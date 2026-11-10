@@ -1283,42 +1283,60 @@ function ItemPurchaseThink()
 	if c.HasItem(a, "item_mask_of_madness") and c.HasItem(a, "item_satanic") then
 		a:ActionImmediate_SellItem(a:GetItemInSlot(a:FindItemSlot("item_mask_of_madness")))
 	end
-	-- Healing Lotus (item_famango*) cannot be sold — use via ConsiderItemDesire (self/ally).
+	-- Healing Lotus (item_famango*) cannot be sold — stack / use / drop to free a slot.
 	-- Prefer supports holding them: healthy cores hand off to a nearby support with space.
+	local lateLotus = (GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23) and (15 * 60) or (25 * 60)
+	-- Step 0: finish greater-famango stack pickup after a merge drop, or start a merge anytime.
+	if c.TryPickupStackedGreaterFamango(a) then
+		return
+	end
+	if c.CanStackGreaterFamango(a) and w > (a._lastLotusStack or -100) + 2.0 then
+		if c.TryStackGreaterFamango(a) then
+			a._lastLotusStack = w
+			MatchTrace.Buy(a, "item_greater_famango", "stack merge")
+			return
+		end
+	end
+	local function NearbySupportForLotus(preferGreaterStack)
+		for _, ally in pairs(a:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
+			if ally ~= nil and ally ~= a and ally:IsAlive() and e.GetPosition(ally) >= 4 then
+				local greater = ally:FindItemSlot("item_greater_famango")
+				local canStackOnAlly = false
+				if preferGreaterStack and greater >= 0 then
+					local gItem = ally:GetItemInSlot(greater)
+					if gItem ~= nil and c.GetLotusCharges(gItem) < c.GREATER_FAMANGO_MAX_STACK then
+						canStackOnAlly = true
+					end
+				end
+				local emptyOk = c.GetEmptyInventoryAmount(ally) >= 1 or canStackOnAlly
+				local noOtherLotus = ally:FindItemSlot("item_famango") < 0
+					and ally:FindItemSlot("item_great_famango") < 0
+					and (greater < 0 or canStackOnAlly)
+				if emptyOk and noOtherLotus then
+					return ally
+				end
+			end
+		end
+		return nil
+	end
 	if e.GetPosition(a) <= 3 and w > (a._lastLotusHandoff or -100) + 4.0 then
 		local hp = e.GetHP(a)
 		local mp = e.GetMP(a)
 		if hp >= 0.78 and mp >= 0.6 then
-			local lotusNames = { "item_famango", "item_great_famango", "item_greater_famango" }
-			for _, lotusName in ipairs(lotusNames) do
-				local lotusSlot = a:FindItemSlot(lotusName)
-				if lotusSlot >= 0 then
-					local lotusItem = a:GetItemInSlot(lotusSlot)
-					if lotusItem ~= nil then
-						for _, ally in pairs(a:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
-							if
-								ally ~= nil
-								and ally ~= a
-								and ally:IsAlive()
-								and e.GetPosition(ally) >= 4
-								and c.GetEmptyInventoryAmount(ally) >= 1
-								and ally:FindItemSlot("item_famango") < 0
-								and ally:FindItemSlot("item_great_famango") < 0
-								and ally:FindItemSlot("item_greater_famango") < 0
-							then
-								a._lastLotusHandoff = w
-								MatchTrace.Buy(a, lotusName, "core handoff lotus to support")
-								a:Action_DropItem(lotusItem, ally:GetLocation())
-								return
-							end
-						end
-					end
+			local lotusName, _, lotusItem = c.FindLotusToFreeSlot(a)
+			if lotusItem ~= nil then
+				local ally = NearbySupportForLotus(lotusName == "item_greater_famango")
+				if ally ~= nil then
+					a._lastLotusHandoff = w
+					MatchTrace.Buy(a, lotusName, "core handoff lotus to support")
+					a:Action_DropItem(lotusItem, ally:GetLocation())
+					return
 				end
 			end
 		end
 	elseif e.GetPosition(a) >= 4 then
-		-- Supports pick up healing lotuses cores dropped for them.
-		if c.GetEmptyInventoryAmount(a) >= 1 then
+		-- Supports pick up healing lotuses cores dropped for them (or own stack merge).
+		if c.GetEmptyInventoryAmount(a) >= 1 or c.CanStackGreaterFamango(a) then
 			for _, drop in pairs(GetDroppedItemList() or {}) do
 				if drop ~= nil and drop.item ~= nil then
 					local dropName = drop.item:GetName()
@@ -1337,6 +1355,47 @@ function ItemPurchaseThink()
 							return
 						end
 					end
+				end
+			end
+		end
+	end
+	-- Late game: main bag full.
+	-- 0) Stack greater famango (max 3) when two piles exist — frees a slot.
+	-- 1) Else drop to support if HP/MP full, or consume.
+	if w >= lateLotus and w > (a._lastLotusFreeSlot or -100) + 3.0 then
+		if c.GetEmptyNonBackpackInventoryAmount(a) <= 0 then
+			if c.TryStackGreaterFamango(a) then
+				a._lastLotusFreeSlot = w
+				MatchTrace.Buy(a, "item_greater_famango", "late full-bag stack merge")
+				return
+			end
+			local lotusName, lotusSlot, lotusItem = c.FindLotusToFreeSlot(a)
+			if lotusItem ~= nil then
+				local hp = e.GetHP(a)
+				local mp = e.GetMP(a)
+				local ally = NearbySupportForLotus(lotusName == "item_greater_famango")
+				if hp >= 0.9 and mp >= 0.85 and ally ~= nil then
+					a._lastLotusFreeSlot = w
+					MatchTrace.Buy(a, lotusName, "late full-bag drop to support")
+					a:Action_DropItem(lotusItem, ally:GetLocation())
+					return
+				end
+				-- Consume (even near full) — cannot sell; opens a slot for the next buy.
+				if lotusSlot > 5 then
+					for J = 0, 5 do
+						if a:GetItemInSlot(J) == nil then
+							a:ActionImmediate_SwapItems(lotusSlot, J)
+							lotusSlot = J
+							lotusItem = a:GetItemInSlot(J)
+							break
+						end
+					end
+				end
+				if lotusItem ~= nil and lotusSlot >= 0 and lotusSlot <= 5 then
+					a._lastLotusFreeSlot = w
+					MatchTrace.Buy(a, lotusName, "late full-bag consume")
+					a:Action_UseAbilityOnEntity(lotusItem, a)
+					return
 				end
 			end
 		end

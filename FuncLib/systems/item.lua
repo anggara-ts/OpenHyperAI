@@ -1260,6 +1260,153 @@ end
 function b.GetEmptyNonBackpackInventoryAmount(E)
 	return S(E, 0, 5)
 end
+-- Greater Healing Lotus (item_greater_famango) stacks up to 3 per slot.
+b.GREATER_FAMANGO = "item_greater_famango"
+b.GREATER_FAMANGO_MAX_STACK = 3
+function b.GetLotusCharges(item)
+	if item == nil or item:IsNull() then
+		return 0
+	end
+	local charges = item:GetCurrentCharges()
+	if charges == nil or charges <= 0 then
+		return 1
+	end
+	return charges
+end
+function b.CollectGreaterFamangoStacks(bot)
+	local stacks = {}
+	if bot == nil then
+		return stacks
+	end
+	for slot = 0, 8 do
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil and not item:IsNull() and item:GetName() == b.GREATER_FAMANGO then
+			stacks[#stacks + 1] = {
+				slot = slot,
+				item = item,
+				charges = b.GetLotusCharges(item),
+			}
+		end
+	end
+	return stacks
+end
+-- True if inventory has 2+ greater-famango piles that can merge (frees a slot).
+function b.CanStackGreaterFamango(bot)
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	if #stacks < 2 then
+		return false
+	end
+	for i = 1, #stacks do
+		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+			return true
+		end
+	end
+	return false
+end
+-- Drop a spare greater-famango so the next pick-up merges into an incomplete stack (max 3).
+-- Returns true if a drop was issued (caller should pick up on a later think).
+function b.TryStackGreaterFamango(bot)
+	if bot == nil or not b.CanStackGreaterFamango(bot) then
+		return false
+	end
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local sink = nil
+	for i = 1, #stacks do
+		local s = stacks[i]
+		if s.charges < b.GREATER_FAMANGO_MAX_STACK then
+			if sink == nil or s.charges < sink.charges then
+				sink = s
+			end
+		end
+	end
+	if sink == nil then
+		return false
+	end
+	local donor = nil
+	for i = 1, #stacks do
+		local s = stacks[i]
+		if s.slot ~= sink.slot then
+			donor = s
+			break
+		end
+	end
+	if donor == nil or donor.item == nil then
+		return false
+	end
+	bot:Action_DropItem(donor.item, bot:GetLocation())
+	bot._lotusStackPickupUntil = DotaTime() + 3.0
+	return true
+end
+-- After TryStackGreaterFamango drop: pick the ground greater back up to merge stacks.
+function b.TryPickupStackedGreaterFamango(bot)
+	if bot == nil or bot._lotusStackPickupUntil == nil then
+		return false
+	end
+	if DotaTime() > bot._lotusStackPickupUntil then
+		bot._lotusStackPickupUntil = nil
+		return false
+	end
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local hasRoom = false
+	for i = 1, #stacks do
+		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+			hasRoom = true
+			break
+		end
+	end
+	if not hasRoom and b.GetEmptyInventoryAmount(bot) <= 0 then
+		bot._lotusStackPickupUntil = nil
+		return false
+	end
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and drop.item:GetName() == b.GREATER_FAMANGO then
+			local dist = GetUnitToLocationDistance(bot, drop.location)
+			if dist <= 400 then
+				if dist > 100 then
+					bot:Action_MoveToLocation(drop.location)
+				else
+					bot:Action_PickUpItem(drop.item)
+					bot._lotusStackPickupUntil = nil
+				end
+				return true
+			end
+		end
+	end
+	return false
+end
+-- Prefer freeing a lotus that cannot stack further (full greater stack, or lower tiers).
+function b.FindLotusToFreeSlot(bot)
+	if bot == nil then
+		return nil, -1, nil
+	end
+	local prefer = {
+		"item_famango",
+		"item_great_famango",
+		"item_greater_famango",
+	}
+	-- First pass: greater at max stack, then lower tiers.
+	for pass = 1, 2 do
+		for _, name in ipairs(prefer) do
+			for slot = 0, 8 do
+				local item = bot:GetItemInSlot(slot)
+				if item ~= nil and not item:IsNull() and item:GetName() == name then
+					if name == b.GREATER_FAMANGO then
+						local charges = b.GetLotusCharges(item)
+						if pass == 1 and charges >= b.GREATER_FAMANGO_MAX_STACK then
+							return name, slot, item
+						end
+						if pass == 2 then
+							return name, slot, item
+						end
+					elseif pass == 1 then
+						return name, slot, item
+					end
+				end
+			end
+		end
+	end
+	return nil, -1, nil
+end
 function b.GetEmptyNeutralBackpackAmount(E)
 	return S(E, 6, 8) + (E:GetItemInSlot(16) == nil and 1 or 0)
 end

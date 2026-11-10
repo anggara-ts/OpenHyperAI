@@ -1825,6 +1825,7 @@ a.ConsiderItemDesire["item_flask"] = function(bm)
 end
 -- Healing Lotus (item_famango*) — not Lotus Orb. Cannot be sold; use on self or ally (ctrl-click, ~400 range).
 -- Pool pickup: supports first, cores low priority. Use: prefer ally if their HP/mana dropped, else self.
+-- Late game + full bag: consume (or leave for purchase drop) to free a slot even at high HP/MP.
 local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fountainDist)
 	if b:DistanceFromFountain() < fountainDist then
 		return BOT_ACTION_DESIRE_NONE
@@ -1837,6 +1838,8 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 	-- Only supports (or anyone in real emergency) share/use these liberally.
 	local hpGate = isSupport and selfHp or math.max(0.32, selfHp - 0.2)
 	local mpGate = isSupport and selfMp or math.max(0.22, selfMp - 0.2)
+	local lateGame = (GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23) and (15 * 60) or (25 * 60)
+	local bagFull = f.Item.GetEmptyNonBackpackInventoryAmount(b) <= 0
 
 	-- Ally first when their HP/mana dropped (ctrl+click, range 400).
 	local allies = f.GetAlliesNearLoc(b:GetLocation(), 400) or {}
@@ -1891,6 +1894,35 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 		and not b:HasModifier("modifier_filler_heal")
 	then
 		return BOT_ACTION_DESIRE_HIGH, b, bq, "Self heal (" .. label .. ")"
+	end
+	-- Late game, main inventory full: consume to free a slot (cannot sell).
+	-- Step 0: if greater famango can still stack (2+ piles), skip consume — purchase path merges.
+	if
+		DotaTime() >= lateGame
+		and bagFull
+		and #enemies == 0
+		and not b:WasRecentlyDamagedByAnyHero(2.0)
+		and not b:HasModifier("modifier_flask_healing")
+	then
+		-- Step 0: leave incomplete greater stacks alone if they can still merge (purchase merges).
+		if f.Item.CanStackGreaterFamango(b) then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		if item ~= nil and item:GetName() == "item_greater_famango" then
+			local charges = f.Item.GetLotusCharges(item)
+			local freeName = f.Item.FindLotusToFreeSlot(b)
+			-- Prefer consuming a lower-tier / full stack over an incomplete greater pile.
+			if charges < f.Item.GREATER_FAMANGO_MAX_STACK and freeName ~= nil and freeName ~= "item_greater_famango" then
+				return BOT_ACTION_DESIRE_NONE
+			end
+		end
+		if hp >= 0.9 and mp >= 0.85 then
+			return BOT_ACTION_DESIRE_HIGH, b, bq, "Free slot (" .. label .. ", full)"
+		end
+		-- Still packed but not full resources — use it, then the slot opens.
+		if hp < 0.95 or mp < 0.9 then
+			return BOT_ACTION_DESIRE_MODERATE, b, bq, "Free slot (" .. label .. ")"
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

@@ -1,0 +1,27 @@
+-- Thinking for summoned units: attacking wards.
+local a = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local b = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
+local c = {}
+function c.Think(d, e)
+	local f = e:GetAttackRange()
+	if f == nil or f < 400 then
+		f = 500
+	end
+	-- Priority: heroes > creeps > towers/buildings.
+	local g = b.GetWeakestHero(f, e)
+	if g == nil then
+		g = b.GetWeakestCreep(f, e)
+	end
+	if g == nil then
+		g = b.GetWeakestTower(f, e)
+	end
+	if g == nil or b.IsNotAllowedToAttack(g) then
+		return
+	end
+	if e._lastWardTarget == g and e:GetAttackTarget() == g then
+		return
+	end
+	e._lastWardTarget = g
+	e:Action_AttackUnit(g, false)
+end
+return c

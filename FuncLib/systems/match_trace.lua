@@ -1,11 +1,14 @@
--- Match trace. Live append to disk + [OHA-DEV] console print.
+-- Match trace. [OHA-DEV] console print (+ optional file append).
 -- Files: C:/Users/ANGGARA/Documents/OpenHyperAI/match-trace-p<id>.log
 -- Toggle: Customize.MatchTrace = true/false
--- Extra detail: Customize.MatchTraceVerbose = true (default true while developing)
+-- Extra detail: Customize.MatchTraceVerbose = true
+-- File writes are disabled: Dota bot sandbox usually blocks io.open.
 local MatchTrace = {}
 
 local enabled = true
 local verbose = true
+-- Keep WriteFile code, but do not attempt disk I/O (it does not work in-game).
+local WRITE_TO_FILE = false
 local settingsOk, settings = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 if settingsOk and type(settings) == "table" then
 	if settings.MatchTrace == false then
@@ -13,6 +16,9 @@ if settingsOk and type(settings) == "table" then
 	end
 	if settings.MatchTraceVerbose == false then
 		verbose = false
+	end
+	if settings.MatchTraceWriteFile == true then
+		WRITE_TO_FILE = true
 	end
 end
 
@@ -100,6 +106,10 @@ function MatchTrace.LogPath(bot)
 end
 
 local function WriteFile(bot, line)
+	-- Disabled: file logging does not work under the bot sandbox.
+	if not WRITE_TO_FILE then
+		return "console-only"
+	end
 	if io == nil or io.open == nil then
 		return "console-only"
 	end

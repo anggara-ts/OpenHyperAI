@@ -25,22 +25,20 @@ Customize.Enable = true
 --[[
 MatchTrace — live decision/debug logging for bot development.
 
-Enable:  Customize.MatchTrace = true   (default here)
+Enable:  Customize.MatchTrace = true
 Disable: Customize.MatchTrace = false
 
 Verbose heartbeats every ~15s (mode/hp/gold/xy). Set false for quieter logs (~30s):
   Customize.MatchTraceVerbose = true
 
-Where logs go (appended during the match, plus an "end" marker after the game):
-  C:\Users\<you>\Documents\OpenHyperAI\match-trace-p<playerId>.log
-  Fallback: next to the bot scripts if Documents write fails.
-
-Also prints the same lines to the Dota console as [OHA-DEV ...].
+File writes are OFF by default (Dota sandbox blocks them). Console [OHA-DEV ...] still works
+when MatchTrace is true. Set MatchTraceWriteFile = true only if you intentionally want disk logs.
 Logged events include: mode changes, stuck, deaths, item use, buys (wards/smoke),
 ward plants, farm exits, smoke skip reasons, periodic beats.
 --]]
-Customize.MatchTrace = true
-Customize.MatchTraceVerbose = true
+Customize.MatchTrace = false
+Customize.MatchTraceVerbose = false
+Customize.MatchTraceWriteFile = false
 
 -- Set the localization code to make bots speak the specific language when possible (not guaranteed to 100% localized).
 -- Currently supprot: "en" for "English", "zh" for "中文", "ru" for Russian, "ja" for Japanese

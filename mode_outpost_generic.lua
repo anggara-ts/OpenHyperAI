@@ -62,16 +62,6 @@ function GetDesire()
 	local a5 = GetDesireHelper()
 	if a5 > 0 then
 		a4 = DotaTime()
-		log(
-			"[OUTPOST] %s t=%.0f desire=%.2f reason=%s hp=%.2f enemies=%d allies=%d",
-			c:GetUnitName(),
-			DotaTime(),
-			a5,
-			a3,
-			a.GetHP(c),
-			I and #I or -1,
-			J and #J or -1
-		)
 	end
 	return a5
 end

@@ -100,13 +100,42 @@ local N
 local O
 local P
 function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
-		return
-	end
 	local Q = d.Build(b)
 	N = Q.isEngaging
 	O = c.IsAttacking(b)
 	P = Q.hp
+	-- Sun Ray / dive stop + ray move must run while channeling.
+	-- CanNotUseAbility() is true during channels, which previously blocked stop forever
+	-- (Phoenix stood still on low HP until the ray finished).
+	E = a.ConsiderSunRayStop()
+	if E > 0 then
+		b:Action_UseAbility(t)
+		b.sun_ray_engage = false
+		b.sun_ray_heal_ally = false
+		return
+	end
+	F, G = a.ConsiderToggleMovement()
+	if F > 0 then
+		if G == "on" then
+			if not u:GetToggleState() then
+				b:Action_UseAbility(u)
+			end
+		else
+			if u:GetToggleState() then
+				b:Action_UseAbility(u)
+			end
+		end
+		return
+	end
+	y = a.ConsiderIcarusDiveStop()
+	if y > 0 then
+		b:Action_UseAbility(p)
+		b.icarus_dive_stuck = false
+		return
+	end
+	if c.CanNotUseAbility(b) then
+		return
+	end
 	z = a.ConsiderFireSpirits()
 	if z > 0 then
 		b:Action_UseAbility(q)
@@ -154,35 +183,9 @@ function a.SkillsComplement()
 		J = DotaTime()
 		return
 	end
-	y = a.ConsiderIcarusDiveStop()
-	if y > 0 then
-		b:Action_UseAbility(p)
-		b.icarus_dive_stuck = false
-		return
-	end
 	C, D = a.ConsiderSunRay()
 	if C > 0 then
 		b:Action_UseAbilityOnLocation(s, D)
-		return
-	end
-	E = a.ConsiderSunRayStop()
-	if E > 0 then
-		b:Action_UseAbility(t)
-		b.sun_ray_engage = false
-		b.sun_ray_heal_ally = false
-		return
-	end
-	F, G = a.ConsiderToggleMovement()
-	if F > 0 then
-		if G == "on" then
-			if not u:GetToggleState() then
-				b:Action_UseAbility(u)
-			end
-		else
-			if u:GetToggleState() then
-				b:Action_UseAbility(u)
-			end
-		end
 		return
 	end
 end
@@ -641,26 +644,32 @@ function a.ConsiderSunRayStop()
 	if not c.CanCastAbility(t) or b:HasModifier("modifier_phoenix_icarus_dive") then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	if not b:HasModifier("modifier_phoenix_sun_ray") then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	local Z = c.GetAlliesNearLoc(b:GetLocation(), 1600)
 	local R = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	local ag = P
+	local ag = P or c.GetHP(b)
+	local underFire = b:WasRecentlyDamagedByAnyHero(2.0) or a.IsBeingAttackedByRealHero(R, b)
+	-- Abort early so retreat / dive can run instead of standing still.
+	if c.IsRetreating(b) and underFire then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	if underFire and ag < 0.4 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	if ag < 0.28 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	if b.sun_ray_engage then
-		if
-			a.IsBeingAttackedByRealHero(R, b) and ag < 0.25 and b:WasRecentlyDamagedByAnyHero(2.0)
-			or #Z + 1 < #R
-			or #R == 0
-			or #Z == 0 and #R == 0
-		then
+		if underFire and ag < 0.35 or #Z + 1 < #R or #R == 0 or #Z == 0 and #R == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if b.sun_ray_heal_ally then
-		if a.IsBeingAttackedByRealHero(R, b) and ag < 0.25 and b:WasRecentlyDamagedByAnyHero(2.0) then
+		if underFire and ag < 0.35 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-	end
-	if ag < 0.17 then
-		return BOT_ACTION_DESIRE_HIGH
 	end
 	if math.floor(DotaTime()) % 2 == 0 then
 		if c.IsValidHero(b.sun_ray_target) and not b:IsFacingLocation(b.sun_ray_target:GetLocation(), 45) then

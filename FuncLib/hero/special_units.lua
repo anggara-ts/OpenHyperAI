@@ -30,7 +30,16 @@ function a.GetDesire(d)
 			break
 		end
 	end
-	-- Deward first: revealed enemy obs/sentry under ally true sight.
+	-- Escape Shadow Shaman serpent ward traps (self or ally) before other specials.
+	-- Below teamfight priority; above creeps when no enemy hero is nearby.
+	do
+		local snakeDesire, snakeTarget = a.GetSerpentWardEscapeDesire(b, l, p)
+		if snakeDesire > 0 and c.IsValid(snakeTarget) then
+			b.special_unit_target = snakeTarget
+			return snakeDesire
+		end
+	end
+	-- Deward: revealed enemy obs/sentry under ally true sight.
 	do
 		local wardDesire, wardTarget = a.GetDewardDesire(b, l, n)
 		if wardDesire > 0 and c.IsValid(wardTarget) then
@@ -430,6 +439,133 @@ function a.IsEnemyWard(unit)
 	end
 	local name = unit:GetUnitName()
 	return string.find(name, "observer_wards") ~= nil or string.find(name, "sentry_wards") ~= nil
+end
+
+function a.IsSerpentWard(unit)
+	if not c.IsValid(unit) then
+		return false
+	end
+	return string.find(unit:GetUnitName(), "shadow_shaman_ward") ~= nil
+end
+
+function a.GetEnemySerpentWardsNear(loc, radius)
+	local wards = {}
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+		if a.IsSerpentWard(unit) and c.CanBeAttacked(unit) and GetUnitToLocationDistance(unit, loc) <= radius then
+			wards[#wards + 1] = unit
+		end
+	end
+	return wards
+end
+
+function a.IsHeroTrappedBySerpentWards(hero)
+	if not c.IsValidHero(hero) or not hero:IsAlive() then
+		return false, nil
+	end
+	local wards = a.GetEnemySerpentWardsNear(hero:GetLocation(), 420)
+	local n = #wards
+	if n <= 0 then
+		return false, nil
+	end
+	local beingHit = false
+	for _, ward in pairs(wards) do
+		if ward:GetAttackTarget() == hero then
+			beingHit = true
+			break
+		end
+	end
+	-- Mass Serpent Ward rings trap a hero; open a gap by killing one.
+	if n >= 3 or (n >= 2 and (c.IsStuck(hero) or beingHit)) then
+		return true, wards
+	end
+	return false, wards
+end
+
+function a.GetBestSerpentWardToKill(wards, bot, attackRange)
+	if wards == nil or bot == nil then
+		return nil
+	end
+	local best = nil
+	local bestScore = -1
+	local reach = (attackRange or bot:GetAttackRange()) + 450
+	for _, ward in pairs(wards) do
+		if c.IsValid(ward) and c.CanBeAttacked(ward) then
+			local dist = GetUnitToUnitDistance(bot, ward)
+			if dist <= math.max(reach, 900) then
+				-- Prefer low HP and already in attack range so we open a gap fast.
+				local inRangeBonus = dist <= (attackRange or bot:GetAttackRange()) + 50 and 200 or 0
+				local score = inRangeBonus + (1200 - math.min(dist, 1200)) + (500 - math.min(ward:GetHealth(), 500))
+				if score > bestScore then
+					bestScore = score
+					best = ward
+				end
+			end
+		end
+	end
+	return best
+end
+
+function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
+	if bot == nil or c.CanNotUseAction(bot) or bot:IsDisarmed() then
+		return 0, nil
+	end
+	-- Team fights come first — do not peel for snakes while a real fight is on.
+	if c.IsInTeamFight(bot, 1200) then
+		return 0, nil
+	end
+
+	local enemyHeroCount = 0
+	for _, hero in pairs(nearbyEnemyHeroes or {}) do
+		if c.IsValidHero(hero) and not c.IsSuspiciousIllusion(hero) then
+			enemyHeroCount = enemyHeroCount + 1
+		end
+	end
+
+	local trapWards = nil
+	local selfTrapped, selfWards = a.IsHeroTrappedBySerpentWards(bot)
+	if selfTrapped then
+		trapWards = selfWards
+	else
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local ally = GetTeamMember(i)
+			if
+				ally ~= nil
+				and ally ~= bot
+				and ally:IsAlive()
+				and not ally:IsIllusion()
+				and GetUnitToUnitDistance(bot, ally) <= 1800
+			then
+				local allyTrapped, allyWards = a.IsHeroTrappedBySerpentWards(ally)
+				if allyTrapped then
+					trapWards = allyWards
+					break
+				end
+			end
+		end
+	end
+
+	if trapWards == nil then
+		return 0, nil
+	end
+
+	local target = a.GetBestSerpentWardToKill(trapWards, bot, attackRange)
+	if target == nil then
+		return 0, nil
+	end
+
+	-- No enemy heroes: kill a snake over creeps / farm.
+	if enemyHeroCount == 0 then
+		return 1.15, target
+	end
+	-- Enemy heroes around but not a teamfight: still open an escape if we can hit soon.
+	if GetUnitToUnitDistance(bot, target) <= (attackRange or bot:GetAttackRange()) + 200 then
+		return 0.98, target
+	end
+	if selfTrapped then
+		return 0.96, target
+	end
+	-- Ally trap, need a short walk — still above creep clearing, below hard commits.
+	return 0.95, target
 end
 
 function a.GetDewardDesire(bot, attackRange, nearbyEnemies)

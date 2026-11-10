@@ -311,7 +311,7 @@ function GetDesireHelper()
 	local aw = j.GetDesire(a)
 	if aw > 0 then
 		w = true
-		-- Deward / high-priority special targets: don't dump desire just because HP isn't full.
+		-- Deward / serpent-escape / high-priority specials: keep desire even if HP isn't full.
 		if aw >= 0.95 then
 			return aw
 		end

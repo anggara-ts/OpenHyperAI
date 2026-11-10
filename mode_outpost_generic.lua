@@ -154,18 +154,19 @@ function Think()
 	if a.CanNotUseAction(c) then
 		return
 	end
-	if a2 and Z ~= nil then
-		if GetUnitToUnitDistance(c, Z) > 300 then
+	if a2 and Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
+		local dist = GetUnitToUnitDistance(c, Z)
+		if dist > 280 then
 			c:Action_MoveToLocation(Z:GetLocation())
 			return
-		else
-			if a1 then
-				c:Action_UseAbilityOnEntity(a1, Z)
-			else
-				c:Action_AttackUnit(Z, false)
-			end
-			return
 		end
+		-- Right-click / ability_capture starts the capture channel.
+		if a1 ~= nil and a1:IsFullyCastable() then
+			c:Action_UseAbilityOnEntity(a1, Z)
+		else
+			c:Action_AttackUnit(Z, false)
+		end
+		return
 	end
 	if c:HasModifier("modifier_fountain_aura_buff") and m == false and (a.GetHP(c) < 0.8 or a.GetMP(c) < 0.8) then
 		return
@@ -1858,25 +1859,20 @@ local function RefreshOutpostCache()
 end
 
 function ConsiderOutpostCapture()
-	-- Unlock once an enemy T1/T2 is down, or after ~12 minutes.
+	-- Jungle outposts unlock after any enemy T2 is down (game rule).
+	-- Also allow reclaim of enemy-held outposts / late fallback.
 	if not a0 then
 		local enemy = GetOpposingTeam()
 		if
-			GetTower(enemy, TOWER_TOP_1) == nil
-			or GetTower(enemy, TOWER_MID_1) == nil
-			or GetTower(enemy, TOWER_BOT_1) == nil
-			or GetTower(enemy, TOWER_TOP_2) == nil
+			GetTower(enemy, TOWER_TOP_2) == nil
 			or GetTower(enemy, TOWER_MID_2) == nil
 			or GetTower(enemy, TOWER_BOT_2) == nil
-			or DotaTime() >= 12 * 60
+			or DotaTime() >= 10 * 60
 		then
 			a0 = true
 		end
 	end
 	if not a0 then
-		return 0
-	end
-	if a.Utils.IsTeamPushingSecondTierOrHighGround(c) then
 		return 0
 	end
 	if a.GetEnemiesAroundAncient(c, 3200) > 0 then
@@ -1888,19 +1884,37 @@ function ConsiderOutpostCapture()
 	if d == "npc_dota_hero_invoker" then
 		return 0
 	end
-	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 30 then
+	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 10 then
 		RefreshOutpostCache()
 	end
 	Z, _ = GetClosestOutpost()
-	local maxDist = 3200
-	if Z ~= nil and _ < maxDist and not IsEnemyCloserToOutpostLoc(Z:GetLocation(), _) and IsSuitableToCaptureOutpost() then
-		if GetUnitToUnitDistance(c, Z) < 700 then
-			local bU = a.GetEnemiesNearLoc(Z:GetLocation(), 1200)
-			if bU ~= nil and #bU >= 1 then
+	if Z == nil then
+		return 0
+	end
+	-- Don't abandon a live HG fight deep in base, but allow peeling for a nearby outpost
+	-- after a T2 push (that is exactly when outposts become available).
+	local nearOutpost = _ <= 1600
+	if a.Utils.IsTeamPushingSecondTierOrHighGround(c) and not nearOutpost then
+		return 0
+	end
+	local maxDist = nearOutpost and 4500 or 3800
+	if _ < maxDist and not IsEnemyCloserToOutpostLoc(Z:GetLocation(), _) and IsSuitableToCaptureOutpost() then
+		local enemiesAtOutpost = a.GetEnemiesNearLoc(Z:GetLocation(), 1200)
+		if enemiesAtOutpost ~= nil and #enemiesAtOutpost >= 1 then
+			-- Still walk toward a contested outpost only if we already have numbers nearby.
+			local alliesAtOutpost = a.GetAlliesNearLoc(Z:GetLocation(), 1400)
+			if #alliesAtOutpost < #enemiesAtOutpost then
 				return 0
 			end
 		end
-		return RemapValClamped(GetUnitToUnitDistance(c, Z), maxDist, 0, BOT_ACTION_DESIRE_VERYLOW, BOT_ACTION_DESIRE_HIGH)
+		local dist = GetUnitToUnitDistance(c, Z)
+		if dist <= 400 then
+			return BOT_MODE_DESIRE_HIGH + 0.05
+		end
+		if dist <= 1200 then
+			return BOT_MODE_DESIRE_HIGH
+		end
+		return RemapValClamped(dist, maxDist, 0, BOT_MODE_DESIRE_LOW, BOT_MODE_DESIRE_HIGH)
 	end
 	return 0
 end
@@ -1909,12 +1923,9 @@ function GetClosestOutpost()
 	local bW = 10000
 	for aE = 1, #X do
 		local outpost = X[aE]
-		if
-			outpost ~= nil
-			and not outpost:IsNull()
-			and outpost:GetTeam() ~= GetTeam()
-			and not outpost:IsInvulnerable()
-		then
+		-- Outposts are permanently invulnerable buildings; capture is a channel, not damage.
+		-- Do NOT require not IsInvulnerable() — that filtered every outpost.
+		if outpost ~= nil and not outpost:IsNull() and outpost:GetTeam() ~= GetTeam() then
 			local dist = GetUnitToUnitDistance(c, outpost)
 			if dist < bW then
 				bV = outpost

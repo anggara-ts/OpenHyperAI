@@ -80,6 +80,40 @@ local function t(u, q)
 	end
 	q:Action_MoveToLocation(u:GetLocation())
 end
+local function HawkScoutPoint(owner)
+	local ancient = GetAncient(GetOpposingTeam())
+	local origin = owner:GetLocation()
+	if ancient == nil then
+		return origin
+	end
+	local aLoc = ancient:GetLocation()
+	local dx = aLoc.x - origin.x
+	local dy = aLoc.y - origin.y
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len < 1 then
+		return origin
+	end
+	local dist = 1500
+	return Vector(origin.x + dx / len * dist, origin.y + dy / len * dist, 0)
+end
+local function HawkThink(owner, hawk)
+	if not owner:IsAlive() then
+		local home = GetAncient(GetTeam())
+		if home ~= nil then
+			hawk:Action_MoveToLocation(home:GetLocation())
+		end
+		return
+	end
+	local enemies = hawk:GetNearbyHeroes(1000, true, BOT_MODE_NONE)
+	if enemies ~= nil and #enemies > 0 or GetUnitToUnitDistance(hawk, owner) > 2200 then
+		hawk:Action_MoveToLocation(owner:GetLocation())
+		return
+	end
+	local goal = HawkScoutPoint(owner)
+	if GetUnitToLocationDistance(hawk, goal) > 400 then
+		hawk:Action_MoveToLocation(goal)
+	end
+end
 function a.IllusionThink(q)
 	return a.MinionThink(q)
 end
@@ -91,6 +125,19 @@ function a.HealingWardThink(A)
 end
 function a.MinionThink(q)
 	if not q or q:IsNull() or not q:IsAlive() then
+		return
+	end
+	if c.IsHawk(q) then
+		local owner = GetBot()
+		if owner == nil or owner:GetUnitName() ~= "npc_dota_hero_beastmaster" then
+			return
+		end
+		local now = DotaTime()
+		if q._hawkThink ~= nil and now - q._hawkThink < 0.4 then
+			return
+		end
+		q._hawkThink = now
+		HawkThink(owner, q)
 		return
 	end
 	local B = q._minionTier

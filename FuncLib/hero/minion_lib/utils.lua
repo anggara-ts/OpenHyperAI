@@ -293,7 +293,10 @@ function a.IsFrozeSigil(c)
 end
 function a.IsHawk(c)
 	local o = c:GetUnitName()
-	return o == "npc_dota_scout_hawk" or string.find(o, "npc_dota_beastmaster_hawk") or o == "npc_dota_greater_hawk"
+	return o == "npc_dota_scout_hawk"
+		or o == "npc_dota_greater_hawk"
+		or string.find(o, "npc_dota_beastmaster_hawk")
+		or string.find(o, "npc_dota_beastmaster_raptor")
 end
 function a.IsTornado(c)
 	local o = c:GetUnitName()

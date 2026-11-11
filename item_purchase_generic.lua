@@ -1145,7 +1145,9 @@ function ItemPurchaseThink()
 						end
 					end
 				else
-					if aP >= 0 and aP <= 5 then
+					-- Stash observers only. A sentry or a sentry-only dispenser
+					-- goes on cooldown when it is swapped back into the bag.
+					if aO == "item_ward_observer" and aP >= 0 and aP <= 5 then
 						for aS = 6, 8 do
 							local aT = a:GetItemInSlot(aS)
 							if aT == nil then

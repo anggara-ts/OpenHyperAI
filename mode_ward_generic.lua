@@ -28,6 +28,21 @@ local h = nil
 local i = nil
 local j = nil
 local k = -math.huge
+local function DispenserSentryCharges(item)
+	if item == nil or item.GetSecondaryCharges == nil then
+		return 0
+	end
+	local ok, n = pcall(function()
+		return item:GetSecondaryCharges()
+	end)
+	if ok and type(n) == "number" then
+		return n
+	end
+	return 0
+end
+local function DispenserHasObservers(item)
+	return item ~= nil and (item:GetCurrentCharges() or 0) > 0
+end
 -- Console copy at game end only keeps the tail, and the signout fills most of it.
 -- Remember plants during the match and print them once POST_GAME starts.
 local planted = {}
@@ -147,11 +162,15 @@ function GetDesireHelper()
 		local p = b:GetItemInSlot(o)
 		if p then
 			local q = p:GetName()
-			if not I and (q == "item_ward_observer" or q == "item_ward_dispenser") then
+			-- A dispenser with only sentries is not an observer. Toggling it
+			-- toward observer mode puts the sentry on cooldown.
+			local dispenserObs = q == "item_ward_dispenser" and DispenserHasObservers(p)
+			local dispenserSen = q == "item_ward_dispenser" and DispenserSentryCharges(p) > 0
+			if not I and (q == "item_ward_observer" or dispenserObs) then
 				h = p
 				I = o <= 5
 			end
-			if not J and (q == "item_ward_sentry" or q == "item_ward_dispenser") then
+			if not J and (q == "item_ward_sentry" or dispenserSen) then
 				i = p
 				J = o <= 5
 			end
@@ -192,7 +211,7 @@ function Think()
 		return
 	end
 	if j then
-		if h and c.CanCastAbility(h) then
+		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then
 			if GetUnitToLocationDistance(b, j.location) <= f then
 				if h:GetName() == "item_ward_observer" then
 					AnnounceWard("observer")
@@ -213,7 +232,7 @@ function Think()
 				return
 			end
 		end
-		if i and c.CanCastAbility(i) then
+		if i and c.CanCastAbility(i) and (i:GetName() ~= "item_ward_dispenser" or DispenserSentryCharges(i) > 0) then
 			if GetUnitToLocationDistance(b, j.location) <= g then
 				local u = 0
 				if d.IsOtherWardClose(j.location, "npc_dota_observer_wards", 300, true, false) then

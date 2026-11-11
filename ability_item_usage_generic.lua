@@ -899,6 +899,20 @@ local function bg()
 		b8 = 0
 	end
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
+	-- Forage in the main inventory is eaten immediately. Backpack copies are dropped elsewhere.
+	for forageSlot = 0, 5 do
+		local forage = b:GetItemInSlot(forageSlot)
+		if forage ~= nil and not forage:IsNull() and f.CanCastAbility(forage) then
+			local forageName = forage:GetName()
+			if forageName == "item_foragers_stats" then
+				b:Action_UseAbility(forage)
+				return BOT_ACTION_DESIRE_NONE
+			elseif forageName == "item_foragers_health" or forageName == "item_foragers_mana" then
+				b:Action_UseAbilityOnEntity(forage, b)
+				return BOT_ACTION_DESIRE_NONE
+			end
+		end
+	end
 	local bk = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
 	for aX, bl in pairs(bk) do
 		local bm = b:GetItemInSlot(bl)

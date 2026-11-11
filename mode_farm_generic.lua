@@ -629,6 +629,39 @@ function OnEnd()
 	e:SetTarget(nil)
 end
 local b0 = 0
+local function IsNeutralCreep(creep)
+	if not g.IsValid(creep) or g.IsRoshan(creep) or g.IsTormentor(creep) then
+		return false
+	end
+	if creep.IsNeutralUnitType and creep:IsNeutralUnitType() then
+		return true
+	end
+	return creep.GetTeam and creep:GetTeam() == TEAM_NEUTRAL
+end
+-- Creeps kite off the camp box. A 900 scan from the hero marks the camp empty
+-- while the last one is still alive, then a lane wave steals the bot.
+local function CampNeutrals(bot, campLoc)
+	local found = {}
+	local seen = {}
+	local function add(list)
+		if list == nil then
+			return
+		end
+		for _, creep in pairs(list) do
+			if IsNeutralCreep(creep) and seen[creep] == nil then
+				local nearBot = GetUnitToUnitDistance(bot, creep) <= 1400
+				local nearCamp = campLoc ~= nil and GetUnitToLocationDistance(creep, campLoc) <= 1100
+				if nearBot or nearCamp then
+					seen[creep] = true
+					found[#found + 1] = creep
+				end
+			end
+		end
+	end
+	add(bot:GetNearbyNeutralCreeps(1600))
+	add(bot:GetNearbyCreeps(1600, true))
+	return found
+end
 function Think()
 	if IsDebug then
 		local b1 = DotaTime()
@@ -712,6 +745,10 @@ function Think()
 	e._farmCommitAt = e._farmCommitAt or 0
 	local bf = GameTime()
 	local bg = e._farmCommitKind ~= nil and bf - e._farmCommitAt < be
+	local campLoc = l ~= nil and l.cattr.location or nil
+	local campCreeps = CampNeutrals(e, campLoc)
+	local finishingCamp = #campCreeps > 0
+		and (e._farmCommitKind == "camp" or (campLoc ~= nil and GetUnitToLocationDistance(e, campLoc) <= 1200))
 	local bh = e:GetNearbyLaneCreeps(900, true)
 	local bi = true
 	if l ~= nil and bh ~= nil and #bh > 0 then
@@ -720,7 +757,7 @@ function Think()
 		local bl = GetUnitToUnitDistance(e, bh[1])
 		bi = bl * 1.3 < bk
 	end
-	if bg and e._farmCommitKind == "camp" then
+	if bg and e._farmCommitKind == "camp" or finishingCamp then
 		bi = false
 	end
 	if bh ~= nil and #bh > 0 and p ~= r and bi then
@@ -780,7 +817,7 @@ function Think()
 		local bv = l.cattr.location
 		local bw = GetUnitToLocationDistance(e, bv)
 		local bx = e:GetNearbyLaneCreeps(1200, true)
-		if #bx > 0 then
+		if #bx > 0 and not finishingCamp then
 			local by = g.GetCenterOfUnits(bx)
 			local bz = GetUnitToLocationDistance(e, by)
 			local bA = g.GetEnemiesNearLoc(by, 1600)
@@ -816,36 +853,43 @@ function Think()
 		else
 			bv = l.cattr.location
 			bw = GetUnitToLocationDistance(e, bv)
-			aF = e:GetNearbyCreeps(900, true)
-			if f.IsLocCanBeSeen(bv) and bw <= 600 or bw <= 250 then
-				local bF = false
-				for a5, bp in pairs(aF) do
-					if g.IsValid(bp) and not g.IsRoshan(bp) and not g.IsTormentor(bp) then
-						bF = true
-						break
-					end
+			aF = CampNeutrals(e, bv)
+			local campLooksEmpty = (f.IsLocCanBeSeen(bv) and bw <= 700) or bw <= 300
+			if #aF > 0 then
+				e._campEmptySince = 0
+			elseif campLooksEmpty then
+				if (e._campEmptySince or 0) == 0 then
+					e._campEmptySince = bf
 				end
-				if not bF then
+				if bf - e._campEmptySince > 1.2 then
+					e._campEmptySince = 0
+					e._farmCommitKind = nil
 					g.Role["availableCampTable"], l = g.Site.UpdateAvailableCamp(e, l, g.Role["availableCampTable"])
 					n = g.Role["availableCampTable"]
 					l = g.Site.GetClosestNeutralSpwan(e, n)
 					p = q
 				end
 			end
-			if #aF > 0 then
+			if l ~= nil and #aF > 0 then
 				local bn = nil
 				local bo = math.huge
 				local bG = nil
+				local anyAlive = nil
 				for a5, bp in pairs(aF) do
-					if g.IsValid(bp) and g.CanBeAttacked(bp) and not g.IsRoshan(bp) and not g.IsTormentor(bp) then
-						if not bp:IsAncientCreep() or e:GetLevel() >= 10 and e:GetArmor() >= 6 then
-							local bq = bp:GetHealth()
-							if bq < bo then
-								bn = bp
-								bo = bq
+					if IsNeutralCreep(bp) then
+						if anyAlive == nil or GetUnitToUnitDistance(e, bp) < GetUnitToUnitDistance(e, anyAlive) then
+							anyAlive = bp
+						end
+						if g.CanBeAttacked(bp) then
+							if not bp:IsAncientCreep() or e:GetLevel() >= 10 and e:GetArmor() >= 6 then
+								local bq = bp:GetHealth()
+								if bq < bo then
+									bn = bp
+									bo = bq
+								end
+							elseif GetUnitToUnitDistance(e, bp) < 700 then
+								bG = bp
 							end
-						elseif GetUnitToUnitDistance(e, bp) < 500 then
-							bG = bp
 						end
 					end
 				end
@@ -857,27 +901,23 @@ function Think()
 					e:SetTarget(bH)
 					e:Action_AttackUnit(bH, false)
 					return
-				else
-					if bw < 300 then
-						p = q
-						e._farmCommitKind = nil
-						g.Role["availableCampTable"], l = g.Site.UpdateAvailableCamp(e, l, g.Role["availableCampTable"])
-						n = g.Role["availableCampTable"]
-						l = g.Site.GetClosestNeutralSpwan(e, n)
-					else
-						e._farmCommitKind = "camp"
-						e._farmCommitAt = bf
-						e:Action_MoveToLocation(bv)
-						return
-					end
-				end
-			else
-				if bw > 200 then
+				elseif g.IsValid(anyAlive) then
+					p = r
 					e._farmCommitKind = "camp"
 					e._farmCommitAt = bf
-					e:Action_MoveToLocation(bv)
+					e:Action_MoveToLocation(anyAlive:GetLocation())
 					return
 				end
+			elseif l ~= nil and bw > 200 then
+				e._farmCommitKind = "camp"
+				e._farmCommitAt = bf
+				e:Action_MoveToLocation(bv)
+				return
+			elseif l ~= nil and (e._campEmptySince or 0) > 0 and bf - e._campEmptySince <= 1.2 then
+				e._farmCommitKind = "camp"
+				e._farmCommitAt = bf
+				e:Action_MoveToLocation(bv)
+				return
 			end
 		end
 	end

@@ -72,11 +72,8 @@ local function ShouldAbortStickyEngage(bot, target)
 	if not g.IsValidHero(target) then
 		return true
 	end
-	-- Finish a free kill in range.
-	if
-		g.CanKillTarget(target, bot:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL)
-		and GetUnitToUnitDistance(bot, target) <= bot:GetAttackRange() + 200
-	then
+	-- Finish a one-hit kill even when more enemies are nearby.
+	if g.ShouldFinishCommittedKill(bot, target) then
 		return false
 	end
 	local allies = g.GetAllyCount(bot, 1400)

@@ -144,9 +144,7 @@ function GetDesireHelper()
 		local enemiesNearby = b.GetEnemyCount(c, 1400)
 		local lastSeen = b.GetLastSeenEnemiesNearLoc and b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 2000) or {}
 		local pressure = math.max(enemiesNearby, #lastSeen)
-		local freeKill = b.IsValidHero(k)
-			and b.CanKillTarget(k, c:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL)
-			and GetUnitToUnitDistance(c, k) <= c:GetAttackRange() + 200
+		local freeKill = b.ShouldFinishCommittedKill(c, k)
 		if
 			not freeKill
 			and (

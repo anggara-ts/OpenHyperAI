@@ -976,9 +976,17 @@ function ItemPurchaseThink()
 				emptySlots = c.GetEmptyInventoryAmount(a)
 				return true
 			end
-			-- Observers first (map vision), then a sentry for deward/invis.
+			-- Observers first. One sentry on pos 5 in lane; a second waits until
+			-- 8:00 or a known invis hero. Two sentries at minute 0 sit unused.
+			local earlyLane = w < 8 * 60 and d["invisEnemyExist"] ~= true
+			local sentryCap = 2
+			if earlyLane then
+				sentryCap = e.GetPosition(a) == 5 and 1 or 0
+			end
 			tryBuyWard("item_ward_observer", 2, "support obs")
-			tryBuyWard("item_ward_sentry", 2, "support sentry")
+			if sentryCap > 0 then
+				tryBuyWard("item_ward_sentry", sentryCap, "support sentry")
+			end
 		end
 		-- Supports: pick up wards a core dropped for us.
 		if emptySlots >= 1 or c.GetEmptyInventoryAmount(a) >= 1 then

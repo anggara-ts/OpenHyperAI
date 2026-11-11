@@ -489,7 +489,7 @@ function MapObjectives.LotusPluckStalled(bot, enemyInRing)
 		bot._lotusHave = have
 		bot._lotusHaveAt = now
 	end
-	local limit = enemyInRing and 6 or 2.5
+	local limit = enemyInRing and 8 or 6
 	return now - bot._lotusHaveAt >= limit
 end
 
@@ -529,17 +529,8 @@ local function ActInsideLotus(bot, loc)
 			return
 		end
 	end
-	local creeps = bot:GetNearbyCreeps(range, true) or {}
-	for i = 1, #creeps do
-		local creep = creeps[i]
-		if creep ~= nil and creep:IsAlive() and GetUnitToUnitDistance(bot, creep) <= range then
-			if bot:GetAttackTarget() ~= creep then
-				bot:Action_AttackUnit(creep, true)
-			end
-			return
-		end
-	end
 	-- Stop the walk-in order once, so it does not carry the hero out of the ring.
+	-- Chasing a camp here walks them out before the lotus plucks.
 	if action == BOT_ACTION_TYPE_MOVE_TO then
 		bot:Action_ClearActions(true)
 	end
@@ -613,7 +604,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			if count == 0 and type(etaL) == "number" and etaL < -1.5 then
 				inLotus = false
 			end
-			if bot._lotusSkipMark == mark and mark >= lInterval and (count == nil or count == 0) then
+			if bot._lotusSkipMark == mark and mark >= lInterval and count == 0 then
 				inLotus = false
 			end
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
@@ -685,7 +676,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	if #enemies > 0 and #enemies > #allies and dist > gather then
 		return true
 	end
-	if #enemies > 0 and #enemies <= #allies and not (kind == "lotus" and dist <= gather) then
+	if #enemies > 0 and #enemies <= #allies and dist > gather then
 		local target = enemies[1]
 		if target ~= nil and target:IsAlive() then
 			bot:Action_AttackUnit(target, true)

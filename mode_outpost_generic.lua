@@ -50,6 +50,7 @@ local X = {}
 local Y = false
 local Z = nil
 local _ = 10000
+local outpostMoveLoc = nil
 local a0 = false
 local a1 = c:GetAbilityByName("ability_capture")
 local a2 = false
@@ -72,6 +73,7 @@ function GetDesireHelper()
 	end
 	M = false
 	N = false
+	a2 = false
 	S = a.GetHP(c)
 	h = a.Utils.GetItemFromFullInventory(c, "item_tpscroll")
 	O = a.GetProperTarget(c)
@@ -121,6 +123,13 @@ function GetDesireHelper()
 			end
 		end
 	end
+	-- Capture before roam so a farming/roam desire cannot skip the outpost check.
+	local aa = ConsiderOutpostCapture()
+	if aa > 0 then
+		a2 = true
+		a3 = "outpost_capture"
+		return aa
+	end
 	local a9 = ConsiderGeneralRoamingInConditions()
 	if a9 then
 		if a9 > 0 and a9 <= 1 then
@@ -131,32 +140,40 @@ function GetDesireHelper()
 			return a9
 		end
 	end
-	a2 = false
-	local aa = ConsiderOutpostCapture()
-	if aa > 0 then
-		a2 = true
-		a3 = "outpost_capture"
-		return aa
-	end
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
 	if a.CanNotUseAction(c) then
 		return
 	end
-	if a2 and Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
-		local dist = GetUnitToUnitDistance(c, Z)
-		if dist > 280 then
-			c:Action_MoveToLocation(Z:GetLocation())
+	if a2 then
+		if c:IsChanneling() or c:HasModifier("modifier_watch_tower_capturing") then
 			return
 		end
-		-- Right-click / ability_capture starts the capture channel.
-		if a1 ~= nil and a1:IsFullyCastable() then
-			c:Action_UseAbilityOnEntity(a1, Z)
-		else
-			c:Action_AttackUnit(Z, false)
+		if Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
+			local dist = GetUnitToUnitDistance(c, Z)
+			-- Hold still after the capture order so the 6s channel is not restarted every frame.
+			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 6.5 and dist <= 380 then
+				return
+			end
+			if dist > 250 then
+				c.outpostOrderAt = nil
+				c:Action_MoveToLocation(Z:GetLocation())
+				return
+			end
+			local capture = c:GetAbilityByName("ability_capture")
+			if capture ~= nil and capture:IsFullyCastable() then
+				c:Action_UseAbilityOnEntity(capture, Z)
+			else
+				c:Action_AttackUnit(Z, false)
+			end
+			c.outpostOrderAt = DotaTime()
+			return
 		end
-		return
+		if outpostMoveLoc ~= nil then
+			c:Action_MoveToLocation(outpostMoveLoc)
+			return
+		end
 	end
 	if c:HasModifier("modifier_fountain_aura_buff") and m == false and (a.GetHP(c) < 0.8 or a.GetMP(c) < 0.8) then
 		return
@@ -1825,40 +1842,159 @@ r["npc_dota_hero_nevermore"] = function()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+-- Primary-jungle outposts (map dump). Live units override these when the scan finds them.
+local OUTPOST_FALLBACK = {
+	Vector(-4096, -448, 128),
+	Vector(3392, -448, 128),
+}
+
 local function IsOutpostUnit(unit)
-	if unit == nil or unit:IsNull() then
+	if unit == nil or unit:IsNull() or unit.GetUnitName == nil then
 		return false
 	end
-	local name = unit:GetUnitName() or ""
-	return name == "npc_dota_watch_tower"
-		or name == "#DOTA_OutpostName_North"
-		or name == "#DOTA_OutpostName_South"
-		or (unit.IsBuilding and unit:IsBuilding() and string.find(name, "watch_tower"))
+	local name = string.lower(unit:GetUnitName() or "")
+	if name == "" then
+		return false
+	end
+	-- Watchers are npc_dota_lantern. Outposts are watch_tower / OutpostName.
+	return string.find(name, "watch_tower", 1, true) ~= nil or string.find(name, "outpost", 1, true) ~= nil
+end
+
+local function AddOutpost(list, unit)
+	if not IsOutpostUnit(unit) then
+		return
+	end
+	for i = 1, #list do
+		if list[i] == unit then
+			return
+		end
+	end
+	list[#list + 1] = unit
 end
 
 local outpostCacheAt = -999
 local function RefreshOutpostCache()
 	X = {}
-	for _, unit in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
-		if IsOutpostUnit(unit) then
-			X[#X + 1] = unit
+	local lists = {
+		UNIT_LIST_ALL,
+		UNIT_LIST_ENEMY_BUILDINGS,
+		UNIT_LIST_ALLIED_BUILDINGS,
+	}
+	for i = 1, #lists do
+		for _, unit in pairs(GetUnitList(lists[i]) or {}) do
+			AddOutpost(X, unit)
 		end
 	end
 	Y = true
 	outpostCacheAt = DotaTime()
 end
 
-function ConsiderOutpostCapture()
-	-- Jungle outposts unlock after any enemy T2 is down (game rule).
-	-- Also allow reclaim of enemy-held outposts / late fallback.
-	if not a0 then
-		local enemy = GetOpposingTeam()
+local function AnyTier2Down()
+	local teams = { TEAM_RADIANT, TEAM_DIRE }
+	local towers = { TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2 }
+	for t = 1, #teams do
+		for i = 1, #towers do
+			if GetTower(teams[t], towers[i]) == nil then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function HeroHp(hero)
+	if hero == nil or hero:GetMaxHealth() <= 0 then
+		return 0
+	end
+	return hero:GetHealth() / hero:GetMaxHealth()
+end
+
+local function IsBusyPushing(hero)
+	if hero == nil or hero:IsNull() then
+		return false
+	end
+	local towers = hero:GetNearbyTowers(900, true)
+	if towers == nil or #towers == 0 then
+		return false
+	end
+	local allies = hero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
+	return allies ~= nil and #allies >= 2
+end
+
+local function CanThisBotCapture()
+	if not c:IsAlive() or HeroHp(c) < 0.45 then
+		return false
+	end
+	if a.IsRetreating(c) and c:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH then
+		return false
+	end
+	if c:WasRecentlyDamagedByAnyHero(1.5) then
+		local near = c:GetNearbyHeroes(900, true, BOT_MODE_NONE)
+		if near ~= nil and #near >= 1 then
+			return false
+		end
+	end
+	local ak = a.GetProperTarget(c)
+	if a.IsDoingRoshan(c) and a.IsRoshan(ak) and a.IsAttacking(c) then
+		return false
+	end
+	if a.IsDoingTormentor(c) and a.IsTormentor(ak) and a.IsAttacking(c) then
+		return false
+	end
+	local fight = c:GetNearbyHeroes(700, true, BOT_MODE_NONE)
+	if fight ~= nil and #fight >= 2 then
+		return false
+	end
+	return true
+end
+
+-- Only the closest free hero walks over. A grouped tower siege stays put if someone else can go.
+local function AmAssignedCapturer(loc)
+	local myDist = GetUnitToLocationDistance(c, loc)
+	local myBusy = IsBusyPushing(c)
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local ally = GetTeamMember(i)
 		if
-			GetTower(enemy, TOWER_TOP_2) == nil
-			or GetTower(enemy, TOWER_MID_2) == nil
-			or GetTower(enemy, TOWER_BOT_2) == nil
-			or DotaTime() >= 10 * 60
+			ally ~= nil
+			and ally ~= c
+			and ally:IsHero()
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and HeroHp(ally) >= 0.45
 		then
+			local allyDist = GetUnitToLocationDistance(ally, loc)
+			local allyBusy = IsBusyPushing(ally)
+			if not allyBusy and allyDist + 250 < myDist then
+				return false
+			end
+			if myBusy and not allyBusy and allyDist < myDist + 3500 then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+local function OutpostIsTooHot(loc)
+	local enemies = a.GetEnemiesNearLoc(loc, 1000)
+	local n = enemies ~= nil and #enemies or 0
+	if n <= 1 then
+		return false
+	end
+	local allies = a.GetAlliesNearLoc(loc, 1400)
+	local allyN = allies ~= nil and #allies or 0
+	if GetUnitToLocationDistance(c, loc) <= 1400 then
+		allyN = math.max(allyN, 1)
+	end
+	return allyN < n
+end
+
+function ConsiderOutpostCapture()
+	outpostMoveLoc = nil
+	-- Enemy can take our outpost once ANY tier-2 falls (ours or theirs).
+	-- Reclaim does not wait for an enemy tier-2.
+	if not a0 then
+		if AnyTier2Down() or DotaTime() >= 10 * 60 then
 			a0 = true
 		end
 	end
@@ -1871,42 +2007,59 @@ function ConsiderOutpostCapture()
 	if a.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
 		return 0
 	end
-	if d == "npc_dota_hero_invoker" then
+	if not CanThisBotCapture() then
 		return 0
 	end
-	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 10 then
+	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 2 then
 		RefreshOutpostCache()
 	end
 	Z, _ = GetClosestOutpost()
-	if Z == nil then
+	local loc = nil
+	if Z ~= nil and not Z:IsNull() then
+		loc = Z:GetLocation()
+	elseif #X > 0 then
+		-- Both outposts are already ours.
+		Z = nil
 		return 0
-	end
-	-- Don't abandon a live HG fight deep in base, but allow peeling for a nearby outpost
-	-- after a T2 push (that is exactly when outposts become available).
-	local nearOutpost = _ <= 1600
-	if a.Utils.IsTeamPushingSecondTierOrHighGround(c) and not nearOutpost then
-		return 0
-	end
-	local maxDist = nearOutpost and 4500 or 3800
-	if _ < maxDist and not IsEnemyCloserToOutpostLoc(Z:GetLocation(), _) and IsSuitableToCaptureOutpost() then
-		local enemiesAtOutpost = a.GetEnemiesNearLoc(Z:GetLocation(), 1200)
-		if enemiesAtOutpost ~= nil and #enemiesAtOutpost >= 1 then
-			-- Still walk toward a contested outpost only if we already have numbers nearby.
-			local alliesAtOutpost = a.GetAlliesNearLoc(Z:GetLocation(), 1400)
-			if #alliesAtOutpost < #enemiesAtOutpost then
-				return 0
+	else
+		Z = nil
+		-- Scan missed the buildings. Walk to the outpost closer to the enemy fountain
+		-- (their jungle outpost, or ours if they already took it and it is the nearer spot).
+		local enemyFountain = a.GetEnemyFountain()
+		local best = 100000
+		for i = 1, #OUTPOST_FALLBACK do
+			local spot = OUTPOST_FALLBACK[i]
+			local score = enemyFountain ~= nil and a.GetDistance(spot, enemyFountain)
+				or GetUnitToLocationDistance(c, spot)
+			if score < best then
+				best = score
+				loc = spot
 			end
 		end
-		local dist = GetUnitToUnitDistance(c, Z)
-		if dist <= 400 then
-			return BOT_MODE_DESIRE_HIGH + 0.05
+		if loc == nil then
+			return 0
 		end
-		if dist <= 1200 then
-			return BOT_MODE_DESIRE_HIGH
-		end
-		return RemapValClamped(dist, maxDist, 0, BOT_MODE_DESIRE_LOW, BOT_MODE_DESIRE_HIGH)
+		_ = GetUnitToLocationDistance(c, loc)
+		outpostMoveLoc = loc
 	end
-	return 0
+	if loc == nil then
+		return 0
+	end
+	if OutpostIsTooHot(loc) then
+		return 0
+	end
+	if not AmAssignedCapturer(loc) then
+		-- Already on it: stay and help finish the channel.
+		if GetUnitToLocationDistance(c, loc) > 600 then
+			return 0
+		end
+	end
+	local dist = GetUnitToLocationDistance(c, loc)
+	-- Above farm (VERYHIGH ~0.9) so one bot actually leaves the wave. Below retreat.
+	if dist <= 500 then
+		return 0.98
+	end
+	return 0.95
 end
 function GetClosestOutpost()
 	local bV = nil
@@ -1925,38 +2078,8 @@ function GetClosestOutpost()
 	end
 	return bV, bW
 end
-function IsEnemyCloserToOutpostLoc(bX, bY)
-	for af, bZ in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		local b_ = GetHeroLastSeenInfo(bZ)
-		if b_ ~= nil then
-			local c0 = b_[1]
-			if c0 ~= nil and c0.time_since_seen < 5 and a.GetDistance(c0.location, bX) < bY then
-				return true
-			end
-		end
-	end
-	return false
-end
 function IsSuitableToCaptureOutpost()
-	local ak = a.GetProperTarget(c)
-	if
-		a.IsGoingOnSomeone(c) and a.IsValidTarget(ak) and GetUnitToUnitDistance(c, ak) < 700
-		or a.IsDefending(c)
-		or a.IsDoingTormentor(c) and a.IsTormentor(ak) and a.IsAttacking(c)
-		or a.IsDoingRoshan(c) and a.IsRoshan(ak) and a.IsAttacking(c)
-		or a.IsRetreating(c) and c:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH
-		or c:WasRecentlyDamagedByAnyHero(2.0)
-		or c:GetActiveMode() == BOT_MODE_DEFEND_ALLY
-	then
-		return false
-	end
-	-- Only refuse on numbers if the outpost area is contested / we are far behind.
-	local aliveAlly = a.GetNumOfAliveHeroes(false)
-	local aliveEnemy = a.GetNumOfAliveHeroes(true)
-	if aliveAlly + 1 < aliveEnemy then
-		return false
-	end
-	return true
+	return CanThisBotCapture()
 end
 if SafeCall then
 	local c1 = GetDesire

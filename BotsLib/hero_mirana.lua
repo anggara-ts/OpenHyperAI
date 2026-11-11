@@ -33,12 +33,12 @@ m["pos_2"] = m["pos_1"]
 m["pos_4"] = {
 	"item_priest_outfit",
 	"item_rod_of_atos",
-	"item_mekansm",
-	"item_glimmer_cape",
 	"item_aghanims_shard",
-	"item_guardian_greaves",
-	"item_spirit_vessel",
 	"item_ultimate_scepter",
+	"item_mekansm",
+	"item_guardian_greaves",
+	"item_glimmer_cape",
+	"item_spirit_vessel",
 	"item_shivas_guard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -48,11 +48,12 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_crystal_maiden_outfit",
 	"item_rod_of_atos",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_ancient_janggo",
-	"item_glimmer_cape",
 	"item_boots_of_bearing",
 	"item_pipe",
-	"item_ultimate_scepter",
+	"item_glimmer_cape",
 	"item_cyclone",
 	"item_shivas_guard",
 	"item_sheepstick",
@@ -105,10 +106,14 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbility(o)
 		return
 	end
+	a._heldArrow = false
 	v, w = a.ConsiderW()
 	if v > 0 then
 		c.SetQueuePtToINT(b, true)
 		b:ActionQueue_UseAbilityOnLocation(p, w)
+		return
+	end
+	if a._heldArrow then
 		return
 	end
 	x, y = a.ConsiderE()
@@ -280,6 +285,14 @@ function a.ConsiderW()
 		return true
 	end
 
+	-- Root first so the arrow cannot be dodged. Hold the shot until the root lands.
+	local function releaseArrow(target, loc)
+		if a.HoldArrowForAtos(target) then
+			return 0
+		end
+		return BOT_ACTION_DESIRE_HIGH, loc
+	end
+
 	-- TP interrupt / already disabled: highest priority.
 	for W, X in pairs(a4) do
 		if
@@ -292,10 +305,10 @@ function a.ConsiderW()
 			local loc = arrowLoc(X)
 			if clearShot(X, loc) then
 				if X:HasModifier("modifier_teleporting") then
-					return BOT_ACTION_DESIRE_HIGH, loc
+					return releaseArrow(X, loc)
 				end
 				if c.IsDisabled(X) and not c.IsInRange(b, X, minUseful) then
-					return BOT_ACTION_DESIRE_HIGH, loc
+					return releaseArrow(X, loc)
 				end
 			end
 		end
@@ -315,7 +328,7 @@ function a.ConsiderW()
 		then
 			local loc = arrowLoc(botTarget)
 			if clearShot(botTarget, loc) then
-				return BOT_ACTION_DESIRE_HIGH, loc
+				return releaseArrow(botTarget, loc)
 			end
 		end
 		-- Secondary: any visible enemy with a clean long shot.
@@ -330,7 +343,7 @@ function a.ConsiderW()
 			then
 				local loc = arrowLoc(X)
 				if clearShot(X, loc) then
-					return BOT_ACTION_DESIRE_HIGH, loc
+					return releaseArrow(X, loc)
 				end
 			end
 		end
@@ -349,7 +362,7 @@ function a.ConsiderW()
 			then
 				local loc = arrowLoc(X)
 				if clearShot(X, loc) then
-					return BOT_ACTION_DESIRE_HIGH, loc
+					return releaseArrow(X, loc)
 				end
 			end
 		end
@@ -368,7 +381,7 @@ function a.ConsiderW()
 			then
 				local loc = arrowLoc(X)
 				if clearShot(X, loc) then
-					return BOT_ACTION_DESIRE_HIGH, loc
+					return releaseArrow(X, loc)
 				end
 			end
 		end
@@ -394,8 +407,64 @@ function a.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+function a.HoldArrowForAtos(target)
+	if not c.IsValidHero(target) or c.IsDisabled(target) or target:IsRooted() then
+		return false
+	end
+	local slot = b:FindItemSlot("item_rod_of_atos")
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local item = b:GetItemInSlot(slot)
+	if item == nil or item:IsNull() then
+		return false
+	end
+	if not c.CanCastOnNonMagicImmune(target) or not c.CanCastOnTargetAdvanced(target) then
+		return false
+	end
+	local range = 1100 + (D or 0)
+	local castRange = item:GetCastRange()
+	if type(castRange) == "number" and castRange > 200 then
+		range = castRange + (D or 0)
+	end
+	if GetUnitToUnitDistance(b, target) > range then
+		return false
+	end
+	if item:IsFullyCastable() then
+		b:Action_UseAbilityOnEntity(item, target)
+		a._heldArrow = true
+		return true
+	end
+	local cd = item:GetCooldown()
+	local remain = item:GetCooldownTimeRemaining()
+	-- Atos was just thrown. Wait for the root instead of firing the arrow over it.
+	if type(cd) == "number" and type(remain) == "number" and cd > 0 and remain > cd - 2.5 then
+		a._heldArrow = true
+		return true
+	end
+	return false
+end
+function a.LeapReady()
+	if q == nil or q:IsNull() or q:IsHidden() or not q:IsTrained() or not q:IsActivated() then
+		return false
+	end
+	if b:GetMana() < q:GetManaCost() then
+		return false
+	end
+	if q:IsFullyCastable() then
+		return true
+	end
+	-- Shard stores leap charges. The ability still looks on cooldown while a charge is refilling.
+	if c.HasAghanimsShard(b) then
+		local charges = q:GetCurrentCharges()
+		if type(charges) == "number" and charges >= 1 then
+			return true
+		end
+	end
+	return false
+end
 function a.ConsiderE()
-	if not q:IsFullyCastable() or b:IsRooted() then
+	if not a.LeapReady() or b:IsRooted() then
 		return 0
 	end
 	local L = q:GetLevel()
@@ -409,7 +478,7 @@ function a.ConsiderE()
 	local T = c.GetAroundEnemyHeroList(1200)
 	local U = nil
 	local V = nil
-	if c.IsGoingOnSomeone(b) and not b:HasModifier("modifier_mirana_leap_buff") then
+	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(b, botTarget, M + N + 100)
@@ -447,7 +516,7 @@ function a.ConsiderE()
 			end
 		end
 	end
-	if c.IsFarming(b) and E >= 12 and not b:HasModifier("modifier_mirana_leap_buff") then
+	if c.IsFarming(b) and E >= 12 then
 		if
 			botTarget ~= nil
 			and botTarget:IsAlive()
@@ -590,26 +659,32 @@ function a.ConsiderCelestialQuiver()
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
+	local harass = false
+	for W, al in pairs(ak) do
 		if
-			c.IsValidHero(botTarget)
-			and c.CanBeAttacked(botTarget)
-			and c.IsInRange(b, botTarget, b:GetAttackRange() + 300)
-			and not c.IsSuspiciousIllusion(botTarget)
-			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
-			and not botTarget:HasModifier("modifier_dazzle_shallow_grave")
-			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not botTarget:HasModifier("modifier_oracle_false_promise_timer")
-			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
+			c.IsValidHero(al)
+			and c.CanBeAttacked(al)
+			and c.IsInRange(b, al, b:GetAttackRange() + 150)
+			and not c.IsSuspiciousIllusion(al)
+			and not al:HasModifier("modifier_abaddon_borrowed_time")
+			and not al:HasModifier("modifier_dazzle_shallow_grave")
+			and not al:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not al:HasModifier("modifier_oracle_false_promise_timer")
+			and not al:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			if not aj then
-				s:ToggleAutoCast()
-			end
-			return BOT_ACTION_DESIRE_NONE
+			harass = true
+			break
 		end
 	end
+	-- Mid game onward the orb stays on. Early, it stays on only while a hero is in attack range.
+	if not c.IsEarlyGame() or (harass and G ~= nil and G > 0.35) then
+		if not aj then
+			s:ToggleAutoCast()
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
 	local am = b:GetNearbyCreeps(Min(b:GetAttackRange() + 300, 1600), true)
-	if c.IsLaning(b) and c.IsEarlyGame() then
+	if c.IsLaning(b) then
 		for W, creep in pairs(am) do
 			if
 				c.IsValid(creep)

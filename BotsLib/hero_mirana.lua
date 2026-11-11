@@ -387,12 +387,85 @@ function a.ConsiderW()
 		end
 	end
 
-	if c.IsFarming(b) and DotaTime() > 4 * 60 and E <= 22 and c.IsAllowedToSpam(b, P) then
-		local a2 = b:GetNearbyNeutralCreeps(1600)
-		local a5 = c.GetMostHpUnit(a2)
-		if c.IsValid(a5) and a5:GetHealth() > 920 and not a5:IsAncientCreep() and not c.IsOtherAllysTarget(a5) then
-			U = a5
-			return BOT_ACTION_DESIRE_HIGH, U:GetLocation()
+	-- The first non-ancient creep hit dies outright, lane or jungle, at any travel distance.
+	-- Hero shots above already had priority. Ancient creeps are not instant-killed.
+	local nearEnemy = c.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)
+	if
+		not c.IsGoingOnSomeone(b)
+		and not c.IsRetreating(b)
+		and c.IsAllowedToSpam(b, P)
+		and (nearEnemy == nil or #nearEnemy == 0)
+	then
+		local search = math.min(M, 1600)
+		local function aimCreep(creep)
+			if creep == nil or not c.IsValid(creep) or creep:IsHero() then
+				return nil
+			end
+			if creep.IsAncientCreep ~= nil and creep:IsAncientCreep() then
+				return nil
+			end
+			if not c.IsInRange(b, creep, M) or c.IsInRange(b, creep, 80) then
+				return nil
+			end
+			if c.IsOtherAllysTarget(creep) then
+				return nil
+			end
+			local loc = creep:GetLocation()
+			if a.IsEnemyUnitBetweenArrow(b, creep, loc, N) then
+				return nil
+			end
+			return loc
+		end
+		if c.IsLaning(b) or c.IsFarming(b) or c.IsPushing(b) or c.IsDefending(b) then
+			local lane = b:GetNearbyLaneCreeps(search, true)
+			local siege, ranged, fat
+			for _, creep in pairs(lane or {}) do
+				if c.IsValid(creep) and not creep:IsHero() then
+					local far = not c.IsInRange(b, creep, b:GetAttackRange() + 80)
+					if c.IsKeyWordUnit("siege", creep) then
+						if siege == nil or creep:GetHealth() > siege:GetHealth() then
+							siege = creep
+						end
+					elseif c.IsKeyWordUnit("ranged", creep) and far then
+						if ranged == nil or creep:GetHealth() > ranged:GetHealth() then
+							ranged = creep
+						end
+					elseif far and creep:GetHealth() >= 400 and (fat == nil or creep:GetHealth() > fat:GetHealth()) then
+						fat = creep
+					end
+				end
+			end
+			local loc = aimCreep(siege)
+			if loc == nil then
+				loc = aimCreep(ranged)
+			end
+			if loc == nil then
+				loc = aimCreep(fat)
+			end
+			if loc ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, loc
+			end
+		end
+		if c.IsFarming(b) or c.IsPushing(b) or (not c.IsLaning(b) and DotaTime() > 3 * 60) then
+			local neutrals = b:GetNearbyNeutralCreeps(search)
+			local best, bestHp = nil, 0
+			for _, creep in pairs(neutrals or {}) do
+				if
+					c.IsValid(creep)
+					and not creep:IsHero()
+					and (creep.IsAncientCreep == nil or not creep:IsAncientCreep())
+					and creep:GetHealth() > bestHp
+				then
+					best = creep
+					bestHp = creep:GetHealth()
+				end
+			end
+			if best ~= nil and bestHp >= 450 then
+				local loc = aimCreep(best)
+				if loc ~= nil then
+					return BOT_ACTION_DESIRE_HIGH, loc
+				end
+			end
 		end
 	end
 	if c.IsDoingRoshan(b) then

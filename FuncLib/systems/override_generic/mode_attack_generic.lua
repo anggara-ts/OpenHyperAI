@@ -282,13 +282,17 @@ function r.GetDesire()
 			local a3 = a.GetProperTarget(S)
 			if a.IsGoingOnSomeone(S) then
 				-- Don't pile into a lost fight / solo chase when outnumbered.
-				local allyN = a.GetAllyCount(c, 1400)
-				local enemyN = a.GetEnemyCount(c, 1400)
-				if enemyN >= allyN + 1 and not a.WeAreStronger(c, 1400) then
-					goto continue_ally_follow
-				end
-				if allyN <= 1 and enemyN >= 2 then
-					goto continue_ally_follow
+				-- Still commit when the target dies to one attack.
+				local finishKill = a.IsValidHero(a3) and a.ShouldFinishCommittedKill(c, a3)
+				if not finishKill then
+					local allyN = a.GetAllyCount(c, 1400)
+					local enemyN = a.GetEnemyCount(c, 1400)
+					if enemyN >= allyN + 1 and not a.WeAreStronger(c, 1400) then
+						goto continue_ally_follow
+					end
+					if allyN <= 1 and enemyN >= 2 then
+						goto continue_ally_follow
+					end
 				end
 				if a.IsValidHero(a3) and not a.IsSuspiciousIllusion(a3) then
 					d.unit = a3

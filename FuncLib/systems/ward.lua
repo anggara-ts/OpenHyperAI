@@ -30,7 +30,8 @@ local GateSpots = {
 	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
 }
 local E = {
-	[1] = { location = Vector(-1650, -83, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	-- Dire bank of the top rune. The radiant bank (-1650, -83) looks into Radiant's jungle.
+	[1] = { location = Vector(-627, 850, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[2] = { location = Vector(-245, -996, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 	[3] = { location = Vector(6113, -3427, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[4] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
@@ -180,8 +181,10 @@ end
 function a.GetAvailabeObserverWardSpots(K)
 	local L = {}
 	if DotaTime() < 0 or b.IsEarlyGame() then
+		local ourSide = TeamSide()
 		for M, N in pairs(a.GetEarlyGameWardSpots()) do
-			if ObsFree(N) then
+			-- Early observers go on the enemy side. Own-side cliffs look back into our jungle.
+			if ObsFree(N) and N.side ~= ourSide then
 				table.insert(L, N)
 			end
 		end

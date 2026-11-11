@@ -46,17 +46,22 @@ function b.GetDesire()
 		n = n * 1.65
 	end
 	if n <= 10 then
+		c.isInLanePhase = true
 		return 0.268
 	end
 	if n <= 9 * 60 and o <= 7 then
+		c.isInLanePhase = true
 		return 0.446
 	end
 	if n <= 12 * 60 and o <= 11 then
+		c.isInLanePhase = true
 		return 0.369
 	end
 	if o <= 15 and a.GetCoresAverageNetworth() < 12000 then
+		c.isInLanePhase = true
 		return 0.228
 	end
+	c.isInLanePhase = false
 	return BOT_MODE_DESIRE_VERYLOW
 end
 function GetBotTargetLane()
@@ -175,9 +180,9 @@ function b.Think()
 			return
 		end
 	end
-	-- Light poke: enemy within 3000 of our T1 (our half of the lane). T1↔T1 ≈ 7k mid / 11k sides.
-	if a.IsInLaningPhase and a.IsInLaningPhase() and a.GetHP(c) >= 0.85 and a.GetMP(c) >= 0.75 then
-		if not c:WasRecentlyDamagedByAnyHero(1.5) then
+	-- Aggressive poke on our half; never chase into enemy T1 (rune/tower bait).
+	if a.IsInLaningPhase and a.IsInLaningPhase() and a.GetHP(c) >= 0.55 then
+		if not (c:WasRecentlyDamagedByAnyHero(1.0) and a.GetHP(c) < 0.75) then
 			local function laneT1(team, lane)
 				if lane == LANE_TOP then
 					return GetTower(team, TOWER_TOP_1)
@@ -197,16 +202,19 @@ function b.Think()
 						a.IsValidHero(enemy)
 						and a.CanBeAttacked(enemy)
 						and not a.IsSuspiciousIllusion(enemy)
-						and a.IsInRange(c, enemy, atk + 80)
+						and a.IsInRange(c, enemy, atk + 250)
 					then
+						local selfUnderTower = enemyT1 ~= nil
+							and enemyT1:IsAlive()
+							and GetUnitToUnitDistance(c, enemyT1) < (enemyT1:GetAttackRange() or 700) + 180
+						local enemyUnderTower = enemyT1 ~= nil
+							and enemyT1:IsAlive()
+							and GetUnitToUnitDistance(enemy, enemyT1) < (enemyT1:GetAttackRange() or 700) + 250
 						if
-							not (
-								enemyT1 ~= nil
-								and enemyT1:IsAlive()
-								and GetUnitToUnitDistance(c, enemyT1) < (enemyT1:GetAttackRange() or 700) + 120
-							)
-							and GetUnitToUnitDistance(enemy, allyT1) <= 3000
-							and GetUnitToUnitDistance(c, allyT1) <= 3400
+							not selfUnderTower
+							and not enemyUnderTower
+							and GetUnitToUnitDistance(enemy, allyT1) <= 3800
+							and GetUnitToUnitDistance(c, allyT1) <= 4000
 						then
 							local now = DotaTime()
 							if c.sOffsideHarassChatTime == nil or now - c.sOffsideHarassChatTime >= 10 then
@@ -218,7 +226,11 @@ function b.Think()
 								name = string.upper(string.sub(name, 1, 1)) .. string.sub(name, 2)
 								c:ActionImmediate_Chat("Harassing " .. name, false)
 							end
-							c:Action_AttackUnit(enemy, true)
+							if GetUnitToUnitDistance(c, enemy) > atk then
+								c:Action_MoveToLocation(enemy:GetLocation())
+							else
+								c:Action_AttackUnit(enemy, true)
+							end
 							return
 						end
 					end
@@ -228,7 +240,7 @@ function b.Think()
 	end
 	local i = c.isBear or string.find(c:GetUnitName(), "lone_druid_bear")
 	local G = c:GetNearbyLaneCreeps(600, true)
-	if #G <= 1 and not a.IsCore(c) and not i then
+	if #G <= 2 and not a.IsCore(c) and not i and a.GetHP(c) > 0.4 then
 		local H = GetHarassTarget(v)
 		if a.IsValidHero(H) then
 			c:Action_AttackUnit(H, true)
@@ -292,15 +304,24 @@ function GetBestDenyCreep(M)
 	return fallback
 end
 function GetHarassTarget(P)
+	local enemyTowers = c:GetNearbyTowers(1000, true)
 	for A, Q in pairs(P) do
 		if
 			a.IsValidHero(Q)
-			and a.IsInRange(c, Q, c:GetAttackRange() + 150)
+			and a.IsInRange(c, Q, c:GetAttackRange() + 220)
 			and a.CanBeAttacked(Q)
 			and not a.IsSuspiciousIllusion(Q)
 		then
+			-- Skip tower-hugging bait.
+			if a.IsValidBuilding(enemyTowers[1]) then
+				local tr = (enemyTowers[1]:GetAttackRange() or 700) + 200
+				if GetUnitToUnitDistance(c, enemyTowers[1]) < tr or GetUnitToUnitDistance(Q, enemyTowers[1]) < tr + 80 then
+					goto continue_harass
+				end
+			end
 			return Q
 		end
+		::continue_harass::
 	end
 	return nil
 end

@@ -95,7 +95,9 @@ local v, w
 local x
 local y, z
 local A
+-- Pending BKB after Solar Guardian lands (do not pop before channel — wastes duration).
 local B = false
+local BKBLandDeadline = -1
 local C = nil
 local D = -1
 local E = false
@@ -103,11 +105,36 @@ local F
 local G
 local H
 local I
+local function IsSolarGuardianInFlight()
+	return b:IsChanneling()
+		or b:HasModifier("modifier_dawnbreaker_solar_guardian_air_time")
+		or b:HasModifier("modifier_dawnbreaker_solar_guardian_airtime")
+end
 function a.SkillsComplement()
 	local J = d.Build(b)
 	G = J.isEngaging
 	H = J.isRetreating
 	I = J.hp
+	-- BKB after landing into the fight, not before ult cast.
+	if B then
+		if DotaTime() > BKBLandDeadline then
+			B = false
+		elseif
+			CanBKB()
+			and not b:IsMagicImmune()
+			and not IsSolarGuardianInFlight()
+			and not b:IsStunned()
+			and not b:IsHexed()
+			and not b:IsMuted()
+		then
+			local enemies = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
+			if enemies ~= nil and #enemies >= 1 then
+				b:Action_UseAbility(A)
+				B = false
+				return
+			end
+		end
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -134,10 +161,6 @@ function a.SkillsComplement()
 	end
 	y, z = a.ConsiderSolarGuardian()
 	if y > 0 then
-		if CanBKB() and B then
-			b:Action_UseAbility(A)
-			B = false
-		end
 		b:Action_UseAbilityOnLocation(r, z)
 		return
 	end
@@ -408,8 +431,10 @@ function a.ConsiderSolarGuardian()
 				local aa = b:FindAoELocation(true, true, a5, GetUnitToLocationDistance(b, a5), L, a6, 0)
 				local V = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
 				if a9.count >= 1 and aa.count >= 1 then
-					if V ~= nil and #V >= 1 and not b:IsMagicImmune() then
+					-- Queue BKB for after channel+airtime land, not before cast.
+					if V ~= nil and #V >= 1 and not b:IsMagicImmune() and CanBKB() then
 						B = true
+						BKBLandDeadline = DotaTime() + a6 + 1.5
 					end
 					return BOT_ACTION_DESIRE_HIGH, a9.targetloc
 				end

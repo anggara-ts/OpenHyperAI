@@ -261,9 +261,9 @@ local function a0()
 	return nil
 end
 -- Ally T1 ↔ enemy T1 is ~7k mid / ~11k side lanes; midpoint ≈ 3.5k / 5.5k from our T1.
--- Harass within 3000 of our T1 = our half of the lane without diving theirs.
-local OFFSIDE_ENEMY_FROM_T1 = 3000
-local OFFSIDE_SELF_FROM_T1 = 3400
+-- Harass up to ~lane midpoint on our half; never inside enemy T1 range.
+local OFFSIDE_ENEMY_FROM_T1 = 3800
+local OFFSIDE_SELF_FROM_T1 = 4000
 local function GetLaneT1(team, lane)
 	if lane == LANE_TOP then
 		return GetTower(team, TOWER_TOP_1)
@@ -289,15 +289,15 @@ local function AnnounceOffsideHarass(target)
 	e.sOffsideHarassChatTime = now
 	e:ActionImmediate_Chat("Harassing " .. PrettyHeroName(target), false)
 end
--- Light poke when enemy is within 3000 of our T1 (offside / our half). LH/deny first.
+-- Aggressive lane poke on our half. LH/deny still come first in Think.
 local function ConsiderOffsideHarass(enemyHeroes)
 	if not b.IsInLaningPhase or not b.IsInLaningPhase() then
 		return nil
 	end
-	if b.GetHP(e) < 0.85 or b.GetMP(e) < 0.75 then
+	if b.GetHP(e) < 0.55 then
 		return nil
 	end
-	if e:WasRecentlyDamagedByAnyHero(1.5) then
+	if e:WasRecentlyDamagedByAnyHero(1.0) and b.GetHP(e) < 0.75 then
 		return nil
 	end
 	local allyT1 = GetLaneT1(GetTeam(), l)
@@ -313,13 +313,21 @@ local function ConsiderOffsideHarass(enemyHeroes)
 			b.IsValidHero(enemy)
 			and b.CanBeAttacked(enemy)
 			and not b.IsSuspiciousIllusion(enemy)
-			and b.IsInRange(e, enemy, atk + 80)
+			and b.IsInRange(e, enemy, atk + 250)
 		then
 			-- Never stand inside enemy tower attack range.
 			if
 				enemyT1 ~= nil
 				and enemyT1:IsAlive()
-				and GetUnitToUnitDistance(e, enemyT1) < (enemyT1:GetAttackRange() or 700) + 120
+				and GetUnitToUnitDistance(e, enemyT1) < (enemyT1:GetAttackRange() or 700) + 180
+			then
+				goto continue_enemy
+			end
+			-- Don't chase a hero who is hugging their own T1 (rune/tower bait).
+			if
+				enemyT1 ~= nil
+				and enemyT1:IsAlive()
+				and GetUnitToUnitDistance(enemy, enemyT1) < (enemyT1:GetAttackRange() or 700) + 250
 			then
 				goto continue_enemy
 			end
@@ -337,7 +345,8 @@ local function ConsiderOffsideHarass(enemyHeroes)
 	end
 	return best
 end
-if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
+-- Custom laning Think for all roles so cores also harass (not only buggy/human-support).
+do
 	function Think()
 		local _ = e:GetNearbyTowers(1200, true)
 		if Y(h) then
@@ -417,7 +426,12 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 			local offside = ConsiderOffsideHarass(k)
 			if offside ~= nil then
 				AnnounceOffsideHarass(offside)
-				e:Action_AttackUnit(offside, true)
+				local harassRange = e:GetAttackRange()
+				if GetUnitToUnitDistance(e, offside) > harassRange then
+					e:Action_MoveToLocation(offside:GetLocation())
+				else
+					e:Action_AttackUnit(offside, true)
+				end
 				return
 			end
 		end
@@ -436,35 +450,42 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 				return
 			end
 		end
+		local enemyT1Harass = GetLaneT1(GetOpposingTeam(), l)
+		local function SafeToHarassHero(L)
+			if not b.IsValidHero(L) or not b.CanBeAttacked(L) or b.IsSuspiciousIllusion(L) then
+				return false
+			end
+			if
+				enemyT1Harass ~= nil
+				and enemyT1Harass:IsAlive()
+				and (
+					GetUnitToUnitDistance(e, enemyT1Harass) < (enemyT1Harass:GetAttackRange() or 700) + 180
+					or GetUnitToUnitDistance(L, enemyT1Harass) < (enemyT1Harass:GetAttackRange() or 700) + 250
+				)
+			then
+				return false
+			end
+			return true
+		end
 		local ab = e:GetNearbyLaneCreeps(600, true)
-		if #ab <= 1 and not b.IsCore(e) and b.GetHP(e) > 0.5 then
+		if #ab <= 2 and not b.IsCore(e) and b.GetHP(e) > 0.4 then
 			for D, L in pairs(k) do
-				if
-					b.IsValidHero(L)
-					and b.CanBeAttacked(L)
-					and not b.IsSuspiciousIllusion(L)
-					and b.IsInRange(e, L, m + 150)
-				then
+				if SafeToHarassHero(L) and b.IsInRange(e, L, m + 220) then
 					e:Action_AttackUnit(L, true)
 					return
 				end
 			end
 		end
-		if b.IsCore(e) and b.GetHP(e) > 0.6 then
+		if b.IsCore(e) and b.GetHP(e) > 0.45 then
 			for D, L in pairs(k) do
-				if
-					b.IsValidHero(L)
-					and b.CanBeAttacked(L)
-					and not b.IsSuspiciousIllusion(L)
-					and b.IsInRange(e, L, m + 50)
-				then
+				if SafeToHarassHero(L) and b.IsInRange(e, L, m + 180) then
 					local ac = 0
 					for D, ad in pairs(i) do
 						if b.IsValid(ad) and ad:GetAttackTarget() == e then
 							ac = ac + 1
 						end
 					end
-					if ac <= 2 then
+					if ac <= 3 then
 						e:Action_AttackUnit(L, true)
 						return
 					end

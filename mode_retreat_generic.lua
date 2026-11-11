@@ -133,6 +133,11 @@ function GetDesireHelper()
 	local H = v.enemyLaneCreeps1200
 	local I = b.WeAreStronger(c, 1600)
 	local J = b.IsInTeamFight(c, 1200)
+	-- Abort early tower-dive chase (e.g. gold-rune bait under T1).
+	local towerDiveRetreat = a.RetreatWhenTowerTargetedDesire()
+	if towerDiveRetreat > 0 then
+		return towerDiveRetreat
+	end
 	if
 		m == BOT_MODE_ROSHAN
 		and not b.IsRoshanAlive()
@@ -517,18 +522,21 @@ function a.ShouldRun()
 	if ak < 1560 then
 		return 2
 	end
-	if DotaTime() > 30 and b.IsEarlyGame() then
+	if DotaTime() > 0 and b.IsEarlyGame() then
 		local al = c:GetAssignedLane()
 		local am = GetTeam()
 		local an = al == LANE_TOP and ak < (am == TEAM_RADIANT and 12000 or 9000)
 			or al == LANE_MID and ak < (am == TEAM_RADIANT and 9000 or 8000)
 			or al == LANE_BOT and ak < (am == TEAM_RADIANT and 8700 or 11500)
+		local aoEarly = c:GetNearbyTowers(950, true)
+		local diving = b.IsValidBuilding(aoEarly[1])
+			and GetUnitToUnitDistance(c, aoEarly[1]) < (aoEarly[1]:GetAttackRange() or 700) + 200
 		if
-			an
+			(an or diving)
 			and b.IsValidHero(k)
 			and b.CanBeAttacked(k)
 			and not b.IsSuspiciousIllusion(k)
-			and not b.CanKillTarget(k, c:GetAttackDamage() * 2.33, DAMAGE_TYPE_PHYSICAL)
+			and not b.CanKillTarget(k, c:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL)
 		then
 			return 2.88
 		end
@@ -610,24 +618,34 @@ function a.RetreatWhenTowerTargetedDesire()
 	if DotaTime() > 10 * 60 or b.IsInTeamFight(c, 1600) then
 		return 0
 	end
-	local G = c:GetNearbyTowers(800, true)
+	local G = c:GetNearbyTowers(900, true)
 	if b.IsValidBuilding(G[1]) and not b.IsPushing(c) then
-		if b.IsGoingOnSomeone(c) then
+		local tr = (G[1]:GetAttackRange() or 700) + 160
+		local underTower = GetUnitToUnitDistance(c, G[1]) < tr
+		if G[1]:GetAttackTarget() == c or c:WasRecentlyDamagedByTower(1.5) then
+			return BOT_MODE_DESIRE_ABSOLUTE
+		end
+		if underTower and (b.IsGoingOnSomeone(c) or m == BOT_MODE_ATTACK or m == BOT_MODE_RUNE) then
 			if
 				b.IsValidHero(k)
 				and not b.IsSuspiciousIllusion(k)
 				and not k:HasModifier("modifier_dazzle_shallow_grave")
 				and not k:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
+				-- Early game: never trade under T1 unless the kill is free.
+				if b.IsEarlyGame() or b.IsInLaningPhase() then
+					if not b.CanKillTarget(k, c:GetAttackDamage() * 1.8, DAMAGE_TYPE_PHYSICAL) then
+						return BOT_MODE_DESIRE_VERYHIGH
+					end
+				end
 				local aH = c:GetEstimatedDamageToTarget(true, k, 5.0, DAMAGE_TYPE_ALL) * 1.2
 				aH = k:GetActualIncomingDamage(aH, DAMAGE_TYPE_ALL)
-				if aH / k:GetHealth() < 0.88 then
+				if aH / math.max(k:GetHealth(), 1) < 0.88 then
 					return 0.9
 				end
+			else
+				return BOT_MODE_DESIRE_HIGH
 			end
-		end
-		if G[1]:GetAttackTarget() == c then
-			return 0.9
 		end
 	end
 	return 0

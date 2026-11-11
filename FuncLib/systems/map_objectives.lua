@@ -415,6 +415,158 @@ function MapObjectives.WisdomScore(hero, loc)
 	return score
 end
 
+-- Pool buff stack is the stored lotus count once we have seen it above zero.
+-- Until then a zero stack is "unknown", so an empty read cannot skip every pool.
+local lotusStackSeen = false
+
+local function LotusCharges(bot)
+	local n = 0
+	for slot = 0, 16 do
+		local it = bot:GetItemInSlot(slot)
+		if it ~= nil and it.GetName ~= nil then
+			local name = it:GetName()
+			if name == "item_famango" or name == "item_great_famango" or name == "item_greater_famango" then
+				local charges = 1
+				if it.GetCurrentCharges ~= nil then
+					local c = it:GetCurrentCharges()
+					if type(c) == "number" and c > charges then
+						charges = c
+					end
+				end
+				n = n + charges
+			end
+		end
+	end
+	return n
+end
+
+function MapObjectives.LotusCountOnUnit(pool)
+	if pool == nil or pool.NumModifiers == nil then
+		return nil
+	end
+	local found = false
+	local stacks = 0
+	local n = pool:NumModifiers() or 0
+	for i = 0, n - 1 do
+		local name = pool:GetModifierName(i)
+		if type(name) == "string" and string.find(name, "lotus_pool", 1, true) then
+			found = true
+			local s = pool:GetModifierStackCount(i)
+			if type(s) == "number" and s > stacks then
+				stacks = s
+			end
+		end
+	end
+	if not found then
+		return nil
+	end
+	if stacks > 0 then
+		lotusStackSeen = true
+		return stacks
+	end
+	if lotusStackSeen then
+		return 0
+	end
+	return nil
+end
+
+function MapObjectives.LotusCountNear(loc, units)
+	if loc == nil or units == nil then
+		return nil
+	end
+	local best = nil
+	local bestDist = 800
+	for i = 1, #units do
+		local pool = units[i]
+		if pool ~= nil and pool.GetLocation ~= nil then
+			local dist = GetUnitToLocationDistance(pool, loc)
+			if dist < bestDist then
+				bestDist = dist
+				best = pool
+			end
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return MapObjectives.LotusCountOnUnit(best)
+end
+
+-- True once this spawn's lotus should already be in the pool.
+function MapObjectives.LotusSpawnOpen()
+	local interval = MapObjectives.LotusInterval()
+	local t = DotaTime()
+	if t < interval - 1 then
+		return false
+	end
+	local mark = math.floor(t / interval) * interval
+	return mark >= interval and t >= mark
+end
+
+-- Inside the ring: a lotus that never arrives was taken or the pool is empty.
+function MapObjectives.LotusPluckStalled(bot, enemyInRing)
+	local have = LotusCharges(bot)
+	local now = DotaTime()
+	if bot._lotusHave ~= have or bot._lotusHaveAt == nil then
+		bot._lotusHave = have
+		bot._lotusHaveAt = now
+	end
+	local limit = enemyInRing and 6 or 2.5
+	return now - bot._lotusHaveAt >= limit
+end
+
+local function EnemyInLotusRing(bot, loc)
+	local enemies = bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}
+	for i = 1, #enemies do
+		local enemy = enemies[i]
+		if
+			enemy ~= nil
+			and enemy:IsAlive()
+			and not enemy:IsIllusion()
+			and GetUnitToLocationDistance(enemy, loc) <= 380
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Attack or cast without leaving the pluck ring. Standing still is only for the pickup itself.
+local function ActInsideLotus(bot, loc)
+	if bot:IsCastingAbility() or bot:IsChanneling() then
+		return
+	end
+	local action = bot:GetCurrentActionType()
+	if action == BOT_ACTION_TYPE_USE_ABILITY then
+		return
+	end
+	local range = bot:GetAttackRange() + 80
+	local heroes = bot:GetNearbyHeroes(range, true, BOT_MODE_NONE) or {}
+	for i = 1, #heroes do
+		local hero = heroes[i]
+		if hero ~= nil and hero:IsAlive() and not hero:IsIllusion() and GetUnitToUnitDistance(bot, hero) <= range then
+			if bot:GetAttackTarget() ~= hero then
+				bot:Action_AttackUnit(hero, true)
+			end
+			return
+		end
+	end
+	local creeps = bot:GetNearbyCreeps(range, true) or {}
+	for i = 1, #creeps do
+		local creep = creeps[i]
+		if creep ~= nil and creep:IsAlive() and GetUnitToUnitDistance(bot, creep) <= range then
+			if bot:GetAttackTarget() ~= creep then
+				bot:Action_AttackUnit(creep, true)
+			end
+			return
+		end
+	end
+	-- Stop the walk-in order once, so it does not carry the hero out of the ring.
+	if action == BOT_ACTION_TYPE_MOVE_TO then
+		bot:Action_ClearActions(true)
+	end
+end
+
 -- Returns desire, location, kind ("lotus"|"wisdom"), eta. Desire 0 if none.
 function MapObjectives.ConsiderObjectiveDesire(bot)
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
@@ -464,14 +616,23 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		end
 	end
 
-	-- Lotus: same distance-scaled leave; linger ~12s after to pluck.
+	-- Lotus: walk in before the mark. Leave once the pool is empty or a pluck never lands.
 	do
 		local lInterval = MapObjectives.LotusInterval()
-		local locs = MapObjectives.GetLotusPoolLocations()
+		local locs, units = MapObjectives.GetLotusPoolLocations()
 		local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
 		local maxWalk = MapObjectives.MaxWalk(bot, true)
 		local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
-		local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 12)
+		local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
+		local count = MapObjectives.LotusCountNear(loc, units)
+		local mark = math.floor(math.max(0, DotaTime()) / lInterval) * lInterval
+		-- Enemy already took this spawn, or the pool has not stored one.
+		if count == 0 and type(etaL) == "number" and etaL < -1.5 then
+			inLotus = false
+		end
+		if bot._lotusSkipMark == mark and mark >= lInterval and (count == nil or count == 0) then
+			inLotus = false
+		end
 		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 		if
 			inLotus
@@ -537,7 +698,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	if #enemies > 0 and #enemies > #allies and dist > gather then
 		return true
 	end
-	if #enemies > 0 and #enemies <= #allies then
+	if #enemies > 0 and #enemies <= #allies and not (kind == "lotus" and dist <= gather) then
 		local target = enemies[1]
 		if target ~= nil and target:IsAlive() then
 			bot:Action_AttackUnit(target, true)
@@ -548,6 +709,8 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if kind == "wisdom" then
 			bot._wisdomStandSince = nil
 			bot._wisdomXpAtStand = nil
+		elseif kind == "lotus" then
+			bot._lotusHaveAt = nil
 		end
 		bot:Action_MoveToLocation(loc)
 		return true
@@ -557,6 +720,22 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if Item.GetEmptyInventoryAmount(bot) <= 0 then
 			MapObjectives.EnsureInventorySlot(bot)
 		end
+		local _, units = MapObjectives.GetLotusPoolLocations()
+		local count = MapObjectives.LotusCountNear(loc, units)
+		if count == 0 and MapObjectives.LotusSpawnOpen() then
+			local interval = MapObjectives.LotusInterval()
+			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			return false
+		end
+		if (MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0)) then
+			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
+				local interval = MapObjectives.LotusInterval()
+				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+				return false
+			end
+		end
+		ActInsideLotus(bot, loc)
+		return true
 	elseif kind == "wisdom" then
 		-- Shrine channel is ~3s. Mark claimed once XP lands or after a short stand so we leave.
 		local now = DotaTime()

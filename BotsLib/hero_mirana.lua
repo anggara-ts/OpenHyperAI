@@ -15,9 +15,8 @@ local m = {}
 m["pos_1"] = {
 	"item_ranged_carry_outfit",
 	"item_dragon_lance",
-	"item_rod_of_atos",
 	"item_maelstrom",
-	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_mjollnir",
 	"item_travel_boots",
 	"item_orchid",
@@ -62,7 +61,7 @@ m["pos_5"] = {
 }
 m["pos_3"] = m["pos_1"]
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+a["sSellList"] = { "item_maelstrom", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_ranged_carry" }, {}
 end

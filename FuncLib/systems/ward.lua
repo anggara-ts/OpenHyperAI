@@ -22,6 +22,13 @@ local HuntSpots = {
 	{ location = Vector(36, -3778, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "radiant" },
 	{ location = Vector(-4876, 624, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "radiant" },
 }
+-- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
+local GateSpots = {
+	{ location = Vector(-7421, 4238, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
+	{ location = Vector(7309, -4419, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
+	{ location = Vector(-6244, 7147, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
+	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
+}
 local E = {
 	[1] = { location = Vector(-1650, -83, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 	[2] = { location = Vector(-245, -996, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
@@ -212,6 +219,9 @@ function a.GetAvailabeObserverWardSpots(K)
 	for i = 1, #RoshSpots do
 		consider(RoshSpots[i])
 	end
+	for i = 1, #GateSpots do
+		consider(GateSpots[i])
+	end
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])
 	end
@@ -273,6 +283,9 @@ function a.GetPossibleSentryWardSpots(K)
 	end
 	for i = 1, #RoshSpots do
 		consider(RoshSpots[i])
+	end
+	for i = 1, #GateSpots do
+		consider(GateSpots[i])
 	end
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])

@@ -649,8 +649,8 @@ aD.BarrackList = { aH.TopMelee, aH.TopRanged, aH.MidMelee, aH.MidRanged, aH.BotM
 aD.WisdomRunes = { [aL.Radiant] = Vector(-8126, -320, 256), [aL.Dire] = Vector(8319, 266, 256) }
 -- Lotus pool centers (7.41 map). Prefer live npc_dota_lotus_pool discovery in modes.
 aD.LotusPools = {
-	top = Vector(-7264, 4493, 256),
-	bottom = Vector(7788, -4121, 256),
+	top = Vector(-7421, 4238, 0),
+	bottom = Vector(7309, -4419, 0),
 }
 aD.BuggyHeroesDueToValveTooLazy = {
 	[aZ.Muerta] = true,

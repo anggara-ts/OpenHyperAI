@@ -44,7 +44,6 @@ local N = -90
 local O = -90
 local P = -90
 local Q = -90
-local R = -90
 local S = -90
 local T = -90
 local U = 0
@@ -1662,12 +1661,10 @@ function ItemOpsDesire()
 		N = DotaTime()
 	end
 	TrySellOrDropItem()
-	SwapSmokeSupport()
 	TrySwapInvItemForCheese()
 	TrySwapInvItemForRefresherShard()
 	TrySwapInvItemForClarity()
 	TrySwapInvItemForFlask()
-	TrySwapInvItemForSmoke()
 	TrySwapInvItemForMoonshard()
 end
 function ItemOpsThink()
@@ -1700,20 +1697,6 @@ function GoPickUpItem(cy)
 		return
 	end
 end
-function SwapSmokeSupport()
-	if g.IsDoingRoshan(a) then
-		local ay = a:GetAttackTarget()
-		if g.IsRoshan(ay) and g.IsAttacking(a) then
-			local cA = a:FindItemSlot("item_smoke_of_deceit")
-			if a:GetItemSlotType(cA) == ITEM_SLOT_TYPE_BACKPACK then
-				local cB = g.FindLeastExpensiveItemSlot()
-				if cB ~= -1 then
-					a:ActionImmediate_SwapItems(cA, cB)
-				end
-			end
-		end
-	end
-end
 function TrySwapInvItemForClarity()
 	if DotaTime() >= P + 6.3 and a:GetActiveMode() ~= BOT_MODE_WARD then
 		local cC = a:FindItemSlot("item_clarity")
@@ -1736,18 +1719,6 @@ function TrySwapInvItemForFlask()
 			end
 		end
 		Q = DotaTime()
-	end
-end
-function TrySwapInvItemForSmoke()
-	if DotaTime() >= R + 15 then
-		local cC = a:FindItemSlot("item_smoke_of_deceit")
-		if cC and a:GetItemSlotType(cC) == ITEM_SLOT_TYPE_BACKPACK then
-			local cu = g.Item.GetMainInvLessValItemSlot(a)
-			if cu ~= -1 then
-				a:ActionImmediate_SwapItems(cC, cu)
-			end
-		end
-		R = DotaTime()
 	end
 end
 function TrySwapInvItemForMoonshard()

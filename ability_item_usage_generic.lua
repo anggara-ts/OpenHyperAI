@@ -898,11 +898,22 @@ local function bg()
 	else
 		b8 = 0
 	end
-	local bk = { 0, 1, 2, 3, 4, 5, 15, 16 }
+	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
+	local bk = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
 	for aX, bl in pairs(bk) do
 		local bm = b:GetItemInSlot(bl)
-		if f.CanCastAbility(bm) then
-			local bn = bm:GetName()
+		local bn = bm ~= nil and bm:GetName() or nil
+		local inBackpack = bl >= 6 and bl <= 8
+		local smokeFromBag = inBackpack and bn == "item_smoke_of_deceit"
+		if inBackpack and not smokeFromBag then
+			bn = nil
+		end
+		local ready = f.CanCastAbility(bm)
+		if smokeFromBag and bm ~= nil and not bm:IsNull() then
+			local cd = bm:GetCooldownTimeRemaining()
+			ready = not (type(cd) == "number" and cd > 0)
+		end
+		if ready and bn ~= nil then
 			if a.ConsiderItemDesire[bn] ~= nil and not a.IsItemInStash(bn) then
 				local bo, bp, bq, brReason = a.ConsiderItemDesire[bn](bm)
 				if bo > 0 then

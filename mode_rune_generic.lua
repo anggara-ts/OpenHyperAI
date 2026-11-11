@@ -54,6 +54,18 @@ function GetDesireRaw()
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
 		return BOT_MODE_DESIRE_ABSOLUTE
 	end
+	-- After a fight the enemy is still inside 1600, which used to zero rune desire
+	-- and leave the bot pacing the bank. A rune already in reach is an instant pickup.
+	local runeId, runeDist = a.ClosestAvailableRune(700)
+	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
+	if runeId ~= nil and not dying then
+		local D = d.rune.normal
+		D.location = runeId
+		D.distance = runeDist
+		D.status = RUNE_STATUS_AVAILABLE
+		D.type = GetRuneType(runeId)
+		return BOT_MODE_DESIRE_ABSOLUTE + 0.02
+	end
 	if DotaTime() > 0 and #p > 0 then
 		if #p > #o then
 			return BOT_MODE_DESIRE_NONE
@@ -232,8 +244,14 @@ function Think()
 		d:Action_MoveToLocation(d:GetLocation() + RandomVector(500))
 		return
 	end
-	if b.CanNotUseAction(d) or d:GetCurrentActionType() == BOT_ACTION_TYPE_PICK_UP_RUNE then
+	if b.CanNotUseAction(d) then
 		return
+	end
+	-- A pickup order that never lands (knockback, stun, river edge) must be reissued.
+	if d:GetCurrentActionType() == BOT_ACTION_TYPE_PICK_UP_RUNE then
+		if d._runePickupAt ~= nil and DotaTime() - d._runePickupAt < 0.6 then
+			return
+		end
 	end
 	-- Lotus / wisdom shrine fallback (same gather logic as dedicated modes).
 	if d._mapObjKind ~= nil and d._mapObjLoc ~= nil then
@@ -327,8 +345,9 @@ function Think()
 			return 1.5 * myDmg > theirDmg
 		end
 		if D.status == RUNE_STATUS_AVAILABLE then
-			-- River spawn sits in the water. Grab from the bank instead of pathing onto the point.
-			if liveDist <= 220 then
+			-- River spawn sits in the water. Grab from the bank; don't path onto the point.
+			if liveDist <= 320 then
+				d._runePickupAt = DotaTime()
 				d:Action_PickUpRune(D.location)
 				return
 			end
@@ -355,28 +374,32 @@ function Think()
 					return
 				end
 			end
-			local step = math.max(0, liveDist - 160)
+			local step = math.max(0, liveDist - 280)
 			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
 			d.rune.location = stand
 			d:Action_MoveToLocation(stand)
 			return
 		else
-			for F, W in pairs(S) do
-				if CanHarassNearRune(W) then
-					d:Action_AttackUnit(W, true)
+			if liveDist > 500 then
+				for F, W in pairs(S) do
+					if CanHarassNearRune(W) then
+						d:Action_AttackUnit(W, true)
+						return
+					end
+				end
+				if
+					b.IsValid(T[1])
+					and b.CanBeAttacked(T[1])
+					and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+				then
+					d:Action_AttackUnit(T[1], true)
 					return
 				end
 			end
-			if
-				b.IsValid(T[1])
-				and b.CanBeAttacked(T[1])
-				and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
-			then
-				d:Action_AttackUnit(T[1], true)
-				return
-			end
-			d.rune.location = E
-			d:Action_MoveToLocation(E)
+			local step = math.max(0, liveDist - 280)
+			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
+			d.rune.location = stand
+			d:Action_MoveToLocation(stand)
 			return
 		end
 	end
@@ -386,6 +409,19 @@ function a.InitRune()
 		d.rune =
 			{ normal = { time = 0, type = nil, location = nil, distance = 0, status = RUNE_STATUS_MISSING }, location = nil }
 	end
+end
+function a.ClosestAvailableRune(maxDist)
+	local best, bestDist = nil, maxDist or 700
+	for _, rune in pairs(h) do
+		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE then
+			local dist = GetUnitToLocationDistance(d, GetRuneSpawnLocation(rune))
+			if dist < bestDist then
+				best = rune
+				bestDist = dist
+			end
+		end
+	end
+	return best, bestDist
 end
 function a.IsSuitableToPickRune()
 	if a.IsNearRune(d, 550) then

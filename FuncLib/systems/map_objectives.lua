@@ -634,8 +634,11 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			inLotus = false
 		end
 		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+		local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
 		if
 			inLotus
+			and mainRoom
 			and loc ~= nil
 			and dist <= maxWalk
 			and hp >= 0.28
@@ -717,8 +720,11 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	end
 	if kind == "lotus" then
 		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-		if Item.GetEmptyInventoryAmount(bot) <= 0 then
-			MapObjectives.EnsureInventorySlot(bot)
+		-- A full main inventory puts the lotus in the backpack, where it sits unused.
+		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+			local interval = MapObjectives.LotusInterval()
+			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			return false
 		end
 		local _, units = MapObjectives.GetLotusPoolLocations()
 		local count = MapObjectives.LotusCountNear(loc, units)

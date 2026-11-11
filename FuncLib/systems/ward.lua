@@ -36,7 +36,8 @@ local E = {
 	[4] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 local F = {
-	[1] = { location = Vector(922, -298, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
+	-- Radiant bank of the bottom rune. The dire bank looks back into Dire's own jungle.
+	[1] = { location = Vector(-245, -996, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 	[2] = { location = Vector(-627, 850, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[3] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[4] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
@@ -217,7 +218,13 @@ function a.GetAvailabeObserverWardSpots(K)
 		consider(UberWardSpots[i])
 	end
 	for i = 1, #RoshSpots do
-		consider(RoshSpots[i])
+		local spot = RoshSpots[i]
+		local x, y = spot.location.x, spot.location.y
+		local bottomRune = (x == 1230 and y == -3082) or (x == 2588 and y == -1248)
+		-- Own bank of the bottom rune faces our jungle. Ward the enemy bank.
+		if not (bottomRune and spot.side == ourSide) then
+			consider(spot)
+		end
 	end
 	for i = 1, #GateSpots do
 		consider(GateSpots[i])

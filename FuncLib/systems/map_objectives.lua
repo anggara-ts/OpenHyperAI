@@ -624,44 +624,50 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 	end
 
 	-- Lotus: walk in before the mark. Leave once the pool is empty or a pluck never lands.
+	-- The pool is empty until the first mark (3:00, 1:30 in turbo). Don't query it before the walk window.
 	do
 		local lInterval = MapObjectives.LotusInterval()
-		local locs, units = MapObjectives.GetLotusPoolLocations()
-		local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
-		local maxWalk = MapObjectives.MaxWalk(bot, true)
-		local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
-		local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
-		local count = MapObjectives.LotusCountNear(loc, units)
-		local mark = math.floor(math.max(0, DotaTime()) / lInterval) * lInterval
-		-- Enemy already took this spawn, or the pool has not stored one.
-		if count == 0 and type(etaL) == "number" and etaL < -1.5 then
-			inLotus = false
-		end
-		if bot._lotusSkipMark == mark and mark >= lInterval and (count == nil or count == 0) then
-			inLotus = false
-		end
-		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
-		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-		local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
-		if
-			inLotus
-			and mainRoom
-			and loc ~= nil
-			and dist <= maxWalk
-			and hp >= 0.28
-			and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
-			and MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore)
-		then
-			local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
-			if type(etaL) == "number" and etaL > arrive * 0.55 then
-				desire = math.min(desire, BOT_MODE_DESIRE_LOW + 0.05)
-			elseif type(etaL) == "number" and etaL <= 12 then
-				desire = math.max(desire, BOT_MODE_DESIRE_HIGH + 0.05)
+		local toNext = MapObjectives.SecondsToNextMark(lInterval)
+		local sinceLast = lInterval - toNext
+		local nearSpawn = toNext <= 32 or (DotaTime() >= lInterval - 1 and sinceLast <= 8)
+		if nearSpawn then
+			local locs, units = MapObjectives.GetLotusPoolLocations()
+			local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
+			local maxWalk = MapObjectives.MaxWalk(bot, true)
+			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
+			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
+			local count = MapObjectives.LotusCountNear(loc, units)
+			local mark = math.floor(math.max(0, DotaTime()) / lInterval) * lInterval
+			-- Enemy already took this spawn, or the pool has not stored one.
+			if count == 0 and type(etaL) == "number" and etaL < -1.5 then
+				inLotus = false
 			end
-			if type(etaL) == "number" and math.abs(etaL) <= 8 then
-				desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
+			if bot._lotusSkipMark == mark and mark >= lInterval and (count == nil or count == 0) then
+				inLotus = false
 			end
-			return desire, loc, "lotus", etaL
+			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
+			if
+				inLotus
+				and mainRoom
+				and loc ~= nil
+				and dist <= maxWalk
+				and hp >= 0.28
+				and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
+				and MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore)
+			then
+				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
+				if type(etaL) == "number" and etaL > arrive * 0.55 then
+					desire = math.min(desire, BOT_MODE_DESIRE_LOW + 0.05)
+				elseif type(etaL) == "number" and etaL <= 12 then
+					desire = math.max(desire, BOT_MODE_DESIRE_HIGH + 0.05)
+				end
+				if type(etaL) == "number" and math.abs(etaL) <= 8 then
+					desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
+				end
+				return desire, loc, "lotus", etaL
+			end
 		end
 	end
 

@@ -83,6 +83,7 @@ o["pos_3"] = {
 	"item_magic_stick",
 	"item_magic_wand",
 	"item_boots",
+	"item_bracer",
 	"item_phase_boots",
 	"item_blink",
 	"item_pipe",

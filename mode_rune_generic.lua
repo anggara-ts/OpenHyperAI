@@ -42,13 +42,6 @@ function GetDesireRaw()
 	a.InitRune()
 	d._mapObjKind = nil
 	d._mapObjLoc = nil
-	if
-		DotaTime() > 2 * 60
-		and DotaTime() < 6 * 60
-		and GetUnitToLocationDistance(d, GetRuneSpawnLocation(RUNE_POWERUP_2)) < 80
-	then
-		return BOT_MODE_DESIRE_NONE
-	end
 	g = d:FindItemSlot("item_bottle") >= 0
 	i = b.GetHP(d)
 	j = b.GetMP(d)
@@ -110,6 +103,10 @@ function GetDesireRaw()
 		then
 			local A = GetRuneStatus(d.rune.normal.location)
 			if A == RUNE_STATUS_AVAILABLE or A == RUNE_STATUS_UNKNOWN then
+				local here = GetUnitToLocationDistance(d, GetRuneSpawnLocation(d.rune.normal.location))
+				if A == RUNE_STATUS_AVAILABLE and here <= 800 then
+					return BOT_MODE_DESIRE_ABSOLUTE
+				end
 				return BOT_MODE_DESIRE_VERYHIGH
 			end
 		end
@@ -293,6 +290,7 @@ function Think()
 		local T = d:GetNearbyCreeps(R, true)
 		local D = d.rune.normal
 		local E = GetRuneSpawnLocation(D.location)
+		local liveDist = GetUnitToLocationDistance(d, E)
 		local U = D.location == RUNE_POWERUP_1 or D.location == RUNE_POWERUP_2
 		if
 			U
@@ -329,14 +327,19 @@ function Think()
 			return 1.5 * myDmg > theirDmg
 		end
 		if D.status == RUNE_STATUS_AVAILABLE then
-			if K and b.CanCastAbility(K) and D.distance < 1200 then
+			-- River spawn sits in the water. Grab from the bank instead of pathing onto the point.
+			if liveDist <= 220 then
+				d:Action_PickUpRune(D.location)
+				return
+			end
+			if K and b.CanCastAbility(K) and liveDist < 1200 then
 				local V = K:GetCurrentCharges()
 				if V > 0 and (i ~= 1 or j ~= 1) then
 					d:Action_UseAbility(K)
 					return
 				end
 			end
-			if D.distance > 50 then
+			if liveDist > 900 then
 				for F, W in pairs(S) do
 					if CanHarassNearRune(W) then
 						d:Action_AttackUnit(W, true)
@@ -351,13 +354,12 @@ function Think()
 					d:Action_AttackUnit(T[1], true)
 					return
 				end
-				d.rune.location = E
-				d:Action_MoveToLocation(E)
-				return
-			else
-				d:Action_PickUpRune(D.location)
-				return
 			end
+			local step = math.max(0, liveDist - 160)
+			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
+			d.rune.location = stand
+			d:Action_MoveToLocation(stand)
+			return
 		else
 			for F, W in pairs(S) do
 				if CanHarassNearRune(W) then
@@ -564,6 +566,13 @@ function a.GetScaledDesire(ae, af, ag)
 	end
 	return aj
 end
+-- A rune underfoot must beat laning (cores sit at ~0.57, last-hit at 0.6).
+function a.DesireForNearbyRune(desire, dist, status)
+	if status == RUNE_STATUS_AVAILABLE and type(dist) == "number" and dist <= 800 then
+		return math.max(desire or 0, BOT_MODE_DESIRE_ABSOLUTE)
+	end
+	return desire
+end
 -- After creeps spawn, laning desire (~0.45) fights scaled rune desire and bots oscillate
 -- lane ↔ river gold/bounty. Only start a pickup when already close; once committed, stick.
 function a.ApplyEarlyLaneRuneGate(desire, dist, status)
@@ -703,6 +712,7 @@ function a.GetLaningRuneDesire(z)
 	if au then
 		local av = { RUNE_POWERUP_1, RUNE_POWERUP_2 }
 		local aw = nil
+		local awStatus = nil
 		local ax = z
 		for F, D in pairs(av) do
 			local ay = GetRuneStatus(D)
@@ -715,6 +725,7 @@ function a.GetLaningRuneDesire(z)
 				if a0 < ax then
 					aw = D
 					ax = a0
+					awStatus = ay
 				end
 			end
 		end
@@ -725,7 +736,7 @@ function a.GetLaningRuneDesire(z)
 				d.rune.normal.status = GetRuneStatus(aw)
 				d.rune.normal.type = GetRuneType(aw)
 			end
-			return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, ax, 3200)
+			return a.DesireForNearbyRune(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, ax, 3200), ax, awStatus)
 		end
 	end
 	if k >= 4 then
@@ -745,7 +756,11 @@ function a.GetLaningRuneDesire(z)
 					d.rune.normal.status = GetRuneStatus(aA)
 					d.rune.normal.type = GetRuneType(aA)
 				end
-				return a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH, a0, 3500)
+				return a.DesireForNearbyRune(
+					a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH, a0, 3500),
+					a0,
+					GetRuneStatus(aA)
+				)
 			end
 		end
 	end
@@ -768,7 +783,7 @@ function a.GetLaningRuneDesire(z)
 			d.rune.normal.status = GetRuneStatus(aB)
 			d.rune.normal.type = GetRuneType(aB)
 		end
-		return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, aC, z)
+		return a.DesireForNearbyRune(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, aC, z), aC, GetRuneStatus(aB))
 	end
 	return 0
 end

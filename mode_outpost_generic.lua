@@ -1889,14 +1889,28 @@ local function RefreshOutpostCache()
 	outpostCacheAt = DotaTime()
 end
 
-local function AnyTier2Down()
-	local teams = { TEAM_RADIANT, TEAM_DIRE }
-	local towers = { TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2 }
-	for t = 1, #teams do
-		for i = 1, #towers do
-			if GetTower(teams[t], towers[i]) == nil then
-				return true
-			end
+-- Capturing an outpost needs an enemy tier-2 dead. Our own tier-2, or the 10:00 clock, does not unlock it.
+-- A tier-2 counts as dead only after that lane's tier-1 is gone too, so a nil tower list at game start does not qualify.
+local function EnemyTier2Down()
+	local enemy = GetOpposingTeam()
+	local lanes = {
+		{ TOWER_TOP_1, TOWER_TOP_2 },
+		{ TOWER_MID_1, TOWER_MID_2 },
+		{ TOWER_BOT_1, TOWER_BOT_2 },
+	}
+	local anyTower = false
+	for i = 1, #lanes do
+		if GetTower(enemy, lanes[i][1]) ~= nil or GetTower(enemy, lanes[i][2]) ~= nil then
+			anyTower = true
+			break
+		end
+	end
+	if not anyTower then
+		return false
+	end
+	for i = 1, #lanes do
+		if GetTower(enemy, lanes[i][1]) == nil and GetTower(enemy, lanes[i][2]) == nil then
+			return true
 		end
 	end
 	return false
@@ -1991,16 +2005,11 @@ end
 
 function ConsiderOutpostCapture()
 	outpostMoveLoc = nil
-	-- Enemy can take our outpost once ANY tier-2 falls (ours or theirs).
-	-- Reclaim does not wait for an enemy tier-2.
-	if not a0 then
-		if AnyTier2Down() or DotaTime() >= 10 * 60 then
-			a0 = true
-		end
-	end
-	if not a0 then
+	if not EnemyTier2Down() then
+		a0 = false
 		return 0
 	end
+	a0 = true
 	if a.GetEnemiesAroundAncient(c, 3200) > 0 then
 		return 0
 	end

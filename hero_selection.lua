@@ -126,32 +126,82 @@ local W = { [1] = LANE_TOP, [2] = LANE_MID, [3] = LANE_BOT, [4] = LANE_BOT, [5] 
 f = { TEAM_RADIANT = j.Deepcopy(V), TEAM_DIRE = j.Deepcopy(W) }
 local X = { [1] = LANE_MID, [2] = LANE_MID, [3] = LANE_MID, [4] = LANE_MID, [5] = LANE_MID }
 local Y = { [1] = LANE_MID, [2] = LANE_TOP, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_TOP }
-if p then
-	if GetTeam() == TEAM_RADIANT and p.Radiant_Heros then
-		for Z = 1, #p.Radiant_Heros do
-			local U = j.TrimString(p.Radiant_Heros[Z])
-			if U and U ~= "Random" and j.HasValue(u, U) then
-				d[Z] = U
-			end
-		end
-	elseif GetTeam() == TEAM_DIRE and p.Dire_Heros then
-		for Z = 1, #p.Dire_Heros do
-			local U = j.TrimString(p.Dire_Heros[Z])
-			if U and U ~= "Random" and j.HasValue(u, U) then
-				d[Z] = U
-			end
+-- Resolve which Customize pick list applies to a team.
+-- Debug_Ally/Enemy override Radiant/Dire when that debug list has real hero names.
+local function a_DebugHumanTeam()
+	if j.IsHumanPlayerInTeam(TEAM_RADIANT) then
+		return TEAM_RADIANT
+	end
+	if j.IsHumanPlayerInTeam(TEAM_DIRE) then
+		return TEAM_DIRE
+	end
+	return TEAM_RADIANT
+end
+local function a_HasForcedHeroNames(list)
+	if type(list) ~= "table" then
+		return false
+	end
+	for Z = 1, #list do
+		local U = j.TrimString(list[Z] or "")
+		if U ~= "" and U ~= "Random" then
+			return true
 		end
 	end
+	return false
+end
+local function a_GetForcedPickList(ab)
+	if not p then
+		return nil
+	end
+	local allyList = p.Debug_Ally_Heros
+	local enemyList = p.Debug_Enemy_Heros
+	local useAlly = a_HasForcedHeroNames(allyList)
+	local useEnemy = a_HasForcedHeroNames(enemyList)
+	if useAlly or useEnemy then
+		local humanTeam = a_DebugHumanTeam()
+		if ab == humanTeam then
+			return useAlly and allyList or nil
+		end
+		return useEnemy and enemyList or nil
+	end
+	if ab == TEAM_RADIANT and p.Radiant_Heros then
+		return p.Radiant_Heros
+	end
+	if ab == TEAM_DIRE and p.Dire_Heros then
+		return p.Dire_Heros
+	end
+	return nil
+end
+local function a_ApplyForcedPicks(list)
+	if type(list) ~= "table" then
+		return false
+	end
+	local applied = false
+	for Z = 1, math.min(5, #list) do
+		local U = j.TrimString(list[Z] or "")
+		if U ~= "" and U ~= "Random" and j.HasValue(u, U) then
+			d[Z] = U
+			applied = true
+		end
+	end
+	return applied
+end
+local a_ForcedPickList = nil
+local a_HasDebugForcedPicks = false
+if p then
+	a_ForcedPickList = a_GetForcedPickList(GetTeam())
+	a_HasDebugForcedPicks = a_ApplyForcedPicks(a_ForcedPickList)
+		and (
+			a_HasForcedHeroNames(p.Debug_Ally_Heros) or a_HasForcedHeroNames(p.Debug_Enemy_Heros)
+		)
 end
 function a.IsInCustomizedPicks(I)
 	if not p then
 		return false
 	end
-	local _ = {}
-	if GetTeam() == TEAM_RADIANT and p.Radiant_Heros then
-		_ = p.Radiant_Heros
-	elseif GetTeam() == TEAM_DIRE and p.Dire_Heros then
-		_ = p.Dire_Heros
+	local _ = a_ForcedPickList or a_GetForcedPickList(GetTeam())
+	if type(_) ~= "table" then
+		return false
 	end
 	return j.HasValue(_, I)
 end
@@ -609,8 +659,16 @@ local function b3(Z, al)
 end
 local function b7()
 	local a3 = GetTeamPlayers(GetTeam(), true)
-	if not ay[B] and not j.IsHumanPlayerInTeam(GetTeam()) and not IsLanMode() then
+	-- Keep debug force-pick order stable (pos 1..N as listed).
+	if
+		not ay[B]
+		and not a_HasDebugForcedPicks
+		and not j.IsHumanPlayerInTeam(GetTeam())
+		and not IsLanMode()
+	then
 		a.ShufflePickOrder(a3)
+		ay[B] = true
+	elseif not ay[B] and a_HasDebugForcedPicks then
 		ay[B] = true
 	end
 	for Z, al in pairs(a3) do

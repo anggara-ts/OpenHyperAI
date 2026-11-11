@@ -459,6 +459,61 @@ local function OuterStillStanding(team, towerId)
 	end
 	return false
 end
+-- A spot next to an enemy T2/T3, or deeper than a living T1, gets the ward killed and the support ganked.
+local function EnemyWardTooDeep(loc)
+	local enemy = GetOpposingTeam()
+	local gates = {
+		{ TOWER_TOP_2, TOWER_TOP_1 },
+		{ TOWER_MID_2, TOWER_MID_1 },
+		{ TOWER_BOT_2, TOWER_BOT_1 },
+		{ TOWER_TOP_3, TOWER_TOP_2 },
+		{ TOWER_MID_3, TOWER_MID_2 },
+		{ TOWER_BOT_3, TOWER_BOT_2 },
+		{ TOWER_TOP_3, TOWER_TOP_1 },
+		{ TOWER_MID_3, TOWER_MID_1 },
+		{ TOWER_BOT_3, TOWER_BOT_1 },
+	}
+	for i = 1, #gates do
+		local inner = GetTower(enemy, gates[i][1])
+		local outer = GetTower(enemy, gates[i][2])
+		if inner ~= nil and outer ~= nil and GetUnitToLocationDistance(inner, loc) <= 1600 then
+			return true
+		end
+	end
+	local ancient = GetAncient(enemy)
+	if ancient == nil then
+		return false
+	end
+	local fronts = { TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1 }
+	local nearest = nil
+	local nearestDist = 3200
+	for i = 1, #fronts do
+		local t1 = GetTower(enemy, fronts[i])
+		if t1 ~= nil then
+			local dist = GetUnitToLocationDistance(t1, loc)
+			if dist < nearestDist then
+				nearestDist = dist
+				nearest = t1
+			end
+		end
+	end
+	if nearest == nil then
+		return false
+	end
+	local spotDepth = GetUnitToLocationDistance(ancient, loc)
+	local towerDepth = GetUnitToUnitDistance(ancient, nearest)
+	return spotDepth + 500 < towerDepth
+end
+local function DropDeepEnemySpots(list)
+	local kept = {}
+	for i = 1, #list do
+		local spot = list[i]
+		if spot ~= nil and spot.location ~= nil and not EnemyWardTooDeep(spot.location) then
+			kept[#kept + 1] = spot
+		end
+	end
+	return kept
+end
 -- Home/defend ground spots sit on our T3. Skip them until that lane's T1 is gone,
 -- unless enemies are already on the high ground (handled by the caller).
 local function HomeWardTooEarly(loc)
@@ -629,7 +684,7 @@ function a.GetAvailabeObserverWardSpots(K)
 				end
 			end
 	end
-	return L
+	return DropDeepEnemySpots(L)
 end
 function a.GetClosestObserverWardSpot(K, S)
 	local T = 100000
@@ -804,7 +859,7 @@ function a.GetPossibleSentryWardSpots(K)
 			end
 		end
 	end
-	return W
+	return DropDeepEnemySpots(W)
 end
 function a.GetClosestSentryWardSpot(K, S)
 	local T = 100000

@@ -415,10 +415,6 @@ function MapObjectives.WisdomScore(hero, loc)
 	return score
 end
 
--- Pool buff stack is the stored lotus count once we have seen it above zero.
--- Until then a zero stack is "unknown", so an empty read cannot skip every pool.
-local lotusStackSeen = false
-
 local function LotusCharges(bot)
 	local n = 0
 	for slot = 0, 16 do
@@ -441,39 +437,9 @@ local function LotusCharges(bot)
 end
 
 function MapObjectives.LotusCountOnUnit(pool)
-	if pool == nil or pool.NumModifiers == nil then
-		return nil
-	end
-	if pool.IsNull ~= nil and pool:IsNull() then
-		return nil
-	end
-	-- NumModifiers on a fogged lotus pool spams the console and tanks FPS.
-	if pool.CanBeSeen ~= nil and not pool:CanBeSeen() then
-		return nil
-	end
-	local found = false
-	local stacks = 0
-	local n = pool:NumModifiers() or 0
-	for i = 0, n - 1 do
-		local name = pool:GetModifierName(i)
-		if type(name) == "string" and string.find(name, "lotus_pool", 1, true) then
-			found = true
-			local s = pool:GetModifierStackCount(i)
-			if type(s) == "number" and s > stacks then
-				stacks = s
-			end
-		end
-	end
-	if not found then
-		return nil
-	end
-	if stacks > 0 then
-		lotusStackSeen = true
-		return stacks
-	end
-	if lotusStackSeen then
-		return 0
-	end
+	-- CanBeSeen() stays true on npc_dota_lotus_pool while it is fogged, and
+	-- NumModifiers then prints a developer warning every think. The stack is
+	-- not readable. Callers treat nil as "unknown" and use the in-ring timeout.
 	return nil
 end
 
@@ -511,7 +477,12 @@ function MapObjectives.LotusSpawnOpen()
 end
 
 -- Inside the ring: a lotus that never arrives was taken or the pool is empty.
+-- Time spent waiting for the mark does not count, or they walk off as it spawns.
 function MapObjectives.LotusPluckStalled(bot, enemyInRing)
+	if not MapObjectives.LotusSpawnOpen() then
+		bot._lotusHaveAt = nil
+		return false
+	end
 	local have = LotusCharges(bot)
 	local now = DotaTime()
 	if bot._lotusHave ~= have or bot._lotusHaveAt == nil then

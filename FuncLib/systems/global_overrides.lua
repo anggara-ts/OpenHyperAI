@@ -323,6 +323,14 @@ function CDOTA_Bot_Script:HasModifier(a9)
 	end
 	return a8(self, a9)
 end
+-- Lotus pools report CanBeSeen() while fogged, then NumModifiers logs a warning.
+local lotusPoolNumModifiers = CDOTA_Bot_Script.NumModifiers
+function CDOTA_Bot_Script:NumModifiers()
+	if self ~= nil and self.GetUnitName ~= nil and self:GetUnitName() == "npc_dota_lotus_pool" then
+		return 0
+	end
+	return lotusPoolNumModifiers(self)
+end
 local aa = CDOTA_Bot_Script.GetLocation
 function CDOTA_Bot_Script:GetLocation()
 	if self == nil or not self:IsBuilding() and not self:CanBeSeen() then

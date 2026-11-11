@@ -17,6 +17,41 @@ local i = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local j = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 j.ThinkLess = j.Enable and j.ThinkLess or 1
+local lastHumanPingTime = -1
+local function LogHumanPing()
+	local myId = b:GetPlayerID()
+	local loggerId = nil
+	for _, pid in ipairs(GetTeamPlayers(GetTeam())) do
+		local member = GetTeamMember(pid)
+		if member ~= nil and member:IsBot() and not member:IsIllusion() and member:IsAlive() then
+			local id = member:GetPlayerID()
+			if loggerId == nil or id < loggerId then
+				loggerId = id
+			end
+		end
+	end
+	if loggerId ~= myId then
+		return
+	end
+	local human, ping = g.GetHumanPing()
+	if human == nil or ping == nil or ping.location == nil or ping.time == nil or ping.time == 0 then
+		return
+	end
+	if ping.time == lastHumanPingTime or GameTime() - ping.time > 1.5 then
+		lastHumanPingTime = ping.time
+		return
+	end
+	lastHumanPingTime = ping.time
+	local loc = ping.location
+	print(string.format(
+		"[OHA-PING] %.0f %.0f %.0f normal=%s t=%.1f",
+		loc.x,
+		loc.y,
+		loc.z or 0,
+		tostring(ping.normal_ping),
+		DotaTime()
+	))
+end
 -- When already attacking a valid target and not in danger, skip heavy item/ability
 -- rescans for ~3 engine frames * ThinkLess (DotaTime-based, not wall clock).
 local THINK_SAMPLE_FRAME = 0.033
@@ -6749,6 +6784,7 @@ function ItemUsageThink()
 		end
 	end
 	MatchTrace.Tick(b)
+	LogHumanPing()
 	if b:IsInvulnerable() or not b:IsHero() or not b:IsAlive() or not string.find(c, "hero") or b:IsIllusion() then
 		_perfDone()
 		return

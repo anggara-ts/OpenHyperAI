@@ -6815,6 +6815,13 @@ function ItemUsageThink()
 		_perfDone()
 		return
 	end
+	-- A spell or attack cancels an outpost capture. Wisdom and lotus do not care.
+	if b:HasModifier("modifier_watch_tower_capturing")
+		or (b.outpostOrderAt ~= nil and DotaTime() - b.outpostOrderAt < 6.5)
+	then
+		_perfDone()
+		return
+	end
 	-- Keep attack orders; only throttle expensive item/ability rescans when target is locked.
 	if ShouldThrottleHeavyThink() then
 		_perfDone()

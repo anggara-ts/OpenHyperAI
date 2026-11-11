@@ -444,6 +444,13 @@ function MapObjectives.LotusCountOnUnit(pool)
 	if pool == nil or pool.NumModifiers == nil then
 		return nil
 	end
+	if pool.IsNull ~= nil and pool:IsNull() then
+		return nil
+	end
+	-- NumModifiers on a fogged lotus pool spams the console and tanks FPS.
+	if pool.CanBeSeen ~= nil and not pool:CanBeSeen() then
+		return nil
+	end
 	local found = false
 	local stacks = 0
 	local n = pool:NumModifiers() or 0

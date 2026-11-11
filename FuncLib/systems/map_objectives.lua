@@ -493,6 +493,22 @@ function MapObjectives.LotusPluckStalled(bot, enemyInRing)
 	return now - bot._lotusHaveAt >= limit
 end
 
+local function EnemyOnPoint(bot, loc, radius)
+	local enemies = bot:GetNearbyHeroes(radius + 200, true, BOT_MODE_NONE) or {}
+	for i = 1, #enemies do
+		local enemy = enemies[i]
+		if
+			enemy ~= nil
+			and enemy:IsAlive()
+			and not enemy:IsIllusion()
+			and GetUnitToLocationDistance(enemy, loc) <= radius
+		then
+			return enemy
+		end
+	end
+	return nil
+end
+
 local function EnemyInLotusRing(bot, loc)
 	local enemies = bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}
 	for i = 1, #enemies do
@@ -662,7 +678,9 @@ local function AnnounceObjective(bot, kind)
 	bot:ActionImmediate_Chat(msg, false)
 end
 
--- Stand in the gather/pluck ring. kind: "lotus" | "wisdom"
+-- Cover the gather/pluck ring. kind: "lotus" | "wisdom"
+-- An attack or a spell inside the ring does not cancel either one.
+-- Wisdom fails only when an enemy hero is standing on the shrine.
 function MapObjectives.ThinkObjective(bot, loc, kind)
 	if bot == nil or loc == nil then
 		return false
@@ -672,6 +690,53 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	local dist = GetUnitToLocationDistance(bot, loc)
 	local enemies = bot:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
 	local allies = bot:GetNearbyHeroes(1000, false, BOT_MODE_NONE) or {}
+
+	if kind == "wisdom" then
+		local onShrine = EnemyOnPoint(bot, loc, gather)
+		if dist > gather then
+			bot._wisdomStandSince = nil
+			bot._wisdomXpAtStand = nil
+			-- Nearby heroes do not matter. Only a hero already on the shrine, and only when we are outnumbered.
+			if onShrine ~= nil and #enemies > #allies then
+				return true
+			end
+			bot:Action_MoveToLocation(loc)
+			return true
+		end
+		if onShrine ~= nil then
+			bot._wisdomStandSince = nil
+			bot._wisdomXpAtStand = nil
+			if not bot:IsCastingAbility() and not bot:IsChanneling() then
+				local range = bot:GetAttackRange() + 80
+				if GetUnitToUnitDistance(bot, onShrine) <= range then
+					if bot:GetAttackTarget() ~= onShrine then
+						bot:Action_AttackUnit(onShrine, true)
+					end
+				else
+					bot:Action_MoveToLocation(onShrine:GetLocation())
+				end
+			end
+			return true
+		end
+		local now = DotaTime()
+		local xp = bot.GetCurrentXP and bot:GetCurrentXP() or nil
+		if bot._wisdomStandSince == nil then
+			bot._wisdomStandSince = now
+			bot._wisdomXpAtStand = xp
+		else
+			local gotXp = xp ~= nil and bot._wisdomXpAtStand ~= nil and xp > bot._wisdomXpAtStand
+			local covered = now - bot._wisdomStandSince >= 3.5
+			local interval = MapObjectives.WisdomInterval()
+			local mark = math.floor(math.max(0, now) / interval) * interval
+			if mark >= interval and now >= mark and (gotXp or covered) then
+				bot._wisdomClaimedMark = mark
+				bot._wisdomStandSince = nil
+				bot._wisdomXpAtStand = nil
+			end
+		end
+		-- Covering the shrine is enough. An attack or a spell does not cancel it.
+		return true
+	end
 
 	if #enemies > 0 and #enemies > #allies and dist > gather then
 		return true
@@ -684,12 +749,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		end
 	end
 	if dist > gather then
-		if kind == "wisdom" then
-			bot._wisdomStandSince = nil
-			bot._wisdomXpAtStand = nil
-		elseif kind == "lotus" then
-			bot._lotusHaveAt = nil
-		end
+		bot._lotusHaveAt = nil
 		bot:Action_MoveToLocation(loc)
 		return true
 	end
@@ -717,29 +777,8 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		end
 		ActInsideLotus(bot, loc)
 		return true
-	elseif kind == "wisdom" then
-		-- Shrine channel is ~3s. Mark claimed once XP lands or after a short stand so we leave.
-		local now = DotaTime()
-		local xp = bot.GetCurrentXP and bot:GetCurrentXP() or nil
-		if bot._wisdomStandSince == nil then
-			bot._wisdomStandSince = now
-			bot._wisdomXpAtStand = xp
-		else
-			local gotXp = xp ~= nil and bot._wisdomXpAtStand ~= nil and xp > bot._wisdomXpAtStand
-			local stoodLongEnough = now - bot._wisdomStandSince >= 3.5
-			-- Only claim after the mark has opened (eta already passed / clock on the interval).
-			local interval = MapObjectives.WisdomInterval()
-			local mark = math.floor(math.max(0, now) / interval) * interval
-			if mark >= interval and now >= mark and (gotXp or stoodLongEnough) then
-				bot._wisdomClaimedMark = mark
-				bot._wisdomStandSince = nil
-				bot._wisdomXpAtStand = nil
-			end
-		end
 	end
-	-- Hold still so pluck/channel is not cancelled by micro-moves.
-	bot:Action_ClearActions(true)
-	return true
+	return false
 end
 
 return MapObjectives

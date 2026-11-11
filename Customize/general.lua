@@ -61,12 +61,31 @@ Customize.Ban = {
 }
 
 --[[
+Debug force-picks (ally / enemy) — preferred for debugging specific matchups.
+
+Ally = human player's team (Radiant if no human). Enemy = the other side.
+Put any number of internal hero names (0–5). Remaining slots pick freely.
+Empty tables = off (falls back to Radiant_Heros / Dire_Heros below).
+Examples:
+  Customize.Debug_Ally_Heros = { "npc_dota_hero_phoenix" }
+  Customize.Debug_Enemy_Heros = { "npc_dota_hero_sniper", "npc_dota_hero_axe" }
+Hero name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
+--]]
+Customize.Debug_Ally_Heros = {
+	-- "npc_dota_hero_phoenix",
+}
+Customize.Debug_Enemy_Heros = {
+	-- "npc_dota_hero_sniper",
+}
+
+--[[
 1. To pick heroes for the Radiant bots. You have to use hero's internal name.
 2. Hero internal name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
 3. Don't need to provide a value for all 5 bots, any empty/missing value will fallback to a Random value.
 4. The position is ranked by the order of the names you put in the below list, pos 1 - 5, from top to down.
 5. There are sample team picks in Appendix section below. 
 6. Check Appendix to ensure you DO NOT pick more than 1 "weak" heroes in a team for your game experience.
+7. Ignored for a side when the matching Debug_Ally_Heros / Debug_Enemy_Heros list above is non-empty.
 --]]
 Customize.Radiant_Heros = {
 	"Random",

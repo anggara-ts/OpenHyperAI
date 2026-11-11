@@ -366,6 +366,31 @@ function a.ConsiderFireSpirits()
 			end
 		end
 	end
+	-- Laning: harass a farming enemy core (last-hits / near wave), not only when they hit an ally.
+	if c.IsInLaningPhase() and Y > 0.4 and c.GetMP(b) > 0.2 and not c.IsRetreating(b) then
+		for S, T in pairs(R) do
+			if
+				c.IsValidHero(T)
+				and c.IsCore(T)
+				and not c.IsSuspiciousIllusion(T)
+				and c.IsInRange(b, T, a1)
+				and c.CanCastOnNonMagicImmune(T)
+				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				local atk = T:GetAttackTarget()
+				local farming = atk ~= nil
+					and not atk:IsNull()
+					and atk:IsAlive()
+					and not atk:IsHero()
+					and atk:GetTeam() ~= T:GetTeam()
+				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+				if farming or nearWave then
+					return BOT_ACTION_DESIRE_HIGH
+				end
+			end
+		end
+	end
 	local a8 = b:GetNearbyLaneCreeps(math.min(a1, 1600), true)
 	if (c.IsPushing(b) or c.IsDefending(b)) and not c.IsThereNonSelfCoreNearby(1200) then
 		if
@@ -506,6 +531,34 @@ function a.ConsiderFireSpiritsLaunch()
 					if a0.count >= 2 then
 						return BOT_ACTION_DESIRE_HIGH, a0.targetloc
 					else
+						return BOT_ACTION_DESIRE_HIGH, ac
+					end
+				end
+			end
+		end
+	end
+	-- Laning: launch spirits onto farming enemy cores.
+	if c.IsInLaningPhase() and not c.IsRetreating(b) then
+		for S, T in pairs(R) do
+			if
+				c.IsValidHero(T)
+				and c.IsCore(T)
+				and not c.IsSuspiciousIllusion(T)
+				and c.IsInRange(b, T, a1)
+				and c.CanCastOnNonMagicImmune(T)
+				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+			then
+				local atk = T:GetAttackTarget()
+				local farming = atk ~= nil
+					and not atk:IsNull()
+					and atk:IsAlive()
+					and not atk:IsHero()
+					and atk:GetTeam() ~= T:GetTeam()
+				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+				if farming or nearWave then
+					local ab = GetUnitToUnitDistance(b, T) / a3
+					local ac = c.GetCorrectLoc(T, ab)
+					if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(T, "modifier_phoenix_fire_spirit_burn") then
 						return BOT_ACTION_DESIRE_HIGH, ac
 					end
 				end

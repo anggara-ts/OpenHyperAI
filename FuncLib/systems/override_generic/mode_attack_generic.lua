@@ -314,6 +314,7 @@ function r.GetDesire()
 					end
 				end
 			end
+			::continue_ally_follow::
 		end
 	end
 	if #x == 0 then

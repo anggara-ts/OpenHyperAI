@@ -1318,16 +1318,60 @@ function ItemPurchaseThink()
 						canStackOnAlly = true
 					end
 				end
-				local emptyOk = c.GetEmptyInventoryAmount(ally) >= 1 or canStackOnAlly
-				local noOtherLotus = ally:FindItemSlot("item_famango") < 0
-					and ally:FindItemSlot("item_great_famango") < 0
-					and (greater < 0 or canStackOnAlly)
-				if emptyOk and noOtherLotus then
+				local emptyOk = c.GetEmptyNonBackpackInventoryAmount(ally) >= 1 or canStackOnAlly
+				if emptyOk then
 					return ally
 				end
 			end
 		end
 		return nil
+	end
+	local function BackpackLotus()
+		for slot = 6, 8 do
+			local it = a:GetItemInSlot(slot)
+			if it ~= nil and not it:IsNull() then
+				local name = it:GetName()
+				if
+					name == "item_famango"
+					or name == "item_great_famango"
+					or name == "item_greater_famango"
+				then
+					return name, slot, it
+				end
+			end
+		end
+		return nil, -1, nil
+	end
+	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
+	if w > (a._lastBackpackLotus or -100) + 3.0 then
+		local lotusName, lotusSlot, lotusItem = BackpackLotus()
+		if lotusItem ~= nil then
+			a._lastBackpackLotus = w
+			local hp = e.GetHP(a)
+			local mp = e.GetMP(a)
+			local ally = nil
+			if hp >= 0.6 and mp >= 0.4 then
+				ally = NearbySupportForLotus(lotusName == "item_greater_famango")
+			end
+			if ally ~= nil then
+				MatchTrace.Buy(a, lotusName, "backpack lotus to support")
+				a:Action_DropItem(lotusItem, ally:GetLocation())
+				return
+			end
+			local dest = c.GetMainInvLessValItemSlot(a)
+			if dest ~= nil and dest >= 0 then
+				a:ActionImmediate_SwapItems(lotusSlot, dest)
+				local moved = a:GetItemInSlot(dest)
+				if moved ~= nil and not moved:IsNull() and moved:GetName() == lotusName then
+					MatchTrace.Buy(a, lotusName, "backpack lotus swap and use")
+					a:Action_UseAbilityOnEntity(moved, a)
+				end
+				return
+			end
+			MatchTrace.Buy(a, lotusName, "backpack lotus drop")
+			a:Action_DropItem(lotusItem, a:GetLocation())
+			return
+		end
 	end
 	if e.GetPosition(a) <= 3 and w > (a._lastLotusHandoff or -100) + 4.0 then
 		local hp = e.GetHP(a)
@@ -1346,7 +1390,7 @@ function ItemPurchaseThink()
 		end
 	elseif e.GetPosition(a) >= 4 then
 		-- Supports pick up healing lotuses cores dropped for them (or own stack merge).
-		if c.GetEmptyInventoryAmount(a) >= 1 or c.CanStackGreaterFamango(a) then
+		if c.GetEmptyNonBackpackInventoryAmount(a) >= 1 or c.CanStackGreaterFamango(a) then
 			for _, drop in pairs(GetDroppedItemList() or {}) do
 				if drop ~= nil and drop.item ~= nil then
 					local dropName = drop.item:GetName()

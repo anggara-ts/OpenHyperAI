@@ -138,6 +138,26 @@ function GetDesireHelper()
 	if towerDiveRetreat > 0 then
 		return towerDiveRetreat
 	end
+	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
+	do
+		local alliesNearby = b.GetAllyCount(c, 1400)
+		local enemiesNearby = b.GetEnemyCount(c, 1400)
+		local lastSeen = b.GetLastSeenEnemiesNearLoc and b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 2000) or {}
+		local pressure = math.max(enemiesNearby, #lastSeen)
+		local freeKill = b.IsValidHero(k)
+			and b.CanKillTarget(k, c:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL)
+			and GetUnitToUnitDistance(c, k) <= c:GetAttackRange() + 200
+		if
+			not freeKill
+			and (
+				alliesNearby <= 1 and pressure >= 2
+				or pressure >= alliesNearby + 1 and not b.WeAreStronger(c, 1400)
+			)
+			and (m == BOT_MODE_ATTACK or m == BOT_MODE_TEAM_ROAM or m == BOT_MODE_ROAM or b.IsGoingOnSomeone(c))
+		then
+			return BOT_MODE_DESIRE_ABSOLUTE
+		end
+	end
 	if
 		m == BOT_MODE_ROSHAN
 		and not b.IsRoshanAlive()

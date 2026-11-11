@@ -67,6 +67,35 @@ local function a2(a3)
 	a:SetTarget(a3)
 	a1 = DotaTime() + a0
 end
+-- Drop sticky chase when outnumbered / alone after enemy backup arrives.
+local function ShouldAbortStickyEngage(bot, target)
+	if not g.IsValidHero(target) then
+		return true
+	end
+	-- Finish a free kill in range.
+	if
+		g.CanKillTarget(target, bot:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL)
+		and GetUnitToUnitDistance(bot, target) <= bot:GetAttackRange() + 200
+	then
+		return false
+	end
+	local allies = g.GetAllyCount(bot, 1400)
+	local enemies = g.GetEnemyCount(bot, 1400)
+	local lastSeen = g.GetLastSeenEnemiesNearLoc and g.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
+	local pressure = math.max(enemies, #lastSeen)
+	if allies <= 1 and pressure >= 2 then
+		return true
+	end
+	if pressure >= allies + 1 and not g.WeAreStronger(bot, 1400) then
+		return true
+	end
+	return false
+end
+local function ClearEngageTarget()
+	m = nil
+	a1 = -90
+	a:SetTarget(nil)
+end
 local function a4(a5)
 	if g.IsPushing(a) then
 		if a5 > 0.6 then
@@ -575,6 +604,10 @@ function Think()
 		y = g.CheckBotIdleState()
 	end
 	if g.Utils.IsValidUnit(m) and (z or u or t) then
+		if g.IsValidHero(m) and ShouldAbortStickyEngage(a, m) then
+			ClearEngageTarget()
+			return
+		end
 		local aO = GetUnitToUnitDistance(a, m)
 		local aQ = a:GetAttackRange()
 		if aQ >= 400 and aO > aQ + 100 then
@@ -616,7 +649,11 @@ function k.SupportFindTarget()
 			return aW, BOT_DESIRE_OVERRIDE * 1.5
 		end
 		if aW:IsHero() and not g.IsInLaningPhase() and (a:GetCurrentMovementSpeed() < 300 or aY >= 25) then
-			return aW, BOT_DESIRE_OVERRIDE * 1.2
+			if ShouldAbortStickyEngage(a, aW) then
+				ClearEngageTarget()
+				return nil, 0
+			end
+			return aW, BOT_MODE_DESIRE_ABSOLUTE
 		end
 		if g.IsPushing(a) and not aW:IsHero() then
 			return nil, 0
@@ -735,7 +772,11 @@ function k.CarryFindTarget()
 					return nil, BOT_MODE_DESIRE_NONE
 				end
 			end
-			return aW, BOT_DESIRE_OVERRIDE * 1.2
+			if ShouldAbortStickyEngage(a, aW) then
+				ClearEngageTarget()
+				return nil, 0
+			end
+			return aW, BOT_MODE_DESIRE_ABSOLUTE
 		end
 		if g.IsPushing(a) and not aW:IsHero() then
 			return nil, 0

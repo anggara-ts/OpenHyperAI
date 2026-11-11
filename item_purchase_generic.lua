@@ -778,6 +778,10 @@ function ItemPurchaseThink()
 			and ay.item:GetName() ~= "item_famango"
 			and ay.item:GetName() ~= "item_great_famango"
 			and ay.item:GetName() ~= "item_greater_famango"
+			-- Forage finds (toadstool, nut, ringcap) are dropped on purpose.
+			and ay.item:GetName() ~= "item_foragers_health"
+			and ay.item:GetName() ~= "item_foragers_stats"
+			and ay.item:GetName() ~= "item_foragers_mana"
 			-- Never re-pick wards we just handed to supports (breaks drop↔pickup loops).
 			and ay.item:GetName() ~= "item_ward_observer"
 			and ay.item:GetName() ~= "item_ward_sentry"
@@ -1341,6 +1345,32 @@ function ItemPurchaseThink()
 			end
 		end
 		return nil, -1, nil
+	end
+	local function BackpackForage()
+		for slot = 6, 8 do
+			local it = a:GetItemInSlot(slot)
+			if it ~= nil and not it:IsNull() then
+				local name = it:GetName()
+				if
+					name == "item_foragers_health"
+					or name == "item_foragers_stats"
+					or name == "item_foragers_mana"
+				then
+					return name, it
+				end
+			end
+		end
+		return nil, nil
+	end
+	-- Vital Toadstool, Ironwood Nut, Tomo'kan Ringcap. They land in the backpack and are never used.
+	if w > (a._lastBackpackForage or -100) + 3.0 then
+		local forageName, forageItem = BackpackForage()
+		if forageItem ~= nil then
+			a._lastBackpackForage = w
+			MatchTrace.Buy(a, forageName, "drop backpack forage")
+			a:Action_DropItem(forageItem, a:GetLocation())
+			return
+		end
 	end
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
 	if w > (a._lastBackpackLotus or -100) + 3.0 then

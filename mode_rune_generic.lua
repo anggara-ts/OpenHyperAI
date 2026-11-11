@@ -54,18 +54,6 @@ function GetDesireRaw()
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
 		return BOT_MODE_DESIRE_ABSOLUTE
 	end
-	-- After a fight the enemy is still inside 1600, which used to zero rune desire
-	-- and leave the bot pacing the bank. A rune already in reach is an instant pickup.
-	local runeId, runeDist = a.ClosestAvailableRune(700)
-	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
-	if runeId ~= nil and not dying then
-		local D = d.rune.normal
-		D.location = runeId
-		D.distance = runeDist
-		D.status = RUNE_STATUS_AVAILABLE
-		D.type = GetRuneType(runeId)
-		return BOT_MODE_DESIRE_ABSOLUTE + 0.02
-	end
 	if DotaTime() > 0 and #p > 0 then
 		if #p > #o then
 			return BOT_MODE_DESIRE_NONE
@@ -93,6 +81,17 @@ function GetDesireRaw()
 			d._mapObjLoc = loc
 			return desire
 		end
+	end
+	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
+	local runeId, runeDist = a.ClosestAvailableRune(400)
+	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
+	if runeId ~= nil and not dying then
+		local D = d.rune.normal
+		D.location = runeId
+		D.distance = runeDist
+		D.status = RUNE_STATUS_AVAILABLE
+		D.type = GetRuneType(runeId)
+		return BOT_MODE_DESIRE_ABSOLUTE + 0.02
 	end
 	if not b.IsInLaningPhase() then
 		if b.IsPushing(d) or b.IsDefending(d) then

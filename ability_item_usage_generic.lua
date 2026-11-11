@@ -17,6 +17,35 @@ local i = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local j = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 j.ThinkLess = j.Enable and j.ThinkLess or 1
+-- When already attacking a valid target and not in danger, skip heavy item/ability
+-- rescans for ~3 engine frames * ThinkLess (DotaTime-based, not wall clock).
+local THINK_SAMPLE_FRAME = 0.033
+local function ShouldThrottleHeavyThink()
+	local thinkLess = tonumber(j.ThinkLess) or 1
+	if thinkLess <= 0 then
+		return false
+	end
+	local now = DotaTime()
+	local tgt = b:GetAttackTarget()
+	local locked = tgt ~= nil
+		and not tgt:IsNull()
+		and tgt:IsAlive()
+		and not tgt:IsInvulnerable()
+		and GetUnitToUnitDistance(b, tgt) <= 1600
+	local urgent = not locked
+		or b:GetHealth() / math.max(1, b:GetMaxHealth()) < 0.45
+		or b:WasRecentlyDamagedByAnyHero(1.2)
+		or b:WasRecentlyDamagedByTower(1.2)
+		or b:WasRecentlyDamagedByCreep(1.0)
+	-- Urgent / no target: every tick. Locked & safe: every ~3 ticks * ThinkLess.
+	local interval = urgent and 0 or (THINK_SAMPLE_FRAME * 3 * math.max(1, thinkLess))
+	local last = b._ohaHeavyThinkAt or -100
+	if now - last < interval then
+		return true
+	end
+	b._ohaHeavyThinkAt = now
+	return false
+end
 local k, l = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/dispel")
 if not k then
 	l = nil
@@ -6710,15 +6739,38 @@ local function f8()
 	end
 end
 function ItemUsageThink()
+	local _perfT0 = nil
+	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
+		_perfT0 = RealTime()
+	end
+	local function _perfDone()
+		if _perfT0 then
+			MatchTrace.PerfSample("ItemUsageThink", RealTime() - _perfT0)
+		end
+	end
 	MatchTrace.Tick(b)
 	if b:IsInvulnerable() or not b:IsHero() or not b:IsAlive() or not string.find(c, "hero") or b:IsIllusion() then
+		_perfDone()
+		return
+	end
+	-- Keep attack orders; only throttle expensive item/ability rescans when target is locked.
+	if ShouldThrottleHeavyThink() then
+		_perfDone()
 		return
 	end
 	if not f.IsNoItemIllution(b) then
+		local tItem = _perfT0 and RealTime() or nil
 		bg()
+		if tItem then
+			MatchTrace.PerfSample("ItemUsage.bg", RealTime() - tItem)
+		end
 	end
 	if h ~= nil and not f.IsNoAbilityIllution(b) then
+		local tSkill = _perfT0 and RealTime() or nil
 		local x, ff = pcall(h.SkillsComplement)
+		if tSkill then
+			MatchTrace.PerfSample("SkillsComplement", RealTime() - tSkill)
+		end
 		if not x then
 			MatchTrace.Event(b, "error", "SkillsComplement: " .. tostring(ff))
 		end
@@ -6729,6 +6781,7 @@ function ItemUsageThink()
 			local bm = b:GetItemInSlot(fg)
 			if bm then
 				b:Action_UseAbility(bm)
+				_perfDone()
 				return
 			end
 		end
@@ -6737,6 +6790,7 @@ function ItemUsageThink()
 			local bm = b:GetItemInSlot(fh)
 			if bm then
 				b:Action_UseAbility(bm)
+				_perfDone()
 				return
 			end
 		end
@@ -6745,6 +6799,7 @@ function ItemUsageThink()
 			local bm = b:GetItemInSlot(fi)
 			if bm then
 				b:Action_UseAbilityOnEntity(bm, d9)
+				_perfDone()
 				return
 			end
 		end
@@ -6764,6 +6819,7 @@ function ItemUsageThink()
 			end
 		end
 	end
+	_perfDone()
 end
 function AbilityUsageThink()
 	HandleIdleBotState(b)

@@ -214,9 +214,29 @@ function GetTeamPlayers(F, G)
 	return H
 end
 IsDebug = b.DebugMode
+local SafeCallPerf = nil
+local function LoadSafeCallPerf()
+	if SafeCallPerf ~= nil then
+		return SafeCallPerf
+	end
+	SafeCallPerf = false
+	local ok, mt = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+	if ok and mt and mt.PerfEnabled and mt.PerfEnabled() and mt.PerfSample then
+		SafeCallPerf = mt
+	end
+	return SafeCallPerf
+end
 function SafeCall(O, P, Q)
 	return function(...)
+		local perf = LoadSafeCallPerf()
+		local t0 = nil
+		if perf and RealTime then
+			t0 = RealTime()
+		end
 		local n, R, S, T = pcall(O, ...)
+		if t0 ~= nil and perf then
+			perf.PerfSample(Q or "SafeCall", RealTime() - t0)
+		end
 		if n then
 			return R, S, T
 		end

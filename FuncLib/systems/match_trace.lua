@@ -7,6 +7,7 @@ local MatchTrace = {}
 
 local enabled = true
 local verbose = true
+local perfEnabled = false
 -- Keep WriteFile code, but do not attempt disk I/O (it does not work in-game).
 local WRITE_TO_FILE = false
 local settingsOk, settings = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
@@ -19,6 +20,10 @@ if settingsOk and type(settings) == "table" then
 	end
 	if settings.MatchTraceWriteFile == true then
 		WRITE_TO_FILE = true
+	end
+	-- Perf can run without full MatchTrace decision spam.
+	if settings.MatchTracePerf == true then
+		perfEnabled = true
 	end
 end
 
@@ -145,6 +150,89 @@ end
 
 function MatchTrace.Verbose()
 	return verbose
+end
+
+function MatchTrace.PerfEnabled()
+	return perfEnabled
+end
+
+-- Lightweight RealTime() profiler. Enable: Customize.MatchTracePerf = true
+-- Logs spikes + periodic top-N averages to console ([OHA-PERF]).
+local perfStats = {}
+local perfNextReport = 0
+local PERF_SPIKE_MS = 2.5
+local PERF_REPORT_EVERY = 10.0
+
+function MatchTrace.PerfSample(label, elapsedSec)
+	if not perfEnabled or label == nil or elapsedSec == nil then
+		return
+	end
+	local ms = elapsedSec * 1000.0
+	local s = perfStats[label]
+	if s == nil then
+		s = { n = 0, sum = 0, max = 0 }
+		perfStats[label] = s
+	end
+	s.n = s.n + 1
+	s.sum = s.sum + ms
+	if ms > s.max then
+		s.max = ms
+	end
+	if ms >= PERF_SPIKE_MS then
+		print(string.format("[OHA-PERF spike] %s %.2fms t=%.1f", tostring(label), ms, DotaTime()))
+	end
+	local now = RealTime and RealTime() or DotaTime()
+	if now >= perfNextReport then
+		perfNextReport = now + PERF_REPORT_EVERY
+		local rows = {}
+		for name, st in pairs(perfStats) do
+			if st.n > 0 then
+				rows[#rows + 1] = {
+					name = name,
+					avg = st.sum / st.n,
+					max = st.max,
+					n = st.n,
+					sum = st.sum,
+				}
+			end
+		end
+		table.sort(rows, function(a, b)
+			return a.sum > b.sum
+		end)
+		local parts = {}
+		for i = 1, math.min(8, #rows) do
+			local r = rows[i]
+			parts[#parts + 1] =
+				string.format("%s avg=%.2f max=%.2f n=%d", r.name, r.avg, r.max, r.n)
+		end
+		if #parts > 0 then
+			print(string.format("[OHA-PERF top] t=%.1f %s", DotaTime(), table.concat(parts, " | ")))
+		end
+		-- Soft reset max so spikes stay meaningful; keep avg over window via sum/n reset.
+		for _, st in pairs(perfStats) do
+			st.n = 0
+			st.sum = 0
+			st.max = 0
+		end
+	end
+end
+
+function MatchTrace.PerfWrap(label, fn, fallback)
+	if not perfEnabled then
+		return fn
+	end
+	return function(...)
+		local t0 = RealTime and RealTime() or nil
+		local ok, a, b, c = pcall(fn, ...)
+		if t0 ~= nil then
+			MatchTrace.PerfSample(label, (RealTime() - t0))
+		end
+		if ok then
+			return a, b, c
+		end
+		print(string.format("[OHA-PERF err] %s %s", tostring(label), tostring(a)))
+		return fallback
+	end
 end
 
 function MatchTrace.Event(bot, kind, detail)

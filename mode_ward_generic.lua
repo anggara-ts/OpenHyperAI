@@ -28,6 +28,10 @@ local h = nil
 local i = nil
 local j = nil
 local k = -math.huge
+-- Console copy at game end only keeps the tail, and the signout fills most of it.
+-- Remember plants during the match and print them once POST_GAME starts.
+local planted = {}
+local dumped = false
 local function PickChat(key, fallback)
 	local msg = loc.Get(key)
 	if type(msg) == "table" and #msg > 0 then
@@ -38,7 +42,36 @@ local function PickChat(key, fallback)
 	end
 	return fallback
 end
+local function RememberWard(kind)
+	if j == nil or j.location == nil then
+		return
+	end
+	local x = math.floor(j.location.x)
+	local y = math.floor(j.location.y)
+	local now = DotaTime()
+	local last = planted[#planted]
+	if last and last.kind == kind and last.x == x and last.y == y and now - last.t < 20 then
+		return
+	end
+	planted[#planted + 1] = { t = now, kind = kind, role = j.role or "spot", x = x, y = y }
+	if #planted > 40 then
+		table.remove(planted, 1)
+	end
+end
+local function DumpWards()
+	if dumped or GetGameState() ~= DOTA_GAMERULES_STATE_POST_GAME then
+		return
+	end
+	dumped = true
+	local name = string.gsub(b:GetUnitName() or "bot", "npc_dota_hero_", "")
+	print(string.format("[OHA-WARD] %s n=%d", name, #planted))
+	for idx = 1, #planted do
+		local p = planted[idx]
+		print(string.format("[OHA-WARD] %s %s t=%.0f role=%s %d,%d", name, p.kind, p.t, p.role, p.x, p.y))
+	end
+end
 local function AnnounceWard(kind)
+	RememberWard(kind)
 	local role = j and j.role or nil
 	local wardLoc = j and j.location or nil
 	MatchTrace.Item(
@@ -83,6 +116,7 @@ local function AnnounceWard(kind)
 	end
 end
 function GetDesire()
+	DumpWards()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
@@ -153,6 +187,7 @@ function GetDesireHelper()
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
+	DumpWards()
 	if c.CanNotUseAction(b) then
 		return
 	end

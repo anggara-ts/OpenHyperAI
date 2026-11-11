@@ -24,8 +24,9 @@ local v = Vector(3810.311523, -4562.782227)
 local w = Vector(7512.600586, -4630.147461)
 local x =
 	{ TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1, TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2, TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
--- Uber / eye-cliff spots (high platform with eye mark). Mid/late only — push or defend.
+-- Uber / eye-cliff spots (high platform with eye mark). After 6:00, preferred over closer ground spots.
 -- Not pathable tops — plant from below; do not gate these with IsLocationPassable.
+local UBER_WALK = 7000
 local UberWardSpots = {
 	{ location = Vector(-7932.318848, 1798.319336, 535.996094), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
 	{ location = Vector(7688.733398, -1536.282471, 527.996094), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
@@ -438,6 +439,58 @@ function a.GetGameStartWardSpots()
 	end
 	return GetTeam() == TEAM_RADIANT and G or H
 end
+-- T2/T3 spots wait until the outer tower of that lane is actually gone.
+local function OuterStillStanding(team, towerId)
+	local t1, t2, isT3
+	if towerId == TOWER_TOP_2 or towerId == TOWER_TOP_3 then
+		t1, t2, isT3 = TOWER_TOP_1, TOWER_TOP_2, towerId == TOWER_TOP_3
+	elseif towerId == TOWER_MID_2 or towerId == TOWER_MID_3 then
+		t1, t2, isT3 = TOWER_MID_1, TOWER_MID_2, towerId == TOWER_MID_3
+	elseif towerId == TOWER_BOT_2 or towerId == TOWER_BOT_3 then
+		t1, t2, isT3 = TOWER_BOT_1, TOWER_BOT_2, towerId == TOWER_BOT_3
+	else
+		return false
+	end
+	if GetTower(team, t1) ~= nil then
+		return true
+	end
+	if isT3 and GetTower(team, t2) ~= nil then
+		return true
+	end
+	return false
+end
+-- Home/defend ground spots sit on our T3. Skip them until that lane's T1 is gone,
+-- unless enemies are already on the high ground (handled by the caller).
+local function HomeWardTooEarly(loc)
+	local team = GetTeam()
+	local lanes = {
+		{ TOWER_TOP_1, TOWER_TOP_3 },
+		{ TOWER_MID_1, TOWER_MID_3 },
+		{ TOWER_BOT_1, TOWER_BOT_3 },
+	}
+	local sawTower = false
+	local laneOpen = false
+	for i = 1, #lanes do
+		local t1 = GetTower(team, lanes[i][1])
+		local t3 = GetTower(team, lanes[i][2])
+		if t1 ~= nil or t3 ~= nil then
+			sawTower = true
+		end
+		if t1 == nil and t3 ~= nil then
+			laneOpen = true
+		end
+		if t1 ~= nil and t3 ~= nil and GetUnitToLocationDistance(t3, loc) <= 1800 then
+			return true
+		end
+	end
+	return not sawTower or not laneOpen
+end
+function a.WalkLimit(spot)
+	if spot and spot.role == "uber" then
+		return UBER_WALK
+	end
+	return 4000
+end
 function a.GetAvailabeObserverWardSpots(K)
 	local L = {}
 	if DotaTime() < 0 then
@@ -467,16 +520,11 @@ function a.GetAvailabeObserverWardSpots(K)
 		local a1 = GetAncient(GetTeam())
 		local a2 = a1 ~= nil and b.Utils.CountEnemyHeroesNear(a1:GetLocation(), 2500) or 0
 		local a3 = b.Utils.CountEnemyHeroesOnHighGround(GetTeam())
-		local a4 = b.GetNumOfAliveHeroes(false)
-		local a5 = b.GetNumOfAliveHeroes(true)
 		local a6 = a2 >= 1 or a3 >= 1
-		local a7 = a4 >= a5 + 1 and a4 >= 3
 		for M, N in pairs(O) do
 			local a8 = N.role or "contest"
 			if a6 and a8 == "offense" then
-			elseif a7 and a8 == "defend" and not a6 then
-			elseif a8 == "uber" and not a6 and not a7 then
-				-- Uber cliffs: only while defending HG/base or ahead enough to push.
+			elseif a8 == "defend" and not a6 and HomeWardTooEarly(N.location) then
 			elseif
 				not a.IsOtherWardClose(N.location, "npc_dota_observer_wards", c * 2, true, false)
 				and not a.IsThereEnemySentry(N.location, 1100)
@@ -487,22 +535,7 @@ function a.GetAvailabeObserverWardSpots(K)
 		end
 	end
 	for P = 1, #x do
-		local Q = GetTower(GetTeam(), x[P])
-		if
-			Q ~= nil
-			or GetTower(GetTeam(), TOWER_TOP_3) == nil
-			or GetTower(GetTeam(), TOWER_MID_3) == nil
-			or GetTower(GetTeam(), TOWER_BOT_3) == nil
-		then
-			if
-				Q == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
-			then
-			else
+		if not OuterStillStanding(GetTeam(), x[P]) then
 				if GetTeam() == TEAM_RADIANT then
 					for R, S in pairs(A) do
 						if R == x[P] then
@@ -546,21 +579,11 @@ function a.GetAvailabeObserverWardSpots(K)
 						end
 					end
 				end
-			end
 		end
 	end
 	for P = 1, #x do
 		local Q = GetTower(GetOpposingTeam(), x[P])
-		if Q == nil then
-			if
-				Q == GetTower(GetOpposingTeam(), TOWER_TOP_2) and GetTower(GetOpposingTeam(), TOWER_TOP_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_TOP_3) and GetTower(GetOpposingTeam(), TOWER_TOP_2) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_MID_2) and GetTower(GetOpposingTeam(), TOWER_MID_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_MID_3) and GetTower(GetOpposingTeam(), TOWER_MID_2) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_BOT_2) and GetTower(GetOpposingTeam(), TOWER_BOT_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_BOT_3) and GetTower(GetOpposingTeam(), TOWER_BOT_2) ~= nil
-			then
-			else
+		if Q == nil and not OuterStillStanding(GetOpposingTeam(), x[P]) then
 				if GetTeam() == TEAM_RADIANT then
 					for R, S in pairs(B) do
 						if R == x[P] then
@@ -605,7 +628,6 @@ function a.GetAvailabeObserverWardSpots(K)
 					end
 				end
 			end
-		end
 	end
 	return L
 end
@@ -614,8 +636,7 @@ function a.GetClosestObserverWardSpot(K, S)
 	local U = nil
 	local uberBest = nil
 	local uberDist = 100000
-	-- Prefer eye-cliff uber spots when a support can reach them (same 4k gate as ward mode).
-	local uberMax = 4000
+	local uberMax = UBER_WALK
 	for M, N in pairs(S) do
 		local V = GetUnitToLocationDistance(K, N.location)
 		if N.role == "uber" and V < uberDist and V <= uberMax then
@@ -648,22 +669,7 @@ function a.GetPossibleSentryWardSpots(K)
 	end
 	if DotaTime() > 0 then
 		for P = 1, #x do
-			local Q = GetTower(GetTeam(), x[P])
-			if
-				Q ~= nil
-				or GetTower(GetTeam(), TOWER_TOP_3) == nil
-				or GetTower(GetTeam(), TOWER_MID_3) == nil
-				or GetTower(GetTeam(), TOWER_BOT_3) == nil
-			then
-				if
-					Q == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
-				then
-				else
+			if not OuterStillStanding(GetTeam(), x[P]) then
 					if GetTeam() == TEAM_RADIANT then
 						for R, S in pairs(A) do
 							if R == x[P] then
@@ -727,21 +733,11 @@ function a.GetPossibleSentryWardSpots(K)
 							end
 						end
 					end
-				end
 			end
 		end
 		for P = 1, #x do
 			local Q = GetTower(GetOpposingTeam(), x[P])
-			if Q == nil then
-				if
-					Q == GetTower(GetOpposingTeam(), TOWER_TOP_2) and GetTower(GetOpposingTeam(), TOWER_TOP_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_TOP_3) and GetTower(GetOpposingTeam(), TOWER_TOP_2) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_MID_2) and GetTower(GetOpposingTeam(), TOWER_MID_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_MID_3) and GetTower(GetOpposingTeam(), TOWER_MID_2) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_BOT_2) and GetTower(GetOpposingTeam(), TOWER_BOT_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_BOT_3) and GetTower(GetOpposingTeam(), TOWER_BOT_2) ~= nil
-				then
-				else
+			if Q == nil and not OuterStillStanding(GetOpposingTeam(), x[P]) then
 					if GetTeam() == TEAM_RADIANT then
 						for R, S in pairs(B) do
 							if R == x[P] then
@@ -805,7 +801,6 @@ function a.GetPossibleSentryWardSpots(K)
 							end
 						end
 					end
-				end
 			end
 		end
 	end
@@ -816,7 +811,7 @@ function a.GetClosestSentryWardSpot(K, S)
 	local U = nil
 	local uberBest = nil
 	local uberDist = 100000
-	local uberMax = 4000
+	local uberMax = UBER_WALK
 	for M, N in pairs(S) do
 		local V = GetUnitToLocationDistance(K, N.location)
 		if N.role == "uber" and V < uberDist and V <= uberMax then

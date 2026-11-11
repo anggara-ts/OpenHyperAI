@@ -4627,6 +4627,7 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		and not f.Role.IsAllyHaveAegis()
 		and not f.Role.CanBeSupport(c)
 		and not f.IsEnemyHeroAroundLocation(GetAncient(d):GetLocation(), 3300)
+		and f.Utils.CountEnemyHeroesOnHighGround(GetTeam()) < 1
 	then
 		local e6 = f.GetNearbyHeroes(b, 1600, false, BOT_MODE_ATTACK)
 		local e9 = f.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)

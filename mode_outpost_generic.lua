@@ -2013,7 +2013,7 @@ function ConsiderOutpostCapture()
 	if a.GetEnemiesAroundAncient(c, 3200) > 0 then
 		return 0
 	end
-	if a.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
+	if a.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1 then
 		return 0
 	end
 	if not CanThisBotCapture() then

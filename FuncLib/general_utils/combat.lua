@@ -158,6 +158,68 @@ local function a(b)
 		end
 		return o:GetActualIncomingDamage(B, C) >= o:GetHealth()
 	end
+	-- True when one real auto-attack from attacker, or an ally already in hit range, kills target.
+	function b.IsOneAutoAttackKill(attacker, target)
+		if not b.IsValidHero(attacker) or not b.IsValidHero(target) or b.IsSuspiciousIllusion(target) then
+			return false
+		end
+		if target:IsInvulnerable() or target:IsAttackImmune() then
+			return false
+		end
+		if
+			target:HasModifier("modifier_abaddon_borrowed_time")
+			or target:HasModifier("modifier_dazzle_shallow_grave")
+			or target:HasModifier("modifier_oracle_false_promise_timer")
+			or target:HasModifier("modifier_item_aeon_disk_buff")
+		then
+			return false
+		end
+		local hp = target:GetHealth()
+		if hp <= 0 then
+			return false
+		end
+		local function hitKills(unit)
+			if not b.IsValidHero(unit) or b.IsSuspiciousIllusion(unit) then
+				return false
+			end
+			local dmg = unit:GetAttackDamage()
+			if type(dmg) ~= "number" or dmg <= 0 then
+				return false
+			end
+			return target:GetActualIncomingDamage(dmg, DAMAGE_TYPE_PHYSICAL) >= hp
+		end
+		if hitKills(attacker) then
+			return true
+		end
+		local allies = attacker:GetNearbyHeroes(1000, false, BOT_MODE_NONE) or {}
+		for _, ally in pairs(allies) do
+			if
+				ally ~= attacker
+				and hitKills(ally)
+				and GetUnitToUnitDistance(ally, target) <= ally:GetAttackRange() + 250
+			then
+				return true
+			end
+		end
+		return false
+	end
+	-- Stay in a committed fight to land the last hit instead of leaving on a numbers disadvantage.
+	function b.ShouldFinishCommittedKill(bot, target)
+		if not b.IsValidHero(bot) then
+			return false
+		end
+		local reach = math.max((bot:GetAttackRange() or 150) + 750, 1100)
+		if b.IsValidHero(target) and GetUnitToUnitDistance(bot, target) <= reach and b.IsOneAutoAttackKill(bot, target) then
+			return true
+		end
+		local enemies = bot:GetNearbyHeroes(math.min(reach, 1200), true, BOT_MODE_NONE) or {}
+		for _, enemy in pairs(enemies) do
+			if b.IsOneAutoAttackKill(bot, enemy) then
+				return true
+			end
+		end
+		return false
+	end
 	function b.WillKillTarget(o, B, C, D)
 		local E = o:GetHealth() + o:GetHealthRegen() * D + 0.8
 		local F = b.GetTotalAttackWillRealDamage(o, D)

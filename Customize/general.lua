@@ -35,10 +35,17 @@ File writes are OFF by default (Dota sandbox blocks them). Console [OHA-DEV ...]
 when MatchTrace is true. Set MatchTraceWriteFile = true only if you intentionally want disk logs.
 Logged events include: mode changes, stuck, deaths, item use, buys (wards/smoke),
 ward plants, farm exits, smoke skip reasons, periodic beats.
+
+FPS / CPU: set MatchTracePerf = true to sample RealTime() costs of ItemUsageThink,
+SkillsComplement, and SafeCall-wrapped mode GetDesire/Think. Console shows spikes >2.5ms
+and a top-N summary every ~10s as [OHA-PERF ...].
 --]]
 Customize.MatchTrace = false
 Customize.MatchTraceVerbose = false
 Customize.MatchTraceWriteFile = false
+-- RealTime() CPU profiler: prints [OHA-PERF spike] / [OHA-PERF top] to console.
+-- Does not need MatchTrace=true. Use to find which bot Think paths tank FPS.
+Customize.MatchTracePerf = false
 
 -- Set the localization code to make bots speak the specific language when possible (not guaranteed to 100% localized).
 -- Currently supprot: "en" for "English", "zh" for "中文", "ru" for Russian, "ja" for Japanese
@@ -152,10 +159,11 @@ Customize.Fretbots = {
 	Player_Death_Sound = true,
 }
 
--- Make bots think less, 0: fully think through, 1 to 10: think less and less frequently.
--- Bots can become slow or dumb in reaction and decision making if you set this value to a higher number.
--- When doing Local Host, you can potentially improve PC performance (FPS) by setting this to 1 to 10, which sacrifices some bot IQ/performance.
--- This won't be very effective for FPS improvement because Valve has a lot of compute on their side that your PC have to handle for Local Hosting.
+-- Make bots think less, 0: fully think through every tick, 1 to 10: sample heavy item/ability
+-- rescans less often when already attacking a valid target (safe: ~every 3 frames * ThinkLess).
+-- Urgent cases (no target, low HP, recently damaged, tower hits, 3+ nearby enemies) still run every tick.
+-- Higher values improve FPS a bit but can make bots feel slower/dumber.
+-- Valve mode GetDesire() still runs every frame for all modes — that part cannot be sampled away.
 Customize.ThinkLess = 1
 
 return Customize

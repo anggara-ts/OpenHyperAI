@@ -24,8 +24,37 @@ local v = Vector(3810.311523, -4562.782227)
 local w = Vector(7512.600586, -4630.147461)
 local x =
 	{ TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1, TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2, TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
--- Late general spots (after 6:00). role: defend / contest / offense.
+-- Uber / eye-cliff spots (high platform with eye mark). Mid/late only — push or defend.
+-- Not pathable tops — plant from below; do not gate these with IsLocationPassable.
+local UberWardSpots = {
+	{ location = Vector(-7932.318848, 1798.319336, 535.996094), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(7688.733398, -1536.282471, 527.996094), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(-4345.000000, -1018.000000, 663.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(4620.000000, 788.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(-514.000000, -3321.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(514.000000, 4107.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(-4089.000000, 1544.000000, 535.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(5122.000000, -1930.000000, 527.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(1283.000000, -5109.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(-760.000000, 2053.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(2818.000000, -3047.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+	{ location = Vector(2047.000000, -769.000000, 655.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "uber" },
+}
+-- Late general spots (after 6:00). role: defend / contest / offense / uber.
 local y = {
+	-- Uber eye cliffs first (preferred when in range)
+	UberWardSpots[1],
+	UberWardSpots[2],
+	UberWardSpots[3],
+	UberWardSpots[4],
+	UberWardSpots[5],
+	UberWardSpots[6],
+	UberWardSpots[7],
+	UberWardSpots[8],
+	UberWardSpots[9],
+	UberWardSpots[10],
+	UberWardSpots[11],
+	UberWardSpots[12],
 	-- Radiant defend (home jungle / HG approaches)
 	{ location = Vector(-4800.000000, -4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
 	{ location = Vector(-5500.000000, -1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
@@ -55,6 +84,19 @@ local y = {
 	{ location = Vector(5940.784668, -6109.887695, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
 }
 local z = {
+	-- Uber eye cliffs first (preferred when in range)
+	UberWardSpots[1],
+	UberWardSpots[2],
+	UberWardSpots[3],
+	UberWardSpots[4],
+	UberWardSpots[5],
+	UberWardSpots[6],
+	UberWardSpots[7],
+	UberWardSpots[8],
+	UberWardSpots[9],
+	UberWardSpots[10],
+	UberWardSpots[11],
+	UberWardSpots[12],
 	-- Dire defend (home jungle / HG approaches)
 	{ location = Vector(4800.000000, 4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
 	{ location = Vector(5500.000000, 1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
@@ -433,6 +475,8 @@ function a.GetAvailabeObserverWardSpots(K)
 			local a8 = N.role or "contest"
 			if a6 and a8 == "offense" then
 			elseif a7 and a8 == "defend" and not a6 then
+			elseif a8 == "uber" and not a6 and not a7 then
+				-- Uber cliffs: only while defending HG/base or ahead enough to push.
 			elseif
 				not a.IsOtherWardClose(N.location, "npc_dota_observer_wards", c * 2, true, false)
 				and not a.IsThereEnemySentry(N.location, 1100)
@@ -568,14 +612,22 @@ end
 function a.GetClosestObserverWardSpot(K, S)
 	local T = 100000
 	local U = nil
+	local uberBest = nil
+	local uberDist = 100000
+	-- Prefer eye-cliff uber spots when a support can reach them (same 4k gate as ward mode).
+	local uberMax = 4000
 	for M, N in pairs(S) do
 		local V = GetUnitToLocationDistance(K, N.location)
+		if N.role == "uber" and V < uberDist and V <= uberMax then
+			uberDist = V
+			uberBest = N
+		end
 		if V < T then
 			T = V
 			U = N
 		end
 	end
-	return U
+	return uberBest or U
 end
 function a.GetPossibleSentryWardSpots(K)
 	local W = {}
@@ -762,14 +814,21 @@ end
 function a.GetClosestSentryWardSpot(K, S)
 	local T = 100000
 	local U = nil
+	local uberBest = nil
+	local uberDist = 100000
+	local uberMax = 4000
 	for M, N in pairs(S) do
 		local V = GetUnitToLocationDistance(K, N.location)
+		if N.role == "uber" and V < uberDist and V <= uberMax then
+			uberDist = V
+			uberBest = N
+		end
 		if V < T then
 			T = V
 			U = N
 		end
 	end
-	return U
+	return uberBest or U
 end
 function a.IsOtherWardClose(X, Y, Z, _, a0)
 	local a1 = GetUnitList(UNIT_LIST_ALLIED_WARDS)

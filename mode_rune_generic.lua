@@ -154,11 +154,13 @@ function GetDesireRaw()
 					if a.IsEnemyPickRune(D.location) then
 						return BOT_MODE_DESIRE_NONE
 					end
+					local desire
 					if g or k >= 4 and not a.IsThereAllyWithBottle(E, 1600) then
-						return a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH, D.distance, 3500)
+						desire = a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH, D.distance, 3500)
 					else
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, 3500)
+						desire = a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, 3500)
 					end
+					return a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status)
 				elseif
 					D.status == RUNE_STATUS_UNKNOWN
 					and D.distance <= C * 1.5
@@ -180,18 +182,22 @@ function GetDesireRaw()
 						return BOT_MODE_DESIRE_NONE
 					end
 					local H = D.type
+					local desire
 					if H == RUNE_WATER and (g or i < 0.6 or j < 0.5) then
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, 3200)
+						desire = a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, 3200)
 					elseif H == RUNE_WATER and not g then
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C)
-					end
-					local I = n == LANE_MID and b.IsInLaningPhase()
-					if g or not b.IsEarlyGame() and k <= 3 then
-						local J = I and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH
-						return a.GetScaledDesire(J, D.distance, C * 2.5)
+						desire = a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C)
 					else
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5)
+						local I = n == LANE_MID and b.IsInLaningPhase()
+						if g or not b.IsEarlyGame() and k <= 3 then
+							local J = I and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH
+							desire = a.GetScaledDesire(J, D.distance, C * 2.5)
+						else
+							desire = a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5)
+						end
 					end
+					-- Starting river gold/bounty sits on power-rune spots — gate early lane oscillation.
+					return a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status)
 				elseif D.status == RUNE_STATUS_UNKNOWN and DotaTime() > 113 then
 					if g or not b.IsEarlyGame() and k <= 3 then
 						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5)
@@ -300,6 +306,28 @@ function Think()
 				return
 			end
 		end
+		-- Don't chase heroes into enemy tower after gold/power rune bait.
+		local function CanHarassNearRune(enemy)
+			if not b.IsValidHero(enemy) or i <= 0.35 then
+				return false
+			end
+			local towers = d:GetNearbyTowers(1000, true)
+			if b.IsValidBuilding(towers[1]) then
+				local tr = (towers[1]:GetAttackRange() or 700) + 200
+				if GetUnitToUnitDistance(d, towers[1]) < tr then
+					return false
+				end
+				if GetUnitToUnitDistance(enemy, towers[1]) < tr + 100 then
+					-- Only finish if we can kill them before tower melts us.
+					if not b.CanKillTarget(enemy, d:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL) then
+						return false
+					end
+				end
+			end
+			local myDmg = d:GetEstimatedDamageToTarget(false, enemy, 5.0, DAMAGE_TYPE_ALL)
+			local theirDmg = enemy:GetEstimatedDamageToTarget(true, d, 5.0, DAMAGE_TYPE_ALL)
+			return 1.5 * myDmg > theirDmg
+		end
 		if D.status == RUNE_STATUS_AVAILABLE then
 			if K and b.CanCastAbility(K) and D.distance < 1200 then
 				local V = K:GetCurrentCharges()
@@ -310,16 +338,7 @@ function Think()
 			end
 			if D.distance > 50 then
 				for F, W in pairs(S) do
-					if
-						b.IsValidHero(W)
-						and 1.5 * d:GetEstimatedDamageToTarget(false, d, 5.0, DAMAGE_TYPE_ALL) > W:GetEstimatedDamageToTarget(
-							true,
-							d,
-							5.0,
-							DAMAGE_TYPE_ALL
-						)
-						and i > 0.3
-					then
+					if CanHarassNearRune(W) then
 						d:Action_AttackUnit(W, true)
 						return
 					end
@@ -341,16 +360,7 @@ function Think()
 			end
 		else
 			for F, W in pairs(S) do
-				if
-					b.IsValidHero(W)
-					and 1.6 * d:GetEstimatedDamageToTarget(false, d, 5.0, DAMAGE_TYPE_ALL) > W:GetEstimatedDamageToTarget(
-						true,
-						d,
-						5.0,
-						DAMAGE_TYPE_ALL
-					)
-					and i > 0.3
-				then
+				if CanHarassNearRune(W) then
 					d:Action_AttackUnit(W, true)
 					return
 				end
@@ -438,6 +448,10 @@ function a.IsTheClosestAlly(X, Q)
 				a2 = a3
 			end
 		end
+	end
+	-- Keep claim while committed so a slightly closer ally doesn't flip us back to lane.
+	if a1 ~= X and X._earlyRuneCommit and GetUnitToLocationDistance(X, Q) <= 1900 then
+		return true
 	end
 	return a1 == X
 end
@@ -549,6 +563,38 @@ function a.GetScaledDesire(ae, af, ag)
 		aj = RemapValClamped(ai, 0, 0.8, 0, aj)
 	end
 	return aj
+end
+-- After creeps spawn, laning desire (~0.45) fights scaled rune desire and bots oscillate
+-- lane ↔ river gold/bounty. Only start a pickup when already close; once committed, stick.
+function a.ApplyEarlyLaneRuneGate(desire, dist, status)
+	if desire == nil or desire <= 0 then
+		return desire or 0
+	end
+	local t = DotaTime()
+	if t <= 0 or t >= 70 then
+		d._earlyRuneCommit = nil
+		return desire
+	end
+	if status ~= RUNE_STATUS_AVAILABLE then
+		d._earlyRuneCommit = nil
+		return BOT_MODE_DESIRE_NONE
+	end
+	dist = dist or 99999
+	local startDist = 1050
+	local stickDist = 1900
+	if dist > stickDist then
+		d._earlyRuneCommit = nil
+		return BOT_MODE_DESIRE_NONE
+	end
+	if (l == BOT_MODE_RUNE or d._earlyRuneCommit) and dist <= stickDist then
+		d._earlyRuneCommit = true
+		return math.max(desire, BOT_MODE_DESIRE_HIGH)
+	end
+	if dist > startDist then
+		return BOT_MODE_DESIRE_NONE
+	end
+	d._earlyRuneCommit = true
+	return math.max(desire, BOT_MODE_DESIRE_HIGH)
 end
 local ak = nil
 function a.GetGoOutLocation()

@@ -100,9 +100,17 @@ function r.GetDesire()
 			if a.IsDisabled(D) then
 				F = F * 3
 			end
-			if a.IsEarlyGame() then
-				if a.IsValidBuilding(z[1]) and a.IsInRange(D, z[1], 800) then
-					F = F * 0.5
+			if a.IsEarlyGame() or a.IsInLaningPhase() then
+				if a.IsValidBuilding(z[1]) and a.IsInRange(D, z[1], 900) then
+					-- Hard reject tower-hugging bait (starting gold rune → dive).
+					if not a.CanKillTarget(D, c:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL) then
+						F = F * 0.05
+					else
+						F = F * 0.35
+					end
+				end
+				if a.IsValidBuilding(z[1]) and a.IsInRange(c, z[1], (z[1]:GetAttackRange() or 700) + 180) then
+					F = F * 0.05
 				end
 			end
 			local G = a.GetAlliesNearLoc(D:GetLocation(), 1200)

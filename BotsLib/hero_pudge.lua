@@ -81,15 +81,12 @@ o["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
-	"item_ring_of_protection",
 	"item_magic_wand",
-	"item_helm_of_iron_will",
 	"item_boots",
+	"item_blink",
 	"item_phase_boots",
-	"item_veil_of_discord",
 	"item_pipe",
 	"item_ultimate_scepter",
-	"item_blink",
 	"item_shivas_guard",
 	n,
 	"item_black_king_bar",
@@ -198,8 +195,14 @@ function a.SkillsComplement()
 	local F = c.GetHP(b)
 	local G = C:GetSpecialValueInt("rot_radius")
 	local H = c.GetNearbyHeroes(b, G + 50, true, BOT_MODE_NONE)
-	local I = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-	local J = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if a.TryBlink() then
+		return
+	end
+	u = a.ConsiderMeatShield(D, C, x, F, G, H)
+	if u > 0 then
+		b:Action_UseAbility(D)
+		return
+	end
 	if C:GetToggleState() and #H <= 0 then
 		b:Action_UseAbility(C)
 		return
@@ -214,23 +217,63 @@ function a.SkillsComplement()
 		b:Action_UseAbility(C)
 		return
 	end
-	u = a.ConsiderMeatShield(D)
-	if u > 0 then
-		b:Action_UseAbility(D)
-		return
-	end
 	v, w = a.ConsiderDismember(E, x, F, H)
 	if v > 0 then
 		b:Action_ClearActions(false)
+		if c.CanCastAbility(D) and not b:HasModifier("modifier_pudge_flesh_heap_block") then
+			b:ActionQueue_UseAbility(D)
+		end
 		if F > 0.3 and c.CanCastAbility(C) and not C:GetToggleState() then
 			b:ActionQueue_UseAbility(C)
-		end
-		if c.CanCastAbility(D) then
-			b:ActionQueue_UseAbility(D)
 		end
 		b:ActionQueue_UseAbilityOnEntity(E, w)
 		return
 	end
+end
+function a.TryBlink()
+	if not c.CanBlinkDagger(b) or b.Blink == nil or b:IsRooted() then
+		return false
+	end
+	local blink = b.Blink
+	local range = 1200
+	if blink:GetName() == "item_arcane_blink" then
+		range = 1400
+	end
+	if z and b:DistanceFromFountain() > 900 then
+		local enemies = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+		local ancient = GetAncient(GetTeam())
+		if enemies ~= nil and #enemies >= 1 and ancient ~= nil then
+			local dest = c.GetLocationTowardDistanceLocation(b, ancient:GetLocation(), range)
+			if IsLocationPassable(dest) then
+				b:Action_UseAbilityOnLocation(blink, dest)
+				return true
+			end
+		end
+	end
+	if y and c.IsValidHero(x) and not c.IsSuspiciousIllusion(x) then
+		local dist = GetUnitToUnitDistance(b, x)
+		if
+			dist > 350
+			and dist <= range + 150
+			and not c.IsLocationInChrono(x:GetLocation())
+			and not c.IsLocationInBlackHole(x:GetLocation())
+		then
+			local friends = c.GetAlliesNearLoc(x:GetLocation(), 1100)
+			local foes = c.GetEnemiesNearLoc(x:GetLocation(), 1100)
+			local vulnerable = c.GetHP(x) < 0.6 or c.IsDisabled(x) or #foes <= 1
+			if vulnerable and #friends >= #foes then
+				local dest = x:GetLocation()
+				if dist > range then
+					dest = c.GetLocationTowardDistanceLocation(b, x:GetLocation(), range - 50)
+				end
+				if IsLocationPassable(dest) then
+					b:Action_UseAbilityOnLocation(blink, dest)
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 function a.ConsiderMeatHook(B, C, E, x, F, H)
 	if not B:IsFullyCastable() then
@@ -555,30 +598,21 @@ function a.ConsiderRot(C, x, F, G, H)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderMeatShield(D)
-	if not D:IsFullyCastable() then
+function a.ConsiderMeatShield(D, C, x, F, G, H)
+	if not c.CanCastAbility(D) or b:HasModifier("modifier_pudge_flesh_heap_block") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:HasModifier("modifier_pudge_rot") then
+	local near = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
+	local engaged = near ~= nil
+		and #near >= 1
+		and (y or z or b:WasRecentlyDamagedByAnyHero(2.0) or b:WasRecentlyDamagedByTower(1.5))
+	if engaged then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if z then
-		local X = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
-		local Z = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		if
-			X ~= nil
-			and Z ~= nil
-			and c.IsValidHero(Z[1])
-			and c.IsRunning(Z[1])
-			and Z[1]:IsFacingLocation(b:GetLocation(), 30)
-			and not c.IsSuspiciousIllusion(Z[1])
-			and not c.IsDisabled(Z[1])
-		then
-			local _ = c.GetNearbyHeroes(Z[1], 1200, false, BOT_MODE_NONE)
-			if _ ~= nil and (#_ > #X or c.GetHP(b) < 0.7 and b:WasRecentlyDamagedByAnyHero(2.2)) then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
+	local rotOn = C:GetToggleState()
+	local wantsRot = not rotOn and a.ConsiderRot(C, x, F, G, H) > 0
+	if (rotOn or wantsRot) and ((H ~= nil and #H >= 1) or F < 0.7) then
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

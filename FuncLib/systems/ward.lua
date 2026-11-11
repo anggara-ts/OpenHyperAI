@@ -197,7 +197,15 @@ function a.GetAvailabeObserverWardSpots(K)
 			return
 		end
 		local onOurs = spot.side == ourSide
-		if spot.role == "uber" or spot.role == "contest" then
+		if spot.role == "uber" then
+			-- Own eye cliff looks back into our jungle. While pushing, ward the enemy cliff.
+			if defending and not onOurs then
+				return
+			end
+			if pushing and onOurs then
+				return
+			end
+		elseif spot.role == "contest" then
 			if defending and not onOurs then
 				return
 			end

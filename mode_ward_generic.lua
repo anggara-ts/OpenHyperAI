@@ -130,7 +130,7 @@ function GetDesireHelper()
 		if j and (not a.IsEnemyCloserToWardLocation(j.location) or c.IsRealInvisible(b)) then
 			local s = n and not a.IsWardSpotDefensiveOrNearby(j.location)
 			if s then
-			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > 4000 then
+			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > d.WalkLimit(j) then
 			elseif DotaTime() < 0 and DotaTime() > (c.IsModeTurbo() and -45 or -60) then
 				return BOT_MODE_DESIRE_ABSOLUTE
 			elseif DotaTime() > k + 1.0 then
@@ -144,7 +144,7 @@ function GetDesireHelper()
 		if j and (not a.IsEnemyCloserToWardLocation(j.location) or c.IsRealInvisible(b)) then
 			local s = n and not a.IsWardSpotDefensiveOrNearby(j.location)
 			if s then
-			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > 4000 then
+			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > d.WalkLimit(j) then
 			elseif DotaTime() > k + 1.0 then
 				return BOT_MODE_DESIRE_VERYHIGH
 			end

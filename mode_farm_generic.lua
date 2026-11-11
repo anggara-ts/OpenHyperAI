@@ -153,6 +153,17 @@ function GetDesire()
 	if e._farmCommitUntil and DotaTime() <= e._farmCommitUntil then
 		W = math.max(W, e._farmCommitFloor or 0)
 	end
+	-- A defend call already treats one hero on the high ground as a base fight.
+	-- The 3s farm lock must not put him back in the jungle after that call.
+	local ancient = GetAncient(GetTeam())
+	if
+		g.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
+		or ancient and g.Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2500) >= 1
+	then
+		e._farmCommitUntil = nil
+		e._farmCommitFloor = nil
+		return BOT_MODE_DESIRE_NONE
+	end
 	if W > 0.5 and FarmDefend.ClaimAnnounce() then
 		local X = f.GetModeLocaleKey(e:GetActiveMode())
 		local Y = c.Get(X) or X
@@ -189,7 +200,7 @@ function GetDesireHelper()
 	end
 	local a9 = GetAncient(GetTeam())
 	if
-		g.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
+		g.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
 		or a9 and g.Utils.CountEnemyHeroesNear(a9:GetLocation(), 2500) >= 1
 	then
 		e._farmExitReason = "enemies_on_hg"

@@ -20,6 +20,25 @@ local e = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local f = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
+-- Observer stock is shared with the human. When a ward lands in the shop, leave it
+-- for 30s. Buy only what is still there after that.
+local OBS_HUMAN_WINDOW = 30
+local obsStockSeen = -1
+local obsStockAt = nil
+local function ObserverStockForHumans()
+	local stock = GetItemStockCount("item_ward_observer")
+	local now = DotaTime()
+	if stock <= 0 then
+		obsStockSeen = 0
+		obsStockAt = nil
+		return false
+	end
+	if obsStockAt == nil or stock > obsStockSeen then
+		obsStockAt = now
+	end
+	obsStockSeen = stock
+	return now >= obsStockAt + OBS_HUMAN_WINDOW
+end
 local g = {}
 if a:IsInvulnerable() or not a:IsHero() or a:IsIllusion() then
 	return
@@ -976,12 +995,16 @@ function ItemPurchaseThink()
 	-- pos4 sentry only after 5m, and obs/sentry split by exact role — so bags full
 	-- of starting consumables meant nobody bought.
 	local wardNames = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
+	local obsForHumans = e.GetPosition(a) >= 4 and ObserverStockForHumans()
 	if e.GetPosition(a) >= 4 and C == 0 then
 		local emptySlots = c.GetEmptyInventoryAmount(a)
 		-- Near shop/fountain, purchase can go to stash even if the bag is full.
 		local canReceive = emptySlots >= 1 or E <= 1600
 		if canReceive then
 			local function tryBuyWard(itemName, maxCharges, reason)
+				if itemName == "item_ward_observer" and not obsForHumans then
+					return false
+				end
 				if GetItemStockCount(itemName) < 1 then
 					return false
 				end

@@ -11,8 +11,7 @@ local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10
 local j = { { 1, 3, 2, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_crimson_guard", "item_pipe", "item_lotus_orb" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_2"] = {
 	"item_tango",

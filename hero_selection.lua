@@ -17,6 +17,7 @@ local m = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local n = require(GetScriptDirectory() .. "/FuncLib/data/hero_pos_weights")
 local o = require(GetScriptDirectory() .. "/FretBots/HeroNames")
 local p = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 n = n.GetHeroPositions()
 if GAMEMODE_TURBO == nil then
 	GAMEMODE_TURBO = 23
@@ -957,6 +958,7 @@ local function bH()
 	b.initialized = true
 end
 function Think()
+	MatchTrace.MatchMarker("start", "mode=" .. tostring(GetGameMode()))
 	if GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM then
 		l.CaptainModeLogic(u)
 		l.AddToList()

@@ -37,7 +37,6 @@ local o = {}
 o["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_double_circlet",
 	"item_magic_wand",
 	"item_vladmir",
 	"item_boots",
@@ -56,7 +55,6 @@ o["pos_3"] = {
 o["pos_4"] = {
 	"item_enchanted_mango",
 	"item_double_tango",
-	"item_circlet",
 	"item_double_branches",
 	"item_blood_grenade",
 	"item_magic_wand",
@@ -77,7 +75,6 @@ o["pos_4"] = {
 o["pos_5"] = {
 	"item_enchanted_mango",
 	"item_double_tango",
-	"item_circlet",
 	"item_double_branches",
 	"item_blood_grenade",
 	"item_magic_wand",

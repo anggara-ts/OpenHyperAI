@@ -86,7 +86,14 @@ local function a(b)
 		end
 		if hp < 0.45 then
 			if not c._roshHoldOut and log then
-				log(string.format("[ROSH] %s leave hp=%.2f rosh=%.2f", c:GetUnitName(), hp, roshHp))
+				log(
+					string.format(
+						"[ROSH] %s leave hp=%.2f rosh=%.2f",
+						string.gsub(c:GetUnitName(), "npc_dota_hero_", ""),
+						hp,
+						roshHp
+					)
+				)
 			end
 			c._roshHoldOut = true
 		end

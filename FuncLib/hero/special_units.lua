@@ -481,7 +481,33 @@ function a.IsHeroTrappedBySerpentWards(hero)
 	return false, wards
 end
 
-function a.GetBestSerpentWardToKill(wards, bot, attackRange)
+-- The ward standing between the trapped hero and safety. Killing any other one
+-- keeps the ring closed and the hero dies inside it.
+function a.GetExitSerpentWard(wards, trapped)
+	if wards == nil or trapped == nil then
+		return nil
+	end
+	local from = trapped:GetLocation()
+	local dest = c.GetTeamFountain()
+	local best, bestLine = nil, 99999
+	for _, ward in pairs(wards) do
+		if c.IsValid(ward) and c.CanBeAttacked(ward) then
+			local line = PointToLineDistance(from, dest, ward:GetLocation())
+			local off = (line ~= nil and line.within) and line.distance or 99999
+			if off < bestLine then
+				bestLine = off
+				best = ward
+			end
+		end
+	end
+	return best
+end
+
+function a.GetBestSerpentWardToKill(wards, bot, attackRange, trapped)
+	local exitWard = a.GetExitSerpentWard(wards, trapped or bot)
+	if exitWard ~= nil then
+		return exitWard
+	end
 	if wards == nil or bot == nil then
 		return nil
 	end
@@ -522,9 +548,11 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 	end
 
 	local trapWards = nil
+	local trapped = nil
 	local selfTrapped, selfWards = a.IsHeroTrappedBySerpentWards(bot)
 	if selfTrapped then
 		trapWards = selfWards
+		trapped = bot
 	else
 		for i = 1, #GetTeamPlayers(GetTeam()) do
 			local ally = GetTeamMember(i)
@@ -538,6 +566,7 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 				local allyTrapped, allyWards = a.IsHeroTrappedBySerpentWards(ally)
 				if allyTrapped then
 					trapWards = allyWards
+					trapped = ally
 					break
 				end
 			end
@@ -548,7 +577,7 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 		return 0, nil
 	end
 
-	local target = a.GetBestSerpentWardToKill(trapWards, bot, attackRange)
+	local target = a.GetBestSerpentWardToKill(trapWards, bot, attackRange, trapped)
 	if target == nil then
 		return 0, nil
 	end

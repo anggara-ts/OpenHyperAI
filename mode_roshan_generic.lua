@@ -87,14 +87,36 @@ function GetDesire()
 	-- Do not shout here — desire alone is not a commit (caused "Let's Rosh" then nothing).
 	return Clamp(D, 0, BOT_MODE_DESIRE_VERYHIGH)
 end
-local function F()
-	if c.IsLateGame() then
-		return c.IsCore(a) and 1 or 2
-	elseif c.IsMidGame() then
-		return 3
-	else
-		return 4
+local function AllyActiveMode(hero)
+	local ok, mode = pcall(function()
+		return hero:GetActiveMode()
+	end)
+	if ok then
+		return mode
 	end
+	return nil
+end
+-- present: allies already at the rally. nearby: living allies the call should wait on.
+-- pending: furthest teammate who is in Roshan mode and has not reached the rally yet.
+local function RoshanGather(rally)
+	local present, nearby, pending = 0, 0, 0
+	local players = GetTeamPlayers(GetTeam())
+	for i = 1, #players do
+		local ally = GetTeamMember(i)
+		if ally ~= nil and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
+			local dist = GetUnitToLocationDistance(ally, rally)
+			if dist <= 1000 then
+				present = present + 1
+			end
+			if dist <= 4500 then
+				nearby = nearby + 1
+			end
+			if ally ~= a and dist > 1000 and AllyActiveMode(ally) == BOT_MODE_ROSHAN and dist > pending then
+				pending = dist
+			end
+		end
+	end
+	return present, nearby, pending
 end
 local function G()
 	local H = c.Utils.GameStates.roshHandle
@@ -287,7 +309,6 @@ function GetDesireHelper()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-local a0 = 1000
 local a1 = 900
 local a2 = 300
 function Think()
@@ -320,43 +341,63 @@ function Think()
 			a7()
 		end
 	end
-	-- Unsafe: hold fountain-side of pit, do not walk in or shout.
-	if not safe then
-		local hold = c.AdjustLocationWithOffsetTowardsFountain(M, a1)
-		if GetUnitToLocationDistance(a, hold) > 80 then
-			a:Action_MoveToLocation(hold + RandomVector(80))
+	local rally = c.AdjustLocationWithOffsetTowardsFountain(M, a1)
+	local pitAllies = c.GetAlliesNearLoc(M, 700) or {}
+	local pitCount = 0
+	for _, ally in pairs(pitAllies) do
+		if c.IsValidHero(ally) and ally:IsAlive() and not ally:IsIllusion() then
+			pitCount = pitCount + 1
 		end
-		return
 	end
-	if finishing then
+	-- Fight is already going with a group in the pit. Join it.
+	if finishing and pitCount >= 2 and safe then
 		a8()
 		return
 	end
-	local a9 = c.AdjustLocationWithOffsetTowardsFountain(M, a1)
-	local aa = c.GetAlliesNearLoc(a9, a0)
-	local ab = 0
-	for J, ac in pairs(aa) do
-		if c.IsValidHero(ac) and ac:IsAlive() and not ac:IsIllusion() then
-			ab = ab + 1
-		end
+	-- Unsafe, or still grouping: hold the fountain side. Do not walk in alone.
+	local now = DotaTime()
+	if a._roshGatherAt == nil or now - (a._roshThinkAt or 0) > 3 then
+		a._roshGatherAt = now
 	end
-	local ad = F()
-	local ae = GetUnitToLocationDistance(a, a9)
-	if ab < ad then
-		if ae > 50 then
-			a:Action_MoveToLocation(a9 + RandomVector(100))
+	a._roshThinkAt = now
+	local present, nearby, pending = RoshanGather(rally)
+	local elapsed = now - a._roshGatherAt
+	local othersWalking = pending > 1000
+	local waitingForSwitch = nearby > present and not othersWalking and elapsed < 12
+	local hardCap = elapsed >= 30
+	local ready = safe and not waitingForSwitch and not othersWalking
+	if hardCap then
+		ready = safe and present >= 1
+	elseif ready then
+		ready = present >= 1 and (nearby <= 1 or present >= math.min(2, nearby))
+	end
+	if not ready then
+		if GetUnitToLocationDistance(a, rally) > 50 then
+			a:Action_MoveToLocation(rally + RandomVector(80))
 		end
-		-- Shout only when nearly ready to go (not while alone waiting forever).
-		if ab >= ad - 1 and DotaTime() > (a._lastRoshGatherPing or 0) + 12 then
-			a._lastRoshGatherPing = DotaTime()
-			c.ModeAnnounce(a, "say_roshan", 12)
+		if elapsed < 2 then
+			local myId = a:GetPlayerID()
+			local caller = true
+			local players = GetTeamPlayers(GetTeam())
+			for i = 1, #players do
+				local ally = GetTeamMember(i)
+				if
+					ally ~= nil
+					and ally ~= a
+					and ally:IsAlive()
+					and not ally:IsIllusion()
+					and AllyActiveMode(ally) == BOT_MODE_ROSHAN
+					and ally:GetPlayerID() < myId
+				then
+					caller = false
+					break
+				end
+			end
+			if caller then
+				c.ModeAnnounce(a, "say_roshan", 20)
+			end
 		end
 		return
-	end
-	-- Commit: team gathered and safe — announce once, then enter pit.
-	if not a._roshCommitAnnounced or DotaTime() - (a._roshCommitAnnounced or 0) > 45 then
-		a._roshCommitAnnounced = DotaTime()
-		c.ModeAnnounce(a, "say_roshan", 20)
 	end
 	if not a5 then
 		a7()

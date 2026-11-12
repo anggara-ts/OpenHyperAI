@@ -12,6 +12,7 @@ then
 	return
 end
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local e = 0.0
 local f = false
@@ -202,10 +203,12 @@ function GetDesireHelper()
 	if O < P then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	local kw = KillWindow.Tick()
+	local killRosh = kw.fresh >= 1 and f and j and DotaTime() > 8 * 60
 	if l == nil then
 		l = c.Utils.IsHumanPlayerInTeam(GetTeam())
 	end
-	if l then
+	if l and not killRosh then
 		if c.IsEarlyGame() then
 			return BOT_ACTION_DESIRE_NONE
 		end
@@ -257,7 +260,7 @@ function GetDesireHelper()
 				return BOT_MODE_DESIRE_NONE
 			end
 		end
-		if DotaTime() < (c.IsModeTurbo() and 15 * 60 or 20 * 60) then
+		if DotaTime() < (c.IsModeTurbo() and 15 * 60 or 20 * 60) and not killRosh then
 			return BOT_MODE_DESIRE_NONE
 		end
 		local X = RemapValClamped(DotaTime(), h, h + 2.5 * 60, 1, 2)
@@ -269,6 +272,13 @@ function GetDesireHelper()
 		local _ = c.Utils.IsTeamPushingSecondTierOrHighGround(a)
 		if _ and #Z < 3 then
 			Y = Y * 0.6
+		end
+		if killRosh then
+			local floor = BOT_MODE_DESIRE_VERYHIGH
+			if Y < floor then
+				KillWindow.LogRosh(a, Y, floor, kw)
+				Y = floor
+			end
 		end
 		return Clamp(Y, 0, BOT_MODE_DESIRE_VERYHIGH)
 	end

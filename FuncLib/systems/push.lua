@@ -45,6 +45,7 @@ local _ = Y.GetLocationToLocationDistance
 local a0 = Y.RadiantFountainTpPoint
 local a1 = Y.DireFountainTpPoint
 local a2 = require(GetScriptDirectory() .. "/FuncLib/systems/cache")
+local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
 local a3 = a2.getGlobalGameState
 local a4 = a2.getGlobalLocationState
 local a5 = a2.getCachedAlliesNearLoc
@@ -156,6 +157,15 @@ function l.GetPushDesireHelper(ao, ap)
 	local aq = a4()
 	local ab = ad.team
 	m(ab)
+	local kw = KillWindow.Tick()
+	local killPush = kw.fresh >= 1
+		and not kw.buyback
+		and ad.aliveAllyCount > ad.aliveEnemyCount
+		and O.GetHP(ao) >= 0.3
+		and w < 1
+	if kw.buyback then
+		return S.None
+	end
 	local ar = ao:GetActiveMode()
 	local as = ao:GetAssignedLane() == ap
 	t = ad.enemyAncient
@@ -372,7 +382,7 @@ function l.GetPushDesireHelper(ao, ap)
 	end
 	if t and l.GetLaneBuildingTier(ap) >= 2 then
 		local be = GetUnitToUnitDistance(ao, t)
-		if be < 6000 and #aA + 1 < aQ and b8 < 0.65 then
+		if be < 6000 and #aA + 1 < aQ and b8 < 0.65 and not (killPush and #aA >= 2 and #aB < #aA) then
 			return S.None
 		elseif be < 6000 and #aA < aQ then
 			B = math.min(B, 0.4)
@@ -398,6 +408,7 @@ function l.GetPushDesireHelper(ao, ap)
 	if #aA <= 1 and #aB >= 2 then
 		d = math.min(d, 0.2)
 	end
+	local groupHurt = false
 	if aE and #aA >= 2 then
 		local bl = 0
 		local bm = 0
@@ -413,6 +424,7 @@ function l.GetPushDesireHelper(ao, ap)
 		local bo = #aA > 0 and bm / #aA or 1
 		if bl >= 2 and bo < 0.6 and aQ >= #aA - 2 then
 			d = math.min(d, 0.15)
+			groupHurt = true
 		end
 	end
 	if E then
@@ -454,6 +466,19 @@ function l.GetPushDesireHelper(ao, ap)
 		end
 		if F[ap] and DotaTime() < F[ap] then
 			d = math.max(d, 0.45)
+		end
+	end
+	-- A fresh kill lifts the high-ground caps. Buyback already returned none above.
+	if killPush and not groupHurt and #aA >= 2 and #aB < #aA and (v == nil or v == ap) then
+		-- One death beats farm (VERYHIGH ~0.9) and loses to a close outpost (0.95).
+		-- Two deaths beat the outpost channel itself (0.98 on the point).
+		local floor = 0.91
+		if kw.fresh >= 2 and O.GetHP(ao) >= 0.4 then
+			floor = 0.99
+		end
+		if d < floor then
+			KillWindow.LogPush(ao, ap, d, floor, kw, O.GetHP(ao), ad.aliveAllyCount, ad.aliveEnemyCount)
+			d = floor
 		end
 	end
 	return d

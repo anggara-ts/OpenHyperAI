@@ -51,11 +51,11 @@ local DAMAGE_OVERRIDE = {
 -- Offlaner leads team items, then supports, then mid, then carry.
 local POS_ORDER = { [3] = 1, [4] = 2, [5] = 3, [2] = 4, [1] = 5 }
 
--- Urn of Shadows and Spirit Vessel share one heal/damage effect, so one per team.
-local URN_FAMILY = { item_urn_of_shadows = true, item_spirit_vessel = true }
+-- Urn of Shadows and its upgrades share one heal/damage effect, so one per team.
+local URN_FAMILY = { item_urn_of_shadows = true, item_spirit_vessel = true, item_essence_distiller = true }
 -- Roamer first, then hard support.
 local URN_POS_ORDER = { [4] = 1, [5] = 2, [3] = 3, [2] = 4, [1] = 5 }
--- Positions whose BotsLib build has Urn or Spirit Vessel. A bot cannot read an ally's
+-- Positions whose BotsLib build has Urn, Spirit Vessel or Essence Distiller. A bot cannot read an ally's
 -- build at runtime, so this is kept by hand. Update it when a hero build adds or drops one.
 local URN_BUILDS = {
 	npc_dota_hero_ancient_apparition = { 4 },
@@ -84,10 +84,13 @@ local URN_BUILDS = {
 	npc_dota_hero_ogre_magi = { 4, 5 },
 	npc_dota_hero_oracle = { 4 },
 	npc_dota_hero_primal_beast = { 4, 5 },
+	npc_dota_hero_pugna = { 4 },
 	npc_dota_hero_sand_king = { 4 },
 	npc_dota_hero_tinker = { 5 },
+	npc_dota_hero_undying = { 4 },
 	npc_dota_hero_venomancer = { 4, 5 },
 	npc_dota_hero_wisp = { 4 },
+	npc_dota_hero_witch_doctor = { 4 },
 	npc_dota_hero_zuus = { 4 },
 }
 
@@ -250,8 +253,8 @@ end
 function Strategy.AllyOwns(bot, item)
 	local family = nil
 	if URN_FAMILY[item] then
-		-- Upgrading our own Urn into a Vessel is fine.
-		if item == "item_spirit_vessel" and bot:FindItemSlot("item_urn_of_shadows") >= 0 then
+		-- Upgrading our own Urn is fine.
+		if item ~= "item_urn_of_shadows" and bot:FindItemSlot("item_urn_of_shadows") >= 0 then
 			return false
 		end
 		family = URN_FAMILY

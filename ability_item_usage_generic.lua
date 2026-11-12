@@ -317,33 +317,62 @@ local function K()
 			end
 		end
 		if O == nil then
-			log("[ARDM] Ability %s not found on %s, skipping", N, c)
+			log("[WARN] Ability %s not found on %s, skipping", N, c)
 			table.remove(o, 1)
 			return
 		end
-		if
-			not O:IsHidden()
-			and A >= O:GetHeroLevelRequiredToUpgrade()
-			and O:CanAbilityBeUpgraded()
-			and O:GetLevel() < O:GetMaxLevel()
-		then
+		-- The server rejects a train order for anything the hero cannot learn right now
+		-- ("Ability is not owned by specified unit"). Only send one that will land.
+		local function CanLearn(ab)
+			return ab ~= nil
+				and not ab:IsNull()
+				and not ab:IsHidden()
+				and ab:GetName() ~= "generic_hidden"
+				and not g.AbilityBehaviorHasFlag(ab:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE or 64)
+				and ab:CanAbilityBeUpgraded()
+				and ab:GetLevel() < ab:GetMaxLevel()
+				and A >= ab:GetHeroLevelRequiredToUpgrade()
+		end
+		local function FallbackAbility()
+			local best = nil
+			for slot = 0, 25 do
+				local ab = b:GetAbilityInSlot(slot)
+				if CanLearn(ab) then
+					if ab:IsUltimate() then
+						return ab
+					end
+					if not ab:IsTalent() and (best == nil or best:IsTalent() or ab:GetLevel() < best:GetLevel()) then
+						best = ab
+					elseif best == nil then
+						best = ab
+					end
+				end
+			end
+			return best
+		end
+		if CanLearn(O) then
 			b:ActionImmediate_LevelAbility(O:GetName())
 			table.remove(o, 1)
-		elseif N == "generic_hidden" then
-			local T = o[2]
-			log("[WARN] Level up ability %s for %s does not make sense. try to upgrade the next ability: %s", N, c, T)
+		elseif
+			N == "generic_hidden"
+			or O:IsHidden() and A >= 25
+			or g.AbilityBehaviorHasFlag(O:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE or 64)
+			or O:GetLevel() >= O:GetMaxLevel()
+		then
+			-- This entry can never be learned. Spend the point on something that can.
 			table.remove(o, 1)
-			if T then
-				b:ActionImmediate_LevelAbility(T)
+			local fb = FallbackAbility()
+			log("[WARN] %s cannot learn %s, using %s instead", c, N, fb and fb:GetName() or "nothing")
+			if fb ~= nil then
+				b:ActionImmediate_LevelAbility(fb:GetName())
 			end
 		elseif not O:IsHidden() and A >= O:GetHeroLevelRequiredToUpgrade() then
-			log(
-				"[WARN] Level up ability %s for %s may fail because it was called on ability that's not available or can't get upgraded anymore.",
-				N,
-				c
-			)
-			b:ActionImmediate_LevelAbility(N)
 			table.remove(o, 1)
+			local fb = FallbackAbility()
+			log("[WARN] %s cannot upgrade %s now, using %s instead", c, N, fb and fb:GetName() or "nothing")
+			if fb ~= nil then
+				b:ActionImmediate_LevelAbility(fb:GetName())
+			end
 		else
 			log("[WARN] Skipped to level up ability %s for %s for this time because it may fail.", N, c)
 			if A > 25 then

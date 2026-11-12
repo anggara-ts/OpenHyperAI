@@ -629,6 +629,15 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
 			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
 			if beside then
+				local hpNow = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+				local foes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+				local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
+				-- The forced desire beats retreat. Do not hold a losing fight on the pool.
+				if hpNow < 0.5 and #foes > #friends + 1 then
+					beside = false
+				end
+			end
+			if beside then
 				inLotus = true
 				etaL = -sinceLast
 			end
@@ -645,9 +654,6 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
-			if not mainRoom then
-				mainRoom = MapObjectives.EnsureInventorySlot(bot)
-			end
 			if
 				inLotus
 				and mainRoom
@@ -790,9 +796,6 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 		-- A full main inventory puts the lotus in the backpack, where it sits unused.
 		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
-			if MapObjectives.EnsureInventorySlot(bot) then
-				return true
-			end
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
 			return false

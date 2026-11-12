@@ -537,12 +537,33 @@ local function EnemyInLotusRing(bot, loc)
 end
 
 -- Attack or cast without leaving the pluck ring. Standing still is only for the pickup itself.
+local function MarkLotusDo(bot, name)
+	bot._lotusDo = name
+	if name == bot._lotusDoPrev then
+		return
+	end
+	bot._lotusDoPrev = name
+	local ok, err = pcall(function()
+		local pos = bot:GetLocation()
+		local hero = string.gsub(bot:GetUnitName() or "?", "npc_dota_hero_", "")
+		local team = GetTeam() == TEAM_RADIANT and "r" or "d"
+		print(string.format(
+			"[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f",
+			hero, team, DotaTime(), name, pos.x, pos.y
+		))
+	end)
+	if not ok then
+		print("[OHA-LOTUS] err " .. tostring(err))
+	end
+end
 local function ActInsideLotus(bot, loc)
 	if bot:IsCastingAbility() or bot:IsChanneling() then
+		MarkLotusDo(bot, "channel")
 		return
 	end
 	local action = bot:GetCurrentActionType()
 	if action == BOT_ACTION_TYPE_USE_ABILITY then
+		MarkLotusDo(bot, "ability")
 		return
 	end
 	local range = bot:GetAttackRange() + 80
@@ -553,6 +574,7 @@ local function ActInsideLotus(bot, loc)
 			if bot:GetAttackTarget() ~= hero then
 				bot:Action_AttackUnit(hero, true)
 			end
+			MarkLotusDo(bot, "hit")
 			return
 		end
 	end
@@ -560,19 +582,27 @@ local function ActInsideLotus(bot, loc)
 	-- Chasing a camp here walks them out before the lotus plucks.
 	if action == BOT_ACTION_TYPE_MOVE_TO then
 		bot:Action_ClearActions(true)
+		MarkLotusDo(bot, "clear")
+		return
 	end
+	MarkLotusDo(bot, "hold")
 end
 
 -- Returns desire, location, kind ("lotus"|"wisdom"), eta. Desire 0 if none.
 function MapObjectives.ConsiderObjectiveDesire(bot)
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
+		if bot ~= nil then
+			bot._lotusWhy = "dead"
+		end
 		return 0, nil, nil, nil
 	end
 	if MapObjectives.TeamInCrisis(bot) then
+		bot._lotusWhy = "crisis"
 		return 0, nil, nil, nil
 	end
 	local ok, Utils = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
 	if ok and Utils and Utils.IsDefending and Utils.IsDefending(bot) then
+		bot._lotusWhy = "defending"
 		return 0, nil, nil, nil
 	end
 
@@ -608,6 +638,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			if type(etaW) == "number" and math.abs(etaW) <= 8 then
 				desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
 			end
+			bot._lotusWhy = "wisdom"
 			return desire, loc, "wisdom", etaW
 		end
 	end
@@ -627,14 +658,16 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local maxWalk = MapObjectives.MaxWalk(bot, true)
 			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
+			local foes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+			local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
+			local lostBeside = false
 			if beside then
 				local hpNow = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
-				local foes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
-				local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 				-- The forced desire beats retreat. Do not hold a losing fight on the pool.
 				if hpNow < 0.5 and #foes > #friends + 1 then
 					beside = false
+					lostBeside = true
 				end
 			end
 			if beside then
@@ -654,15 +687,63 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
+			local danger = loc ~= nil and MapObjectives.DangerousObjective(bot, loc, 1500)
+			local function note(why)
+				bot._lotusWhy = why
+				bot._lotusDist = dist
+				bot._lotusDbg = {
+					why = why,
+					dist = dist,
+					eta = etaL,
+					beside = beside and 1 or 0,
+					lost = lostBeside and 1 or 0,
+					inwin = inLotus and 1 or 0,
+					count = count,
+					room = mainRoom and 1 or 0,
+					hp = hp,
+					walk = maxWalk,
+					skip = bot._lotusSkipMark or 0,
+					pools = units and #units or 0,
+					foes = #foes,
+					friends = #friends,
+					arrive = arrive,
+					toNext = toNext,
+					since = sinceLast,
+					danger = danger and 1 or 0,
+				}
+			end
+			local failWhy = "blocked"
+			if not inLotus then
+				if count == 0 and type(etaL) == "number" and etaL < -1.5 then
+					failWhy = "empty"
+				elseif bot._lotusSkipMark == mark and mark >= lInterval then
+					failWhy = "skip"
+				else
+					failWhy = "outside"
+				end
+			elseif not mainRoom then
+				failWhy = "room"
+			elseif loc == nil then
+				failWhy = "no-pool"
+			elseif dist > maxWalk then
+				failWhy = "too-far"
+			elseif hp < 0.28 then
+				failWhy = "low-hp"
+			elseif danger and dist > 700 then
+				failWhy = "danger"
+			elseif not beside then
+				failWhy = "not-best"
+			end
 			if
 				inLotus
 				and mainRoom
 				and loc ~= nil
 				and dist <= maxWalk
 				and hp >= 0.28
-				and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
+				and not (danger and dist > 700)
 				and (beside or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
 			then
+				note(beside and "beside" or "walk")
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
 				if beside then
 					-- Has to beat laning and a nearby fight, or Think never runs and they never say it.
@@ -677,6 +758,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 				return desire, loc, "lotus", etaL
 			end
+			note(failWhy)
+		else
+			bot._lotusWhy = "not-window"
+			bot._lotusDist = nil
 		end
 	end
 
@@ -774,22 +859,26 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	if kind == "lotus" and dist > gather and dist <= 700 then
 		bot._lotusHaveAt = nil
 		bot:Action_MoveToLocation(loc)
+		MarkLotusDo(bot, "move-lip")
 		return true
 	end
 
 	if #enemies > 0 and #enemies > #allies and dist > gather then
+		MarkLotusDo(bot, "outnumbered")
 		return true
 	end
 	if #enemies > 0 and #enemies <= #allies and dist > gather then
 		local target = enemies[1]
 		if target ~= nil and target:IsAlive() then
 			bot:Action_AttackUnit(target, true)
+			MarkLotusDo(bot, "attack")
 			return true
 		end
 	end
 	if dist > gather then
 		bot._lotusHaveAt = nil
 		bot:Action_MoveToLocation(loc)
+		MarkLotusDo(bot, "move")
 		return true
 	end
 	if kind == "lotus" then
@@ -798,6 +887,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			MarkLotusDo(bot, "full")
 			return false
 		end
 		local _, units = MapObjectives.GetLotusPoolLocations()
@@ -805,12 +895,14 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if count == 0 and MapObjectives.LotusSpawnOpen() then
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			MarkLotusDo(bot, "empty")
 			return false
 		end
 		if (MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0)) then
 			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
 				local interval = MapObjectives.LotusInterval()
 				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+				MarkLotusDo(bot, "stalled")
 				return false
 			end
 		end

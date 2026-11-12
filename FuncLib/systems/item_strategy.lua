@@ -51,6 +51,46 @@ local DAMAGE_OVERRIDE = {
 -- Offlaner leads team items, then supports, then mid, then carry.
 local POS_ORDER = { [3] = 1, [4] = 2, [5] = 3, [2] = 4, [1] = 5 }
 
+-- Urn of Shadows and Spirit Vessel share one heal/damage effect, so one per team.
+local URN_FAMILY = { item_urn_of_shadows = true, item_spirit_vessel = true }
+-- Roamer first, then hard support.
+local URN_POS_ORDER = { [4] = 1, [5] = 2, [3] = 3, [2] = 4, [1] = 5 }
+-- Positions whose BotsLib build has Urn or Spirit Vessel. A bot cannot read an ally's
+-- build at runtime, so this is kept by hand. Update it when a hero build adds or drops one.
+local URN_BUILDS = {
+	npc_dota_hero_ancient_apparition = { 4 },
+	npc_dota_hero_arc_warden = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_bane = { 4 },
+	npc_dota_hero_bristleback = { 4, 5 },
+	npc_dota_hero_chen = { 4 },
+	npc_dota_hero_crystal_maiden = { 4 },
+	npc_dota_hero_dazzle = { 4, 5 },
+	npc_dota_hero_earthshaker = { 4 },
+	npc_dota_hero_earth_spirit = { 1, 2, 4 },
+	npc_dota_hero_elder_titan = { 4, 5 },
+	npc_dota_hero_furion = { 4, 5 },
+	npc_dota_hero_grimstroke = { 4, 5 },
+	npc_dota_hero_invoker = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_jakiro = { 4 },
+	npc_dota_hero_keeper_of_the_light = { 1, 2, 3, 4 },
+	npc_dota_hero_largo = { 5 },
+	npc_dota_hero_lich = { 5 },
+	npc_dota_hero_lina = { 4 },
+	npc_dota_hero_lion = { 4 },
+	npc_dota_hero_mirana = { 4 },
+	npc_dota_hero_muerta = { 4, 5 },
+	npc_dota_hero_necrolyte = { 5 },
+	npc_dota_hero_night_stalker = { 4, 5 },
+	npc_dota_hero_ogre_magi = { 4, 5 },
+	npc_dota_hero_oracle = { 4 },
+	npc_dota_hero_primal_beast = { 4, 5 },
+	npc_dota_hero_sand_king = { 4 },
+	npc_dota_hero_tinker = { 5 },
+	npc_dota_hero_venomancer = { 4, 5 },
+	npc_dota_hero_wisp = { 4 },
+	npc_dota_hero_zuus = { 4 },
+}
+
 local function TeamKey(team)
 	return team == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
 end
@@ -100,6 +140,27 @@ local function Has(list, item)
 		end
 	end
 	return false
+end
+
+-- The one bot ally whose build keeps Urn / Spirit Vessel. Same result in every bot.
+function Strategy.UrnOwner()
+	local team = GetTeam()
+	local roles = require(GetScriptDirectory() .. "/FuncLib/systems/role").RoleAssignment[TeamKey(team)] or {}
+	local best, bestOrder, bestIdx = nil, 99, 99
+	for idx, pid in pairs(GetTeamPlayers(team) or {}) do
+		local name = GetSelectedHeroName(pid)
+		local positions = name ~= nil and URN_BUILDS[name] or nil
+		if positions ~= nil and IsPlayerBot(pid) then
+			local pos = roles[idx] or idx
+			if Has(positions, pos) then
+				local order = URN_POS_ORDER[pos] or 9
+				if order < bestOrder or (order == bestOrder and idx < bestIdx) then
+					best, bestOrder, bestIdx = name, order, idx
+				end
+			end
+		end
+	end
+	return best
 end
 
 -- heroName -> item for every bot ally with a flexible slot. Same result in every bot.
@@ -158,10 +219,16 @@ function Strategy.ApplyTeamItems(bot, list)
 	local me = bot:GetUnitName()
 	local plan, owner, kind = Strategy.TeamPlan()
 	local mine = plan[me]
+	local urnOwner = Strategy.UrnOwner()
+	local dropUrn = urnOwner ~= nil and urnOwner ~= me
 	local out, seen = {}, {}
 	for i = 1, #list do
 		local item = list[i]
-		if item == Strategy.SLOT then
+		if URN_FAMILY[item] then
+			if not dropUrn then
+				out[#out + 1] = item
+			end
+		elseif item == Strategy.SLOT then
 			if mine ~= nil and not seen[mine] then
 				out[#out + 1] = mine
 				seen[mine] = true
@@ -175,18 +242,31 @@ function Strategy.ApplyTeamItems(bot, list)
 			out[#out + 1] = item
 		end
 	end
-	log("[TeamItems] %s enemy=%s pick=%s", me, kind, tostring(mine))
+	log("[TeamItems] %s enemy=%s pick=%s urn=%s", me, kind, tostring(mine), tostring(urnOwner))
 	return out
 end
 
--- True when an ally hero already carries this team item.
+-- True when an ally hero already carries this team item (or one from the Urn family).
 function Strategy.AllyOwns(bot, item)
-	if not TEAM_ITEMS[item] then
+	local family = nil
+	if URN_FAMILY[item] then
+		-- Upgrading our own Urn into a Vessel is fine.
+		if item == "item_spirit_vessel" and bot:FindItemSlot("item_urn_of_shadows") >= 0 then
+			return false
+		end
+		family = URN_FAMILY
+	elseif TEAM_ITEMS[item] then
+		family = { [item] = true }
+	else
 		return false
 	end
 	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-		if ally ~= nil and ally ~= bot and not ally:IsIllusion() and ally:FindItemSlot(item) >= 0 then
-			return true
+		if ally ~= nil and ally ~= bot and not ally:IsIllusion() then
+			for name in pairs(family) do
+				if ally:FindItemSlot(name) >= 0 then
+					return true
+				end
+			end
 		end
 	end
 	return false

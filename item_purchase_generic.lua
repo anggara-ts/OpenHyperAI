@@ -1510,7 +1510,7 @@ function ItemPurchaseThink()
 				log("[Purchase] Skipping %s — already have boots", b4)
 				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
 			elseif TeamItems.AllyOwns(a, b4) then
-				-- Pipe / Crimson / Lotus do not stack. A human or a fixed build may already have one.
+				-- Pipe / Crimson / Lotus / Urn / Vessel do not stack. A human or a fixed build may already have one.
 				log("[Purchase] Skipping %s — an ally already has it", b4)
 				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
 			else

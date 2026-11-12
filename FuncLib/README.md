@@ -42,7 +42,7 @@ FuncLib/
 │   ├── defend.lua              Tower/base defense logic
 │   ├── global_overrides.lua    Valve API overrides
 │   ├── item.lua                Item purchase/usage system
-│   ├── item_strategy.lua       Advanced item build strategy
+│   ├── item_strategy.lua       Team Pipe / Crimson / Lotus split by enemy damage
 │   ├── localization.lua        Multi-language support (en/zh/ru/ja)
 │   ├── push.lua                Tower push logic
 │   ├── role.lua                Role/position assignment

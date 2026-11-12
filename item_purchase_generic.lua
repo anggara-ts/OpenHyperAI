@@ -19,6 +19,7 @@ local d = require(GetScriptDirectory() .. "/FuncLib/systems/role")
 local e = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local f = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
 local g = {}
 if a:IsInvulnerable() or not a:IsHero() or a:IsIllusion() then
 	return
@@ -1507,6 +1508,10 @@ function ItemPurchaseThink()
 				)
 			then
 				log("[Purchase] Skipping %s — already have boots", b4)
+				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
+			elseif TeamItems.AllyOwns(a, b4) then
+				-- Pipe / Crimson / Lotus do not stack. A human or a fixed build may already have one.
+				log("[Purchase] Skipping %s — an ally already has it", b4)
 				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
 			else
 				break

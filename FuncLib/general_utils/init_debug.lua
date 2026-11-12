@@ -23,6 +23,22 @@ local function a(b)
 			e = b.GetTalentBuildList(k.Talent)
 			f = k.PurchaseList
 			g = k.SellList
+		elseif type(f) == "table" then
+			local ok, applied = pcall(function()
+				return require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").ApplyTeamItems(h, f)
+			end)
+			if ok and type(applied) == "table" then
+				f = applied
+			else
+				log("[WARN] Team item plan failed for %s: %s", i, tostring(applied))
+				local kept = {}
+				for q = 1, #f do
+					if f[q] ~= "item_team_aura" then
+						kept[#kept + 1] = f[q]
+					end
+				end
+				f = kept
+			end
 		end
 		return d, e, f, g
 	end

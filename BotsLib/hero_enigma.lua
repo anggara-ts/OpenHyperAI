@@ -32,8 +32,7 @@ end
 if h == "pos_5" then
 	l = c.Skill.GetTalentBuild(i[2])
 end
-local m = { "item_pipe", "item_lotus_orb" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",

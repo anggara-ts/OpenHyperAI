@@ -6845,9 +6845,8 @@ function ItemUsageThink()
 		return
 	end
 	-- A spell or attack cancels an outpost capture. Wisdom and lotus do not care.
-	if b:HasModifier("modifier_watch_tower_capturing")
-		or (b.outpostOrderAt ~= nil and DotaTime() - b.outpostOrderAt < 6.5)
-	then
+	-- Only while the capture is running, so a bot that gave up can still use items.
+	if b:HasModifier("modifier_watch_tower_capturing") then
 		_perfDone()
 		return
 	end

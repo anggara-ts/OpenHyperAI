@@ -145,8 +145,7 @@ function a.SkillsComplement()
 	end
 	w, x = a.ConsiderSnakebite()
 	if w > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(r, x)
+		b:Action_UseAbilityOnEntity(r, x)
 		return
 	end
 	u, v = a.ConsiderVenomousGale()
@@ -385,15 +384,19 @@ function a.ConsiderSnakebite()
 	if not c.CanCastAbility(r) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local I = r:GetCastRange()
+	-- A queued bite clears his move order, and lane, farm, and retreat then wait
+	-- on that queue. Cast only when the target is already in range.
+	local I = c.GetProperCastRange(false, b, r:GetCastRange())
 	local a5 = r:GetManaCost()
 	local a6 = c.GetManaAfter(a5)
 	local a7 = c.GetManaThreshold(b, a5, { q, s, t })
-	if c.IsGoingOnSomeone(b) then
+	local hitByHero = b:WasRecentlyDamagedByAnyHero(1.5)
+	local hitByCreep = b:WasRecentlyDamagedByCreep(1.5)
+	if c.IsGoingOnSomeone(b) and not c.IsRetreating(b) then
 		if
 			c.IsValidHero(D)
 			and c.CanBeAttacked(D)
-			and c.IsInRange(b, D, I + 300)
+			and c.IsInRange(b, D, I)
 			and c.CanCastOnNonMagicImmune(D)
 			and c.CanCastOnTargetAdvanced(D)
 			and not c.IsDisabled(D)
@@ -406,28 +409,13 @@ function a.ConsiderSnakebite()
 			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
-	if c.IsRetreating(b) and not c.IsRealInvisible(b) then
-		local M = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
-		for N, O in pairs(M) do
-			if
-				c.IsValidHero(O)
-				and c.CanBeAttacked(O)
-				and c.IsInRange(b, O, I)
-				and c.CanCastOnNonMagicImmune(O)
-				and c.CanCastOnTargetAdvanced(O)
-				and not c.IsDisabled(O)
-				and not O:IsDisarmed()
-				and b:WasRecentlyDamagedByHero(O, 2.0)
-			then
-				return BOT_ACTION_DESIRE_HIGH, O
-			end
-		end
-	end
-	if (c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b)) and F and a6 > a7 then
+	if (c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b)) and F and a6 > a7 and not hitByHero and not hitByCreep then
 		if
 			c.IsValid(D)
 			and c.CanBeAttacked(D)
+			and c.IsInRange(b, D, I)
 			and not D:IsBuilding()
+			and not D:IsHero()
 			and not c.CanKillTarget(D, b:GetAttackDamage() * 3.5, DAMAGE_TYPE_PHYSICAL)
 		then
 			return BOT_ACTION_DESIRE_HIGH, D

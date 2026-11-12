@@ -1513,22 +1513,33 @@ function ItemPurchaseThink()
 		a:SetNextItemPurchaseValue(0)
 		return
 	end
-	local b3 = { item_boots = true }
+	local b3 = {
+		item_boots = true,
+		item_phase_boots = true,
+		item_power_treads = true,
+		item_tranquil_boots = true,
+		item_arcane_boots = true,
+	}
+	local function OwnsOtherBoots(item)
+		for _, boot in pairs(c["tEarlyBoots"]) do
+			if boot ~= item and a:FindItemSlot(boot) >= 0 then
+				return boot
+			end
+		end
+		return nil
+	end
 	if a.currBuyingItemInPurchaseList == nil and #a.currBuyingBasicItemList == 0 then
 		while #a.purchaseListInReverseOrder > 0 do
 			local b4 = a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder]
-			if
-				b3[b4]
-				and (
-					c.HasBuyBoots(a)
-					or c.HasItem(a, "item_guardian_greaves")
-					or c.HasItem(a, "item_travel_boots")
-					or c.HasItem(a, "item_travel_boots_2")
-					or c.HasItem(a, "item_boots_of_bearing")
-				)
-			then
-				log("[Purchase] Skipping %s — already have boots", b4)
-				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
+			local otherBoots = b3[b4] and OwnsOtherBoots(b4) or nil
+			if otherBoots ~= nil then
+				-- A second pair never combines with the first. Sell the old one and buy this.
+				local slot = a:FindItemSlot(otherBoots)
+				if slot >= 0 and slot <= 8 then
+					log("[Purchase] Selling %s to buy %s", otherBoots, b4)
+					a:ActionImmediate_SellItem(a:GetItemInSlot(slot))
+				end
+				break
 			elseif TeamItems.AllyOwns(a, b4) then
 				-- Pipe / Crimson / Lotus / Urn / Vessel do not stack. A human or a fixed build may already have one.
 				log("[Purchase] Skipping %s — an ally already has it", b4)

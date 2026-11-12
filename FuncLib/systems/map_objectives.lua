@@ -358,6 +358,10 @@ function MapObjectives.LotusScore(hero, loc)
 	end
 	local pos = UtilsPos(hero)
 	local score = 10000 - dist
+	-- The hero already on the bank takes it. A support still walking in should not steal the job.
+	if dist <= 500 then
+		score = score + 4000
+	end
 	-- Supports hold healing lotuses; strongly prefer them at the pool.
 	if pos >= 4 then
 		score = score + 1200
@@ -626,6 +630,9 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
+			if not mainRoom then
+				mainRoom = MapObjectives.EnsureInventorySlot(bot)
+			end
 			if
 				inLotus
 				and mainRoom
@@ -686,7 +693,8 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		return false
 	end
 	AnnounceObjective(bot, kind)
-	local gather = kind == "wisdom" and 280 or 340
+	-- Lotus grants only from the middle of the pool. 340 stops them on the bank.
+	local gather = kind == "wisdom" and 280 or 140
 	local dist = GetUnitToLocationDistance(bot, loc)
 	local enemies = bot:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
 	local allies = bot:GetNearbyHeroes(1000, false, BOT_MODE_NONE) or {}
@@ -738,6 +746,13 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		return true
 	end
 
+	-- Step into the pool before fighting. Stopping on the lip never grants the lotus.
+	if kind == "lotus" and dist > gather and dist <= 700 then
+		bot._lotusHaveAt = nil
+		bot:Action_MoveToLocation(loc)
+		return true
+	end
+
 	if #enemies > 0 and #enemies > #allies and dist > gather then
 		return true
 	end
@@ -757,6 +772,9 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 		-- A full main inventory puts the lotus in the backpack, where it sits unused.
 		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+			if MapObjectives.EnsureInventorySlot(bot) then
+				return true
+			end
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
 			return false

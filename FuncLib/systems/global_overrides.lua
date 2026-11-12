@@ -314,6 +314,10 @@ function CDOTA_Bot_Script:IsIllusion()
 	if not self:CanBeSeen() then
 		return nil
 	end
+	-- The engine only answers for teammates and logs a warning on every other call.
+	if self:GetTeam() ~= GetTeam() then
+		return self:HasModifier("modifier_illusion")
+	end
 	return a7(self)
 end
 local a8 = CDOTA_Bot_Script.HasModifier

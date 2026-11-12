@@ -418,8 +418,11 @@ function a.InitRune()
 end
 function a.ClosestAvailableRune(maxDist)
 	local best, bestDist = nil, maxDist or 700
+	local t = DotaTime()
 	for _, rune in pairs(h) do
-		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE then
+		-- Bounty runes spawn every 3 minutes and report missing until the bot has vision.
+		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2) and t >= 170 and t % 180 <= 50
+		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE or (bountyDue and GetRuneStatus(rune) ~= RUNE_STATUS_MISSING) then
 			local dist = GetUnitToLocationDistance(d, GetRuneSpawnLocation(rune))
 			if dist < bestDist then
 				best = rune

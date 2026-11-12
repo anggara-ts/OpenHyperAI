@@ -1998,6 +1998,11 @@ local function OutpostIsTooHot(loc)
 	if n == 0 then
 		return false
 	end
+	-- An enemy beside the bot on the walk over is just as much a fight as one on the outpost.
+	local beside = c:GetNearbyHeroes(OUTPOST_CONTEST, true, BOT_MODE_NONE)
+	if beside ~= nil and #beside > n then
+		n = #beside
+	end
 	local allies = a.GetAlliesNearLoc(loc, OUTPOST_CONTEST)
 	local allyN = allies ~= nil and #allies or 0
 	if GetUnitToLocationDistance(c, loc) <= OUTPOST_CONTEST then

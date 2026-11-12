@@ -297,7 +297,75 @@ local function StandingStillOk(bot, mode)
 	return mode == BOT_MODE_SECRET_SHOP or mode == BOT_MODE_WARD or mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM
 end
 
+-- Game boundary lines for split-console.js. Printed even when tracing is off.
+-- Module state is per script VM, so a team can print the same marker more than once.
+local markerSent = {}
+local nextEndCheck = 0
+
+local function TeamTag(team)
+	return team == TEAM_RADIANT and "radiant" or "dire"
+end
+
+local function Lineup(team)
+	local names = {}
+	for _, pid in ipairs(GetTeamPlayers(team) or {}) do
+		local name = string.gsub(GetSelectedHeroName(pid) or "", "npc_dota_hero_", "")
+		names[#names + 1] = name ~= "" and name or "?"
+	end
+	return table.concat(names, ",")
+end
+
+function MatchTrace.MatchMarker(phase, detail)
+	if markerSent[phase] then
+		return
+	end
+	markerSent[phase] = true
+	print(string.format(
+		"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
+		phase,
+		TeamTag(GetTeam()),
+		DotaTime(),
+		version,
+		detail or ""
+	))
+end
+
+local function AncientDead(team)
+	local ancient = GetAncient(team)
+	return ancient == nil or ancient:GetHealth() <= 0
+end
+
+function MatchTrace.Markers()
+	MatchTrace.MatchMarker(
+		"game",
+		string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE))
+	)
+	if markerSent["end"] or DotaTime() < nextEndCheck then
+		return
+	end
+	nextEndCheck = DotaTime() + 1
+	local gs = GetGameState()
+	if gs ~= GAME_STATE_GAME_IN_PROGRESS and gs ~= GAME_STATE_POST_GAME then
+		return
+	end
+	local radiantDead = AncientDead(TEAM_RADIANT)
+	local direDead = AncientDead(TEAM_DIRE)
+	if gs ~= GAME_STATE_POST_GAME and not radiantDead and not direDead then
+		return
+	end
+	local winner = "unknown"
+	if radiantDead and not direDead then
+		winner = "dire"
+	elseif direDead and not radiantDead then
+		winner = "radiant"
+	end
+	MatchTrace.MatchMarker("end", "winner=" .. winner)
+end
+
 function MatchTrace.Tick(bot)
+	if bot ~= nil and bot:IsHero() then
+		MatchTrace.Markers()
+	end
 	if not enabled or bot == nil or not bot:IsHero() then
 		return
 	end

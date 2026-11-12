@@ -166,6 +166,12 @@ function GetDesireHelper()
 			return BOT_MODE_DESIRE_MODERATE
 		end
 	end
+	if b.ShouldLeaveRoshanFight(c) then
+		local pit = b.GetCurrentRoshanLocation()
+		if pit ~= nil and GetUnitToLocationDistance(c, pit) < 2500 then
+			return BOT_MODE_DESIRE_ABSOLUTE
+		end
+	end
 	if (b.IsDoingRoshan(c) or b.IsDoingTormentor(c)) and d > 0.2 then
 		return BOT_MODE_DESIRE_NONE
 	end

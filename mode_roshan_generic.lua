@@ -34,6 +34,10 @@ local s = 0
 local t = 1.5
 local u = 8
 local function v(w)
+	if b ~= "npc_dota_hero_huskar" and c.ShouldLeaveRoshanFight(a) then
+		a._roshDipActive = false
+		return 0
+	end
 	if w <= 0 then
 		return w
 	end
@@ -317,6 +321,11 @@ function Think()
 	end
 	local M = c.GetCurrentRoshanLocation()
 	if M == nil then
+		return
+	end
+	if c.ShouldLeaveRoshanFight(a) then
+		local away = c.AdjustLocationWithOffsetTowardsFountain(M, 1600)
+		a:Action_MoveToLocation(away)
 		return
 	end
 	if a._roshDipActive then

@@ -65,6 +65,37 @@ local function a(b)
 		end
 		return c:GetActiveMode() == BOT_MODE_ROSHAN
 	end
+	-- Leave the pit when this hero is low and Roshan is still healthy. Stay out until
+	-- 60% HP so they do not step back in on the next heal tick. Huskar wants to be low.
+	function b.ShouldLeaveRoshanFight(c)
+		if not b.IsUnitValid(c) or not c:IsAlive() then
+			return false
+		end
+		if c:GetUnitName() == "npc_dota_hero_huskar" then
+			return false
+		end
+		local hp = b.GetHP(c)
+		local handle = b.Utils.GameStates and b.Utils.GameStates.roshHandle
+		local roshHp = 1
+		if b.IsUnitValid(handle) and handle:IsAlive() and handle:CanBeSeen() then
+			roshHp = b.GetHP(handle)
+		end
+		if roshHp <= 0.5 then
+			c._roshHoldOut = false
+			return false
+		end
+		if hp < 0.45 then
+			if not c._roshHoldOut and log then
+				log(string.format("[ROSH] %s leave hp=%.2f rosh=%.2f", c:GetUnitName(), hp, roshHp))
+			end
+			c._roshHoldOut = true
+		end
+		if c._roshHoldOut and hp < 0.6 then
+			return true
+		end
+		c._roshHoldOut = false
+		return false
+	end
 	function b.IsFarming(c)
 		if not b.IsUnitValid(c) then
 			return false

@@ -11,6 +11,135 @@ local h = { RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }
 local i, j, k, l, m, n
 local o, p
 local q = {}
+-- Early-game console trace. Grep [OHA-RUNE]. One line a second while a bot is
+-- within 1600 of a rune before 1:40, plus a line whenever the reason changes.
+local RUNE_DBG_UNTIL = 100
+local runeWhy = "none"
+local dbgAt = -100
+local dbgWhy = ""
+local dbgLoc = nil
+local function give(desire, why)
+	if why ~= nil then
+		runeWhy = why
+	end
+	return desire
+end
+local function ModeTag(mode)
+	if mode == BOT_MODE_NONE then return "none" end
+	if mode == BOT_MODE_LANING then return "laning" end
+	if mode == BOT_MODE_ATTACK then return "attack" end
+	if mode == BOT_MODE_ROAM then return "roam" end
+	if mode == BOT_MODE_RETREAT then return "retreat" end
+	if mode == BOT_MODE_FARM then return "farm" end
+	if mode == BOT_MODE_WARD then return "ward" end
+	if mode == BOT_MODE_RUNE then return "rune" end
+	if mode == BOT_MODE_TEAM_ROAM then return "team_roam" end
+	if BOT_MODE_LOTUS_POOL ~= nil and mode == BOT_MODE_LOTUS_POOL then return "lotus" end
+	if BOT_MODE_WISDOM_SHRINE ~= nil and mode == BOT_MODE_WISDOM_SHRINE then return "wisdom" end
+	if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST then return "outpost" end
+	return "m" .. tostring(mode)
+end
+local function RuneTag(id)
+	if id == RUNE_BOUNTY_1 then return "b1" end
+	if id == RUNE_BOUNTY_2 then return "b2" end
+	if id == RUNE_POWERUP_1 then return "p1" end
+	if id == RUNE_POWERUP_2 then return "p2" end
+	return tostring(id)
+end
+local function StatusTag(st)
+	if st == RUNE_STATUS_AVAILABLE then return "up" end
+	if st == RUNE_STATUS_MISSING then return "miss" end
+	if st == RUNE_STATUS_UNKNOWN then return "unk" end
+	return tostring(st)
+end
+local function ActTag(action)
+	if action == BOT_ACTION_TYPE_IDLE then return "idle" end
+	if action == BOT_ACTION_TYPE_MOVE_TO then return "move" end
+	if action == BOT_ACTION_TYPE_ATTACK then return "attack" end
+	if action == BOT_ACTION_TYPE_PICK_UP_RUNE then return "pickup" end
+	if action == BOT_ACTION_TYPE_USE_ABILITY then return "ability" end
+	return "a" .. tostring(action)
+end
+local function HeroTag()
+	local name = string.gsub(d:GetUnitName() or "?", "npc_dota_hero_", "")
+	local team = GetTeam() == TEAM_RADIANT and "r" or "d"
+	return name .. "/" .. team
+end
+local function NearRune()
+	local bestId, bestDist = nil, math.huge
+	local parts = {}
+	for idx = 1, #h do
+		local rune = h[idx]
+		local dist = GetUnitToLocationDistance(d, GetRuneSpawnLocation(rune))
+		parts[#parts + 1] = string.format("%s:%s:%.0f", RuneTag(rune), StatusTag(GetRuneStatus(rune)), dist)
+		if dist < bestDist then
+			bestId, bestDist = rune, dist
+		end
+	end
+	return bestId, bestDist, table.concat(parts, " ")
+end
+function a.RuneDbg(desire)
+	local ok, err = pcall(function()
+		local t = DotaTime()
+		if t > RUNE_DBG_UNTIL then
+			return
+		end
+		local nearId, nearDist, runeList = NearRune()
+		local why = runeWhy or "?"
+		local inRune = l == BOT_MODE_RUNE
+		if nearDist > 1600 and not inRune and (desire or 0) <= 0 then
+			return
+		end
+		local loc = d:GetLocation()
+		local moved = dbgLoc and b.GetDistance(dbgLoc, loc) or -1
+		local dt = t - dbgAt
+		if dt < 0.25 or (why == dbgWhy and dt < 1) then
+			return
+		end
+		local stuck = (dt >= 0.8 and nearDist <= 900 and moved >= 0 and moved < 40) and 1 or 0
+		dbgAt = t
+		dbgWhy = why
+		dbgLoc = loc
+		local D = d.rune and d.rune.normal
+		local best = "none"
+		if D ~= nil and D.location ~= nil then
+			best = string.format("%s:%s:%.0f", RuneTag(D.location), StatusTag(D.status), D.distance or -1)
+		end
+		print(string.format(
+			"[OHA-RUNE] %s t=%.1f xy=%.0f,%.0f pos=%s mode=%s/%.2f des=%.2f why=%s best=%s near=%s:%.0f commit=%s n=%d/%d act=%s runeDo=%s moved=%.0f stuck=%d hp=%.2f cant=%s q=%d runes=%s",
+			HeroTag(), t, loc.x, loc.y, tostring(k),
+			ModeTag(l), m or 0, desire or 0, why, best,
+			RuneTag(nearId), nearDist,
+			d._earlyRuneCommit and "1" or "0",
+			#(p or {}), #(o or {}),
+			ActTag(d:GetCurrentActionType()),
+			tostring(d._runeDo or "-"),
+			moved, stuck, i or 0,
+			b.CanNotUseAction(d) and "1" or "0",
+			d.NumQueuedActions and d:NumQueuedActions() or 0,
+			runeList
+		))
+	end)
+	if not ok then
+		print("[OHA-RUNE] err " .. tostring(err))
+	end
+end
+local function doing(name)
+	d._runeDo = name
+	if DotaTime() > RUNE_DBG_UNTIL or name == d._runeDoPrev then
+		return
+	end
+	local nearDist = select(2, NearRune())
+	if nearDist > 1600 and DotaTime() > 0 then
+		return
+	end
+	d._runeDoPrev = name
+	local loc = d:GetLocation()
+	print(string.format(
+		"[OHA-RUNE] %s t=%.1f do=%s xy=%.0f,%.0f mode=%s",
+		HeroTag(), DotaTime(), name, loc.x, loc.y, ModeTag(d:GetActiveMode())
+	))
+end
 local function r(s)
 	local t = GetRuneSpawnLocation(s)
 	if q[s] and GameTime() - q[s] < 5 then
@@ -34,9 +163,13 @@ local function r(s)
 end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
+		runeWhy = "skip"
+		a.RuneDbg(0)
 		return 0
 	end
-	return GetDesireRaw()
+	local desire = GetDesireRaw()
+	a.RuneDbg(desire)
+	return desire
 end
 function GetDesireRaw()
 	a.InitRune()
@@ -52,7 +185,7 @@ function GetDesireRaw()
 	o = d:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}
 	p = d:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return give(BOT_MODE_DESIRE_ABSOLUTE, "fountain")
 	end
 	-- Before the fight bailouts. An enemy near the pool was returning NONE and lotus never started.
 	do
@@ -61,26 +194,26 @@ function GetDesireRaw()
 		if desire > 0 and loc ~= nil and kind ~= nil then
 			d._mapObjKind = kind
 			d._mapObjLoc = loc
-			return desire
+			return give(desire, "mapobj-" .. tostring(kind))
 		end
 	end
 	if DotaTime() > 0 and #p > 0 then
 		if #p > #o then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "outnumbered")
 		end
 		if d:WasRecentlyDamagedByAnyHero(2.0) and i < 0.4 then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "hurt")
 		end
 	end
 	if b.Utils.IsTeamPushingSecondTierOrHighGround(d) then
-		return BOT_MODE_DESIRE_NONE
+		return give(BOT_MODE_DESIRE_NONE, "team-push")
 	end
 	local x = b.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200)
 	if x >= 1 then
-		return BOT_MODE_DESIRE_NONE
+		return give(BOT_MODE_DESIRE_NONE, "ancient")
 	end
 	if b.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
-		return BOT_MODE_DESIRE_NONE
+		return give(BOT_MODE_DESIRE_NONE, "highground")
 	end
 	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
 	local runeId, runeDist = a.ClosestAvailableRune(400)
@@ -91,15 +224,15 @@ function GetDesireRaw()
 		D.distance = runeDist
 		D.status = RUNE_STATUS_AVAILABLE
 		D.type = GetRuneType(runeId)
-		return BOT_MODE_DESIRE_ABSOLUTE + 0.02
+		return give(BOT_MODE_DESIRE_ABSOLUTE + 0.02, "underfoot")
 	end
 	if not b.IsInLaningPhase() then
 		if b.IsPushing(d) or b.IsDefending(d) then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "pushing")
 		end
 		local y = d:GetActiveMode()
 		if y == BOT_MODE_PUSH_TOWER_TOP or y == BOT_MODE_PUSH_TOWER_MID or y == BOT_MODE_PUSH_TOWER_BOT then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "push-mode")
 		end
 	end
 	if DotaTime() >= 60 and DotaTime() < 7 * 60 then
@@ -116,14 +249,14 @@ function GetDesireRaw()
 			if A == RUNE_STATUS_AVAILABLE or A == RUNE_STATUS_UNKNOWN then
 				local here = GetUnitToLocationDistance(d, GetRuneSpawnLocation(d.rune.normal.location))
 				if A == RUNE_STATUS_AVAILABLE and here <= 800 then
-					return BOT_MODE_DESIRE_ABSOLUTE
+					return give(BOT_MODE_DESIRE_ABSOLUTE, "laning-close")
 				end
-				return BOT_MODE_DESIRE_VERYHIGH
+				return give(BOT_MODE_DESIRE_VERYHIGH, "laning-hold")
 			end
 		end
 		local B = a.GetLaningRuneDesire(z)
 		if B > 0 then
-			return B
+			return give(B, "laning")
 		end
 	end
 	if d.rune and d.rune.normal then
@@ -131,13 +264,13 @@ function GetDesireRaw()
 		local D = d.rune.normal
 		D.location, D.distance = a.GetBestRune()
 		if D.distance > 4000 and DotaTime() >= 60 * 2 then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "too-far")
 		end
 		if DotaTime() < 0 and not d:WasRecentlyDamagedByAnyHero(10.0) then
-			return BOT_MODE_DESIRE_MODERATE
+			return give(BOT_MODE_DESIRE_MODERATE, "pre-horn")
 		end
 		if not b.IsInLaningPhase() and D.distance > 2000 then
-			return BOT_MODE_DESIRE_NONE
+			return give(BOT_MODE_DESIRE_NONE, "post-lane-far")
 		end
 		if D.location ~= -1 then
 			D.type = GetRuneType(D.location)
@@ -146,7 +279,7 @@ function GetDesireRaw()
 			if D.distance < 1200 then
 				for F, G in pairs(o) do
 					if G ~= nil and not G:IsBot() and GetUnitToLocationDistance(G, E) < 2000 then
-						return BOT_MODE_DESIRE_NONE
+						return give(BOT_MODE_DESIRE_NONE, "human-near")
 					end
 				end
 			end
@@ -160,7 +293,7 @@ function GetDesireRaw()
 					)
 				then
 					if a.IsEnemyPickRune(D.location) then
-						return BOT_MODE_DESIRE_NONE
+						return give(BOT_MODE_DESIRE_NONE, "enemy-closer")
 					end
 					local desire
 					if g or k >= 4 and not a.IsThereAllyWithBottle(E, 1600) then
@@ -168,26 +301,26 @@ function GetDesireRaw()
 					else
 						desire = a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, 3500)
 					end
-					return a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status)
+					return give(a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status, "bounty"))
 				elseif
 					D.status == RUNE_STATUS_UNKNOWN
 					and D.distance <= C * 1.5
 					and DotaTime() > 3 * 60 + 50
 					and (e % 4 == 0 or e % 4 == 3 and f > 45)
 				then
-					return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C)
+					return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C), "bounty-unknown")
 				elseif
 					D.status == RUNE_STATUS_MISSING
 					and D.distance <= C * 1.5
 					and DotaTime() > 3 * 60 + 50
 					and (e % 4 == 3 or f > 52)
 				then
-					return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5)
+					return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5), "bounty-missing")
 				end
 			else
 				if D.status == RUNE_STATUS_AVAILABLE then
 					if a.IsEnemyPickRune(D.location) then
-						return BOT_MODE_DESIRE_NONE
+						return give(BOT_MODE_DESIRE_NONE, "enemy-closer")
 					end
 					local H = D.type
 					local desire
@@ -205,27 +338,29 @@ function GetDesireRaw()
 						end
 					end
 					-- Starting river gold/bounty sits on power-rune spots — gate early lane oscillation.
-					return a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status)
+					return give(a.ApplyEarlyLaneRuneGate(desire, D.distance, D.status, "power"))
 				elseif D.status == RUNE_STATUS_UNKNOWN and DotaTime() > 113 then
 					if g or not b.IsEarlyGame() and k <= 3 then
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5)
+						return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2.5), "power-unknown")
 					else
-						return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C)
+						return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C), "power-unknown")
 					end
 				elseif D.status == RUNE_STATUS_MISSING and DotaTime() > 60 and (e % 2 == 1 and f > 53) then
-					return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C)
+					return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C), "power-missing")
 				elseif
 					D.status == RUNE_STATUS_UNKNOWN
 					and a.IsTeamMustSaveRune(D.location)
 					and DotaTime() > 113
 					and D.distance <= C * 2
 				then
-					return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2)
+					return give(a.GetScaledDesire(BOT_MODE_DESIRE_HIGH, D.distance, C * 2), "power-save")
 				end
 			end
+			return give(BOT_MODE_DESIRE_NONE, "status-" .. StatusTag(D.status))
 		end
+		return give(BOT_MODE_DESIRE_NONE, "no-best")
 	end
-	return BOT_MODE_DESIRE_NONE
+	return give(BOT_MODE_DESIRE_NONE, "no-rune")
 end
 local K = nil
 function OnStart()
@@ -239,16 +374,20 @@ function OnEnd()
 end
 local M = -math.huge
 function Think()
+	d._runeDo = "fall"
 	if d:IsInvulnerable() and d:DistanceFromFountain() < 500 then
 		d:Action_MoveToLocation(d:GetLocation() + RandomVector(500))
+		doing("fountain")
 		return
 	end
 	if b.CanNotUseAction(d) then
+		doing("cant-act")
 		return
 	end
 	-- A pickup order that never lands (knockback, stun, river edge) must be reissued.
 	if d:GetCurrentActionType() == BOT_ACTION_TYPE_PICK_UP_RUNE then
 		if d._runePickupAt ~= nil and DotaTime() - d._runePickupAt < 0.6 then
+			doing("pickup-wait")
 			return
 		end
 	end
@@ -256,10 +395,12 @@ function Think()
 	if d._mapObjKind ~= nil and d._mapObjLoc ~= nil then
 		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 		MapObj.ThinkObjective(d, d._mapObjLoc, d._mapObjKind)
+		doing("mapobj-" .. tostring(d._mapObjKind))
 		return
 	end
 	if DotaTime() < 0 then
 		if b.IsModeTurbo() and DotaTime() < -50 then
+			doing("pre-wait")
 			return
 		end
 		local N = d:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
@@ -267,36 +408,44 @@ function Think()
 		if #N > #O and #N >= 2 then
 			local P = GetLaneFrontLocation(GetTeam(), n or d:GetAssignedLane(), -1500)
 			d:Action_MoveToLocation(P)
+			doing("pre-flee")
 			return
 		end
 		if DotaTime() < -10 then
 			local Q = a.GetGoOutLocation()
 			if GetUnitToLocationDistance(d, Q) > 300 then
 				d:Action_MoveToLocation(Q)
+				doing("pre-out")
 				return
 			else
 				if DotaTime() >= M then
 					d:Action_MoveToLocation(Q + RandomVector(150))
 					M = DotaTime() + RandomFloat(1, 3)
+					doing("pre-hold")
 					return
 				end
 			end
+			doing("pre-hold")
 			return
 		end
 		if GetTeam() == TEAM_RADIANT then
 			if n == LANE_BOT then
 				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_BOUNTY_2) + RandomVector(50))
+				doing("pre-bounty2")
 				return
 			else
 				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_POWERUP_1) + RandomVector(50))
+				doing("pre-power1")
 				return
 			end
 		else
 			if n == LANE_TOP then
 				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_BOUNTY_1) + RandomVector(50))
+				doing("pre-bounty1")
 				return
 			else
 				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_POWERUP_2) + RandomVector(50))
+				doing("pre-power2")
 				return
 			end
 		end
@@ -318,6 +467,7 @@ function Think()
 		then
 			if GetUnitToLocationDistance(d, E) > 50 then
 				d:Action_MoveToLocation(E)
+				doing("move-unseen")
 				return
 			end
 		end
@@ -348,12 +498,14 @@ function Think()
 			if liveDist <= 320 then
 				d._runePickupAt = DotaTime()
 				d:Action_PickUpRune(D.location)
+				doing("pickup")
 				return
 			end
 			if K and b.CanCastAbility(K) and liveDist < 1200 then
 				local V = K:GetCurrentCharges()
 				if V > 0 and (i ~= 1 or j ~= 1) then
 					d:Action_UseAbility(K)
+					doing("bottle")
 					return
 				end
 			end
@@ -361,6 +513,7 @@ function Think()
 				for F, W in pairs(S) do
 					if CanHarassNearRune(W) then
 						d:Action_AttackUnit(W, true)
+						doing("harass")
 						return
 					end
 				end
@@ -370,6 +523,7 @@ function Think()
 					and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 				then
 					d:Action_AttackUnit(T[1], true)
+					doing("lasthit")
 					return
 				end
 			end
@@ -378,18 +532,21 @@ function Think()
 			if liveDist <= 900 then
 				d._runePickupAt = DotaTime()
 				d:Action_PickUpRune(D.location)
+				doing("pickup")
 				return
 			end
 			local step = math.max(0, liveDist - 280)
 			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
 			d.rune.location = stand
 			d:Action_MoveToLocation(stand)
+			doing("move-stand")
 			return
 		else
 			if liveDist > 500 then
 				for F, W in pairs(S) do
 					if CanHarassNearRune(W) then
 						d:Action_AttackUnit(W, true)
+						doing("harass")
 						return
 					end
 				end
@@ -399,6 +556,7 @@ function Think()
 					and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 				then
 					d:Action_AttackUnit(T[1], true)
+					doing("lasthit")
 					return
 				end
 			end
@@ -406,9 +564,11 @@ function Think()
 			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
 			d.rune.location = stand
 			d:Action_MoveToLocation(stand)
+			doing("move-down")
 			return
 		end
 	end
+	doing("no-target")
 end
 function a.InitRune()
 	if d.rune == nil then
@@ -623,17 +783,21 @@ function a.DesireForNearbyRune(desire, dist, status)
 end
 -- After creeps spawn, laning desire (~0.45) fights scaled rune desire and bots oscillate
 -- lane ↔ river gold/bounty. Only start a pickup when already close; once committed, stick.
-function a.ApplyEarlyLaneRuneGate(desire, dist, status)
+function a.ApplyEarlyLaneRuneGate(desire, dist, status, tag)
+	tag = tag or "gate"
 	if desire == nil or desire <= 0 then
+		runeWhy = tag .. "-zero"
 		return desire or 0
 	end
 	local t = DotaTime()
 	if t <= 0 or t >= 70 then
 		d._earlyRuneCommit = nil
+		runeWhy = tag .. "-open"
 		return desire
 	end
 	if status ~= RUNE_STATUS_AVAILABLE then
 		d._earlyRuneCommit = nil
+		runeWhy = tag .. "-not-up"
 		return BOT_MODE_DESIRE_NONE
 	end
 	dist = dist or 99999
@@ -641,16 +805,20 @@ function a.ApplyEarlyLaneRuneGate(desire, dist, status)
 	local stickDist = 1900
 	if dist > stickDist then
 		d._earlyRuneCommit = nil
+		runeWhy = tag .. "-far"
 		return BOT_MODE_DESIRE_NONE
 	end
 	if (l == BOT_MODE_RUNE or d._earlyRuneCommit) and dist <= stickDist then
 		d._earlyRuneCommit = true
+		runeWhy = tag .. "-stick"
 		return math.max(desire, BOT_MODE_DESIRE_HIGH)
 	end
 	if dist > startDist then
+		runeWhy = tag .. "-wait"
 		return BOT_MODE_DESIRE_NONE
 	end
 	d._earlyRuneCommit = true
+	runeWhy = tag .. "-go"
 	return math.max(desire, BOT_MODE_DESIRE_HIGH)
 end
 local ak = nil

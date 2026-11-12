@@ -712,6 +712,26 @@ function ItemPurchaseThink()
 				item_tranquil_boots = true,
 				item_arcane_boots = true,
 			}
+			-- The new position's boots replace the old pair. Dropping them from the buy list
+			-- left the old pair in the inventory, so a swap stacked two pairs of boots.
+			if ah then
+				local kept = {}
+				for k = 1, #i do
+					kept[i[k]] = true
+					for _, part in pairs(c[i[k]] or {}) do
+						kept[part] = true
+					end
+				end
+				for _, boot in pairs(c["tEarlyBoots"]) do
+					if not kept[boot] then
+						local slot = a:FindItemSlot(boot)
+						if slot >= 0 and slot <= 8 then
+							log("[PosSwap] Selling %s — %s no longer builds it", boot, b)
+							a:ActionImmediate_SellItem(a:GetItemInSlot(slot))
+						end
+					end
+				end
+			end
 			a.purchaseListInReverseOrder = {}
 			local aj = 0
 			for k = #i, 1, -1 do

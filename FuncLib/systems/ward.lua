@@ -143,6 +143,7 @@ local function ObsFree(spot)
 	return spot ~= nil
 		and spot.location ~= nil
 		and not a.IsOtherWardClose(spot.location, "npc_dota_observer_wards", OBS_GAP, true, false)
+		and not a.AllyGoingTo(spot.location, OBS_GAP)
 		and not a.IsThereEnemySentry(spot.location, 1100)
 		and (spot.plant_time_obs == 0 or DotaTime() > spot.plant_time_obs + 360)
 end
@@ -383,6 +384,22 @@ function a.GetClosestSentryWardSpot(K, S)
 		end
 	end
 	return U
+end
+-- Another support already heading here would plant a second observer before the first exists.
+function a.AllyGoingTo(loc, gap)
+	local me = GetBot()
+	for i = 1, 5 do
+		local ally = GetTeamMember(i)
+		if
+			b.IsValidHero(ally)
+			and ally ~= me
+			and ally:GetActiveMode() == BOT_MODE_WARD
+			and b.GetDistance(ally:GetExtrapolatedLocation(3), loc) <= gap
+		then
+			return true
+		end
+	end
+	return false
 end
 function a.IsOtherWardClose(X, Y, Z, _, a0)
 	local a1 = GetUnitList(UNIT_LIST_ALLIED_WARDS)

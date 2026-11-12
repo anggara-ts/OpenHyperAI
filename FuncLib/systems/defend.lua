@@ -772,6 +772,8 @@ function r.GetDefendDesireHelper(af, aF)
 		end
 	end
 	local ch = { active = false, floor = 0 }
+	-- Lane creeps hit the Ancient with no hero nearby. Only the closest bot answers.
+	local ancientCreeps = am and am:IsAlive() and C(am:GetLocation(), 900) or 0
 	if am and am:IsAlive() then
 		local ci = az.ancientHP
 		local cj = az.defendersAtAncient
@@ -789,7 +791,7 @@ function r.GetDefendDesireHelper(af, aF)
 					af.laneToDefend = aF
 				end
 			end
-		elseif ci < 0.95 and ca == 0 and cj == 0 then
+		elseif ca == 0 and cj == 0 and (ci < 0.95 or ancientCreeps >= 2) then
 			local by = Z.GetPosition(af)
 			local bB = E({ 4, 5, 3 }, am:GetLocation())
 			if by == bB then

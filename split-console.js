@@ -1,7 +1,11 @@
-// Split Dota's -condebug console.log into one file per game.
+// Split Dota's -condebug logs into one file per game.
 //
 // Usage:
-//   node split-console.js [path\to\console.log] [--out <dir>]
+//   node split-console.js [path\to\dota\game\dota] [--out <dir>]
+//
+// Once a match gets an ID, Dota stops writing console.log and continues in
+// console.<matchid>.log ("Tearing off console log, will continue using suffix").
+// console.log itself only holds the menu and signon, so this reads the per-match files.
 //
 // The bots print these markers (FuncLib/systems/match_trace.lua):
 //   [OHA-MATCH] start team=radiant ...   hero selection began
@@ -13,28 +17,36 @@
 // ended, or that team goes back a phase (start < game < end). Lines before the first
 // marker are dropped; lines after "end" stay with that game until the next game opens.
 //
-// console.log keeps growing across games, so every run re-splits the whole file and
-// rewrites the game-*.log files in the output folder.
+// Every run re-reads all the per-match logs and rewrites the game-*.log files.
 
 const fs = require("fs");
 const path = require("path");
-const readline = require("readline");
 
-const DEFAULT_LOG = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota\\console.log";
+const DEFAULT_DIR = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota";
 const MARKER = /\[OHA-MATCH\] (start|game|end) team=(\w+)(.*)$/;
 const PHASE_RANK = { start: 0, game: 1, end: 2 };
 
 function parseArgs(argv) {
-	let input = null;
+	let dir = null;
 	let out = path.join(__dirname, "match-logs");
 	for (let i = 0; i < argv.length; i++) {
 		if (argv[i] === "--out") {
 			out = path.resolve(argv[++i]);
-		} else if (input === null) {
-			input = path.resolve(argv[i]);
+		} else if (dir === null) {
+			dir = path.resolve(argv[i]);
 		}
 	}
-	return { input: input || DEFAULT_LOG, out };
+	return { dir: dir || DEFAULT_DIR, out };
+}
+
+// console.<matchid>.log, oldest first, so game numbers follow match order.
+function matchLogs(dir) {
+	return fs
+		.readdirSync(dir)
+		.filter((name) => /^console\.\d+\.log$/.test(name))
+		.map((name) => ({ name, time: fs.statSync(path.join(dir, name)).mtimeMs }))
+		.sort((a, b) => a.time - b.time)
+		.map((entry) => path.join(dir, entry.name));
 }
 
 function field(text, name) {
@@ -47,10 +59,11 @@ function newGame(number) {
 }
 
 async function main() {
-	const { input, out } = parseArgs(process.argv.slice(2));
-	if (!fs.existsSync(input)) {
-		console.error(`console.log not found: ${input}`);
-		console.error("Pass the path: node split-console.js <path\\to\\console.log>");
+	const { dir, out } = parseArgs(process.argv.slice(2));
+	const logs = fs.existsSync(dir) ? matchLogs(dir) : [];
+	if (logs.length === 0) {
+		console.error(`No console.<matchid>.log files in ${dir}`);
+		console.error("Pass the folder: node split-console.js <path\\to\\dota\\game\\dota>");
 		process.exit(1);
 	}
 	fs.mkdirSync(out, { recursive: true });
@@ -62,8 +75,14 @@ async function main() {
 
 	const games = [];
 	let current = null;
-	const rl = readline.createInterface({ input: fs.createReadStream(input, "utf8"), crlfDelay: Infinity });
-	for await (const line of rl) {
+	const lines = [];
+	for (const log of logs) {
+		const id = path.basename(log).match(/^console\.(\d+)\.log$/)[1];
+		for (const line of fs.readFileSync(log, "utf8").split(/\r?\n/)) {
+			lines.push({ line, id });
+		}
+	}
+	for (const { line, id } of lines) {
 		const m = line.match(MARKER);
 		if (m) {
 			const [, phase, team, rest] = m;
@@ -75,6 +94,7 @@ async function main() {
 			}
 			if (current !== null) {
 				current.rank[team] = Math.max(current.rank[team] ?? rank, rank);
+				current.matchId = current.matchId || id;
 				current.version = current.version || field(rest, "version");
 				if (phase === "game") {
 					current.radiant = current.radiant || field(rest, "radiant");
@@ -87,6 +107,7 @@ async function main() {
 		}
 		if (current !== null) {
 			current.lines.push(line);
+			current.matchId = current.matchId || id;
 		}
 	}
 
@@ -97,7 +118,7 @@ async function main() {
 		const file = `game-${num}_${result}.log`;
 		fs.writeFileSync(path.join(out, file), g.lines.join("\n") + "\n", "utf8");
 		index.push(
-			`${file}\tlines=${g.lines.length}\tversion=${g.version || "?"}\tradiant=${g.radiant || "?"}\tdire=${g.dire || "?"}`
+			`${file}\tlines=${g.lines.length}\tmatch=${g.matchId || "?"}\tversion=${g.version || "?"}\tradiant=${g.radiant || "?"}\tdire=${g.dire || "?"}`
 		);
 	}
 	fs.writeFileSync(path.join(out, "index.txt"), index.join("\n") + "\n", "utf8");

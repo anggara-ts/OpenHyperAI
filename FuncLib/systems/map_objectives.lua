@@ -206,14 +206,21 @@ function MapObjectives.PickWisdomForBot(bot, locations)
 end
 
 -- True if this bot is the best living ally to take the objective (one bot per spot).
-function MapObjectives.IsBestAllyForLocation(bot, loc, scoreFn)
+function MapObjectives.IsBestAllyForLocation(bot, loc, scoreFn, botsOnly)
 	if loc == nil then
 		return false
 	end
 	local bestBot = bot
 	local bestScore = scoreFn(bot, loc)
 	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-		if ally ~= nil and ally ~= bot and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
+		if
+			ally ~= nil
+			and ally ~= bot
+			and ally:IsAlive()
+			and ally:IsHero()
+			and not ally:IsIllusion()
+			and not (botsOnly and ally.IsBot and not ally:IsBot())
+		then
 			local score = scoreFn(ally, loc)
 			if score > bestScore then
 				bestScore = score
@@ -611,20 +618,28 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		local lInterval = MapObjectives.LotusInterval()
 		local toNext = MapObjectives.SecondsToNextMark(lInterval)
 		local sinceLast = lInterval - toNext
-		local nearSpawn = toNext <= 32 or (DotaTime() >= lInterval - 1 and sinceLast <= 8)
+		local spawnOpen = DotaTime() >= lInterval - 1
+		-- Walk window is short. A lotus that nobody took is still in the pool well after that.
+		local nearSpawn = toNext <= 32 or (spawnOpen and sinceLast <= 45)
 		if nearSpawn then
 			local locs, units = MapObjectives.GetLotusPoolLocations()
 			local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
 			local maxWalk = MapObjectives.MaxWalk(bot, true)
 			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
+			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
+			if beside then
+				inLotus = true
+				etaL = -sinceLast
+			end
 			local count = MapObjectives.LotusCountNear(loc, units)
 			local mark = math.floor(math.max(0, DotaTime()) / lInterval) * lInterval
 			-- Enemy already took this spawn, or the pool has not stored one.
 			if count == 0 and type(etaL) == "number" and etaL < -1.5 then
 				inLotus = false
 			end
-			if bot._lotusSkipMark == mark and mark >= lInterval and count == 0 then
+			-- Count stays unknown, so a failed stand has to be enough to leave this mark.
+			if bot._lotusSkipMark == mark and mark >= lInterval then
 				inLotus = false
 			end
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
@@ -640,15 +655,18 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and dist <= maxWalk
 				and hp >= 0.28
 				and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
-				and MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore)
+				and (beside or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
 			then
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
-				if type(etaL) == "number" and etaL > arrive * 0.55 then
+				if beside then
+					-- Has to beat laning and a nearby fight, or Think never runs and they never say it.
+					desire = BOT_MODE_DESIRE_ABSOLUTE + 0.05
+				elseif type(etaL) == "number" and etaL > arrive * 0.55 then
 					desire = math.min(desire, BOT_MODE_DESIRE_LOW + 0.05)
 				elseif type(etaL) == "number" and etaL <= 12 then
 					desire = math.max(desire, BOT_MODE_DESIRE_HIGH + 0.05)
 				end
-				if type(etaL) == "number" and math.abs(etaL) <= 8 then
+				if not beside and type(etaL) == "number" and math.abs(etaL) <= 8 then
 					desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
 				end
 				return desire, loc, "lotus", etaL

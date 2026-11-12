@@ -1363,7 +1363,10 @@ function ItemPurchaseThink()
 		return nil, nil
 	end
 	-- Vital Toadstool, Ironwood Nut, Tomo'kan Ringcap. They land in the backpack and are never used.
-	if w > (a._lastBackpackForage or -100) + 3.0 then
+	-- A drop order cancels the current action, so not while a fight is on.
+	local forageCalm = #(a:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
+		and not a:WasRecentlyDamagedByAnyHero(3.0)
+	if forageCalm and w > (a._lastBackpackForage or -100) + 3.0 then
 		local forageName, forageItem = BackpackForage()
 		if forageItem ~= nil then
 			a._lastBackpackForage = w

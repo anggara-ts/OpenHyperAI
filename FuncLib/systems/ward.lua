@@ -24,10 +24,10 @@ local HuntSpots = {
 }
 -- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
 local GateSpots = {
-	{ location = Vector(-7421, 4238, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
-	{ location = Vector(7309, -4419, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
-	{ location = Vector(-6244, 7147, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
-	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
+	{ location = Vector(-7421, 4238, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
+	{ location = Vector(7309, -4419, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
+	{ location = Vector(-6244, 7147, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
+	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
 }
 local E = {
 	-- Dire bank of the top rune. The radiant bank (-1650, -83) looks into Radiant's jungle.
@@ -173,6 +173,61 @@ end
 local function TeamSide()
 	return GetTeam() == TEAM_RADIANT and "radiant" or "dire"
 end
+-- Cliffs, hunt spots and gates on the enemy side sit in their jungle. River banks do not.
+local function NeedsCover(spot)
+	return spot.role == "uber" or spot.role == "hunt" or spot.deep == true
+end
+-- Walk into enemy jungle only behind our wave or with teammates, never into a visible bigger group.
+local function EnemySideCovered(bot, loc)
+	if bot == nil or loc == nil then
+		return false
+	end
+	if bot:GetHealth() / math.max(1, bot:GetMaxHealth()) < 0.6 then
+		return false
+	end
+	local allies = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if u ~= bot and u:IsAlive() and not u:IsIllusion() and GetUnitToLocationDistance(u, loc) <= 1800 then
+			allies = allies + 1
+		end
+	end
+	local enemies = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if u:IsAlive() and not u:IsIllusion() and GetUnitToLocationDistance(u, loc) <= 2000 then
+			enemies = enemies + 1
+		end
+	end
+	if enemies > allies then
+		return false
+	end
+	-- Several enemies out of sight can be waiting in that jungle.
+	local missing = 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local seen = info ~= nil and info[1] or nil
+			if seen == nil or seen.time_since_seen > 5 then
+				missing = missing + 1
+			end
+		end
+	end
+	if allies >= 2 then
+		return true
+	end
+	if missing >= 3 then
+		return false
+	end
+	local creeps = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIED_CREEPS) or {}) do
+		if u:IsAlive() and GetUnitToLocationDistance(u, loc) <= 2200 then
+			creeps = creeps + 1
+			if creeps >= 3 then
+				return true
+			end
+		end
+	end
+	return false
+end
 local function DefendingHighGround()
 	local ancient = GetAncient(GetTeam())
 	local near = ancient ~= nil and b.Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2500) or 0
@@ -200,6 +255,9 @@ function a.GetAvailabeObserverWardSpots(K)
 			return
 		end
 		local onOurs = spot.side == ourSide
+		if not onOurs and NeedsCover(spot) and not EnemySideCovered(K, spot.location) then
+			return
+		end
 		if spot.role == "uber" then
 			-- Own eye cliff looks back into our jungle. While pushing, ward the enemy cliff.
 			if defending and not onOurs then
@@ -284,6 +342,9 @@ function a.GetPossibleSentryWardSpots(K)
 			return
 		end
 		local onOurs = spot.side == ourSide
+		if not onOurs and NeedsCover(spot) and not EnemySideCovered(K, spot.location) then
+			return
+		end
 		local want = false
 		if defending then
 			want = onOurs

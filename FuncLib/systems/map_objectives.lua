@@ -588,6 +588,113 @@ local function ActInsideLotus(bot, loc)
 	MarkLotusDo(bot, "hold")
 end
 
+local T1_BY_LANE = {
+	[LANE_TOP] = TOWER_TOP_1,
+	[LANE_MID] = TOWER_MID_1,
+	[LANE_BOT] = TOWER_BOT_1,
+}
+
+local function LivingT1(lane)
+	local id = T1_BY_LANE[lane]
+	if id == nil then
+		return nil
+	end
+	local tower = GetTower(GetTeam(), id)
+	if tower ~= nil and tower:IsAlive() then
+		return tower
+	end
+	return nil
+end
+
+local function CreepsPushingTower(tower)
+	if tower == nil then
+		return false
+	end
+	local creeps = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
+	if creeps == nil then
+		return false
+	end
+	local n = 0
+	for _, creep in pairs(creeps) do
+		if
+			creep ~= nil
+			and creep:IsAlive()
+			and not creep:IsIllusion()
+			and GetUnitToUnitDistance(creep, tower) <= 1100
+		then
+			n = n + 1
+			if n >= 2 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function HeroesNearLoc(loc, radius)
+	if loc == nil then
+		return 0
+	end
+	local radiusSq = radius * radius
+	local n = 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam())) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local seen = info and info[1]
+			if
+				seen ~= nil
+				and seen.location ~= nil
+				and seen.time_since_seen ~= nil
+				and seen.time_since_seen <= 5
+			then
+				local dx = seen.location.x - loc.x
+				local dy = seen.location.y - loc.y
+				if dx * dx + dy * dy <= radiusSq then
+					n = n + 1
+				end
+			end
+		end
+	end
+	return n
+end
+
+-- A lotus trip while a T1 is being hit, or while heroes are already at the pool.
+-- Returns a short reason, or nil when the walk is fine.
+local function LotusTripBlock(bot, loc, dist, foes, friends)
+	if loc == nil then
+		return nil
+	end
+	local ownTower = LivingT1(bot:GetAssignedLane())
+	local poolTower, poolDist = nil, 99999
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local tower = LivingT1(lane)
+		if tower ~= nil then
+			local d = GetUnitToLocationDistance(tower, loc)
+			if d < poolDist then
+				poolTower, poolDist = tower, d
+			end
+		end
+	end
+	local wave = CreepsPushingTower(ownTower) or CreepsPushingTower(poolTower)
+	local heroesPool = HeroesNearLoc(loc, 1600)
+	local heroesTower = 0
+	if poolTower ~= nil then
+		heroesTower = HeroesNearLoc(poolTower:GetLocation(), 1400)
+	end
+	local foesNear = #foes >= 1 or heroesPool >= 1 or heroesTower >= 1
+	local holding = dist <= 800 and #friends >= math.max(#foes, heroesPool, 1)
+	if wave and foesNear and not holding then
+		if CreepsPushingTower(ownTower) then
+			return "lane-push"
+		end
+		return "tower-push"
+	end
+	if heroesPool >= 1 and not (dist <= 800 and #friends >= heroesPool) then
+		return "pool-foes"
+	end
+	return nil
+end
+
 -- Returns desire, location, kind ("lotus"|"wisdom"), eta. Desire 0 if none.
 function MapObjectives.ConsiderObjectiveDesire(bot)
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
@@ -688,6 +795,11 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
 			local danger = loc ~= nil and MapObjectives.DangerousObjective(bot, loc, 1500)
+			local tripBlock = LotusTripBlock(bot, loc, dist, foes, friends)
+			if tripBlock ~= nil then
+				beside = false
+				inLotus = false
+			end
 			local function note(why)
 				bot._lotusWhy = why
 				bot._lotusDist = dist
@@ -713,7 +825,9 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				}
 			end
 			local failWhy = "blocked"
-			if not inLotus then
+			if tripBlock ~= nil then
+				failWhy = tripBlock
+			elseif not inLotus then
 				if count == 0 and type(etaL) == "number" and etaL < -1.5 then
 					failWhy = "empty"
 				elseif bot._lotusSkipMark == mark and mark >= lInterval then

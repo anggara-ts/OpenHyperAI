@@ -215,14 +215,14 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(s, A)
 		return
 	end
-	v, w = a.ConsiderShockwave()
-	if v > 0 then
-		b:Action_UseAbilityOnLocation(q, w)
-		return
-	end
 	x, y = a.ConsiderEmpower()
 	if x > 0 then
 		b:Action_UseAbilityOnEntity(r, y)
+		return
+	end
+	v, w = a.ConsiderShockwave()
+	if v > 0 then
+		b:Action_UseAbilityOnLocation(q, w)
 		return
 	end
 end
@@ -352,70 +352,36 @@ function a.ConsiderEmpower()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local N = c.GetProperCastRange(false, b, r:GetCastRange())
-	local a6 = b:GetAttackRange()
-	I = c.GetProperTarget(b)
-	local a7 = nil
-	local a8 = 0
-	local a3 = c.GetNearbyHeroes(b, N, false, BOT_MODE_NONE)
-	for U, a4 in pairs(a3) do
-		if
-			c.IsValidHero(a4)
-			and a4 ~= b
-			and c.IsCore(a4)
-			and not a4:IsIllusion()
-			and not c.IsDisabled(a4)
-			and not c.IsWithoutTarget(a4)
-			and not a4:HasModifier("modifier_magnataur_empower")
-			and a4:GetAttackDamage() * a4:GetAttackSpeed() > a8
-		then
-			a7 = a4
-			a8 = a4:GetAttackDamage() * a4:GetAttackSpeed()
+	-- Casting on an ally also empowers Magnus. Keep enough mana to still Reverse Polarity.
+	if u ~= nil and u:GetLevel() > 0 and u:GetCooldownTimeRemaining() < 2 then
+		if b:GetMana() < r:GetManaCost() + u:GetManaCost() + 30 then
+			return BOT_ACTION_DESIRE_NONE, nil
 		end
 	end
-	if J then
-		local X = c.GetNearbyHeroes(b, N + 200, false, BOT_MODE_NONE)
-		local Y = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	local N = c.GetProperCastRange(false, b, r:GetCastRange())
+	local best = nil
+	local bestScore = -1
+	local allies = c.GetNearbyHeroes(b, N, false, BOT_MODE_NONE)
+	for _, ally in pairs(allies) do
 		if
-			c.IsValidTarget(I)
-			and c.CanBeAttacked(I)
-			and not c.IsSuspiciousIllusion(I)
-			and not I:HasModifier("modifier_dazzle_shallow_grave")
-			and not I:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and X ~= nil
-			and Y
-			and #X >= #Y
+			c.IsValidHero(ally)
+			and ally ~= b
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and not ally:HasModifier("modifier_magnataur_empower")
 		then
-			if a7 ~= nil and c.IsInRange(a7, I, a7:GetAttackRange() + 100) and c.IsInRange(b, a7, N) then
-				return BOT_ACTION_DESIRE_HIGH, a7
+			local score = ally:GetAttackDamage() * ally:GetAttackSpeed()
+			if c.IsCore(ally) then
+				score = score + 10000
+			end
+			if score > bestScore then
+				bestScore = score
+				best = ally
 			end
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local a1 = b:GetNearbyLaneCreeps(600, true)
-		if a1 ~= nil and #a1 >= 4 and a7 ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-		local a9 = b:GetNearbyTowers(700, true)
-		if
-			a9 ~= nil
-			and #a9 > 0
-			and a7 ~= nil
-			and c.IsInRange(a7, a9[1], a7:GetAttackRange() + 100)
-			and c.IsInRange(b, a7, N)
-		then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-	end
-	if c.IsDoingRoshan(b) and a7 ~= nil then
-		if c.IsRoshan(I) and c.IsInRange(b, I, 500) and c.IsAttacking(a7) then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-	end
-	if c.IsDoingTormentor(b) and a7 ~= nil then
-		if c.IsTormentor(I) and c.IsInRange(b, I, 400) and c.IsAttacking(a7) then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
+	if best ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, best
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

@@ -373,6 +373,13 @@ function Think()
 					return
 				end
 			end
+			-- The point 280 short of the spawn can be water, cliff or trees. Walking there left
+			-- bots parked on the bank, out of grab range, so let the pickup order path instead.
+			if liveDist <= 900 then
+				d._runePickupAt = DotaTime()
+				d:Action_PickUpRune(D.location)
+				return
+			end
 			local step = math.max(0, liveDist - 280)
 			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
 			d.rune.location = stand
@@ -462,7 +469,10 @@ function a.GetBestRune()
 			and not r(D)
 			and not a.IsMissing(D)
 		then
-			if D == RUNE_BOUNTY_1 or D == RUNE_BOUNTY_2 or (b.IsCore(d) or not b.IsThereCoreNearby(1200)) then
+			-- The horn gold on power-rune spots is for whoever stands closest. Leaving it to a
+			-- nearby core stalled both, since the core is not the closest ally.
+			local hornGold = DotaTime() < 70
+			if D == RUNE_BOUNTY_1 or D == RUNE_BOUNTY_2 or hornGold or (b.IsCore(d) or not b.IsThereCoreNearby(1200)) then
 				local a0 = GetUnitToLocationDistance(d, E)
 				if a0 < _ then
 					Z = D

@@ -373,6 +373,27 @@ local tPromoteFromBackpack = {
 	item_nullifier = true,
 }
 local promoteNextCheck = 0
+-- A full bag puts the grenade in the backpack, where it cannot be thrown.
+-- An iron branch can sit back there instead.
+local function PreferBloodGrenadeOverBranch()
+	local grenadeSlot = a:FindItemSlot("item_blood_grenade")
+	if grenadeSlot < 6 or grenadeSlot > 8 then
+		return
+	end
+	for slot = 0, 5 do
+		if a:GetItemInSlot(slot) == nil then
+			a:ActionImmediate_SwapItems(grenadeSlot, slot)
+			return
+		end
+	end
+	for slot = 0, 5 do
+		local it = a:GetItemInSlot(slot)
+		if it ~= nil and it:GetName() == "item_branches" then
+			a:ActionImmediate_SwapItems(grenadeSlot, slot)
+			return
+		end
+	end
+end
 local function PromoteBackpackCounters()
 	if DotaTime() < promoteNextCheck then
 		return
@@ -807,6 +828,7 @@ function ItemPurchaseThink()
 	E = a:DistanceFromFountain()
 	QueueRightclickCounters()
 	PromoteBackpackCounters()
+	PreferBloodGrenadeOverBranch()
 	local ax = GetDroppedItemList()
 	for O, ay in pairs(ax) do
 		if
@@ -1024,16 +1046,30 @@ function ItemPurchaseThink()
 				emptySlots = c.GetEmptyInventoryAmount(a)
 				return true
 			end
-			-- Observers first. One sentry on pos 5 in lane; a second waits until
-			-- 8:00 or a known invis hero. Two sentries at minute 0 sit unused.
+			-- Observers first. One sentry for the whole team before 8:00.
+			-- A second waits until 8:00 or a known invis hero.
 			local earlyLane = w < 8 * 60 and d["invisEnemyExist"] ~= true
 			local sentryCap = 2
 			if earlyLane then
-				sentryCap = e.GetPosition(a) == 5 and 1 or 0
+				sentryCap = 1
+				for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+					if
+						ally ~= nil
+						and ally ~= a
+						and ally:IsHero()
+						and not ally:IsIllusion()
+						and c.GetWardCharges(ally, "item_ward_sentry") >= 1
+					then
+						sentryCap = 0
+						break
+					end
+				end
 			end
 			tryBuyWard("item_ward_observer", 2, "support obs")
-			if sentryCap > 0 then
-				tryBuyWard("item_ward_sentry", sentryCap, "support sentry")
+			if sentryCap > 0 and w > (a._sentryBuyAt or -100) + 15 then
+				if tryBuyWard("item_ward_sentry", sentryCap, "support sentry") then
+					a._sentryBuyAt = w
+				end
 			end
 		end
 		-- Supports: pick up wards a core dropped for us.

@@ -54,6 +54,16 @@ function GetDesireRaw()
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
 		return BOT_MODE_DESIRE_ABSOLUTE
 	end
+	-- Before the fight bailouts. An enemy near the pool was returning NONE and lotus never started.
+	do
+		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
+		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(d)
+		if desire > 0 and loc ~= nil and kind ~= nil then
+			d._mapObjKind = kind
+			d._mapObjLoc = loc
+			return desire
+		end
+	end
 	if DotaTime() > 0 and #p > 0 then
 		if #p > #o then
 			return BOT_MODE_DESIRE_NONE
@@ -71,16 +81,6 @@ function GetDesireRaw()
 	end
 	if b.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
 		return BOT_MODE_DESIRE_NONE
-	end
-	-- Fallback if BOT_MODE_LOTUS_POOL / WISDOM_SHRINE are not invoked by the engine.
-	do
-		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
-		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(d)
-		if desire > 0 and loc ~= nil and kind ~= nil then
-			d._mapObjKind = kind
-			d._mapObjLoc = loc
-			return desire
-		end
 	end
 	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
 	local runeId, runeDist = a.ClosestAvailableRune(400)

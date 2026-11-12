@@ -1989,18 +1989,25 @@ local function AmAssignedCapturer(loc)
 	return true
 end
 
+-- Enemies within this of the outpost make walking over a fight, not a capture.
+local OUTPOST_CONTEST = 1600
+
 local function OutpostIsTooHot(loc)
-	local enemies = a.GetEnemiesNearLoc(loc, 1000)
+	local enemies = a.GetEnemiesNearLoc(loc, OUTPOST_CONTEST)
 	local n = enemies ~= nil and #enemies or 0
-	if n <= 1 then
+	if n == 0 then
 		return false
 	end
-	local allies = a.GetAlliesNearLoc(loc, 1400)
+	local allies = a.GetAlliesNearLoc(loc, OUTPOST_CONTEST)
 	local allyN = allies ~= nil and #allies or 0
-	if GetUnitToLocationDistance(c, loc) <= 1400 then
+	if GetUnitToLocationDistance(c, loc) <= OUTPOST_CONTEST then
 		allyN = math.max(allyN, 1)
 	end
-	return allyN < n
+	-- One enemy keeps the nearest ally contesting; two or more needs a clear majority.
+	if n == 1 then
+		return allyN < 1
+	end
+	return allyN <= n
 end
 
 function ConsiderOutpostCapture()
@@ -2065,10 +2072,14 @@ function ConsiderOutpostCapture()
 	end
 	local dist = GetUnitToLocationDistance(c, loc)
 	-- Above farm (VERYHIGH ~0.9) so one bot actually leaves the wave. Below retreat.
+	-- Far outposts no longer beat a nearby fight or a lane the bot is already in.
 	if dist <= 500 then
 		return 0.98
 	end
-	return 0.95
+	if dist <= 2500 then
+		return 0.95
+	end
+	return BOT_MODE_DESIRE_MODERATE
 end
 function GetClosestOutpost()
 	local bV = nil

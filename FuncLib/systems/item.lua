@@ -1218,10 +1218,14 @@ end
 -- count then reads 0, so a support carrying both re-buys wards every tick.
 -- Dispenser current charges are observers. Secondary charges are sentries.
 function b.GetWardCharges(E, wardType)
-	local charges = b.GetItemCharges(E, wardType)
+	local charges = 0
 	for A = 0, 16 do
 		local G = E:GetItemInSlot(A)
-		if G ~= nil and G:GetName() == "item_ward_dispenser" then
+		if G ~= nil and G:GetName() == wardType then
+			-- One ward often reports 0 charges, so a cap of 1 still bought a second.
+			local n = G:GetCurrentCharges()
+			charges = charges + ((n ~= nil and n > 0) and n or 1)
+		elseif G ~= nil and G:GetName() == "item_ward_dispenser" then
 			if wardType == "item_ward_observer" then
 				charges = charges + G:GetCurrentCharges()
 			else

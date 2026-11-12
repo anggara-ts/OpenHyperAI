@@ -549,6 +549,46 @@ local function ReassignBotRoles(teamKey, locked)
 	-- Force GetPosition() to re-read RoleAssignment.
 	i.HeroPositions = {}
 end
+-- Exchange roster slot idx with whoever currently holds newPos. Every other slot stays.
+-- Returns "ok", "same", "human", or "missing".
+local function SwapRoleWithHolder(teamKey, players, idx, newPos)
+	local roles = i.RoleAssignment[teamKey]
+	local oldPos = roles[idx]
+	if oldPos == nil then
+		return "missing"
+	end
+	if oldPos == newPos then
+		return "same"
+	end
+	local holder = nil
+	for slot = 1, 5 do
+		if roles[slot] == newPos then
+			holder = slot
+			break
+		end
+	end
+	if holder ~= nil and holder ~= idx then
+		local pid = players[holder]
+		if pid ~= nil and not IsPlayerBot(pid) then
+			return "human"
+		end
+	end
+	roles[idx] = newPos
+	if holder ~= nil and holder ~= idx then
+		roles[holder] = oldPos
+	end
+	ApplyLanesFromRoles(teamKey)
+	i.HeroPositions = {}
+	log(
+		"Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s",
+		teamKey,
+		idx,
+		oldPos,
+		tostring(holder),
+		newPos
+	)
+	return "ok"
+end
 local function aI(ab)
 	local aJ = 0
 	for G, al in pairs(GetTeamPlayers(ab)) do
@@ -867,39 +907,23 @@ local function bg(bh, bi, bj)
 				end
 				local targetPid = a3[bA]
 				local targetHero = targetPid and GetSelectedHeroName(targetPid) or ""
-				-- Don't force a core hero onto 4/5.
+				-- Don't force a core hero onto 4/5. Leave the roster as it is.
 				if aA >= 4 and IsCorePreferredHero(targetHero) then
 					log(
-						"Refuse !%spos %s: %s is a core hero, reassigning supports to 4/5 instead",
+						"Refuse !%spos %s: %s is a core hero",
 						bE,
 						bF,
 						targetHero
 					)
-					local locked = {}
-					for idx, pid in pairs(a3) do
-						if idx <= 5 and not IsPlayerBot(pid) then
-							locked[idx] = i.RoleAssignment[by][idx]
-						end
-					end
-					ReassignBotRoles(by, locked)
 				else
-					local locked = {}
-					for idx, pid in pairs(a3) do
-						if idx <= 5 and not IsPlayerBot(pid) then
-							if i.RoleAssignment[by][idx] ~= aA then
-								locked[idx] = i.RoleAssignment[by][idx]
-							end
-						end
+					local swapped = SwapRoleWithHolder(by, a3, bA, aA)
+					if swapped == "human" then
+						log("Switch role failed: target role belongs to human.")
+					elseif swapped == "same" then
+						log("Switch role skipped: idx %s already pos %s", bA, aA)
+					elseif swapped == "missing" then
+						log("Switch role failed: idx %s has no role", bA)
 					end
-					locked[bA] = aA
-					ReassignBotRoles(by, locked)
-					log(
-						"Switch role ok (role-aware). Team: %s idx: %s hero: %s -> pos %s",
-						by,
-						bA,
-						targetHero,
-						i.RoleAssignment[by][bA]
-					)
 				end
 			else
 				log("Cannot select pos: %s (not available).", bF)

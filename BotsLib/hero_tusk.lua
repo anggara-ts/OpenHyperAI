@@ -54,6 +54,8 @@ m["pos_5"] = {
 m["pos_1"] = {
 	"item_tank_outfit",
 	"item_echo_sabre",
+	"item_ring_of_health",
+	"item_vanguard",
 	"item_crimson_guard",
 	"item_ultimate_scepter",
 	"item_heavens_halberd",

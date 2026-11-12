@@ -363,6 +363,78 @@ function Think()
 		a8()
 		return
 	end
+	-- A gank on the rally must not leave them idle. Fight if the local fight is ours,
+	-- otherwise step toward the fountain instead of holding the spot.
+	local function RallyThreat()
+		local enemy = nil
+		local enemyDist = 1200
+		local near = c.GetEnemyList(a, 1200) or {}
+		for _, hero in pairs(near) do
+			if c.IsValidHero(hero) then
+				local dist = GetUnitToUnitDistance(a, hero)
+				if dist < enemyDist then
+					enemy = hero
+					enemyDist = dist
+				end
+			end
+		end
+		local seenLoc = nil
+		local seenDist = 1400
+		for _, pid in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(pid) then
+				local info = GetHeroLastSeenInfo(pid)
+				local spot = info and info[1]
+				if spot ~= nil and spot.time_since_seen < 2.5 then
+					local dist = GetUnitToLocationDistance(a, spot.location)
+					if dist < seenDist then
+						seenLoc = spot.location
+						seenDist = dist
+					end
+				end
+			end
+		end
+		local hit = a:WasRecentlyDamagedByAnyHero(2.0)
+		if enemy == nil and seenLoc == nil and not hit then
+			return false
+		end
+		local allies = #(c.GetAlliesNearLoc(a:GetLocation(), 1200) or {})
+		if allies < 1 then
+			allies = 1
+		end
+		local threats = #near
+		if seenLoc ~= nil then
+			threats = math.max(threats, 1)
+		end
+		local run = threats > allies or not c.WeAreStronger(a, 1200)
+		a._roshThinkAt = DotaTime() - 4
+		if run then
+			local away = c.AdjustLocationWithOffsetTowardsFountain(a:GetLocation(), 700)
+			if enemy ~= nil then
+				away = c.VectorAway(a:GetLocation(), enemy:GetLocation(), 600)
+				away = (away + c.AdjustLocationWithOffsetTowardsFountain(a:GetLocation(), 400)) / 2
+			elseif seenLoc ~= nil then
+				away = c.VectorAway(a:GetLocation(), seenLoc, 600)
+			end
+			a:Action_MoveToLocation(away)
+			return true
+		end
+		if enemy ~= nil then
+			if enemyDist <= a:GetAttackRange() + 150 then
+				a:Action_AttackUnit(enemy, true)
+			else
+				a:Action_MoveToLocation(enemy:GetLocation())
+			end
+			return true
+		end
+		if seenLoc ~= nil or hit then
+			a:Action_MoveToLocation(c.AdjustLocationWithOffsetTowardsFountain(a:GetLocation(), 400))
+			return true
+		end
+		return false
+	end
+	if RallyThreat() then
+		return
+	end
 	-- Unsafe, or still grouping: hold the fountain side. Do not walk in alone.
 	local now = DotaTime()
 	if a._roshGatherAt == nil or now - (a._roshThinkAt or 0) > 3 then

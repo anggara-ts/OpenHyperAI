@@ -172,6 +172,17 @@ function GetDesireHelper()
 			return BOT_MODE_DESIRE_ABSOLUTE
 		end
 	end
+	if
+		b.IsDoingRoshan(c)
+		and c:WasRecentlyDamagedByAnyHero(2.0)
+		and not b.WeAreStronger(c, 1200)
+		and (
+			b.GetEnemyCount(c, 1400) >= 1
+			or #(b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 1400) or {}) >= 1
+		)
+	then
+		return BOT_MODE_DESIRE_ABSOLUTE
+	end
 	if (b.IsDoingRoshan(c) or b.IsDoingTormentor(c)) and d > 0.2 then
 		return BOT_MODE_DESIRE_NONE
 	end

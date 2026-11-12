@@ -181,21 +181,24 @@ function GetDesireHelper()
 		h = 0
 		i = false
 	end
-	if c.HasEnoughDPSForRoshan(Q) then
-		j = true
-	end
+	-- Re-checked every think. A team that was strong enough once is not strong enough for the rest of the game.
+	j = c.HasEnoughDPSForRoshan(Q)
 	if c.GetEnemiesAroundAncient(a, 2000) > 2 or c.GetHP(GetAncient(a:GetTeam())) < 0.6 then
 		return BOT_MODE_DESIRE_NONE
 	end
-	if c.Utils.IsValidUnit(k) then
-		local S = k:GetHealth() / k:GetMaxHealth()
-		if S < 0.8 then
-			if IsRoshanEngageSafe(M, true) then
-				return RemapValClamped(S, 0.8, 0.0, 0.9, 1.0)
-			end
-			-- Contested / unsafe finish — do not suicide into the pit.
-			return BOT_MODE_DESIRE_NONE
+	local alliesInPit = #(c.GetAlliesNearLoc(M, 1600) or {})
+	local roshLow = c.Utils.IsValidUnit(k) and (k:GetHealth() / k:GetMaxHealth()) < 0.8
+	-- Early game: no fresh pit. Only stay if Roshan is already low and allies are in it.
+	if c.IsEarlyGame() and not (roshLow and alliesInPit >= 2 and IsRoshanEngageSafe(M, true)) then
+		return BOT_MODE_DESIRE_NONE
+	end
+	if roshLow then
+		if IsRoshanEngageSafe(M, true) and (j or alliesInPit >= 2) then
+			local S = k:GetHealth() / k:GetMaxHealth()
+			return RemapValClamped(S, 0.8, 0.0, 0.9, 1.0)
 		end
+		-- Contested / unsafe finish — do not suicide into the pit.
+		return BOT_MODE_DESIRE_NONE
 	end
 	if not IsRoshanEngageSafe(M, false) then
 		return BOT_MODE_DESIRE_NONE
@@ -204,7 +207,7 @@ function GetDesireHelper()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local kw = KillWindow.Tick()
-	local killRosh = kw.fresh >= 1 and f and j and DotaTime() > 8 * 60
+	local killRosh = kw.fresh >= 1 and f and j and not c.IsEarlyGame() and DotaTime() > 8 * 60
 	if l == nil then
 		l = c.Utils.IsHumanPlayerInTeam(GetTeam())
 	end

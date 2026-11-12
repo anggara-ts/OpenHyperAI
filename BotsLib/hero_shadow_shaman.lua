@@ -152,6 +152,18 @@ function a.ConsiderQ()
 	local U = DAMAGE_TYPE_MAGICAL
 	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
 	local W = c.GetNearbyHeroes(b, Q + 220, true, BOT_MODE_NONE)
+	-- Ether Shock is only worth walking into when it kills. Otherwise stay at range.
+	if c.IsGoingOnSomeone(b) then
+		if
+			c.IsValidHero(botTarget)
+			and c.IsInRange(b, botTarget, Q)
+			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.CanCastOnTargetAdvanced(botTarget)
+			and (c.WillMagicKillTarget(b, botTarget, T, R) or c.GetHP(botTarget) < 0.3)
+		then
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-attack:" .. c.Chat.GetNormName(botTarget)
+		end
+	end
 	for X, Y in pairs(W) do
 		if
 			c.IsValid(Y)
@@ -176,18 +188,6 @@ function a.ConsiderQ()
 		end
 		if Z ~= nil then
 			return BOT_ACTION_DESIRE_HIGH, Z, "Q-Battle-Weakest:" .. c.Chat.GetNormName(Z)
-		end
-	end
-	if c.IsGoingOnSomeone(b) then
-		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, Q)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.CanCastOnTargetAdvanced(botTarget)
-		then
-			if P >= 2 or K > 0.7 or c.GetHP(botTarget) < 0.5 or L < 0.4 then
-				return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-attack:" .. c.Chat.GetNormName(botTarget)
-			end
 		end
 	end
 	if c.IsRetreating(b) then
@@ -314,6 +314,8 @@ function a.ConsiderW()
 	local U = DAMAGE_TYPE_MAGICAL
 	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
 	local W = c.GetNearbyHeroes(b, Q + 240, true, BOT_MODE_NONE)
+	-- Hex from the back of its range. Closing in just to land it walks him into the fight.
+	local hexRange = math.max(200, Q - 150)
 	for X, Y in pairs(W) do
 		if c.IsValidHero(Y) and c.CanCastOnTargetAdvanced(Y) and c.CanCastOnNonMagicImmune(Y) then
 			if Y:IsChanneling() then
@@ -343,7 +345,7 @@ function a.ConsiderW()
 				end
 			end
 		end
-		if a6 ~= nil and c.IsInRange(b, a6, Q + 50) then
+		if a6 ~= nil and c.IsInRange(b, a6, hexRange) then
 			return BOT_ACTION_DESIRE_HIGH, a6, "W-Battle:" .. c.Chat.GetNormName(a6)
 		end
 	end
@@ -352,7 +354,7 @@ function a.ConsiderW()
 			c.IsValidHero(botTarget)
 			and c.CanCastOnNonMagicImmune(botTarget)
 			and c.CanCastOnTargetAdvanced(botTarget)
-			and c.IsInRange(b, botTarget, Q + 32)
+			and c.IsInRange(b, botTarget, hexRange)
 			and not c.IsDisabled(botTarget)
 			and not c.IsTaunted(botTarget)
 			and not botTarget:IsDisarmed()
@@ -418,6 +420,8 @@ function a.ConsiderE()
 	local U = DAMAGE_TYPE_MAGICAL
 	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
 	local W = c.GetNearbyHeroes(b, Q + 240, true, BOT_MODE_NONE)
+	-- Shackles roots him for the whole channel, so only start it with a clear way out.
+	local shackleRange = math.max(200, Q - 150)
 	for X, Y in pairs(W) do
 		if c.IsValidHero(Y) and c.CanCastOnTargetAdvanced(Y) and c.CanCastOnNonMagicImmune(Y) then
 			if Y:IsChanneling() then
@@ -446,14 +450,14 @@ function a.ConsiderE()
 				end
 			end
 		end
-		if a6 ~= nil and c.IsInRange(b, a6, Q + 50) then
+		if a6 ~= nil and c.IsInRange(b, a6, shackleRange) then
 			return BOT_ACTION_DESIRE_HIGH, a6, "E-Battle:" .. c.Chat.GetNormName(a6)
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, Q + 30)
+			and c.IsInRange(b, botTarget, shackleRange)
 			and c.CanCastOnNonMagicImmune(botTarget)
 			and c.CanCastOnTargetAdvanced(botTarget)
 			and not c.IsDisabled(botTarget)
@@ -465,7 +469,7 @@ function a.ConsiderE()
 			end
 		end
 	end
-	if c.IsRetreating(b) and P >= 3 and #M == 1 then
+	if c.IsRetreating(b) and P >= 3 and #M == 1 and #N >= 2 then
 		for X, Y in pairs(V) do
 			if
 				c.IsValidHero(Y)

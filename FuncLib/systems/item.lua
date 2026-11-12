@@ -594,6 +594,9 @@ b["item_power_treads_str"] = { "item_boots", "item_belt_of_strength", "item_glov
 b["item_power_treads"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
 b["item_ultimate_scepter"] =
 	{ "item_point_booster", "item_ogre_axe", "item_blade_of_alacrity", "item_staff_of_wizardry" }
+-- A finished Magic Wand already includes the recipe. The engine's component list still
+-- names it, so every outfit that finishes a wand bought the recipe a second time.
+b["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches" }
 b["item_yasha"] = { "item_boots_of_elves", "item_blade_of_alacrity", "item_recipe_yasha" }
 local x = {
 	["item_double_tango"] = "item_tango",

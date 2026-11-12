@@ -16,8 +16,7 @@ local j = {
 }
 local k = j[h] or { 1, 3, 2, 2, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_lotus_orb", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",

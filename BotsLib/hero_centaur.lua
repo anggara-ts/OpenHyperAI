@@ -20,6 +20,8 @@ o["pos_3"] = {
 	"item_quelling_blade",
 	"item_magic_wand",
 	"item_boots",
+	"item_bracer",
+	"item_bracer",
 	"item_phase_boots",
 	"item_blink",
 	"item_pipe",

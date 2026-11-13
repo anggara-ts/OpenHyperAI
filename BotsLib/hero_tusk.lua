@@ -165,6 +165,23 @@ function a.ConsiderIceShards()
 	local O = o:GetSpecialValueInt("shard_width")
 	local P = o:GetSpecialValueInt("shard_damage")
 	local Q = o:GetSpecialValueInt("shard_speed")
+	-- The shards ring the target point (7 shards 200 out), so aim where he will be when the
+	-- ball arrives. The old aim added 2s on top and landed the ring ~700 ahead of a runner.
+	local function Spot(T)
+		if c.IsDisabled(T) or T:GetCurrentMovementSpeed() <= 0 then
+			return T:GetLocation()
+		end
+		return T:GetExtrapolatedLocation(GetUnitToUnitDistance(b, T) / math.max(1, Q) + N + 0.2)
+	end
+	local function Trappable(T)
+		return c.IsValidHero(T)
+			and c.IsInRange(b, T, M)
+			and not c.IsSuspiciousIllusion(T)
+			and not T:HasModifier("modifier_enigma_black_hole_pull")
+			and not T:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not T:HasModifier("modifier_legion_commander_duel")
+			and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+	end
 	local R = c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE)
 	for S, T in pairs(R) do
 		if
@@ -179,8 +196,8 @@ function a.ConsiderIceShards()
 			and not T:HasModifier("modifier_oracle_false_promise_timer")
 			and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local U = GetUnitToUnitDistance(b, T) / Q + N + 2
-			return BOT_ACTION_DESIRE_HIGH, T:GetExtrapolatedLocation(U)
+			a.LogShards("kill", T)
+			return BOT_ACTION_DESIRE_HIGH, Spot(T)
 		end
 	end
 	if c.IsInTeamFight(b, 1200) then
@@ -192,26 +209,31 @@ function a.ConsiderIceShards()
 			and not c.IsLocationInChrono(V.targetloc)
 			and not c.IsLocationInBlackHole(V.targetloc)
 		then
+			a.LogShards("fight", W[1])
 			return BOT_ACTION_DESIRE_HIGH, V.targetloc
 		end
 	end
-	if I then
-		if
-			c.IsValidTarget(H)
-			and c.CanCastOnMagicImmune(H)
-			and c.IsInRange(b, H, M)
-			and c.IsChasingTarget(b, H)
-			and not c.IsSuspiciousIllusion(H)
-			and not H:HasModifier("modifier_enigma_black_hole_pull")
-			and not H:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not H:HasModifier("modifier_legion_commander_duel")
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			local X = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-			local W = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if X ~= nil and W ~= nil and #X >= #W then
-				local U = GetUnitToUnitDistance(b, H) / Q + N + 2
-				return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(U)
+	-- Going in on his target: trap it whether he is chasing, walking up, or it is disabled.
+	if I and c.IsValidTarget(H) and c.CanCastOnMagicImmune(H) and Trappable(H) then
+		local X = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
+		local W = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
+		if X ~= nil and W ~= nil and #X >= #W then
+			a.LogShards("engage", H)
+			return BOT_ACTION_DESIRE_HIGH, Spot(H)
+		end
+	end
+	-- An ally is already hitting a hurt enemy hero: trap it so it cannot walk out.
+	for S, T in pairs(R) do
+		if Trappable(T) and c.GetHP(T) < 0.6 then
+			local ours = c.GetNearbyHeroes(T, 1200, true, BOT_MODE_NONE)
+			local theirs = c.GetNearbyHeroes(T, 1200, false, BOT_MODE_NONE)
+			if ours ~= nil and theirs ~= nil and #ours >= #theirs then
+				for Z, ally in pairs(c.GetNearbyHeroes(T, 700, true, BOT_MODE_NONE)) do
+					if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() and ally:GetAttackTarget() == T then
+						a.LogShards("gank", T)
+						return BOT_ACTION_DESIRE_HIGH, Spot(T)
+					end
+				end
 			end
 		end
 	end
@@ -221,6 +243,21 @@ function a.ConsiderIceShards()
 		return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(wave)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-TUSK] shards why=kill|fight|engage|gank, at most once per 3s.
+function a.LogShards(why, target)
+	if DotaTime() < (b._tuskShardsLogAt or -999) then
+		return
+	end
+	b._tuskShardsLogAt = DotaTime() + 3
+	pcall(print, string.format(
+		"[OHA-TUSK] t=%.0f shards why=%s target=%s hp=%.2f dist=%d",
+		DotaTime(),
+		why,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		target and c.GetHP(target) or 0,
+		target and math.floor(GetUnitToUnitDistance(b, target)) or 0
+	))
 end
 -- Enemy lane creeps worth a spell, or nil. No enemy hero in sight, mana left after the cast,
 -- and not taking a core's farm. Laning phase only to save a tower, so the lane is not pushed.

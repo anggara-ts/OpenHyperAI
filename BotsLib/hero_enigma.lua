@@ -38,8 +38,10 @@ o["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_wand",
-	"item_vladmir",
+	-- Tranquil Boots before Vladmir (Buckler is its first part).
 	"item_boots",
+	"item_tranquil_boots",
+	"item_vladmir",
 	"item_blink",
 	"item_black_king_bar",
 	"item_aghanims_shard",
@@ -79,8 +81,9 @@ o["pos_5"] = {
 	"item_blood_grenade",
 	"item_magic_wand",
 	"item_boots",
-	"item_vladmir",
+	-- Tranquil Boots before Vladmir (Buckler is its first part).
 	"item_tranquil_boots",
+	"item_vladmir",
 	"item_pipe",
 	"item_blink",
 	"item_boots_of_bearing",

@@ -1536,7 +1536,9 @@ function ItemPurchaseThink()
 	then
 		-- No Smoke before the horn or in the laning phase: it is wasted gold and a slot that
 		-- early. Pos 5 buys one once laning is over.
-		if DotaTime() > 0 and not e.IsInLaningPhase() then
+		-- By the clock: the laning-phase flag drops out mid-lane (GetDesireRaw clears it and
+		-- several early returns never set it back), so Techies bought one at 7:00 in lane.
+		if DotaTime() >= 12 * 60 and not e.IsInLaningPhase() then
 			MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning pos5")
 			a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
 		end

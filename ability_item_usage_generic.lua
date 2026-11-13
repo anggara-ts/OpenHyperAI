@@ -5858,6 +5858,14 @@ a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 		)
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Not in the laning phase by the clock, and never in a lane fight or under our own tower:
+	-- at 7:00 Techies popped one in team roam beside Medusa at our T1, in a creep wave.
+	if DotaTime() > 0 and DotaTime() < 10 * 60 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if #(b:GetNearbyLaneCreeps(1000, true) or {}) >= 3 or #(b:GetNearbyTowers(1000, false) or {}) >= 1 then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	-- Never smoke alone after horn.
 	if bE == nil or #bE < 2 then
 		MatchTrace.Decide(

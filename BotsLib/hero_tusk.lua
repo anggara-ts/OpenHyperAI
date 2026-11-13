@@ -200,10 +200,20 @@ function a.ConsiderIceShards()
 	-- The shards ring the target point (7 shards 200 out), so aim where he will be when the
 	-- ball arrives. The old aim added 2s on top and landed the ring ~700 ahead of a runner.
 	local function Spot(T)
+		-- Close up (right after a snowball), a ring centred on the enemy puts shards between
+		-- him and Tusk: at 10:00 it walled Tusk off and the enemy walked away. Centre it 300
+		-- past the enemy, on the side away from Tusk, so the wall is behind the enemy instead.
+		local dist = GetUnitToUnitDistance(b, T)
+		if dist < 500 then
+			local from, to = b:GetLocation(), T:GetLocation()
+			local dx, dy = to.x - from.x, to.y - from.y
+			local len = math.max(1, math.sqrt(dx * dx + dy * dy))
+			return Vector(to.x + dx / len * 300, to.y + dy / len * 300, to.z)
+		end
 		if c.IsDisabled(T) or T:GetCurrentMovementSpeed() <= 0 then
 			return T:GetLocation()
 		end
-		return T:GetExtrapolatedLocation(GetUnitToUnitDistance(b, T) / math.max(1, Q) + N + 0.2)
+		return T:GetExtrapolatedLocation(dist / math.max(1, Q) + N + 0.2)
 	end
 	local function Trappable(T)
 		return c.IsValidHero(T)

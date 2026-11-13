@@ -958,6 +958,16 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			end
 			return true
 		end
+		-- 280 only says "near the shrine". The real capture area is smaller: at 14:00 Techies
+		-- stood ~280 out "covering" it and got nothing. Walk onto the centre before covering.
+		if dist > 100 then
+			bot._wisdomStandSince = nil
+			bot._wisdomXpAtStand = nil
+			if not bot:IsCastingAbility() and not bot:IsChanneling() then
+				bot:Action_MoveToLocation(loc)
+			end
+			return true
+		end
 		local now = DotaTime()
 		local xp = bot.GetCurrentXP and bot:GetCurrentXP() or nil
 		if bot._wisdomStandSince == nil then

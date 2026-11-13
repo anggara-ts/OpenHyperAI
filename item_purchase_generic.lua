@@ -1534,22 +1534,11 @@ function ItemPurchaseThink()
 		and c.GetItemCharges(a, "item_smoke_of_deceit") == 0
 		and C == 0
 	then
-		if DotaTime() < 0 and not v then
-			local aG = false
-			for O, aH in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-				if e.IsValidHero(aH) and e.IsNotSelf(a, aH) and e.HasItem(aH, "item_smoke_of_deceit") then
-					aG = true
-				end
-			end
-			if not aG then
-				MatchTrace.Buy(a, "item_smoke_of_deceit", "prehorn pos5")
-				a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
-			end
-		else
-			if not e.IsInLaningPhase() then
-				MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning pos5")
-				a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
-			end
+		-- No Smoke before the horn or in the laning phase: it is wasted gold and a slot that
+		-- early. Pos 5 buys one once laning is over.
+		if DotaTime() > 0 and not e.IsInLaningPhase() then
+			MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning pos5")
+			a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
 		end
 	end
 	if

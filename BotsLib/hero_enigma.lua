@@ -396,10 +396,34 @@ function a.ConsiderDemonicSummoning()
 			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
 		end
 	end
-	if c.IsLaning(b) and c.GetHealthAfter(a0) > 0.61 and c.GetManaAfter(r:GetManaCost()) > 0.5 then
-		local a2 = b:GetNearbyLaneCreeps(800, true)
-		if a2 ~= nil and #a2 >= 3 then
+	if c.IsLaning(b) then
+		-- Eidolons take the wave and harass in lane. The mana bar was 50% after the cast, about
+		-- three quarters of a level 1-3 pool, and Enigma was never seen summoning in lane.
+		-- Every skip is logged with the reason so the next game shows what blocks it.
+		local hpAfter = c.GetHealthAfter(a0)
+		local mpAfter = c.GetManaAfter(r:GetManaCost())
+		local a2 = b:GetNearbyLaneCreeps(800, true) or {}
+		local why = nil
+		if hpAfter <= 0.61 then
+			why = "hp"
+		elseif mpAfter <= 0.35 then
+			why = "mana"
+		elseif #a2 < 3 then
+			why = "creeps"
+		end
+		if why == nil then
+			pcall(print, string.format(
+				"[OHA-ENIGMA] t=%.0f summon why=lane creeps=%d hpAfter=%.2f mpAfter=%.2f",
+				DotaTime(), #a2, hpAfter, mpAfter
+			))
 			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+		end
+		if DotaTime() >= (b._summonSkipLogAt or -999) then
+			b._summonSkipLogAt = DotaTime() + 20
+			pcall(print, string.format(
+				"[OHA-ENIGMA] t=%.0f summon-skip why=%s creeps=%d hpAfter=%.2f mpAfter=%.2f",
+				DotaTime(), why, #a2, hpAfter, mpAfter
+			))
 		end
 	end
 	if c.IsDoingRoshan(b) and c.GetHealthAfter(a0) > 0.5 then

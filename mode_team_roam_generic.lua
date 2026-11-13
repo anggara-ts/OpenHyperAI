@@ -1772,13 +1772,17 @@ function TrySellOrDropItem()
 			for an = 1, #h["tEarlyConsumableItem"] do
 				local ct = h["tEarlyConsumableItem"][an]
 				local cE = a:FindItemSlot(ct)
-				if cE >= 6 and cE <= 8 then
-					local cz = a:DistanceFromFountain()
-					if cz <= 300 then
-						a:ActionImmediate_SellItem(a:GetItemInSlot(cE))
-					elseif cz >= 3000 then
-						a:Action_DropItem(a:GetItemInSlot(cE), a:GetLocation())
-					end
+				-- Sell only. A consumable dropped in the field was picked straight back up
+				-- (by the engine's own item mode, nothing of ours picks these), then dropped
+				-- again 3s later: Bristleback looped a Clarity at 55:30.
+				if cE >= 6 and cE <= 8 and a:DistanceFromFountain() <= 300 then
+					pcall(print, string.format(
+						"[OHA-ITEM] t=%.0f %s consumable-sold %s",
+						DotaTime(),
+						(string.gsub(a:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(ct, "^item_", ""))
+					))
+					a:ActionImmediate_SellItem(a:GetItemInSlot(cE))
 				end
 			end
 		end

@@ -120,6 +120,42 @@ function Strategy.EnemyDamage()
 	return magic, physical
 end
 
+-- Heroes whose damage comes through illusions or clones. Halberd's disarm hits only one body.
+local ILLUSION_HEROES = {
+	npc_dota_hero_arc_warden = true,
+	npc_dota_hero_chaos_knight = true,
+	npc_dota_hero_meepo = true,
+	npc_dota_hero_naga_siren = true,
+	npc_dota_hero_phantom_lancer = true,
+	npc_dota_hero_terrorblade = true,
+}
+
+-- Heaven's Halberd is worth it: the enemy has heavy right-click damage that does not come
+-- through illusions. Counts carry weight (or a physical override) over enemy heroes that
+-- hit mostly with attacks (carry above nuker) and are not illusion heroes. One hard carry
+-- (3) or two lesser ones is enough. Returns the answer and the heroes that counted.
+function Strategy.EnemyHeavyPhysical()
+	local weight, names = 0, {}
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		local name = GetSelectedHeroName(pid)
+		if name ~= nil and name ~= "" and not ILLUSION_HEROES[name] then
+			local o = DAMAGE_OVERRIDE[name]
+			local r = Roles[name]
+			local w = 0
+			if o ~= nil then
+				w = o.physical > o.magic and o.physical or 0
+			elseif r ~= nil and (r.carry or 0) > (r.nuker or 0) then
+				w = r.carry or 0
+			end
+			if w >= 2 then
+				weight = weight + w
+				names[#names + 1] = (string.gsub(name, "npc_dota_hero_", ""))
+			end
+		end
+	end
+	return weight >= 3, names
+end
+
 -- Team items, best first, for this enemy lineup.
 function Strategy.RankTeamItems()
 	local magic, physical = Strategy.EnemyDamage()

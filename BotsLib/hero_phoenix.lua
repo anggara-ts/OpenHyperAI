@@ -19,7 +19,8 @@ m["pos_4"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_tranquil_boots",
-	"item_veil_of_discord",
+	-- Rod of Atos instead of Veil of Discord: roots the Sun Ray target so it cannot walk out.
+	"item_rod_of_atos",
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_force_staff",
@@ -125,6 +126,13 @@ function a.SkillsComplement()
 				b:Action_UseAbility(u)
 			end
 		end
+		return
+	end
+	-- Root the Sun Ray target with Rod of Atos so it cannot walk out of the beam. Runs here
+	-- because the busy check below is true during the ray and blocks the shared item logic.
+	local atos, atosTarget = a.ConsiderAtosOnSunRay()
+	if atos ~= nil then
+		b:Action_UseAbilityOnEntity(atos, atosTarget)
 		return
 	end
 	y = a.ConsiderIcarusDiveStop()
@@ -692,6 +700,41 @@ function a.ConsiderSunRay()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Rod of Atos and the enemy to root while an engage Sun Ray is on it, or nil.
+function a.ConsiderAtosOnSunRay()
+	if not b.sun_ray_engage or not b:HasModifier("modifier_phoenix_sun_ray") then
+		return nil
+	end
+	local T = b.sun_ray_target
+	if not c.IsValidHero(T) or T:GetTeam() == b:GetTeam() or c.IsSuspiciousIllusion(T) then
+		return nil
+	end
+	local slot = b:FindItemSlot("item_rod_of_atos")
+	if slot < 0 or slot > 5 then
+		return nil
+	end
+	local atos = b:GetItemInSlot(slot)
+	if atos == nil or not atos:IsFullyCastable() then
+		return nil
+	end
+	local range = c.GetProperCastRange(false, b, atos:GetCastRange())
+	if
+		not c.IsInRange(b, T, range)
+		or not c.CanCastOnNonMagicImmune(T)
+		or c.IsDisabled(T)
+		or T:IsRooted()
+	then
+		return nil
+	end
+	pcall(print, string.format(
+		"[OHA-PHOENIX] t=%.0f atos-sun-ray target=%s hp=%.2f dist=%d",
+		DotaTime(),
+		(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+		c.GetHP(T),
+		math.floor(GetUnitToUnitDistance(b, T))
+	))
+	return atos, T
 end
 function a.ConsiderSunRayStop()
 	if not c.CanCastAbility(t) or b:HasModifier("modifier_phoenix_icarus_dive") then

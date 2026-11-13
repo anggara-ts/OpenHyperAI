@@ -11,7 +11,18 @@ local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10
 local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = RandomInt(1, 9) > 6 and "item_black_king_bar" or "item_heavens_halberd"
+-- Heaven's Halberd only against heavy right-click damage that does not come through
+-- illusions; otherwise the slot is skipped. It used to be a random pick, a second BKB 1 in 3.
+local heavyPhysical, physicalHeroes = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").EnemyHeavyPhysical()
+local m = heavyPhysical and "item_heavens_halberd" or false
+if h == "pos_3" then
+	pcall(print, string.format(
+		"[OHA-BUY] t=%.0f bristleback halberd=%s physical=%s",
+		DotaTime(),
+		tostring(heavyPhysical),
+		table.concat(physicalHeroes, ",")
+	))
+end
 local n = {}
 n["pos_1"] = {
 	"item_tango",
@@ -108,6 +119,14 @@ n["pos_5"] = {
 	"item_moon_shard",
 	"item_sheepstick",
 }
+-- Drop the skipped Halberd slot (false) so the list has no holes.
+for _, list in pairs(n) do
+	for idx = #list, 1, -1 do
+		if list[idx] == false then
+			table.remove(list, idx)
+		end
+	end
+end
 a["sBuyList"] = n[h]
 a["sSellList"] = {
 	"item_power_treads",

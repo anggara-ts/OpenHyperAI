@@ -974,10 +974,13 @@ function r.GetDefendDesireHelper(af, aF)
 	-- there clears it; if nobody is, the closest support or anyone within 4000 comes. The
 	-- old rule counted a creep as 0.2 (a 5-creep wave read as 1, needed 2) and only sent a
 	-- support while no ally was near, itself included, so he arrived, quit, and came back.
+	-- The wave counts from HG_WAVE_RADIUS (2600) out, not when it reaches the building, so a
+	-- hero has time to walk there.
 	if cC >= 3 and not ch.active then
 		local hgLoc = cA:GetLocation()
-		local hgCreeps = CountEnemyCreepsNear(hgLoc, 1600)
-		if hgCreeps >= 2 and #Z.GetLastSeenEnemiesNearLoc(hgLoc, 2500) == 0 then
+		local hgRadius = Z.Utils.HG_WAVE_RADIUS or 2600
+		local hgCreeps = Z.Utils.CountHighGroundWave(ah, hgLoc, hgRadius)
+		if hgCreeps >= 2 and #Z.GetLastSeenEnemiesNearLoc(hgLoc, hgRadius) == 0 then
 			local myDist = GetUnitToLocationDistance(af, hgLoc)
 			local others = #Z.Utils.GetAllyIdsInTpToLocation(hgLoc, 2500)
 			for aq, ally in ipairs(Z.GetAlliesNearLoc(hgLoc, 2500)) do

@@ -4495,8 +4495,12 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			return BOT_ACTION_DESIRE_HIGH, d_, "ground", "tp_roshan"
 		end
 	end
+	-- Side shop / watcher mode only means Tormentor once our Tormentor mode can run (20:00,
+	-- 10:00 in Turbo). Before that it is the engine's own watcher trip: at 0:10 Snapfire and
+	-- earlier Phoenix TP'd to the tower nearest the Tormentor and walked back to their lane.
 	if
 		(b:GetActiveMode() == BOT_MODE_SIDE_SHOP or b:GetActiveMode() == BOT_MODE_WATCHER)
+		and DotaTime() >= (f.IsModeTurbo() and 10 or 20) * 60
 		and ax == 0
 		and (not f.IsInTeamFight(b, 1200) or not f.IsGoingOnSomeone(b) or not f.IsDefending(b))
 	then

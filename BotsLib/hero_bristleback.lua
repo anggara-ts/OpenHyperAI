@@ -45,6 +45,7 @@ n["pos_3"] = {
 	"item_blade_mail",
 	"item_crimson_guard",
 	"item_black_king_bar",
+	"item_lotus_orb",
 	m,
 	"item_aghanims_shard",
 	"item_assault",

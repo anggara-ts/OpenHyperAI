@@ -1028,6 +1028,43 @@ function aD.CountEnemyHeroesOnHighGround(bn)
 	aD.SetCachedVars(c9, ch)
 	return ch
 end
+-- A creep wave (2+ enemy creeps within 1600) at one of our high-ground buildings (T3 or
+-- barracks) with no enemy hero within 2500 of it, and that building within `range` of the
+-- bot. Returns the building and the creep count, or nil.
+function aD.HighGroundCreepWaveNear(bot, range)
+	local team = bot:GetTeam()
+	local buildings = {}
+	for a2, id in ipairs(c8) do
+		local tower = GetTower(team, id)
+		if aD.IsValidBuilding(tower) then
+			buildings[#buildings + 1] = tower
+		end
+	end
+	for a2, id in ipairs(c7) do
+		local rax = GetBarracks(team, id)
+		if aD.IsValidBuilding(rax) then
+			buildings[#buildings + 1] = rax
+		end
+	end
+	local creepList = GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}
+	for a2, building in ipairs(buildings) do
+		if GetUnitToUnitDistance(bot, building) <= range then
+			local loc = building:GetLocation()
+			if aD.CountEnemyHeroesNear(loc, 2500) == 0 then
+				local creeps = 0
+				for a3, unit in pairs(creepList) do
+					if unit ~= nil and unit:IsAlive() and GetUnitToLocationDistance(unit, loc) <= 1600 then
+						creeps = creeps + 1
+					end
+				end
+				if creeps >= 2 then
+					return building, creeps
+				end
+			end
+		end
+	end
+	return nil
+end
 function aD.GetDistanceFromAncient(bv, ci)
 	local cj = GetAncient(ci and GetOpposingTeam() or GetTeam())
 	return GetUnitToUnitDistance(bv, cj)

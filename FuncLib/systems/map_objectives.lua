@@ -645,7 +645,7 @@ local function HeroesNearLoc(loc, radius)
 				seen ~= nil
 				and seen.location ~= nil
 				and seen.time_since_seen ~= nil
-				and seen.time_since_seen <= 5
+				and seen.time_since_seen <= 1.0
 			then
 				local dx = seen.location.x - loc.x
 				local dy = seen.location.y - loc.y
@@ -791,6 +791,12 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			if bot._lotusSkipMark == mark and mark >= lInterval then
 				inLotus = false
 			end
+			-- The 6s linger ends while he is still walking. A lotus still in the pool
+			-- is worth the rest of the trip when no enemy is actually visible.
+			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and #foes == 0 and bot._lotusSkipMark ~= mark then
+				inLotus = true
+				etaL = -sinceLast
+			end
 			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
@@ -869,6 +875,9 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 				if not beside and type(etaL) == "number" and math.abs(etaL) <= 8 then
 					desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
+				end
+				if count ~= nil and count > 0 and #foes == 0 and hp >= 0.45 and not danger then
+					desire = BOT_MODE_DESIRE_ABSOLUTE + 0.02
 				end
 				return desire, loc, "lotus", etaL
 			end

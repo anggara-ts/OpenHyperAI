@@ -173,6 +173,9 @@ local function a_GetForcedPickList(ab)
 	end
 	return nil
 end
+-- forcedSlot[Z] marks a slot whose hero comes from a pick list, not from the random pool.
+-- Checked by slot: a "Random" slot whose roll matches a listed hero is still random.
+local forcedSlot = {}
 local function a_ApplyForcedPicks(list)
 	if type(list) ~= "table" then
 		return false
@@ -182,6 +185,7 @@ local function a_ApplyForcedPicks(list)
 		local U = j.TrimString(list[Z] or "")
 		if U ~= "" and U ~= "Random" and j.HasValue(u, U) then
 			d[Z] = U
+			forcedSlot[Z] = true
 			applied = true
 		end
 	end
@@ -223,6 +227,7 @@ function a.ShufflePickOrder(a3)
 		local a5 = a4[Z]
 		if a3[Z] and a3[Z] >= 0 and IsPlayerBot(a3[Z]) and IsPlayerBot(a3[a5]) then
 			d[Z], d[a5] = d[a5], d[Z]
+			forcedSlot[Z], forcedSlot[a5] = forcedSlot[a5], forcedSlot[Z]
 			e[Z], e[a5] = e[a5], e[Z]
 			f["TEAM_RADIANT"][Z], f["TEAM_RADIANT"][a5] = f["TEAM_RADIANT"][a5], f["TEAM_RADIANT"][Z]
 			f["TEAM_DIRE"][Z], f["TEAM_DIRE"][a5] = f["TEAM_DIRE"][a5], f["TEAM_DIRE"][Z]
@@ -329,6 +334,24 @@ function a.CanPickHero(ab, a7)
 	end
 	return not ak(a7)
 end
+-- A hero named in either team's pick list is kept for that slot. A random slot that picks
+-- first would otherwise take it, and the listed slot then picked it again (two Techies).
+function a.IsReservedByForcedPick(a7)
+	for G, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+		local list = a_GetForcedPickList(team)
+		if type(list) == "table" then
+			for Z = 1, math.min(5, #list) do
+				if j.TrimString(list[Z] or "") == a7 then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+function a.CanPickRandomHero(ab, a7)
+	return a.CanPickHero(ab, a7) and not a.IsReservedByForcedPick(a7)
+end
 function a.GetRandomAvailableHero(ab, an)
 	if type(an) ~= "table" or #an == 0 then
 		return nil
@@ -339,7 +362,7 @@ function a.GetRandomAvailableHero(ab, an)
 	end
 	a.ShuffleArray(ao)
 	for G, ap in ipairs(ao) do
-		if a.CanPickHero(ab, ap) then
+		if a.CanPickRandomHero(ab, ap) then
 			return ap
 		end
 	end
@@ -608,7 +631,7 @@ local function aL(ab, aM, aN, aO)
 	local aQ = ac(ab)
 	local aR = aF()
 	for G, ap in ipairs(aM) do
-		if a.CanPickHero(ab, ap) then
+		if a.CanPickRandomHero(ab, ap) then
 			local aS = 0
 			if h[ap] then
 				for G, aT in ipairs(aN) do
@@ -673,7 +696,8 @@ local function b3(Z, al)
 	local aM = e[Z]
 	local b4 = d[Z]
 	local ar = b4
-	if not a.IsInCustomizedPicks(b4) and RandomInt(1, 5) >= 1 then
+	local forced = forcedSlot[Z] == true
+	if not forced and RandomInt(1, 5) >= 1 then
 		local aN = aC()
 		local aZ = aL(ab, aM, aN, Z)
 		local b5 = ab == TEAM_RADIANT and "Radiant" or "Dire"
@@ -686,9 +710,9 @@ local function b3(Z, al)
 			ar = a.GetRandomAvailableHero(ab, aM) or b4
 		end
 	end
-	local b6 = a.IsInCustomizedPicks(b4) and b4 == ar
+	local b6 = forced and b4 == ar
 	if not b6 then
-		if not a.CanPickHero(ab, ar) then
+		if not a.CanPickRandomHero(ab, ar) then
 			ar = a.GetRandomAvailableHero(ab, aM) or b4
 		end
 	end

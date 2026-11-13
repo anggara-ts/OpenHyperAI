@@ -161,6 +161,10 @@ function GetDesireHelper()
 	if a:IsInvulnerable() or not a:IsHero() or not a:IsAlive() or not string.find(b, "hero") or a:IsIllusion() then
 		return BOT_MODE_DESIRE_NONE
 	end
+	local dropDesire = h.RoshanDropDesire(a)
+	if dropDesire > 0 then
+		return dropDesire
+	end
 	if g.IsInLaningPhase() then
 		if DotaTime() < H and G ~= nil then
 			F = true
@@ -499,6 +503,9 @@ function Think()
 		return
 	end
 	if g.CanNotUseAction(a) then
+		return
+	end
+	if h.TryPickupRoshanDrop(a) then
 		return
 	end
 	if F and G ~= nil then
@@ -1612,14 +1619,10 @@ function ItemOpsDesire()
 			if cs ~= nil then
 				local ct = cs.item:GetName()
 				if not g.Utils.SetContains(ct) and not g.Utils.HasValue(h["tEarlyConsumableItem"], ct) then
-					if ct == "item_aegis" and g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
-						if g.Item.GetEmptyNonBackpackInventoryAmount(a) == 0 then
-							local cu = g.Item.GetMainInvLessValItemSlot(a)
-							local cv = g.Item.GetEmptyBackpackSlot(a)
-							if cu ~= -1 and cv ~= -1 then
-								a:ActionImmediate_SwapItems(cv, cu)
-							end
-						end
+					if
+						(ct == "item_aegis" or ct == "item_roshans_banner")
+						and h.ShouldClaimRoshanDrop(a, cs.location, ct)
+					then
 						J = cs
 					end
 					if ct == "item_cheese" and g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
@@ -1640,12 +1643,10 @@ function ItemOpsDesire()
 						and ct ~= "item_famango"
 						and ct ~= "item_great_famango"
 						and ct ~= "item_greater_famango"
-						and ct ~= "item_foragers_health"
-						and ct ~= "item_foragers_stats"
-						and ct ~= "item_foragers_mana"
 						and ct ~= "item_ward_observer"
 						and ct ~= "item_ward_sentry"
 						and ct ~= "item_ward_dispenser"
+						and h.RoshanClaimKind(ct) == nil
 					then
 						J = cs
 					end
@@ -1679,7 +1680,11 @@ function ItemOpsThink()
 				c.AddToSet(L, J.item)
 			end
 			if not c.SetContains(ct) and not c.HasValue(h["tEarlyConsumableItem"], ct) then
-				if ct == "item_aegis" or ct == "item_cheese" then
+				if ct == "item_aegis" or ct == "item_roshans_banner" then
+					if h.ShouldClaimRoshanDrop(a, J.location, ct) then
+						GoPickUpItem(J)
+					end
+				elseif ct == "item_cheese" then
 					if g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
 						GoPickUpItem(J)
 					end

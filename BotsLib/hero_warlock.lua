@@ -180,7 +180,9 @@ function a.ConsiderR()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if n:IsFullyCastable() and b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 then
+	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
+	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
+	if b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 and a.ConsiderQ() > 0 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local M = q:GetCastRange() + I
@@ -209,7 +211,9 @@ function a.ConsiderRFR()
 	if not q:IsFullyCastable() or J == nil or not J:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if n:IsFullyCastable() and b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 then
+	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
+	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
+	if b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 and a.ConsiderQ() > 0 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if b:GetMana() < q:GetManaCost() * 2 + J:GetManaCost() then
@@ -344,6 +348,38 @@ function a.ConsiderQ()
 	local O = n:GetManaCost()
 	local P = n:GetSpecialValueInt("search_aoe")
 	local a5 = n:GetSpecialValueInt("count")
+	-- Grouped enemy heroes: Bonds first, on the hero nearest the middle of the group. Every
+	-- linked hero then shares the Chaotic Offering stun, the golem's hits and the follow-up.
+	local cluster = b:FindAoELocation(true, true, b:GetLocation(), M, P, 0, 0)
+	if cluster ~= nil and cluster.count >= 2 then
+		local best, bestDist = nil, math.huge
+		for _, foe in pairs(c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(foe)
+				and c.CanCastOnNonMagicImmune(foe)
+				and c.CanCastOnTargetAdvanced(foe)
+				and not c.IsSuspiciousIllusion(foe)
+			then
+				local dist = GetUnitToLocationDistance(foe, cluster.targetloc)
+				if dist < bestDist then
+					best, bestDist = foe, dist
+				end
+			end
+		end
+		if best ~= nil then
+			if DotaTime() >= (b._bondsLogAt or -999) then
+				b._bondsLogAt = DotaTime() + 10
+				pcall(print, string.format(
+					"[OHA-WARLOCK] t=%.0f fatal-bonds grouped=%d target=%s ultReady=%s",
+					DotaTime(),
+					cluster.count,
+					(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(q:IsFullyCastable())
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
 	if c.IsInTeamFight(b, 1000) then
 		local R = b:FindAoELocation(true, true, b:GetLocation(), M, P, 0, 0)
 		if R.count >= 2 then

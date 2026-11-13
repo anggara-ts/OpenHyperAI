@@ -69,6 +69,16 @@ local R = {
 if BOT_MODE_WATCHER then
 	R[BOT_MODE_WATCHER] = "mode_tormentor"
 end
+-- Short modes that used to print as "busy".
+if BOT_MODE_WARD then
+	R[BOT_MODE_WARD] = "mode_warding"
+end
+if BOT_MODE_RUNE then
+	R[BOT_MODE_RUNE] = "mode_rune"
+end
+if BOT_MODE_ITEM then
+	R[BOT_MODE_ITEM] = "mode_item"
+end
 function f.GetModeLocaleKey(S)
 	return R[S] or "mode_other"
 end
@@ -164,7 +174,33 @@ function GetDesire()
 		e._farmCommitFloor = nil
 		return BOT_MODE_DESIRE_NONE
 	end
-	if W > 0.5 and FarmDefend.ClaimAnnounce() then
+	-- A creep wave at our Ancient while this bot is at base (just respawned, or shopping):
+	-- clear it before walking out. Farm (0.66) otherwise beat the defend floor and the bot
+	-- walked to the middle of the map and back.
+	if ancient ~= nil and GetUnitToUnitDistance(e, ancient) <= 4500 then
+		local creeps = 0
+		local loc = ancient:GetLocation()
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+			if unit ~= nil and unit:IsAlive() and GetUnitToLocationDistance(unit, loc) <= 1400 then
+				creeps = creeps + 1
+			end
+		end
+		if creeps >= 2 then
+			e._farmCommitUntil = nil
+			e._farmCommitFloor = nil
+			return BOT_MODE_DESIRE_NONE
+		end
+	end
+	-- Same for a creep wave on our high ground (T3 or barracks) with this bot already there.
+	-- The defend mode takes it (hg-creeps); farm used to win and walk him away from it.
+	if g.Utils.HighGroundCreepWaveNear ~= nil and g.Utils.HighGroundCreepWaveNear(e, 2500) then
+		e._farmCommitUntil = nil
+		e._farmCommitFloor = nil
+		return BOT_MODE_DESIRE_NONE
+	end
+	-- Evasive maneuvers is the engine's momentary dodge mode. Replying from it read as
+	-- "I'm busy" for a bot that was really about to farm.
+	if W > 0.5 and e:GetActiveMode() ~= BOT_MODE_EVASIVE_MANEUVERS and FarmDefend.ClaimAnnounce() then
 		local X = f.GetModeLocaleKey(e:GetActiveMode())
 		local Y = c.Get(X) or X
 		local Z = c.Get("say_not_defending")

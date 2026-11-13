@@ -6,6 +6,7 @@ local enemies = {}
 local pushLockUntil = -999
 local pushLogged = {}
 local roshLogged = {}
+local heldLogged = {}
 local LOCK_SECONDS = 20
 
 local function Now()
@@ -222,6 +223,52 @@ local function TickRaw()
 	}
 end
 
+-- Seconds until the first dead enemy respawns, or nil when none is dead.
+function KillWindow.WindowLeft()
+	local now = Now()
+	local left = nil
+	for _, slot in pairs(enemies) do
+		if not slot.alive and slot.deathAt ~= nil then
+			local rest = slot.deathAt + (slot.respawnFor or 30) - now
+			if rest > 0 and (left == nil or rest < left) then
+				left = rest
+			end
+		end
+	end
+	return left
+end
+
+-- Seconds a respawned enemy needs to reach `loc` from its fountain, counting a TP to a
+-- tower on the way. Kept between 8 and 20.
+function KillWindow.TransitGrace(loc)
+	local d = Dist(Fountain(GetOpposingTeam()), loc)
+	if d >= 99999 then
+		return 10
+	end
+	return math.max(8, math.min(20, d / 450))
+end
+
+-- Enemies that respawned less than `grace` seconds ago and have not been seen away from
+-- their fountain. They are alive but cannot contest a far objective yet.
+function KillWindow.EnemiesInTransit(grace)
+	local now = Now()
+	local fountain = Fountain(GetOpposingTeam())
+	local n = 0
+	for pid, slot in pairs(enemies) do
+		if slot.alive and slot.backAt ~= nil and now - slot.backAt < (grace or 15) then
+			local seen = LastSeen(pid)
+			local away = seen ~= nil
+				and seen.time_since_seen ~= nil
+				and seen.time_since_seen < 3
+				and Dist(seen.location, fountain) > 3500
+			if not away then
+				n = n + 1
+			end
+		end
+	end
+	return n
+end
+
 function KillWindow.Tick()
 	local ok, snap = pcall(TickRaw)
 	if not ok or type(snap) ~= "table" then
@@ -253,6 +300,29 @@ function KillWindow.LogPush(bot, lane, was, floor, snap, hp, allies, enemiesAliv
 		allies or 0,
 		enemiesAlive or 0,
 		hp or 0
+	))
+end
+
+-- A kill window is open but the push floor is held because our base is being hit.
+function KillWindow.LogPushHeld(bot, lane, snap, why)
+	if bot == nil or bot.GetPlayerID == nil then
+		return
+	end
+	local now = Now()
+	local id = bot:GetPlayerID()
+	if heldLogged[id] ~= nil and now < heldLogged[id] then
+		return
+	end
+	heldLogged[id] = now + 4
+	Print(string.format(
+		"[OHA-FIGHT] t=%.0f %s push-held %s lane=%s dead=%d (%s) why=%s",
+		now,
+		TeamLabel(),
+		ShortName(bot:GetUnitName()),
+		tostring(lane),
+		snap.fresh or 0,
+		snap.names or "",
+		(why ~= nil and why ~= "") and why or "?"
 	))
 end
 

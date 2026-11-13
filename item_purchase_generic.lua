@@ -197,6 +197,7 @@ local function a2()
 	a.currBuyingBasicItemList = {}
 	a.currBuyingBasicItemRefList = {}
 	a.currBuyingRequiredCounts = nil
+	a._recipeTarget = nil
 end
 -- Which bot cores owe the team a lockdown answer. Mid first, then offlane,
 -- then the carry if a human holds one of those roles. Every bot computes the
@@ -373,25 +374,100 @@ local tPromoteFromBackpack = {
 	item_nullifier = true,
 }
 local promoteNextCheck = 0
--- A full bag puts the grenade in the backpack, where it cannot be thrown.
--- An iron branch can sit back there instead.
-local function PreferBloodGrenadeOverBranch()
-	local grenadeSlot = a:FindItemSlot("item_blood_grenade")
-	if grenadeSlot < 6 or grenadeSlot > 8 then
-		return
-	end
+-- Consumables that can sit in the backpack. A branch cannot: it is a wand component,
+-- and parking it makes the game pull it straight back on cooldown.
+local PARK_IN_BACKPACK = {
+	item_tango = true,
+	item_tango_single = true,
+	item_clarity = true,
+	item_faerie_fire = true,
+	item_enchanted_mango = true,
+	item_flask = true,
+}
+local function ForceSwap(fromSlot, toSlot)
+	a._swapDespiteEnemies = true
+	a:ActionImmediate_SwapItems(fromSlot, toSlot)
+	a._swapDespiteEnemies = nil
+end
+local function MainSlotForBackpackItem()
 	for slot = 0, 5 do
 		if a:GetItemInSlot(slot) == nil then
-			a:ActionImmediate_SwapItems(grenadeSlot, slot)
-			return
+			return slot
 		end
 	end
 	for slot = 0, 5 do
 		local it = a:GetItemInSlot(slot)
-		if it ~= nil and it:GetName() == "item_branches" then
-			a:ActionImmediate_SwapItems(grenadeSlot, slot)
-			return
+		if it ~= nil and PARK_IN_BACKPACK[it:GetName()] then
+			return slot
 		end
+	end
+	return nil
+end
+-- A full bag puts the grenade in the backpack, where it cannot be thrown.
+-- The grenade takes a main slot ahead of a branch. Do not pull that branch back out.
+local function PreferBloodGrenadeOverBranch()
+	if VerifyLastSwap then
+		VerifyLastSwap(a)
+	end
+	local grenadeSlot = a:FindItemSlot("item_blood_grenade")
+	-- Log every slot change of the grenade with the main inventory and the mode. A move into
+	-- the backpack that no logged swap made was something outside the swap wrapper.
+	if grenadeSlot ~= (a._grenadeLastSlot or -1) then
+		if grenadeSlot >= 0 or (a._grenadeLastSlot or -1) >= 0 then
+			local main = {}
+			for s = 0, 5 do
+				local it = a:GetItemInSlot(s)
+				main[#main + 1] = it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
+			end
+			local pack = {}
+			for s = 6, 8 do
+				local it = a:GetItemInSlot(s)
+				pack[#pack + 1] = it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
+			end
+			pcall(print, string.format(
+				"[OHA-ITEM] t=%.0f %s grenade-moved from=%d to=%d mode=%s main=%s pack=%s",
+				DotaTime(),
+				(string.gsub(b, "npc_dota_hero_", "")),
+				a._grenadeLastSlot or -1,
+				grenadeSlot,
+				tostring(a:GetActiveMode()),
+				table.concat(main, ","),
+				table.concat(pack, ",")
+			))
+		end
+		a._grenadeLastSlot = grenadeSlot
+	end
+	-- Bot item swaps do not take effect in this game build (every checked swap was a no-op), so
+	-- there is nothing to do while the grenade is merely in the backpack. The game moves it
+	-- back up as soon as a main slot frees. From 12:00 a grenade still carried is dead weight:
+	-- sell it at base or drop it elsewhere, away from enemy heroes.
+	if grenadeSlot < 0 or grenadeSlot > 8 or DotaTime() < 12 * 60 then
+		return
+	end
+	if #(a:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) > 0 then
+		return
+	end
+	local grenade = a:GetItemInSlot(grenadeSlot)
+	if grenade == nil then
+		return
+	end
+	local how
+	if a:DistanceFromFountain() <= 1600 then
+		a:ActionImmediate_SellItem(grenade)
+		how = "sold"
+	else
+		a:Action_DropItem(grenade, a:GetLocation())
+		how = "dropped"
+	end
+	if DotaTime() >= (a._grenadeDisposeLogAt or -999) then
+		a._grenadeDisposeLogAt = DotaTime() + 10
+		pcall(print, string.format(
+			"[OHA-ITEM] t=%.0f %s grenade-%s slot=%d",
+			DotaTime(),
+			(string.gsub(b, "npc_dota_hero_", "")),
+			how,
+			grenadeSlot
+		))
 	end
 end
 local function PromoteBackpackCounters()
@@ -431,6 +507,248 @@ local function PromoteBackpackCounters()
 		end
 	end
 end
+local function ShortItem(name)
+	return (string.gsub(tostring(name), "^item_", ""))
+end
+-- [OHA-BUY] lines: every purchase, and every recipe held back for a missing ingredient.
+local function BuyLog(fmt, ...)
+	pcall(print, string.format(
+		"[OHA-BUY] t=%.0f %s " .. fmt,
+		DotaTime(),
+		(string.gsub(b, "npc_dota_hero_", "")),
+		...
+	))
+end
+local function IsBasicItem(name)
+	if type(c[name]) == "table" then
+		return false
+	end
+	local ok, parts = pcall(GetItemComponents, name)
+	return not ok or type(parts) ~= "table" or #parts == 0
+end
+-- An ingredient of this recipe's item that the hero does not own yet, or nil.
+local function MissingIngredient(recipe)
+	local parent = string.gsub(recipe, "^item_recipe_", "item_")
+	local parts = c[parent]
+	if type(parts) ~= "table" then
+		local ok, list = pcall(c.GetComponentList, parent)
+		parts = ok and list or nil
+	end
+	if type(parts) ~= "table" then
+		return nil
+	end
+	local need = {}
+	for _, part in ipairs(parts) do
+		if type(part) == "string" and part ~= recipe and not string.find(part, "item_recipe_", 1, true) then
+			need[part] = (need[part] or 0) + 1
+		end
+	end
+	for part, count in pairs(need) do
+		if F(a, part) < count then
+			return part
+		end
+	end
+	return nil
+end
+-- true/false when the courier's slots can be read, nil when there is no courier handle.
+local function CourierHasItem(name)
+	local courier = a.theCourier
+	if courier == nil then
+		return nil
+	end
+	local ok, found = pcall(function()
+		for slot = 0, 8 do
+			local it = courier:GetItemInSlot(slot)
+			if it ~= nil and it:GetName() == name then
+				return true
+			end
+		end
+		return false
+	end)
+	if not ok then
+		return nil
+	end
+	return found
+end
+-- How many times one recipe may put its ingredient back in the queue before the
+-- re-queues stop counting as progress.
+local MAX_REQUEUES = 3
+-- The missing ingredient plus every part it is built from (Ring of Basilius -> Sobi Mask,
+-- its recipe, ...). A composite ingredient never sits in the basic buy list itself.
+local function IngredientParts(name)
+	local parts = { name }
+	local function walk(n, depth)
+		local list = c[n]
+		if depth > 3 or type(list) ~= "table" then
+			return
+		end
+		for _, part in ipairs(list) do
+			if type(part) == "string" then
+				parts[#parts + 1] = part
+				walk(part, depth + 1)
+			end
+		end
+	end
+	walk(name, 0)
+	return parts
+end
+-- A recipe is bought only after its own ingredients. Returns true when the recipe was
+-- held back this think.
+local function HoldRecipe()
+	local item = a.currBuyingBasicItem
+	if type(item) ~= "string" or not string.find(item, "item_recipe_", 1, true) then
+		return false
+	end
+	-- A recipe whose item the hero already has as many of as this build wants is a
+	-- leftover from a rebuild. Buying its ingredients would make an extra item.
+	local parent = string.gsub(item, "^item_recipe_", "item_")
+	local wanted = a._recipeTarget and a._recipeTarget[parent]
+	if wanted ~= nil and F(a, parent) >= wanted then
+		BuyLog(
+			"recipe-stray %s owned=%d wanted=%d for=%s",
+			ShortItem(item),
+			F(a, parent),
+			wanted,
+			ShortItem(a.currBuyingItemInPurchaseList)
+		)
+		a1()
+		return true
+	end
+	a._recipeHold = a._recipeHold or {}
+	local missing = MissingIngredient(item)
+	if missing == nil then
+		a._recipeHold[item] = nil
+		return false
+	end
+	local parts = IngredientParts(missing)
+	local isPart = {}
+	for _, p in ipairs(parts) do
+		isPart[p] = true
+	end
+	local list = a.currBuyingBasicItemList
+	-- Nearest upcoming entry for this ingredient or one of its parts. Buy order runs from
+	-- the end of the list, so the highest index below the recipe is the next one bought.
+	local queuedAt = nil
+	for k = #list - 1, 1, -1 do
+		if isPart[list[k]] then
+			queuedAt = k
+			break
+		end
+	end
+	-- Only act on an ingredient this build planned to buy. An upgrade recipe can name an
+	-- item whose parts the hero no longer holds (boots inside Travel Boots); leave those alone.
+	local planned = false
+	for _, entry in ipairs(a.currBuyingBasicItemRefList or {}) do
+		if isPart[entry] then
+			planned = true
+			break
+		end
+	end
+	if queuedAt == nil and not planned then
+		a._recipeHold[item] = nil
+		return false
+	end
+	local now = DotaTime()
+	local hold = a._recipeHold[item]
+	if hold == nil then
+		hold = { since = now, requeues = 0 }
+		a._recipeHold[item] = hold
+	end
+	-- The 60s only counts time spent truly stuck. Queuing or deferring for the ingredient
+	-- restarts it; waiting on the courier and repeated failed re-queues do not.
+	if now - hold.since > 60 then
+		if not hold.forcedLogged then
+			hold.forcedLogged = true
+			BuyLog(
+				"recipe-forced %s missing=%s requeues=%d for=%s",
+				ShortItem(item),
+				ShortItem(missing),
+				hold.requeues,
+				ShortItem(a.currBuyingItemInPurchaseList)
+			)
+		end
+		return false
+	end
+	-- Courier first. An ingredient already bought and on its way must not be matched to a
+	-- later copy in the queue (a Sobi Mask meant for Urn pushed the Ring of Basilius recipe
+	-- to the end of the build, and Arcane Boots never combined).
+	local onCourier = nil
+	for _, p in ipairs(parts) do
+		local found = CourierHasItem(p)
+		if found == true then
+			onCourier = true
+			break
+		elseif found == false then
+			onCourier = false
+		end
+	end
+	if onCourier == nil then
+		onCourier = (a:GetCourierValue() or 0) > 0
+	end
+	local action
+	if onCourier then
+		action = "wait-courier"
+	elseif queuedAt ~= nil then
+		-- Sit right behind that part instead of at the very end of the build.
+		list[#list] = nil
+		table.insert(list, queuedAt, item)
+		action = "defer"
+		hold.since = now
+	else
+		-- Planned but fell out of the queue: put back the basic parts the hero lacks.
+		local need = {}
+		if IsBasicItem(missing) then
+			need[missing] = 1
+		else
+			for _, p in ipairs(parts) do
+				if p ~= missing and IsBasicItem(p) then
+					need[p] = (need[p] or 0) + 1
+				end
+			end
+		end
+		local added = 0
+		for p, count in pairs(need) do
+			for _ = 1, count - F(a, p) do
+				list[#list + 1] = p
+				added = added + 1
+			end
+		end
+		if added == 0 then
+			a._recipeHold[item] = nil
+			return false
+		end
+		hold.requeues = hold.requeues + 1
+		action = "queue"
+		if hold.requeues <= MAX_REQUEUES then
+			hold.since = now
+		end
+	end
+	a.currBuyingBasicItem = nil
+	if a._recipeHoldLogAt == nil or now >= a._recipeHoldLogAt then
+		a._recipeHoldLogAt = now + 3
+		BuyLog(
+			"recipe-hold %s missing=%s action=%s requeues=%d for=%s gold=%d",
+			ShortItem(item),
+			ShortItem(missing),
+			action,
+			hold.requeues,
+			ShortItem(a.currBuyingItemInPurchaseList),
+			a:GetGold()
+		)
+	end
+	return true
+end
+-- A failed purchase removes the item from the queue only when the shop will never sell it
+-- (out of stock, disallowed, unknown name). Unlimited items report stock 0, so the old
+-- "stock < 1" rule also dropped items that only failed for gold or shop distance.
+local function FailureDropsItem(result, stock)
+	if PURCHASE_ITEM_OUT_OF_STOCK ~= nil then
+		return result == PURCHASE_ITEM_OUT_OF_STOCK
+			or result == PURCHASE_ITEM_DISALLOWED_ITEM
+			or result == PURCHASE_ITEM_INVALID_ITEM_NAME
+	end
+	return stock < 1 and result ~= 63
+end
 local function a3()
 	if a.lastItemToBuy ~= a.currBuyingBasicItem then
 		a.lastItemToBuy = a.currBuyingBasicItem
@@ -453,8 +771,19 @@ local function a3()
 		return
 	end
 	a.currBuyingBasicItem = a4
+	if HoldRecipe() then
+		return
+	end
 	if Y(a.currBuyingBasicItem) then
 		return
+	end
+	-- The price set at the top of a3 belongs to the item picked last think. In the opening
+	-- loop that was a 50-gold Branch, so a hero with 110 gold tried the wand recipe and failed.
+	if a.lastItemToBuy ~= a.currBuyingBasicItem then
+		a.lastItemToBuy = a.currBuyingBasicItem
+		a:SetNextItemPurchaseValue(GetItemCost(a.currBuyingBasicItem))
+		a.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(a.currBuyingBasicItem)
+		m = GetItemCost(a.currBuyingBasicItem)
 	end
 	local a5 = m
 	if
@@ -510,16 +839,26 @@ local function a3()
 		return
 	end
 	if a:GetGold() >= a5 and a:GetItemInSlot(14) == nil then
+		if DotaTime() < 20 and (a:DistanceFromFountain() > 1000 or c.GetEmptyInventoryAmount(a) < 1) and a:DistanceFromSecretShop() > 300 then
+			return
+		end
 		if n == nil then
 			n = a.theCourier
 		end
 		if a.SecretShop and n ~= nil and n:DistanceFromSecretShop() == 0 then
 			local a8 = n:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
 			if a8 == PURCHASE_ITEM_SUCCESS then
+				BuyLog(
+					"bought %s for=%s gold=%d left=%d courier=secret",
+					ShortItem(a.currBuyingBasicItem),
+					ShortItem(a.currBuyingItemInPurchaseList),
+					a:GetGold(),
+					math.max(0, #a.currBuyingBasicItemList - 1)
+				)
 				a1()
 				a.SecretShop = false
 				return
-			elseif GetItemStockCount(a.currBuyingBasicItem) < 1 then
+			elseif FailureDropsItem(a8, GetItemStockCount(a.currBuyingBasicItem)) then
 				a1()
 				a.SecretShop = false
 				return
@@ -529,12 +868,30 @@ local function a3()
 			a.SecretShop = true
 		else
 			if f.CountBackpackEmptySpace(a) > 0 or a:DistanceFromSecretShop() > 700 then
-				if a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem) == PURCHASE_ITEM_SUCCESS then
+				local result = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
+				if result == PURCHASE_ITEM_SUCCESS then
+					BuyLog(
+						"bought %s for=%s gold=%d left=%d",
+						ShortItem(a.currBuyingBasicItem),
+						ShortItem(a.currBuyingItemInPurchaseList),
+						a:GetGold(),
+						math.max(0, #a.currBuyingBasicItemList - 1)
+					)
 					a1()
 					a.SecretShop = false
 					return
 				else
-					if GetItemStockCount(a.currBuyingBasicItem) < 1 then
+					local stock = GetItemStockCount(a.currBuyingBasicItem)
+					if FailureDropsItem(result, stock) then
+						-- The item leaves the queue here. If it was an ingredient, the recipe guard puts it back.
+						BuyLog(
+							"dropped %s for=%s result=%s stock=%s gold=%d",
+							ShortItem(a.currBuyingBasicItem),
+							ShortItem(a.currBuyingItemInPurchaseList),
+							tostring(result),
+							tostring(stock),
+							a:GetGold()
+						)
 						a1()
 						a.SecretShop = false
 					else
@@ -554,6 +911,9 @@ local function aa()
 		return
 	end
 	a.currBuyingBasicItem = a4
+	if HoldRecipe() then
+		return
+	end
 	if Y(a.currBuyingBasicItem) then
 		return
 	end
@@ -591,11 +951,31 @@ local function aa()
 		return
 	end
 	if a:GetGold() >= a5 and a:GetItemInSlot(14) == nil then
-		if a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem) == PURCHASE_ITEM_SUCCESS then
+		if DotaTime() < 20 and (a:DistanceFromFountain() > 1000 or c.GetEmptyInventoryAmount(a) < 1) and a:DistanceFromSecretShop() > 300 then
+			return
+		end
+		local result = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
+		if result == PURCHASE_ITEM_SUCCESS then
+			BuyLog(
+				"bought %s for=%s gold=%d left=%d",
+				ShortItem(a.currBuyingBasicItem),
+				ShortItem(a.currBuyingItemInPurchaseList),
+				a:GetGold(),
+				math.max(0, #a.currBuyingBasicItemList - 1)
+			)
 			a1()
 			return
 		else
-			if GetItemStockCount(a.currBuyingBasicItem) < 1 then
+			local stock = GetItemStockCount(a.currBuyingBasicItem)
+			if FailureDropsItem(result, stock) then
+				BuyLog(
+					"dropped %s for=%s result=%s stock=%s gold=%d",
+					ShortItem(a.currBuyingBasicItem),
+					ShortItem(a.currBuyingItemInPurchaseList),
+					tostring(result),
+					tostring(stock),
+					a:GetGold()
+				)
 				a1()
 			else
 				local a9 = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
@@ -829,6 +1209,9 @@ function ItemPurchaseThink()
 	QueueRightclickCounters()
 	PromoteBackpackCounters()
 	PreferBloodGrenadeOverBranch()
+	if c.TryPickupRoshanDrop(a) then
+		return
+	end
 	local ax = GetDroppedItemList()
 	for O, ay in pairs(ax) do
 		if
@@ -840,14 +1223,11 @@ function ItemPurchaseThink()
 			and ay.item:GetName() ~= "item_famango"
 			and ay.item:GetName() ~= "item_great_famango"
 			and ay.item:GetName() ~= "item_greater_famango"
-			-- Forage finds (toadstool, nut, ringcap) are dropped on purpose.
-			and ay.item:GetName() ~= "item_foragers_health"
-			and ay.item:GetName() ~= "item_foragers_stats"
-			and ay.item:GetName() ~= "item_foragers_mana"
 			-- Never re-pick wards we just handed to supports (breaks drop↔pickup loops).
 			and ay.item:GetName() ~= "item_ward_observer"
 			and ay.item:GetName() ~= "item_ward_sentry"
 			and ay.item:GetName() ~= "item_ward_dispenser"
+			and c.RoshanClaimKind(ay.item:GetName()) == nil
 		then
 			local az = GetUnitToLocationDistance(a, ay.location)
 			if az > 200 and az < 1000 then
@@ -1020,8 +1400,9 @@ function ItemPurchaseThink()
 	local obsForHumans = e.GetPosition(a) >= 4 and ObserverStockForHumans()
 	if e.GetPosition(a) >= 4 and C == 0 then
 		local emptySlots = c.GetEmptyInventoryAmount(a)
-		-- Near shop/fountain, purchase can go to stash even if the bag is full.
-		local canReceive = emptySlots >= 1 or E <= 1600
+		-- A buy outside the fountain shop goes straight to the stash. During the
+		-- opening that sentry then sits there, so require a free slot and the shop.
+		local canReceive = emptySlots >= 1 and (w >= 20 or E <= 1000)
 		if canReceive then
 			local function tryBuyWard(itemName, maxCharges, reason)
 				if itemName == "item_ward_observer" and not obsForHumans then
@@ -1034,10 +1415,6 @@ function ItemPurchaseThink()
 					return false
 				end
 				if c.GetWardCharges(a, itemName) >= maxCharges then
-					return false
-				end
-				-- Prefer one ward purchase per think tick when only one free slot.
-				if emptySlots < 1 and E > 1600 then
 					return false
 				end
 				MatchTrace.Buy(a, itemName, reason)
@@ -1436,23 +1813,40 @@ function ItemPurchaseThink()
 					or name == "item_foragers_stats"
 					or name == "item_foragers_mana"
 				then
-					return name, it
+					return name, slot, it
 				end
 			end
 		end
-		return nil, nil
+		return nil, -1, nil
 	end
-	-- Vital Toadstool, Ironwood Nut, Tomo'kan Ringcap. They land in the backpack and are never used.
-	-- A drop order cancels the current action, so not while a fight is on.
+	-- Vital Toadstool, Ironwood Nut, Tomo'kan Ringcap. They land in the backpack, which cannot cast them.
+	-- Swap one into a main slot and eat it. A drop leaves it on the ground.
 	local forageCalm = #(a:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
 		and not a:WasRecentlyDamagedByAnyHero(3.0)
 	if forageCalm and w > (a._lastBackpackForage or -100) + 3.0 then
-		local forageName, forageItem = BackpackForage()
+		local forageName, forageSlot, forageItem = BackpackForage()
 		if forageItem ~= nil then
 			a._lastBackpackForage = w
-			MatchTrace.Buy(a, forageName, "drop backpack forage")
-			a:Action_DropItem(forageItem, a:GetLocation())
-			return
+			local dest = MainSlotForBackpackItem()
+			if dest == nil then
+				local cheap = c.GetMainInvLessValItemSlot(a)
+				if cheap ~= nil and cheap >= 0 then
+					dest = cheap
+				end
+			end
+			if dest ~= nil then
+				ForceSwap(forageSlot, dest)
+				local moved = a:GetItemInSlot(dest)
+				if moved ~= nil and not moved:IsNull() and moved:GetName() == forageName then
+					MatchTrace.Buy(a, forageName, "backpack forage swap and use")
+					if forageName == "item_foragers_stats" then
+						a:Action_UseAbility(moved)
+					else
+						a:Action_UseAbilityOnEntity(moved, a)
+					end
+				end
+				return
+			end
 		end
 	end
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
@@ -1570,6 +1964,9 @@ function ItemPurchaseThink()
 	if #a.purchaseListInReverseOrder == 0 then
 		a2()
 		a:SetNextItemPurchaseValue(0)
+		if w < 20 and E <= 1000 and (D or 0) == 0 then
+			a._openingShopDone = true
+		end
 		return
 	end
 	local b3 = {
@@ -1620,6 +2017,14 @@ function ItemPurchaseThink()
 		end
 		a.currBuyingBasicItemRefList = f.Deepcopy(a.currBuyingBasicItemList)
 		a.currBuyingRequiredCounts = L(a.currBuyingBasicItemRefList)
+		-- How many of each recipe item this build should end with: owned now plus the recipes in it.
+		a._recipeTarget = {}
+		for _, part in ipairs(a.currBuyingBasicItemRefList) do
+			if string.find(part, "item_recipe_", 1, true) then
+				local parent = string.gsub(part, "^item_recipe_", "item_")
+				a._recipeTarget[parent] = (a._recipeTarget[parent] or F(a, parent)) + 1
+			end
+		end
 		W()
 	end
 	if #a.currBuyingBasicItemList == 0 then
@@ -1687,10 +2092,37 @@ function ItemPurchaseThink()
 		if a.currBuyingBasicItem == nil then
 			a.currBuyingBasicItem = W()
 		else
-			if GetGameMode() == 23 then
-				aa()
+			local function buyOpening()
+				if GetGameMode() == 23 then
+					aa()
+				else
+					a3()
+				end
+			end
+			-- One think at the fountain buys the whole starting kit, before rune mode walks out.
+			if E <= 1000 and w < 20 then
+				for _ = 1, 8 do
+					if #a.currBuyingBasicItemList == 0 then
+						break
+					end
+					local gold = a:GetGold()
+					buyOpening()
+					if a:GetGold() >= gold then
+						break
+					end
+				end
 			else
-				a3()
+				buyOpening()
+			end
+		end
+		if w < 20 and E <= 1000 and (D or 0) == 0 then
+			local waiting = #a.currBuyingBasicItemList > 0
+			local cost = 0
+			if waiting and a.currBuyingBasicItem ~= nil then
+				cost = GetItemCost(a.currBuyingBasicItem) or 0
+			end
+			if not waiting or a:GetGold() < cost or c.GetEmptyInventoryAmount(a) < 1 then
+				a._openingShopDone = true
 			end
 		end
 	end

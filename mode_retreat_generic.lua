@@ -138,6 +138,24 @@ function GetDesireHelper()
 	if towerDiveRetreat > 0 then
 		return towerDiveRetreat
 	end
+	-- Summons and illusions chewing on us: spiderlings, golems, eidolons, illusions whose next
+	-- 5s of damage is a big share of our HP. This check existed but nothing called it, so a
+	-- hero stood in a spiderling swarm until its HP alone was low enough to retreat.
+	local unitRun = a.GetUnitDesire(1000)
+	if unitRun > 0 then
+		if DotaTime() >= (c._unitRunLogAt or -999) then
+			c._unitRunLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-RETREAT] t=%.0f %s summons desire=%.2f by=%s hp=%.2f",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				unitRun,
+				tostring(c._unitRunBy),
+				d
+			))
+		end
+		return unitRun
+	end
 	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
 	do
 		local alliesNearby = b.GetAllyCount(c, 1400)
@@ -612,14 +630,21 @@ function a.GetUnitDesire(au)
 			local aw = av:GetUnitName()
 			local ax = 0
 			local ay = b.IsChasingTarget(av, c) or av:GetAttackTarget() == c
-			if not av:HasModifier("modifier_arc_warden_tempest_double") and b.IsSuspiciousIllusion(av) then
+			-- Only a real illusion. The suspicion check alone matched real heroes (Razor, Chaos Knight).
+			if
+				not av:HasModifier("modifier_arc_warden_tempest_double")
+				and b.IsSuspiciousIllusion(av)
+				and av:IsIllusion()
+			then
 				local az = b.GetSameUnitType(c, 1600, aw, false)
 				ax = b.GetUnitListTotalAttackDamage(c, az, 5.0)
 				local aA = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aA / g > 0.5 then
 					if aA / g > 0.65 then
+						c._unitRunBy = aw
 						return 0.9
 					else
+						c._unitRunBy = aw
 						return 0.75
 					end
 				end
@@ -628,13 +653,16 @@ function a.GetUnitDesire(au)
 				ax = b.GetUnitListTotalAttackDamage(c, aB, 5.0)
 				local aC = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aC / g > 0.45 then
+					c._unitRunBy = aw
 					return 0.9
 				end
-			elseif string.find(aw, "spiderlings") and ay and not b.IsInTeamFight(c, 1600) then
+			elseif string.find(aw, "broodmother_spider") and ay and not b.IsInTeamFight(c, 1600) then
+				-- npc_dota_broodmother_spiderling / _spiderite. "spiderlings" (plural) never matched.
 				local aD = b.GetSameUnitType(c, 1600, aw, true)
 				ax = b.GetUnitListTotalAttackDamage(c, aD, 5.0)
 				local aE = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aE / g > 0.25 then
+					c._unitRunBy = aw
 					return 0.75
 				end
 			elseif string.find(aw, "eidolon") and ay and not b.IsInTeamFight(c, 1600) then
@@ -642,6 +670,7 @@ function a.GetUnitDesire(au)
 				ax = b.GetUnitListTotalAttackDamage(c, aF, 5.0)
 				local aG = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aG / g > 0.25 then
+					c._unitRunBy = aw
 					return 0.9
 				end
 			end

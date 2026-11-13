@@ -111,6 +111,18 @@ function a.SkillsComplement()
 	if b.snowballHeroRetreat and q:IsHidden() and DotaTime() > (b._snowballRetreatAt or -99) + 1.5 then
 		b.snowballHeroRetreat = false
 	end
+	-- Launch as soon as the snowball is up, before the busy-casting check and every other
+	-- spell. Checked after them, it could wait out the whole 3s windup while engaging. Only an
+	-- escape snowball (snowballHeroRetreat) keeps rolling, to stay out of reach.
+	if a.ConsiderLaunchSnowball() > 0 and not b:IsStunned() and not b:IsHexed() and not b:IsSilenced() then
+		pcall(print, string.format(
+			"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
+			DotaTime(),
+			DotaTime() - (b._snowballCastAt or DotaTime())
+		))
+		b:Action_UseAbility(q)
+		return
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -134,15 +146,10 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(o, w)
 		return
 	end
-	z = a.ConsiderLaunchSnowball()
-	if z > 0 then
-		b:Action_UseAbility(q)
-		b.snowballHeroRetreat = false
-		return
-	end
 	x, y = a.ConsiderSnowball()
 	if x > 0 then
 		b:Action_UseAbilityOnEntity(p, y)
+		b._snowballCastAt = DotaTime()
 		return
 	end
 	B, C = a.ConsiderWalrusKick()

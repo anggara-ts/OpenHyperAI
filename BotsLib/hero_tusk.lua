@@ -111,6 +111,13 @@ function a.SkillsComplement()
 	if b.snowballHeroRetreat and q:IsHidden() and DotaTime() > (b._snowballRetreatAt or -99) + 1.5 then
 		b.snowballHeroRetreat = false
 	end
+	-- Walrus Punch is an autocast attack spell. With autocast on, any right-click on a hero
+	-- punches without Tag Team first (7:04 on Mirana, no Tag Team, no punch decision of ours).
+	-- Keep it off so every Punch goes through ConsiderWalrusPunch and Tag Team leads.
+	if t ~= nil and not t:IsNull() and t:IsTrained() and t:GetAutoCastState() then
+		pcall(print, string.format("[OHA-TUSK] t=%.0f punch-autocast was=on turned=off", DotaTime()))
+		t:ToggleAutoCast()
+	end
 	-- Launch as soon as the snowball is up, before the busy-casting check and every other
 	-- spell. Checked after them, it could wait out the whole 3s windup while engaging. Only an
 	-- escape snowball (snowballHeroRetreat) keeps rolling, to stay out of reach.

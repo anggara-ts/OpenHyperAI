@@ -14,11 +14,15 @@ local l = c.Skill.GetRandomBuild(k)
 local m = c.Skill.GetTalentBuild(j)
 local n = {}
 n["pos_4"] = {
-	"item_double_tango",
-	"item_double_branches",
+	-- 600 starting gold: Soul Ring parts (455) + Tango (90) + Blood Grenade (50) = 595.
+	-- The recipe (350) finishes Soul Ring after Boots, in place of Magic Wand.
+	"item_tango",
 	"item_blood_grenade",
+	"item_ring_of_protection",
+	"item_gauntlets",
+	"item_gauntlets",
 	"item_boots",
-	"item_magic_wand",
+	"item_soul_ring",
 	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
@@ -31,11 +35,15 @@ n["pos_4"] = {
 	"item_ultimate_scepter_2",
 }
 n["pos_5"] = {
-	"item_double_tango",
-	"item_double_branches",
+	-- 600 starting gold: Soul Ring parts (455) + Tango (90) + Blood Grenade (50) = 595.
+	-- The recipe (350) finishes Soul Ring after Boots, in place of Magic Wand.
+	"item_tango",
 	"item_blood_grenade",
+	"item_ring_of_protection",
+	"item_gauntlets",
+	"item_gauntlets",
 	"item_boots",
-	"item_magic_wand",
+	"item_soul_ring",
 	"item_tranquil_boots",
 	"item_glimmer_cape",
 	"item_pipe",
@@ -48,10 +56,14 @@ n["pos_5"] = {
 	"item_ultimate_scepter_2",
 }
 n["pos_3"] = {
-	"item_double_tango",
-	"item_double_branches",
+	-- 600 starting gold: Soul Ring parts (455) + Tango (90) + Branches (55) = 600.
+	"item_tango",
+	"item_branches",
+	"item_ring_of_protection",
+	"item_gauntlets",
+	"item_gauntlets",
 	"item_boots",
-	"item_magic_wand",
+	"item_soul_ring",
 	"item_tranquil_boots",
 	"item_glimmer_cape",
 	"item_kaya",

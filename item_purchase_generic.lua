@@ -451,13 +451,30 @@ local function PreferBloodGrenadeOverBranch()
 	if grenade == nil then
 		return
 	end
+	-- A dropped item can be picked straight back up by the engine (seen with a Clarity).
+	-- Drop it once; if it comes back, only sell it at base from then on.
+	if a._grenadeDroppedAt ~= nil and DotaTime() - a._grenadeDroppedAt < 3 then
+		return
+	end
+	if a._grenadeDroppedAt ~= nil and not a._grenadeRepickLogged then
+		a._grenadeRepickLogged = true
+		pcall(print, string.format(
+			"[OHA-ITEM] t=%.0f %s grenade-repicked after=%.0fs",
+			DotaTime(),
+			(string.gsub(b, "npc_dota_hero_", "")),
+			DotaTime() - a._grenadeDroppedAt
+		))
+	end
 	local how
 	if a:DistanceFromFountain() <= 1600 then
 		a:ActionImmediate_SellItem(grenade)
 		how = "sold"
-	else
+	elseif a._grenadeDroppedAt == nil then
 		a:Action_DropItem(grenade, a:GetLocation())
+		a._grenadeDroppedAt = DotaTime()
 		how = "dropped"
+	else
+		return
 	end
 	if DotaTime() >= (a._grenadeDisposeLogAt or -999) then
 		a._grenadeDisposeLogAt = DotaTime() + 10

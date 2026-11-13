@@ -1559,9 +1559,19 @@ function ItemPurchaseThink()
 		and x < 5
 		and y >= GetItemCost("item_blood_grenade")
 		and c.GetEmptyInventoryAmount(a) >= 3
+		-- The 3 above counts the backpack. A grenade that arrives into a full main inventory
+		-- goes to the backpack and cannot be thrown (Lina at 2:58). Need a free main slot, two
+		-- away from the fountain since the courier brings build parts along with it.
+		and c.GetEmptyNonBackpackInventoryAmount(a) >= (a:DistanceFromFountain() <= 1600 and 1 or 2)
 		and c.GetItemCharges(a, "item_blood_grenade") == 0
 		and D > 0
 	then
+		pcall(print, string.format(
+			"[OHA-BUY] t=%.0f %s bought blood_grenade for=rebuy mainFree=%d",
+			DotaTime(),
+			(string.gsub(b, "npc_dota_hero_", "")),
+			c.GetEmptyNonBackpackInventoryAmount(a)
+		))
 		a:ActionImmediate_PurchaseItem("item_blood_grenade")
 	end
 	if not a.hasBuyShard and GetItemStockCount("item_aghanims_shard") > 0 and y >= 1400 then

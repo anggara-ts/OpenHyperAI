@@ -646,6 +646,9 @@ local x = {
 	["item_priest_outfit"] = "item_arcane_boots",
 }
 b["item_double_branches"] = { "item_branches", "item_branches" }
+-- Two Gauntlets as one build entry. Two separate "item_gauntlets" entries do not work: the
+-- second reads as done as soon as the first is owned.
+b["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
 b["item_double_tango"] = { "item_tango", "item_tango" }
 b["item_double_clarity"] = { "item_clarity", "item_clarity" }
 b["item_double_flask"] = { "item_flask", "item_flask" }
@@ -1169,23 +1172,30 @@ function b.IsItemInTargetHero(y, E)
 	local H = E:FindItemSlot(y)
 	return H >= 0 and (H <= 8 or b.IsTopItem(y))
 end
-function b.GetBasicItems(I)
+-- Basic items still to buy for a list. Owned copies are counted, and each owned copy covers
+-- one entry only, so a recipe that needs two of a part (Soul Ring: two Gauntlets) buys the
+-- second one. The old single "last repeat item" flag was shared with every other call and
+-- often lost, so a Techies with one Gauntlets got only the Soul Ring recipe.
+function b.GetBasicItems(I, owned)
 	local E = GetBot()
+	owned = owned or {}
 	local J = {}
 	for A, i in pairs(I) do
-		local K = b.IsItemInHero(i)
-		if K == false or i == E.sLastRepeatItem then
-			if b[i] ~= nil then
-				for h, L in pairs(b.GetBasicItems(b[i])) do
-					J[#J + 1] = L
-				end
-			elseif b[i] == nil then
-				J[#J + 1] = i
+		if owned[i] == nil then
+			if b.IsItemInHero(i) then
+				owned[i] = math.max(1, b.GetItemCountInSolt(E, i, 0, 8))
+			else
+				owned[i] = 0
+			end
+		end
+		if owned[i] > 0 then
+			owned[i] = owned[i] - 1
+		elseif b[i] ~= nil then
+			for h, L in pairs(b.GetBasicItems(b[i], owned)) do
+				J[#J + 1] = L
 			end
 		else
-			if b.GetItemCount(GetBot(), i) <= 1 then
-				E.sLastRepeatItem = i
-			end
+			J[#J + 1] = i
 		end
 	end
 	return J

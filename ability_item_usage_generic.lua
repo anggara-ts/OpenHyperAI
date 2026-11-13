@@ -6937,6 +6937,65 @@ local function f8()
 		return
 	end
 end
+-- [OHA-STUCK]: a live hero away from the fountain that has moved less than 300 in 8s while not
+-- attacking, casting or channeling. Catches back-and-forth between two orders too, which the
+-- idle nudge in global_overrides misses (the hero is never "idle"). At most every 10s per bot.
+local STUCK_MODE_NAMES = nil
+local function StuckModeName(mode)
+	if STUCK_MODE_NAMES == nil then
+		STUCK_MODE_NAMES = {}
+		for name, id in pairs(_G) do
+			if type(name) == "string" and type(id) == "number" and string.sub(name, 1, 9) == "BOT_MODE_" then
+				STUCK_MODE_NAMES[id] = string.lower(string.sub(name, 10))
+			end
+		end
+	end
+	return STUCK_MODE_NAMES[mode] or tostring(mode)
+end
+function a.LogStuck()
+	if not b:IsAlive() or b:IsChanneling() or b:IsCastingAbility() or b:DistanceFromFountain() < 1200 then
+		b._stuckTrail = nil
+		return
+	end
+	local now = DotaTime()
+	if now < (b._stuckSampleAt or -999) then
+		return
+	end
+	b._stuckSampleAt = now + 1
+	local trail = b._stuckTrail or {}
+	b._stuckTrail = trail
+	trail[#trail + 1] = { t = now, loc = b:GetLocation() }
+	while #trail > 0 and trail[1].t < now - 8.5 do
+		table.remove(trail, 1)
+	end
+	if #trail < 8 or now < (b._stuckLogAt or -999) then
+		return
+	end
+	local attacking = b:GetAttackTarget() ~= nil
+	local moved = f.GetLocationToLocationDistance(trail[1].loc, b:GetLocation())
+	local path = 0
+	for k = 2, #trail do
+		path = path + f.GetLocationToLocationDistance(trail[k - 1].loc, trail[k].loc)
+	end
+	if moved < 300 and not attacking then
+		b._stuckLogAt = now + 10
+		local loc = b:GetLocation()
+		pcall(print, string.format(
+			"[OHA-STUCK] t=%.0f %s mode=%s/%.2f action=%s moved=%d path=%d at=%.0f,%.0f hp=%.2f enemies=%d",
+			now,
+			(string.gsub(c, "npc_dota_hero_", "")),
+			StuckModeName(b:GetActiveMode()),
+			b:GetActiveModeDesire(),
+			tostring(b:GetCurrentActionType()),
+			math.floor(moved),
+			math.floor(path),
+			loc.x,
+			loc.y,
+			f.GetHP(b),
+			#(f.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {})
+		))
+	end
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -6949,6 +7008,7 @@ function ItemUsageThink()
 	end
 	MatchTrace.Tick(b)
 	LogHumanPing()
+	pcall(a.LogStuck)
 	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has
 	-- to launch it). Spells only, no items. The return below used to skip it entirely, so the
 	-- snowball always rolled its full duration.

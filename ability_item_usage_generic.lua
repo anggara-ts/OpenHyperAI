@@ -697,7 +697,7 @@ local function aD()
 			and (aA == COURIER_STATE_AT_BASE or aA == COURIER_STATE_IDLE and aF:DistanceFromFountain() < 800)
 		then
 			local aN = a.GetNumStashItem(b)
-			if aN > 0 then
+			if aN > 0 and aH >= 20 then
 				if
 					b.currBuyingBasicItemList ~= nil and #b.currBuyingBasicItemList == 0
 					or b.currBuyingBasicItem ~= nil
@@ -735,6 +735,7 @@ local function aD()
 		end
 		if
 			aI
+			and aH >= 20
 			and b:GetCourierValue() > 0
 			and b:GetStashValue() < 100
 			and (not a.IsInvFull(b) or a.GetNumStashItem(b) == 0 and b.currBuyingBasicItemList ~= nil and #b.currBuyingBasicItemList == 0)
@@ -928,7 +929,7 @@ local function bg()
 		b8 = 0
 	end
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
-	-- Forage in the main inventory is eaten immediately. Backpack copies are dropped elsewhere.
+	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
 	for forageSlot = 0, 5 do
 		local forage = b:GetItemInSlot(forageSlot)
 		if forage ~= nil and not forage:IsNull() and f.CanCastAbility(forage) then
@@ -974,12 +975,52 @@ local function bg()
 							#brAllies
 						)
 					)
+					if string.find(bn, "tpscroll", 1, true) or string.find(bn, "travel_boots", 1, true) then
+						a.LogTeleport(bn, bp, brReason, bf)
+					end
 					a.SetUseItem(bm, bp, bq)
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-TP]: every teleport with its reason, where from and to, and which lane the target is
+-- on next to the lane this bot is laning in (by position) and the engine's assignment.
+function a.LogTeleport(item, target, reason, mode)
+	if target == nil or type(target) ~= "userdata" and type(target) ~= "table" then
+		return
+	end
+	local ok, tx, ty = pcall(function()
+		return target.x, target.y
+	end)
+	if not ok or type(tx) ~= "number" then
+		return
+	end
+	local names = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
+	local nearestLane, nearestDist = nil, math.huge
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local along = GetAmountAlongLane(lane, target)
+		if along ~= nil and along.distance < nearestDist then
+			nearestLane, nearestDist = lane, along.distance
+		end
+	end
+	local here = b:GetLocation()
+	pcall(print, string.format(
+		"[OHA-TP] t=%.0f %s %s why=%s mode=%s posLane=%s engineLane=%s from=%.0f,%.0f to=%.0f,%.0f targetLane=%s",
+		DotaTime(),
+		(string.gsub(c, "npc_dota_hero_", "")),
+		(string.gsub(item, "^item_", "")),
+		tostring(reason),
+		tostring(mode),
+		tostring(names[a.GetLaneByPosition(b)]),
+		tostring(names[b:GetAssignedLane()]),
+		here.x,
+		here.y,
+		tx,
+		ty,
+		tostring(names[nearestLane])
+	))
 end
 function a.SetUseItem(bm, bp, bq)
 	if bm == nil or bm:IsNull() then
@@ -3998,6 +4039,18 @@ a.ConsiderItemDesire["item_tango_single"] = function(bm)
 		local dj = b:GetNearbyTowers(1400, true)
 		local dk = dj[1]
 		local cA = f.GetHP(b)
+		if b:GetActiveMode() == BOT_MODE_RETREAT and cA > 0.35 and cA < 0.95 and dg ~= nil then
+			local dm = GetTreeLocation(dg)
+			if
+				IsLocationVisible(dm)
+				and IsLocationPassable(dm)
+				and (#dj == 0 or GetUnitToLocationDistance(dk, dm) > 920)
+			then
+				hEffectTarget = dg
+				bw = "retreat tango"
+				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+			end
+		end
 		local dl = #dh == 0 or di ~= nil and not f.IsInRange(b, di, 400)
 		if dg ~= nil and bQ >= 350 and dl then
 			local dm = GetTreeLocation(dg)
@@ -4156,14 +4209,14 @@ function a.GetLaningTPLocation(b, dt, botLocation)
 	end
 	local dy = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
 	if dv then
-		log(
-			"[TP-DIAG laning] %s pos=%s assigned=%s chose=%s lan=%s",
+		pcall(print, string.format(
+			"[OHA-TP] diag-laning %s pos=%s assigned=%s chose=%s lan=%s",
 			b:GetUnitName(),
 			tostring(f.GetPosition(b)),
 			tostring(dy[b:GetAssignedLane()] or b:GetAssignedLane()),
 			tostring(dy[du] or du),
 			tostring(IsLanMode and IsLanMode())
-		)
+		))
 	end
 	return GetLaneFrontLocation(d, du, 100), dv
 end
@@ -4366,15 +4419,15 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		end
 		local dS = GetLaneFrontLocation(GetTeam(), dO, -500)
 		local dT = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
-		log(
-			"[TP-DIAG fountain] %s pos=%s assigned=%s chose=%s mode=%s lan=%s",
+		pcall(print, string.format(
+			"[OHA-TP] diag-fountain %s pos=%s assigned=%s chose=%s mode=%s lan=%s",
 			c,
 			tostring(f.GetPosition(b)),
 			tostring(dT[b:GetAssignedLane()] or b:GetAssignedLane()),
 			tostring(dT[dO] or dO),
 			tostring(bf),
 			tostring(IsLanMode and IsLanMode())
-		)
+		))
 		if dS ~= nil and GetUnitToLocationDistance(b, dS) > 3500 then
 			local dU = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
 			local dV = f.GetLastSeenEnemiesNearLoc(dS, 1600)
@@ -4550,6 +4603,26 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		and b:GetLevel() >= 3
 		and not b:HasModifier("modifier_arc_warden_tempest_double")
 	then
+		local function HasTangoToEat()
+			if b:HasModifier("modifier_tango_heal") then
+				return true
+			end
+			for _, name in pairs({ "item_tango", "item_tango_single" }) do
+				local slot = b:FindItemSlot(name)
+				if slot >= 0 and slot <= 8 then
+					local it = b:GetItemInSlot(slot)
+					if it ~= nil then
+						local charges = it:GetCurrentCharges()
+						if charges == nil or charges > 0 then
+							return true
+						end
+					end
+				end
+			end
+			return false
+		end
+		-- Above half health, a tango refills him. A fountain TP spends the scroll for nothing.
+		local tangoInstead = bR > 0.5 and HasTangoToEat()
 		if
 			bR < 0.19
 			and (b:WasRecentlyDamagedByAnyHero(8.0) or bR < 0.12)
@@ -4585,6 +4658,7 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			and ax <= (bR < 0.4 and 2 or 3)
 			and ay <= 2
 			and dN == nil
+			and not tangoInstead
 			and not b:HasModifier("modifier_tango_heal")
 			and not b:HasModifier("modifier_flask_healing")
 			and not b:HasModifier("modifier_item_urn_heal")
@@ -4623,6 +4697,7 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			and not b:HasModifier("modifier_juggernaut_healing_ward_heal")
 			and not b:HasModifier("modifier_bottle_regeneration")
 			and not b:HasModifier("modifier_tango_heal")
+			and not tangoInstead
 			and b:DistanceFromFountain() > dt - 600
 		then
 			dL = f.GetTeamFountain()
@@ -5077,12 +5152,14 @@ a.ConsiderItemDesire["item_ash_legion_shield"] = function(bm)
 				return BOT_ACTION_DESIRE_HIGH, b, "none", nil
 			end
 			if
-				string.find(eo, "spiderlings")
-				or string.find(eo, "forge_spirit")
+				-- Unit names are singular: npc_dota_broodmother_spiderling, npc_dota_invoker_forged_spirit,
+				-- npc_dota_visage_familiar. The plural / "forge_spirit" spellings never matched.
+				string.find(eo, "broodmother_spider")
+				or string.find(eo, "forged_spirit")
 				or string.find(eo, "golem")
 				or string.find(eo, "boar")
 				or string.find(eo, "furion_treant")
-				or string.find(eo, "familiars")
+				or string.find(eo, "familiar")
 				or aR:IsDominated()
 				or aR:HasModifier("modifier_chen_holy_persuasion")
 			then
@@ -5719,6 +5796,34 @@ a.ConsiderItemDesire["item_blood_grenade"] = function(aT)
 					return BOT_ACTION_DESIRE_HIGH, eq:GetLocation(), "ground", "Blood Grenade"
 				end
 			end
+		end
+	end
+	-- An early fight item. In any fight, or from 8:00 on anywhere, throw it at an enemy hero in
+	-- range instead of waiting for a kill. It otherwise sat in a slot until the game pushed it
+	-- into the backpack (bot swaps do not take effect) and it was never thrown.
+	local fighting = f.IsGoingOnSomeone(b) or f.IsInTeamFight(b, 1200)
+	if (fighting or DotaTime() >= 8 * 60) and eG > eH * 2 then
+		local best, bestCount = nil, 0
+		for aX, eq in pairs(nEnemyHeroes) do
+			if f.IsValidHero(eq) and f.CanCastOnNonMagicImmune(eq) and not f.IsSuspiciousIllusion(eq) then
+				local group = f.GetEnemiesNearLoc(eq:GetLocation(), ek) or {}
+				if best == nil or #group > bestCount then
+					best, bestCount = eq, #group
+				end
+			end
+		end
+		if best ~= nil then
+			local group = f.GetEnemiesNearLoc(best:GetLocation(), ek)
+			local spot = (group ~= nil and #group >= 2) and f.GetCenterOfUnits(group) or best:GetLocation()
+			pcall(print, string.format(
+				"[OHA-ITEM] t=%.0f %s grenade-throw why=%s target=%s group=%d",
+				DotaTime(),
+				(string.gsub(c, "npc_dota_hero_", "")),
+				fighting and "fight" or "late",
+				(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
+				bestCount
+			))
+			return BOT_ACTION_DESIRE_HIGH, spot, "ground", "Blood Grenade"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

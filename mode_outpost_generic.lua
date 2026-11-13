@@ -276,7 +276,7 @@ function ThinkIndividualRoaming()
 					end
 				end
 				if h ~= nil and not h:IsNull() and h:IsFullyCastable() then
-					log("[TP] %s t=%.0f ROAM tp to fountain", c:GetUnitName(), DotaTime())
+					pcall(print, string.format("[OHA-TP] outpost-mode %s t=%.0f ROAM tp to fountain", c:GetUnitName(), DotaTime()))
 					c:Action_UseAbilityOnLocation(h, a.GetTeamFountain())
 					return true
 				end
@@ -729,7 +729,7 @@ function ThinkGeneralRoaming()
 	if m and n ~= nil then
 		local aV = a.Utils.GetItemFromFullInventory(c, "item_tpscroll")
 		if a.CanCastAbility(aV) then
-			log("[TP] %s t=%.0f ROAM tp to lane at (%.0f,%.0f)", c:GetUnitName(), DotaTime(), n.x, n.y)
+			pcall(print, string.format("[OHA-TP] outpost-mode %s t=%.0f ROAM tp to lane at (%.0f,%.0f)", c:GetUnitName(), DotaTime(), n.x, n.y))
 			c:Action_UseAbilityOnLocation(aV, n)
 			m = false
 			return true
@@ -925,12 +925,30 @@ function SetupTwinGates()
 		end
 	end
 end
+-- The lane this bot lanes in, by position (Radiant pos 3/4 top, Dire pos 3/4 bot), the same
+-- mapping laning and the laning teleport use. The engine assignment can differ, which sent a
+-- support walking or teleporting to the wrong lane.
+local function PositionLane()
+	if IsLanMode and IsLanMode() then
+		return c:GetAssignedLane()
+	end
+	local pos = a.GetPosition(c)
+	local radiant = GetTeam() == TEAM_RADIANT
+	if pos == 2 then
+		return LANE_MID
+	elseif pos == 1 or pos == 5 then
+		return radiant and LANE_BOT or LANE_TOP
+	elseif pos == 3 or pos == 4 then
+		return radiant and LANE_TOP or LANE_BOT
+	end
+	return c:GetAssignedLane()
+end
 function ThinkActualGankingInLanes()
 	if s ~= nil then
 		local b4 = a.GetEnemyCountInLane(s)
 		if b4 == 0 then
 			s = nil
-			c:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), c:GetAssignedLane(), 0))
+			c:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), PositionLane(), 0))
 			return true
 		end
 		local b5 = GetLaneFrontLocation(GetTeam(), s, -300)
@@ -1018,7 +1036,7 @@ function CheckLaneToGank(b8)
 				if bj > 4000 and not a.HasItem(c, "item_tpscroll") then
 					goto bk
 				end
-				if be[1] == c:GetAssignedLane() then
+				if be[1] == PositionLane() then
 					goto bk
 				end
 				local bl = bi < 2000
@@ -1336,12 +1354,28 @@ function ConsiderGeneralRoamingInConditions()
 		return 0.91
 	end
 	if a.IsInLaningPhase() then
+		-- A Tango heals over 16s a charge. Under 15% the hero sat in lane nibbling for a minute
+		-- or more; walking or teleporting home is faster and safer. Above that, a healing item
+		-- in the bag still keeps the hero in lane.
+		local critical = S < 0.15
 		if
 			not c:WasRecentlyDamagedByAnyHero(1.5)
-			and not a.HasHealingItem(c)
+			-- P: already on the way home. Regen past 15% must not turn the hero back mid-walk.
+			and (P or critical or not a.HasHealingItem(c))
 			and d ~= "npc_dota_hero_huskar"
 			and (P and not IsInHealthyState() or (S < 0.22 or S < 0.3 and a.GetMP(c) < 0.22))
 		then
+			if not P then
+				pcall(print, string.format(
+					"[OHA-LANE] t=%.0f %s go-home hp=%.2f mp=%.2f healItem=%s critical=%s",
+					DotaTime(),
+					(string.gsub(d, "npc_dota_hero_", "")),
+					S,
+					a.GetMP(c),
+					tostring(a.HasHealingItem(c)),
+					tostring(critical)
+				))
+			end
 			P = true
 			return BOT_ACTION_DESIRE_ABSOLUTE * 1.5
 		end

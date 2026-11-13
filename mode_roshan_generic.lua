@@ -63,21 +63,57 @@ local function v(w)
 end
 local B = 0
 local C = 0
+local function RoshLog(fmt, ...)
+	pcall(print, string.format(
+		"[OHA-ROSH] t=%.0f %s %s " .. fmt,
+		DotaTime(),
+		GetTeam() == TEAM_DIRE and "dire" or "radiant",
+		(string.gsub(a:GetUnitName(), "npc_dota_hero_", "")),
+		...
+	))
+end
+-- One line when this bot's Roshan desire turns on or off, with the reason.
+local function LogDesireChange(final)
+	local on = final >= 0.3
+	if on == (a._roshOn == true) then
+		return
+	end
+	a._roshOn = on
+	local M = c.GetCurrentRoshanLocation()
+	RoshLog(
+		"%s desire=%.2f why=%s mode=%s dist=%d allies=%d enemies=%d fit=%s",
+		on and "call" or "drop",
+		final,
+		tostring(a._roshWhy),
+		tostring(a:GetActiveMode()),
+		M ~= nil and math.floor(GetUnitToLocationDistance(a, M)) or -1,
+		c.GetNumOfAliveHeroes(false),
+		c.GetNumOfAliveHeroes(true),
+		tostring(a._roshFitWhy)
+	)
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	local D = GetDesireHelper()
+	local D, gatherCall = GetDesireHelper()
+	local final = v(D)
+	-- A live gather has to beat farm and a one-kill push. VERYHIGH in this engine is ~0.6,
+	-- so clamping the call there is why the rest of the team never leaves the lane.
+	if gatherCall and final >= 0.9 then
+		final = 0.96
+	else
+		final = Clamp(final, 0, BOT_MODE_DESIRE_VERYHIGH)
+	end
 	if DotaTime() > 3 * 60 and DotaTime() > C + 15 then
 		C = DotaTime()
-		local E = Clamp(v(D), 0, BOT_MODE_DESIRE_VERYHIGH)
 		log(
 			string.format(
 				"[ROSH] t=%.0f %s raw=%.2f final=%.2f alive=%s dps=%s kill=%s hg=%s eA=%d aA=%d",
 				DotaTime(),
 				string.gsub(a:GetUnitName(), "npc_dota_hero_", ""),
 				D,
-				E,
+				final,
 				tostring(c.IsRoshanAlive()),
 				tostring(j),
 				tostring(f),
@@ -87,9 +123,9 @@ function GetDesire()
 			)
 		)
 	end
-	D = v(D)
+	LogDesireChange(final)
 	-- Do not shout here — desire alone is not a commit (caused "Let's Rosh" then nothing).
-	return Clamp(D, 0, BOT_MODE_DESIRE_VERYHIGH)
+	return final
 end
 local function AllyActiveMode(hero)
 	local ok, mode = pcall(function()
@@ -100,27 +136,66 @@ local function AllyActiveMode(hero)
 	end
 	return nil
 end
--- present: allies already at the rally. nearby: living allies the call should wait on.
--- pending: furthest teammate who is in Roshan mode and has not reached the rally yet.
-local function RoshanGather(rally)
-	local present, nearby, pending = 0, 0, 0
+-- A low hero (except Huskar) and anyone already defending the ancient are not part of the call.
+local function AllyShouldJoin(ally)
+	if ally == nil or not ally:IsAlive() or not ally:IsHero() or ally:IsIllusion() then
+		return false
+	end
+	if ally:GetUnitName() ~= "npc_dota_hero_huskar" and c.GetHP(ally) < 0.45 then
+		return false
+	end
+	local ancient = GetAncient(GetTeam())
+	if ancient ~= nil and GetUnitToUnitDistance(ally, ancient) < 2500 then
+		if c.Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2500) >= 1 then
+			return false
+		end
+	end
+	return true
+end
+-- grouped: joiners already at the pit or the fountain-side rally.
+-- pending: furthest joiner who switched to Roshan and is still outside that ring.
+-- required: living allies this call is supposed to wait for.
+local function RoshanGather(pit)
+	local grouped, pending, required = 0, 0, 0
 	local players = GetTeamPlayers(GetTeam())
 	for i = 1, #players do
 		local ally = GetTeamMember(i)
-		if ally ~= nil and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
-			local dist = GetUnitToLocationDistance(ally, rally)
-			if dist <= 1000 then
-				present = present + 1
-			end
-			if dist <= 4500 then
-				nearby = nearby + 1
-			end
-			if ally ~= a and dist > 1000 and AllyActiveMode(ally) == BOT_MODE_ROSHAN and dist > pending then
+		if AllyShouldJoin(ally) then
+			required = required + 1
+			local dist = GetUnitToLocationDistance(ally, pit)
+			if dist <= 1800 then
+				grouped = grouped + 1
+			elseif ally ~= a and AllyActiveMode(ally) == BOT_MODE_ROSHAN and dist > pending then
 				pending = dist
 			end
 		end
 	end
-	return present, nearby, pending
+	return grouped, pending, required
+end
+local function GatherMinimum()
+	if c.IsLateGame() then
+		return 2
+	elseif c.IsMidGame() then
+		return 3
+	end
+	return 4
+end
+-- Someone is already standing on the call. That is what pulls the rest of the team.
+local function TeamRoshanCall(pit)
+	local rally = c.AdjustLocationWithOffsetTowardsFountain(pit, 900)
+	local players = GetTeamPlayers(GetTeam())
+	for i = 1, #players do
+		local ally = GetTeamMember(i)
+		if ally ~= nil and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
+			if GetUnitToLocationDistance(ally, rally) <= 2800 then
+				local mode = ally == a and a:GetActiveMode() or AllyActiveMode(ally)
+				if mode == BOT_MODE_ROSHAN then
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 local function G()
 	local H = c.Utils.GameStates.roshHandle
@@ -139,12 +214,34 @@ local function G()
 end
 -- Safe to start/continue Roshan: numbers + pit not contested.
 -- finishing=true allows a looser gate when Roshan is already low and allies are in the pit.
+-- Enemies that can reach the pit now. One who just respawned is still walking back
+-- from the fountain, so the numbers a kill bought last a little past the respawn.
+local function ContestingEnemies(M)
+	local alive = c.GetNumOfAliveHeroes(true)
+	local grace = KillWindow.TransitGrace(M)
+	local transit = KillWindow.EnemiesInTransit(grace)
+	return math.max(0, alive - transit), transit
+end
+-- Numbers rule for a fresh take. Returns ok, why.
+local function FreshTakeNumbers(alliesAlive, enemiesAlive, missing)
+	if enemiesAlive >= alliesAlive then
+		return false, string.format("even(%dv%d)", alliesAlive, enemiesAlive)
+	end
+	if enemiesAlive >= 4 and missing < 2 then
+		return false, string.format("enemies4(missing=%d)", missing)
+	end
+	if enemiesAlive >= 3 and alliesAlive - enemiesAlive < 1 and missing < 2 then
+		return false, string.format("enemies3(missing=%d)", missing)
+	end
+	return true, "ok"
+end
+-- Safe to start/continue Roshan: numbers + pit not contested. Returns ok, why.
 local function IsRoshanEngageSafe(M, finishing)
 	if M == nil then
-		return false
+		return false, "no-pit"
 	end
 	local alliesAlive = c.GetNumOfAliveHeroes(false)
-	local enemiesAlive = c.GetNumOfAliveHeroes(true)
+	local enemiesAlive = ContestingEnemies(M)
 	local missing = c.Utils.CountMissingEnemyHeroes and c.Utils.CountMissingEnemyHeroes() or 0
 	local alliesNear = c.GetAlliesNearLoc(M, 1600) or {}
 	local enemiesNear = c.GetLastSeenEnemiesNearLoc(M, 1600) or {}
@@ -152,47 +249,101 @@ local function IsRoshanEngageSafe(M, finishing)
 	local enemiesInPit = #enemiesNear
 	-- Contested pit: enemies already there in force.
 	if enemiesInPit >= 2 and enemiesInPit >= math.max(1, alliesInPit) then
-		return false
+		return false, string.format("contested(%d)", enemiesInPit)
 	end
 	if finishing then
 		-- Finish only if we already own the pit / have numbers.
 		if alliesInPit >= 2 and enemiesInPit <= 1 then
-			return true
+			return true, "ok"
 		end
 		if alliesAlive >= enemiesAlive + 1 and enemiesInPit == 0 then
-			return true
+			return true, "ok"
 		end
-		return false
+		return false, string.format("finish-unsafe(pit=%d foes=%d)", alliesInPit, enemiesInPit)
 	end
 	-- Fresh take: need a real numbers edge or missing enemies — never full 5v5.
-	if enemiesAlive >= alliesAlive then
-		return false
+	return FreshTakeNumbers(alliesAlive, enemiesAlive, missing)
+end
+-- Time the group needs: the GatherMinimum-th closest joiner walks to the rally, then the
+-- group kills Roshan. Everyone computes the same number, so the team goes or stays together.
+local function TakeTimeNeeded(M)
+	local rally = c.AdjustLocationWithOffsetTowardsFountain(M, 900)
+	local etas = {}
+	local dps = {}
+	local players = GetTeamPlayers(GetTeam())
+	for i = 1, #players do
+		local ally = GetTeamMember(i)
+		if AllyShouldJoin(ally) then
+			local speed = math.max(250, ally:GetCurrentMovementSpeed())
+			local eta = GetUnitToLocationDistance(ally, rally) / speed
+			local spa = ally:GetSecondsPerAttack()
+			local hit = (spa ~= nil and spa > 0) and ally:GetAttackDamage() / spa or 0
+			etas[#etas + 1] = { eta = eta, dps = hit }
+		end
 	end
-	if enemiesAlive >= 4 and missing < 2 then
-		return false
+	if #etas == 0 then
+		return 999, 999, 999
 	end
-	if enemiesAlive >= 3 and alliesAlive - enemiesAlive < 1 and missing < 2 then
-		return false
+	table.sort(etas, function(x, y)
+		return x.eta < y.eta
+	end)
+	local n = math.min(#etas, GatherMinimum())
+	local groupDps = 0
+	for i = 1, n do
+		groupDps = groupDps + etas[i].dps
 	end
-	return true
+	local roshHp = 6000 + 130 * math.max(0, DotaTime() / 60)
+	if c.Utils.IsValidUnit(k) and k:CanBeSeen() then
+		roshHp = k:GetHealth()
+	end
+	-- Roshan's armor takes roughly half of right-click damage.
+	local killTime = math.max(8, math.min(60, roshHp / math.max(1, groupDps * 0.5)))
+	return etas[n].eta + killTime, etas[n].eta, killTime
+end
+-- A take that only works because of a kill must fit inside that kill's window.
+-- Returns ok, why.
+local function TakeFitsWindow(M)
+	local alliesAlive = c.GetNumOfAliveHeroes(false)
+	local missing = c.Utils.CountMissingEnemyHeroes and c.Utils.CountMissingEnemyHeroes() or 0
+	local kw = KillWindow.Tick()
+	local everyone = c.GetNumOfAliveHeroes(true) + (kw.fresh or 0)
+	if FreshTakeNumbers(alliesAlive, everyone, missing) then
+		return true, "no-window-needed"
+	end
+	local left = KillWindow.WindowLeft()
+	if left == nil then
+		-- Only the transit grace is left. Not enough to start a walk.
+		return false, "window-closed"
+	end
+	local window = left + KillWindow.TransitGrace(M)
+	local need, eta, kill = TakeTimeNeeded(M)
+	if need + 3 > window then
+		return false, string.format("window-short(need=%.0f eta=%.0f kill=%.0f left=%.0f)", need, eta, kill, window)
+	end
+	return true, string.format("window(need=%.0f left=%.0f)", need, window)
+end
+-- Records why the desire came out as it did, for the [OHA-ROSH] call/abort lines.
+local function Ret(d, why, call)
+	a._roshWhy = why
+	return d, call
 end
 function GetDesireHelper()
 	if a:IsInvulnerable() or not a:IsHero() or not a:IsAlive() or not string.find(b, "hero") or a:IsIllusion() then
-		return BOT_MODE_DESIRE_NONE
+		return Ret(BOT_MODE_DESIRE_NONE, "invalid")
 	end
 	local L = GetAncient(GetTeam())
 	if
 		c.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
 		or L and c.Utils.CountEnemyHeroesNear(L:GetLocation(), 2500) >= 1
 	then
-		return BOT_MODE_DESIRE_NONE
+		return Ret(BOT_MODE_DESIRE_NONE, "base-threat")
 	end
 	if not c.Utils.IsValidUnit(k) then
 		G()
 	end
 	local M = c.GetCurrentRoshanLocation()
 	local O = c.GetNumOfAliveHeroes(false)
-	local P = c.GetNumOfAliveHeroes(true)
+	local P = ContestingEnemies(M)
 	local Q = {}
 	for J, R in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
 		if R:IsAlive() then
@@ -210,39 +361,59 @@ function GetDesireHelper()
 	-- Re-checked every think. A team that was strong enough once is not strong enough for the rest of the game.
 	j = c.HasEnoughDPSForRoshan(Q)
 	if c.GetEnemiesAroundAncient(a, 2000) > 2 or c.GetHP(GetAncient(a:GetTeam())) < 0.6 then
-		return BOT_MODE_DESIRE_NONE
+		return Ret(BOT_MODE_DESIRE_NONE, "base-threat")
 	end
 	local alliesInPit = #(c.GetAlliesNearLoc(M, 1600) or {})
 	local roshLow = c.Utils.IsValidUnit(k) and (k:GetHealth() / k:GetMaxHealth()) < 0.8
 	-- Early game: no fresh pit. Only stay if Roshan is already low and allies are in it.
 	if c.IsEarlyGame() and not (roshLow and alliesInPit >= 2 and IsRoshanEngageSafe(M, true)) then
-		return BOT_MODE_DESIRE_NONE
+		return Ret(BOT_MODE_DESIRE_NONE, "early-game")
 	end
 	if roshLow then
-		if IsRoshanEngageSafe(M, true) and (j or alliesInPit >= 2) then
+		local safeFinish, finishWhy = IsRoshanEngageSafe(M, true)
+		if safeFinish and (j or alliesInPit >= 2) then
 			local S = k:GetHealth() / k:GetMaxHealth()
-			return RemapValClamped(S, 0.8, 0.0, 0.9, 1.0)
+			return Ret(RemapValClamped(S, 0.8, 0.0, 0.9, 1.0), "finishing")
 		end
 		-- Contested / unsafe finish — do not suicide into the pit.
-		return BOT_MODE_DESIRE_NONE
+		return Ret(BOT_MODE_DESIRE_NONE, safeFinish and "finish-no-dps" or finishWhy)
 	end
-	if not IsRoshanEngageSafe(M, false) then
-		return BOT_MODE_DESIRE_NONE
+	local safeTake, takeWhy = IsRoshanEngageSafe(M, false)
+	if not safeTake then
+		return Ret(BOT_MODE_DESIRE_NONE, takeWhy)
 	end
 	if O < P then
-		return BOT_ACTION_DESIRE_NONE
+		return Ret(BOT_ACTION_DESIRE_NONE, "outnumbered")
+	end
+	-- A take that only works because of a kill has to fit in that kill's window. Once the
+	-- group has committed at the rally, finish the walk in.
+	local committed = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
+	if not committed then
+		local fits, fitWhy = TakeFitsWindow(M)
+		a._roshFitWhy = fitWhy
+		if not fits then
+			return Ret(BOT_MODE_DESIRE_NONE, fitWhy)
+		end
+	end
+	if f and j and TeamRoshanCall(M) and not a:WasRecentlyDamagedByAnyHero(2.0) then
+		local enemiesHere = a:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
+		if #enemiesHere == 0 then
+			return Ret(0.96, "team-call", true)
+		end
 	end
 	local kw = KillWindow.Tick()
-	local killRosh = kw.fresh >= 1 and f and j and not c.IsEarlyGame() and DotaTime() > 8 * 60
+	-- The kill window stays open until a respawned enemy could be back at the pit.
+	local inTransit = KillWindow.EnemiesInTransit(KillWindow.TransitGrace(M))
+	local killRosh = (kw.fresh >= 1 or inTransit >= 1) and f and j and not c.IsEarlyGame() and DotaTime() > 8 * 60
 	if l == nil then
 		l = c.Utils.IsHumanPlayerInTeam(GetTeam())
 	end
 	if l and not killRosh then
 		if c.IsEarlyGame() then
-			return BOT_ACTION_DESIRE_NONE
+			return Ret(BOT_ACTION_DESIRE_NONE, "early-game")
 		end
 		if DotaTime() < n then
-			return BOT_ACTION_DESIRE_NONE
+			return Ret(BOT_ACTION_DESIRE_NONE, "human-cooldown")
 		end
 		local T, U = c.GetHumanPing()
 		local V = T ~= nil
@@ -259,11 +430,11 @@ function GetDesireHelper()
 				end
 				local W = DotaTime() - m
 				if W < o then
-					return BOT_MODE_DESIRE_LOW
+					return Ret(BOT_MODE_DESIRE_LOW, "human-invite")
 				else
 					m = 0
 					n = DotaTime() + (c.IsModeTurbo() and q or p)
-					return BOT_MODE_DESIRE_NONE
+					return Ret(BOT_MODE_DESIRE_NONE, "human-invite-expired")
 				end
 			else
 				m = 0
@@ -284,13 +455,13 @@ function GetDesireHelper()
 				and DotaTime() < U.time + 5.0
 			then
 				if IsRoshanEngageSafe(M, false) then
-					return 0.95
+					return Ret(0.95, "ping")
 				end
-				return BOT_MODE_DESIRE_NONE
+				return Ret(BOT_MODE_DESIRE_NONE, "ping-unsafe")
 			end
 		end
 		if DotaTime() < (c.IsModeTurbo() and 15 * 60 or 20 * 60) and not killRosh then
-			return BOT_MODE_DESIRE_NONE
+			return Ret(BOT_MODE_DESIRE_NONE, "too-early-no-kill")
 		end
 		local X = RemapValClamped(DotaTime(), h, h + 2.5 * 60, 1, 2)
 		local Y = RemapValClamped(GetRoshanDesire() * X, 0, 1, 0, BOT_MODE_DESIRE_ABSOLUTE)
@@ -302,21 +473,26 @@ function GetDesireHelper()
 		if _ and #Z < 3 then
 			Y = Y * 0.6
 		end
+		local why = "timer"
 		if killRosh then
 			local floor = BOT_MODE_DESIRE_VERYHIGH
 			if Y < floor then
 				KillWindow.LogRosh(a, Y, floor, kw)
 				Y = floor
 			end
+			why = "kill-window"
 		end
-		return Clamp(Y, 0, BOT_MODE_DESIRE_VERYHIGH)
+		return Ret(Clamp(Y, 0, BOT_MODE_DESIRE_VERYHIGH), why)
 	end
-	return BOT_ACTION_DESIRE_NONE
+	return Ret(BOT_ACTION_DESIRE_NONE, f and "no-dps" or "rosh-dead")
 end
 local a1 = 900
 local a2 = 300
 function Think()
 	if not a:IsAlive() or c.CanNotUseAction(a) then
+		return
+	end
+	if c.Item.TryPickupRoshanDrop(a) then
 		return
 	end
 	local M = c.GetCurrentRoshanLocation()
@@ -435,24 +611,66 @@ function Think()
 	if RallyThreat() then
 		return
 	end
-	-- Unsafe, or still grouping: hold the fountain side. Do not walk in alone.
+	-- Hold the fountain side until the living team is in the ring, then go in together.
+	-- Two at the rally used to count as ready, so the rest never had to arrive.
 	local now = DotaTime()
 	if a._roshGatherAt == nil or now - (a._roshThinkAt or 0) > 3 then
 		a._roshGatherAt = now
+		a._roshCommitUntil = nil
 	end
 	a._roshThinkAt = now
-	local present, nearby, pending = RoshanGather(rally)
+	local grouped, pending, required = RoshanGather(M)
 	local elapsed = now - a._roshGatherAt
-	local othersWalking = pending > 1000
-	local waitingForSwitch = nearby > present and not othersWalking and elapsed < 12
-	local hardCap = elapsed >= 30
-	local ready = safe and not waitingForSwitch and not othersWalking
-	if hardCap then
-		ready = safe and present >= 1
-	elseif ready then
-		ready = present >= 1 and (nearby <= 1 or present >= math.min(2, nearby))
+	local othersWalking = pending > 1800
+	local minimum = math.min(GatherMinimum(), math.max(required, 1))
+	local full = required > 0 and grouped >= required
+	local committed = a._roshCommitUntil ~= nil and now < a._roshCommitUntil
+	-- A short wait lets allies switch into the call. After that, the minimum group goes
+	-- in as soon as nobody else is still walking. The old flat 22s wait was where kill
+	-- windows ran out and the whole group walked away again.
+	local arrived = not othersWalking and grouped >= minimum and elapsed >= 6
+	-- Waiting for a straggler would outlast the kill window: go with who is here.
+	local windowTight = false
+	local left = KillWindow.WindowLeft()
+	if othersWalking and grouped >= minimum and left ~= nil then
+		local _, _, killTime = TakeTimeNeeded(M)
+		local window = left + KillWindow.TransitGrace(M)
+		windowTight = window < pending / 320 + killTime + 3
+	end
+	local capped = elapsed >= 40 and grouped >= math.min(2, math.max(required, 1))
+	if safe and (full or arrived or windowTight or capped) then
+		local fresh = not committed
+		a._roshCommitUntil = now + 25
+		committed = true
+		if fresh then
+			RoshLog(
+				"commit grouped=%d/%d min=%d pending=%d elapsed=%.0f by=%s",
+				grouped,
+				required,
+				minimum,
+				math.floor(pending),
+				elapsed,
+				full and "full" or (arrived and "arrived" or (windowTight and "window" or "cap"))
+			)
+		end
+	end
+	local ready = safe and (committed or full or arrived or windowTight or capped)
+	if not ready and now >= (a._roshGatherLogAt or -999) then
+		a._roshGatherLogAt = now + 5
+		local _, safeWhy = IsRoshanEngageSafe(M, finishing)
+		RoshLog(
+			"gather grouped=%d/%d min=%d pending=%d elapsed=%.0f safe=%s window=%s",
+			grouped,
+			required,
+			minimum,
+			math.floor(pending),
+			elapsed,
+			safe and "ok" or tostring(safeWhy),
+			left ~= nil and string.format("%.0f", left) or "-"
+		)
 	end
 	if not ready then
+		a._roshCommitUntil = nil
 		if GetUnitToLocationDistance(a, rally) > 50 then
 			a:Action_MoveToLocation(rally + RandomVector(80))
 		end

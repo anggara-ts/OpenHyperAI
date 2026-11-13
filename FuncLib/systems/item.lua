@@ -346,6 +346,10 @@ b["sCanNotSwitchItems"] = {
 	"item_famango",
 	"item_great_famango",
 	"item_greater_famango",
+	-- A branch is a wand component. Parking it and pulling it back starts the backpack cooldown.
+	"item_branches",
+	-- Thrown from the main inventory only. Do not park it to make room for something else.
+	"item_blood_grenade",
 }
 b["sSellList"] = {
 	"item_black_king_bar",
@@ -386,8 +390,6 @@ b["sSellList"] = {
 	"item_recipe_magic_wand",
 	"item_splintmail",
 	"item_chainmail",
-	"item_shawl",
-	"item_cloak",
 	"item_wizard_hat",
 	"item_circlet",
 }
@@ -584,8 +586,26 @@ local v = {
 	"item_new_5",
 	"item_new_6",
 }
+-- The engine lists some recipes ahead of their ingredients. Buy the ingredients first.
+local function RecipesLast(parts)
+	if type(parts) ~= "table" then
+		return parts
+	end
+	local ordered = {}
+	for _, part in ipairs(parts) do
+		if not string.find(part, "item_recipe_", 1, true) then
+			ordered[#ordered + 1] = part
+		end
+	end
+	for _, part in ipairs(parts) do
+		if string.find(part, "item_recipe_", 1, true) then
+			ordered[#ordered + 1] = part
+		end
+	end
+	return ordered
+end
 for h, w in pairs(v) do
-	b[w] = GetItemComponents(w)[1]
+	b[w] = RecipesLast(GetItemComponents(w)[1])
 end
 b["item_phase_boots"] = { "item_blades_of_attack", "item_boots", "item_chainmail" }
 b["item_power_treads_agi"] = { "item_boots", "item_boots_of_elves", "item_gloves" }
@@ -594,9 +614,11 @@ b["item_power_treads_str"] = { "item_boots", "item_belt_of_strength", "item_glov
 b["item_power_treads"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
 b["item_ultimate_scepter"] =
 	{ "item_point_booster", "item_ogre_axe", "item_blade_of_alacrity", "item_staff_of_wizardry" }
--- A finished Magic Wand already includes the recipe. The engine's component list still
--- names it, so every outfit that finishes a wand bought the recipe a second time.
-b["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches" }
+-- Stick and two branches do not combine on their own. The recipe has to be bought
+-- with them, before the build moves on to boots.
+b["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches", "item_recipe_magic_wand" }
+-- Claymore and Blades of Attack do not combine on their own.
+b["item_lesser_crit"] = { "item_claymore", "item_blades_of_attack", "item_recipe_lesser_crit" }
 b["item_yasha"] = { "item_boots_of_elves", "item_blade_of_alacrity", "item_recipe_yasha" }
 local x = {
 	["item_double_tango"] = "item_tango",
@@ -659,9 +681,9 @@ b["item_medusa_outfit"] = {
 	"item_double_branches",
 	"item_null_talisman",
 	"item_null_talisman",
-	"item_power_treads_int",
 	"item_magic_stick",
 	"item_recipe_magic_wand",
+	"item_power_treads_int",
 }
 b["item_templar_assassin_outfit"] = {
 	"item_tango",
@@ -681,9 +703,9 @@ b["item_ranged_carry_outfit"] = {
 	"item_slippers",
 	"item_circlet",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_wraith_band",
 	"item_power_treads_agi",
-	"item_recipe_magic_wand",
 	"item_infused_raindrop",
 }
 b["item_melee_carry_outfit"] = {
@@ -731,10 +753,10 @@ b["item_huskar_outfit"] = {
 	"item_gauntlets",
 	"item_circlet",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_bracer",
 	"item_boots",
 	"item_bracer",
-	"item_recipe_magic_wand",
 	"item_blades_of_attack",
 	"item_chainmail",
 }
@@ -792,8 +814,8 @@ b["item_priest_outfit"] = {
 	"item_branches",
 	"item_magic_stick",
 	"item_branches",
-	"item_arcane_boots",
 	"item_recipe_magic_wand",
+	"item_arcane_boots",
 	"item_flask",
 	"item_urn_of_shadows",
 }
@@ -804,9 +826,9 @@ b["item_mage_outfit"] = {
 	"item_circlet",
 	"item_mantle",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_null_talisman",
 	"item_tranquil_boots",
-	"item_recipe_magic_wand",
 	"item_flask",
 }
 b["item_crystal_maiden_outfit"] = {
@@ -815,9 +837,9 @@ b["item_crystal_maiden_outfit"] = {
 	"item_circlet",
 	"item_mantle",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_null_talisman",
 	"item_arcane_boots",
-	"item_recipe_magic_wand",
 	"item_flask",
 }
 b["PvN_priest"] = {
@@ -1570,5 +1592,127 @@ function b.GetItemWardSolt()
 		end
 	end
 	return -1
+end
+-- Aegis: a nearby human, then a core, then anyone else.
+-- Roshan's Banner: a nearby support, then anyone else.
+function b.RoshanClaimKind(name)
+	if name == "item_aegis" then
+		return "aegis"
+	end
+	if name == "item_roshans_banner" then
+		return "banner"
+	end
+	return nil
+end
+local function RoshanDropTier(hero, kind)
+	local human = hero.IsBot ~= nil and not hero:IsBot()
+	local pos = a.GetPosition(hero) or 3
+	if kind == "aegis" then
+		if human then
+			return 1
+		end
+		if pos <= 3 then
+			return 2
+		end
+		return 3
+	end
+	if pos >= 4 then
+		return 1
+	end
+	return 2
+end
+local function RoshanDropCandidate(hero, itemName)
+	if hero == nil or not hero:IsAlive() or not hero:IsHero() or hero:IsIllusion() then
+		return false
+	end
+	if b.HasItem(hero, itemName) then
+		return false
+	end
+	return true
+end
+function b.ShouldClaimRoshanDrop(bot, loc, itemName)
+	local kind = b.RoshanClaimKind(itemName)
+	if kind == nil or loc == nil or not RoshanDropCandidate(bot, itemName) then
+		return false
+	end
+	local tiers = kind == "aegis" and { 1, 2, 3 } or { 1, 2 }
+	local function closest(tier, maxDist)
+		local best, bestDist, bestId = nil, maxDist, math.huge
+		local players = GetTeamPlayers(GetTeam())
+		for i = 1, #players do
+			local ally = GetTeamMember(i)
+			if RoshanDropCandidate(ally, itemName) and RoshanDropTier(ally, kind) == tier then
+				local dist = GetUnitToLocationDistance(ally, loc)
+				local id = ally:GetPlayerID() or 99
+				if dist <= bestDist and (dist < bestDist or id < bestId) then
+					best = ally
+					bestDist = dist
+					bestId = id
+				end
+			end
+		end
+		return best
+	end
+	local function winner(maxDist)
+		for n = 1, #tiers do
+			local ally = closest(tiers[n], maxDist)
+			if ally ~= nil then
+				return ally
+			end
+		end
+		return nil
+	end
+	-- Someone of a better tier within walking range keeps the claim. Otherwise it falls through.
+	local ally = winner(4000) or winner(math.huge)
+	return ally == bot
+end
+function b.RoshanDropDesire(bot)
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+			local name = drop.item:GetName()
+			if
+				b.RoshanClaimKind(name) ~= nil
+				and b.ShouldClaimRoshanDrop(bot, drop.location, name)
+				and GetUnitToLocationDistance(bot, drop.location) <= 4500
+			then
+				return 0.97
+			end
+		end
+	end
+	return 0
+end
+function b.TryPickupRoshanDrop(bot)
+	if bot == nil or not bot:IsAlive() then
+		return false
+	end
+	local best, bestDist = nil, math.huge
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+			local name = drop.item:GetName()
+			if b.RoshanClaimKind(name) ~= nil and b.ShouldClaimRoshanDrop(bot, drop.location, name) then
+				local dist = GetUnitToLocationDistance(bot, drop.location)
+				if dist < bestDist then
+					best = drop
+					bestDist = dist
+				end
+			end
+		end
+	end
+	if best == nil or bestDist > 4500 then
+		return false
+	end
+	if b.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+		local cheap = b.GetMainInvLessValItemSlot(bot)
+		local pack = b.GetEmptyBackpackSlot(bot)
+		if cheap ~= nil and cheap >= 0 and pack ~= nil and pack >= 0 then
+			bot:ActionImmediate_SwapItems(cheap, pack)
+		end
+	end
+	if bestDist > 120 then
+		bot:Action_MoveToLocation(best.location)
+	else
+		bot:Action_PickUpItem(best.item)
+	end
+	return true
 end
 return b

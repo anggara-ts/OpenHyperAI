@@ -25,9 +25,13 @@ local function a(b)
 		if d == nil or d:IsNull() then
 			return false
 		end
-		if d.is_suspicious_illusion ~= nil then
+		-- The answer used to be cached on the handle for the whole game. One bad moment (a level-up
+		-- tick, a dead read) flagged a real hero as an illusion until the game ended, and every
+		-- check that skips illusions ignored that hero. Reuse it for half a second only.
+		if d.is_suspicious_illusion ~= nil and DotaTime() - (d.is_suspicious_illusion_at or -999) < 0.5 then
 			return d.is_suspicious_illusion
 		end
+		d.is_suspicious_illusion_at = DotaTime()
 		if not d:CanBeSeen() then
 			d.is_suspicious_illusion = false
 			return false

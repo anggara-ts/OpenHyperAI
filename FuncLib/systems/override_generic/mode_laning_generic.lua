@@ -202,7 +202,8 @@ function b.Think()
 						a.IsValidHero(enemy)
 						and a.CanBeAttacked(enemy)
 						and not a.IsSuspiciousIllusion(enemy)
-						and a.IsInRange(c, enemy, atk + 250)
+						and a.IsInRange(c, enemy, atk)
+						and not CreepAggroUnsafe(c)
 					then
 						local selfUnderTower = enemyT1 ~= nil
 							and enemyT1:IsAlive()
@@ -226,11 +227,7 @@ function b.Think()
 								name = string.upper(string.sub(name, 1, 1)) .. string.sub(name, 2)
 								c:ActionImmediate_Chat("Harassing " .. name, false)
 							end
-							if GetUnitToUnitDistance(c, enemy) > atk then
-								c:Action_MoveToLocation(enemy:GetLocation())
-							else
-								c:Action_AttackUnit(enemy, true)
-							end
+							c:Action_AttackUnit(enemy, true)
 							return
 						end
 					end
@@ -239,8 +236,7 @@ function b.Think()
 		end
 	end
 	local i = c.isBear or string.find(c:GetUnitName(), "lone_druid_bear")
-	local G = c:GetNearbyLaneCreeps(600, true)
-	if #G <= 2 and not a.IsCore(c) and not i and a.GetHP(c) > 0.4 then
+	if not a.IsCore(c) and not i and a.GetHP(c) > 0.5 and not CreepAggroUnsafe(c) then
 		local H = GetHarassTarget(v)
 		if a.IsValidHero(H) then
 			c:Action_AttackUnit(H, true)
@@ -250,6 +246,10 @@ function b.Think()
 	local I = GetFurthestEnemyAttackRange(v)
 	if I == 0 then
 		I = math.max(r, 330)
+	end
+	-- A melee core held back at a ranged laner's attack range cannot walk in for a last hit in time.
+	if a.IsCore(c) and r < 326 and a.GetHP(c) >= 0.45 then
+		I = math.min(I, 300)
 	end
 	local J = GetLaneFrontAmount(GetTeam(), s, false)
 	local K = GetLaneFrontAmount(GetOpposingTeam(), s, false)
@@ -303,12 +303,27 @@ function GetBestDenyCreep(M)
 	end
 	return fallback
 end
+function CreepAggroUnsafe(hero)
+	local creeps = hero:GetNearbyLaneCreeps(500, true) or {}
+	local fresh, hitting = 0, 0
+	for _, creep in pairs(creeps) do
+		if a.IsValid(creep) then
+			if creep:GetAttackTarget() == hero then
+				hitting = hitting + 1
+			else
+				fresh = fresh + 1
+			end
+		end
+	end
+	return fresh > 0 or hitting >= 2
+end
 function GetHarassTarget(P)
 	local enemyTowers = c:GetNearbyTowers(1000, true)
+	local atk = c:GetAttackRange()
 	for A, Q in pairs(P) do
 		if
 			a.IsValidHero(Q)
-			and a.IsInRange(c, Q, c:GetAttackRange() + 220)
+			and a.IsInRange(c, Q, atk)
 			and a.CanBeAttacked(Q)
 			and not a.IsSuspiciousIllusion(Q)
 		then

@@ -46,6 +46,39 @@ local a0 = Y.RadiantFountainTpPoint
 local a1 = Y.DireFountainTpPoint
 local a2 = require(GetScriptDirectory() .. "/FuncLib/systems/cache")
 local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
+-- Our base is being hit. A fresh kill must not pull the team away from it, since
+-- defend desire tops out at 0.6 and the kill floor is 0.91 or 0.99.
+local BASE_CREEP_RADIUS = 1600
+local baseThreat = { exposed = false, why = "" }
+local function ReadBaseThreat(ancient, heroesAtAncient, heroesOnHG)
+	local s = { exposed = false, why = "", creeps = 0, ancHP = 1 }
+	if ancient == nil or not ancient:IsAlive() then
+		return s
+	end
+	s.ancHP = ancient:GetHealth() / math.max(1, ancient:GetMaxHealth())
+	local loc = ancient:GetLocation()
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+		if unit ~= nil and unit:IsAlive() and GetUnitToLocationDistance(unit, loc) <= BASE_CREEP_RADIUS then
+			s.creeps = s.creeps + 1
+		end
+	end
+	local why = {}
+	if (heroesAtAncient or 0) >= 1 then
+		why[#why + 1] = "heroes=" .. heroesAtAncient
+	end
+	if (heroesOnHG or 0) >= 1 then
+		why[#why + 1] = "hg=" .. heroesOnHG
+	end
+	if s.ancHP < 0.95 then
+		why[#why + 1] = string.format("anc=%.2f", s.ancHP)
+	end
+	if s.creeps >= 2 then
+		why[#why + 1] = "creeps=" .. s.creeps
+	end
+	s.exposed = #why > 0
+	s.why = table.concat(why, ",")
+	return s
+end
 local a3 = a2.getGlobalGameState
 local a4 = a2.getGlobalLocationState
 local a5 = a2.getCachedAlliesNearLoc
@@ -64,6 +97,7 @@ function m(ab)
 	local ae = ad.ourAncient
 	w = ae ~= nil and O.Utils.CountEnemyHeroesNear(ae:GetLocation(), M) or 0
 	x = O.Utils.CountEnemyHeroesOnHighGround(ab)
+	baseThreat = ReadBaseThreat(ae, w, x)
 	y = {}
 	for af, ag in ipairs({ U.Top, U.Mid, U.Bot }) do
 		local ah = GetLaneFrontLocation(ab, ag, 0)
@@ -158,11 +192,14 @@ function l.GetPushDesireHelper(ao, ap)
 	local ab = ad.team
 	m(ab)
 	local kw = KillWindow.Tick()
-	local killPush = kw.fresh >= 1
+	local killOpen = kw.fresh >= 1
 		and not kw.buyback
 		and ad.aliveAllyCount > ad.aliveEnemyCount
 		and O.GetHP(ao) >= 0.3
-		and w < 1
+	local killPush = killOpen and w < 1 and not baseThreat.exposed
+	if killOpen and not killPush then
+		KillWindow.LogPushHeld(ao, ap, kw, baseThreat.why)
+	end
 	if kw.buyback then
 		return S.None
 	end
@@ -1134,12 +1171,26 @@ function l.PushThink(ao, ap)
 	end
 	do
 		local dx = ao:GetNearbyLaneCreeps(1200, true)
+		local creepOnMe = false
 		if dx then
 			for af, ci in ipairs(dx) do
 				if O.IsValid(ci) and ci:GetAttackTarget() == ao then
-					ao:Action_MoveToLocation(cu)
-					return
+					creepOnMe = true
+					break
 				end
+			end
+		end
+		if not creepOnMe then
+			creepOnMe = ao:WasRecentlyDamagedByCreep(1.0)
+		end
+		-- cu can be the hero's own spot once they are ahead of the wave, so moving there
+		-- left them standing in the creeps that were already hitting them.
+		if creepOnMe then
+			local heroes = ao:GetNearbyHeroes(1000, true, R.None) or {}
+			if #heroes == 0 then
+				local away = O.AdjustLocationWithOffsetTowardsFountain(ao:GetLocation(), 700)
+				ao:Action_MoveToLocation(away)
+				return
 			end
 		end
 	end

@@ -152,6 +152,7 @@ local function SentryFree(spot)
 		and spot.location ~= nil
 		and not a.IsOtherWardClose(spot.location, "npc_dota_sentry_wards", 1200, true, false)
 		and not b.Site.IsLocationHaveTrueSight(spot.location)
+		and (spot.plant_time_sentry == 0 or DotaTime() > spot.plant_time_sentry + 360)
 end
 -- Towers have loaded and at least one enemy tier-1 is gone. All-nil is not "all down".
 local function EnemyOuterDown()

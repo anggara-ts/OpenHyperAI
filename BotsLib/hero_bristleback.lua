@@ -38,7 +38,10 @@ n["pos_3"] = {
 	"item_quelling_blade",
 	"item_magic_wand",
 	"item_bracer",
-	"item_arcane_boots",
+	"item_power_treads_str",
+	-- Ring of Health and Vanguard first, then Blade Mail, then the Vanguard upgrades to Crimson Guard.
+	"item_ring_of_health",
+	"item_vanguard",
 	"item_blade_mail",
 	"item_crimson_guard",
 	"item_black_king_bar",
@@ -294,6 +297,47 @@ function a.ConsiderViscousNasalGoo()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
+-- Enemy lane creeps in range that one spray kills. Damage is base plus 30 per quill stack
+-- already on the creep (capped at max_damage), physical, so armor applies.
+function a.QuillLaneKills(radius)
+	local base = q:GetSpecialValueInt("quill_base_damage")
+	if base == nil or base <= 0 then
+		return 0
+	end
+	local perStack = q:GetSpecialValueInt("quill_stack_damage") or 0
+	local maxDamage = q:GetSpecialValueInt("max_damage") or 0
+	local kills = 0
+	for M, N in pairs(b:GetNearbyLaneCreeps(radius, true) or {}) do
+		if c.IsValid(N) and c.CanBeAttacked(N) then
+			local stacks = c.GetModifierCount(N, "modifier_bristleback_quill_spray") or 0
+			local raw = base + perStack * stacks
+			if maxDamage > 0 then
+				raw = math.min(raw, maxDamage)
+			end
+			if N:GetHealth() <= N:GetActualIncomingDamage(raw, DAMAGE_TYPE_PHYSICAL) then
+				kills = kills + 1
+			end
+		end
+	end
+	return kills
+end
+-- [OHA-QUILL]: each Quill Spray cast with why, at most once per 10s per reason.
+function a.LogQuill(why, kills, heroes, mana)
+	b._quillLogAt = b._quillLogAt or {}
+	if DotaTime() < (b._quillLogAt[why] or -999) then
+		return
+	end
+	b._quillLogAt[why] = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-QUILL] t=%.0f %s %s kills=%d heroes=%d mana=%.2f",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		why,
+		kills,
+		heroes,
+		mana
+	))
+end
 function a.ConsiderQuillSpray()
 	if not c.CanCastAbility(q) then
 		return BOT_ACTION_DESIRE_NONE
@@ -329,6 +373,30 @@ function a.ConsiderQuillSpray()
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
+		end
+	end
+	local foesInRange = 0
+	for M, N in pairs(b:GetNearbyHeroes(T - 50, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(N) and c.CanBeAttacked(N) and not c.IsSuspiciousIllusion(N) then
+			foesInRange = foesInRange + 1
+		end
+	end
+	-- Engaging: any enemy hero inside the spray, not only the chosen target.
+	if H and foesInRange >= 1 then
+		a.LogQuill("engage", 0, foesInRange, Q)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Lane: 35 mana on a 3s cooldown. Finish creeps the quills will kill, and poke a laner
+	-- in range; a spell on a hero does not pull creep aggro the way a right-click does.
+	if c.IsInLaningPhase() and Q > 0.3 then
+		local kills = a.QuillLaneKills(T - 50)
+		if kills >= 2 or kills >= 1 and foesInRange >= 1 then
+			a.LogQuill("lane-lasthit", kills, foesInRange, Q)
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		if foesInRange >= 1 and Q > 0.5 then
+			a.LogQuill("lane-poke", kills, foesInRange, Q)
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	local U = b:GetNearbyCreeps(T, true)

@@ -6949,6 +6949,17 @@ function ItemUsageThink()
 	end
 	MatchTrace.Tick(b)
 	LogHumanPing()
+	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has
+	-- to launch it). Spells only, no items. The return below used to skip it entirely, so the
+	-- snowball always rolled its full duration.
+	if b:IsInvulnerable() and b:IsAlive() and h ~= nil and h.bThinkWhileInvulnerable then
+		local x, ff = pcall(h.SkillsComplement)
+		if not x then
+			MatchTrace.Event(b, "error", "SkillsComplement: " .. tostring(ff))
+		end
+		_perfDone()
+		return
+	end
 	if b:IsInvulnerable() or not b:IsHero() or not b:IsAlive() or not string.find(c, "hero") or b:IsIllusion() then
 		_perfDone()
 		return

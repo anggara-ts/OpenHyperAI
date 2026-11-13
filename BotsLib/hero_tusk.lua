@@ -80,6 +80,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Tusk is invulnerable inside his snowball; spell logic must still run to launch it.
+a["bThinkWhileInvulnerable"] = true
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)

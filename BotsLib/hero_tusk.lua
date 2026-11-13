@@ -159,6 +159,22 @@ function a.SkillsComplement()
 	end
 	D, E = a.ConsiderWalrusPunch()
 	if D > 0 then
+		-- Tag Team first when it can go: its bonus damage applies to the Punch. Tag Team keys
+		-- off Tusk's target and Punch off any hero in reach, so in lane (target a creep) the
+		-- Punch went out alone (7:04).
+		local tagWhy = a.TagTeamBeforePunch(E)
+		if tagWhy == "cast" then
+			b:Action_UseAbility(r)
+			return
+		end
+		pcall(print, string.format(
+			"[OHA-TUSK] t=%.0f punch target=%s hp=%.2f tagTeam=%s mp=%.2f",
+			DotaTime(),
+			E and (string.gsub(E:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			E and c.GetHP(E) or 0,
+			tagWhy,
+			c.GetMP(b)
+		))
 		b:Action_UseAbilityOnEntity(t, E)
 		return
 	end
@@ -619,6 +635,29 @@ function a.ConsiderTagTeam()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- "cast" when Tag Team should go out ahead of a Walrus Punch on `target`, or why not.
+function a.TagTeamBeforePunch(target)
+	if r == nil or r:IsNull() or not r:IsTrained() then
+		return "untrained"
+	end
+	if r:GetCooldownTimeRemaining() > 0 then
+		return "cooldown"
+	end
+	if b:GetMana() < r:GetManaCost() + t:GetManaCost() then
+		return "mana"
+	end
+	local radius = r:GetSpecialValueInt("radius")
+	if radius == nil or radius < 100 then
+		radius = 350
+	end
+	if target == nil or GetUnitToUnitDistance(b, target) > radius then
+		return "range"
+	end
+	if not c.CanCastAbility(r) then
+		return "blocked"
+	end
+	return "cast"
 end
 function a.ConsiderWalrusKick()
 	-- Walrus Kick comes from Aghanim's Scepter. Before that it is hidden but can still read castable.

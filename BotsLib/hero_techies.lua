@@ -14,15 +14,12 @@ local l = c.Skill.GetRandomBuild(k)
 local m = c.Skill.GetTalentBuild(j)
 local n = {}
 n["pos_4"] = {
-	-- 600 starting gold: Soul Ring parts (455) + Tango (90) + Blood Grenade (50) = 595.
-	-- The recipe (350) finishes Soul Ring after Boots, in place of Magic Wand.
-	"item_tango",
+	-- Arcane Boots already cover mana, so this build keeps Magic Wand instead of Soul Ring.
+	"item_double_tango",
+	"item_double_branches",
 	"item_blood_grenade",
-	"item_ring_of_protection",
-	"item_gauntlets",
-	"item_gauntlets",
 	"item_boots",
-	"item_soul_ring",
+	"item_magic_wand",
 	"item_arcane_boots",
 	"item_kaya",
 	"item_guardian_greaves",

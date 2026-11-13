@@ -135,6 +135,30 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnEntity(atos, atosTarget)
 		return
 	end
+	-- Fire Spirits work during Sun Ray too, but the busy check below blocked them for the
+	-- whole beam. During the ray, only against enemy heroes and with HP to spare (the cast
+	-- costs a share of HP on top of the ray's own cost).
+	if b:HasModifier("modifier_phoenix_sun_ray") and (P or c.GetHP(b)) > 0.35 then
+		local spiritRange = c.GetProperCastRange(false, b, q:GetCastRange())
+		local foes = b:GetNearbyHeroes(math.min(spiritRange, 1600), true, BOT_MODE_NONE) or {}
+		if #foes > 0 then
+			if a.ConsiderFireSpirits() > 0 then
+				a.LogSunRaySpirits("summon", foes[1])
+				b:Action_UseAbility(q)
+				return
+			end
+			local launch, loc = a.ConsiderFireSpiritsLaunch()
+			if launch > 0 and loc ~= nil then
+				local hit = c.GetEnemiesNearLoc(loc, q:GetSpecialValueInt("radius") + 150)
+				if hit ~= nil and #hit >= 1 then
+					a.LogSunRaySpirits("launch", hit[1])
+					b:Action_UseAbilityOnLocation(r, loc)
+					L = DotaTime()
+					return
+				end
+			end
+		end
+	end
 	y = a.ConsiderIcarusDiveStop()
 	if y > 0 then
 		b:Action_UseAbility(p)
@@ -700,6 +724,21 @@ function a.ConsiderSunRay()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-PHOENIX] sun-ray-spirits summon|launch, at most once per 2s per kind.
+function a.LogSunRaySpirits(kind, target)
+	b._sunRaySpiritsLogAt = b._sunRaySpiritsLogAt or {}
+	if DotaTime() < (b._sunRaySpiritsLogAt[kind] or -999) then
+		return
+	end
+	b._sunRaySpiritsLogAt[kind] = DotaTime() + 2
+	pcall(print, string.format(
+		"[OHA-PHOENIX] t=%.0f sun-ray-spirits %s target=%s hp=%.2f",
+		DotaTime(),
+		kind,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		c.GetHP(b)
+	))
 end
 -- Rod of Atos and the enemy to root while an engage Sun Ray is on it, or nil.
 function a.ConsiderAtosOnSunRay()

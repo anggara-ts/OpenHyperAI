@@ -259,6 +259,44 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Grouped heroes: the snake jumps between enemies within 450 and gains 25% per jump.
+	-- Start it on the hero nearest the middle of the group, in any fight, not only a team fight.
+	local group = b:FindAoELocation(true, true, b:GetLocation(), I, Z, 0, 0)
+	if group ~= nil and group.count >= 2 then
+		local best, bestDist = nil, math.huge
+		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a8)
+				and not c.IsSuspiciousIllusion(a8)
+				and c.CanCastOnNonMagicImmune(a8)
+				and c.CanCastOnTargetAdvanced(a8)
+			then
+				local dist = GetUnitToLocationDistance(a8, group.targetloc)
+				if dist < bestDist then
+					best, bestDist = a8, dist
+				end
+			end
+		end
+		if best ~= nil then
+			a.LogSnake("group", best, group.count)
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
+	-- Lane poke: the snake gives back mana from what it hits, so a hero in range is worth it
+	-- while she keeps enough mana for Mana Shield.
+	if c.IsInLaningPhase() and c.GetManaAfter(p:GetManaCost()) >= 0.45 then
+		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a8)
+				and not c.IsSuspiciousIllusion(a8)
+				and c.CanCastOnNonMagicImmune(a8)
+				and c.CanCastOnTargetAdvanced(a8)
+			then
+				a.LogSnake("lane-poke", a8, 1)
+				return BOT_ACTION_DESIRE_MODERATE, a8
+			end
+		end
+	end
 	if c.IsInTeamFight(b, 1200) then
 		local a9 = nil
 		local aa = 0
@@ -283,8 +321,10 @@ function a.ConsiderW()
 			if ad and c.IsInRange(ad, b, I + 50) then
 				return BOT_ACTION_DESIRE_HIGH, ad
 			end
+			-- Was "return ..., ad": ad is nil when no creep bounce exists, which sent a cast
+			-- with no target (refused=nil-target). The target itself is the fallback.
 			if c.IsInRange(ac, b, I + 50) then
-				return BOT_ACTION_DESIRE_HIGH, ad
+				return BOT_ACTION_DESIRE_HIGH, ac
 			end
 		end
 	end
@@ -329,22 +369,73 @@ function a.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- [OHA-MEDUSA]: Mystic Snake casts from the group and lane-poke rules, once per 10s per rule.
+function a.LogSnake(why, target, heroes)
+	b._snakeLogAt = b._snakeLogAt or {}
+	if DotaTime() < (b._snakeLogAt[why] or -999) then
+		return
+	end
+	b._snakeLogAt[why] = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-MEDUSA] t=%.0f mystic-snake why=%s target=%s heroes=%d mp=%.2f",
+		DotaTime(),
+		why,
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		heroes,
+		c.GetMP(b)
+	))
+end
+-- [OHA-MEDUSA]: each Stone Gaze with why and how many heroes were looking at her.
+function a.LogGaze(why, looking)
+	pcall(print, string.format(
+		"[OHA-MEDUSA] t=%.0f stone-gaze why=%s looking=%d hp=%.2f mp=%.2f",
+		DotaTime(),
+		why,
+		looking,
+		c.GetHP(b),
+		c.GetMP(b)
+	))
+end
 function a.ConsiderR()
 	if not q:IsFullyCastable() then
 		return 0
 	end
 	local I = q:GetSpecialValueInt("radius")
+	if I == nil or I <= 0 then
+		I = 1200
+	end
 	local ak = b:GetAttackRange()
-	local al = false
-	local am = c.GetEnemyList(b, ak + 100)
-	for R, a8 in pairs(am) do
-		if a8:IsFacingLocation(b:GetLocation(), 50) then
-			al = true
-			break
+	-- Stone Gaze works on anyone in 1200 who looks at her: slowed at once, stone after 2s of
+	-- looking. A hero attacking or chasing her is looking at her by definition. The old gate
+	-- only counted enemies inside her attack range facing her within 50 degrees.
+	local looking = 0
+	for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+		if
+			c.IsValidHero(a8)
+			and not c.IsSuspiciousIllusion(a8)
+			and c.CanCastOnNonMagicImmune(a8)
+			and (
+				a8:GetAttackTarget() == b
+				or c.IsChasingTarget(a8, b)
+				or a8:IsFacingLocation(b:GetLocation(), 45)
+			)
+		then
+			looking = looking + 1
 		end
 	end
-	if not al then
+	if looking == 0 then
 		return 0
+	end
+	local fighting = c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) or b:WasRecentlyDamagedByAnyHero(2.0)
+	-- Two or more heroes looking at her in a fight: that is most of the ult's value.
+	if fighting and looking >= 2 then
+		a.LogGaze("group", looking)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Low and being hit: petrify the attacker and take the speed boost.
+	if looking >= 1 and C < 0.45 and b:WasRecentlyDamagedByAnyHero(2.0) then
+		a.LogGaze("survive", looking)
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	if c.IsRetreating(b) then
 		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)

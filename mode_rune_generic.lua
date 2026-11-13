@@ -218,13 +218,23 @@ function GetDesireRaw()
 	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
 	local runeId, runeDist = a.ClosestAvailableRune(400)
 	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
-	if runeId ~= nil and not dying then
+	if
+		runeId ~= nil
+		and not dying
+		and not a.SidelaneSkipsRiver(runeId, runeDist)
+		and not a.SkipSecondLaningRune(runeId)
+	then
 		local D = d.rune.normal
 		D.location = runeId
 		D.distance = runeDist
 		D.status = RUNE_STATUS_AVAILABLE
 		D.type = GetRuneType(runeId)
 		return give(BOT_MODE_DESIRE_ABSOLUTE + 0.02, "underfoot")
+	end
+	-- A leftover bounty sits beside the spawn, not on a second rune id. Stay and walk the ring.
+	local sweepDesire = a.BountySweepDesire()
+	if sweepDesire ~= nil then
+		return give(sweepDesire, "bounty-sweep")
 	end
 	if not b.IsInLaningPhase() then
 		if b.IsPushing(d) or b.IsDefending(d) then
@@ -246,12 +256,17 @@ function GetDesireRaw()
 			and GetUnitToLocationDistance(d, GetRuneSpawnLocation(d.rune.normal.location)) < z
 		then
 			local A = GetRuneStatus(d.rune.normal.location)
+			local here = GetUnitToLocationDistance(d, GetRuneSpawnLocation(d.rune.normal.location))
+			-- 2:00 and 4:00 river runes are the mid's. A sidelaner who camped the
+			-- 0:00 gold stays through the water spawn and picks up both.
 			if A == RUNE_STATUS_AVAILABLE or A == RUNE_STATUS_UNKNOWN then
-				local here = GetUnitToLocationDistance(d, GetRuneSpawnLocation(d.rune.normal.location))
-				if A == RUNE_STATUS_AVAILABLE and here <= 800 then
+				if a.SidelaneSkipsRiver(d.rune.normal.location, here) or a.SkipSecondLaningRune(d.rune.normal.location) then
+					-- fall through and let lane desire win
+				elseif A == RUNE_STATUS_AVAILABLE and here <= 800 then
 					return give(BOT_MODE_DESIRE_ABSOLUTE, "laning-close")
+				else
+					return give(BOT_MODE_DESIRE_VERYHIGH, "laning-hold")
 				end
-				return give(BOT_MODE_DESIRE_VERYHIGH, "laning-hold")
 			end
 		end
 		local B = a.GetLaningRuneDesire(z)
@@ -384,6 +399,23 @@ function Think()
 		doing("cant-act")
 		return
 	end
+	-- Opening buys go to the stash once the hero has left the shop. Stay until they
+	-- are in the bag, and walk back if something was stashed anyway.
+	if DotaTime() < 20 and d:GetStashValue() > 0 and d:DistanceFromFountain() > 500 then
+		d:Action_MoveToLocation(b.GetTeamFountain())
+		doing("stash-back")
+		return
+	end
+	if DotaTime() < -70 and d._openingShopDone ~= true and d:DistanceFromFountain() < 2200 then
+		if d:DistanceFromFountain() > 350 then
+			d:Action_MoveToLocation(b.GetTeamFountain())
+		end
+		doing("pre-shop")
+		return
+	end
+	if a.ThinkBountySweep() then
+		return
+	end
 	-- A pickup order that never lands (knockback, stun, river edge) must be reissued.
 	if d:GetCurrentActionType() == BOT_ACTION_TYPE_PICK_UP_RUNE then
 		if d._runePickupAt ~= nil and DotaTime() - d._runePickupAt < 0.6 then
@@ -494,52 +526,52 @@ function Think()
 			return 1.5 * myDmg > theirDmg
 		end
 		if D.status == RUNE_STATUS_AVAILABLE then
-			-- River spawn sits in the water. Grab from the bank; don't path onto the point.
-			if liveDist <= 320 then
-				d._runePickupAt = DotaTime()
-				d:Action_PickUpRune(D.location)
-				doing("pickup")
-				return
-			end
-			if K and b.CanCastAbility(K) and liveDist < 1200 then
-				local V = K:GetCurrentCharges()
-				if V > 0 and (i ~= 1 or j ~= 1) then
-					d:Action_UseAbility(K)
-					doing("bottle")
+			-- Pickup from the bank does not collect a river rune. Walk onto the point.
+			-- If that walk makes no progress, leave so the lane is not abandoned.
+			if liveDist > 130 then
+				if liveDist <= 900 and a.RuneReachFailed(D.location, liveDist) then
+					a.SkipRune(D.location, 25)
+					local lane = n or d:GetAssignedLane()
+					d:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), lane, -600))
+					doing("give-up")
 					return
 				end
-			end
-			if liveDist > 900 then
-				for F, W in pairs(S) do
-					if CanHarassNearRune(W) then
-						d:Action_AttackUnit(W, true)
-						doing("harass")
+				if K and b.CanCastAbility(K) and liveDist < 1200 then
+					local V = K:GetCurrentCharges()
+					if V > 0 and (i ~= 1 or j ~= 1) then
+						d:Action_UseAbility(K)
+						doing("bottle")
 						return
 					end
 				end
-				if
-					b.IsValid(T[1])
-					and b.CanBeAttacked(T[1])
-					and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
-				then
-					d:Action_AttackUnit(T[1], true)
-					doing("lasthit")
-					return
+				if liveDist > 900 then
+					for F, W in pairs(S) do
+						if CanHarassNearRune(W) then
+							d:Action_AttackUnit(W, true)
+							doing("harass")
+							return
+						end
+					end
+					if
+						b.IsValid(T[1])
+						and b.CanBeAttacked(T[1])
+						and b.CanKillTarget(T[1], d:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+					then
+						d:Action_AttackUnit(T[1], true)
+						doing("lasthit")
+						return
+					end
 				end
-			end
-			-- The point 280 short of the spawn can be water, cliff or trees. Walking there left
-			-- bots parked on the bank, out of grab range, so let the pickup order path instead.
-			if liveDist <= 900 then
-				d._runePickupAt = DotaTime()
-				d:Action_PickUpRune(D.location)
-				doing("pickup")
+				d:Action_MoveToLocation(E)
+				doing("move-on")
 				return
 			end
-			local step = math.max(0, liveDist - 280)
-			local stand = b.Site.GetXUnitsTowardsLocation(d, E, step) or E
-			d.rune.location = stand
-			d:Action_MoveToLocation(stand)
-			doing("move-stand")
+			d._runeReach = nil
+			d._runePickupAt = DotaTime()
+			a.NoteBountyGrab(D.location)
+			a.NoteLaneRuneTake(D.location)
+			d:Action_PickUpRune(D.location)
+			doing("pickup")
 			return
 		else
 			if liveDist > 500 then
@@ -576,6 +608,132 @@ function a.InitRune()
 			{ normal = { time = 0, type = nil, location = nil, distance = 0, status = RUNE_STATUS_MISSING }, location = nil }
 	end
 end
+-- Bounty runes never despawn. A new one spawns beside the old one, but the bot API
+-- still has a single id for that jungle spot. PickUpRune takes the one on the point
+-- and then reports the spot missing, so the older rune is left unless we walk onto it.
+local BOUNTY_SWEEP = {
+	Vector(160, 0, 0),
+	Vector(113, 113, 0),
+	Vector(0, 160, 0),
+	Vector(-113, 113, 0),
+	Vector(-160, 0, 0),
+	Vector(-113, -113, 0),
+	Vector(0, -160, 0),
+	Vector(113, -113, 0),
+}
+function a.NoteBountyGrab(runeId)
+	if runeId ~= RUNE_BOUNTY_1 and runeId ~= RUNE_BOUNTY_2 then
+		return
+	end
+	local now = DotaTime()
+	local s = d._bountySweep
+	if s == nil or s.id ~= runeId or (s.sweepUntil ~= nil and now > s.sweepUntil) then
+		d._bountySweep = { id = runeId, seen = now }
+		return
+	end
+	if s.sweepUntil == nil then
+		s.seen = now
+	end
+end
+function a.BountySweepState()
+	local s = d._bountySweep
+	if s == nil then
+		return nil
+	end
+	local now = DotaTime()
+	if s.sweepUntil ~= nil and now > s.sweepUntil then
+		d._bountySweep = nil
+		return nil
+	end
+	local loc = GetRuneSpawnLocation(s.id)
+	local dist = GetUnitToLocationDistance(d, loc)
+	local status = GetRuneStatus(s.id)
+	if s.sweepUntil == nil then
+		-- Still walking up to the registered rune. The ring starts once that one is gone.
+		if status == RUNE_STATUS_AVAILABLE then
+			if now - s.seen > 1.5 then
+				d._bountySweep = nil
+			end
+			return nil
+		end
+		if dist > 900 then
+			if now - s.seen > 1.5 then
+				d._bountySweep = nil
+			end
+			return nil
+		end
+		s.sweepUntil = now + 2.4
+		s.ringStart = now
+	end
+	if dist > 900 then
+		return nil
+	end
+	return s, loc, dist, status
+end
+function a.BountySweepDesire()
+	local s, loc, dist, status = a.BountySweepState()
+	if s == nil then
+		return nil
+	end
+	local D = d.rune.normal
+	D.location = s.id
+	D.distance = dist
+	D.status = status
+	D.type = RUNE_BOUNTY
+	return BOT_MODE_DESIRE_ABSOLUTE
+end
+function a.ThinkBountySweep()
+	local s, loc = a.BountySweepState()
+	if s == nil then
+		return false
+	end
+	local idx = math.floor((DotaTime() - s.ringStart) / 0.3) % #BOUNTY_SWEEP + 1
+	local dest = loc + BOUNTY_SWEEP[idx]
+	if GetUnitToLocationDistance(d, dest) <= 50 then
+		d._runePickupAt = DotaTime()
+		a.NoteLaneRuneTake(s.id)
+		d:Action_PickUpRune(s.id)
+		doing("sweep-pick")
+		return true
+	end
+	d:Action_MoveToLocation(dest)
+	doing("sweep")
+	return true
+end
+function a.SkipRune(id, seconds)
+	d._runeSkip = d._runeSkip or {}
+	d._runeSkip[id] = DotaTime() + (seconds or 25)
+	d._earlyRuneCommit = nil
+	d._runeReach = nil
+end
+function a.RuneSkipped(id)
+	local untilAt = d._runeSkip and d._runeSkip[id]
+	return untilAt ~= nil and DotaTime() < untilAt
+end
+function a.RuneReachFailed(id, dist)
+	local now = DotaTime()
+	local s = d._runeReach
+	if s == nil or s.id ~= id then
+		d._runeReach = { id = id, since = now, best = dist }
+		return false
+	end
+	if dist + 30 < s.best then
+		s.best = dist
+		s.since = now
+		return false
+	end
+	local limit = 4
+	local loc = GetRuneSpawnLocation(id)
+	local mine = GetUnitToLocationDistance(d, loc)
+	for u = 1, 5 do
+		local v = GetTeamMember(u)
+		if b.IsValidHero(v) and v ~= d and v:IsAlive() and GetUnitToLocationDistance(v, loc) + 80 < mine then
+			limit = 2
+			break
+		end
+	end
+	return now - s.since >= limit
+end
 function a.ClosestAvailableRune(maxDist)
 	local best, bestDist = nil, maxDist or 700
 	local t = DotaTime()
@@ -583,12 +741,16 @@ function a.ClosestAvailableRune(maxDist)
 		-- Bounty runes spawn every 3 minutes and report missing until the bot has vision.
 		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2) and t >= 170 and t % 180 <= 50
 		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE or (bountyDue and GetRuneStatus(rune) ~= RUNE_STATUS_MISSING) then
+			if a.RuneSkipped(rune) then
+				goto continue_rune
+			end
 			local dist = GetUnitToLocationDistance(d, GetRuneSpawnLocation(rune))
 			if dist < bestDist then
 				best = rune
 				bestDist = dist
 			end
 		end
+		::continue_rune::
 	end
 	return best, bestDist
 end
@@ -619,6 +781,34 @@ function a.IsNearRune(X, Y)
 	end
 	return false
 end
+function a.NoteLaneRuneTake(id)
+	if DotaTime() >= 6 * 60 then
+		return
+	end
+	d._laneRuneTaken = { id = id, untilAt = DotaTime() + 25 }
+end
+function a.SkipSecondLaningRune(id)
+	local taken = d._laneRuneTaken
+	if taken == nil or DotaTime() >= 6 * 60 or DotaTime() > taken.untilAt then
+		return false
+	end
+	return id ~= taken.id
+end
+-- After the horn, the river spot is the mid's. 0:00 gold and 2:00 water share it,
+-- and a sidelaner who stays there picks up both.
+function a.SidelaneSkipsRiver(id, dist)
+	if id ~= RUNE_POWERUP_1 and id ~= RUNE_POWERUP_2 then
+		return false
+	end
+	local t = DotaTime()
+	if t < 50 or t >= 6 * 60 then
+		return false
+	end
+	if k == 2 then
+		return false
+	end
+	return (dist or 99999) > 160
+end
 function a.GetBestRune()
 	e = math.floor(DotaTime() / 60)
 	f = DotaTime() % 60
@@ -630,13 +820,17 @@ function a.GetBestRune()
 			a.IsTheClosestAlly(d, E)
 			and not a.IsPingedByHumanPlayer(E, math.huge)
 			and not r(D)
+			and not a.RuneSkipped(D)
 			and not a.IsMissing(D)
 		then
 			-- The horn gold on power-rune spots is for whoever stands closest. Leaving it to a
 			-- nearby core stalled both, since the core is not the closest ally.
 			local hornGold = DotaTime() < 70
-			if D == RUNE_BOUNTY_1 or D == RUNE_BOUNTY_2 or hornGold or (b.IsCore(d) or not b.IsThereCoreNearby(1200)) then
-				local a0 = GetUnitToLocationDistance(d, E)
+			local dist = GetUnitToLocationDistance(d, E)
+			if a.SidelaneSkipsRiver(D, dist) or a.SkipSecondLaningRune(D) then
+				-- River gold at 0:00 and water at 2:00 share this spot. One mid trip.
+			elseif D == RUNE_BOUNTY_1 or D == RUNE_BOUNTY_2 or hornGold or (b.IsCore(d) or not b.IsThereCoreNearby(1200)) then
+				local a0 = dist
 				if a0 < _ then
 					Z = D
 					_ = a0
@@ -931,6 +1125,9 @@ function a.GetLaningRuneDesire(z)
 		local awStatus = nil
 		local ax = z
 		for F, D in pairs(av) do
+			if k ~= 2 or a.SkipSecondLaningRune(D) then
+				goto continue_power
+			end
 			local ay = GetRuneStatus(D)
 			if
 				(ay == RUNE_STATUS_AVAILABLE or ay == RUNE_STATUS_UNKNOWN)
@@ -944,6 +1141,7 @@ function a.GetLaningRuneDesire(z)
 					awStatus = ay
 				end
 			end
+			::continue_power::
 		end
 		if aw ~= nil then
 			if d.rune and d.rune.normal then
@@ -963,7 +1161,7 @@ function a.GetLaningRuneDesire(z)
 		elseif az == TEAM_RADIANT and k == 5 or az == TEAM_DIRE and k == 4 then
 			aA = RUNE_BOUNTY_2
 		end
-		if aA ~= nil and a.ShouldCheckRuneStatus(aA) and not a.IsHumanDangerPingedRune(aA) then
+		if aA ~= nil and a.ShouldCheckRuneStatus(aA) and not a.IsHumanDangerPingedRune(aA) and not a.SkipSecondLaningRune(aA) then
 			local a0 = GetUnitToLocationDistance(d, GetRuneSpawnLocation(aA))
 			if a0 < z then
 				if d.rune and d.rune.normal then
@@ -986,7 +1184,7 @@ function a.GetLaningRuneDesire(z)
 	for F, D in pairs(aD) do
 		if a.ShouldCheckRuneStatus(D) and not a.IsHumanDangerPingedRune(D) and not a.IsAllyWithBottleCloser(D) then
 			local a0 = GetUnitToLocationDistance(d, GetRuneSpawnLocation(D))
-			if a0 < aC then
+			if not a.SidelaneSkipsRiver(D, a0) and not a.SkipSecondLaningRune(D) and a0 < aC then
 				aB = D
 				aC = a0
 			end

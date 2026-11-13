@@ -17,7 +17,6 @@ n["pos_4"] = {
 	"item_double_tango",
 	"item_double_branches",
 	"item_blood_grenade",
-	"item_circlet",
 	"item_boots",
 	"item_magic_wand",
 	"item_arcane_boots",
@@ -35,7 +34,6 @@ n["pos_5"] = {
 	"item_double_tango",
 	"item_double_branches",
 	"item_blood_grenade",
-	"item_circlet",
 	"item_boots",
 	"item_magic_wand",
 	"item_tranquil_boots",
@@ -52,7 +50,6 @@ n["pos_5"] = {
 n["pos_3"] = {
 	"item_double_tango",
 	"item_double_branches",
-	"item_circlet",
 	"item_boots",
 	"item_magic_wand",
 	"item_tranquil_boots",
@@ -99,19 +96,31 @@ local r = SafeAbility(b:GetAbilityByName("techies_reactive_tazer_stop"), "techie
 local s = SafeAbility(b:GetAbilityByName("techies_suicide"), "techies_suicide", "techies")
 local t = SafeAbility(b:GetAbilityByName("techies_minefield_sign"), "techies_minefield_sign", "techies")
 local u = SafeAbility(b:GetAbilityByName("techies_land_mines"), "techies_land_mines", "techies")
+local mad = SafeAbility(
+	b:GetAbilityByName("techies_mutually_assured_destruction"),
+	"techies_mutually_assured_destruction",
+	"techies"
+)
+local madStop = SafeAbility(b:GetAbilityByName("techies_focused_detonate"), "techies_focused_detonate", "techies")
 local v, w
-local x
-local y, z
+local x, xTarget
+local y, z, yWhy
 local A, B
 local C, D
 local E = 0
-local F, G
+local F, G, Flag
 local H, I, J, K, L
 local M
 local N
 local O
 local P
 function a.SkillsComplement()
+	-- Detonate M.A.D. still works while Techies is dead or already acting.
+	if a.ConsiderDetonateMad() > 0 then
+		b:Action_UseAbility(madStop)
+		b._madLoc = nil
+		return
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -125,43 +134,67 @@ function a.SkillsComplement()
 	J = u:GetSpecialValueInt("damage")
 	K = J * 2
 	L = I + K
-	F, G, Flag = a.ConsiderCombo()
-	if F > 0 then
+	-- Blast Off first, never waiting on the Tazer. The Tazer and the mines are extras queued
+	-- behind it when they are up: the Tazer on Techies after he lands (speed, and a disarm on
+	-- whoever hits him in the middle of the fight), then mines around the stunned target.
+	-- The old order put the Tazer first (0.1s cast and a 0.6s wait), which delayed the stun,
+	-- and Blast Off was held back whenever the Tazer was not ready to go with it.
+	y, z, yWhy = a.ConsiderBlastOff()
+	if y > 0 then
 		b:Action_ClearActions(false)
-		local R = s:GetCastPoint()
-		local S = s:GetSpecialValueInt("stun_radius")
-		if Flag == 1 then
-			if c.CheckBitfieldFlag(q:GetBehavior(), ABILITY_BEHAVIOR_UNIT_TARGET) then
+		b:ActionQueue_UseAbilityOnLocation(s, z)
+		-- The cast point is spent before the next queued order; the 0.75s flight is not.
+		b:ActionQueue_Delay(math.max(0.3, s:GetSpecialValueFloat("duration")) + 0.1)
+		local manaLeft = b:GetMana() - s:GetManaCost()
+		local tazer = false
+		if a.TazerUsable() and manaLeft >= q:GetManaCost() then
+			if a.TazerIsUnitTarget() then
 				b:ActionQueue_UseAbilityOnEntity(q, b)
 			else
 				b:ActionQueue_UseAbility(q)
 			end
-			b:ActionQueue_Delay(0.6)
-			b:ActionQueue_UseAbilityOnLocation(s, G)
-			b:ActionQueue_Delay(R + S)
-			if not r:IsHidden() then
-				b:ActionQueue_UseAbility(r)
+			b._tazerCastAt = DotaTime()
+			manaLeft = manaLeft - q:GetManaCost()
+			tazer = true
+		end
+		local planted = 0
+		if yWhy ~= "escape" and u:IsTrained() and not u:IsHidden() then
+			local mineCost = u:GetManaCost()
+			local maxMines = math.min(a.MineCharges(), mineCost > 0 and math.floor(manaLeft / mineCost) or 3)
+			for _, spot in ipairs(a.MineTriangle(z, 210)) do
+				if planted >= maxMines then
+					break
+				end
+				b:ActionQueue_UseAbilityOnLocation(u, spot)
+				planted = planted + 1
 			end
 		end
+		a.LogTechies(string.format("blast why=%s tazer=%s", yWhy or "?", tostring(tazer)), planted, z)
 		return
 	end
+	x, xTarget = a.ConsiderReactiveTazer()
+	if x > 0 then
+		-- Unit-target only in a version where it can go on an ally. Otherwise it is a self cast.
+		if a.TazerIsUnitTarget() then
+			b:Action_UseAbilityOnEntity(q, xTarget or b)
+		else
+			b:Action_UseAbility(q)
+		end
+		b._tazerCastAt = DotaTime()
+		return
+	end
+	-- No manual Tazer detonation. Popping it early throws away the speed and the disarm on
+	-- attackers, and the blast goes off by itself when the buff ends.
 	v, w = a.ConsiderStickyBomb()
 	if v > 0 then
 		b:Action_UseAbilityOnLocation(p, w)
 		return
 	end
-	x = a.ConsiderReactiveTazer()
-	if x > 0 then
-		if c.CheckBitfieldFlag(q:GetBehavior(), ABILITY_BEHAVIOR_UNIT_TARGET) then
-			b:Action_UseAbilityOnEntity(q, b)
-		else
-			b:Action_UseAbility(q)
-		end
-		return
-	end
-	y, z = a.ConsiderBlastOff()
-	if y > 0 then
-		b:Action_UseAbilityOnLocation(s, z)
+	C, D = a.ConsiderPlantMad()
+	if C > 0 then
+		b._madLoc = D
+		b._madUntil = DotaTime() + 45
+		b:Action_UseAbilityOnLocation(mad, D)
 		return
 	end
 	C, D = a.ConsiderProximityMines()
@@ -306,6 +339,22 @@ function a.ConsiderStickyBomb()
 				end
 			end
 		end
+		-- The bomb latches the nearest enemy hero at the landing spot. A lane poke is worth the mana.
+		if c.GetManaAfter(p:GetManaCost()) > 0.4 then
+			for Z, _ in pairs(a5) do
+				if
+					c.IsValidHero(_)
+					and c.CanCastOnNonMagicImmune(_)
+					and c.IsInRange(b, _, T)
+					and not c.IsSuspiciousIllusion(_)
+					and not _:HasModifier("modifier_abaddon_borrowed_time")
+					and not _:HasModifier("modifier_dazzle_shallow_grave")
+					and not _:HasModifier("modifier_oracle_false_promise_timer")
+				then
+					return BOT_ACTION_DESIRE_HIGH, _:GetExtrapolatedLocation(1.2)
+				end
+			end
+		end
 		for Z, ab in pairs(a7) do
 			if c.IsValid(ab) and ab:GetHealth() <= U then
 				table.insert(a9, ab)
@@ -337,47 +386,242 @@ function a.ConsiderStickyBomb()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderReactiveTazer()
-	if not q:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE
+local function HeroIsBeingHit(hero)
+	if hero == nil or not hero:IsAlive() then
+		return false
 	end
-	local ad = q:GetSpecialValueInt("stun_radius")
-	if M and not CanDoCombo1() then
-		if
-			c.IsValidTarget(H)
-			and c.IsInRange(b, H, ad)
-			and not c.IsSuspiciousIllusion(H)
-			and not c.IsDisabled(H)
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			local a4 = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-			local a5 = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if a4 ~= nil and a5 ~= nil and #a4 >= #a5 then
-				return BOT_ACTION_DESIRE_HIGH
-			end
+	if hero:WasRecentlyDamagedByAnyHero(2.0) then
+		return true
+	end
+	local foes = c.GetNearbyHeroes(hero, 800, true, BOT_MODE_NONE)
+	for Z, foe in pairs(foes or {}) do
+		if c.IsValidHero(foe) and not foe:IsIllusion() and foe:GetAttackTarget() == hero then
+			return true
 		end
 	end
-	if N and b:GetActiveModeDesire() > BOT_ACTION_DESIRE_HIGH then
-		local a5 = c.GetNearbyHeroes(b, ad, true, BOT_MODE_NONE)
-		for Z, _ in pairs(a5) do
-			if
-				c.IsValidHero(_)
-				and c.IsChasingTarget(_, b)
-				and not c.IsSuspiciousIllusion(_)
-				and not c.IsDisabled(_)
-			then
-				local a4 = c.GetNearbyHeroes(_, 1200, true, BOT_MODE_NONE)
-				local a6 = c.GetNearbyHeroes(_, 1200, false, BOT_MODE_NONE)
-				if a4 ~= nil and a6 ~= nil and (#a6 > #a4 or b:WasRecentlyDamagedByAnyHero(1.5)) then
-					return BOT_ACTION_DESIRE_HIGH
+	return false
+end
+local function TazerCastRange()
+	local range = q:GetCastRange()
+	if range == nil or range < 100 then
+		range = 600
+	end
+	return c.GetProperCastRange(false, b, range)
+end
+local function AllyCanTakeTazer(ally, range)
+	return ally ~= nil
+		and ally ~= b
+		and c.IsValidHero(ally)
+		and not ally:IsIllusion()
+		and c.IsInRange(b, ally, range)
+		and not ally:HasModifier("modifier_techies_reactive_tazer")
+		and c.CanCastOnNonMagicImmune(ally)
+end
+local function AllyIsFleeing(ally)
+	if HeroIsBeingHit(ally) or c.IsRetreating(ally) then
+		return true
+	end
+	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
+	for Z, foe in pairs(foes or {}) do
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, ally) then
+			return true
+		end
+	end
+	return false
+end
+local function AllyIsInitiating(ally)
+	if c.IsGoingOnSomeone(ally) then
+		return true
+	end
+	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
+	for Z, foe in pairs(foes or {}) do
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(ally, foe) then
+			return true
+		end
+	end
+	return false
+end
+function a.ConsiderReactiveTazer()
+	if not a.TazerUsable() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local range = TazerCastRange()
+	-- Self first when he is the one being hit or chased. The buff is speed plus a disarm on attackers.
+	if not b:HasModifier("modifier_techies_reactive_tazer") then
+		if HeroIsBeingHit(b) then
+			return BOT_ACTION_DESIRE_HIGH, b
+		end
+		if N then
+			local foes = c.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)
+			for Z, foe in pairs(foes or {}) do
+				if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, b) then
+					return BOT_ACTION_DESIRE_HIGH, b
 				end
 			end
 		end
 	end
+	-- Same cast works on an ally with no shard. Help the one who is fleeing, then the one going in.
+	local flee, initiate = nil, nil
+	local allies = a.TazerIsUnitTarget() and c.GetNearbyHeroes(b, range, false, BOT_MODE_NONE) or {}
+	for Z, ally in pairs(allies or {}) do
+		if AllyCanTakeTazer(ally, range) then
+			if AllyIsFleeing(ally) then
+				flee = ally
+			elseif initiate == nil and AllyIsInitiating(ally) then
+				initiate = ally
+			end
+		end
+	end
+	if flee ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, flee
+	end
+	-- With Blast Off up, keep the Tazer for the combo. Spent on an ally going in or on our own
+	-- approach, it was on cooldown by the time a target came into Blast Off range.
+	local selfEngage = not b:HasModifier("modifier_techies_reactive_tazer")
+		and M
+		and c.IsValidTarget(H)
+		and c.IsInRange(b, H, 1200)
+		and not c.IsSuspiciousIllusion(H)
+		and c.GetManaAfter(q:GetManaCost()) > 0.2
+	if (initiate ~= nil or selfEngage) and a.ComboReady() then
+		if DotaTime() >= (b._tazerHeldLogAt or -999) then
+			b._tazerHeldLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-TECHIES] t=%.0f tazer-held for=%s pid=%d mp=%.2f",
+				DotaTime(),
+				initiate ~= nil and (string.gsub(initiate:GetUnitName(), "npc_dota_hero_", "")) or "self",
+				b:GetPlayerID(),
+				c.GetMP(b)
+			))
+		end
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if initiate ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, initiate
+	end
+	if selfEngage then
+		return BOT_ACTION_DESIRE_HIGH, b
+	end
+	return BOT_ACTION_DESIRE_NONE, nil
+end
+local function TazerHost()
+	if b:HasModifier("modifier_techies_reactive_tazer") then
+		return b
+	end
+	local allies = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
+	for Z, ally in pairs(allies or {}) do
+		if c.IsValidHero(ally) and ally:HasModifier("modifier_techies_reactive_tazer") then
+			return ally
+		end
+	end
+	return nil
+end
+function a.ConsiderDetonateTazer()
+	if r == nil or r:IsNull() or r:IsHidden() or not r:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local host = TazerHost()
+	if host == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- Secondary cast pops the charge early and ends the speed and the disarm on attackers.
+	-- Pop it at once only for two heroes in the blast; one hero waits until the buff has worked.
+	local radius = q:GetSpecialValueInt("stun_radius")
+	if radius == nil or radius < 100 then
+		radius = q:GetSpecialValueInt("radius")
+	end
+	if radius == nil or radius < 100 then
+		radius = 450
+	end
+	local inBlast = 0
+	local foes = c.GetNearbyHeroes(host, radius, true, BOT_MODE_NONE)
+	for Z, foe in pairs(foes or {}) do
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and not foe:IsMagicImmune() then
+			inBlast = inBlast + 1
+		end
+	end
+	local held = DotaTime() - (b._tazerCastAt or -99)
+	if inBlast >= 2 or inBlast >= 1 and held >= 1.5 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
+function a.TazerIsUnitTarget()
+	local ok, behavior = pcall(function()
+		return q:GetBehavior()
+	end)
+	return ok and behavior ~= nil and c.CheckBitfieldFlag(behavior, ABILITY_BEHAVIOR_UNIT_TARGET)
+end
+function a.ConsiderPlantMad()
+	if not c.HasAghanimsShard(b) or b:WasRecentlyDamagedByAnyHero(1.5) then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	if mad == nil or mad:IsNull() or mad:IsHidden() or mad:IsPassive() or not mad:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local castRange = mad:GetCastRange()
+	if castRange == nil or castRange < 100 then
+		castRange = 450
+	end
+	castRange = c.GetProperCastRange(false, b, castRange)
+	local function Toward(unit)
+		local dist = GetUnitToUnitDistance(b, unit)
+		if dist <= castRange then
+			return unit:GetLocation()
+		end
+		if dist <= castRange + 250 then
+			return c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), unit:GetLocation(), castRange - 40)
+		end
+		return nil
+	end
+	if M and c.IsValidTarget(H) and not c.IsSuspiciousIllusion(H) and GetUnitToUnitDistance(b, H) > 400 then
+		local loc = Toward(H)
+		if loc ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, loc
+		end
+	end
+	if N then
+		local foes = c.GetNearbyHeroes(b, 1100, true, BOT_MODE_NONE)
+		for Z, foe in pairs(foes or {}) do
+			if
+				c.IsValidHero(foe)
+				and not c.IsSuspiciousIllusion(foe)
+				and c.IsChasingTarget(foe, b)
+				and GetUnitToUnitDistance(b, foe) > 500
+			then
+				local loc = Toward(foe)
+				if loc ~= nil then
+					return BOT_ACTION_DESIRE_HIGH, loc
+				end
+			end
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE, 0
+end
+function a.ConsiderDetonateMad()
+	if madStop == nil or madStop:IsNull() or madStop:IsHidden() or not madStop:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local loc = b._madLoc
+	if loc == nil or DotaTime() > (b._madUntil or 0) then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- The barrel needs 1.5s after the order. Pop it when a hero is already on it.
+	local foes = c.GetEnemiesNearLoc(loc, 280)
+	if foes ~= nil and #foes >= 1 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	return BOT_ACTION_DESIRE_NONE
+end
+-- Returns desire, location, and why: channel, fight, chase, initiate, last-stand, escape.
 function a.ConsiderBlastOff()
-	if not s:IsFullyCastable() then
+	if not s:IsFullyCastable() or s:IsHidden() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local T = c.GetProperCastRange(false, b, s:GetCastRange())
@@ -397,23 +641,25 @@ function a.ConsiderBlastOff()
 			and not _:HasModifier("modifier_oracle_false_promise_timer")
 			and not _:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local a4 = c.GetNearbyHeroes(_, 1200, true, BOT_MODE_NONE)
-			local a5 = c.GetNearbyHeroes(_, 1200, false, BOT_MODE_NONE)
-			if a4 ~= nil and a5 ~= nil and #a4 >= #a5 then
-				if _:IsChanneling() then
-					return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
+			-- Stop a channel (TP, ult) even when outnumbered. Only a low Techies checks numbers,
+			-- since the landing costs him a share of his current HP.
+			if _:IsChanneling() then
+				local a4 = c.GetNearbyHeroes(_, 1200, true, BOT_MODE_NONE)
+				local a5 = c.GetNearbyHeroes(_, 1200, false, BOT_MODE_NONE)
+				if (P or 1) >= 0.3 or a4 ~= nil and a5 ~= nil and #a4 >= #a5 then
+					return BOT_ACTION_DESIRE_HIGH, _:GetLocation(), "channel"
 				end
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) and not CanDoCombo1() then
+	if c.IsInTeamFight(b, 1200) then
 		local ae = b:FindAoELocation(true, true, b:GetLocation(), T, ad, 0, 0)
 		local a5 = c.GetEnemiesNearLoc(ae.targetloc, ad * 0.8)
 		if a5 ~= nil and #a5 >= 2 and not c.IsLocationInChrono(c.GetCenterOfUnits(a5)) then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5)
+			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), "fight"
 		end
 	end
-	if M and not CanDoCombo1() then
+	if M then
 		if
 			c.IsValidTarget(H)
 			and c.CanCastOnNonMagicImmune(H)
@@ -435,7 +681,7 @@ function a.ConsiderBlastOff()
 						end
 					end
 					if not af then
-						return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(a0)
+						return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(a0), "chase"
 					end
 				else
 					if c.IsInLaningPhase() then
@@ -446,9 +692,9 @@ function a.ConsiderBlastOff()
 					if not af then
 						a5 = c.GetEnemiesNearLoc(H:GetLocation(), ad)
 						if a5 ~= nil and #a5 >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5)
+							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), "initiate"
 						else
-							return BOT_ACTION_DESIRE_HIGH, H:GetLocation()
+							return BOT_ACTION_DESIRE_HIGH, H:GetLocation(), "initiate"
 						end
 					end
 				end
@@ -467,9 +713,9 @@ function a.ConsiderBlastOff()
 						and c.CanCastOnNonMagicImmune(_)
 						and b:GetHealth() < c.GetTotalEstimatedDamageToTarget(a5, b)
 					then
-						return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
+						return BOT_ACTION_DESIRE_HIGH, _:GetLocation(), "last-stand"
 					else
-						return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), T)
+						return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), T), "escape"
 					end
 				end
 			end
@@ -478,7 +724,9 @@ function a.ConsiderBlastOff()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderMineFieldSign()
-	if not u:IsTrained() or not t:IsFullyCastable() then
+	-- Minefield Sign stays hidden without Scepter but still reports castable. Ordering it
+	-- then is refused by the server and freezes Techies in place every think.
+	if not u:IsTrained() or t:IsHidden() or not t:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local ad = t:GetSpecialValueInt("aura_radius")
@@ -487,7 +735,7 @@ function a.ConsiderMineFieldSign()
 	if
 		MineLocation ~= nil
 		and GetUnitToLocationDistance(b, MineLocation) <= b:GetCurrentVisionRange()
-		and not IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
+		and not a.IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
 	then
 		for ai = 0, 50 do
 			local aj = c.GetRandomLocationWithinDist(MineLocation, 0, ad * 3 + 100)
@@ -502,6 +750,53 @@ function a.ConsiderMineFieldSign()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Proximity Mines is charge based (3 charges, one every 15s). Charges left, or 3 if the
+-- API does not report them.
+function a.MineCharges()
+	local ok, n = pcall(function()
+		return u:GetCurrentAbilityCharges()
+	end)
+	if ok and type(n) == "number" then
+		return n
+	end
+	return 3
+end
+-- Three spots 120 degrees apart around center. At radius 210 they sit ~364 apart, past the
+-- 350 minimum mine spacing, and the target in the middle is near full damage from each.
+-- Skips spots that are not passable or too close to an existing mine.
+function a.MineTriangle(center, radius)
+	local spots = {}
+	if center == nil then
+		return spots
+	end
+	for k = 0, 2 do
+		local angle = math.rad(90 + 120 * k)
+		local spot = center + Vector(math.cos(angle) * radius, math.sin(angle) * radius, 0)
+		if IsLocationPassable(spot) and not f.IsOtherMinesClose(spot) then
+			spots[#spots + 1] = spot
+		end
+	end
+	return spots
+end
+-- [OHA-TECHIES]: mine combos and triangles, at most once per 5s per kind.
+function a.LogTechies(kind, mines, center)
+	b._techiesLogAt = b._techiesLogAt or {}
+	if DotaTime() < (b._techiesLogAt[kind] or -999) then
+		return
+	end
+	b._techiesLogAt[kind] = DotaTime() + 5
+	pcall(print, string.format(
+		"[OHA-TECHIES] t=%.0f %s pid=%d mines=%d charges=%d at=%.0f,%.0f mp=%.2f",
+		DotaTime(),
+		kind,
+		b:GetPlayerID(),
+		mines,
+		a.MineCharges(),
+		center and center.x or 0,
+		center and center.y or 0,
+		c.GetMP(b)
+	))
+end
 function a.ConsiderProximityMines()
 	if not u:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -509,6 +804,21 @@ function a.ConsiderProximityMines()
 	local T = c.GetProperCastRange(false, b, u:GetCastRange())
 	local al = 400
 	local am = u:GetManaCost()
+	-- A disabled enemy in reach: build the triangle around it, one mine per think (cast point 0).
+	if
+		c.IsValidHero(H)
+		and c.IsDisabled(H)
+		and c.CanCastOnNonMagicImmune(H)
+		and not c.IsSuspiciousIllusion(H)
+		and GetUnitToUnitDistance(b, H) <= T + 210
+		and not H:HasModifier("modifier_necrolyte_reapers_scythe")
+	then
+		local spots = a.MineTriangle(H:GetLocation(), 210)
+		if spots[1] ~= nil and GetUnitToLocationDistance(b, spots[1]) <= T + 100 then
+			a.LogTechies("triangle", #spots, H:GetLocation())
+			return BOT_ACTION_DESIRE_HIGH, spots[1]
+		end
+	end
 	if M then
 		if
 			c.IsValidTarget(H)
@@ -599,7 +909,13 @@ function a.ConsiderProximityMines()
 			local a4 = c.GetAlliesNearLoc(ag[1]:GetLocation(), b:GetAttackRange())
 			local a5 = c.GetEnemiesNearLoc(ag[1]:GetLocation(), 1600)
 			if a4 ~= nil and #a4 >= 1 and a5 ~= nil and #a5 == 0 then
-				return BOT_ACTION_DESIRE_HIGH, ag[1]:GetLocation() + RandomVector(200)
+				-- Mines deal 30% to buildings. Ring the tower with the 350-spaced triangle
+				-- instead of one random spot that blocks the next mine.
+				local spots = a.MineTriangle(ag[1]:GetLocation(), 250)
+				if spots[1] ~= nil then
+					a.LogTechies("tower", #spots, ag[1]:GetLocation())
+					return BOT_ACTION_DESIRE_HIGH, spots[1]
+				end
 			end
 		end
 	end
@@ -634,13 +950,13 @@ function a.ConsiderProximityMines()
 		end
 	end
 	local ao = q:GetManaCost() + s:GetManaCost()
-	if DotaTime() > E + 1.5 and c.GetManaAfter(ao) * b:GetMana() > u:GetManaCost() * 2 and IsSuitableToPlaceMine() then
+	if DotaTime() > E + 1.5 and c.GetManaAfter(ao) * b:GetMana() > u:GetManaCost() * 2 and a.IsSuitableToPlaceMine() then
 		local ah = f.GetAvailableSpot()
 		MineLocation, MineLocationDistance = f.GetClosestSpot(b, ah)
 		if
 			MineLocation ~= nil
 			and GetUnitToLocationDistance(b, MineLocation) <= 2000
-			and not IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
+			and not a.IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
 		then
 			for ai = 0, 10 do
 				local aj = c.GetRandomLocationWithinDist(MineLocation, 0, f.nMinMineDistance * 3 + 100)
@@ -656,7 +972,7 @@ function a.ConsiderProximityMines()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function IsSuitableToPlaceMine()
+function a.IsSuitableToPlaceMine()
 	local Y = c.GetEnemiesNearLoc(b:GetLocation(), 2000)
 	local ap = b:GetActiveMode()
 	local aq = c.GetTeamFightLocation(b)
@@ -677,7 +993,7 @@ function IsSuitableToPlaceMine()
 	end
 	return true
 end
-function IsIBecameTheTarget(ar)
+function a.IsIBecameTheTarget(ar)
 	for Z, as in pairs(ar) do
 		if as ~= nil and as:CanBeSeen() and as:GetAttackTarget() == b then
 			return true
@@ -685,7 +1001,7 @@ function IsIBecameTheTarget(ar)
 	end
 	return false
 end
-function IsEnemyCloserToWardLocation(at, au)
+function a.IsEnemyCloserToWardLocation(at, au)
 	for Z, av in pairs(GetTeamPlayers(GetOpposingTeam())) do
 		local aw = GetHeroLastSeenInfo(av)
 		if aw ~= nil then
@@ -697,65 +1013,44 @@ function IsEnemyCloserToWardLocation(at, au)
 	end
 	return false
 end
-function a.ConsiderCombo()
-	local ay = 0
-	if CanDoCombo1() then
-		ay = 1
+-- Tazer can report castable while hidden (seen with two Techies on one team). Every order on it
+-- is then refused, so nothing that needs it may count on it.
+function a.TazerUsable()
+	if not q:IsFullyCastable() then
+		return false
 	end
-	if ay > 0 then
-		local T = c.GetProperCastRange(false, b, s:GetCastRange())
-		local R = s:GetCastPoint()
-		local ad = s:GetSpecialValueInt("radius")
-		local S = s:GetSpecialValueFloat("duration")
-		if c.IsInTeamFight(b, 1200) then
-			local ae = b:FindAoELocation(true, true, b:GetLocation(), T, ad, 0, 0)
-			local a5 = c.GetEnemiesNearLoc(ae.targetloc, ad)
-			if
-				a5 ~= nil
-				and #a5 >= 1
-				and (c.IsValidHero(a5[1]) and not a5[1]:IsMagicImmune() or c.IsValidHero(a5[2]) and not a5[2]:IsMagicImmune())
-				and not c.IsLocationInChrono(c.GetCenterOfUnits(a5))
-			then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), ay
-			end
+	if q:IsHidden() then
+		if DotaTime() >= (b._tazerHiddenLogAt or -999) then
+			b._tazerHiddenLogAt = DotaTime() + 30
+			pcall(print, string.format(
+				"[OHA-TECHIES] t=%.0f tazer-hidden pid=%d lvl=%d stopHidden=%s buff=%s",
+				DotaTime(),
+				b:GetPlayerID(),
+				q:GetLevel(),
+				tostring(r == nil or r:IsNull() or r:IsHidden()),
+				tostring(b:HasModifier("modifier_techies_reactive_tazer"))
+			))
 		end
-		if M then
-			if
-				c.IsValidTarget(H)
-				and c.CanCastOnNonMagicImmune(H)
-				and c.IsInRange(b, H, T)
-				and not c.IsSuspiciousIllusion(H)
-				and not H:IsMagicImmune()
-				and not H:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local a4 = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-				local a5 = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-				if a4 ~= nil and a5 ~= nil and #a4 >= #a5 then
-					local a0 = R + S
-					if c.IsChasingTarget(b, H) or c.CanKillTarget(H, L, DAMAGE_TYPE_MAGICAL) then
-						return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(a0), ay
-					else
-						a5 = c.GetEnemiesNearLoc(H:GetLocation(), ad)
-						if a5 ~= nil and #a5 >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), ay
-						else
-							return BOT_ACTION_DESIRE_HIGH, H:GetLocation(), ay
-						end
-					end
-				end
-			end
-		end
+		return false
 	end
-	return BOT_ACTION_DESIRE_NONE, 0, 0
+	return true
 end
-function CanDoCombo1()
-	if q:IsFullyCastable() and s:IsFullyCastable() then
-		local ao = q:GetManaCost() + s:GetManaCost()
-		if b:GetMana() >= ao and P > 0.35 then
-			return true
-		end
+-- Blast Off and the Tazer are both up with mana for both, and the target is about to be in
+-- Blast Off range. Only then is the Tazer kept back to follow the Blast Off; it never holds
+-- the Blast Off itself, and it is not kept when there is no target close.
+function a.ComboReady()
+	if
+		not (
+			s:IsFullyCastable()
+			and not s:IsHidden()
+			and q:IsFullyCastable()
+			and not q:IsHidden()
+			and b:GetMana() >= q:GetManaCost() + s:GetManaCost()
+		)
+	then
+		return false
 	end
-	return false
+	local range = c.GetProperCastRange(false, b, s:GetCastRange()) + 300
+	return c.IsValidTarget(H) and GetUnitToUnitDistance(b, H) <= range
 end
 return a

@@ -238,18 +238,25 @@ function Think()
 				if d.IsOtherWardClose(j.location, "npc_dota_observer_wards", 300, true, false) then
 					u = 30
 				end
-				if i:GetName() == "item_ward_sentry" then
-					AnnounceWard("sentry")
-					b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
-				else
-					if i:GetToggleState() == true then
+				-- A sentry-only dispenser left in observer mode. Toggling it again every
+				-- think cancels the toggle, so the sentry never plants and he stays here.
+				if i:GetName() ~= "item_ward_sentry" and i:GetToggleState() == true then
+					local now = DotaTime()
+					if b._wardToggleAt == nil then
+						b._wardToggleAt = now
 						b:Action_UseAbilityOnEntity(i, b)
 						return
-					else
-						AnnounceWard("sentry")
-						b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
 					end
+					if now - b._wardToggleAt < 0.8 then
+						return
+					end
+					j.plant_time_sentry = now
+					b._wardToggleAt = nil
+					return
 				end
+				b._wardToggleAt = nil
+				AnnounceWard("sentry")
+				b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
 				j.plant_time_sentry = DotaTime()
 				return
 			else

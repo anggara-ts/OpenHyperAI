@@ -1028,9 +1028,46 @@ function aD.CountEnemyHeroesOnHighGround(bn)
 	aD.SetCachedVars(c9, ch)
 	return ch
 end
--- A creep wave (2+ enemy creeps within 1600) at one of our high-ground buildings (T3 or
--- barracks) with no enemy hero within 2500 of it, and that building within `range` of the
--- bot. Returns the building and the creep count, or nil.
+-- How far out from a high-ground building a creep wave starts to count. Defenders are sent
+-- while the wave is still walking up, so they arrive before it hits the building. It was
+-- 1600; 1000 more gives a walking hero about 3s more lead.
+aD.HG_WAVE_RADIUS = 2600
+-- Enemy creeps within `radius` of loc, counting only those closer to loc than to another of
+-- our T3 towers (mid and top T3 are close enough that one wave would count for both).
+function aD.CountHighGroundWave(team, loc, radius)
+	local others = {}
+	for a2, id in ipairs(c8) do
+		local tower = GetTower(team, id)
+		if aD.IsValidBuilding(tower) then
+			local tl = tower:GetLocation()
+			if (tl.x - loc.x) ^ 2 + (tl.y - loc.y) ^ 2 > 300 * 300 then
+				others[#others + 1] = tl
+			end
+		end
+	end
+	local n = 0
+	for a2, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+		if unit ~= nil and unit:IsAlive() then
+			local d = GetUnitToLocationDistance(unit, loc)
+			if d <= radius then
+				local mine = true
+				for a3, tl in ipairs(others) do
+					if GetUnitToLocationDistance(unit, tl) < d then
+						mine = false
+						break
+					end
+				end
+				if mine then
+					n = n + 1
+				end
+			end
+		end
+	end
+	return n
+end
+-- A creep wave (2+ enemy creeps within HG_WAVE_RADIUS) at one of our high-ground buildings
+-- (T3 or barracks) with no enemy hero that close to it, and that building within `range` of
+-- the bot. Returns the building and the creep count, or nil.
 function aD.HighGroundCreepWaveNear(bot, range)
 	local team = bot:GetTeam()
 	local buildings = {}
@@ -1046,17 +1083,11 @@ function aD.HighGroundCreepWaveNear(bot, range)
 			buildings[#buildings + 1] = rax
 		end
 	end
-	local creepList = GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}
 	for a2, building in ipairs(buildings) do
 		if GetUnitToUnitDistance(bot, building) <= range then
 			local loc = building:GetLocation()
-			if aD.CountEnemyHeroesNear(loc, 2500) == 0 then
-				local creeps = 0
-				for a3, unit in pairs(creepList) do
-					if unit ~= nil and unit:IsAlive() and GetUnitToLocationDistance(unit, loc) <= 1600 then
-						creeps = creeps + 1
-					end
-				end
+			if aD.CountEnemyHeroesNear(loc, aD.HG_WAVE_RADIUS) == 0 then
+				local creeps = aD.CountHighGroundWave(team, loc, aD.HG_WAVE_RADIUS)
 				if creeps >= 2 then
 					return building, creeps
 				end

@@ -49,9 +49,11 @@ n["pos_3"] = {
 	"item_quelling_blade",
 	"item_magic_wand",
 	"item_bracer",
-	"item_power_treads_str",
-	-- Ring of Health and Vanguard first, then Blade Mail, then the Vanguard upgrades to Crimson Guard.
+	-- Boots, then Ring of Health for lane sustain, then the rest of Power Treads. Vanguard
+	-- uses the Ring, then Blade Mail, then the Vanguard upgrades to Crimson Guard.
+	"item_boots",
 	"item_ring_of_health",
+	"item_power_treads_str",
 	"item_vanguard",
 	"item_blade_mail",
 	"item_crimson_guard",

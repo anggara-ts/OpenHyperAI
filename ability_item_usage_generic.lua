@@ -5585,6 +5585,10 @@ a.ConsiderItemDesire["item_soul_ring"] = function(aT)
 	local ez = b:GetActiveMode()
 	local eA = b:GetMana() / b:GetMaxMana()
 	local eB = b:OriginalGetHealth() / b:OriginalGetMaxHealth()
+	-- Techies uses it in his own script, only right before a Blast Off he cannot afford.
+	if c == "npc_dota_hero_techies" then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	if (ez == BOT_MODE_FARM or ez == BOT_MODE_LANING) and eB > 0.5 and eA < 0.5 then
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
 	end

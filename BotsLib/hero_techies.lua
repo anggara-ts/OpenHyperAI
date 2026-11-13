@@ -145,6 +145,10 @@ function a.SkillsComplement()
 	-- whoever hits him in the middle of the fight), then mines around the stunned target.
 	-- The old order put the Tazer first (0.1s cast and a 0.6s wait), which delayed the stun,
 	-- and Blast Off was held back whenever the Tazer was not ready to go with it.
+	-- Short on mana for a Blast Off that is otherwise ready: Soul Ring now, Blast Off next think.
+	if a.ConsiderSoulRingForBlast() then
+		return
+	end
 	y, z, yWhy = a.ConsiderBlastOff()
 	if y > 0 then
 		b:Action_ClearActions(false)
@@ -657,8 +661,56 @@ function a.ConsiderDetonateMad()
 	return BOT_ACTION_DESIRE_NONE
 end
 -- Returns desire, location, and why: channel, fight, chase, initiate, last-stand, escape.
-function a.ConsiderBlastOff()
-	if not s:IsFullyCastable() or s:IsHidden() then
+-- Soul Ring (costs 170 HP, gives 170 mana for 10s) only right before a Blast Off he cannot
+-- otherwise afford, never to escape, and only if HP stays safe after both the ring and Blast
+-- Off's own cost (a share of current HP): early on that pair would drop him into a TP home.
+function a.ConsiderSoulRingForBlast()
+	local slot = b:FindItemSlot("item_soul_ring")
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local ring = b:GetItemInSlot(slot)
+	if ring == nil or not ring:IsFullyCastable() then
+		return false
+	end
+	local cost = s:GetManaCost()
+	local mana = b:GetMana()
+	if mana >= cost or mana + 170 < cost then
+		return false
+	end
+	local desire, loc, why = a.ConsiderBlastOff(true)
+	if desire <= 0 or why == "escape" then
+		return false
+	end
+	local pct = s:GetSpecialValueInt("hp_cost")
+	if pct == nil or pct <= 0 then
+		pct = 20
+	end
+	local after = (b:GetHealth() - 170) * (1 - pct / 100)
+	local ok = after >= 0.4 * b:GetMaxHealth() and after >= 300
+	if DotaTime() >= (b._soulRingLogAt or -999) then
+		b._soulRingLogAt = DotaTime() + 5
+		pcall(print, string.format(
+			"[OHA-TECHIES] t=%.0f soul-ring %s for=blast-%s hpAfter=%.0f max=%.0f mana=%.0f cost=%.0f",
+			DotaTime(),
+			ok and "used" or "skipped-hp",
+			tostring(why),
+			after,
+			b:GetMaxHealth(),
+			mana,
+			cost
+		))
+	end
+	if not ok then
+		return false
+	end
+	b:Action_UseAbility(ring)
+	return true
+end
+-- ignoreMana: judge the situation as if the mana were there (used to decide on Soul Ring).
+function a.ConsiderBlastOff(ignoreMana)
+	local ready = ignoreMana and s:IsTrained() and s:GetCooldownTimeRemaining() <= 0 or s:IsFullyCastable()
+	if not ready or s:IsHidden() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local T = c.GetProperCastRange(false, b, s:GetCastRange())

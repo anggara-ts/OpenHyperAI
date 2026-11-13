@@ -10,8 +10,8 @@ local h = c.Skill.GetAbilityList(b)
 local i = c.Item.GetRoleItemsBuyList(b)
 local j = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
 -- 1 Sticky Bomb, 2 Reactive Tazer, 3 Blast Off, 6 Proximity Mines (ultimate). Entries skip
--- talent levels: entry 10 is level 11, entry 12 is level 13.
-local k = { { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 1, 6, 1, 1, 6 } }
+-- talent levels (talent picks are unchanged); ultimate points stay at levels 6, 12 and 17.
+local k = { { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
 local l = c.Skill.GetRandomBuild(k)
 local m = c.Skill.GetTalentBuild(j)
 local n = {}

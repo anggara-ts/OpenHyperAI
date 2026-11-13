@@ -425,29 +425,51 @@ local function AllyCanTakeTazer(ally, range)
 		and not ally:HasModifier("modifier_techies_reactive_tazer")
 		and c.CanCastOnNonMagicImmune(ally)
 end
+-- Why an ally needs the Tazer to get away, or nil. Being hit only counts when it is a real
+-- threat (below 70% HP, or two enemy heroes on her): one lane harass hit used to make a
+-- full-HP Medusa "fleeing" (5:50).
 local function AllyIsFleeing(ally)
-	if HeroIsBeingHit(ally) or c.IsRetreating(ally) then
-		return true
+	if c.IsRetreating(ally) and ally:WasRecentlyDamagedByAnyHero(3.0) then
+		return "flee-retreat"
+	end
+	local near = c.GetNearbyHeroes(ally, 800, true, BOT_MODE_NONE) or {}
+	if HeroIsBeingHit(ally) and (c.GetHP(ally) < 0.7 or #near >= 2) then
+		return "flee-hit"
 	end
 	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
 	for Z, foe in pairs(foes or {}) do
-		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, ally) then
-			return true
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, ally) and c.GetHP(ally) < 0.8 then
+			return "flee-chased"
 		end
 	end
-	return false
+	return nil
 end
+-- Why an ally is going in (worth the Tazer), or nil. Attack mode alone is not enough: an
+-- enemy hero has to be close to her.
 local function AllyIsInitiating(ally)
-	if c.IsGoingOnSomeone(ally) then
-		return true
-	end
 	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
 	for Z, foe in pairs(foes or {}) do
-		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(ally, foe) then
-			return true
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) then
+			if c.IsChasingTarget(ally, foe) then
+				return "initiate-chase"
+			end
+			if c.IsGoingOnSomeone(ally) and GetUnitToUnitDistance(ally, foe) <= 700 then
+				return "initiate"
+			end
 		end
 	end
-	return false
+	return nil
+end
+-- [OHA-TECHIES] tazer target=... why=..., every cast.
+function a.LogTazer(target, why)
+	pcall(print, string.format(
+		"[OHA-TECHIES] t=%.0f tazer target=%s why=%s targetHp=%.2f mode=%d",
+		DotaTime(),
+		target == b and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		why,
+		c.GetHP(target),
+		target:GetActiveMode()
+	))
 end
 function a.ConsiderReactiveTazer()
 	if not a.TazerUsable() then
@@ -457,30 +479,37 @@ function a.ConsiderReactiveTazer()
 	-- Self first when he is the one being hit or chased. The buff is speed plus a disarm on attackers.
 	if not b:HasModifier("modifier_techies_reactive_tazer") then
 		if HeroIsBeingHit(b) then
+			a.LogTazer(b, "self-hit")
 			return BOT_ACTION_DESIRE_HIGH, b
 		end
 		if N then
 			local foes = c.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)
 			for Z, foe in pairs(foes or {}) do
 				if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, b) then
+					a.LogTazer(b, "self-chased")
 					return BOT_ACTION_DESIRE_HIGH, b
 				end
 			end
 		end
 	end
 	-- Same cast works on an ally with no shard. Help the one who is fleeing, then the one going in.
-	local flee, initiate = nil, nil
+	local flee, initiate, fleeWhy, initiateWhy = nil, nil, nil, nil
 	local allies = a.TazerIsUnitTarget() and c.GetNearbyHeroes(b, range, false, BOT_MODE_NONE) or {}
 	for Z, ally in pairs(allies or {}) do
 		if AllyCanTakeTazer(ally, range) then
-			if AllyIsFleeing(ally) then
-				flee = ally
-			elseif initiate == nil and AllyIsInitiating(ally) then
-				initiate = ally
+			local why = AllyIsFleeing(ally)
+			if why ~= nil then
+				flee, fleeWhy = ally, why
+			elseif initiate == nil then
+				initiateWhy = AllyIsInitiating(ally)
+				if initiateWhy ~= nil then
+					initiate = ally
+				end
 			end
 		end
 	end
 	if flee ~= nil then
+		a.LogTazer(flee, fleeWhy)
 		return BOT_ACTION_DESIRE_HIGH, flee
 	end
 	-- With Blast Off up, keep the Tazer for the combo. Spent on an ally going in or on our own
@@ -505,9 +534,11 @@ function a.ConsiderReactiveTazer()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if initiate ~= nil then
+		a.LogTazer(initiate, initiateWhy)
 		return BOT_ACTION_DESIRE_HIGH, initiate
 	end
 	if selfEngage then
+		a.LogTazer(b, "self-engage")
 		return BOT_ACTION_DESIRE_HIGH, b
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

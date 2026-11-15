@@ -431,16 +431,29 @@ function GetDesireHelper()
 	if c.IsEarlyGame() and not (roshLow and alliesInPit >= 2 and IsRoshanEngageSafe(M, true)) then
 		return Ret(BOT_MODE_DESIRE_NONE, "early-game")
 	end
+	-- Nobody acked this bot's last call: off for 30s, finishing included (game 015, 57:00:
+	-- Medusa stayed in a "finishing" Roshan alone and hit him solo while the rest pushed).
+	if DotaTime() < (a._roshNoAckUntil or -999) then
+		return Ret(BOT_MODE_DESIRE_NONE, "nobody-acked")
+	end
 	if roshLow then
 		local safeFinish, finishWhy = IsRoshanEngageSafe(M, true)
-		if safeFinish and (j or alliesInPit >= 2) then
+		-- Finishing needs company in the pit, unless he can finish Roshan alone in about 5s.
+		local spa = a:GetSecondsPerAttack()
+		local myDps = (spa ~= nil and spa > 0) and a:GetAttackDamage() / spa * 0.5 or 0
+		local soloFinish = c.Utils.IsValidUnit(k) and k:GetHealth() <= myDps * 5
+		if safeFinish and (alliesInPit >= 2 or soloFinish) then
 			local S = k:GetHealth() / k:GetMaxHealth()
 			return Ret(RemapValClamped(S, 0.8, 0.0, 0.9, 1.0), "finishing")
 		end
 		-- Contested / unsafe finish — do not suicide into the pit.
 		return Ret(BOT_MODE_DESIRE_NONE, safeFinish and "finish-no-dps" or finishWhy)
 	end
-	local safeTake, takeWhy = IsRoshanEngageSafe(M, false)
+	-- A committed take with the group in the pit keeps going on pit control (the finishing check),
+	-- not the fresh-take numbers: at 56:59 a committed 5-man take on full-HP Roshan was dropped
+	-- by everyone at once as enemies4(missing=1).
+	local committedNow = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
+	local safeTake, takeWhy = IsRoshanEngageSafe(M, committedNow and alliesInPit >= 3)
 	if not safeTake then
 		return Ret(BOT_MODE_DESIRE_NONE, takeWhy)
 	end
@@ -449,9 +462,6 @@ function GetDesireHelper()
 	end
 	-- A take that only works because of a kill has to fit in that kill's window. Once the
 	-- group has committed at the rally, finish the walk in.
-	if DotaTime() < (a._roshNoAckUntil or -999) then
-		return Ret(BOT_MODE_DESIRE_NONE, "nobody-acked")
-	end
 	local committed = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
 	local teamCall = f and j and TeamRoshanCall(M)
 	if not committed then
@@ -716,8 +726,12 @@ function Think()
 	local elapsed = now - a._roshGatherAt
 	-- Nobody else acked: drop the call (no solo Roshan) and do not re-call for 30s.
 	if elapsed >= ACK_GRACE and required < 2 then
+		if now >= (a._roshNoAckUntil or -999) then
+			RoshLog("drop why=nobody-acked declined=%s", #declined > 0 and table.concat(declined, ",") or "-")
+		end
 		a._roshNoAckUntil = now + 30
-		RoshLog("drop why=nobody-acked declined=%s", #declined > 0 and table.concat(declined, ",") or "-")
+		-- Stop hitting Roshan alone: the last order (attack) would keep running.
+		a:Action_MoveToLocation(c.AdjustLocationWithOffsetTowardsFountain(a:GetLocation(), 400))
 		return
 	end
 	-- The allies who acked are not enough to kill Roshan (the desire check counts every living

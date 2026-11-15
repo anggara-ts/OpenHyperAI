@@ -117,6 +117,28 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnEntity(s, B)
 		return
 	end
+	-- Abilities taken with Devour. ConsiderDevourAbility existed but was never called, so stolen
+	-- creep skills went unused. The slots change after each Devour, so look them up by name.
+	for slot = 0, 10 do
+		local stolen = b:GetAbilityInSlot(slot)
+		if stolen ~= nil and not stolen:IsNull() and DEVOUR_ABILITIES[stolen:GetName()] then
+			local want, target, kind = a.ConsiderDevourAbility(stolen)
+			if want ~= nil and want > 0 then
+				pcall(print, string.format(
+					"[OHA-DOOM] t=%.0f devour-cast %s target=%s",
+					DotaTime(),
+					stolen:GetName(),
+					target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-"
+				))
+				if kind == "unit" and target ~= nil then
+					b:Action_UseAbilityOnEntity(stolen, target)
+				else
+					b:Action_UseAbility(stolen)
+				end
+				return
+			end
+		end
+	end
 	z = a.ConsiderScorchedEarth()
 	if z > 0 then
 		b:Action_UseAbility(r)
@@ -444,6 +466,14 @@ function a.ConsiderDoom()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
+DEVOUR_ABILITIES = {
+	centaur_khan_war_stomp = true,
+	fel_beast_haunt = true,
+	giant_wolf_intimidate = true,
+	harpy_scout_take_off = true,
+	harpy_storm_chain_lightning = true,
+	satyr_trickster_purge = true,
+}
 function a.ConsiderDevourAbility(a8)
 	if a8:IsPassive() or not a8:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil, ""
@@ -728,9 +758,8 @@ function a.ConsiderDevourAbility(a8)
 				and not c.IsSuspiciousIllusion(ad)
 			then
 				if c.IsDisabled(ad) or ad:HasModifier("modifier_bounty_hunter_track") then
-					return BOT_ACTION_DESIRE_HIGH, b, "unit"
+					return BOT_ACTION_DESIRE_HIGH, ad, "unit"
 				end
-				return BOT_ACTION_DESIRE_HIGH, ad, "unit"
 			end
 		end
 		local a1 = c.GetNearbyHeroes(b, Y, true, BOT_MODE_NONE)
@@ -791,7 +820,7 @@ function a.ConsiderDevourAbility(a8)
 			end
 		end
 	end
-	return BOT_ACTION_DESIRE_HIGH, nil, ""
+	return BOT_ACTION_DESIRE_NONE, nil, ""
 end
 function a.GetRangedOrSiegeCreep(O, ae)
 	for R, S in pairs(O) do

@@ -21,11 +21,14 @@ local k = {
 local l = k[1]
 local m = c.Skill.GetTalentBuild(j[1])
 local n = {}
--- 7.41: Invoker's Aghanim's Scepter and Shard stay inert until an upgrade is
--- manually chosen. Bot scripts cannot send that selection, so skip buying them
--- instead of spending gold on items the bot can never activate.
+-- 7.41: Invoker's Aghanim's Scepter and Shard stay inert until he activates them and picks one
+-- of three upgrades. TEST: pos 2 buys both early so the game shows what a bot sees after
+-- buying them ([OHA-INVOKER] aghs lines: his abilities and items). Remove once the
+-- activation is understood.
 n["pos_2"] = {
 	"item_ranged_carry_outfit",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_urn_of_shadows",
 	"item_spirit_vessel",
 	"item_orchid",
@@ -47,6 +50,8 @@ n["pos_2_qe"] = {
 	"item_boots",
 	"item_hand_of_midas",
 	"item_power_treads",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_orchid",
 	"item_sphere",
 	"item_black_king_bar",
@@ -244,7 +249,76 @@ local aJ
 local aK
 local aL
 local aM
+-- TEST: once he owns Shard or Scepter (as an item or as a buff), and again 5s later, print every
+-- ability (name, behavior, hidden, passive, castable) and every item (name, behavior, castable,
+-- cooldown) so the Aghanim's activation and the three upgrade choices can be found.
+local function DumpAghs(tag)
+	local parts = {}
+	for slot = 0, 30 do
+		local ab = b:GetAbilityInSlot(slot)
+		if ab ~= nil and not ab:IsNull() then
+			local okB, beh = pcall(function()
+				return ab:GetBehavior()
+			end)
+			local okP, passive = pcall(function()
+				return ab:IsPassive()
+			end)
+			parts[#parts + 1] = string.format(
+				"%d:%s(beh=%s hidden=%s passive=%s castable=%s lvl=%d)",
+				slot,
+				ab:GetName(),
+				tostring(okB and beh),
+				tostring(ab:IsHidden()),
+				tostring(okP and passive),
+				tostring(ab:IsFullyCastable()),
+				ab:GetLevel()
+			)
+		end
+	end
+	pcall(print, string.format("[OHA-INVOKER] t=%.0f aghs-%s abilities %s", DotaTime(), tag, table.concat(parts, " ")))
+	local items = {}
+	for slot = 0, 16 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil then
+			local okB, beh = pcall(function()
+				return it:GetBehavior()
+			end)
+			items[#items + 1] = string.format(
+				"%d:%s(beh=%s castable=%s cd=%.1f)",
+				slot,
+				it:GetName(),
+				tostring(okB and beh),
+				tostring(it:IsFullyCastable()),
+				it:GetCooldownTimeRemaining()
+			)
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-INVOKER] t=%.0f aghs-%s items %s shardBuff=%s scepter=%s",
+		DotaTime(),
+		tag,
+		table.concat(items, " "),
+		tostring(b:HasModifier("modifier_item_aghanims_shard")),
+		tostring(b:HasScepter())
+	))
+end
+local function LogAghs()
+	for _, name in ipairs({ "item_aghanims_shard", "item_ultimate_scepter" }) do
+		local owned = b:FindItemSlot(name) >= 0
+			or name == "item_aghanims_shard" and b:HasModifier("modifier_item_aghanims_shard")
+			or name == "item_ultimate_scepter" and b:HasScepter()
+		local key = "_aghsLog_" .. name
+		if owned and b[key] == nil then
+			b[key] = DotaTime()
+			DumpAghs(string.gsub(name, "item_", "") .. "-got")
+		elseif owned and b[key] ~= false and DotaTime() - b[key] >= 5 then
+			b[key] = false
+			DumpAghs(string.gsub(name, "item_", "") .. "-5s")
+		end
+	end
+end
 function a.SkillsComplement()
+	pcall(LogAghs)
 	CheckAbilityUsage()
 	if c.CanNotUseAbility(b) then
 		return

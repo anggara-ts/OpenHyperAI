@@ -1459,11 +1459,62 @@ function r.DefendThink(af, aF)
 		local d_ = t().enemiesOnHG
 		local e0 = Z.GetLastSeenEnemiesNearLoc(dZ, 1200)
 		local e1 = Z.GetAlliesNearLoc(dZ, 1400)
-		-- Only creeps at our high ground (no enemy hero seen there): kill them, the most
-		-- dangerous first. This branch used to attack-move back to a spot 200 toward the
-		-- fountain, so the creeps followed the hero and it looked like running (game 016, 43:15:
-		-- Medusa at full HP/mana backing off from a wave while defending).
+		-- Only creeps at our high ground (no enemy hero seen there). Pull them into the fountain
+		-- when they will follow: none of them is busy with one of our units, none of our creeps is
+		-- near, and our next wave is not about to arrive (lane creeps spawn every 30s; arriving at
+		-- the high ground they take the aggro and break the pull, so only from 4s to 22s into
+		-- each 30s). The hero takes their aggro with one attack, then walks to the fountain while
+		-- they chase. As soon as they stop chasing, or any of that changes, it is regular attacks.
+		-- Before, it always walked back toward the fountain, even with the creeps busy with ours
+		-- (game 016, 43:15: Medusa backing off, nothing followed).
 		if #e0 == 0 then
+			local now = DotaTime()
+			local enemyCreeps = af:GetNearbyCreeps(1200, true) or {}
+			local onMe, busy, nearest, nearestD = 0, false, nil, math.huge
+			for _, cr in pairs(enemyCreeps) do
+				if Z.IsValid(cr) then
+					local tgt = cr:GetAttackTarget()
+					if tgt == af then
+						onMe = onMe + 1
+					elseif tgt ~= nil and tgt:GetTeam() == af:GetTeam() then
+						busy = true
+					end
+					local d0 = GetUnitToUnitDistance(af, cr)
+					if d0 < nearestD and Z.CanBeAttacked(cr) then
+						nearest, nearestD = cr, d0
+					end
+				end
+			end
+			local ourCreeps = #(af:GetNearbyLaneCreeps(1200, false) or {}) > 0
+			local phase = now % 30
+			local spawnOk = phase >= 4 and phase <= 22
+			local pullOk = nearest ~= nil
+				and not busy
+				and not ourCreeps
+				and spawnOk
+				and Z.GetHP(af) >= 0.5
+				and af:DistanceFromFountain() > 900
+			if pullOk then
+				if onMe >= 1 then
+					if now >= (af._hgPullLogAt or -999) then
+						af._hgPullLogAt = now + 5
+						pcall(print, string.format(
+							"[OHA-DEFEND] t=%.0f %s hg-pull following=%d fountainDist=%d",
+							now,
+							(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+							onMe,
+							math.floor(af:DistanceFromFountain())
+						))
+					end
+					af:Action_MoveToLocation(Z.GetTeamFountain())
+					return
+				end
+				if now - (af._hgPullTriedAt or -99) > 6 then
+					af._hgPullTriedAt = now
+					af:Action_AttackUnit(nearest, true)
+					return
+				end
+			end
 			local best, bestScore = nil, -1
 			for _, cr in pairs(af:GetNearbyCreeps(1200, true) or {}) do
 				if Z.IsValid(cr) and Z.CanBeAttacked(cr) then

@@ -5190,6 +5190,13 @@ a.ConsiderItemDesire["item_urn_of_shadows"] = function(bm)
 	return BOT_ACTION_DESIRE_NONE
 end
 a.ConsiderItemDesire["item_veil_of_discord"] = function(bm)
+	-- Techies casts it himself when Blast Off lands; keep it while Blast Off is ready.
+	if c == "npc_dota_hero_techies" then
+		local blast = b:GetAbilityByName("techies_suicide")
+		if blast ~= nil and blast:IsTrained() and blast:IsFullyCastable() then
+			return BOT_ACTION_DESIRE_NONE
+		end
+	end
 	local bv = 900
 	local bq = "none"
 	local hEffectTarget = nil

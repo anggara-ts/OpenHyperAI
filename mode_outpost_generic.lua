@@ -1923,7 +1923,10 @@ local function RefreshOutpostCache()
 	outpostCacheAt = DotaTime()
 end
 
--- Capturing an outpost needs an enemy tier-2 dead. Our own tier-2, or the 10:00 clock, does not unlock it.
+-- Capture rule (from the user, 2026-11-15): the enemy-side outpost needs one of the enemy's tier-2
+-- towers dead. Our own side's outpost, taken by the enemy, can be retaken any time: the rule looks
+-- at whose side the outpost is on, not at towers. Our own tier-2 or the 10:00 clock does not
+-- unlock the enemy-side one.
 -- A tier-2 counts as dead only after that lane's tier-1 is gone too, so a nil tower list at game start does not qualify.
 local function EnemyTier2Down()
 	local enemy = GetOpposingTeam()
@@ -2072,10 +2075,7 @@ function ConsiderOutpostCapture()
 			return 0
 		end
 	end
-	if not EnemyTier2Down() then
-		a0 = false
-		return 0
-	end
+	-- No global tower gate any more: GetClosestOutpost only offers outposts this team may take.
 	a0 = true
 	if a.GetEnemiesAroundAncient(c, 3200) > 0 then
 		return 0
@@ -2099,6 +2099,11 @@ function ConsiderOutpostCapture()
 		return 0
 	else
 		Z = nil
+		-- Without the scan the owner is unknown, so only walk to the enemy-side spot, and only
+		-- once it may be taken. Our own side's outpost is retaken only when the scan sees it.
+		if not EnemyTier2Down() then
+			return 0
+		end
 		-- Scan missed the buildings. Walk to the outpost closer to the enemy fountain
 		-- (their jungle outpost, or ours if they already took it and it is the nearer spot).
 		local enemyFountain = a.GetEnemyFountain()
@@ -2141,6 +2146,17 @@ function ConsiderOutpostCapture()
 	end
 	return BOT_MODE_DESIRE_MODERATE
 end
+-- Our side's outpost: the one closer to our fountain than to theirs.
+function IsOurSideOutpost(loc)
+	local ours, theirs = a.GetTeamFountain(), a.GetEnemyFountain()
+	if loc == nil or ours == nil or theirs == nil then
+		return false
+	end
+	return a.GetDistance(loc, ours) < a.GetDistance(loc, theirs)
+end
+function CanCaptureOutpostAt(loc)
+	return IsOurSideOutpost(loc) or EnemyTier2Down()
+end
 function GetClosestOutpost()
 	local bV = nil
 	local bW = 10000
@@ -2148,7 +2164,12 @@ function GetClosestOutpost()
 		local outpost = X[aE]
 		-- Outposts are permanently invulnerable buildings; capture is a channel, not damage.
 		-- Do NOT require not IsInvulnerable() — that filtered every outpost.
-		if outpost ~= nil and not outpost:IsNull() and outpost:GetTeam() ~= GetTeam() then
+		if
+			outpost ~= nil
+			and not outpost:IsNull()
+			and outpost:GetTeam() ~= GetTeam()
+			and CanCaptureOutpostAt(outpost:GetLocation())
+		then
 			local dist = GetUnitToUnitDistance(c, outpost)
 			if dist < bW then
 				bV = outpost

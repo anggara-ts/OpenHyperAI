@@ -495,20 +495,37 @@ function a.ConsiderW()
 			end
 		end
 		if c.IsFarming(b) or c.IsPushing(b) or (not c.IsLaning(b) and DotaTime() > 3 * 60) then
+			-- Arrow kills a non-ancient creep outright (Valve data), so spend it on a large camp,
+			-- the biggest creep there. It went on small-camp creeps before.
 			local neutrals = b:GetNearbyNeutralCreeps(search)
+			local spawners = GetNeutralSpawners() or {}
+			local function CampType(creep)
+				local best, bestD = nil, 900
+				for _, sp in pairs(spawners) do
+					if sp.location ~= nil then
+						local d = GetUnitToLocationDistance(creep, sp.location)
+						if d < bestD then
+							best, bestD = sp.type, d
+						end
+					end
+				end
+				return best
+			end
 			local best, bestHp = nil, 0
 			for _, creep in pairs(neutrals or {}) do
 				if
 					c.IsValid(creep)
 					and not creep:IsHero()
 					and (creep.IsAncientCreep == nil or not creep:IsAncientCreep())
-					and creep:GetHealth() > bestHp
+					and creep:GetMaxHealth() > bestHp
+					and CampType(creep) == "large"
 				then
 					best = creep
-					bestHp = creep:GetHealth()
+					bestHp = creep:GetMaxHealth()
 				end
 			end
-			if best ~= nil and bestHp >= 450 then
+			-- Not on one an attack or two would finish anyway.
+			if best ~= nil and bestHp >= 450 and best:GetHealth() >= 300 then
 				local loc = aimCreep(best)
 				if loc ~= nil then
 					return BOT_ACTION_DESIRE_HIGH, loc

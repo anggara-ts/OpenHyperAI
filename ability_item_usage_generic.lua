@@ -1283,55 +1283,121 @@ a.ConsiderItemDesire["item_arcane_boots"] = function(bm)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Armlet of Mordiggian (Valve data: +35 damage, +25 strength, +4 armor while on, 45 HP/s drain;
+-- neither the drain nor switching off can kill; the strength comes in and goes out over 0.6s).
+-- Returning HIGH toggles it. On when it pays for the drain, off as soon as it no longer does;
+-- the rules below switch it back on when needed.
+-- 1. Worth on: an enemy hero within attack range + 300, Roshan, Tormentor, or a building while
+--    pushing. Not lane creeps or neutrals (it used to be on through every farm).
+-- 2. On early when chasing a hero within attack range + 600, so the strength is in by the hit.
+-- 3. Held 3s after the last reason, and while an enemy hero is within 800 in a fight, so it
+--    does not flicker off between targets.
+-- 4. Not off below 30% HP with an enemy hero within 1200 (switching off takes the strength HP).
+-- 5. Toggle trick: on, being hit, HP below what the strength gives (measured when it turns on):
+--    off, then straight back on (at most once a second; not under Doom, which blocks the gain).
+-- Never toggled under Ancient Apparition's Ice Blast: changing max HP there can drop him under
+-- the shatter threshold.
 a.ConsiderItemDesire["item_armlet"] = function(bm)
-	local bB = bm:GetToggleState()
-	if
-		f.IsValid(be)
-		and f.CanBeAttacked(be)
-		and f.IsInRange(b, be, b:GetAttackRange() + 300)
-		and (not be:IsBuilding() or not string.find(be:GetUnitName(), "OutpostName"))
-		and not b:IsDisarmed()
-	then
-		if not bB then
-			return BOT_ACTION_DESIRE_HIGH, nil, "none"
-		else
-			return BOT_ACTION_DESIRE_NONE
-		end
-	end
-	-- The "switch on to survive" uses below rely on the HP gained when Armlet turns on, which
-	-- Doom blocks; under Doom they only add the drain. Switching on to fight still works.
-	if a.IsDoomed(b) and not bB then
+	local on = bm:GetToggleState()
+	local now = DotaTime()
+	if b:HasModifier("modifier_ice_blast") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if f.IsRetreating(b) and not f.IsRealInvisible(b) then
-		if f.GetHP(b) < 0.2 then
+	-- Strength HP: max HP with it on minus off, measured once it has settled (0.6s+).
+	if on and b._armletOnAt ~= nil and now - b._armletOnAt > 0.8 and b._armletMaxOff ~= nil then
+		b._armletHpGain = math.max(0, b:GetMaxHealth() - b._armletMaxOff)
+	elseif not on and (b._armletOffAt == nil or now - b._armletOffAt > 0.8) then
+		b._armletMaxOff = b:GetMaxHealth()
+	end
+	local function TurnOn(why)
+		b._armletOnAt = now
+		b._armletWhy = why
+		return BOT_ACTION_DESIRE_HIGH, nil, "none"
+	end
+	local function TurnOff(why)
+		b._armletOffAt = now
+		b._armletWhy = why
+		return BOT_ACTION_DESIRE_HIGH, nil, "none"
+	end
+	-- 5. Second half of the trick: back on right away.
+	if not on and b._armletTrickAt ~= nil and now - b._armletTrickAt < 0.5 then
+		b._armletTrickAt = nil
+		return TurnOn("trick-on")
+	end
+	local doomed = a.IsDoomed(b)
+	local heroNear = f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+	local hit = b:WasRecentlyDamagedByAnyHero(1.5) or f.IsAttackProjectileIncoming(b, 1000)
+	if
+		on
+		and not doomed
+		and hit
+		and b._armletHpGain ~= nil
+		and b._armletHpGain > 0
+		and b:GetHealth() < b._armletHpGain * 0.9
+		and now - (b._armletTrickLast or -99) >= 1
+	then
+		b._armletTrickAt = now
+		b._armletTrickLast = now
+		return TurnOff("trick-off")
+	end
+	-- 1 and 2: reasons to be on.
+	local want = false
+	if f.IsValid(be) and f.CanBeAttacked(be) and not b:IsDisarmed() then
+		local reach = b:GetAttackRange() + 300
+		if be:IsHero() and be:GetTeam() ~= b:GetTeam() then
+			if f.IsInRange(b, be, reach) then
+				want = true
+			elseif f.IsGoingOnSomeone(b) and f.IsInRange(b, be, reach + 300) then
+				want = true
+			end
+		elseif (f.IsRoshan(be) or f.IsTormentor(be)) and f.IsInRange(b, be, reach) then
+			want = true
+		elseif
+			be:IsBuilding()
+			and not string.find(be:GetUnitName(), "OutpostName")
+			and f.IsPushing(b)
+			and f.IsInRange(b, be, reach)
+		then
+			want = true
+		end
+	end
+	-- Survival: on to gain the strength HP (blocked by Doom, so not then).
+	if not doomed then
+		if f.IsRetreating(b) and not f.IsRealInvisible(b) and f.GetHP(b) < 0.2 then
 			if
 				b:WasRecentlyDamagedByAnyHero(2.0)
 				or f.IsAttackProjectileIncoming(b, 1200)
 				or f.IsStunProjectileIncoming(b, 550)
 			then
-				if not bB then
-					return BOT_ACTION_DESIRE_HIGH, nil, "none"
-				else
-					return BOT_ACTION_DESIRE_NONE
-				end
+				want = true
 			end
 		end
-	end
-	if
-		f.GetAttackProjectileDamageByRange(b, 600) > b:GetHealth() * 2
-		or f.IsStunProjectileIncoming(b, 600) and f.GetHP(b) < 0.25
-	then
-		if not bB then
-			return BOT_ACTION_DESIRE_HIGH, nil, "none"
-		else
-			return BOT_ACTION_DESIRE_NONE
+		if
+			f.GetAttackProjectileDamageByRange(b, 600) > b:GetHealth() * 2
+			or f.IsStunProjectileIncoming(b, 600) and f.GetHP(b) < 0.25
+		then
+			want = true
 		end
 	end
-	if bB then
-		return BOT_ACTION_DESIRE_HIGH, nil, "none"
+	-- 3. Hold.
+	if want then
+		b._armletHoldUntil = now + 3
 	end
-	return BOT_ACTION_DESIRE_NONE
+	local fightNear = #(f.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE) or {}) > 0
+		and (f.IsGoingOnSomeone(b) or f.IsInTeamFight(b, 1200))
+	local holding = now < (b._armletHoldUntil or -99) or fightNear
+	-- 4. Low with enemies around: keep it on.
+	local lowNearEnemy = f.GetHP(b) < 0.3 and #heroNear > 0
+	if not on then
+		if want then
+			return TurnOn("worth")
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if want or holding or lowNearEnemy then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	return TurnOff("not-worth")
 end
 a.ConsiderItemDesire["item_bfury"] = function(bm)
 	return a.ConsiderItemDesire["item_quelling_blade"](bm)

@@ -12,8 +12,9 @@ local i, j, k, l, m, n
 local o, p
 local q = {}
 -- Early-game console trace. Grep [OHA-RUNE]. One line a second while a bot is
--- within 1600 of a rune before 1:40, plus a line whenever the reason changes.
-local RUNE_DBG_UNTIL = 100
+-- within 1600 of a rune before 6:10 (covers the 2:00 and 4:00 water runes and the 6:00 power
+-- rune; it stopped at 1:40), plus a line whenever the reason changes.
+local RUNE_DBG_UNTIL = 370
 local runeWhy = "none"
 local dbgAt = -100
 local dbgWhy = ""
@@ -567,7 +568,31 @@ function Think()
 				return
 			end
 			d._runeReach = nil
-			d._runePickupAt = DotaTime()
+			-- On the rune and the pick-up keeps not happening (game 015, 2:28: Medusa went back
+			-- and forth on the bottom water rune, pick-up action, 64 moved in 10s). Four orders
+			-- over 3s+ on the same rune that is still up: skip it for 30s and say so.
+			local now = DotaTime()
+			if d._runePickTry == nil or d._runePickTry.id ~= D.location or now - d._runePickTry.first > 8 then
+				d._runePickTry = { id = D.location, first = now, n = 0 }
+			end
+			d._runePickTry.n = d._runePickTry.n + 1
+			if d._runePickTry.n >= 4 and now - d._runePickTry.first >= 3 then
+				pcall(print, string.format(
+					"[OHA-RUNE] %s t=%.1f pickup-failed rune=%s tries=%d dist=%.0f type=%s",
+					HeroTag(),
+					now,
+					tostring(D.location),
+					d._runePickTry.n,
+					liveDist,
+					tostring(GetRuneType and GetRuneType(D.location) or "?")
+				))
+				d._runePickTry = nil
+				a.SkipRune(D.location, 30)
+				d:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), n or d:GetAssignedLane(), -600))
+				doing("pickup-failed")
+				return
+			end
+			d._runePickupAt = now
 			a.NoteBountyGrab(D.location)
 			a.NoteLaneRuneTake(D.location)
 			d:Action_PickUpRune(D.location)

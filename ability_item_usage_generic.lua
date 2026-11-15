@@ -5567,6 +5567,34 @@ a.ConsiderItemDesire["item_gungir"] = function(bm)
 	end
 	return a.ConsiderItemDesire["item_rod_of_atos"](bm)
 end
+-- Meteor Hammer (Valve data: 2s channel, 600 range, 400 radius, 0.75s stun, burn hits buildings).
+-- It had no rule, so it was bought and never cast. A tower or barracks while pushing with no
+-- enemy hero near, or a disabled enemy hero in range (the stun lands after the 2s channel).
+a.ConsiderItemDesire["item_meteor_hammer"] = function(bm)
+	local range = 600 + b8
+	if f.IsPushing(b) and #(f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) == 0 then
+		local buildings = {}
+		for _, t in pairs(b:GetNearbyTowers(range, true) or {}) do
+			buildings[#buildings + 1] = t
+		end
+		for _, r in pairs(b:GetNearbyBarracks(range, true) or {}) do
+			buildings[#buildings + 1] = r
+		end
+		for _, bld in ipairs(buildings) do
+			if f.IsValidBuilding(bld) and f.CanBeAttacked(bld) then
+				pcall(print, string.format("[OHA-ITEM] t=%.0f %s meteor why=building", DotaTime(), (string.gsub(c, "npc_dota_hero_", ""))))
+				return BOT_ACTION_DESIRE_HIGH, bld:GetLocation(), "ground", "meteor-building"
+			end
+		end
+	end
+	for _, e in pairs(f.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+		if f.IsValidHero(e) and f.IsDisabled(e) and f.CanCastOnNonMagicImmune(e) and not f.IsSuspiciousIllusion(e) then
+			pcall(print, string.format("[OHA-ITEM] t=%.0f %s meteor why=disabled target=%s", DotaTime(), (string.gsub(c, "npc_dota_hero_", "")), (string.gsub(e:GetUnitName(), "npc_dota_hero_", ""))))
+			return BOT_ACTION_DESIRE_HIGH, e:GetLocation(), "ground", "meteor-disabled"
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE
+end
 a.ConsiderItemDesire["item_pogo_stick"] = function(bm)
 	local bv = 1000
 	local bq = "none"

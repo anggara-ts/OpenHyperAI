@@ -910,7 +910,22 @@ function a.ConsiderGazeWeave()
 		b:Action_UseAbilityOnLocation(r, target:GetLocation())
 		return true
 	end
-	if s:IsFullyCastable() and c.IsInRange(b, target, s:GetCastRange()) then
+	-- Chain Frost during the Gaze only when it is worth its cooldown: another enemy within the
+	-- bounce range of the target, our Ice Spire beside it, or the target below 50% HP. It went on
+	-- a lone, healthy Techies at 54:40 (game 017).
+	local jump = s:GetSpecialValueInt("jump_range")
+	if jump == nil or jump <= 0 then
+		jump = 550
+	end
+	local others = 0
+	for _, e0 in pairs(c.GetNearbyHeroes(target, jump, false, BOT_MODE_NONE) or {}) do
+		if e0 ~= target and c.IsValidHero(e0) then
+			others = others + 1
+		end
+	end
+	local spireNear = a.GetOwnSpire() ~= nil and GetUnitToUnitDistance(a.GetOwnSpire(), target) <= jump
+	local chainWorth = others >= 1 or spireNear or c.GetHP(target) < 0.5
+	if chainWorth and s:IsFullyCastable() and c.IsInRange(b, target, s:GetCastRange()) then
 		a.LogLich("gaze-weave-chain", target)
 		b._chainAt = DotaTime()
 		b:Action_UseAbilityOnEntity(s, target)

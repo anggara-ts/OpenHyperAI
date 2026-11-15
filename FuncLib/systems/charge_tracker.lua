@@ -8,9 +8,9 @@
 -- Some abilities are charge-based only with Shard, Scepter or a talent. Max charges are re-read
 -- each think; at 1 or less the ability is not tracked and Count returns nil.
 --
--- [OHA-CHARGES] probe lines print what the API reports (GetCurrentCharges, castable, cooldown,
--- GetSpecialValueInt("AbilityCharges")) next to the tracked count, so a game log shows which of
--- them can be trusted.
+-- GetCurrentCharges must not be called on abilities: the engine prints "called on an ability
+-- that isn't an item!" every call (game 014). [OHA-CHARGES] probe lines print castable, cooldown
+-- and GetSpecialValueInt("AbilityCharges") next to the tracked count.
 local ChargeTracker = {}
 
 -- From Valve's datafeed (2026-11-15). base: charges; shard/scepter: charges with it; talent:
@@ -104,15 +104,6 @@ local function TalentLearned(bot, name)
 	return ok and v == true
 end
 
-local function ApiCharges(ability)
-	local ok, v = pcall(function()
-		return ability:GetCurrentCharges()
-	end)
-	if ok and type(v) == "number" then
-		return v
-	end
-	return nil
-end
 
 local function RuntimeMax(ability)
 	local ok, v = pcall(function()
@@ -192,23 +183,21 @@ local function Spend(bot, ability, s, restoreTime, why)
 end
 
 local function Probe(bot, ability, s, castable)
-	local api = ApiCharges(ability)
 	local okCd, cd = pcall(function()
 		return ability:GetCooldownTimeRemaining()
 	end)
 	cd = okCd and type(cd) == "number" and cd or -1
-	local key = string.format("%s|%s|%s|%d|%d", tostring(api), tostring(castable), tostring(cd > 0), RuntimeMax(ability), s.n)
+	local key = string.format("%s|%s|%d|%d", tostring(castable), tostring(cd > 0), RuntimeMax(ability), s.n)
 	if key == s.probeKey or DotaTime() < (s.probeAt or -999) then
 		return
 	end
 	s.probeKey = key
 	s.probeAt = DotaTime() + 1
 	pcall(print, string.format(
-		"[OHA-CHARGES] t=%.0f %s %s probe api=%s castable=%s cd=%.1f runtimeMax=%d max=%d tracked=%d",
+		"[OHA-CHARGES] t=%.0f %s %s probe castable=%s cd=%.1f runtimeMax=%d max=%d tracked=%d",
 		DotaTime(),
 		Short(bot),
 		ability:GetName(),
-		tostring(api),
 		tostring(castable),
 		cd,
 		RuntimeMax(ability),
@@ -299,7 +288,10 @@ local function TickAbility(bot, ability, slot)
 		else
 			s.emptySince = nil
 			if castable and s.n == 0 then
+				-- A charge just came in, so the next one starts restoring now (game 014: the timer
+				-- from learn time gave Sacrifice a second charge 90s early).
 				s.n = 1
+				s.nextAt = s.n < s.max and now + restoreTime or nil
 				Log(bot, ability, s, "resync-one")
 			end
 		end

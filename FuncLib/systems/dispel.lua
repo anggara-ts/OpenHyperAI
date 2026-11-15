@@ -488,11 +488,25 @@ local function O(P)
 	end
 	return false
 end
+-- Worth a self-dispel: humans and cores (pos 1-2) always; others not when the fight is hopeless.
+-- Was P.IsBot() / P.GetHealth() (dot calls): "IsBot called with 0 arguments" aborted
+-- ItemUsageThink every time this ran (game 014).
+local func_utils = nil
 local function S(P)
-	if not P.IsBot() or P.GetPosition and P.GetPosition() <= 2 then
+	if not P:IsBot() then
 		return true
 	end
-	local T = P.GetHealth() / P.GetMaxHealth()
+	if func_utils == nil then
+		local ok, m = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
+		func_utils = ok and m or false
+	end
+	local okPos, pos = pcall(function()
+		return func_utils and func_utils.GetPosition(P) or nil
+	end)
+	if okPos and type(pos) == "number" and pos <= 2 then
+		return true
+	end
+	local T = P:GetHealth() / P:GetMaxHealth()
 	local U = P:GetNearbyHeroes(1200, true, v.None)
 	local V = P:GetNearbyHeroes(1200, false, v.None)
 	if T < 0.1 and U and #U >= 3 and (not V or #V <= 1) then
@@ -629,7 +643,7 @@ function t.ShouldMantaDodge(P)
 	if not a1 or not a1.IsFullyCastable() then
 		return -1
 	end
-	local ac = P.GetIncomingTrackingProjectiles()
+	local ac = P:GetIncomingTrackingProjectiles()
 	if ac then
 		for H, ad in j(ac) do
 			if ad and ad.is_attack == false and ad.is_dodgeable then

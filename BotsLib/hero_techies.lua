@@ -233,7 +233,6 @@ end
 -- + AoE, not passive, not hidden, castable). No IsTrained check: an innate has no skill points.
 function a.MadPlant()
 	local list = MadCandidates()
-	LogMadCandidates(list)
 	for _, ab in ipairs(list) do
 		local okP, passive = pcall(function()
 			return ab:IsPassive()
@@ -282,7 +281,9 @@ function a.PlantMad(plant, loc, tag)
 	local castPoint = math.max(0.3, plant:GetCastPoint())
 	b._madLoc = loc
 	b._madDetonateAt = DotaTime() + castPoint + 0.15
-	b._madUntil = b._madDetonateAt + 2
+	-- 4s after the planned detonate: game 019, plants into a spot beyond cast range (he walks in
+	-- first) showed the barrel 2-3s after the order, past the old 2s window.
+	b._madUntil = b._madDetonateAt + 4
 	b._madPlantAt = DotaTime()
 	-- No other spell order until the plant is cast: game 019, 8 of 15 plants failed because the
 	-- next think sent Sticky Bomb, the Tazer, a mine or Blast Off and cut the cast short (43:01:
@@ -338,7 +339,6 @@ function a.ConsiderPostBlastMad()
 	return plant, loc
 end
 function a.SkillsComplement()
-	pcall(a.WatchBarrel)
 	-- Detonate M.A.D. still works while Techies is dead or already acting.
 	if a.ConsiderDetonateMad() > 0 then
 		local det = a.MadDetonate()

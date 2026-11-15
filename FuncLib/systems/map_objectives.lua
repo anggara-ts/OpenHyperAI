@@ -696,7 +696,73 @@ local function LotusTripBlock(bot, loc, dist, foes, friends)
 end
 
 -- Returns desire, location, kind ("lotus"|"wisdom"), eta. Desire 0 if none.
+-- [OHA-LOTUS] probe: can a bot read how many lotuses a pool holds (or whether a shrine is
+-- ready) when it is in vision? The count was never read because NumModifiers warns every think
+-- while the pool is fogged; here it is only read with the pool's spot visible. One bot per team
+-- logs each pool / shrine's modifiers with stack counts, at most once a minute and only when
+-- they changed.
+local probeSeen = {}
+local function ProbeUnit(kind, u)
+	if u == nil or u:IsNull() or not IsLocationVisible(u:GetLocation()) then
+		return
+	end
+	local key = kind .. ":" .. string.format("%.0f,%.0f", u:GetLocation().x, u:GetLocation().y)
+	local now = DotaTime()
+	local prev = probeSeen[key]
+	if prev ~= nil and now - prev.at < 60 then
+		return
+	end
+	local okN, n = pcall(function()
+		return u:NumModifiers()
+	end)
+	local parts = {}
+	if okN and type(n) == "number" then
+		for i = 0, n - 1 do
+			local okM, name = pcall(function()
+				return u:GetModifierName(i)
+			end)
+			local okS, stack = pcall(function()
+				return u:GetModifierStackCount(i)
+			end)
+			parts[#parts + 1] = string.format("%s/%s", okM and tostring(name) or "?", okS and tostring(stack) or "?")
+		end
+	end
+	local sig = table.concat(parts, ",")
+	if prev ~= nil and prev.sig == sig then
+		prev.at = now
+		return
+	end
+	probeSeen[key] = { at = now, sig = sig }
+	pcall(print, string.format(
+		"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
+		now,
+		kind,
+		key,
+		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+		#parts > 0 and sig or (okN and "none" or "unreadable")
+	))
+end
+local function ProbeObjectives(bot)
+	local first = nil
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0:IsBot() then
+			first = m0
+			break
+		end
+	end
+	if first ~= bot then
+		return
+	end
+	for _, u in ipairs(ScanUnits(cachedLotus, "npc_dota_lotus_pool")) do
+		ProbeUnit("lotus", u)
+	end
+	for _, u in ipairs(ScanUnits(cachedWisdom, "npc_dota_xp_fountain")) do
+		ProbeUnit("wisdom", u)
+	end
+end
 function MapObjectives.ConsiderObjectiveDesire(bot)
+	pcall(ProbeObjectives, bot)
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
 		if bot ~= nil then
 			bot._lotusWhy = "dead"

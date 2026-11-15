@@ -2314,13 +2314,6 @@ function SellMarkedItems()
 		if slot >= 0 and slot <= 14 and now >= (a._sellBlock[name] or -999) then
 			local it = a:GetItemInSlot(slot)
 			if it ~= nil then
-				pcall(print, string.format(
-					"[OHA-ITEM] t=%.0f %s sold-marked %s why=%s",
-					now,
-					(string.gsub(b, "npc_dota_hero_", "")),
-					(string.gsub(name, "^item_", "")),
-					why
-				))
 				a._sellTry = { name = name, at = now }
 				a:ActionImmediate_SellItem(it)
 				return

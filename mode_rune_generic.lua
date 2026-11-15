@@ -443,11 +443,13 @@ function GetDesireRaw()
 	-- and no enemy is closer or about to take it. Laning used to need it within 500, and after
 	-- laning it had to be the "best" rune and the bot not pushing or defending.
 	if not dying and i >= 0.35 then
-		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2 }) do
+		-- Power runes too (user call), with the laning rules for who takes the river runes.
+		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
 			if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
 				local loc = GetRuneSpawnLocation(id)
 				local mine = GetUnitToLocationDistance(d, loc)
-				if mine <= 1000 and not a.RuneSkipped(id) and not a.IsEnemyPickRune(id) then
+				local riverOk = not IsRiverRune(id) or not (a.SidelaneSkipsRiver(id, mine) or a.SkipSecondLaningRune(id))
+				if mine <= 1000 and riverOk and not a.RuneSkipped(id) and not a.IsEnemyPickRune(id) then
 					local allyCloser = false
 					for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
 						if ally ~= d and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, loc) < mine then
@@ -461,7 +463,7 @@ function GetDesireRaw()
 						D.distance = mine
 						D.status = RUNE_STATUS_AVAILABLE
 						D.type = GetRuneType(id)
-						return give(mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH, "bounty-passing")
+						return give(mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH, IsRiverRune(id) and "power-passing" or "bounty-passing")
 					end
 				end
 			end

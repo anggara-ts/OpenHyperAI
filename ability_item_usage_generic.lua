@@ -4556,17 +4556,9 @@ function a.IsFarmingAlways(b)
 		return true
 	end
 	local cz = f.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-	if
-		f.IsValid(dJ)
-		and dJ:IsAncientCreep()
-		and not f.IsRoshan(dJ)
-		and not f.IsKeyWordUnit("warlock", dJ)
-		and b:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT
-		and c ~= "npc_dota_hero_ogre_magi"
-		and #cz < 2
-	then
-		return true
-	end
+	-- Removed: an Intelligence hero hitting an ancient creep with fewer than 2 allies around was
+	-- TP'd to its own Ancient, with no danger at all (game 019, 27:52: Lina from an ancient camp
+	-- by the Radiant outpost to the Dire top T3). Only enemies at the base send a farmer home now.
 	if a.GetNumEnemyNearby(GetAncient(d)) >= 4 and b:DistanceFromFountain() >= 4800 and #cz < 2 then
 		return true
 	end

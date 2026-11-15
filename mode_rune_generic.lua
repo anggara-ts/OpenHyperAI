@@ -605,6 +605,23 @@ function Think()
 			-- The status says up but nothing is there (GetRuneType -1, game 016 at the horn on both
 			-- power spots): skip it at once.
 			local rType = GetRuneType and GetRuneType(D.location) or nil
+			local isBounty = D.location == RUNE_BOUNTY_1 or D.location == RUNE_BOUNTY_2
+			-- Bounty gold can lie off the spawn point: circle the spot (the bounty sweep) before
+			-- giving up on it. Skipping straight away cut the sweep out (game 016, 29:20:
+			-- Disruptor left the jungle gold).
+			d._bountySwept = d._bountySwept or {}
+			local canSweep = isBounty and d._bountySweep == nil and now0 - (d._bountySwept[D.location] or -99) > 20
+			local function StartSweep(why)
+				d._bountySwept[D.location] = now0
+				d._bountySweep = { id = D.location, seen = now0, sweepUntil = now0 + 2.4, ringStart = now0 }
+				d._runePickTry = nil
+				pcall(print, string.format("[OHA-RUNE] %s t=%.1f bounty-sweep why=%s rune=%s", HeroTag(), now0, why, tostring(D.location)))
+				doing("sweep-start")
+			end
+			if canSweep and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
+				StartSweep("no-rune")
+				return
+			end
 			if rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID) then
 				pcall(print, string.format("[OHA-RUNE] %s t=%.1f no-rune rune=%s dist=%.0f", HeroTag(), now0, tostring(D.location), liveDist))
 				d._runePickTry = nil
@@ -637,6 +654,10 @@ function Think()
 				d._runePickTry = { id = D.location, first = now, n = 0 }
 			end
 			d._runePickTry.n = d._runePickTry.n + 1
+			if d._runePickTry.n >= 3 and now - d._runePickTry.first >= 3 and canSweep then
+				StartSweep("pickup-failed")
+				return
+			end
 			if d._runePickTry.n >= 3 and now - d._runePickTry.first >= 3 then
 				pcall(print, string.format(
 					"[OHA-RUNE] %s t=%.1f pickup-failed rune=%s tries=%d dist=%.0f type=%s",

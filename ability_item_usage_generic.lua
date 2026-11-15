@@ -5590,14 +5590,12 @@ a.ConsiderItemDesire["item_meteor_hammer"] = function(bm)
 		end
 		for _, bld in ipairs(buildings) do
 			if f.IsValidBuilding(bld) and f.CanBeAttacked(bld) then
-				pcall(print, string.format("[OHA-ITEM] t=%.0f %s meteor why=building", DotaTime(), (string.gsub(c, "npc_dota_hero_", ""))))
 				return BOT_ACTION_DESIRE_HIGH, bld:GetLocation(), "ground", "meteor-building"
 			end
 		end
 	end
 	for _, e in pairs(f.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
 		if f.IsValidHero(e) and f.IsDisabled(e) and f.CanCastOnNonMagicImmune(e) and not f.IsSuspiciousIllusion(e) then
-			pcall(print, string.format("[OHA-ITEM] t=%.0f %s meteor why=disabled target=%s", DotaTime(), (string.gsub(c, "npc_dota_hero_", "")), (string.gsub(e:GetUnitName(), "npc_dota_hero_", ""))))
 			return BOT_ACTION_DESIRE_HIGH, e:GetLocation(), "ground", "meteor-disabled"
 		end
 	end

@@ -563,6 +563,48 @@ function a.LogBlackHole(why, heroes, target)
 		tostring(s:IsFullyCastable())
 	))
 end
+-- Refresher for a second Black Hole: the first one went out within the last 15s, Refresher
+-- and a Black Hole both fit in current mana, and 2+ enemy heroes are still grouped in reach.
+-- The shared rule wanted mana for two more Black Holes, so it almost never fired. Items are
+-- not used during the channel, so this runs once the first Black Hole has ended.
+function a.CanUseRefresherShard()
+	if not t:IsTrained() or t:IsFullyCastable() then
+		return false
+	end
+	local cd = t:GetCooldown()
+	local remain = t:GetCooldownTimeRemaining()
+	if cd == nil or remain == nil or cd - remain > 15 then
+		return false
+	end
+	local refresher = nil
+	for _, name in ipairs({ "item_refresher", "item_refresher_shard" }) do
+		local slot = b:FindItemSlot(name)
+		if slot >= 0 and slot <= 5 then
+			refresher = b:GetItemInSlot(slot)
+			break
+		end
+	end
+	if refresher == nil or not refresher:IsFullyCastable() then
+		return false
+	end
+	if b:GetMana() < refresher:GetManaCost() + t:GetManaCost() then
+		return false
+	end
+	local reach = c.GetProperCastRange(false, b, t:GetCastRange()) + 300
+	local spot = b:FindAoELocation(true, true, b:GetLocation(), reach, t:GetSpecialValueInt("radius") * 0.8, 0, 0)
+	local group = c.GetEnemiesNearLoc(spot.targetloc, t:GetSpecialValueInt("radius"))
+	if group == nil or #group < 2 then
+		return false
+	end
+	pcall(print, string.format(
+		"[OHA-ENIGMA] t=%.0f refresher heroes=%d mana=%.0f need=%.0f",
+		DotaTime(),
+		#group,
+		b:GetMana(),
+		refresher:GetManaCost() + t:GetManaCost()
+	))
+	return true
+end
 -- Midnight Pulse in front of Black Hole when it is ready and there is mana for both.
 function a.QueuePulseBefore(loc)
 	if s:IsFullyCastable() and b:GetMana() >= s:GetManaCost() + t:GetManaCost() then

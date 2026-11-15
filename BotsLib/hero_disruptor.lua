@@ -8,7 +8,13 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+-- 1 Thunder Strike, 2 Glimpse, 3 Kinetic Field, 6 Static Storm (ultimate at 6, 12, 18).
+-- Support: one point in each, then Glimpse, then Kinetic Field, Thunder Strike last.
+-- Core: Thunder Strike first, then Glimpse, Kinetic Field last.
+local j = { { 1, 2, 3, 2, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+if h ~= "pos_4" and h ~= "pos_5" then
+	j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+end
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}

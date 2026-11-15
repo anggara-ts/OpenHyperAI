@@ -380,16 +380,15 @@ function a.IsEnoughAllies(_, a0)
 	end
 	-- Four heroes with two cores waited ~75s for the fifth (28:00) while a creep wave grew on
 	-- our high ground. Once four with two cores have been gathered for 20s, they start.
-	-- One timer per spot: this is called for both the waiting spot and the Tormentor.
-	b._tormentorGatherSince = b._tormentorGatherSince or {}
-	local spot = string.format("%d,%d", math.floor(_.x / 100), math.floor(_.y / 100))
+	-- One timer for the whole gather. Only the wide waiting-spot check (1600) resets it, so the
+	-- closer check at the Tormentor (900) does not start a second 20s wait.
 	if a1 >= 4 and a2 >= 2 then
-		b._tormentorGatherSince[spot] = b._tormentorGatherSince[spot] or DotaTime()
-	else
-		b._tormentorGatherSince[spot] = nil
+		b._tormentorGatherSince = b._tormentorGatherSince or DotaTime()
+	elseif a0 >= 1600 then
+		b._tormentorGatherSince = nil
 	end
-	local since = b._tormentorGatherSince[spot]
-	local waitedLong = since ~= nil and DotaTime() - since >= 20
+	local since = b._tormentorGatherSince
+	local waitedLong = since ~= nil and DotaTime() - since >= 20 and a1 >= 4 and a2 >= 2
 	return (
 		b.tormentor_kill_time == 0 and a1 >= 5
 		or b.tormentor_kill_time == 0 and a1 >= 4 and a2 >= 3 and a3 >= 1

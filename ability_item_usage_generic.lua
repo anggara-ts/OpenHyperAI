@@ -691,6 +691,29 @@ local function aD()
 			b:ActionImmediate_Courier(aF, COURIER_ACTION_RETURN_STASH_ITEMS)
 			return
 		end
+		-- Before 0:20 stash items wait, except wards: supports buy them at -60s (after the
+		-- human's 30s on fresh stock) wherever they are, and the courier brings them out.
+		if aI and aH < 20 and (aA == COURIER_STATE_AT_BASE or aA == COURIER_STATE_IDLE and aF:DistanceFromFountain() < 800) then
+			local wardInStash = false
+			for slot = 9, 14 do
+				local it = b:GetItemInSlot(slot)
+				local nm = it ~= nil and it:GetName() or ""
+				if nm == "item_ward_observer" or nm == "item_ward_sentry" or nm == "item_ward_dispenser" then
+					wardInStash = true
+					break
+				end
+			end
+			if wardInStash then
+				b:ActionImmediate_Courier(aF, COURIER_ACTION_TAKE_STASH_ITEMS)
+				az = aH
+				return
+			end
+			if b:GetCourierValue() > 0 and aH > az + aK then
+				b:ActionImmediate_Courier(aF, COURIER_ACTION_TRANSFER_ITEMS)
+				az = aH
+				return
+			end
+		end
 		if
 			aI
 			and (not a.IsInvFull(b) or aH <= 5 * 60 or b.currBuyingBasicItemList ~= nil and #b.currBuyingBasicItemList == 0 and b.currBuyingItemInPurchaseList ~= "item_travel_boots")

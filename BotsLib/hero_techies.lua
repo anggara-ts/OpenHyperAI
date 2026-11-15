@@ -152,7 +152,7 @@ function a.SkillsComplement()
 	-- mines), and the stunned-target rule below runs too late, after Tazer and Sticky Bomb.
 	local postMine = a.ConsiderPostBlastMines()
 	if postMine ~= nil then
-		b:Action_UseAbilityOnLocation(u, postMine)
+		a.OrderMine(postMine, "post-blast")
 		return
 	end
 	-- Short on mana for a Blast Off that is otherwise ready: Soul Ring now, Blast Off next think.
@@ -223,7 +223,7 @@ function a.SkillsComplement()
 	end
 	C, D = a.ConsiderProximityMines()
 	if C > 0 then
-		b:Action_UseAbilityOnLocation(u, D)
+		a.OrderMine(D, a._mineKind or "mine")
 		E = DotaTime()
 		return
 	end
@@ -871,16 +871,55 @@ end
 -- Three spots 120 degrees apart around center. At radius 210 they sit ~364 apart, past the
 -- 350 minimum mine spacing, and the target in the middle is near full damage from each.
 -- Skips spots that are not passable or too close to an existing mine.
+-- A spot a mine can actually go: walkable (covers cliffs and map objects), no tree within 120,
+-- no building within 250, no mine too close, and 350 from the other spots of this triangle.
+function a.MineSpotOk(spot, chosen)
+	if not IsLocationPassable(spot) or f.IsOtherMinesClose(spot) then
+		return false
+	end
+	for _, other in ipairs(chosen) do
+		if (other.x - spot.x) ^ 2 + (other.y - spot.y) ^ 2 < 350 * 350 then
+			return false
+		end
+	end
+	for _, tree in pairs(b:GetNearbyTrees(math.min(1600, GetUnitToLocationDistance(b, spot) + 200)) or {}) do
+		local tl = GetTreeLocation(tree)
+		if tl ~= nil and (tl.x - spot.x) ^ 2 + (tl.y - spot.y) ^ 2 < 120 * 120 then
+			return false
+		end
+	end
+	for _, list in ipairs({ UNIT_LIST_ALLIED_BUILDINGS, UNIT_LIST_ENEMY_BUILDINGS }) do
+		for _, bld in pairs(GetUnitList(list) or {}) do
+			if bld ~= nil and not bld:IsNull() and GetUnitToLocationDistance(bld, spot) < 250 then
+				return false
+			end
+		end
+	end
+	return true
+end
 function a.MineTriangle(center, radius)
 	local spots = {}
 	if center == nil then
 		return spots
 	end
+	-- Blocked spot (tree, building, cliff): try a slightly turned or shorter/longer spot first.
+	local turns = { 0, 20, -20 }
+	local radii = { radius, radius - 50, radius + 40 }
 	for k = 0, 2 do
-		local angle = math.rad(90 + 120 * k)
-		local spot = center + Vector(math.cos(angle) * radius, math.sin(angle) * radius, 0)
-		if IsLocationPassable(spot) and not f.IsOtherMinesClose(spot) then
-			spots[#spots + 1] = spot
+		local placed = false
+		for _, rr in ipairs(radii) do
+			for _, turn in ipairs(turns) do
+				local angle = math.rad(90 + 120 * k + turn)
+				local spot = center + Vector(math.cos(angle) * rr, math.sin(angle) * rr, 0)
+				if a.MineSpotOk(spot, spots) then
+					spots[#spots + 1] = spot
+					placed = true
+					break
+				end
+			end
+			if placed then
+				break
+			end
 		end
 	end
 	return spots
@@ -906,6 +945,25 @@ function a.LogTechies(kind, mines, center)
 end
 -- A mine spot of the triangle around the last Blast Off landing, 1.75s to 3.5s after the order
 -- (1s cast point and 0.75s flight, Valve data, then the stun). Spots already mined are skipped.
+-- Every mine order, with the exact spot and its distance from Techies. The engine rejects some
+-- with "Cast failed, but not sure why! (techies_land_mines, target loc ..., result: 24)"; matching
+-- those coordinates against these lines shows whether the distance is the problem.
+function a.OrderMine(loc, kind)
+	if loc == nil then
+		return
+	end
+	pcall(print, string.format(
+		"[OHA-TECHIES] t=%.0f mine-order kind=%s at=%.2f,%.2f dist=%d range=%d charges=%d",
+		DotaTime(),
+		kind,
+		loc.x,
+		loc.y,
+		math.floor(GetUnitToLocationDistance(b, loc)),
+		u:GetCastRange(),
+		a.MineCharges()
+	))
+	b:Action_UseAbilityOnLocation(u, loc)
+end
 function a.ConsiderPostBlastMines()
 	if b._blastAt == nil or b._blastLoc == nil or DotaTime() - b._blastAt > 3.5 then
 		return nil
@@ -913,12 +971,9 @@ function a.ConsiderPostBlastMines()
 	if DotaTime() - b._blastAt < 1.75 or not u:IsTrained() or u:IsHidden() or not u:IsFullyCastable() then
 		return nil
 	end
-	local range = c.GetProperCastRange(false, b, u:GetCastRange())
-	for _, spot in ipairs(a.MineTriangle(b._blastLoc, 210)) do
-		if GetUnitToLocationDistance(b, spot) <= range + 100 then
-			a.LogTechies("post-blast-mine", 1, spot)
-			return spot
-		end
+	-- Around Techies himself: he has just landed among the stunned enemies, so no walking.
+	for _, spot in ipairs(a.MineTriangle(b:GetLocation(), 210)) do
+		return spot
 	end
 	return nil
 end
@@ -1074,27 +1129,7 @@ function a.ConsiderProximityMines()
 			end
 		end
 	end
-	local ao = q:GetManaCost() + s:GetManaCost()
-	if DotaTime() > E + 1.5 and c.GetManaAfter(ao) * b:GetMana() > u:GetManaCost() * 2 and a.IsSuitableToPlaceMine() then
-		local ah = f.GetAvailableSpot()
-		MineLocation, MineLocationDistance = f.GetClosestSpot(b, ah)
-		if
-			MineLocation ~= nil
-			and GetUnitToLocationDistance(b, MineLocation) <= 2000
-			and not a.IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
-		then
-			for ai = 0, 10 do
-				local aj = c.GetRandomLocationWithinDist(MineLocation, 0, f.nMinMineDistance * 3 + 100)
-				if IsLocationPassable(aj) and not f.IsOtherMinesClose(aj) then
-					local ak = c.GetTechiesMinesInLoc(aj, f.nMinMineDistance * 3 + 100)
-					if #ak < 3 then
-						return BOT_ACTION_DESIRE_HIGH, aj
-					end
-				end
-				ai = ai + 1
-			end
-		end
-	end
+	-- No idle mining at random map spots: it spent mana on mines nobody walked into.
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.IsSuitableToPlaceMine()

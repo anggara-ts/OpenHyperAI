@@ -439,22 +439,19 @@ function a.WardThink()
 				if d.IsOtherWardClose(j.location, "npc_dota_observer_wards", 300, true, false) then
 					u = 30
 				end
-				-- A sentry-only dispenser left in observer mode. Toggling it again every
-				-- think cancels the toggle, so the sentry never plants and he stays here.
-				if i:GetName() ~= "item_ward_sentry" and i:GetToggleState() == true then
-					local now = DotaTime()
-					if b._wardToggleAt == nil then
-						b._wardToggleAt = now
-						a.WardThinkActed = true
-						b:Action_UseAbilityOnEntity(i, b)
+				-- A dispenser: plant through DispenserPlant (cast, watch the charges, toggle only
+				-- when the cast did nothing or planted the wrong kind). The old rule took toggle
+				-- state true as observer mode, toggled, waited 0.8s and gave the spot up: game 019,
+				-- 14:48-15:26, Techies kept switching a dispenser that held 0 observers and 2
+				-- sentries. Which state means which mode is not documented.
+				if i:GetName() == "item_ward_dispenser" then
+					a.WardThinkActed = true
+					LogPlantTry("sentry", i, j.location)
+					if DispenserPlant(i, j.location, false) then
 						return
 					end
-					if now - b._wardToggleAt < 0.8 then
-						a.WardThinkActed = true
-						return
-					end
-					j.plant_time_sentry = now
-					b._wardToggleAt = nil
+					AnnounceWard("sentry")
+					j.plant_time_sentry = DotaTime()
 					return
 				end
 				b._wardToggleAt = nil

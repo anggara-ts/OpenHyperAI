@@ -117,7 +117,12 @@ function a.SkillsComplement()
 	if a._heldArrow then
 		return
 	end
-	x, y = a.ConsiderE()
+	local leapWhy
+	x, y, leapWhy = a.ConsiderE()
+	if x > 0 and leapWhy == "turn" then
+		b:Action_MoveToLocation(y)
+		return
+	end
 	if x > 0 then
 		pcall(ChargeTracker.Issued, b, q)
 		pcall(print, string.format(
@@ -719,7 +724,10 @@ function a.ConsiderE()
 		V = "E-被卡住"
 		return BOT_ACTION_DESIRE_HIGH, U, V
 	end
-	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(3.0) then
+	-- Escape. Also out of retreat mode when low and outnumbered: at 31:14 (game 014) she had both
+	-- charges, 27% HP and three enemies on her, but was not in retreat mode, so no Leap.
+	local lowAndOutnumbered = c.GetHP(b) < 0.4 and #T >= 2
+	if (c.IsRetreating(b) or lowAndOutnumbered) and b:WasRecentlyDamagedByAnyHero(3.0) then
 		local why = #S == 0 and "no-enemy-in-800" or "facing-enemy"
 		for W, X in pairs(S) do
 			if c.IsValid(X) and not c.IsDisabled(X) and not b:IsFacingLocation(X:GetLocation(), 155) then
@@ -733,6 +741,29 @@ function a.ConsiderE()
 				))
 				return BOT_ACTION_DESIRE_HIGH, U, V
 			end
+		end
+		-- Facing them while low: turn away first (Leap goes the way she faces); the next think
+		-- leaps once she faces away.
+		if why == "facing-enemy" and c.GetHP(b) < 0.4 then
+			local center = c.GetCenterOfUnits(S)
+			local me = b:GetLocation()
+			local dx, dy = me.x - center.x, me.y - center.y
+			local len = math.sqrt(dx * dx + dy * dy)
+			if len < 1 then
+				local fountain = GetTeam() == TEAM_RADIANT and Vector(-7172, -6652, 0) or Vector(6982, 6422, 0)
+				dx, dy = fountain.x - me.x, fountain.y - me.y
+				len = math.max(1, math.sqrt(dx * dx + dy * dy))
+			end
+			if DotaTime() >= (b._leapTurnLogAt or -999) then
+				b._leapTurnLogAt = DotaTime() + 3
+				pcall(print, string.format(
+					"[OHA-MIRANA] t=%.0f leap-turn enemies800=%d hp=%.2f",
+					DotaTime(),
+					#S,
+					c.GetHP(b)
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, Vector(me.x + dx / len * 300, me.y + dy / len * 300, me.z), "turn"
 		end
 		-- Retreating under fire without a Leap: say why (no enemy hero within 800, or not yet
 		-- turned away; Leap goes the way she faces). At most every 5s.

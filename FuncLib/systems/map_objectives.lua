@@ -811,6 +811,27 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				inLotus = false
 			end
 			local function note(why)
+				-- [OHA-LOTUS] reason line whenever this bot's lotus reason changes in the window.
+				-- The per-second debug lives in mode_lotus_pool_generic.lua, which never runs (no
+				-- such bot mode in this game version), so game 018 had no record of why no Radiant
+				-- bot went for the 3:00 lotus beside Doom.
+				if why ~= bot._lotusWhyLogged then
+					bot._lotusWhyLogged = why
+					pcall(print, string.format(
+						"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						why,
+						loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
+						type(dist) == "number" and string.format("%.0f", dist) or "?",
+						#foes,
+						#friends,
+						loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
+						bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+						sinceLast,
+						toNext
+					))
+				end
 				bot._lotusWhy = why
 				bot._lotusDist = dist
 				bot._lotusDbg = {

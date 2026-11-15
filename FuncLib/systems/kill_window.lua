@@ -224,6 +224,20 @@ local function TickRaw()
 end
 
 -- Seconds until the first dead enemy respawns, or nil when none is dead.
+-- Dead enemies that will be back within `seconds` (respawn timer only).
+function KillWindow.RespawningWithin(seconds)
+	local now = Now()
+	local n = 0
+	for _, slot in pairs(enemies) do
+		if not slot.alive and slot.deathAt ~= nil then
+			local rest = slot.deathAt + (slot.respawnFor or 30) - now
+			if rest <= seconds then
+				n = n + 1
+			end
+		end
+	end
+	return n
+end
 function KillWindow.WindowLeft()
 	local now = Now()
 	local left = nil

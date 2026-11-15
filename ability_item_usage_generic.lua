@@ -4706,7 +4706,7 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			end
 		end
 	end
-	if bf == BOT_MODE_LANING then
+	if bf == BOT_MODE_LANING and not a.JustTeleported() then
 		hEffectTarget, shouldTp = a.GetLaningTPLocation(b, dt, botLocation)
 		bw = "出去发育"
 		if shouldTp then
@@ -5008,6 +5008,9 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			then
 				dL = farmTpLoc
 			end
+		end
+		if dL ~= nil and a.JustTeleported() then
+			dL = nil
 		end
 		if dL ~= nil then
 			hEffectTarget = dL
@@ -7466,6 +7469,29 @@ function a.LogHomeWalk()
 		b:GetCourierValue()
 	))
 end
+-- A teleport just landed (TP scroll, Teleportation, Boots of Travel...): 1500+ moved in under
+-- 1.5s. The "go farm" TPs wait 20s after it: game 020, 6:02-6:08, Nature's Prophet used
+-- Teleportation to help top (team roam 1.50), landed, and laning mode TP'd him back to his
+-- bottom lane 6s later ("出去发育").
+function a.TrackTeleportJump()
+	-- A respawn moves him to the fountain too: not a teleport.
+	if not b:IsAlive() then
+		b._jumpTrack = nil
+		return
+	end
+	local now = DotaTime()
+	local here = b:GetLocation()
+	local last = b._jumpTrack
+	if last ~= nil and now - last.t <= 1.5 and f.GetLocationToLocationDistance(last.loc, here) >= 1500 then
+		b._jumpAt = now
+	end
+	if last == nil or now - last.t >= 0.5 then
+		b._jumpTrack = { t = now, loc = here }
+	end
+end
+function a.JustTeleported()
+	return DotaTime() - (b._jumpAt or -999) < 20
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7484,6 +7510,7 @@ function ItemUsageThink()
 	MatchTrace.Tick(b)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, b)
+	pcall(a.TrackTeleportJump)
 	pcall(a.LogHomeWalk)
 	-- Rune mode just ordered a rune pick-up: no item or spell order this frame, it would replace
 	-- the pick-up. The river horn gold stopped being taken from build 043 on, the build that fixed

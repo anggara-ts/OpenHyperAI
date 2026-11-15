@@ -7466,6 +7466,11 @@ function a.LogHomeWalk()
 		b:GetCourierValue()
 	))
 end
+function a.RunePickupLock()
+	return b:IsAlive()
+		and b:GetActiveMode() == BOT_MODE_RUNE
+		and DotaTime() - (b._runePickupAt or -999) < 0.5
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -7480,6 +7485,13 @@ function ItemUsageThink()
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, b)
 	pcall(a.LogHomeWalk)
+	-- Rune mode just ordered a rune pick-up: no item or spell order this frame, it would replace
+	-- the pick-up. The river horn gold stopped being taken from build 043 on, the build that fixed
+	-- a crash in this think (before it, this think issued no orders at all for most bots); the
+	-- same Dota build (6975) and no rune-mode change in between.
+	if a.RunePickupLock() then
+		return
+	end
 	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
 	local okDeaggro, deaggroed = pcall(a.DeflectTowerAggro)
 	if okDeaggro and deaggroed then
@@ -7624,6 +7636,9 @@ function ItemUsageThink()
 	_perfDone()
 end
 function AbilityUsageThink()
+	if a.RunePickupLock() then
+		return
+	end
 	HandleIdleBotState(b)
 end
 local fn = false

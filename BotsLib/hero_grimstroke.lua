@@ -8,7 +8,13 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+-- 1 Stroke of Fate, 2 Phantom's Embrace, 3 Ink Swell, 6 Soulbind.
+-- Support (pos 4/5): Ink Swell first, then Phantom's Embrace, Stroke of Fate last.
+-- Core: Stroke of Fate first, then Ink Swell, Phantom's Embrace last.
 local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+if h ~= "pos_4" and h ~= "pos_5" then
+	j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+end
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -107,7 +113,34 @@ local G
 local H
 local I
 local J
+-- Stroke of Fate on alt-cast goes straight (7.41), easier to aim than the curve. The bot API
+-- has no alt-cast call; the autocast switch is the closest, so it is turned on once Stroke is
+-- learned and the state is logged before and after, to confirm in game that the path is straight.
+local function StrokeStraight()
+	if b._strokeAltSet or not o:IsTrained() then
+		return
+	end
+	b._strokeAltSet = true
+	local okB, before = pcall(function()
+		return o:GetAutoCastState()
+	end)
+	if okB and before == false then
+		pcall(function()
+			o:ToggleAutoCast()
+		end)
+	end
+	local okA, after = pcall(function()
+		return o:GetAutoCastState()
+	end)
+	pcall(print, string.format(
+		"[OHA-GRIM] t=%.0f stroke-altcast before=%s after=%s",
+		DotaTime(),
+		tostring(okB and before),
+		tostring(okA and after)
+	))
+end
 function a.SkillsComplement()
+	pcall(StrokeStraight)
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -129,7 +162,18 @@ function a.SkillsComplement()
 	end
 	D, E = a.ConsiderSoulBind()
 	if D > 0 then
-		b:Action_UseAbilityOnEntity(t, E)
+		-- Soulbind -> Phantom's Embrace on the bound hero: a unit-target spell on one bound hero
+		-- is also cast on the other (Valve data), so both get the latch and the silence.
+		b:Action_ClearActions(false)
+		b:ActionQueue_UseAbilityOnEntity(t, E)
+		if p:IsFullyCastable() and b:GetMana() >= t:GetManaCost() + p:GetManaCost() then
+			b:ActionQueue_UseAbilityOnEntity(p, E)
+			pcall(print, string.format(
+				"[OHA-GRIM] t=%.0f soulbind-embrace target=%s",
+				DotaTime(),
+				(string.gsub(E:GetUnitName(), "npc_dota_hero_", ""))
+			))
+		end
 		return
 	end
 	w, x = a.ConsiderPhantomsEmbrace()

@@ -912,7 +912,9 @@ function Think()
 				break
 			end
 		end
-		if bE and bw > 400 then
+		-- Another ally is already on this camp: join it unless it is far (game 016: two bots near
+		-- one camp kept turning away from each other; this gave way at 400).
+		if bE and bw > 1200 then
 			g.Role["availableCampTable"], l = g.Site.UpdateAvailableCamp(e, l, g.Role["availableCampTable"])
 			n = g.Role["availableCampTable"]
 			l = g.Site.GetClosestNeutralSpwan(e, n)

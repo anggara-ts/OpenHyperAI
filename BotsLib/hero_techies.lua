@@ -177,6 +177,10 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(p, stickyLoc)
 		return
 	end
+	-- Then out with Force Staff: turn toward home first (it pushes the way he faces).
+	if a.ConsiderPostBlastEscape() then
+		return
+	end
 	-- Short on mana for a Blast Off that is otherwise ready: Soul Ring now, Blast Off next think.
 	if a.ConsiderSoulRingForBlast() then
 		return
@@ -1014,6 +1018,53 @@ local function BlastLandAt()
 		flight = 0.75
 	end
 	return b._blastAt + s:GetCastPoint() + flight
+end
+-- Force Staff out after the landing combo (Veil, mines, Sticky Bomb come first in the order),
+-- once per Blast Off, from 0.5s to 6s after landing, when an enemy hero is within 800 and he is
+-- below 60% HP or two enemy heroes are on him. Force Staff pushes 600 the way he faces (Valve
+-- data), so he turns toward the fountain first. The shared rule only pushes a hero already in
+-- retreat mode and facing home, which he rarely is right after landing.
+function a.ConsiderPostBlastEscape()
+	local land = BlastLandAt()
+	if land == nil or DotaTime() < land + 0.5 or DotaTime() > land + 6 or b._forceBlastAt == b._blastAt then
+		return false
+	end
+	local slot = b:FindItemSlot("item_force_staff")
+	if slot < 0 or slot > 5 then
+		slot = b:FindItemSlot("item_hurricane_pike")
+	end
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local force = b:GetItemInSlot(slot)
+	if force == nil or not force:IsFullyCastable() or b:IsRooted() then
+		return false
+	end
+	local foes = 0
+	for _, e0 in pairs(c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+			foes = foes + 1
+		end
+	end
+	if foes == 0 or (c.GetHP(b) >= 0.6 and foes < 2) then
+		return false
+	end
+	local home = GetTeam() == TEAM_RADIANT and Vector(-7172, -6652, 0) or Vector(6982, 6422, 0)
+	local me = b:GetLocation()
+	local dx, dy = home.x - me.x, home.y - me.y
+	local len = math.max(1, math.sqrt(dx * dx + dy * dy))
+	local landing = Vector(me.x + dx / len * 600, me.y + dy / len * 600, me.z)
+	if not IsLocationPassable(landing) then
+		return false
+	end
+	if not b:IsFacingLocation(home, 25) then
+		b:Action_MoveToLocation(Vector(me.x + dx / len * 200, me.y + dy / len * 200, me.z))
+		return true
+	end
+	b._forceBlastAt = b._blastAt
+	a.LogTechies(string.format("post-blast-force foes=%d hp=%.2f", foes, c.GetHP(b)), 0, landing)
+	b:Action_UseAbilityOnEntity(force, b)
+	return true
 end
 -- Veil of Discord right after landing, once per Blast Off, with an enemy hero in its radius.
 function a.ConsiderPostBlastVeil()

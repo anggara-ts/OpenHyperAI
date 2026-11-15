@@ -130,7 +130,17 @@ function a.SkillsComplement()
 	end
 	u, v = a.ConsiderImpale()
 	if u > 0 then
+		a.RecordImpale(v)
 		b:Action_UseAbilityOnLocation(o, v)
+		return
+	end
+	-- Impale -> Dagon -> Mind Flare: Dagon on the stunned target, so Mind Flare's echo (15% of
+	-- the damage Nyx dealt in the last 15s) includes it.
+	local dagon, dagonTarget = a.ConsiderDagonCombo()
+	if dagon ~= nil then
+		a.AddDealt(dagonTarget, dagon:GetSpecialValueInt("damage"))
+		a.LogNyx("dagon-combo", dagonTarget)
+		b:Action_UseAbilityOnEntity(dagon, dagonTarget)
 		return
 	end
 	w, x = a.ConsiderMindflare()
@@ -148,6 +158,122 @@ function a.SkillsComplement()
 		b:Action_UseAbility(s)
 		return
 	end
+end
+-- [OHA-NYX] lines, at most once per 3s per kind.
+function a.LogNyx(kind, target)
+	b._nyxLogAt = b._nyxLogAt or {}
+	local key = string.match(kind, "^[%w%-]+") or kind
+	if DotaTime() < (b._nyxLogAt[key] or -999) then
+		return
+	end
+	b._nyxLogAt[key] = DotaTime() + 3
+	pcall(print, string.format(
+		"[OHA-NYX] t=%.0f %s target=%s mp=%.2f",
+		DotaTime(),
+		kind,
+		target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		c.GetMP(b)
+	))
+end
+-- Damage Nyx dealt to each enemy hero from his spells and Dagon, for Mind Flare's echo
+-- (15% of the damage he dealt the target in the last 15s, Valve data). Attacks are not counted.
+local dealt = {}
+function a.AddDealt(target, dmg)
+	if target == nil or dmg == nil or dmg <= 0 or not target:IsHero() then
+		return
+	end
+	local id = target:GetPlayerID()
+	dealt[id] = dealt[id] or {}
+	table.insert(dealt[id], { t = DotaTime(), dmg = dmg })
+end
+function a.EchoDamage(target)
+	local list = dealt[target:GetPlayerID()]
+	if list == nil then
+		return 0
+	end
+	local pct = p:GetSpecialValueInt("damage_echo_pct")
+	if pct == nil or pct <= 0 then
+		pct = 15
+	end
+	local window = p:GetSpecialValueInt("damage_echo_duration")
+	if window == nil or window <= 0 then
+		window = 15
+	end
+	local sum, keep = 0, {}
+	for _, e0 in ipairs(list) do
+		if DotaTime() - e0.t <= window then
+			sum = sum + e0.dmg
+			keep[#keep + 1] = e0
+		end
+	end
+	dealt[target:GetPlayerID()] = keep
+	return sum * pct / 100
+end
+-- Enemies on the Impale line at cast time get its damage recorded.
+function a.RecordImpale(loc)
+	if loc == nil then
+		return
+	end
+	local me = b:GetLocation()
+	local dx, dy = loc.x - me.x, loc.y - me.y
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len < 1 then
+		return
+	end
+	local ux, uy = dx / len, dy / len
+	local length = o:GetSpecialValueInt("length")
+	if length == nil or length <= 0 then
+		length = 750
+	end
+	local width = o:GetSpecialValueInt("width")
+	if width == nil or width <= 0 then
+		width = 140
+	end
+	local dmg = o:GetSpecialValueInt("impale_damage")
+	for _, e0 in pairs(c.GetNearbyHeroes(b, length + 200, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) then
+			local p0 = e0:GetLocation()
+			local along = (p0.x - me.x) * ux + (p0.y - me.y) * uy
+			local side = math.abs((p0.x - me.x) * uy - (p0.y - me.y) * ux)
+			if along >= 0 and along <= length + 100 and side <= width + 60 then
+				a.AddDealt(e0, dmg)
+			end
+		end
+	end
+end
+-- Dagon on a stunned enemy hero while engaging, before Mind Flare.
+function a.ConsiderDagonCombo()
+	if not D then
+		return nil
+	end
+	local dagon = nil
+	for slot = 0, 5 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and string.find(it:GetName(), "item_dagon", 1, true) and it:IsFullyCastable() then
+			dagon = it
+			break
+		end
+	end
+	if dagon == nil then
+		return nil
+	end
+	local range = dagon:GetCastRange() + 50
+	for _, e0 in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+		if
+			c.IsValidHero(e0)
+			and c.CanCastOnNonMagicImmune(e0)
+			and c.CanCastOnTargetAdvanced(e0)
+			and not c.IsSuspiciousIllusion(e0)
+			and c.IsDisabled(e0)
+			and not e0:HasModifier("modifier_abaddon_borrowed_time")
+			and not e0:HasModifier("modifier_dazzle_shallow_grave")
+			and not e0:HasModifier("modifier_oracle_false_promise_timer")
+			and not e0:HasModifier("modifier_templar_assassin_refraction_absorb")
+		then
+			return dagon, e0
+		end
+	end
+	return nil
 end
 function a.ConsiderImpale()
 	if not o:IsFullyCastable() or b:HasModifier("modifier_nyx_assassin_vendetta") then
@@ -287,7 +413,7 @@ function a.ConsiderMindflare()
 		if
 			c.IsValidHero(M)
 			and c.CanCastOnNonMagicImmune(M)
-			and c.CanKillTarget(M, M:GetMaxMana() * Y / 100, DAMAGE_TYPE_MAGICAL)
+			and c.CanKillTarget(M, M:GetMaxMana() * Y / 100 + a.EchoDamage(M), DAMAGE_TYPE_MAGICAL)
 			and not c.IsSuspiciousIllusion(M)
 			and not M:HasModifier("modifier_abaddon_borrowed_time")
 			and not M:HasModifier("modifier_dazzle_shallow_grave")
@@ -320,7 +446,38 @@ function a.ConsiderSpikedCarapace()
 	if not q:IsFullyCastable() or b:HasModifier("modifier_nyx_assassin_vendetta") then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Burrowed, Carapace stuns enemies around him at once (Valve data, 400 radius). It was
+	-- never cast while burrowed.
+	if b:HasModifier("modifier_nyx_assassin_burrow") then
+		local radius = r:GetSpecialValueInt("carapace_radius")
+		if radius == nil or radius <= 0 then
+			radius = 400
+		end
+		local near = 0
+		for _, e0 in pairs(c.GetNearbyHeroes(b, radius, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(e0) and c.CanCastOnNonMagicImmune(e0) and not c.IsSuspiciousIllusion(e0) then
+				near = near + 1
+			end
+		end
+		if near >= 1 then
+			a.LogNyx("carapace-burrowed enemies=" .. near, nil)
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
 	if c.IsUnitTargetProjectileIncoming(b, 400) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Right-clicks, melee included: any damage source is stunned (once each). Two heroes hitting
+	-- him, or one when he is below 80% HP.
+	local hitters = 0
+	for _, e0 in pairs(c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) and e0:GetAttackTarget() == b and not e0:IsDisarmed() then
+			hitters = hitters + 1
+		end
+	end
+	if hitters >= 2 or hitters >= 1 and c.GetHP(b) < 0.8 then
+		a.LogNyx("carapace-attacked hitters=" .. hitters, nil)
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if not b:HasModifier("modifier_sniper_assassinate") and not b:IsMagicImmune() then
@@ -382,8 +539,15 @@ function a.ConsiderVendetta()
 			end
 		end
 	end
-	if c.IsRetreating(b) and not c.IsRealInvisible(b) then
-		return BOT_ACTION_DESIRE_HIGH
+	-- Escape only under real pressure: hit by a hero in the last 3s and below 50% HP or
+	-- outnumbered. Every retreat used to spend it.
+	if c.IsRetreating(b) and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(3) then
+		local foes = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+		local friends = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}
+		if #foes >= 1 and (c.GetHP(b) < 0.5 or #foes > #friends) then
+			a.LogNyx("vendetta-escape", nil)
+			return BOT_ACTION_DESIRE_HIGH
+		end
 	end
 	if D then
 		local R = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)

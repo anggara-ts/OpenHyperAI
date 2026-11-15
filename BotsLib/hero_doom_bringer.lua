@@ -275,12 +275,17 @@ function a.ConsiderInfernalBlade()
 			and not c.IsSuspiciousIllusion(W)
 		then
 			local P = W:GetNearbyTowers(700, false)
-			if W:IsChanneling() then
-				if c.IsInLaningPhase() then
-					if P ~= nil and #P == 0 then
-						return BOT_ACTION_DESIRE_HIGH, W
-					end
-				else
+			-- A TP is checked by its modifier too, as everywhere else in the project: IsChanneling()
+			-- alone missed an enemy TP in range at 32:30.
+			if W:IsChanneling() or W:HasModifier("modifier_teleporting") then
+				if not c.IsInLaningPhase() or P ~= nil and #P == 0 then
+					pcall(print, string.format(
+						"[OHA-DOOM] t=%.0f blade-interrupt target=%s tp=%s dist=%d",
+						DotaTime(),
+						(string.gsub(W:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(W:HasModifier("modifier_teleporting")),
+						math.floor(GetUnitToUnitDistance(b, W))
+					))
 					return BOT_ACTION_DESIRE_HIGH, W
 				end
 			end

@@ -27,8 +27,9 @@ n["pos_4"] = {
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_kaya",
-	-- Shard before Mekansm (inside Guardian Greaves).
+	-- Shard, then Aghanim's Scepter, then Guardian Greaves (user call).
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_guardian_greaves",
 	"item_force_staff",
 	"item_lotus_orb",

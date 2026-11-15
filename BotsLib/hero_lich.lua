@@ -190,8 +190,10 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnEntity(p, B)
 		return
 	end
-	C, D = a.ConsiderE()
+	local gazeWhy
+	C, D, gazeWhy = a.ConsiderE()
 	if C > 0 then
+		b._gazeForMana = type(gazeWhy) == "string" and string.find(gazeWhy, "mana", 1, true) ~= nil
 		c.SetQueuePtToINT(b, true)
 		b._gazeAt = DotaTime()
 		b._gazeTarget = D
@@ -463,9 +465,10 @@ function a.ConsiderW()
 		if
 			spire ~= nil
 			and GetUnitToUnitDistance(b, spire) <= T
-			and not spire:HasModifier("modifier_lich_frost_shield")
+			and DotaTime() >= (b._spireShieldAt or -999) + p:GetSpecialValueFloat("duration")
 			and #(c.GetEnemiesNearLoc(spire:GetLocation(), 700) or {}) >= 1
 		then
+			b._spireShieldAt = DotaTime()
 			a.LogLich("shield-spire", nil)
 			return BOT_ACTION_DESIRE_HIGH, spire, "W-spire"
 		end
@@ -889,7 +892,7 @@ end
 -- Gaze ends. Started mid-channel it may cancel the Gaze, so it waits for the end.
 function a.ConsiderMeteorAfterGaze()
 	local gazeAgo = DotaTime() - (b._gazeAt or -99)
-	if gazeAgo < 0.8 or gazeAgo > 3.0 or b:IsChanneling() then
+	if gazeAgo < 0.8 or gazeAgo > 3.0 or b:IsChanneling() or b._gazeForMana then
 		return nil
 	end
 	local slot = b:FindItemSlot("item_meteor_hammer")
@@ -916,10 +919,21 @@ function a.ConsiderSacrifice()
 	local T = t:GetCastRange()
 	-- Both charges up (2 max, 120s each, Valve data): use one now even at full mana. It denies an
 	-- allied creep and gives 69% of its experience. Prefer a creep the enemy is about to kill.
-	local okCharges, charges = pcall(function()
-		return t:GetCurrentAbilityCharges()
-	end)
-	if okCharges and type(charges) == "number" and charges >= 2 then
+	-- Charges: GetCurrentAbilityCharges looks unavailable (every Techies log showed the fallback),
+	-- so GetCurrentCharges is tried too. Not with an enemy hero near: a fight wants Chain Frost,
+	-- not a 0.4s cast on his own creep.
+	local charges = nil
+	for _, getter in ipairs({ "GetCurrentAbilityCharges", "GetCurrentCharges" }) do
+		local ok, n = pcall(function()
+			return t[getter](t)
+		end)
+		if ok and type(n) == "number" and n > 0 then
+			charges = n
+			break
+		end
+	end
+	local enemyNear = #(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) > 0
+	if charges ~= nil and charges >= 2 and not enemyNear and not c.IsInTeamFight(b, 1200) then
 		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
 		for a4, ag in pairs(b:GetNearbyLaneCreeps(Min(T + 300, 1600), false) or {}) do
 			if c.IsValid(ag) and c.CanBeAttacked(ag) then
@@ -934,7 +948,7 @@ function a.ConsiderSacrifice()
 		end
 		local pick = deny or any
 		if pick ~= nil then
-			a.LogLich(deny ~= nil and "sacrifice-deny" or "sacrifice-full", nil)
+			a.LogLich((deny ~= nil and "sacrifice-deny" or "sacrifice-full") .. " charges=" .. tostring(charges), nil)
 			return BOT_ACTION_DESIRE_HIGH, pick
 		end
 	end

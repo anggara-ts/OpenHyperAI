@@ -31,6 +31,7 @@ n["pos_4"] = {
 	"item_lotus_orb",
 	"item_veil_of_discord",
 	"item_bloodstone",
+	"item_yasha_and_kaya",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -52,6 +53,7 @@ n["pos_5"] = {
 	"item_boots_of_bearing",
 	"item_veil_of_discord",
 	"item_bloodstone",
+	"item_yasha_and_kaya",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -72,6 +74,7 @@ n["pos_3"] = {
 	"item_boots_of_bearing",
 	"item_veil_of_discord",
 	"item_bloodstone",
+	"item_yasha_and_kaya",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -87,6 +90,7 @@ n["pos_1"] = {
 	"item_aghanims_shard",
 	"item_veil_of_discord",
 	"item_bloodstone",
+	"item_yasha_and_kaya",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
@@ -714,9 +718,10 @@ function a.ConsiderPlantMad()
 	if not c.HasAghanimsShard(b) or b:WasRecentlyDamagedByAnyHero(1.5) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	-- With Shard M.A.D. is active. Its base behavior keeps the passive flag (Valve data), so the
-	-- old IsPassive() check refused it every time and it was never planted.
-	if mad == nil or mad:IsNull() or mad:IsHidden() or not mad:IsFullyCastable() then
+	-- M.A.D. is his innate; in game the Shard only raises its damage and it stays passive (the
+	-- datafeed text says Shard makes it active, but the game does not). Ordering a passive cast
+	-- is refused and freezes him, so a passive M.A.D. is never planted.
+	if mad == nil or mad:IsNull() or mad:IsHidden() or mad:IsPassive() or not mad:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then

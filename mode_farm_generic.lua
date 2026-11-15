@@ -191,6 +191,27 @@ function GetDesire()
 			return BOT_MODE_DESIRE_NONE
 		end
 	end
+	-- An ally close by is fighting enemy heroes: no farming. At 30:30 Earthshaker and Centaur
+	-- started a fight ~2,100 away and Medusa's farm (0.66) kept beating attack (~0.6), so she
+	-- walked back and forth instead of joining.
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			ally ~= nil
+			and ally ~= e
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and GetUnitToUnitDistance(e, ally) <= 2500
+		then
+			local target = ally:GetAttackTarget()
+			local hitting = target ~= nil and not target:IsNull() and target:IsHero() and target:GetTeam() ~= e:GetTeam()
+			local hit = ally:WasRecentlyDamagedByAnyHero(2.0) and #(ally:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) >= 1
+			if hitting or hit then
+				e._farmCommitUntil = nil
+				e._farmCommitFloor = nil
+				return BOT_MODE_DESIRE_NONE
+			end
+		end
+	end
 	-- Same for a creep wave on our high ground (T3 or barracks) with this bot already there.
 	-- The defend mode takes it (hg-creeps); farm used to win and walk him away from it.
 	if g.Utils.HighGroundCreepWaveNear ~= nil and g.Utils.HighGroundCreepWaveNear(e, 2500) then

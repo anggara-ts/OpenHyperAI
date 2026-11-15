@@ -14,6 +14,7 @@ then
 end
 local d = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local e = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+local ObjectiveTravel = require(GetScriptDirectory() .. "/FuncLib/systems/objective_travel")
 local f = nil
 local g = 0
 local h = 0
@@ -308,6 +309,10 @@ function Think()
 			b:Action_MoveToLocation(g)
 			return
 		end
+		-- Far from the Tormentor gather spot: TP or Twin Gate when clearly faster.
+		if GetUnitToLocationDistance(b, h) > 3000 and ObjectiveTravel.Go(b, h, "tormentor") then
+			return
+		end
 		if DotaTime() >= s then
 			b:Action_MoveToLocation(h + RandomVector(300))
 			s = DotaTime() + RandomFloat(0.05, 0.2)
@@ -315,6 +320,9 @@ function Think()
 		end
 	else
 		if GetUnitToLocationDistance(b, g) > b:GetAttackRange() + 50 then
+			if GetUnitToLocationDistance(b, g) > 3000 and ObjectiveTravel.Go(b, g, "tormentor") then
+				return
+			end
 			b:Action_MoveToLocation(g)
 			return
 		else

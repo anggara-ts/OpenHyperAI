@@ -13,6 +13,7 @@ then
 end
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
+local ObjectiveTravel = require(GetScriptDirectory() .. "/FuncLib/systems/objective_travel")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local e = 0.0
 local f = false
@@ -272,8 +273,9 @@ local function TakeTimeNeeded(M)
 	for i = 1, #players do
 		local ally = GetTeamMember(i)
 		if AllyShouldJoin(ally) then
-			local speed = math.max(250, ally:GetCurrentMovementSpeed())
-			local eta = GetUnitToLocationDistance(ally, rally) / speed
+			-- Fastest way there: walk, TP to our tower nearest the pit, or a Twin Gate. Walking
+			-- only made an ally across the map look too slow for every kill window.
+			local eta = ObjectiveTravel.Eta(ally, rally)
 			local spa = ally:GetSecondsPerAttack()
 			local hit = (spa ~= nil and spa > 0) and ally:GetAttackDamage() / spa or 0
 			etas[#etas + 1] = { eta = eta, dps = hit }
@@ -729,7 +731,9 @@ function Think()
 	if not ready then
 		a._roshCommitUntil = nil
 		if GetUnitToLocationDistance(a, rally) > 50 then
-			a:Action_MoveToLocation(rally + RandomVector(80))
+			if not ObjectiveTravel.Go(a, rally, "roshan") then
+				a:Action_MoveToLocation(rally + RandomVector(80))
+			end
 		end
 		if elapsed < 2 then
 			local myId = a:GetPlayerID()

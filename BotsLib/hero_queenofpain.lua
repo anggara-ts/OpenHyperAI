@@ -337,7 +337,7 @@ function a.ConsiderW()
 					S = a6
 					T = "W-对线赶路"
 					if c.IsValidHero(b:GetTarget()) then
-						if c.CanKillTarget(b:GetTarget(), Z, DAMAGE_TYPE_MAGICAL) and q.IsFullyCastable() then
+						if c.CanKillTarget(b:GetTarget(), Z, DAMAGE_TYPE_MAGICAL) and q:IsFullyCastable() then
 							return BOT_ACTION_DESIRE_VERYHIGH
 						end
 					end

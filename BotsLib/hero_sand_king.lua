@@ -74,6 +74,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = true
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "sandking_epicenter", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(o)
 	e.MinionThink(o)

@@ -901,6 +901,8 @@ function Think()
 				and d._runePickTry.n >= 2
 				and now0 - d._runePickTry.first < 3
 			then
+				-- Stamped like the other pick-ups, so the item think holds its orders (RunePickupLock).
+				d._runePickupAt = now0
 				d:Action_MoveToLocation(E)
 				d:ActionQueue_PickUpRune(D.location)
 				doing("step-pickup")

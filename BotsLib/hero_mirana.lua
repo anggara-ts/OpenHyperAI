@@ -246,8 +246,34 @@ function a.ConsiderQ()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-MIRANA] arrow-skip: an enemy hero is teleporting within arrow range and no arrow goes,
+-- with the reason (cooldown, mana, untrained, blocked). At most every 5s.
+function a.LogTeleportArrowSkip(why, target)
+	if DotaTime() < (b._arrowSkipLogAt or -999) then
+		return
+	end
+	b._arrowSkipLogAt = DotaTime() + 5
+	pcall(print, string.format(
+		"[OHA-MIRANA] t=%.0f arrow-skip why=%s target=%s dist=%d mp=%.2f",
+		DotaTime(),
+		why,
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		math.floor(GetUnitToUnitDistance(b, target)),
+		b:GetMana() / math.max(1, b:GetMaxMana())
+	))
+end
 function a.ConsiderW()
 	if not p:IsFullyCastable() then
+		for _, X in pairs(c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(X) and X:HasModifier("modifier_teleporting") then
+				local why = not p:IsTrained() and "untrained"
+					or p:GetCooldownTimeRemaining() > 0 and "cooldown"
+					or b:GetMana() < p:GetManaCost() and "mana"
+					or "not-castable"
+				a.LogTeleportArrowSkip(why, X)
+				break
+			end
+		end
 		return 0
 	end
 	local M = p:GetSpecialValueInt("arrow_range")
@@ -310,6 +336,9 @@ function a.ConsiderW()
 			and not c.IsSuspiciousIllusion(X)
 		then
 			local loc = arrowLoc(X)
+			if X:HasModifier("modifier_teleporting") and not clearShot(X, loc) then
+				a.LogTeleportArrowSkip("blocked", X)
+			end
 			if clearShot(X, loc) then
 				if X:HasModifier("modifier_teleporting") then
 					return releaseArrow(X, loc)
@@ -593,12 +622,31 @@ function a.ConsiderE()
 		return BOT_ACTION_DESIRE_HIGH, U, V
 	end
 	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(3.0) then
+		local why = #S == 0 and "no-enemy-in-800" or "facing-enemy"
 		for W, X in pairs(S) do
 			if c.IsValid(X) and not c.IsDisabled(X) and not b:IsFacingLocation(X:GetLocation(), 155) then
 				U = X
 				V = "E-逃跑:" .. c.Chat.GetNormName(U)
+				pcall(print, string.format(
+					"[OHA-MIRANA] t=%.0f leap why=escape from=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(X:GetUnitName(), "npc_dota_hero_", "")),
+					c.GetHP(b)
+				))
 				return BOT_ACTION_DESIRE_HIGH, U, V
 			end
+		end
+		-- Retreating under fire without a Leap: say why (no enemy hero within 800, or not yet
+		-- turned away; Leap goes the way she faces). At most every 5s.
+		if DotaTime() >= (b._leapSkipLogAt or -999) then
+			b._leapSkipLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-MIRANA] t=%.0f leap-skip why=%s enemies1200=%d hp=%.2f",
+				DotaTime(),
+				why,
+				#T,
+				c.GetHP(b)
+			))
 		end
 	end
 	if c.IsFarming(b) and E >= 12 then

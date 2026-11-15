@@ -154,24 +154,37 @@ local function AllyShouldJoin(ally)
 	return true
 end
 -- grouped: joiners already at the pit or the fountain-side rally.
--- pending: furthest joiner who switched to Roshan and is still outside that ring.
--- required: living allies this call is supposed to wait for.
-local function RoshanGather(pit)
+-- pending: furthest joiner who acked (switched to Roshan) and is still outside that ring.
+-- required: allies this call waits for: the ones there, the ones who acked, and, for the first
+-- 4s of the call, everyone who could join (they need a think or two to switch).
+-- declined: names of allies who did not switch after that, so the call does not wait for them
+-- (a core busy defending or farming used to hold the whole group).
+local ACK_GRACE = 4
+local function RoshanGather(pit, callAge)
 	local grouped, pending, required = 0, 0, 0
+	local declined = {}
 	local players = GetTeamPlayers(GetTeam())
 	for i = 1, #players do
 		local ally = GetTeamMember(i)
 		if AllyShouldJoin(ally) then
-			required = required + 1
 			local dist = GetUnitToLocationDistance(ally, pit)
+			local acked = ally == a or (ally:IsBot() and AllyActiveMode(ally) == BOT_MODE_ROSHAN)
 			if dist <= 1800 then
 				grouped = grouped + 1
-			elseif ally ~= a and AllyActiveMode(ally) == BOT_MODE_ROSHAN and dist > pending then
-				pending = dist
+				required = required + 1
+			elseif acked then
+				required = required + 1
+				if ally ~= a and dist > pending then
+					pending = dist
+				end
+			elseif (callAge or 0) < ACK_GRACE then
+				required = required + 1
+			else
+				declined[#declined + 1] = (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
 			end
 		end
 	end
-	return grouped, pending, required
+	return grouped, pending, required, declined
 end
 local function GatherMinimum()
 	if c.IsLateGame() then
@@ -420,6 +433,9 @@ function GetDesireHelper()
 	end
 	-- A take that only works because of a kill has to fit in that kill's window. Once the
 	-- group has committed at the rally, finish the walk in.
+	if DotaTime() < (a._roshNoAckUntil or -999) then
+		return Ret(BOT_MODE_DESIRE_NONE, "nobody-acked")
+	end
 	local committed = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
 	local teamCall = f and j and TeamRoshanCall(M)
 	if not committed then
@@ -678,8 +694,14 @@ function Think()
 		a._roshCommitUntil = nil
 	end
 	a._roshThinkAt = now
-	local grouped, pending, required = RoshanGather(M)
+	local grouped, pending, required, declined = RoshanGather(M, now - a._roshGatherAt)
 	local elapsed = now - a._roshGatherAt
+	-- Nobody else acked: drop the call (no solo Roshan) and do not re-call for 30s.
+	if elapsed >= ACK_GRACE and required < 2 then
+		a._roshNoAckUntil = now + 30
+		RoshLog("drop why=nobody-acked declined=%s", #declined > 0 and table.concat(declined, ",") or "-")
+		return
+	end
 	local othersWalking = pending > 1800
 	local minimum = math.min(GatherMinimum(), math.max(required, 1))
 	local full = required > 0 and grouped >= required
@@ -718,14 +740,15 @@ function Think()
 		a._roshGatherLogAt = now + 5
 		local _, safeWhy = IsRoshanEngageSafe(M, finishing)
 		RoshLog(
-			"gather grouped=%d/%d min=%d pending=%d elapsed=%.0f safe=%s window=%s",
+			"gather grouped=%d/%d min=%d pending=%d elapsed=%.0f safe=%s window=%s declined=%s",
 			grouped,
 			required,
 			minimum,
 			math.floor(pending),
 			elapsed,
 			safe and "ok" or tostring(safeWhy),
-			left ~= nil and string.format("%.0f", left) or "-"
+			left ~= nil and string.format("%.0f", left) or "-",
+			#declined > 0 and table.concat(declined, ",") or "-"
 		)
 	end
 	if not ready then

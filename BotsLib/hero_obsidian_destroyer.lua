@@ -24,6 +24,9 @@ l["pos_1"] = {
 	"item_magic_wand",
 	"item_double_null_talisman",
 	"item_power_treads",
+	-- Kaya, then Meteor Hammer (user call): timed to land as Astral Imprisonment ends.
+	"item_kaya",
+	"item_meteor_hammer",
 	"item_witch_blade",
 	"item_force_staff",
 	"item_hurricane_pike",
@@ -44,6 +47,9 @@ l["pos_2"] = {
 	"item_magic_wand",
 	"item_double_null_talisman",
 	"item_power_treads",
+	-- Kaya, then Meteor Hammer (user call): timed to land as Astral Imprisonment ends.
+	"item_kaya",
+	"item_meteor_hammer",
 	"item_witch_blade",
 	"item_force_staff",
 	"item_hurricane_pike",
@@ -112,6 +118,74 @@ local y
 local z = false
 local A, B
 local C, D
+-- Astral Imprisonment then Meteor Hammer. Valve data: the prison lasts 1.75/2.5/3.25/4s (the
+-- prisoner is invulnerable), Meteor Hammer channels 2s and lands 0.5s later (600 range, 400
+-- radius, 0.75s stun). So the channel starts when the prison has 2.5s left, on the prison spot,
+-- and the meteor lands as the target comes out. Walks into range while waiting.
+local PRISON_DURATION = { 1.75, 2.5, 3.25, 4 }
+local HAMMER_LEAD = 2.5
+function a.NotePrison(target)
+	if not c.IsValidHero(target) or target:GetTeam() == GetTeam() then
+		return
+	end
+	local lvl = math.max(1, math.min(4, o:GetLevel()))
+	local dur = PRISON_DURATION[lvl]
+	local okD, v = pcall(function()
+		return o:GetSpecialValueFloat("prison_duration")
+	end)
+	if okD and type(v) == "number" and v > 0 then
+		dur = v
+	end
+	local cast = math.max(0, o:GetCastPoint())
+	b._prison = { target = target, loc = target:GetLocation(), castAt = DotaTime(), endAt = DotaTime() + cast + dur }
+end
+function a.ConsiderPrisonHammer()
+	local st = b._prison
+	if st == nil then
+		return false
+	end
+	local now = DotaTime()
+	-- The prison did not land: the target is still there and can be hurt.
+	if now - st.castAt > 0.7 and c.IsValidHero(st.target) and st.target:CanBeSeen() and not st.target:IsInvulnerable() and now < st.endAt - 0.3 then
+		b._prison = nil
+		return false
+	end
+	if now > st.endAt + 0.3 then
+		b._prison = nil
+		return false
+	end
+	local slot = b:FindItemSlot("item_meteor_hammer")
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local hammer = b:GetItemInSlot(slot)
+	if hammer == nil or not hammer:IsFullyCastable() then
+		return false
+	end
+	local left = st.endAt - now
+	local dist = GetUnitToLocationDistance(b, st.loc)
+	if left <= HAMMER_LEAD + 0.05 then
+		if dist <= 650 then
+			b._prison = nil
+			pcall(print, string.format(
+				"[OHA-OD] t=%.1f prison-hammer target=%s left=%.2f dist=%d",
+				now,
+				c.IsValidHero(st.target) and (string.gsub(st.target:GetUnitName(), "npc_dota_hero_", "")) or "?",
+				left,
+				math.floor(dist)
+			))
+			b:Action_UseAbilityOnLocation(hammer, st.loc)
+			return true
+		end
+		return false
+	end
+	-- Waiting for the moment: step into range if needed.
+	if dist > 580 then
+		b:Action_MoveToLocation(c.Utils.GetOffsetLocationTowardsTargetLocation(st.loc, b:GetLocation(), 520))
+		return true
+	end
+	return false
+end
 function a.SkillsComplement()
 	b = GetBot()
 	if c.CanNotUseAbility(b) then
@@ -159,10 +233,14 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnLocation(r, x)
 		return
 	end
+	if a.ConsiderPrisonHammer() then
+		return
+	end
 	u, v = a.ConsiderAstralImprisonment()
 	if u > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnEntity(o, v)
+		pcall(a.NotePrison, v)
 		return
 	end
 	s, t = a.ConsiderArcaneOrb()

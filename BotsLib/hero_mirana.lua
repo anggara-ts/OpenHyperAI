@@ -397,6 +397,58 @@ function a.ConsiderW()
 		end
 	end
 
+	-- Free shot, in any mode: an enemy hero with a clear line (our own creeps never block; enemy
+	-- and neutral units do). Game 014, 27:20-27:35: defending and retreating at full HP with
+	-- enemies on our high ground, no arrow, because the rules above need a fight, a retreat
+	-- under fire, or an enemy within 1600. Close enough to lead (1800), or standing / attacking /
+	-- slow from further. Keeps 15% mana (30% in lane) unless defending or retreating.
+	do
+		-- In lane keep 30% mana for last-hit Starstorms and escape Leaps.
+		local keepMana = (c.IsDefending(b) or c.IsRetreating(b)) and 0 or (c.IsLaning(b) and 0.3 or 0.15)
+		if c.GetManaAfter(P) >= keepMana then
+			local blocked = nil
+			for W, X in pairs(a4) do
+				if
+					c.IsValidHero(X)
+					and c.IsInRange(b, X, M)
+					and not c.IsInRange(b, X, 600)
+					and c.CanCastOnNonMagicImmune(X)
+					and not c.IsSuspiciousIllusion(X)
+					and not X:HasModifier("modifier_abaddon_borrowed_time")
+					and not X:HasModifier("modifier_oracle_false_promise_timer")
+				then
+					local dist = GetUnitToUnitDistance(b, X)
+					local easy = dist <= 1800
+						or X:GetCurrentMovementSpeed() < 200
+						or X:IsChanneling()
+						or c.IsAttacking(X)
+						or c.IsDisabled(X)
+					if easy then
+						local loc = arrowLoc(X)
+						if clearShot(X, loc) then
+							pcall(print, string.format(
+								"[OHA-MIRANA] t=%.0f arrow-free target=%s dist=%d",
+								DotaTime(),
+								(string.gsub(X:GetUnitName(), "npc_dota_hero_", "")),
+								dist
+							))
+							return releaseArrow(X, loc)
+						end
+						blocked = blocked or X
+					end
+				end
+			end
+			if blocked ~= nil and DotaTime() >= (b._arrowBlockedLogAt or -999) then
+				b._arrowBlockedLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-MIRANA] t=%.0f arrow-skip why=blocked target=%s dist=%d",
+					DotaTime(),
+					(string.gsub(blocked:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToUnitDistance(b, blocked)
+				))
+			end
+		end
+	end
 	-- Retreat: stun chasing heroes.
 	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(3.0) then
 		for W, X in pairs(a4) do

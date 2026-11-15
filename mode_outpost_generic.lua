@@ -217,7 +217,7 @@ function Think()
 		if Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
 			local dist = GetUnitToUnitDistance(c, Z)
 			-- Hold still after the capture order so the 6s channel is not restarted every frame.
-			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 6.5 and dist <= 650 then
+			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 1.5 and dist <= 650 then
 				return
 			end
 			-- The capture order walks the bot into range by itself. Moving to the outpost centre until
@@ -232,7 +232,7 @@ function Think()
 				return
 			end
 			c._outpostNearSince = c._outpostNearSince or DotaTime()
-			if DotaTime() - c._outpostNearSince >= 10 then
+			if DotaTime() - c._outpostNearSince >= 15 then
 				c._outpostNearSince = nil
 				c._outpostOffUntil = DotaTime() + 90
 				local zl = Z:GetLocation()
@@ -249,12 +249,46 @@ function Think()
 				return
 			end
 			local capture = c:GetAbilityByName("ability_capture")
-			if capture ~= nil and capture:IsFullyCastable() then
-				c:Action_UseAbilityOnEntity(capture, Z)
-			else
-				c:Action_AttackUnit(Z, false)
+			local castable = capture ~= nil and capture:IsFullyCastable()
+			local nearFor = DotaTime() - c._outpostNearSince
+			-- Game 019: Gyrocopter (36:31, ~260 away) and Medusa (40:51, ~140 away) stood at an
+			-- outpost with no capture for 10s, from within 600. Log each order (what the bot sees
+			-- of ability_capture), and after 3s with no capture, walk to the outpost's edge on
+			-- the bot's side (150 from the centre) before ordering again.
+			if c._outpostOrderLogAt == nil or DotaTime() - c._outpostOrderLogAt >= 3 then
+				c._outpostOrderLogAt = DotaTime()
+				local okR, range = pcall(function()
+					return capture ~= nil and capture:GetCastRange() or -1
+				end)
+				pcall(print, string.format(
+					"[OHA-OUTPOST] t=%.0f %s capture-order outpost=%s dist=%d ability=%s castable=%s range=%s hidden=%s near=%.1f",
+					DotaTime(),
+					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+					Z:GetUnitName(),
+					math.floor(dist),
+					capture ~= nil and "yes" or "no",
+					tostring(castable),
+					okR and tostring(range) or "?",
+					capture ~= nil and tostring(capture:IsHidden()) or "-",
+					nearFor
+				))
 			end
-			c.outpostOrderAt = DotaTime()
+			if nearFor >= 3 and dist > 200 then
+				local edge = c:GetLocation()
+				local zl = Z:GetLocation()
+				local dir = (edge - zl)
+				if dir:Length2D() > 1 then
+					edge = zl + dir:Normalized() * 150
+				end
+				c.outpostOrderAt = nil
+				c:Action_MoveToLocation(edge)
+				return
+			end
+			if castable then
+				c:Action_UseAbilityOnEntity(capture, Z)
+				c.outpostOrderAt = DotaTime()
+			end
+			-- No attack fallback: outposts are invulnerable, an attack order only made him stand.
 			return
 		end
 		if outpostMoveLoc ~= nil then

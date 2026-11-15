@@ -147,6 +147,14 @@ function a.SkillsComplement()
 	-- whoever hits him in the middle of the fight), then mines around the stunned target.
 	-- The old order put the Tazer first (0.1s cast and a 0.6s wait), which delayed the stun,
 	-- and Blast Off was held back whenever the Tazer was not ready to go with it.
+	-- Just landed from Blast Off: plant the mine triangle first, one mine per think. The mines
+	-- queued behind Blast Off are wiped by any other order before he lands (17:30: blast, no
+	-- mines), and the stunned-target rule below runs too late, after Tazer and Sticky Bomb.
+	local postMine = a.ConsiderPostBlastMines()
+	if postMine ~= nil then
+		b:Action_UseAbilityOnLocation(u, postMine)
+		return
+	end
 	-- Short on mana for a Blast Off that is otherwise ready: Soul Ring now, Blast Off next think.
 	if a.ConsiderSoulRingForBlast() then
 		return
@@ -182,6 +190,10 @@ function a.SkillsComplement()
 			end
 		end
 		a.LogTechies(string.format("blast why=%s tazer=%s", yWhy or "?", tostring(tazer)), planted, z)
+		if yWhy ~= "escape" then
+			b._blastAt = DotaTime()
+			b._blastLoc = z
+		end
 		return
 	end
 	x, xTarget = a.ConsiderReactiveTazer()
@@ -891,6 +903,24 @@ function a.LogTechies(kind, mines, center)
 		center and center.y or 0,
 		c.GetMP(b)
 	))
+end
+-- A mine spot of the triangle around the last Blast Off landing, 1.75s to 3.5s after the order
+-- (1s cast point and 0.75s flight, Valve data, then the stun). Spots already mined are skipped.
+function a.ConsiderPostBlastMines()
+	if b._blastAt == nil or b._blastLoc == nil or DotaTime() - b._blastAt > 3.5 then
+		return nil
+	end
+	if DotaTime() - b._blastAt < 1.75 or not u:IsTrained() or u:IsHidden() or not u:IsFullyCastable() then
+		return nil
+	end
+	local range = c.GetProperCastRange(false, b, u:GetCastRange())
+	for _, spot in ipairs(a.MineTriangle(b._blastLoc, 210)) do
+		if GetUnitToLocationDistance(b, spot) <= range + 100 then
+			a.LogTechies("post-blast-mine", 1, spot)
+			return spot
+		end
+	end
+	return nil
 end
 function a.ConsiderProximityMines()
 	if not u:IsFullyCastable() then

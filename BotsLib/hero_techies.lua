@@ -202,6 +202,25 @@ local function LogMadCandidates(list)
 	end
 	pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-abilities %s", DotaTime(), table.concat(parts, " ")))
 end
+-- The planted barrel is the unit npc_dota_techies_remote_mine (Liquipedia, M.A.D. page). Logged
+-- when one of ours appears and when it is gone, to confirm a plant and a detonation in game.
+function a.WatchBarrel()
+	local found = nil
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
+		if u ~= nil and not u:IsNull() and u:GetUnitName() == "npc_dota_techies_remote_mine" then
+			found = u
+			break
+		end
+	end
+	if found ~= nil and not b._barrelSeen then
+		b._barrelSeen = true
+		local p0 = found:GetLocation()
+		pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-barrel seen at=%.0f,%.0f", DotaTime(), p0.x, p0.y))
+	elseif found == nil and b._barrelSeen then
+		b._barrelSeen = false
+		pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-barrel gone", DotaTime()))
+	end
+end
 -- The barrel plant ability, or nil (no Shard, or not found / not castable).
 function a.MadPlant()
 	local list = MadCandidates()
@@ -247,6 +266,7 @@ function a.MadDetonate()
 	return fallback
 end
 function a.SkillsComplement()
+	pcall(a.WatchBarrel)
 	-- Detonate M.A.D. still works while Techies is dead or already acting.
 	if a.ConsiderDetonateMad() > 0 then
 		local det = a.MadDetonate()

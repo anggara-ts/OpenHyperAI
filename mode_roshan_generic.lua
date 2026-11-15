@@ -163,6 +163,7 @@ local ACK_GRACE = 4
 local function RoshanGather(pit, callAge)
 	local grouped, pending, required = 0, 0, 0
 	local declined = {}
+	local coming = {}
 	local players = GetTeamPlayers(GetTeam())
 	for i = 1, #players do
 		local ally = GetTeamMember(i)
@@ -172,19 +173,22 @@ local function RoshanGather(pit, callAge)
 			if dist <= 1800 then
 				grouped = grouped + 1
 				required = required + 1
+				coming[#coming + 1] = ally
 			elseif acked then
 				required = required + 1
+				coming[#coming + 1] = ally
 				if ally ~= a and dist > pending then
 					pending = dist
 				end
 			elseif (callAge or 0) < ACK_GRACE then
 				required = required + 1
+				coming[#coming + 1] = ally
 			else
 				declined[#declined + 1] = (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
 			end
 		end
 	end
-	return grouped, pending, required, declined
+	return grouped, pending, required, declined, coming
 end
 local function GatherMinimum()
 	if c.IsLateGame() then
@@ -694,12 +698,27 @@ function Think()
 		a._roshCommitUntil = nil
 	end
 	a._roshThinkAt = now
-	local grouped, pending, required, declined = RoshanGather(M, now - a._roshGatherAt)
+	local grouped, pending, required, declined, coming = RoshanGather(M, now - a._roshGatherAt)
 	local elapsed = now - a._roshGatherAt
 	-- Nobody else acked: drop the call (no solo Roshan) and do not re-call for 30s.
 	if elapsed >= ACK_GRACE and required < 2 then
 		a._roshNoAckUntil = now + 30
 		RoshLog("drop why=nobody-acked declined=%s", #declined > 0 and table.concat(declined, ",") or "-")
+		return
+	end
+	-- The allies who acked are not enough to kill Roshan (the desire check counts every living
+	-- ally, decliners included): drop and do not re-call for 30s. Not once committed.
+	if
+		elapsed >= ACK_GRACE
+		and not (a._roshCommitUntil ~= nil and now < a._roshCommitUntil)
+		and not c.HasEnoughDPSForRoshan(coming)
+	then
+		a._roshNoAckUntil = now + 30
+		RoshLog(
+			"drop why=weak-group coming=%d declined=%s",
+			#coming,
+			#declined > 0 and table.concat(declined, ",") or "-"
+		)
 		return
 	end
 	local othersWalking = pending > 1800

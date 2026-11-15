@@ -121,8 +121,13 @@ function a.SkillsComplement()
 	-- creep skills went unused. The slots change after each Devour, so look them up by name.
 	for slot = 0, 10 do
 		local stolen = b:GetAbilityInSlot(slot)
-		if stolen ~= nil and not stolen:IsNull() and DEVOUR_ABILITIES[stolen:GetName()] then
-			local want, target, kind = a.ConsiderDevourAbility(stolen)
+		if stolen ~= nil and not stolen:IsNull() and a.IsStolenAbility(stolen) then
+			local want, target, kind
+			if DEVOUR_ABILITIES[stolen:GetName()] then
+				want, target, kind = a.ConsiderDevourAbility(stolen)
+			else
+				want, target, kind = a.ConsiderGenericDevourAbility(stolen)
+			end
 			if want ~= nil and want > 0 then
 				pcall(print, string.format(
 					"[OHA-DOOM] t=%.0f devour-cast %s target=%s",
@@ -132,6 +137,8 @@ function a.SkillsComplement()
 				))
 				if kind == "unit" and target ~= nil then
 					b:Action_UseAbilityOnEntity(stolen, target)
+				elseif kind == "point" and target ~= nil then
+					b:Action_UseAbilityOnLocation(stolen, target:GetLocation())
 				else
 					b:Action_UseAbility(stolen)
 				end
@@ -474,6 +481,87 @@ DEVOUR_ABILITIES = {
 	harpy_storm_chain_lightning = true,
 	satyr_trickster_purge = true,
 }
+-- A Devoured creep ability: not one of Doom's own, not a map/system ability, not hidden.
+function a.IsStolenAbility(ab)
+	local name = ab:GetName()
+	if type(name) ~= "string" or ab:IsHidden() or ab:IsPassive() then
+		return false
+	end
+	if string.sub(name, 1, 13) == "doom_bringer_" or string.sub(name, 1, 14) == "special_bonus_" then
+		return false
+	end
+	for _, prefix in ipairs({ "ability_", "plus_", "seasonal_", "twin_gate" }) do
+		if string.sub(name, 1, #prefix) == prefix then
+			return false
+		end
+	end
+	return true
+end
+-- Any other Devoured creep ability, judged by its own target type and team (read from the game,
+-- so no creep ability names are hard-coded). Toggles and autocasts are left alone.
+function a.ConsiderGenericDevourAbility(ab)
+	if not ab:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local behavior = ab:GetBehavior()
+	local has = function(flag)
+		return flag ~= nil and c.CheckBitfieldFlag(behavior, flag)
+	end
+	-- Behavior flags: no target 4, unit 8, point 16, toggle 512, autocast 4096 (checked on known
+	-- abilities: Echo Slam, Fissure, Split Shot, Walrus Punch). Friendly target team is 1.
+	if has(512) or has(4096) then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local okTeam, team = pcall(function()
+		return ab:GetTargetTeam()
+	end)
+	local friendly = okTeam and team == 1
+	local range = ab:GetCastRange()
+	if range == nil or range < 150 then
+		range = 350
+	end
+	range = c.GetProperCastRange(false, b, range)
+	local foesNear = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+	if has(8) and friendly then
+		if #foesNear == 0 then
+			return BOT_ACTION_DESIRE_NONE, nil, ""
+		end
+		local best, bestHp = nil, 0.5
+		for _, ally in pairs(c.GetNearbyHeroes(b, range, false, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(ally) and not ally:IsIllusion() and c.GetHP(ally) < bestHp then
+				best, bestHp = ally, c.GetHP(ally)
+			end
+		end
+		if best ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, best, "unit"
+		end
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local target = nil
+	if (J or c.IsInTeamFight(b, 1200)) and c.IsValidHero(I) and not c.IsSuspiciousIllusion(I) then
+		target = I
+	elseif K then
+		for _, foe in pairs(foesNear) do
+			if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, b) then
+				target = foe
+				break
+			end
+		end
+	end
+	if target == nil or not c.CanCastOnNonMagicImmune(target) then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	if has(8) and c.IsInRange(b, target, range + 100) then
+		return BOT_ACTION_DESIRE_HIGH, target, "unit"
+	end
+	if has(16) and c.IsInRange(b, target, range + 100) then
+		return BOT_ACTION_DESIRE_HIGH, target, "point"
+	end
+	if has(4) and c.IsInRange(b, target, 350) then
+		return BOT_ACTION_DESIRE_HIGH, nil, ""
+	end
+	return BOT_ACTION_DESIRE_NONE, nil, ""
+end
 function a.ConsiderDevourAbility(a8)
 	if a8:IsPassive() or not a8:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil, ""

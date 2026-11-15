@@ -558,7 +558,7 @@ function t.ShouldUseSelfDispelItem(P)
 				local a0 = P:FindItemSlot(Z)
 				if a0 >= 0 then
 					local a1 = P:GetItemInSlot(a0)
-					if a1 and a1.IsFullyCastable() then
+					if a1 and a1:IsFullyCastable() then
 						if Z == "item_black_king_bar" and W.worstSeverity < 6 then
 							_ = true
 							break
@@ -588,7 +588,7 @@ function t.ShouldUseAllyDispelItem(P)
 		return -1, nil
 	end
 	local a3 = P:GetItemInSlot(a2)
-	if not a3 or not a3.IsFullyCastable() then
+	if not a3 or not a3:IsFullyCastable() then
 		return -1, nil
 	end
 	local V = P:GetNearbyHeroes(900, false, v.None)
@@ -650,7 +650,7 @@ function t.ShouldMantaDodge(P)
 		return -1
 	end
 	local a1 = P:GetItemInSlot(ab)
-	if not a1 or not a1.IsFullyCastable() then
+	if not a1 or not a1:IsFullyCastable() then
 		return -1
 	end
 	local ac = P:GetIncomingTrackingProjectiles()

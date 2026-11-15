@@ -2203,13 +2203,31 @@ local function NeededLater(name)
 		if it == name then
 			return true
 		end
-		local ok, parts = pcall(c.GetBasicItems, { it })
+		-- Owned items must still count as parts: GetBasicItems leaves out what the hero holds, so a
+		-- held Helm of Iron Will was not seen as a Crimson Guard part, marked unused and sold, then
+		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). An owned-count
+		-- table that is always 0 makes it list every basic part.
+		local none = setmetatable({}, { __index = function()
+			return 0
+		end })
+		local ok, parts = pcall(c.GetBasicItems, { it }, none)
 		if ok and type(parts) == "table" then
 			for _, p in ipairs(parts) do
 				if p == name then
 					return true
 				end
 			end
+		end
+	end
+	-- Parts still to buy for the item being built right now.
+	for _, p in ipairs(a.currBuyingBasicItemList or {}) do
+		if p == name then
+			return true
+		end
+	end
+	for _, p in ipairs(a.currBuyingBasicItemRefList or {}) do
+		if p == name then
+			return true
 		end
 	end
 	return false

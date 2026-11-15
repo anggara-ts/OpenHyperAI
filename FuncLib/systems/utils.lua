@@ -1791,11 +1791,11 @@ function aD.GetAllyIdsInTpToLocation(bp, bq)
 end
 function aD.ConsiderTPToTarget(bv, cV, dY)
 	local dV = GetUnitToLocationDistance(bv, cV)
-	if bv.IsUsingAbility() or bv:HasModifier("modifier_teleporting") then
+	if bv:IsUsingAbility() or bv:HasModifier("modifier_teleporting") then
 		return false
 	end
 	local bu = aD.GetItemFromFullInventory(bv, "item_tpscroll")
-	if bu == nil or not bu.IsFullyCastable() then
+	if bu == nil or not bu:IsFullyCastable() then
 		return false
 	end
 	local dZ = aD.GetAllyIdsInTpToLocation(cV, 2500)

@@ -290,6 +290,13 @@ function a.ConsiderW()
 		if a.HoldArrowForAtos(target) then
 			return 0
 		end
+		pcall(print, string.format(
+			"[OHA-MIRANA] t=%.0f arrow target=%s dist=%d mode=%d",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(GetUnitToUnitDistance(b, target)),
+			b:GetActiveMode()
+		))
 		return BOT_ACTION_DESIRE_HIGH, loc
 	end
 
@@ -314,8 +321,13 @@ function a.ConsiderW()
 		end
 	end
 
-	-- Engage: lead the target when the lane/path is clear.
-	if c.IsGoingOnSomeone(b) then
+	-- Engage: lead the target when the lane/path is clear. A fight while pushing or defending
+	-- counts too: at 47:40 the post-kill push floor kept her in push mode and no arrow went.
+	local nearHeroes = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {}
+	local fighting = c.IsGoingOnSomeone(b)
+		or c.IsInTeamFight(b, 1200)
+		or (c.IsPushing(b) or c.IsDefending(b)) and #nearHeroes >= 1
+	if fighting then
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(b, botTarget, M)

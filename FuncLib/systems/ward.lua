@@ -39,7 +39,9 @@ local E = {
 local F = {
 	-- Radiant bank of the bottom rune. The dire bank looks back into Dire's own jungle.
 	-- Kept off (-245, -996): walking there pulled Dire supports toward the Radiant tower.
-	[1] = { location = Vector(123, -1118, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	-- Was (123, -1118): against the cliff where a ward cannot go (Lina stood there 46s, game 014).
+	-- Moved 40 toward the Radiant base. Observer cast range is 500, so she casts from the river.
+	[1] = { location = Vector(94, -1145, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 	[2] = { location = Vector(-627, 850, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[3] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
 	[4] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },

@@ -43,6 +43,53 @@ end
 local function DispenserHasObservers(item)
 	return item ~= nil and (item:GetCurrentCharges() or 0) > 0
 end
+-- Plant from a Ward Dispenser. Which toggle state means observer is not documented, and the old
+-- code toggled whenever the state read false and returned, so the next think could toggle it
+-- back: game 014 Lina and game 016 Techies stood on the bottom-rune spot holding a dispenser and
+-- never planted. Now: cast, then watch the charges (observers are the current charges, sentries
+-- the secondary). The wanted count went down: done. The other one went down: wrong mode, toggle
+-- once for next time. Nothing changed for 1s: toggle once and cast again. Returns true when it
+-- issued an order or is waiting on one.
+local function DispenserPlant(item, loc, wantObs)
+	local now = DotaTime()
+	local obs = item:GetCurrentCharges() or 0
+	local sen = DispenserSentryCharges(item)
+	local t = b._dispTry
+	if t ~= nil and (t.loc ~= loc or t.wantObs ~= wantObs or now - t.at > 4) then
+		t = nil
+	end
+	if t == nil then
+		b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = false, castAt = now }
+		b:Action_UseAbilityOnLocation(item, loc)
+		return true
+	end
+	local gotWanted = wantObs and obs < t.obs or not wantObs and sen < t.sen
+	local gotOther = wantObs and sen < t.sen or not wantObs and obs < t.obs
+	if gotWanted then
+		b._dispTry = nil
+		return false
+	end
+	if gotOther then
+		-- Planted the other kind: switch the dispenser for the next one.
+		b._dispTry = nil
+		b:Action_UseAbilityOnEntity(item, b)
+		pcall(print, string.format("[OHA-WARD] t=%.0f dispenser wrong-mode want=%s toggled", now, wantObs and "obs" or "sentry"))
+		return true
+	end
+	if now - t.castAt >= 1 and not t.toggled then
+		t.toggled = true
+		t.recast = true
+		t.castAt = now + 0.5
+		b:Action_UseAbilityOnEntity(item, b)
+		return true
+	end
+	if t.recast and now >= t.castAt then
+		t.recast = false
+		t.castAt = now
+		b:Action_UseAbilityOnLocation(item, loc)
+	end
+	return true
+end
 -- Console copy at game end only keeps the tail, and the signout fills most of it.
 -- Remember plants during the match and print them once POST_GAME starts.
 local planted = {}
@@ -262,15 +309,11 @@ function a.WardThink()
 					a.WardThinkActed = true
 					b:Action_UseAbilityOnLocation(h, j.location)
 				else
-					if h:GetToggleState() == false then
-						a.WardThinkActed = true
-						b:Action_UseAbilityOnEntity(h, b)
+					a.WardThinkActed = true
+					if DispenserPlant(h, j.location, true) then
 						return
-					else
-						AnnounceWard("observer")
-						a.WardThinkActed = true
-						b:Action_UseAbilityOnLocation(h, j.location)
 					end
+					AnnounceWard("observer")
 				end
 				j.plant_time_obs = DotaTime()
 				return

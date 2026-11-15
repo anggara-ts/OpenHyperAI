@@ -183,7 +183,10 @@ function a.SkillsComplement()
 	local F = c.GetHP(b)
 	local G = C:GetSpecialValueInt("rot_radius")
 	local H = c.GetNearbyHeroes(b, G + 50, true, BOT_MODE_NONE)
-	if a.TryBlink() then
+	if a.BlinkComboStep(C, D, E) then
+		return
+	end
+	if a.TryBlink(C, D, E) then
 		return
 	end
 	u = a.ConsiderMeatShield(D, C, x, F, G, H)
@@ -221,7 +224,43 @@ function a.SkillsComplement()
 		return
 	end
 end
-function a.TryBlink()
+-- After an engage blink, for 3s: Meat Shield, then Rot on, then Dismember on the blink target,
+-- one order per think. Ends when Dismember goes out, the target is gone, or the 3s run out.
+function a.BlinkComboStep(rot, shield, dismember)
+	local st = b._pudgeCombo
+	if st == nil then
+		return false
+	end
+	local x0 = st.target
+	if DotaTime() - st.at > 3 or not c.IsValidHero(x0) or not x0:IsAlive() then
+		b._pudgeCombo = nil
+		return false
+	end
+	if not st.shield then
+		st.shield = true
+		if shield ~= nil and c.CanCastAbility(shield) and not b:HasModifier("modifier_pudge_flesh_heap_block") then
+			a.LogPudge("blink-combo shield", c.GetHP(b))
+			b:Action_UseAbility(shield)
+			return true
+		end
+	end
+	if not st.rot then
+		st.rot = true
+		if rot ~= nil and rot:IsTrained() and rot:IsFullyCastable() and not rot:GetToggleState() then
+			a.LogPudge("blink-combo rot", c.GetHP(b))
+			b:Action_UseAbility(rot)
+			return true
+		end
+	end
+	b._pudgeCombo = nil
+	if dismember ~= nil and c.CanCastAbility(dismember) and c.CanCastOnMagicImmune(x0) then
+		a.LogPudge("blink-combo dismember " .. (string.gsub(x0:GetUnitName(), "npc_dota_hero_", "")), c.GetHP(b))
+		b:Action_UseAbilityOnEntity(dismember, x0)
+		return true
+	end
+	return false
+end
+function a.TryBlink(rot, shield, dismember)
 	if not c.CanBlinkDagger(b) or b.Blink == nil or b:IsRooted() then
 		return false
 	end
@@ -241,7 +280,12 @@ function a.TryBlink()
 			end
 		end
 	end
-	if y and c.IsValidHero(x) and not c.IsSuspiciousIllusion(x) then
+	-- Engage blink (chase or initiate), user call: no "target below 60% / disabled / alone" gate
+	-- any more, which kept him from initiating. Needs 40%+ HP, and our heroes near the target
+	-- (Pudge always counted) at least as many as theirs. The whole combo is queued at once:
+	-- blink to point blank -> Meat Shield -> Rot on -> Dismember. It used to be the blink alone,
+	-- and the next think could hook or Rot first.
+	if y and c.GetHP(b) >= 0.4 and c.IsValidHero(x) and not c.IsSuspiciousIllusion(x) then
 		local dist = GetUnitToUnitDistance(b, x)
 		if
 			dist > 350
@@ -249,15 +293,26 @@ function a.TryBlink()
 			and not c.IsLocationInChrono(x:GetLocation())
 			and not c.IsLocationInBlackHole(x:GetLocation())
 		then
-			local friends = c.GetAlliesNearLoc(x:GetLocation(), 1100)
-			local foes = c.GetEnemiesNearLoc(x:GetLocation(), 1100)
-			local vulnerable = c.GetHP(x) < 0.6 or c.IsDisabled(x) or #foes <= 1
-			if vulnerable and #friends >= #foes then
+			local friends = 1
+			for _, ally in pairs(c.GetAlliesNearLoc(x:GetLocation(), 1100) or {}) do
+				if ally ~= b then
+					friends = friends + 1
+				end
+			end
+			local foes = c.GetEnemiesNearLoc(x:GetLocation(), 1100) or {}
+			if friends >= #foes then
 				local dest = x:GetLocation()
 				if dist > range then
 					dest = c.GetLocationTowardDistanceLocation(b, x:GetLocation(), range - 50)
 				end
 				if IsLocationPassable(dest) then
+					-- One step per think after this (see BlinkComboStep): a queue behind the blink is
+					-- wiped by the next order from the spell think or the mode.
+					b._pudgeCombo = { target = x, at = DotaTime(), shield = false, rot = false }
+					a.LogPudge(
+						"blink-combo start target=" .. (string.gsub(x:GetUnitName(), "npc_dota_hero_", "")) .. " dist=" .. math.floor(dist),
+						c.GetHP(b)
+					)
 					b:Action_UseAbilityOnLocation(blink, dest)
 					return true
 				end

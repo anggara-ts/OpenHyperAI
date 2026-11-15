@@ -5,18 +5,27 @@ local function a(b)
 		local h = GetBot()
 		local i = h:GetUnitName()
 		local j, k = "game/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", ""), nil
+		-- The handlers only keep the message. Logging from inside them showed up as
+		-- "Script Runtime Error: error in error handling" for every bot at -89s (a per-hero
+		-- Customize file is optional, so a failed require is normal).
+		local loadErr = nil
 		local l, m = xpcall(function()
 			k = require(j)
 		end, function(n)
-			log("[WARN] When loading customized game file: %s", n)
+			loadErr = n
+			return n
 		end)
 		if not (l and k) then
 			j = GetScriptDirectory() .. "/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", "")
 			l, m = xpcall(function()
 				k = require(j)
 			end, function(n)
-				log("[WARN] When loading customized file: %s", n)
+				loadErr = n
+				return n
 			end)
+		end
+		if not (l and k) and loadErr ~= nil then
+			pcall(log, "[WARN] No customized hero file for %s: %s", i, tostring(loadErr))
 		end
 		if l and k and k.Enable then
 			d = k.AbilityUpgrade

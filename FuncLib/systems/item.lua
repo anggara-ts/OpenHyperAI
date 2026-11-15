@@ -607,6 +607,9 @@ end
 for h, w in pairs(v) do
 	b[w] = RecipesLast(GetItemComponents(w)[1])
 end
+-- Boots of Travel 2 is Boots of Travel plus the recipe again (the recipe name the game reported
+-- for it in game 020's purchases). Spelled out so the planner keeps level 1 as a step toward it.
+b["item_travel_boots_2"] = { "item_travel_boots", "item_recipe_travel_boots" }
 b["item_phase_boots"] = { "item_blades_of_attack", "item_boots", "item_chainmail" }
 b["item_power_treads_agi"] = { "item_boots", "item_boots_of_elves", "item_gloves" }
 b["item_power_treads_int"] = { "item_boots", "item_robe", "item_gloves" }

@@ -202,6 +202,29 @@ function a.SkillsComplement()
 	J = c.IsAttacking(b)
 	K = L.isTeamFight
 	G = L.target
+	-- An enemy teleporting within Glimpse range: Glimpse it first. It sat last in the order,
+	-- behind the storms, the fields and Thunder Strike (game 016, 62:00: no Glimpse on a TP).
+	if p:IsFullyCastable() then
+		local range = c.GetProperCastRange(false, b, p:GetCastRange())
+		for _, T in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(T)
+				and T:HasModifier("modifier_teleporting")
+				and c.CanCastOnNonMagicImmune(T)
+				and c.CanCastOnTargetAdvanced(T)
+				and not c.IsSuspiciousIllusion(T)
+			then
+				pcall(print, string.format(
+					"[OHA-DISRUPTOR] t=%.0f glimpse-tp target=%s dist=%d",
+					DotaTime(),
+					(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToUnitDistance(b, T)
+				))
+				b:Action_UseAbilityOnEntity(p, T)
+				return
+			end
+		end
+	end
 	local comboTarget, comboSpot, comboStorm = a.ConsiderGlimpseCombo()
 	if comboTarget ~= nil then
 		pcall(print, string.format(

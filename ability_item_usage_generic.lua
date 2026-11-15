@@ -881,6 +881,29 @@ local bc = {}
 local bd = {}
 local be = nil
 local bf = -1
+-- Doom (or its Scepter aura): spells and healing are blocked, items are not (Valve data:
+-- does_mute empty). It pierces BKB and cannot be dispelled. Items still work; only uses that
+-- heal or restore mana for the doomed hero, or try to cure the silence, are wasted.
+function a.IsDoomed(unit)
+	return unit ~= nil
+		and (unit:HasModifier("modifier_doom_bringer_doom") or unit:HasModifier("modifier_doom_bringer_doom_aura_enemy"))
+end
+local DOOM_WASTED = {
+	item_magic_stick = true,
+	item_magic_wand = true,
+	item_holy_locket = true,
+	item_flask = true,
+	item_tango = true,
+	item_tango_single = true,
+	item_faerie_fire = true,
+	item_greater_faerie_fire = true,
+	item_enchanted_mango = true,
+	item_clarity = true,
+	item_bottle = true,
+	item_cheese = true,
+	item_soul_ring = true,
+	item_satanic = true,
+}
 local function bg()
 	a.SetStashItemTimeUpdate()
 	-- WD: cash Gris-Gris before other item logic (bypasses CanCastAbility).
@@ -957,6 +980,9 @@ local function bg()
 		if smokeFromBag and bm ~= nil and not bm:IsNull() then
 			local cd = bm:GetCooldownTimeRemaining()
 			ready = not (type(cd) == "number" and cd > 0)
+		end
+		if ready and bn ~= nil and DOOM_WASTED[bn] and a.IsDoomed(b) then
+			ready = false
 		end
 		if ready and bn ~= nil then
 			if a.ConsiderItemDesire[bn] ~= nil and not a.IsItemInStash(bn) then
@@ -1274,6 +1300,7 @@ a.ConsiderItemDesire["item_black_king_bar"] = function(bm)
 		end
 		if
 			b:IsSilenced()
+			and not a.IsDoomed(b)
 			and b:GetMana() > 100
 			and not b:HasModifier("modifier_item_mask_of_madness_berserk")
 			and bC >= 2
@@ -1730,7 +1757,7 @@ a.ConsiderItemDesire["item_cyclone"] = function(bm)
 			bw = "撤退:" .. f.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
 		end
-		if b:IsRooted() or b:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and b:IsSilenced() then
+		if b:IsRooted() or b:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and b:IsSilenced() and not a.IsDoomed(b) then
 			hEffectTarget = b
 			bw = "解缠绕:" .. f.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
@@ -2575,11 +2602,14 @@ a.ConsiderItemDesire["item_mekansm"] = function(bm)
 		end
 	end
 	if
-		b:GetHealth() / b:GetMaxHealth() < 0.5
-		or b:IsSilenced()
-		or b:IsRooted()
-		or b:HasModifier("modifier_item_urn_damage")
-		or b:HasModifier("modifier_item_spirit_vessel_damage")
+		not a.IsDoomed(b)
+		and (
+			b:GetHealth() / b:GetMaxHealth() < 0.5
+			or b:IsSilenced()
+			or b:IsRooted()
+			or b:HasModifier("modifier_item_urn_damage")
+			or b:HasModifier("modifier_item_spirit_vessel_damage")
+		)
 	then
 		hEffectTarget = b
 		bw = "治疗自己:" .. f.Chat.GetNormName(hEffectTarget)
@@ -2617,11 +2647,14 @@ a.ConsiderItemDesire["item_guardian_greaves"] = function(bm)
 		end
 	end
 	if
-		b:GetHealth() / b:GetMaxHealth() < 0.5
-		or b:IsSilenced()
-		or b:IsRooted()
-		or b:HasModifier("modifier_item_urn_damage")
-		or b:HasModifier("modifier_item_spirit_vessel_damage")
+		not a.IsDoomed(b)
+		and (
+			b:GetHealth() / b:GetMaxHealth() < 0.5
+			or b:IsSilenced()
+			or b:IsRooted()
+			or b:HasModifier("modifier_item_urn_damage")
+			or b:HasModifier("modifier_item_spirit_vessel_damage")
+		)
 	then
 		hEffectTarget = b
 		bw = "治疗自己:" .. f.Chat.GetNormName(hEffectTarget)
@@ -5429,7 +5462,7 @@ a.ConsiderItemDesire["item_stormcrafter"] = function(bm)
 	local bw = nil
 	local bx = f.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 	if f.CanCastOnNonMagicImmune(b) and #bx > 0 then
-		if b:IsRooted() or b:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and b:IsSilenced() then
+		if b:IsRooted() or b:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and b:IsSilenced() and not a.IsDoomed(b) then
 			hEffectTarget = b
 			bw = "解缠绕:" .. f.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw

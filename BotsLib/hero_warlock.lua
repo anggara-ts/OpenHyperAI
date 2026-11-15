@@ -95,6 +95,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "warlock_rain_of_chaos", kind = "point" } }
 a["bDeafaultItem"] = true
 local n = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "warlock")
 local o = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "warlock")

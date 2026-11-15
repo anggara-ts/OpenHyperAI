@@ -173,11 +173,19 @@ local function Behavior(ab)
 	end)
 	return ok and v or 0
 end
+-- Logged whenever the set of M.A.D. abilities (and their castable/hidden state) changes, with or
+-- without the Shard buff: game 017, Techies had the barrel unlocked but HasAghanimsShard (the
+-- modifier_item_aghanims_shard buff) never let this run, so nothing was logged or planted.
 local function LogMadCandidates(list)
-	if b._madNamesLogged or not c.HasAghanimsShard(b) then
+	local sig = {}
+	for _, ab in ipairs(list) do
+		sig[#sig + 1] = ab:GetName() .. (ab:IsHidden() and "h" or "") .. (ab:IsTrained() and "t" or "")
+	end
+	local key = table.concat(sig, ",")
+	if key == b._madNamesLogged then
 		return
 	end
-	b._madNamesLogged = true
+	b._madNamesLogged = key
 	local parts = {}
 	for _, ab in ipairs(list) do
 		local okP, passive = pcall(function()
@@ -196,9 +204,6 @@ local function LogMadCandidates(list)
 end
 -- The barrel plant ability, or nil (no Shard, or not found / not castable).
 function a.MadPlant()
-	if not c.HasAghanimsShard(b) then
-		return nil
-	end
 	local list = MadCandidates()
 	LogMadCandidates(list)
 	for _, ab in ipairs(list) do
@@ -789,7 +794,8 @@ function a.TazerIsUnitTarget()
 	return ok and behavior ~= nil and c.CheckBitfieldFlag(behavior, ABILITY_BEHAVIOR_UNIT_TARGET)
 end
 function a.ConsiderPlantMad()
-	if not c.HasAghanimsShard(b) or b:WasRecentlyDamagedByAnyHero(1.5) then
+	-- No Shard-buff check: the plant ability is found directly (see MadPlant).
+	if b:WasRecentlyDamagedByAnyHero(1.5) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	-- The barrel plant (Shard) found at runtime; never the passive innate (a refused order

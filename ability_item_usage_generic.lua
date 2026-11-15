@@ -7446,6 +7446,15 @@ function ItemUsageThink()
 		local x, ff = pcall(h.SkillsComplement)
 		if not x then
 			MatchTrace.Event(b, "error", "SkillsComplement: " .. tostring(ff))
+			-- Hero spell-script errors were only in the match trace, never on the console (a
+			-- Techies M.A.D. rule that never ran left no trace). First 3 distinct ones per bot.
+			b._skillErrs = b._skillErrs or {}
+			local key = tostring(ff)
+			if not b._skillErrs[key] and (b._skillErrCount or 0) < 3 then
+				b._skillErrs[key] = true
+				b._skillErrCount = (b._skillErrCount or 0) + 1
+				pcall(print, string.format("[OHA-ERROR] t=%.1f %s SkillsComplement: %s", DotaTime(), c, key))
+			end
 		end
 		_perfDone()
 		return
@@ -7508,6 +7517,15 @@ function ItemUsageThink()
 		end
 		if not x then
 			MatchTrace.Event(b, "error", "SkillsComplement: " .. tostring(ff))
+			-- Hero spell-script errors were only in the match trace, never on the console (a
+			-- Techies M.A.D. rule that never ran left no trace). First 3 distinct ones per bot.
+			b._skillErrs = b._skillErrs or {}
+			local key = tostring(ff)
+			if not b._skillErrs[key] and (b._skillErrCount or 0) < 3 then
+				b._skillErrs[key] = true
+				b._skillErrCount = (b._skillErrCount or 0) + 1
+				pcall(print, string.format("[OHA-ERROR] t=%.1f %s SkillsComplement: %s", DotaTime(), c, key))
+			end
 		end
 	end
 	if l and not b:IsChanneling() then

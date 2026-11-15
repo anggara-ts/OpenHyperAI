@@ -133,17 +133,11 @@ local G, H
 local I, J
 local K = 0
 local L, M, N, O, P, Q
--- Sacrifice: 2 charges, one every 120s, none when first learned (Valve data).
+-- Sacrifice charges from the shared tracker (2 charges, 120s each, none when learned).
 function a.SacrificeCharges()
-	local ok, n = pcall(ChargeTracker.Get, b, t, 2, 120, true)
-	if ok and type(n) == "number" then
-		return n
-	end
-	return 0
+	return ChargeTracker.Count(b, t) or 0
 end
 function a.SkillsComplement()
-	-- Before any early return, so the Sacrifice cast phase is seen by the charge tracker.
-	a.SacrificeCharges()
 	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
 	-- below stops everything during a channel, so the weave runs first.
 	if a.ConsiderGazeWeave() then

@@ -16,6 +16,7 @@ local h = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(c, "npc_dota
 local i = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local j = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 j.ThinkLess = j.Enable and j.ThinkLess or 1
 local lastHumanPingTime = -1
@@ -7176,6 +7177,8 @@ function ItemUsageThink()
 		end
 	end
 	MatchTrace.Tick(b)
+	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
+	pcall(ChargeTracker.Tick, b)
 	LogHumanPing()
 	pcall(a.LogStuck)
 	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has

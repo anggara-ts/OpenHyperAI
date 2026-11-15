@@ -793,7 +793,11 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			end
 			-- The 6s linger ends while he is still walking. A lotus still in the pool
 			-- is worth the rest of the trip when no enemy is actually visible.
-			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and #foes == 0 and bot._lotusSkipMark ~= mark then
+			-- Enemies are counted at the pool, not around the bot: his lane opponent is always within
+			-- 1200 of him, so a laner who said "Taking lotus" turned back a second later (6:05).
+			-- Near the bot only being outnumbered stops it.
+			local foesAtPool = HeroesNearLoc(loc, 1200)
+			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and foesAtPool == 0 and #foes <= #friends and bot._lotusSkipMark ~= mark then
 				inLotus = true
 				etaL = -sinceLast
 			end

@@ -129,12 +129,6 @@ function a.SkillsComplement()
 				want, target, kind = a.ConsiderGenericDevourAbility(stolen)
 			end
 			if want ~= nil and want > 0 then
-				pcall(print, string.format(
-					"[OHA-DOOM] t=%.0f devour-cast %s target=%s",
-					DotaTime(),
-					stolen:GetName(),
-					target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-"
-				))
 				if kind == "unit" and target ~= nil then
 					b:Action_UseAbilityOnEntity(stolen, target)
 				elseif kind == "point" and target ~= nil then
@@ -325,13 +319,6 @@ function a.ConsiderInfernalBlade()
 			-- alone missed an enemy TP in range at 32:30.
 			if W:IsChanneling() or W:HasModifier("modifier_teleporting") then
 				if not c.IsInLaningPhase() or P ~= nil and #P == 0 then
-					pcall(print, string.format(
-						"[OHA-DOOM] t=%.0f blade-interrupt target=%s tp=%s dist=%d",
-						DotaTime(),
-						(string.gsub(W:GetUnitName(), "npc_dota_hero_", "")),
-						tostring(W:HasModifier("modifier_teleporting")),
-						math.floor(GetUnitToUnitDistance(b, W))
-					))
 					return BOT_ACTION_DESIRE_HIGH, W
 				end
 			end

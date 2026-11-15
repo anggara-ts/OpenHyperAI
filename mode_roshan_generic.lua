@@ -180,18 +180,16 @@ local function GatherMinimum()
 	end
 	return 4
 end
--- Someone is already standing on the call. That is what pulls the rest of the team.
+-- A teammate is on the call. That is what pulls the rest of the team. Any distance: it used
+-- to count only allies within 2800 of the rally, so heroes further out never joined and the
+-- gather sat at grouped=0/5 (game 014).
 local function TeamRoshanCall(pit)
-	local rally = c.AdjustLocationWithOffsetTowardsFountain(pit, 900)
 	local players = GetTeamPlayers(GetTeam())
 	for i = 1, #players do
 		local ally = GetTeamMember(i)
-		if ally ~= nil and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
-			if GetUnitToLocationDistance(ally, rally) <= 2800 then
-				local mode = ally == a and a:GetActiveMode() or AllyActiveMode(ally)
-				if mode == BOT_MODE_ROSHAN then
-					return true
-				end
+		if ally ~= nil and ally ~= a and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
+			if AllyActiveMode(ally) == BOT_MODE_ROSHAN then
+				return true
 			end
 		end
 	end
@@ -333,6 +331,28 @@ local function TakeFitsWindow(M)
 	end
 	return true, string.format("window(need=%.0f left=%.0f)", need, window)
 end
+-- Looser window check for a call that is already running (own call that passed the full check
+-- in the last 20s, or a teammate's call): only drop when the window no longer covers the walk
+-- plus 15s of hitting. Re-running the full check every think dropped every call within 1-8s.
+local function RunningCallFits(M)
+	local alliesAlive = c.GetNumOfAliveHeroes(false)
+	local missing = c.Utils.CountMissingEnemyHeroes and c.Utils.CountMissingEnemyHeroes() or 0
+	local kw = KillWindow.Tick()
+	local need0, eta0 = TakeTimeNeeded(M)
+	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
+	if FreshTakeNumbers(alliesAlive, c.GetNumOfAliveHeroes(true) + (kw.fresh or 0) + back, missing) then
+		return true, "running-no-window-needed"
+	end
+	local left = KillWindow.WindowLeft()
+	if left == nil then
+		return false, "running-window-closed"
+	end
+	local window = left + KillWindow.TransitGrace(M)
+	if window < eta0 + 15 then
+		return false, string.format("running-window-short(eta=%.0f left=%.0f)", eta0, window)
+	end
+	return true, string.format("running(eta=%.0f left=%.0f)", eta0, window)
+end
 -- Records why the desire came out as it did, for the [OHA-ROSH] call/abort lines.
 local function Ret(d, why, call)
 	a._roshWhy = why
@@ -399,20 +419,33 @@ function GetDesireHelper()
 	-- A take that only works because of a kill has to fit in that kill's window. Once the
 	-- group has committed at the rally, finish the walk in.
 	local committed = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
+	local teamCall = f and j and TeamRoshanCall(M)
 	if not committed then
-		-- A take that just failed the window check is not re-called for 15s; the call-drop-call
-		-- churn walked the team toward the pit and back several times.
-		if DotaTime() < (a._roshFitFailUntil or -999) then
-			return Ret(BOT_MODE_DESIRE_NONE, "recent-window-fail")
-		end
-		local fits, fitWhy = TakeFitsWindow(M)
-		a._roshFitWhy = fitWhy
-		if not fits then
-			a._roshFitFailUntil = DotaTime() + 15
-			return Ret(BOT_MODE_DESIRE_NONE, fitWhy)
+		local running = teamCall or (a._roshFitOkAt ~= nil and DotaTime() - a._roshFitOkAt < 20)
+		if running then
+			local fits, fitWhy = RunningCallFits(M)
+			a._roshFitWhy = fitWhy
+			if not fits then
+				a._roshFitOkAt = nil
+				a._roshFitFailUntil = DotaTime() + 15
+				return Ret(BOT_MODE_DESIRE_NONE, fitWhy)
+			end
+		else
+			-- A take that just failed the window check is not re-called for 15s; the
+			-- call-drop-call churn walked the team toward the pit and back several times.
+			if DotaTime() < (a._roshFitFailUntil or -999) then
+				return Ret(BOT_MODE_DESIRE_NONE, "recent-window-fail")
+			end
+			local fits, fitWhy = TakeFitsWindow(M)
+			a._roshFitWhy = fitWhy
+			if not fits then
+				a._roshFitFailUntil = DotaTime() + 15
+				return Ret(BOT_MODE_DESIRE_NONE, fitWhy)
+			end
+			a._roshFitOkAt = DotaTime()
 		end
 	end
-	if f and j and TeamRoshanCall(M) and not a:WasRecentlyDamagedByAnyHero(2.0) then
+	if teamCall and not a:WasRecentlyDamagedByAnyHero(2.0) then
 		local enemiesHere = a:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
 		if #enemiesHere == 0 then
 			return Ret(0.96, "team-call", true)

@@ -1675,31 +1675,61 @@ a.ConsiderItemDesire["item_cheese"] = function(bm)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Bloodstone's Bloodpact (Valve data: spell lifesteal 20% -> 60% for 5s, no mana, 35s cooldown).
+-- Worth it only when he is hurt and about to cast: HP below 60%, an enemy hero within 900, and
+-- at least one spell ready with the mana for it (one that costs mana or deals damage; many
+-- spells report 0 ability damage), while fighting, chasing or under fire
+-- (or at Roshan / Tormentor). It used to go on every engage and team fight at any HP, and was
+-- often on cooldown by the time the hero was low.
+local function SpellReadyToCast()
+	for slot = 0, 5 do
+		local ab = b:GetAbilityInSlot(slot)
+		if ab ~= nil and not ab:IsNull() and ab:IsTrained() and not ab:IsHidden() then
+			local okP, passive = pcall(function()
+				return ab:IsPassive()
+			end)
+			local okT, toggle = pcall(function()
+				return ab:IsToggle()
+			end)
+			if
+				not (okP and passive)
+				and not (okT and toggle)
+				and ab:IsFullyCastable()
+				and ab:GetManaCost() <= b:GetMana()
+				and (ab:GetManaCost() > 0 or (ab:GetAbilityDamage() or 0) > 0)
+			then
+				return true
+			end
+		end
+	end
+	return false
+end
 a.ConsiderItemDesire["item_bloodstone"] = function(bm)
 	local bq = "none"
-	local hEffectTarget = nil
-	local bw = nil
-	local bx = f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	if b:IsSilenced() or b:GetMana() < bm:GetManaCost() then
+	if b:IsSilenced() or b:HasModifier("modifier_item_bloodstone_active") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if #bx == 0 and not f.IsDoingRoshan(b) and not f.IsDoingTormentor(b) then
+	if f.GetHP(b) >= 0.6 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if f.IsInTeamFight(b, 1200) and #bx >= 2 then
-		hEffectTarget = b
-		bw = "Bloodstone: teamfight spell lifesteal"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+	local objective = f.IsDoingRoshan(b) or f.IsDoingTormentor(b)
+	local foes = f.GetNearbyHeroes(b, 900, true, BOT_MODE_NONE) or {}
+	if #foes == 0 and not objective then
+		return BOT_ACTION_DESIRE_NONE
 	end
-	if f.IsGoingOnSomeone(b) and #bx >= 1 then
-		hEffectTarget = b
-		bw = "Bloodstone: going on target with spell lifesteal"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
-	end
-	if f.IsDoingRoshan(b) or f.IsDoingTormentor(b) then
-		hEffectTarget = b
-		bw = "Bloodstone: Roshan/Tormentor sustain"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+	local fighting = f.IsInTeamFight(b, 1200)
+		or f.IsGoingOnSomeone(b)
+		or b:WasRecentlyDamagedByAnyHero(2)
+		or objective
+	if fighting and SpellReadyToCast() then
+		pcall(print, string.format(
+			"[OHA-ITEM] t=%.0f %s bloodstone hp=%.2f foes=%d",
+			DotaTime(),
+			(string.gsub(c, "npc_dota_hero_", "")),
+			f.GetHP(b),
+			#foes
+		))
+		return BOT_ACTION_DESIRE_HIGH, b, bq, "Bloodstone: spell lifesteal while low"
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

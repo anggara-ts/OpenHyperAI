@@ -302,6 +302,37 @@ local function DumpAghs(tag)
 		tostring(b:HasScepter())
 	))
 end
+-- TEST step 2 (game 016): both items sat in the inventory as castable no-target items (beh
+-- 12584964), no buff, no new abilities. Cast each once while it is still inert, then dump again
+-- 1s and 5s later to see what the game does for a bot (auto-pick, choice abilities, or nothing).
+local function ActivateAghs()
+	for _, name in ipairs({ "item_aghanims_shard", "item_ultimate_scepter" }) do
+		local slot = b:FindItemSlot(name)
+		local key = "_aghsAct_" .. name
+		if slot >= 0 and slot <= 5 and b[key] == nil then
+			local it = b:GetItemInSlot(slot)
+			local inert = name == "item_aghanims_shard" and not b:HasModifier("modifier_item_aghanims_shard")
+				or name == "item_ultimate_scepter" and not b:HasScepter()
+			if it ~= nil and inert and it:IsFullyCastable() and not b:IsChanneling() then
+				b[key] = DotaTime()
+				pcall(print, string.format("[OHA-INVOKER] t=%.0f aghs-activate %s slot=%d", DotaTime(), name, slot))
+				b:Action_UseAbility(it)
+				return true
+			end
+		end
+		local at = b[key]
+		if type(at) == "number" then
+			if DotaTime() - at >= 1 and b[key .. "_1s"] == nil then
+				b[key .. "_1s"] = true
+				DumpAghs(string.gsub(name, "item_", "") .. "-activated-1s")
+			elseif DotaTime() - at >= 5 and b[key .. "_5s"] == nil then
+				b[key .. "_5s"] = true
+				DumpAghs(string.gsub(name, "item_", "") .. "-activated-5s")
+			end
+		end
+	end
+	return false
+end
 local function LogAghs()
 	for _, name in ipairs({ "item_aghanims_shard", "item_ultimate_scepter" }) do
 		local owned = b:FindItemSlot(name) >= 0
@@ -319,6 +350,10 @@ local function LogAghs()
 end
 function a.SkillsComplement()
 	pcall(LogAghs)
+	local okAct, acted = pcall(ActivateAghs)
+	if okAct and acted then
+		return
+	end
 	CheckAbilityUsage()
 	if c.CanNotUseAbility(b) then
 		return

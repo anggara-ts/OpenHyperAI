@@ -988,9 +988,27 @@ function r.GetDefendDesireHelper(af, aF)
 					others = others + 1
 				end
 			end
-			if myDist <= 2500 or others == 0 and (Z.GetPosition(af) == E({ 4, 5, 3 }, hgLoc) or myDist <= 4000) then
-				af._defendWhy = "hg-creeps"
-				return 0.5
+			-- Rank among the living allied heroes by distance to the wave (1 = closest).
+			local rank = 1
+			for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+				if ally ~= af and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, hgLoc) < myDist then
+					rank = rank + 1
+				end
+			end
+			-- A big wave (6+) or one already at the T4s / Ancient: 0.85, above farm, Roshan and
+			-- rune (game 020, 64:23-64:40: 7-12 creeps on the Dire high ground with one T4 left,
+			-- the only defender got 0.5 and every Dire hero stayed on attack, Roshan or farm).
+			-- With nobody near, the closest ally always counts; with 8+ creeps the second
+			-- closest comes too.
+			local severe = hgCreeps >= 6 or cC >= 4
+			local desire = severe and 0.85 or 0.5
+			if
+				myDist <= 2500
+				or others == 0 and (Z.GetPosition(af) == E({ 4, 5, 3 }, hgLoc) or myDist <= 4000 or rank == 1)
+				or hgCreeps >= 8 and others <= 1 and rank <= 2
+			then
+				af._defendWhy = severe and "hg-creeps-big" or "hg-creeps"
+				return desire
 			end
 		end
 	end

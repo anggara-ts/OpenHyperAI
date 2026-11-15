@@ -4382,12 +4382,26 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 	if b:GetLevel() > 12 and b:DistanceFromFountain() < 600 then
 		dt = dt + 600
 	end
+	-- No TP out of the fountain while creeps are hitting our base: at 37:27 Tusk teleported
+	-- out to farm with 3 enemy creeps at our Ancient. Walk out and defend instead.
+	local baseCreeps = 0
+	local ourAncient = GetAncient(GetTeam())
+	if ourAncient ~= nil then
+		for _, cr in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+			if cr ~= nil and cr:IsAlive() and GetUnitToUnitDistance(cr, ourAncient) <= 1600 then
+				baseCreeps = baseCreeps + 1
+			end
+		end
+	end
+	local baseUnderCreeps = baseCreeps >= 2
+		or f.Utils.HighGroundCreepWaveNear ~= nil and f.Utils.HighGroundCreepWaveNear(b, 30000) ~= nil
 	if
 		b:DistanceFromFountain() < 1500
 		and bR > 0.75
 		and ax == 0
 		and not b:HasModifier("modifier_teleporting")
 		and DotaTime() > 15
+		and not baseUnderCreeps
 	then
 		local dO = a.GetLaneByPosition(b)
 		if not f.IsInLaningPhase() and DotaTime() > 10 * 60 then

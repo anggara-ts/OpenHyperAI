@@ -2051,6 +2051,27 @@ end
 
 function ConsiderOutpostCapture()
 	outpostMoveLoc = nil
+	-- Stop a capture in progress once enemy heroes show up and we do not outnumber them. The
+	-- 6s channel was never cancelled: Doom kept capturing with Tusk and Enigma on him.
+	-- Only the capture itself: a plain IsChanneling() check would also cancel ults like Black Hole.
+	if c:HasModifier("modifier_watch_tower_capturing") then
+		local foes = c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+		local friends = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
+		if #foes >= 1 and #friends <= #foes then
+			pcall(print, string.format(
+				"[OHA-OUTPOST] t=%.0f %s capture-abort foes=%d allies=%d hp=%.2f",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				#foes,
+				#friends,
+				a.GetHP(c)
+			))
+			c:Action_ClearActions(true)
+			c.outpostOrderAt = nil
+			a0 = true
+			return 0
+		end
+	end
 	if not EnemyTier2Down() then
 		a0 = false
 		return 0

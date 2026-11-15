@@ -446,6 +446,11 @@ function a.ConsiderMidnightPulse()
 	if not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
+	-- Pulse only adds to Black Hole. With Black Hole off cooldown, a Pulse on its own must leave
+	-- mana for it (Black Hole queues its own Pulse when both fit). Otherwise Pulse is free.
+	if t:IsTrained() and t:GetCooldownTimeRemaining() <= 0 and b:GetMana() - s:GetManaCost() < t:GetManaCost() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
 	local S = c.GetProperCastRange(false, b, s:GetCastRange())
 	local a6 = s:GetSpecialValueInt("radius")
 	if v:IsTrained() then

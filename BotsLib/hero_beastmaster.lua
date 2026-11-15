@@ -346,18 +346,17 @@ function a.ConsiderCallOfTheWildBoar()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local a8 = b:GetAttackRange()
-	if I then
-		local Z = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		local a1 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-		if
-			c.IsValidTarget(E)
-			and c.IsInRange(b, E, 800)
-			and not c.IsInRange(b, E, a8)
-			and Z ~= nil
-			and a1
-			and #Z >= #a1
-		then
-			return BOT_ACTION_DESIRE_HIGH
+	-- Fights: any engage on a hero within 800. It used to need the target outside his attack
+	-- range and allies >= enemies, so in melee range or outnumbered he never summoned it.
+	if I and c.IsValidHero(E) and c.IsInRange(b, E, 800) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Running away: an enemy hero chasing him within 700 (the boar fights the chaser).
+	if c.IsRetreating(b) then
+		for _, e0 in pairs(c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) and c.IsChasingTarget(e0, b) then
+				return BOT_ACTION_DESIRE_HIGH
+			end
 		end
 	end
 	if c.IsPushing(b) or c.IsDefending(b) then

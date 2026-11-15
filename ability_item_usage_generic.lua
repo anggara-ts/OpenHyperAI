@@ -898,7 +898,8 @@ local function bg()
 		or b:IsCastingAbility()
 		or b:NumQueuedActions() > 0
 		or b:HasModifier("modifier_teleporting")
-		or b:HasModifier("modifier_doom_bringer_doom_aura_enemy")
+		-- No Doom check: Doom silences and blocks healing but does not mute items (Valve data:
+		-- does_mute empty), and its Scepter aura gives the same effects. Items stay usable.
 		or b:HasModifier("modifier_phantom_lancer_phantom_edge_boost")
 		or b:HasModifier("modifier_life_stealer_infest")
 		or b:HasModifier("modifier_nyx_assassin_vendetta") and f.IsRealInvisible(b)

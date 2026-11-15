@@ -44,7 +44,6 @@ m["pos_5"] = {
 	"item_magic_wand",
 	"item_tranquil_boots",
 	"item_glimmer_cape",
-	"item_pavise",
 	"item_force_staff",
 	"item_pipe",
 	"item_aether_lens",

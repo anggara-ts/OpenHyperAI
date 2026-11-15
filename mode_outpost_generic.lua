@@ -106,9 +106,50 @@ local function ConsiderChainFrostSpread()
 	end
 	return true
 end
+-- Never inside the enemy fountain: within 1300 of it, leave (above attack and retreat). Game 019,
+-- 52:04-52:21: Dire chased into the Radiant fountain after killing Mirana (Techies planted M.A.D.
+-- at -7250,-6845) and four of them died. The Radiant Ancient is ~1860 from its fountain, so
+-- fights at the Ancient (even its fountain side, ~1550+) stay outside this radius.
+local leaveFountain = nil
+local function EnemyFountainEscape()
+	local fountain = a.GetEnemyFountain()
+	if fountain == nil or not c:IsAlive() then
+		return nil
+	end
+	local d0 = GetUnitToLocationDistance(c, fountain)
+	if d0 > 1300 then
+		return nil
+	end
+	local away = c:GetLocation() - fountain
+	if away:Length2D() < 1 then
+		away = a.GetTeamFountain() - fountain
+	end
+	local dest = fountain + away:Normalized() * 1800
+	if DotaTime() >= (c._fountainLogAt or -999) + 3 then
+		c._fountainLogAt = DotaTime()
+		pcall(print, string.format(
+			"[OHA-FOUNTAIN] t=%.0f %s leave dist=%d mode=%d hp=%.2f",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(d0),
+			c:GetActiveMode(),
+			a.GetHP(c)
+		))
+	end
+	return dest
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
+	end
+	leaveFountain = nil
+	if c:IsHero() and not c:IsIllusion() then
+		local okF, dest = pcall(EnemyFountainEscape)
+		if okF and dest ~= nil then
+			leaveFountain = dest
+			a4 = DotaTime()
+			return 1.06
+		end
 	end
 	-- Ahead of everything in this mode, above 1 so it beats attack and retreat: the old spread
 	-- rule only knew an enemy Lich had Chain Frost ready, and skipped every fighting bot, so
@@ -203,6 +244,10 @@ function GetDesireHelper()
 end
 function Think()
 	if a.CanNotUseAction(c) then
+		return
+	end
+	if leaveFountain ~= nil then
+		c:Action_MoveToLocation(leaveFountain)
 		return
 	end
 	if chainFrostSpread then

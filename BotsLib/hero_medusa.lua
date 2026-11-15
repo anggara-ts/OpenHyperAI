@@ -202,11 +202,13 @@ function a.ConsiderQ()
 	local W = b:GetNearbyLaneCreeps(I, true)
 	local X = b:GetNearbyLaneCreeps(800, false)
 	G = c.GetProperTarget(b)
+	-- Off when only one enemy unit (hero or creep) is in Split Shot reach (attack range + 150,
+	-- Valve data): the extra arrows have nothing to hit and the main one loses damage.
+	local units = #U + #V
 	if
 		c.IsLaning(b)
-		or #U == 1
+		or units <= 1
 		or c.IsGoingOnSomeone(b) and c.IsValidHero(G) and T <= 2 and #U == 2
-		or #U == 0 and #V <= 1
 		or #U == 0 and #W >= 2 and #X >= 1 and T <= 3
 	then
 		if o:GetToggleState() then

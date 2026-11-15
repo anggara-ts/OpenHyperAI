@@ -438,6 +438,35 @@ function GetDesireRaw()
 	if sweepDesire ~= nil then
 		return give(sweepDesire, "bounty-sweep")
 	end
+	-- Passing by (user call): a bounty rune that reads available (the spot is in vision) within
+	-- 1000, in any phase and before the pushing / defending gates, when no ally is closer to it
+	-- and no enemy is closer or about to take it. Laning used to need it within 500, and after
+	-- laning it had to be the "best" rune and the bot not pushing or defending.
+	if not dying and i >= 0.35 then
+		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2 }) do
+			if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
+				local loc = GetRuneSpawnLocation(id)
+				local mine = GetUnitToLocationDistance(d, loc)
+				if mine <= 1000 and not a.RuneSkipped(id) and not a.IsEnemyPickRune(id) then
+					local allyCloser = false
+					for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+						if ally ~= d and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, loc) < mine then
+							allyCloser = true
+							break
+						end
+					end
+					if not allyCloser then
+						local D = d.rune.normal
+						D.location = id
+						D.distance = mine
+						D.status = RUNE_STATUS_AVAILABLE
+						D.type = GetRuneType(id)
+						return give(mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH, "bounty-passing")
+					end
+				end
+			end
+		end
+	end
 	if not b.IsInLaningPhase() then
 		if b.IsPushing(d) or b.IsDefending(d) then
 			return give(BOT_MODE_DESIRE_NONE, "pushing")

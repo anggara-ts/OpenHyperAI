@@ -118,8 +118,20 @@ function a.SkillsComplement()
 	local F = d.Build(b)
 	D = F.isEngaging
 	E = F.mp
+	-- The chase target (outpost-mode hook walks him to it and attacks while Vendetta is up) is
+	-- cleared once Vendetta is over, so a later escape Vendetta does not chase an old target.
+	if
+		b.canVendettaKill
+		and not b:HasModifier("modifier_nyx_assassin_vendetta")
+		and not t:IsInAbilityPhase()
+		and DotaTime() - (b._vendettaAt or -99) > 1
+	then
+		b.canVendettaKill = false
+		b.vendettaTarget = nil
+	end
 	B = a.ConsiderVendetta()
 	if B > 0 then
+		b._vendettaAt = DotaTime()
 		b:Action_UseAbility(t)
 		return
 	end
@@ -141,6 +153,11 @@ function a.SkillsComplement()
 		a.AddDealt(dagonTarget, dagon:GetSpecialValueInt("damage"))
 		a.LogNyx("dagon-combo", dagonTarget)
 		b:Action_UseAbilityOnEntity(dagon, dagonTarget)
+		return
+	end
+	local blink, blinkLoc = a.ConsiderBlinkCombo()
+	if blink ~= nil then
+		b:Action_UseAbilityOnLocation(blink, blinkLoc)
 		return
 	end
 	w, x = a.ConsiderMindflare()
@@ -208,6 +225,116 @@ function a.EchoDamage(target)
 	end
 	dealt[target:GetPlayerID()] = keep
 	return sum * pct / 100
+end
+-- Not worth a combo: the target cannot die right now.
+function a.SafeToCombo(M)
+	return c.CanCastOnNonMagicImmune(M)
+		and not M:HasModifier("modifier_abaddon_borrowed_time")
+		and not M:HasModifier("modifier_dazzle_shallow_grave")
+		and not M:HasModifier("modifier_oracle_false_promise_timer")
+		and not M:HasModifier("modifier_templar_assassin_refraction_absorb")
+		and not M:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
+end
+-- Damage of his combo on M after resists, spending mana in cast order, and whether it kills.
+-- Order: [Vendetta hit (pure bonus + attack)], Impale, Dagon, Mind Flare (max-mana part plus the
+-- echo of everything before it and of the last 15s). Only spells ready now count.
+function a.ComboDamage(M, withVendetta)
+	local mana = b:GetMana()
+	local total = 0
+	local dealtNow = 0
+	local function spend(ability)
+		if ability == nil or not ability:IsFullyCastable() then
+			return false
+		end
+		local cost = ability:GetManaCost()
+		if cost > mana then
+			return false
+		end
+		mana = mana - cost
+		return true
+	end
+	if withVendetta then
+		if not spend(t) then
+			return 0, false
+		end
+		local bonus = t:GetSpecialValueInt("bonus_damage")
+		local hit = M:GetActualIncomingDamage(bonus, DAMAGE_TYPE_PURE)
+			+ M:GetActualIncomingDamage(b:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+		total = total + hit
+		dealtNow = dealtNow + hit
+	end
+	if spend(o) then
+		local hit = M:GetActualIncomingDamage(o:GetSpecialValueInt("impale_damage"), DAMAGE_TYPE_MAGICAL)
+		total = total + hit
+		dealtNow = dealtNow + hit
+	end
+	for slot = 0, 5 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and string.find(it:GetName(), "item_dagon", 1, true) then
+			if spend(it) then
+				local hit = M:GetActualIncomingDamage(it:GetSpecialValueInt("damage"), DAMAGE_TYPE_MAGICAL)
+				total = total + hit
+				dealtNow = dealtNow + hit
+			end
+			break
+		end
+	end
+	if spend(p) then
+		local pct = p:GetSpecialValueInt("max_mana_as_damage_pct")
+		local echoPct = p:GetSpecialValueInt("damage_echo_pct")
+		if echoPct == nil or echoPct <= 0 then
+			echoPct = 15
+		end
+		local raw = M:GetMaxMana() * pct / 100 + a.EchoDamage(M) + dealtNow * echoPct / 100
+		total = total + M:GetActualIncomingDamage(raw, DAMAGE_TYPE_MAGICAL)
+	end
+	local need = M:GetHealth() + M:GetHealthRegen() * 3
+	return total, total >= need
+end
+-- Vendetta not ready: Blink in next to a target his combo kills, then Impale. Same limits as the
+-- Vendetta combo (up to 2 enemy heroes near the target, him above 50% HP).
+function a.ConsiderBlinkCombo()
+	if t:IsFullyCastable() or not o:IsFullyCastable() or c.GetHP(b) < 0.5 or c.IsRetreating(b) then
+		return nil
+	end
+	if b:HasModifier("modifier_nyx_assassin_vendetta") then
+		return nil
+	end
+	local blink = nil
+	for slot = 0, 5 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and string.find(it:GetName(), "blink", 1, true) and it:IsFullyCastable() then
+			blink = it
+			break
+		end
+	end
+	if blink == nil then
+		return nil
+	end
+	local range = 1200
+	if blink:GetName() ~= "item_blink" then
+		range = 1400
+	end
+	for _, M in pairs(c.GetNearbyHeroes(b, range + 300, true, BOT_MODE_NONE) or {}) do
+		if
+			c.IsValidHero(M)
+			and not c.IsSuspiciousIllusion(M)
+			and a.SafeToCombo(M)
+			and not c.IsInRange(b, M, 600)
+			and #(c.GetNearbyHeroes(M, 1200, false, BOT_MODE_NONE) or {}) <= 2
+		then
+			local dmg, enough = a.ComboDamage(M, false)
+			if enough then
+				local d0 = math.min(range, GetUnitToUnitDistance(b, M) - 250)
+				local loc = c.GetUnitTowardDistanceLocation(b, M, d0)
+				if IsLocationPassable(loc) then
+					a.LogNyx(string.format("blink-combo hp=%d dmg=%d", M:GetHealth(), dmg), M)
+					return blink, loc
+				end
+			end
+		end
+	end
+	return nil
 end
 -- Enemies on the Impale line at cast time get its damage recorded.
 function a.RecordImpale(loc)
@@ -443,7 +570,8 @@ function a.ConsiderMindflare()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderSpikedCarapace()
-	if not q:IsFullyCastable() or b:HasModifier("modifier_nyx_assassin_vendetta") then
+	-- Allowed under Vendetta: activating it does not break the invisibility (Valve data).
+	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	-- Burrowed, Carapace stuns enemies around him at once (Valve data, 400 radius). It was
@@ -514,29 +642,33 @@ function a.ConsiderVendetta()
 	if not t:IsFullyCastable() or b:HasModifier("modifier_nyx_assassin_burrow") or c.IsRealInvisible(b) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local J = t:GetSpecialValueInt("bonus_damage")
 	C = c.GetProperTarget(b)
-	local K = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-	for L, M in pairs(K) do
-		if
-			c.IsValidHero(M)
-			and c.CanKillTarget(M, J, DAMAGE_TYPE_PURE)
-			and not c.IsSuspiciousIllusion(M)
-			and not M:HasModifier("modifier_abaddon_borrowed_time")
-			and not M:HasModifier("modifier_dazzle_shallow_grave")
-			and not M:HasModifier("modifier_oracle_false_promise_timer")
-			and not M:HasModifier("modifier_templar_assassin_refraction_absorb")
-		then
-			local R = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-			local S = c.GetNearbyHeroes(M, 800, false, BOT_MODE_NONE)
-			if R ~= nil and #R >= #S then
-				b.canVendettaKill = true
-				b.vendettaTarget = M
-				return BOT_ACTION_DESIRE_HIGH
-			else
-				b.canVendettaKill = false
-				b.vendettaTarget = nil
+	-- Combo kill: Vendetta hit + Impale + Dagon + Mind Flare (with echo), as far as his mana goes,
+	-- kills the target. It used to count the Vendetta hit alone, and needed his side to match the
+	-- target's within 800, so one enemy next to the target called it off. Now up to 2 enemy heroes
+	-- near the target is fine (Carapace and the stuns cover the way out), if he is above 50% HP.
+	-- Range 2500: Vendetta's speed walks him there.
+	if c.GetHP(b) >= 0.5 and not c.IsRetreating(b) then
+		local best, bestHp = nil, math.huge
+		for L, M in pairs(c.GetNearbyHeroes(b, 2500, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(M)
+				and not c.IsSuspiciousIllusion(M)
+				and a.SafeToCombo(M)
+				and #(c.GetNearbyHeroes(M, 1200, false, BOT_MODE_NONE) or {}) <= 2
+				and M:GetHealth() < bestHp
+			then
+				local dmg, enough = a.ComboDamage(M, true)
+				if enough then
+					best, bestHp = M, M:GetHealth()
+				end
 			end
+		end
+		if best ~= nil then
+			b.canVendettaKill = true
+			b.vendettaTarget = best
+			a.LogNyx(string.format("vendetta-combo hp=%d", best:GetHealth()), best)
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	-- Escape only under real pressure: hit by a hero in the last 3s and below 50% HP or
@@ -545,6 +677,8 @@ function a.ConsiderVendetta()
 		local foes = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
 		local friends = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}
 		if #foes >= 1 and (c.GetHP(b) < 0.5 or #foes > #friends) then
+			b.canVendettaKill = false
+			b.vendettaTarget = nil
 			a.LogNyx("vendetta-escape", nil)
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -565,6 +699,11 @@ function a.ConsiderVendetta()
 		then
 			local S = c.GetNearbyHeroes(C, 1600, false, BOT_MODE_NONE)
 			if R ~= nil and S ~= nil and #R >= #S then
+				-- Walk to the target and break the invisibility on it (it used to only go
+				-- invisible here, with nothing steering him).
+				b.canVendettaKill = true
+				b.vendettaTarget = C
+				a.LogNyx("vendetta-engage", C)
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

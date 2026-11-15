@@ -7237,6 +7237,46 @@ function a.LogStuck()
 		))
 	end
 end
+-- [OHA-HOMEWALK]: a healthy bot (HP 80%+, mana 40%+) closing on its fountain for 4s+ while
+-- outside it, after 10:00. Shows the mode and action behind walks home nobody asked for (game
+-- 015, 52:20: Medusa walked back to the fountain at full HP after defending the high ground).
+-- At most every 15s per bot.
+function a.LogHomeWalk()
+	if DotaTime() < 600 or not b:IsAlive() then
+		b._homeWalkSince = nil
+		return
+	end
+	local d = b:DistanceFromFountain()
+	local healthy = f.GetHP(b) >= 0.8 and (b:GetMaxMana() <= 0 or f.GetMP(b) >= 0.4)
+	local closing = b._homeWalkLast ~= nil and d < b._homeWalkLast - 5
+	b._homeWalkLast = d
+	if not healthy or d < 1200 or d > 9000 or not closing or f.IsRetreating(b) then
+		if not closing then
+			b._homeWalkSince = nil
+		end
+		return
+	end
+	b._homeWalkSince = b._homeWalkSince or DotaTime()
+	if DotaTime() - b._homeWalkSince < 4 or DotaTime() < (b._homeWalkLogAt or -999) then
+		return
+	end
+	b._homeWalkLogAt = DotaTime() + 15
+	local loc = b:GetLocation()
+	pcall(print, string.format(
+		"[OHA-HOMEWALK] t=%.0f %s mode=%s/%.2f action=%s fountainDist=%d at=%.0f,%.0f hp=%.2f stash=%d courier=%d",
+		DotaTime(),
+		(string.gsub(c, "npc_dota_hero_", "")),
+		StuckModeName(b:GetActiveMode()),
+		b:GetActiveModeDesire(),
+		tostring(b:GetCurrentActionType()),
+		math.floor(d),
+		loc.x,
+		loc.y,
+		f.GetHP(b),
+		b:GetStashValue(),
+		b:GetCourierValue()
+	))
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -7250,6 +7290,7 @@ function ItemUsageThink()
 	MatchTrace.Tick(b)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, b)
+	pcall(a.LogHomeWalk)
 	LogHumanPing()
 	pcall(a.LogStuck)
 	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has

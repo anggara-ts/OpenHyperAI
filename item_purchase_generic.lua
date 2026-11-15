@@ -56,7 +56,28 @@ a.currBuyingRequiredCounts = nil
 a._lastPurchaseAttempt = { name = nil, t = -999 }
 a.rebuildCount = 0
 a.SecretShop = false
-local i = h["sBuyList"]
+-- Boots of Travel 2 needs Boots of Travel first in the list. About 60 builds list only Boots of
+-- Travel 2: the planner then bought Boots and the recipe, again and again (game 020: OD ended
+-- with two level-1 Boots of Travel and kept re-buying the recipe; Lich bought Boots 21 times
+-- for it in earlier games). Insert Boots of Travel before the first Boots of Travel 2 when no
+-- Boots of Travel comes before it.
+local function FixTravelBoots(list)
+	if type(list) ~= "table" then
+		return list
+	end
+	local out, seenT1 = {}, false
+	for _, it in ipairs(list) do
+		if it == "item_travel_boots" then
+			seenT1 = true
+		elseif it == "item_travel_boots_2" and not seenT1 then
+			out[#out + 1] = "item_travel_boots"
+			seenT1 = true
+		end
+		out[#out + 1] = it
+	end
+	return out
+end
+local i = FixTravelBoots(h["sBuyList"])
 local j = h["sSellList"]
 if i == nil then
 	log("[ERROR] Can't load purchase list for: %s", b)
@@ -1055,7 +1076,7 @@ function ItemPurchaseThink()
 		local af, ag = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. ae)
 		if af and ag ~= nil and ag["sBuyList"] ~= nil then
 			h = ag
-			i = ag["sBuyList"]
+			i = FixTravelBoots(ag["sBuyList"])
 			j = ag["sSellList"]
 		else
 			i = {}
@@ -1170,7 +1191,7 @@ function ItemPurchaseThink()
 		local af, ag = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. ae)
 		if af and ag ~= nil and ag["sBuyList"] ~= nil then
 			h = ag
-			i = ag["sBuyList"]
+			i = FixTravelBoots(ag["sBuyList"])
 			j = ag["sSellList"]
 		end
 		if i then

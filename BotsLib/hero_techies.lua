@@ -456,20 +456,29 @@ local function AllyIsFleeing(ally)
 	if HeroIsBeingHit(ally) and (c.GetHP(ally) < 0.7 or #near >= 2) then
 		return "flee-hit"
 	end
+	-- Chased: below 50% HP, or by two enemy heroes. At 80% a lane trade counted (game 014:
+	-- Lich at 62-78% HP, 3 of 13 casts).
 	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
+	local chasers = 0
 	for Z, foe in pairs(foes or {}) do
-		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, ally) and c.GetHP(ally) < 0.8 then
-			return "flee-chased"
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, ally) then
+			chasers = chasers + 1
 		end
+	end
+	if chasers >= 1 and (c.GetHP(ally) < 0.5 or chasers >= 2) then
+		return "flee-chased"
 	end
 	return nil
 end
 -- Why an ally is going in (worth the Tazer), or nil. Attack mode alone is not enough: an
 -- enemy hero has to be close to her.
 local function AllyIsInitiating(ally)
+	-- A real kill try (enemy below 50% HP) or a team fight. A lane trade on a healthy enemy
+	-- counted (game 014: 5 of 13 casts on Lich at 89-100% HP, enemy healthy).
+	local teamFight = c.IsInTeamFight(ally, 1200)
 	local foes = c.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
 	for Z, foe in pairs(foes or {}) do
-		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) then
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and (teamFight or c.GetHP(foe) < 0.5) then
 			if c.IsChasingTarget(ally, foe) then
 				return "initiate-chase"
 			end
@@ -507,12 +516,17 @@ function a.ConsiderReactiveTazer()
 			return BOT_ACTION_DESIRE_HIGH, b
 		end
 		if N then
+			-- Below 50% HP or two chasers (game 014: 4 casts at 78-79% HP).
 			local foes = c.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)
+			local chasers = 0
 			for Z, foe in pairs(foes or {}) do
 				if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, b) then
-					a.LogTazer(b, "self-chased")
-					return BOT_ACTION_DESIRE_HIGH, b
+					chasers = chasers + 1
 				end
+			end
+			if chasers >= 1 and (c.GetHP(b) < 0.5 or chasers >= 2) then
+				a.LogTazer(b, "self-chased")
+				return BOT_ACTION_DESIRE_HIGH, b
 			end
 		end
 	end
@@ -535,6 +549,10 @@ function a.ConsiderReactiveTazer()
 	if flee ~= nil then
 		a.LogTazer(flee, fleeWhy)
 		return BOT_ACTION_DESIRE_HIGH, flee
+	end
+	-- Going in: keep 25% mana for mines and Blast Off.
+	if c.GetManaAfter(q:GetManaCost()) < 0.25 then
+		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	-- With Blast Off up, keep the Tazer for the combo. Spent on an ally going in or on our own
 	-- approach, it was on cooldown by the time a target came into Blast Off range.

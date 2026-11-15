@@ -205,29 +205,77 @@ function GetDesireHelper()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+-- Give up a ward spot that is not working: standing in range of it for 5s without planting, or
+-- nothing to do with it for 3s (ward not castable). Game 014: Dire Lina stood 73 from her spot
+-- (123,-1118) from 0:02 to 0:48. The spot is marked planted (skipped for 6 min) and ward mode
+-- stays off for 15s.
+local function GiveUpWardSpot(why)
+	local now = DotaTime()
+	if j ~= nil then
+		j.plant_time_obs = now
+		j.plant_time_sentry = now
+	end
+	k = now + 15
+	b._wardAtSpotSince = nil
+	b._wardIdleSince = nil
+	pcall(print, string.format(
+		"[OHA-WARD] t=%.0f %s give-up why=%s spot=%s obs=%s sentry=%s",
+		now,
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		why,
+		j ~= nil and string.format("%.0f,%.0f", j.location.x, j.location.y) or "-",
+		h ~= nil and string.format("%s/slot%d/%s", h:GetName(), b:FindItemSlot(h:GetName()), tostring(c.CanCastAbility(h))) or "-",
+		i ~= nil and string.format("%s/slot%d/%s", i:GetName(), b:FindItemSlot(i:GetName()), tostring(c.CanCastAbility(i))) or "-"
+	))
+end
 function Think()
 	DumpWards()
 	if c.CanNotUseAction(b) then
 		return
 	end
+	if j and GetUnitToLocationDistance(b, j.location) <= math.max(f, g) then
+		b._wardAtSpotSince = b._wardAtSpotSince or DotaTime()
+		if DotaTime() - b._wardAtSpotSince >= 5 then
+			GiveUpWardSpot("in-range-no-plant")
+			return
+		end
+	else
+		b._wardAtSpotSince = nil
+	end
+	a.WardThinkActed = false
+	a.WardThink()
+	if a.WardThinkActed then
+		b._wardIdleSince = nil
+	else
+		b._wardIdleSince = b._wardIdleSince or DotaTime()
+		if DotaTime() - b._wardIdleSince >= 3 then
+			GiveUpWardSpot("nothing-to-do")
+		end
+	end
+end
+function a.WardThink()
 	if j then
 		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then
 			if GetUnitToLocationDistance(b, j.location) <= f then
 				if h:GetName() == "item_ward_observer" then
 					AnnounceWard("observer")
+					a.WardThinkActed = true
 					b:Action_UseAbilityOnLocation(h, j.location)
 				else
 					if h:GetToggleState() == false then
+						a.WardThinkActed = true
 						b:Action_UseAbilityOnEntity(h, b)
 						return
 					else
 						AnnounceWard("observer")
+						a.WardThinkActed = true
 						b:Action_UseAbilityOnLocation(h, j.location)
 					end
 				end
 				j.plant_time_obs = DotaTime()
 				return
 			else
+				a.WardThinkActed = true
 				b:Action_MoveToLocation(j.location)
 				return
 			end
@@ -244,10 +292,12 @@ function Think()
 					local now = DotaTime()
 					if b._wardToggleAt == nil then
 						b._wardToggleAt = now
+						a.WardThinkActed = true
 						b:Action_UseAbilityOnEntity(i, b)
 						return
 					end
 					if now - b._wardToggleAt < 0.8 then
+						a.WardThinkActed = true
 						return
 					end
 					j.plant_time_sentry = now
@@ -256,10 +306,12 @@ function Think()
 				end
 				b._wardToggleAt = nil
 				AnnounceWard("sentry")
+				a.WardThinkActed = true
 				b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
 				j.plant_time_sentry = DotaTime()
 				return
 			else
+				a.WardThinkActed = true
 				b:Action_MoveToLocation(j.location)
 				return
 			end

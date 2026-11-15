@@ -259,6 +259,18 @@ local function QueueReactiveItem(itemName)
 	if not QueueFront(a.purchaseListInReverseOrder, itemName) then
 		return false
 	end
+	-- Keep what is left of the item being built, so it resumes there after the reactive item.
+	-- Game 014: Ghost Scepter cut into Mirana's priest_outfit at 20:19, the outfit restarted from
+	-- scratch, and she bought tangos, branches, Magic Stick and the wand recipe again while she
+	-- already had a Magic Wand.
+	if a.currBuyingItemInPurchaseList ~= nil and #a.currBuyingBasicItemList > 0 then
+		a._resumeBuy = a._resumeBuy or {}
+		a._resumeBuy[a.currBuyingItemInPurchaseList] = {
+			list = f.Deepcopy(a.currBuyingBasicItemList),
+			ref = f.Deepcopy(a.currBuyingBasicItemRefList),
+			target = a._recipeTarget and f.Deepcopy(a._recipeTarget) or nil,
+		}
+	end
 	a2()
 	a.rebuildCount = 0
 	log("[Item] %s queued counter %s (pos %s)", b, itemName, tostring(e.GetPosition(a)))
@@ -2010,6 +2022,21 @@ function ItemPurchaseThink()
 			return
 		end
 		a.currBuyingItemInPurchaseList = a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder]
+		local resume = a._resumeBuy and a._resumeBuy[a.currBuyingItemInPurchaseList]
+		if resume ~= nil then
+			a._resumeBuy[a.currBuyingItemInPurchaseList] = nil
+			a.currBuyingBasicItemList = resume.list
+			a.currBuyingBasicItemRefList = resume.ref
+			a.currBuyingRequiredCounts = L(a.currBuyingBasicItemRefList)
+			a._recipeTarget = resume.target or {}
+			BuyLog(
+				"resume %s left=%d",
+				ShortItem(a.currBuyingItemInPurchaseList),
+				#a.currBuyingBasicItemList
+			)
+			W()
+			return
+		end
 		local b5 = c.GetBasicItems({ a.currBuyingItemInPurchaseList })
 		for k = 1, math.ceil(#b5 / 2) do
 			a.currBuyingBasicItemList[k] = b5[#b5 - k + 1]

@@ -146,8 +146,15 @@ function a.SkillsComplement()
 			end
 		end
 	end
-	z = a.ConsiderScorchedEarth()
+	local scorchWhy
+	z, scorchWhy = a.ConsiderScorchedEarth()
 	if z > 0 then
+		pcall(print, string.format(
+			"[OHA-DOOM] t=%.0f scorched why=%s hp=%.2f",
+			DotaTime(),
+			tostring(scorchWhy or "?"),
+			c.GetHP(b)
+		))
 		b:Action_UseAbility(r)
 		return
 	end
@@ -216,12 +223,13 @@ function a.ConsiderScorchedEarth()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Valve data: 666 radius damage to enemies; Doom alone gets +7-10% move speed and +6.66 HP
+	-- regen, for 10-16s. So it is both a chase and an escape spell.
 	local T = r:GetSpecialValueInt("radius")
 	if J then
 		if
 			c.IsValidTarget(I)
 			and c.CanCastOnNonMagicImmune(I)
-			and c.IsInRange(b, I, T + 150)
 			and not c.IsSuspiciousIllusion(I)
 			and not I:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not I:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
@@ -229,27 +237,36 @@ function a.ConsiderScorchedEarth()
 			local U = c.GetNearbyHeroes(I, 1200, true, BOT_MODE_NONE)
 			local V = c.GetNearbyHeroes(I, 1200, false, BOT_MODE_NONE)
 			if U ~= nil and V ~= nil and #U >= #V then
-				return BOT_ACTION_DESIRE_HIGH
+				-- In the burn: damage. Up to 1200 and running from him: the speed closes the gap
+				-- (it used to need the target inside 816).
+				if c.IsInRange(b, I, T + 150) then
+					return BOT_ACTION_DESIRE_HIGH, "chase-burn"
+				end
+				if c.IsInRange(b, I, 1200) and c.IsChasingTarget(b, I) then
+					return BOT_ACTION_DESIRE_HIGH, "chase-speed"
+				end
 			end
 		end
 	end
-	if K and b:GetActiveModeDesire() >= 0.75 then
-		local V = c.GetNearbyHeroes(b, T + 200, true, BOT_MODE_NONE)
-		for R, W in pairs(V) do
+	-- Escape: speed and regen. Any enemy hero chasing within 1200, or hit by a hero in the last
+	-- 3s. It used to need retreat desire 0.75+, the chaser inside 866, and either being
+	-- outnumbered by 2 or hit in the last 2s.
+	if K then
+		if b:WasRecentlyDamagedByAnyHero(3) then
+			return BOT_ACTION_DESIRE_HIGH, "escape-hit"
+		end
+		for R, W in pairs(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) do
 			if
 				c.IsValidHero(W)
-				and c.CanCastOnNonMagicImmune(W)
 				and c.IsChasingTarget(W, b)
 				and not c.IsSuspiciousIllusion(W)
 				and not c.IsDisabled(W)
-				and not W:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local U = c.GetNearbyHeroes(W, 1200, true, BOT_MODE_NONE)
-				local X = c.GetNearbyHeroes(W, 1200, false, BOT_MODE_NONE)
-				if U ~= nil and X ~= nil and (#X > #U + 1 or b:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH
-				end
+				return BOT_ACTION_DESIRE_HIGH, "escape-chased"
 			end
+		end
+		if c.GetHP(b) < 0.4 and #(c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {}) > 0 then
+			return BOT_ACTION_DESIRE_HIGH, "escape-low-hp"
 		end
 	end
 	if c.IsFarming(b) then

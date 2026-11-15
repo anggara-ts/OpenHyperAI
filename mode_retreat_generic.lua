@@ -532,6 +532,23 @@ function GetDesireHelper()
 	end
 	return RetreatTag(533, Clamp(a8, 0.0, BOT_MODE_DESIRE_ABSOLUTE))
 end
+-- A kill he is committed to: his target is in reach (attack range + 200) and disabled or below
+-- 40% HP, and he either has Satanic's Unholy Rage on or 35%+ HP. The enemy-base run rules
+-- below (barracks nearby, close to their Ancient) used to fire anyway, with no HP check: game
+-- 020, 58:46-58:56, Nature's Prophet had Lina trapped under their T3, popped Satanic and ran
+-- (retreat line 383 at 98% HP), then died.
+local function CommittedKill()
+	if not b.IsValidHero(k) or not b.CanBeAttacked(k) or b.IsSuspiciousIllusion(k) then
+		return false
+	end
+	if GetUnitToUnitDistance(c, k) > c:GetAttackRange() + 200 then
+		return false
+	end
+	if not (b.IsDisabled(k) or b.GetHP(k) < 0.4) then
+		return false
+	end
+	return c:HasModifier("modifier_item_satanic_unholy") or b.GetHP(c) >= 0.35
+end
 function a.ShouldRun()
 	if c:IsChanneling() or not c:IsAlive() then
 		return 0
@@ -625,12 +642,13 @@ function a.ShouldRun()
 	local ap = c:GetNearbyBarracks(900, true)
 	local O = b.GetNumOfAliveHeroes(true)
 	local aq = GetUnitToUnitDistance(c, u)
-	if #ap >= 1 and O >= 2 then
+	local committed = CommittedKill()
+	if #ap >= 1 and O >= 2 and not committed then
 		if #ao >= 2 or aq <= 1314 or ak <= 2828 then
 			return 2
 		end
 	end
-	if aq <= 2000 or ak <= 3000 then
+	if (aq <= 2000 or ak <= 3000) and not committed then
 		local ar = c:GetNearbyLaneCreeps(900, false)
 		local as = c:WasRecentlyDamagedByTower(3.0) and #ar < 2
 		if as or d < 0.9 then

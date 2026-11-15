@@ -16,6 +16,7 @@ local h = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(c, "npc_dota
 local i = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local j = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 j.ThinkLess = j.Enable and j.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()
@@ -7180,6 +7181,34 @@ function ItemUsageThink()
 		bg()
 		if tItem then
 			MatchTrace.PerfSample("ItemUsage.bg", RealTime() - tItem)
+		end
+	end
+	-- Last stand: a cornered hero casts the big spells its script lists in LastStandSpells
+	-- ({ name, kind = "none" | "unit" | "point" }) before anything else. Running stops working
+	-- under heavy slows in a crowd; the spell is worth more than one more step.
+	if h ~= nil and h.LastStandSpells ~= nil and not f.IsNoAbilityIllution(b) and not f.CanNotUseAbility(b) then
+		local cornered, nearest, foes = AbilityContext.IsCornered(b)
+		if cornered then
+			for _, spec in ipairs(h.LastStandSpells) do
+				local ab = b:GetAbilityByName(spec.name)
+				if ab ~= nil and not ab:IsNull() and ab:IsTrained() and not ab:IsHidden() and ab:IsFullyCastable() then
+					pcall(print, string.format(
+						"[OHA-CORNERED] t=%.0f %s last-stand %s",
+						DotaTime(),
+						(string.gsub(c, "npc_dota_hero_", "")),
+						spec.name
+					))
+					if spec.kind == "unit" and f.IsValidHero(nearest) then
+						b:Action_UseAbilityOnEntity(ab, nearest)
+					elseif spec.kind == "point" and foes ~= nil and #foes > 0 then
+						b:Action_UseAbilityOnLocation(ab, f.GetCenterOfUnits(foes))
+					else
+						b:Action_UseAbility(ab)
+					end
+					_perfDone()
+					return
+				end
+			end
 		end
 	end
 	if h ~= nil and not f.IsNoAbilityIllution(b) then

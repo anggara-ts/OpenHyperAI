@@ -7237,6 +7237,65 @@ function a.LogStuck()
 		))
 	end
 end
+-- An enemy tower shooting at the bot: an attack order on an allied lane creep that stands inside
+-- the tower range makes the tower switch to it. Only a creep already within the bot's attack
+-- range (+50) is used, so there is no walk: walking to a creep would keep the hero under the
+-- tower longer and break a chase or a run. One order, then 2s before another; the mode's own
+-- next order carries on (move, chase). A creep the bot may attack (below 50% HP) is preferred.
+-- Logs [OHA-AGGRO] tower-deflect, and 0.8s later whether the tower switched target.
+function a.DeflectTowerAggro()
+	local now = DotaTime()
+	if b._deaggroTower ~= nil and now - (b._deaggroAt or -99) >= 0.8 and not b._deaggroChecked then
+		b._deaggroChecked = true
+		local tw = b._deaggroTower
+		local switched = f.IsValidBuilding(tw) and tw:GetAttackTarget() ~= b
+		pcall(print, string.format(
+			"[OHA-AGGRO] t=%.0f %s tower-deflect result=%s",
+			now,
+			(string.gsub(c, "npc_dota_hero_", "")),
+			switched and "switched" or "still-on-me"
+		))
+	end
+	if not b:IsAlive() or b:IsInvulnerable() or now < (b._deaggroAt or -99) + 2 then
+		return false
+	end
+	for _, tw in pairs(b:GetNearbyTowers(1000, true) or {}) do
+		if f.IsValidBuilding(tw) and tw:GetAttackTarget() == b then
+			local reach = b:GetAttackRange() + 50
+			local towerReach = tw:GetAttackRange() or 700
+			local best, bestScore = nil, math.huge
+			for _, cr in pairs(b:GetNearbyLaneCreeps(reach + 200, false) or {}) do
+				if
+					f.IsValid(cr)
+					and GetUnitToUnitDistance(b, cr) <= reach
+					and GetUnitToUnitDistance(tw, cr) <= towerReach
+				then
+					local score = GetUnitToUnitDistance(b, cr) + (f.GetHP(cr) < 0.5 and 0 or 1000)
+					if score < bestScore then
+						best, bestScore = cr, score
+					end
+				end
+			end
+			if best ~= nil then
+				b._deaggroAt = now
+				b._deaggroTower = tw
+				b._deaggroChecked = false
+				pcall(print, string.format(
+					"[OHA-AGGRO] t=%.0f %s tower-deflect creepHp=%.2f dist=%d mode=%s",
+					now,
+					(string.gsub(c, "npc_dota_hero_", "")),
+					f.GetHP(best),
+					GetUnitToUnitDistance(b, best),
+					StuckModeName(b:GetActiveMode())
+				))
+				b:Action_AttackUnit(best, true)
+				return true
+			end
+			return false
+		end
+	end
+	return false
+end
 -- [OHA-HOMEWALK]: a healthy bot (HP 80%+, mana 40%+) closing on its fountain for 4s+ while
 -- outside it, after 10:00. Shows the mode and action behind walks home nobody asked for (game
 -- 015, 52:20: Medusa walked back to the fountain at full HP after defending the high ground).
@@ -7291,6 +7350,11 @@ function ItemUsageThink()
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, b)
 	pcall(a.LogHomeWalk)
+	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
+	local okDeaggro, deaggroed = pcall(a.DeflectTowerAggro)
+	if okDeaggro and deaggroed then
+		return
+	end
 	LogHumanPing()
 	pcall(a.LogStuck)
 	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has

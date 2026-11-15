@@ -663,7 +663,10 @@ function a.GetUnitDesire(au)
 				and b.IsSuspiciousIllusion(av)
 				and av:IsIllusion()
 			then
-				local az = b.GetSameUnitType(c, 1600, aw, false)
+				-- Only illusions attacking or chasing this hero. Counting every illusion within 1600
+				-- sent full-HP heroes into retreat near a Phantom Lancer army (game 016: 55 of these
+				-- at 100% HP, Disruptor at 61:30-62:15).
+				local az = b.GetSameUnitType(c, 1600, aw, true)
 				ax = b.GetUnitListTotalAttackDamage(c, az, 5.0)
 				local aA = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aA / g > 0.5 then

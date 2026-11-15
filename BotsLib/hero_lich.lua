@@ -578,16 +578,20 @@ function a.ConsiderW()
 				end
 			end
 		end
-		if c.IsPushing(am) and S >= 4 and c.IsAllowedToSpam(b, W) and #Q <= 2 and #P == 0 then
+		-- Waves and camps: the shield's tick damages everything around the ally. It needed
+		-- level 4, at most two allies, and 4+ creeps, and defending was not covered at all
+		-- (game 016: never cast while defending top). Now level 2+, pushing or defending, 3+
+		-- creeps around the ally, any number of allies, mana kept as before.
+		if (c.IsPushing(am) or c.IsDefending(am)) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 then
 			local ay = am:GetNearbyLaneCreeps(a0, true)
-			if #ay >= 4 and not ay[1]:HasModifier("modifier_fountain_glyph") then
-				return BOT_ACTION_DESIRE_HIGH, am, "W-带线推进" .. #ay
+			if #ay >= 3 and not ay[1]:HasModifier("modifier_fountain_glyph") then
+				return BOT_ACTION_DESIRE_HIGH, am, "W-wave" .. #ay
 			end
 		end
-		if c.IsFarming(am) and S >= 4 and c.IsAllowedToSpam(b, W) and #Q <= 3 and #P == 0 then
+		if c.IsFarming(am) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 then
 			local ay = am:GetNearbyNeutralCreeps(a0)
-			if #ay >= 4 and ay[1]:GetMagicResist() < 0.3 then
-				return BOT_ACTION_DESIRE_HIGH, am, "W-打野" .. #ay
+			if #ay >= 3 and ay[1]:GetMagicResist() < 0.3 then
+				return BOT_ACTION_DESIRE_HIGH, am, "W-camp" .. #ay
 			end
 		end
 		if x:IsTrained() and c.IsAllowedToSpam(b, W) and #P == 0 then

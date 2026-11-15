@@ -609,6 +609,59 @@ do
 				end
 			end
 		end
+		-- Melee core aggro pull. Ordering an attack on any visible enemy hero, at any distance,
+		-- makes the enemy creeps near him turn on him (the order is what counts, not walking in).
+		-- He gives the order once, then steps back toward our tower for 1.5s so they follow:
+		-- the wave fight moves off the enemy tower and away from their heroes, easier to farm.
+		-- Only with HP 60%+, 2+ enemy creeps within 500, the wave within 1500 of the enemy T1,
+		-- at most one enemy hero within 800, and once every 8s.
+		if e._aggroBackUntil ~= nil and DotaTime() < e._aggroBackUntil then
+			e:Action_MoveToLocation(e._aggroBackTo)
+			return
+		end
+		if IsCoreRole() and m < 326 and b.GetHP(e) >= 0.6 and DotaTime() >= (e._aggroNextAt or -999) then
+			local close = 0
+			for D, cr in pairs(i or {}) do
+				if b.IsValid(cr) and GetUnitToUnitDistance(e, cr) <= 500 then
+					close = close + 1
+				end
+			end
+			local enemyT1 = GetLaneT1(GetOpposingTeam(), l)
+			local nearTower = enemyT1 ~= nil
+				and enemyT1:IsAlive()
+				and b.IsValid(i[1])
+				and GetUnitToUnitDistance(i[1], enemyT1) <= 1500
+			local heroesClose = 0
+			for D, L in pairs(k or {}) do
+				if b.IsValidHero(L) and GetUnitToUnitDistance(e, L) <= 800 then
+					heroesClose = heroesClose + 1
+				end
+			end
+			if close >= 2 and nearTower and heroesClose <= 1 then
+				local bait = nil
+				for D, L in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+					if b.IsValidHero(L) and L:CanBeSeen() and not b.IsSuspiciousIllusion(L) then
+						bait = L
+						break
+					end
+				end
+				if bait ~= nil then
+					e._aggroNextAt = DotaTime() + 8
+					e._aggroBackUntil = DotaTime() + 1.5
+					e._aggroBackTo = b.AdjustLocationWithOffsetTowardsFountain(e:GetLocation(), 350)
+					pcall(print, string.format(
+						"[OHA-AGGRO] t=%.0f %s pull creeps=%d bait=%s dist=%d",
+						DotaTime(),
+						(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+						close,
+						(string.gsub(bait:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToUnitDistance(e, bait)
+					))
+					e:Action_AttackUnit(bait, true)
+					return
+				end
+			end
+		end
 		-- Melee core: wait at the edge of attack range of the enemy creep that is about to die
 		-- (2.5 hits or less), not 300 behind the wave. From there the last hit only needs the
 		-- attack, not a walk, so it lands in time. Not next to the enemy tower.

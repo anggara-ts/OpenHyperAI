@@ -132,41 +132,98 @@ local M
 local N
 local O
 local P
--- The M.A.D. detonate sub-ability. Its name is not in Valve's data; techies_focused_detonate is
--- tried first, then any of his abilities with "detonate" in the name (not Sticky Bomb's). The
--- names found are logged once when he has the Shard, so the next game shows the real one.
-function a.MadDetonate()
-	if madStop ~= nil and not madStop:IsNull() and madStop:IsTrained() and not madStop:IsHidden() then
-		return madStop
-	end
-	local found = nil
-	local names = {}
-	for slot = 0, 23 do
+-- M.A.D. (7.41 patch notes): a passive innate. Aghanim's Shard adds an active part: plant an
+-- invisible barrel (450 range, 30s cooldown, 1s cast point, 200 HP), then detonate it with a
+-- sub-ability; detonated, it turns visible and immortal and explodes 1.5s later. Only one planted
+-- barrel at a time. The in-game names of the plant and detonate abilities are not in Valve's data,
+-- so they are found at runtime among his abilities: the plant is a non-passive, point or AoE
+-- targeted M.A.D. ability; the detonate is a no-target one with "detonate" in its name (not
+-- Sticky Bomb's). With Shard, every candidate is logged once (name, behavior, passive, hidden),
+-- so the next game shows the real names.
+local function MadCandidates()
+	local list = {}
+	for slot = 0, 30 do
 		local ab = b:GetAbilityInSlot(slot)
 		if ab ~= nil and not ab:IsNull() then
 			local n = ab:GetName()
-			if string.find(n, "techies", 1, true) and (string.find(n, "detonate", 1, true) or string.find(n, "mutually", 1, true)) then
-				names[#names + 1] = n .. (ab:IsHidden() and "/hidden" or "")
-				if found == nil and string.find(n, "detonate", 1, true) and not ab:IsHidden() then
-					found = ab
-				end
+			if
+				string.find(n, "techies", 1, true)
+				and (
+					string.find(n, "mutually", 1, true)
+					or string.find(n, "detonate", 1, true)
+					or string.find(n, "barrel", 1, true)
+					or string.find(n, "_mad", 1, true)
+				)
+				and not string.find(n, "sticky", 1, true)
+			then
+				list[#list + 1] = ab
 			end
 		end
 	end
-	if c.HasAghanimsShard(b) and not b._madNamesLogged then
-		b._madNamesLogged = true
-		local okP, passive = pcall(function()
-			return mad:IsPassive()
-		end)
-		pcall(print, string.format(
-			"[OHA-TECHIES] t=%.0f mad-abilities %s mad-passive=%s mad-hidden=%s",
-			DotaTime(),
-			table.concat(names, ","),
-			tostring(okP and passive),
-			tostring(mad ~= nil and mad:IsHidden())
-		))
+	return list
+end
+local function Behavior(ab)
+	local ok, v = pcall(function()
+		return ab:GetBehavior()
+	end)
+	return ok and v or 0
+end
+local function LogMadCandidates(list)
+	if b._madNamesLogged or not c.HasAghanimsShard(b) then
+		return
 	end
-	return found
+	b._madNamesLogged = true
+	local parts = {}
+	for _, ab in ipairs(list) do
+		local okP, passive = pcall(function()
+			return ab:IsPassive()
+		end)
+		parts[#parts + 1] = string.format(
+			"%s(beh=%s passive=%s hidden=%s castable=%s)",
+			ab:GetName(),
+			tostring(Behavior(ab)),
+			tostring(okP and passive),
+			tostring(ab:IsHidden()),
+			tostring(ab:IsFullyCastable())
+		)
+	end
+	pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-abilities %s", DotaTime(), table.concat(parts, " ")))
+end
+-- The barrel plant ability, or nil (no Shard, or not found / not castable).
+function a.MadPlant()
+	if not c.HasAghanimsShard(b) then
+		return nil
+	end
+	local list = MadCandidates()
+	LogMadCandidates(list)
+	for _, ab in ipairs(list) do
+		local okP, passive = pcall(function()
+			return ab:IsPassive()
+		end)
+		local beh = Behavior(ab)
+		local targeted = c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_POINT)
+			or (ABILITY_BEHAVIOR_AOE ~= nil and c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_AOE))
+		if
+			not (okP and passive)
+			and not ab:IsHidden()
+			and ab:IsTrained()
+			and targeted
+			and not string.find(ab:GetName(), "detonate", 1, true)
+			and ab:IsFullyCastable()
+		then
+			return ab
+		end
+	end
+	return nil
+end
+-- The detonate sub-ability, or nil.
+function a.MadDetonate()
+	for _, ab in ipairs(MadCandidates()) do
+		if string.find(ab:GetName(), "detonate", 1, true) and not ab:IsHidden() and ab:IsFullyCastable() then
+			return ab
+		end
+	end
+	return nil
 end
 function a.SkillsComplement()
 	-- Detonate M.A.D. still works while Techies is dead or already acting.
@@ -301,9 +358,10 @@ function a.SkillsComplement()
 		b._madLoc = D
 		b._madUntil = DotaTime() + 45
 		-- Detonate as soon as it is down (1s cast point; the barrel blows 1.5s after the order).
-		b._madDetonateAt = DotaTime() + math.max(0.3, mad:GetCastPoint()) + 0.15
-		a.LogTechies("mad-plant", 0, D)
-		b:Action_UseAbilityOnLocation(mad, D)
+		local plant = a.MadPlant()
+		b._madDetonateAt = DotaTime() + math.max(0.3, plant:GetCastPoint()) + 0.15
+		a.LogTechies("mad-plant " .. plant:GetName(), 0, D)
+		b:Action_UseAbilityOnLocation(plant, D)
 		return
 	end
 	C, D = a.ConsiderProximityMines()
@@ -718,16 +776,16 @@ function a.ConsiderPlantMad()
 	if not c.HasAghanimsShard(b) or b:WasRecentlyDamagedByAnyHero(1.5) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	-- M.A.D. is his innate; in game the Shard only raises its damage and it stays passive (the
-	-- datafeed text says Shard makes it active, but the game does not). Ordering a passive cast
-	-- is refused and freezes him, so a passive M.A.D. is never planted.
-	if mad == nil or mad:IsNull() or mad:IsHidden() or mad:IsPassive() or not mad:IsFullyCastable() then
+	-- The barrel plant (Shard) found at runtime; never the passive innate (a refused order
+	-- freezes him).
+	local plant = a.MadPlant()
+	if plant == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local castRange = mad:GetCastRange()
+	local castRange = plant:GetCastRange()
 	if castRange == nil or castRange < 100 then
 		castRange = 450
 	end

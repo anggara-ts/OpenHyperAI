@@ -124,11 +124,15 @@ function a.SkillsComplement()
 	-- spell. Checked after them, it could wait out the whole 3s windup while engaging. Only an
 	-- escape snowball (snowballHeroRetreat) keeps rolling, to stay out of reach.
 	if a.ConsiderLaunchSnowball() > 0 and not b:IsStunned() and not b:IsHexed() and not b:IsSilenced() then
-		pcall(print, string.format(
-			"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
-			DotaTime(),
-			DotaTime() - (b._snowballCastAt or DotaTime())
-		))
+		-- The order repeats each think until the snowball leaves; log the first one only.
+		if (b._snowballLaunchLoggedFor or -1) ~= (b._snowballCastAt or 0) then
+			b._snowballLaunchLoggedFor = b._snowballCastAt or 0
+			pcall(print, string.format(
+				"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
+				DotaTime(),
+				DotaTime() - (b._snowballCastAt or DotaTime())
+			))
+		end
 		b:Action_UseAbility(q)
 		return
 	end

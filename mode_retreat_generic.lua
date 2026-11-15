@@ -91,11 +91,38 @@ local function A()
 	v.aegisNearby1200 = w(1200)
 	return v
 end
+-- Which return in GetDesireHelper decided the retreat desire (its line number in this file),
+-- for [OHA-RETREAT] below.
+local retreatLine = 0
+local function RetreatTag(line, v)
+	retreatLine = line
+	return v
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	return GetDesireHelper()
+	retreatLine = 0
+	local v = GetDesireHelper()
+	-- A healthy bot wanting to retreat: say which rule (game 014, 35:30: Medusa at full HP and
+	-- mana backed off from a 1v1 with OD, and nothing in the log said why). At most every 5s.
+	if type(v) == "number" and v >= 0.5 and c:IsAlive() and c:GetHealth() >= 0.8 * c:GetMaxHealth() then
+		if DotaTime() >= (c._retreatLogAt or -999) then
+			c._retreatLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-RETREAT] t=%.0f %s desire=%.2f line=%d hp=%.2f mp=%.2f enemies1200=%d allies1200=%d",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				v,
+				retreatLine,
+				c:GetHealth() / c:GetMaxHealth(),
+				c:GetMana() / math.max(1, c:GetMaxMana()),
+				#(c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}),
+				#(c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
+			))
+		end
+	end
+	return v
 end
 function GetDesireHelper()
 	m = c:GetActiveMode()
@@ -112,7 +139,7 @@ function GetDesireHelper()
 		or b.GetModifierTime(c, "modifier_dazzle_shallow_grave") > 3
 		or b.GetModifierTime(c, "modifier_oracle_false_promise_timer") > 3
 	then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
 	end
 	d = b.GetHP(c)
 	e = b.GetMP(c)
@@ -136,7 +163,7 @@ function GetDesireHelper()
 	-- Abort early tower-dive chase (e.g. gold-rune bait under T1).
 	local towerDiveRetreat = a.RetreatWhenTowerTargetedDesire()
 	if towerDiveRetreat > 0 then
-		return towerDiveRetreat
+		return RetreatTag(166, towerDiveRetreat)
 	end
 	-- Summons and illusions chewing on us: spiderlings, golems, eidolons, illusions whose next
 	-- 5s of damage is a big share of our HP. This check existed but nothing called it, so a
@@ -154,7 +181,7 @@ function GetDesireHelper()
 				d
 			))
 		end
-		return unitRun
+		return RetreatTag(184, unitRun)
 	end
 	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
 	do
@@ -171,7 +198,7 @@ function GetDesireHelper()
 			)
 			and (m == BOT_MODE_ATTACK or m == BOT_MODE_TEAM_ROAM or m == BOT_MODE_ROAM or b.IsGoingOnSomeone(c))
 		then
-			return BOT_MODE_DESIRE_ABSOLUTE
+			return RetreatTag(201, BOT_MODE_DESIRE_ABSOLUTE)
 		end
 	end
 	if
@@ -181,13 +208,13 @@ function GetDesireHelper()
 		and IsLocationVisible(b.GetCurrentRoshanLocation())
 	then
 		if not v.aegisNearby1200 then
-			return BOT_MODE_DESIRE_MODERATE
+			return RetreatTag(211, BOT_MODE_DESIRE_MODERATE)
 		end
 	end
 	if b.ShouldLeaveRoshanFight(c) then
 		local pit = b.GetCurrentRoshanLocation()
 		if pit ~= nil and GetUnitToLocationDistance(c, pit) < 2500 then
-			return BOT_MODE_DESIRE_ABSOLUTE
+			return RetreatTag(217, BOT_MODE_DESIRE_ABSOLUTE)
 		end
 	end
 	if
@@ -199,10 +226,10 @@ function GetDesireHelper()
 			or #(b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 1400) or {}) >= 1
 		)
 	then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return RetreatTag(229, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	if (b.IsDoingRoshan(c) or b.IsDoingTormentor(c)) and d > 0.2 then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(232, BOT_MODE_DESIRE_NONE)
 	end
 	local K = b.GetEnemiesAroundAncient(c, 3200)
 	if K > 0 then
@@ -213,10 +240,10 @@ function GetDesireHelper()
 			local O = b.GetNumOfAliveHeroes(true)
 			if O <= N + 1 then
 				if N >= 2 and d > 0.15 then
-					return BOT_MODE_DESIRE_NONE
+					return RetreatTag(243, BOT_MODE_DESIRE_NONE)
 				end
 				if N >= 1 and d > 0.25 then
-					return BOT_MODE_DESIRE_LOW
+					return RetreatTag(246, BOT_MODE_DESIRE_LOW)
 				end
 			end
 		end
@@ -224,14 +251,14 @@ function GetDesireHelper()
 	if b.Utils.IsTeamPushingSecondTierOrHighGround(c) and d > 0.5 then
 		local P = c:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}
 		if #P >= 2 then
-			return BOT_MODE_DESIRE_NONE
+			return RetreatTag(254, BOT_MODE_DESIRE_NONE)
 		end
 	end
 	if (c.isBear or f == "npc_dota_hero_lone_druid_bear") and not b.IsEarlyGame() then
 		if d >= 0.3 then
 			local Q = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 			if #Q >= 2 then
-				return BOT_MODE_DESIRE_NONE
+				return RetreatTag(261, BOT_MODE_DESIRE_NONE)
 			end
 		end
 	end
@@ -242,23 +269,23 @@ function GetDesireHelper()
 		and not c:WasRecentlyDamagedByAnyHero(1.0)
 		and not c:WasRecentlyDamagedByTower(1.0)
 	then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(272, BOT_MODE_DESIRE_NONE)
 	end
 	if J and f == "npc_dota_hero_skeleton_king" and l >= 6 then
 		local R = c:GetAbilityByName("skeleton_king_reincarnation")
 		if R:GetCooldownTimeRemaining() <= 1.0 and c:GetMana() >= 160 then
-			return BOT_MODE_DESIRE_NONE
+			return RetreatTag(277, BOT_MODE_DESIRE_NONE)
 		end
 	end
 	if DotaTime() < 0 and d < 1 then
 		for y, S in pairs(o) do
 			if b.IsValidHero(S) and not S:IsBot() then
-				return RemapValClamped(d, 1, 0.1, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE)
+				return RetreatTag(283, RemapValClamped(d, 1, 0.1, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE))
 			end
 		end
 	end
 	if f == "npc_dota_hero_lone_druid" and DotaTime() > 25 and DotaTime() < q + 6.5 then
-		return 3.33
+		return RetreatTag(288, 3.33)
 	end
 	local T = b.GetCurrentRoshanLocation()
 	if
@@ -269,7 +296,7 @@ function GetDesireHelper()
 	then
 		if v.aegisNearby1200 then
 			q = DotaTime()
-			return 3.33
+			return RetreatTag(299, 3.33)
 		end
 	end
 	if
@@ -277,7 +304,7 @@ function GetDesireHelper()
 		or not J and b.IsTargetedByEnemyWithModifier(o, "modifier_skeleton_king_reincarnation_scepter_active")
 		or not J and b.IsTargetedByEnemyWithModifier(o, "modifier_item_helm_of_the_undying_active")
 	then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return RetreatTag(307, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	-- A trancing Troll cannot die to damage. Trading hits only feeds his lifesteal.
 	for y, S in pairs(o) do
@@ -290,7 +317,7 @@ function GetDesireHelper()
 			and not c:HasModifier("modifier_ghost_state")
 			and d < 0.85
 		then
-			return RemapValClamped(d, 0.85, 0.3, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE)
+			return RetreatTag(320, RemapValClamped(d, 0.85, 0.3, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE))
 		end
 	end
 	if
@@ -305,7 +332,7 @@ function GetDesireHelper()
 		)
 		or c:HasModifier("modifier_ice_blast") and not J and #o > #n
 	then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return RetreatTag(335, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	if f == "npc_dota_hero_huskar" and not c:HasModifier("modifier_item_spirit_vessel_damage") then
 		local U = c:GetAbilityByName("huskar_berserkers_blood")
@@ -320,31 +347,31 @@ function GetDesireHelper()
 	end
 	if c:DistanceFromFountain() <= 4000 and not J then
 		if d <= 0.6 or e < 0.4 then
-			return BOT_MODE_DESIRE_VERYHIGH
+			return RetreatTag(350, BOT_MODE_DESIRE_VERYHIGH)
 		end
 	end
 	if c:HasModifier("modifier_fountain_aura_buff") then
 		local V = K and K > 0
 		if V then
 			if d <= 0.5 then
-				return BOT_MODE_DESIRE_ABSOLUTE
+				return RetreatTag(357, BOT_MODE_DESIRE_ABSOLUTE)
 			end
 		elseif d <= 0.9 or e <= 0.8 and f ~= "npc_dota_hero_huskar" then
-			return BOT_MODE_DESIRE_ABSOLUTE
+			return RetreatTag(360, BOT_MODE_DESIRE_ABSOLUTE)
 		end
 		if #o > #n and not I and not b.CanBeAttacked(t) then
-			return BOT_MODE_DESIRE_HIGH
+			return RetreatTag(363, BOT_MODE_DESIRE_HIGH)
 		end
 	end
 	if b.IsInLaningPhase() or b.IsEarlyGame() and d < 0.35 then
 		local W = c:GetNearbyCreeps(600, true)
 		if b.IsGoingOnSomeone(c) and #W >= 4 and c:WasRecentlyDamagedByCreep(3.0) then
-			return BOT_MODE_DESIRE_VERYHIGH
+			return RetreatTag(369, BOT_MODE_DESIRE_VERYHIGH)
 		end
 	end
 	if c:IsAlive() and not c:HasModifier("modifier_fountain_aura_buff") then
 		if r ~= 0 and DotaTime() < r + s then
-			return BOT_DESIRE_OVERRIDE * 1.1
+			return RetreatTag(374, BOT_DESIRE_OVERRIDE * 1.1)
 		else
 			r = 0
 		end
@@ -353,12 +380,12 @@ function GetDesireHelper()
 			if r == 0 then
 				r = DotaTime()
 			end
-			return BOT_DESIRE_OVERRIDE * 1.1
+			return RetreatTag(383, BOT_DESIRE_OVERRIDE * 1.1)
 		end
 	end
 	local X = a.ConsiderCompleteItem()
 	if X > 0 then
-		return X
+		return RetreatTag(388, X)
 	end
 	local Y = #o
 	local Z = #n
@@ -503,7 +530,7 @@ function GetDesireHelper()
 	if c:HasModifier("modifier_slark_shadow_dance_passive_regen") then
 		a8 = a8 - GetAdjustedDesireValue(0.25)
 	end
-	return Clamp(a8, 0.0, BOT_MODE_DESIRE_ABSOLUTE)
+	return RetreatTag(533, Clamp(a8, 0.0, BOT_MODE_DESIRE_ABSOLUTE))
 end
 function a.ShouldRun()
 	if c:IsChanneling() or not c:IsAlive() then

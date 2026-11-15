@@ -12,23 +12,11 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 2, 2, 3, 1, 6, 1, 1, 2, 2, 6, 3, 3, 3, 6 }, { 1, 2, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, {
-	1,
-	2,
-	2,
-	3,
-	1,
-	6,
-	1,
-	1,
-	2,
-	2,
-	3,
-	6,
-	3,
-	3,
-	6,
-} }
+-- 1 Meat Hook, 2 Rot, 3 Meat Shield (pudge_flesh_heap), 6 Dismember. Entries skip talent levels;
+-- Dismember stays at 6, 12 and 17. One point each in Hook, Rot, Meat Shield at levels 1-3, then
+-- Meat Shield maxed (7), Rot (11), Meat Hook last (16). Same for every position (user call).
+local PUDGE_SKILLS = { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }
+local j = { PUDGE_SKILLS, PUDGE_SKILLS, PUDGE_SKILLS }
 local k = j[2]
 if h == "pos_2" then
 	k = j[1]

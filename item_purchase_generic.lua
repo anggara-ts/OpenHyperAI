@@ -2265,7 +2265,10 @@ function SellMarkedItems()
 	end
 	a._sellMarkAt = now
 	local dF, dS, dD = a:DistanceFromFountain(), a:DistanceFromSecretShop(), a:DistanceFromSideShop()
-	local atShop = dF <= 500 or dS <= 200 or dD <= 200
+	-- DistanceFromSideShop() is -2147483648 on this map (no side shops; game 018 sell-failed
+	-- lines), so "<= 200" passed everywhere and sells were tried far from any shop. Only a real,
+	-- non-negative distance counts.
+	local atShop = (dF >= 0 and dF <= 500) or (dS >= 0 and dS <= 200) or (dD >= 0 and dD <= 200)
 	if not atShop then
 		return
 	end

@@ -568,6 +568,41 @@ function Think()
 				return
 			end
 			d._runeReach = nil
+			local now0 = DotaTime()
+			local laneBack = GetLaneFrontLocation(GetTeam(), n or d:GetAssignedLane(), -600)
+			-- Skipped: leave it now (game 016: Medusa went back to a skipped spot every 3s, the
+			-- target rune was kept after the skip).
+			if a.RuneSkipped(D.location) then
+				d:Action_MoveToLocation(laneBack)
+				doing("skipped")
+				return
+			end
+			-- The status says up but nothing is there (GetRuneType -1, game 016 at the horn on both
+			-- power spots): skip it at once.
+			local rType = GetRuneType and GetRuneType(D.location) or nil
+			if rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID) then
+				pcall(print, string.format("[OHA-RUNE] %s t=%.1f no-rune rune=%s dist=%.0f", HeroTag(), now0, tostring(D.location), liveDist))
+				d._runePickTry = nil
+				a.SkipRune(D.location, 30)
+				d:Action_MoveToLocation(laneBack)
+				doing("no-rune")
+				return
+			end
+			-- A real rune (game 016: water rune) and the pick-up from ~110 away kept failing: step
+			-- onto the spawn spot first, then pick up.
+			if
+				liveDist > 60
+				and d._runePickTry ~= nil
+				and d._runePickTry.id == D.location
+				and d._runePickTry.n >= 2
+				and now0 - d._runePickTry.first < 3
+			then
+				d:Action_MoveToLocation(E)
+				d:ActionQueue_PickUpRune(D.location)
+				doing("step-pickup")
+				d._runePickTry.n = d._runePickTry.n + 1
+				return
+			end
 			-- On the rune and the pick-up keeps not happening (game 015, 2:28: Medusa went back
 			-- and forth on the bottom water rune, pick-up action, 64 moved in 10s). Four orders
 			-- over 3s+ on the same rune that is still up: skip it for 30s and say so.

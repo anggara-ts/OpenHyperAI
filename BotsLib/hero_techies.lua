@@ -679,8 +679,8 @@ function a.ConsiderDetonateMad()
 	return BOT_ACTION_DESIRE_NONE
 end
 -- Returns desire, location, and why: channel, fight, chase, initiate, last-stand, escape.
--- Soul Ring (costs 170 HP, gives 170 mana for 10s) only right before a Blast Off he cannot
--- otherwise afford, never to escape, and only if HP stays safe after both the ring and Blast
+-- Soul Ring (costs 170 HP, gives 170 mana for 10s) right before every engaging Blast Off
+-- (never to escape), and only if HP stays safe after both the ring and Blast
 -- Off's own cost (a share of current HP): early on that pair would drop him into a TP home.
 function a.ConsiderSoulRingForBlast()
 	local slot = b:FindItemSlot("item_soul_ring")
@@ -691,9 +691,11 @@ function a.ConsiderSoulRingForBlast()
 	if ring == nil or not ring:IsFullyCastable() then
 		return false
 	end
+	-- Before every engaging Blast Off, not only when short on mana: the extra 170 pays for the
+	-- Tazer and the mine triangle that follow. Still only if the ring makes Blast Off affordable.
 	local cost = s:GetManaCost()
 	local mana = b:GetMana()
-	if mana >= cost or mana + 170 < cost then
+	if mana + 170 < cost then
 		return false
 	end
 	local desire, loc, why = a.ConsiderBlastOff(true)

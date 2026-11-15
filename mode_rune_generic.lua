@@ -233,7 +233,61 @@ local function r(s)
 	end
 	return false
 end
+-- [OHA-RUNE] watch: every 20s, all game, one bot per team prints all four rune slots: status,
+-- type, time since seen, whether the spot is in vision, and the closest ally bot with its mode.
+-- For river spots with an ally within 1200 it also prints the spot log (units and items there).
+-- To see why a rune that is lying there is not taken (game 017, 16:50: top river spot with an
+-- arcane rune and gold, nobody took them; the trace stops at 6:10).
+local function IsTeamLogger()
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0:IsBot() then
+			return m0 == d
+		end
+	end
+	return false
+end
+function a.RuneWatch()
+	local now = DotaTime()
+	if now < 0 or now < (a._runeWatchAt or -999) or not IsTeamLogger() then
+		return
+	end
+	a._runeWatchAt = now + 20
+	local parts = {}
+	for _, id in ipairs(h) do
+		local loc = GetRuneSpawnLocation(id)
+		local okT, rType = pcall(GetRuneType, id)
+		local okS, seen = pcall(GetRuneTimeSinceSeen, id)
+		local okV, vis = pcall(IsLocationVisible, loc)
+		local best, bestD = nil, math.huge
+		for i = 1, 5 do
+			local m0 = GetTeamMember(i)
+			if m0 ~= nil and m0:IsAlive() then
+				local dd = GetUnitToLocationDistance(m0, loc)
+				if dd < bestD then
+					best, bestD = m0, dd
+				end
+			end
+		end
+		parts[#parts + 1] = string.format(
+			"%s:%s/t%s/seen%s/vis%s/near=%s:%d:%s",
+			RuneTag(id),
+			StatusTag(GetRuneStatus(id)),
+			tostring(okT and rType),
+			okS and type(seen) == "number" and string.format("%.0f", seen) or "?",
+			okV and vis and "1" or "0",
+			best ~= nil and (string.gsub(best:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			math.floor(bestD),
+			best ~= nil and ModeTag(best:GetActiveMode()) or "-"
+		)
+		if IsRiverRune(id) and bestD <= 1200 then
+			pcall(LogRuneSpot, id, "watch")
+		end
+	end
+	pcall(print, string.format("[OHA-RUNE] t=%.0f watch %s %s", now, GetTeam() == TEAM_RADIANT and "radiant" or "dire", table.concat(parts, " ")))
+end
 function GetDesire()
+	pcall(a.RuneWatch)
 	if ShouldSkipBotThink(GetBot()) then
 		runeWhy = "skip"
 		a.RuneDbg(0)

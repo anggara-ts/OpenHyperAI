@@ -291,6 +291,22 @@ function SafeCall(O, P, Q)
 		if n <= 3 then
 			pcall(print, string.format("[OHA-ERROR] t=%.1f %s%s: %s", DotaTime(), U, key, tostring(R)))
 		end
+		-- First error only: run it once more under xpcall to print the stack trace (the line
+		-- above names only the innermost line, e.g. utils.lua:525). Kept off the hot path.
+		if n == 1 and debug ~= nil and debug.traceback ~= nil then
+			local args = { ... }
+			local nargs = select("#", ...)
+			local unpackFn = unpack or table.unpack
+			local okTb, tb = xpcall(function()
+				return O(unpackFn(args, 1, nargs))
+			end, function(e)
+				local ok, t = pcall(debug.traceback, tostring(e), 2)
+				return ok and t or tostring(e)
+			end)
+			if not okTb then
+				pcall(print, "[OHA-ERROR] trace " .. key .. ": " .. (string.gsub(tostring(tb), "\n", " | ")))
+			end
+		end
 		return P
 	end
 end

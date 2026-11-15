@@ -22,6 +22,11 @@ end
 local function SweepTime(id)
 	return IsRiverRune(id) and 4.8 or 2.4
 end
+-- Spawn cycle: bounty runes every 180s (the bountyDue check below uses the same), river runes
+-- every 120s (water at 2:00 and 4:00, power runes from 6:00, as the rest of this file assumes).
+local function RuneCycle(id)
+	return IsRiverRune(id) and 120 or 180
+end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local st = RawGetRuneStatus(id)
@@ -621,7 +626,13 @@ function Think()
 			-- giving up on it. Skipping straight away cut the sweep out (game 016, 29:20:
 			-- Disruptor left the jungle gold).
 			d._bountySwept = d._bountySwept or {}
-			local canSweep = isBounty and d._bountySweep == nil and now0 - (d._bountySwept[D.location] or -99) > 20
+			-- One sweep per rune per spawn cycle: a new sweep is only worth it once a new rune can
+			-- have spawned (it was a flat 20s, only there to stop back-to-back sweeps).
+			local cycle = RuneCycle(D.location)
+			local lastSweep = d._bountySwept[D.location]
+			local canSweep = isBounty
+				and d._bountySweep == nil
+				and (lastSweep == nil or math.floor(lastSweep / cycle) < math.floor(now0 / cycle))
 			local function StartSweep(why)
 				d._bountySwept[D.location] = now0
 				d._bountySweep = { id = D.location, seen = now0, sweepUntil = now0 + SweepTime(D.location), ringStart = now0 }

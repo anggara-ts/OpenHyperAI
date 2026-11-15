@@ -1459,6 +1459,29 @@ function r.DefendThink(af, aF)
 		local d_ = t().enemiesOnHG
 		local e0 = Z.GetLastSeenEnemiesNearLoc(dZ, 1200)
 		local e1 = Z.GetAlliesNearLoc(dZ, 1400)
+		-- Only creeps at our high ground (no enemy hero seen there): kill them, the most
+		-- dangerous first. This branch used to attack-move back to a spot 200 toward the
+		-- fountain, so the creeps followed the hero and it looked like running (game 016, 43:15:
+		-- Medusa at full HP/mana backing off from a wave while defending).
+		if #e0 == 0 then
+			local best, bestScore = nil, -1
+			for _, cr in pairs(af:GetNearbyCreeps(1200, true) or {}) do
+				if Z.IsValid(cr) and Z.CanBeAttacked(cr) then
+					local name = cr:GetUnitName()
+					local score = cr:GetAttackDamage() * cr:GetAttackSpeed() * (1 - Z.GetHP(cr))
+					if g(name, "siege") then
+						score = score + 10000
+					end
+					if score > bestScore then
+						best, bestScore = cr, score
+					end
+				end
+			end
+			if best ~= nil then
+				af:Action_AttackUnit(best, true)
+				return
+			end
+		end
 		if d_ == 0 and #e0 > 0 and #e1 >= #e0 + 1 then
 			local e2 = a8(dZ, Z.RandomForwardVector(120))
 			af:Action_AttackMove(e2)

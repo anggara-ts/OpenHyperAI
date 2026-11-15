@@ -7241,7 +7241,8 @@ end
 -- the tower range makes the tower switch to it. Only a creep already within the bot's attack
 -- range (+50) is used, so there is no walk: walking to a creep would keep the hero under the
 -- tower longer and break a chase or a run. One order, then 2s before another; the mode's own
--- next order carries on (move, chase). A creep the bot may attack (below 50% HP) is preferred.
+-- next order carries on (move, chase). Any HP: the order alone moves the tower's aggro, even on a
+-- full-HP creep the hero cannot actually hit.
 -- Logs [OHA-AGGRO] tower-deflect, and 0.8s later whether the tower switched target.
 function a.DeflectTowerAggro()
 	local now = DotaTime()
@@ -7270,7 +7271,7 @@ function a.DeflectTowerAggro()
 					and GetUnitToUnitDistance(b, cr) <= reach
 					and GetUnitToUnitDistance(tw, cr) <= towerReach
 				then
-					local score = GetUnitToUnitDistance(b, cr) + (f.GetHP(cr) < 0.5 and 0 or 1000)
+					local score = GetUnitToUnitDistance(b, cr)
 					if score < bestScore then
 						best, bestScore = cr, score
 					end

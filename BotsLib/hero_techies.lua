@@ -29,7 +29,8 @@ n["pos_4"] = {
 	"item_guardian_greaves",
 	"item_force_staff",
 	"item_lotus_orb",
-	"item_octarine_core",
+	"item_veil_of_discord",
+	"item_bloodstone",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -49,7 +50,8 @@ n["pos_5"] = {
 	"item_pipe",
 	"item_force_staff",
 	"item_boots_of_bearing",
-	"item_octarine_core",
+	"item_veil_of_discord",
+	"item_bloodstone",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -68,7 +70,8 @@ n["pos_3"] = {
 	"item_force_staff",
 	"item_kaya_and_sange",
 	"item_boots_of_bearing",
-	"item_octarine_core",
+	"item_veil_of_discord",
+	"item_bloodstone",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -82,7 +85,8 @@ n["pos_1"] = {
 	"item_black_king_bar",
 	"item_shivas_guard",
 	"item_aghanims_shard",
-	"item_octarine_core",
+	"item_veil_of_discord",
+	"item_bloodstone",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
@@ -152,9 +156,25 @@ function a.SkillsComplement()
 	-- Just landed from Blast Off: plant the mine triangle first, one mine per think. The mines
 	-- queued behind Blast Off are wiped by any other order before he lands (17:30: blast, no
 	-- mines), and the stunned-target rule below runs too late, after Tazer and Sticky Bomb.
+	-- Landed: Veil of Discord first (enemies take more spell damage), then the mine triangle,
+	-- then Sticky Bomb on the nearest enemy hero.
+	local veil = a.ConsiderPostBlastVeil()
+	if veil ~= nil then
+		b._veilBlastAt = b._blastAt
+		a.LogTechies("post-blast-veil", 0, b:GetLocation())
+		b:Action_UseAbility(veil)
+		return
+	end
 	local postMine = a.ConsiderPostBlastMines()
 	if postMine ~= nil then
 		a.OrderMine(postMine, "post-blast")
+		return
+	end
+	local stickyLoc = a.ConsiderPostBlastSticky()
+	if stickyLoc ~= nil then
+		b._stickyBlastAt = b._blastAt
+		a.LogTechies("post-blast-sticky", 0, stickyLoc)
+		b:Action_UseAbilityOnLocation(p, stickyLoc)
 		return
 	end
 	-- Short on mana for a Blast Off that is otherwise ready: Soul Ring now, Blast Off next think.
@@ -983,6 +1003,66 @@ function a.OrderMine(loc, kind)
 	))
 	pcall(ChargeTracker.Issued, b, u)
 	b:Action_UseAbilityOnLocation(u, loc)
+end
+-- When Blast Off lands: its cast point plus the flight.
+local function BlastLandAt()
+	if b._blastAt == nil then
+		return nil
+	end
+	local flight = s:GetSpecialValueFloat("duration")
+	if flight == nil or flight <= 0 then
+		flight = 0.75
+	end
+	return b._blastAt + s:GetCastPoint() + flight
+end
+-- Veil of Discord right after landing, once per Blast Off, with an enemy hero in its radius.
+function a.ConsiderPostBlastVeil()
+	local land = BlastLandAt()
+	if land == nil or DotaTime() < land or DotaTime() > land + 2.5 or b._veilBlastAt == b._blastAt then
+		return nil
+	end
+	local slot = b:FindItemSlot("item_veil_of_discord")
+	if slot < 0 or slot > 5 then
+		return nil
+	end
+	local veil = b:GetItemInSlot(slot)
+	if veil == nil or not veil:IsFullyCastable() then
+		return nil
+	end
+	local radius = veil:GetSpecialValueInt("debuff_radius")
+	if radius == nil or radius <= 0 then
+		radius = 600
+	end
+	for _, e0 in pairs(c.GetNearbyHeroes(b, radius, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+			return veil
+		end
+	end
+	return nil
+end
+-- Sticky Bomb after the post-blast mine triangle (mines spent or not castable), once per Blast
+-- Off, on the nearest enemy hero in range, up to 5s after the cast.
+function a.ConsiderPostBlastSticky()
+	if b._blastAt == nil or DotaTime() - b._blastAt < 1.75 or DotaTime() - b._blastAt > 5 then
+		return nil
+	end
+	if b._stickyBlastAt == b._blastAt or not p:IsTrained() or not p:IsFullyCastable() then
+		return nil
+	end
+	local range = p:GetCastRange() + 100
+	local best, bestD = nil, math.huge
+	for _, e0 in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) and c.CanCastOnNonMagicImmune(e0) and not c.IsSuspiciousIllusion(e0) then
+			local d0 = GetUnitToUnitDistance(b, e0)
+			if d0 < bestD then
+				best, bestD = e0, d0
+			end
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return best:GetExtrapolatedLocation(0.5)
 end
 function a.ConsiderPostBlastMines()
 	if b._blastAt == nil or b._blastLoc == nil or DotaTime() - b._blastAt > 3.5 then

@@ -1419,7 +1419,9 @@ function ItemPurchaseThink()
 		local emptySlots = c.GetEmptyInventoryAmount(a)
 		-- A buy outside the fountain shop goes straight to the stash. During the
 		-- opening that sentry then sits there, so require a free slot and the shop.
-		local canReceive = emptySlots >= 1 and (w >= 20 or E <= 1000)
+		-- Before the horn a ward bought away from the shop goes to the stash; the courier now
+		-- brings wards out from -56s (other stash items still wait for 0:20).
+		local canReceive = emptySlots >= 1 and (w >= 20 or E <= 1000 or w >= -60)
 		if canReceive then
 			local function tryBuyWard(itemName, maxCharges, reason)
 				if itemName == "item_ward_observer" and not obsForHumans then

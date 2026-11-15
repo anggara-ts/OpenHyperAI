@@ -370,23 +370,23 @@ local function LaneStandOff()
 	end
 	return standOff
 end
--- Name of an allied core that will get this last hit itself, or nil when none can.
--- A human core is always left the creep. A bot core counts when its own attack,
--- including the walk, lands before the creeps kill it.
+-- Name of an allied core that will get this last hit itself, or nil when none can, plus
+-- when its hit would land (nil for a human core, who is always left the creep). A bot core
+-- counts when its own attack, including the walk, lands before the creeps kill it.
 local function CoreCanTakeLastHit(creep)
 	for _, ally in pairs(b.GetNearbyHeroes(e, 1000, false, BOT_MODE_NONE) or {}) do
 		if b.IsValidHero(ally) and ally ~= e and b.IsCore(ally) and not ally:IsIllusion() then
 			local name = (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
 			if not ally:IsBot() then
-				return name
+				return name, nil
 			end
 			local delay = b.GetAttackProDelayTime(ally, creep)
 			if b.WillKillTarget(creep, ally:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, delay) then
-				return name
+				return name, delay
 			end
 		end
 	end
-	return nil
+	return nil, nil
 end
 -- [OHA-LANE]: every 20s per bot in the laning phase. Last hits, denies, where it
 -- stands relative to the wave, and how often a support took or left a last hit.
@@ -502,8 +502,15 @@ do
 			local bCanLastHit
 			if bSupport then
 				-- Do not compete with a core for last hits, but take one the core cannot reach in time.
-				local coreName = CoreCanTakeLastHit(C)
+				-- With a bot core on the creep, go too but land after the core's hit: the core
+				-- gets it first, and the support only secures it if the core misses it.
+				local coreName, coreDelay = CoreCanTakeLastHit(C)
 				bCanLastHit = coreName == nil
+				if not bCanLastHit and coreDelay ~= nil then
+					local myDelay = b.GetAttackProDelayTime(e, C)
+					bCanLastHit = myDelay > coreDelay + 0.15
+						and b.WillKillTarget(C, e:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, myDelay)
+				end
 				if e._laneSupportCreep ~= C then
 					e._laneSupportCreep = C
 					if bCanLastHit then

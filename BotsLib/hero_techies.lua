@@ -413,10 +413,38 @@ function a.SkillsComplement()
 	y, z, yWhy = a.ConsiderBlastOff()
 	if y > 0 then
 		b:Action_ClearActions(false)
+		-- Sticky Bomb first (user call), then Blast Off: only when it is ready, an enemy hero is
+		-- in its cast range and near the landing spot, and there is mana for both. Otherwise
+		-- Blast Off goes alone, as before; Sticky never holds it back.
+		local stickyFirst = false
+		local manaLeft = b:GetMana() - s:GetManaCost()
+		if yWhy ~= "escape" and p:IsTrained() and p:IsFullyCastable() and manaLeft >= p:GetManaCost() then
+			local range = p:GetCastRange() + 100
+			local best, bestD = nil, math.huge
+			for _, e0 in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+				if
+					c.IsValidHero(e0)
+					and c.CanCastOnNonMagicImmune(e0)
+					and not c.IsSuspiciousIllusion(e0)
+					and GetUnitToLocationDistance(e0, z) <= 450
+				then
+					local d0 = GetUnitToLocationDistance(e0, z)
+					if d0 < bestD then
+						best, bestD = e0, d0
+					end
+				end
+			end
+			if best ~= nil then
+				local stickyLoc = c.IsDisabled(best) and best:GetLocation() or best:GetExtrapolatedLocation(0.5)
+				b:ActionQueue_UseAbilityOnLocation(p, stickyLoc)
+				manaLeft = manaLeft - p:GetManaCost()
+				stickyFirst = true
+				a.LogTechies("pre-blast-sticky", 0, stickyLoc)
+			end
+		end
 		b:ActionQueue_UseAbilityOnLocation(s, z)
 		-- The cast point is spent before the next queued order; the 0.75s flight is not.
 		b:ActionQueue_Delay(math.max(0.3, s:GetSpecialValueFloat("duration")) + 0.1)
-		local manaLeft = b:GetMana() - s:GetManaCost()
 		local tazer = false
 		if a.TazerUsable() and manaLeft >= q:GetManaCost() then
 			if a.TazerIsUnitTarget() then
@@ -445,8 +473,14 @@ function a.SkillsComplement()
 		end
 		a.LogTechies(string.format("blast why=%s tazer=%s", yWhy or "?", tostring(tazer)), planted, z)
 		if yWhy ~= "escape" then
-			b._blastAt = DotaTime()
+			-- With Sticky in front, Blast Off starts one Sticky cast later; the landing steps
+			-- (mines, M.A.D., ...) are timed from here.
+			b._blastAt = DotaTime() + (stickyFirst and math.max(0, p:GetCastPoint()) or 0)
 			b._blastLoc = z
+			if stickyFirst then
+				-- Sticky already thrown: no second one after landing.
+				b._stickyBlastAt = b._blastAt
+			end
 		end
 		return
 	end

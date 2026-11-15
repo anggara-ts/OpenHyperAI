@@ -9,8 +9,8 @@ local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
 -- 1 Split Shot, 2 Mystic Snake, 3 Gorgon's Grasp, 6 Stone Gaze. Snake, Grasp, Snake maxed by 5,
--- Split Shot maxed by 11, Grasp last. Ultimate at 6, 12 and the last point (18: levels 17 and
--- 19+ give no skill point). Entries skip talent levels 10 and 15.
+-- Split Shot maxed by 11, Grasp last. Ultimate at 6, 12 and with the last point (entry 15,
+-- after level 16). Entries skip talent levels 10 and 15.
 local j = { { 2, 3, 2, 2, 2, 6, 1, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)

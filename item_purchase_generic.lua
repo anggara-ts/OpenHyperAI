@@ -579,8 +579,18 @@ local function MissingIngredient(recipe)
 	end
 	return nil
 end
+local CourierHasItem
+-- true when one of names is seen on the courier.
+local function CourierHasItemAny(names)
+	for _, n in ipairs(names) do
+		if CourierHasItem(n) == true then
+			return true
+		end
+	end
+	return false
+end
 -- true/false when the courier's slots can be read, nil when there is no courier handle.
-local function CourierHasItem(name)
+function CourierHasItem(name)
 	local courier = a.theCourier
 	if courier == nil then
 		return nil
@@ -717,6 +727,11 @@ local function HoldRecipe()
 	local action
 	if onCourier then
 		action = "wait-courier"
+		-- The part is seen on the courier: keep waiting instead of forcing the recipe after 60s
+		-- (game 015: Veil recipe forced while the Robe was on its way, then a second Veil started).
+		if CourierHasItemAny ~= nil and CourierHasItemAny(parts) then
+			hold.since = now
+		end
 	elseif queuedAt ~= nil then
 		-- Sit right behind that part instead of at the very end of the build.
 		list[#list] = nil
@@ -724,17 +739,27 @@ local function HoldRecipe()
 		action = "defer"
 		hold.since = now
 	else
-		-- Planned but fell out of the queue: put back the basic parts the hero lacks.
+		-- Planned but fell out of the queue: put back the basic parts the hero lacks. A part
+		-- he already holds as a built item counts as owned with everything inside it: game 015,
+		-- Mekansm had not combined yet when the Greaves recipe came up, and the Ring of Regen
+		-- inside his Headdress was queued again because only basic items were counted.
 		local need = {}
-		if IsBasicItem(missing) then
-			need[missing] = 1
-		else
-			for _, p in ipairs(parts) do
-				if p ~= missing and IsBasicItem(p) then
-					need[p] = (need[p] or 0) + 1
+		local function NeedParts(n, depth)
+			if F(a, n) >= 1 or depth > 4 then
+				return
+			end
+			local list = c[n]
+			if type(list) ~= "table" or IsBasicItem(n) then
+				need[n] = (need[n] or 0) + 1
+				return
+			end
+			for _, p in ipairs(list) do
+				if type(p) == "string" then
+					NeedParts(p, depth + 1)
 				end
 			end
 		end
+		NeedParts(missing, 0)
 		local added = 0
 		for p, count in pairs(need) do
 			for _ = 1, count - F(a, p) do

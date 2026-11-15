@@ -46,8 +46,10 @@ o["pos_3"] = {
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_refresher",
+	-- Octarine (+450 mana, 25% cooldown) before Refresher: the double Black Hole needs ~1,125-1,465
+	-- mana, more than the pool before Octarine.
 	"item_octarine_core",
+	"item_refresher",
 	n,
 	"item_travel_boots",
 	"item_arcane_blink",

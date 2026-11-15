@@ -1704,6 +1704,49 @@ local function SpellReadyToCast()
 	end
 	return false
 end
+-- A damaging spell ready (mana, castable) with an enemy hero inside its reach. Damage is read
+-- from the ability damage or the usual damage values (many spells report 0 ability damage);
+-- reach is the cast range, or the radius for a no-target spell.
+local DAMAGE_KEYS = { "damage", "aoe_damage", "impale_damage", "damage_per_second", "burn_damage", "tick_damage", "max_damage" }
+local function DamagingSpellOnEnemy(foes)
+	for slot = 0, 5 do
+		local ab = b:GetAbilityInSlot(slot)
+		if ab ~= nil and not ab:IsNull() and ab:IsTrained() and not ab:IsHidden() then
+			local okP, passive = pcall(function()
+				return ab:IsPassive()
+			end)
+			if not (okP and passive) and ab:IsFullyCastable() and ab:GetManaCost() <= b:GetMana() then
+				local dmg = ab:GetAbilityDamage() or 0
+				if dmg <= 0 then
+					for _, key in ipairs(DAMAGE_KEYS) do
+						local okV, v = pcall(function()
+							return ab:GetSpecialValueFloat(key)
+						end)
+						if okV and type(v) == "number" and v > 0 then
+							dmg = v
+							break
+						end
+					end
+				end
+				if dmg > 0 then
+					local reach = ab:GetCastRange()
+					if reach == nil or reach <= 0 then
+						local okR, rad = pcall(function()
+							return ab:GetSpecialValueInt("radius")
+						end)
+						reach = (okR and type(rad) == "number" and rad > 0) and rad or 300
+					end
+					for _, e0 in pairs(foes) do
+						if f.IsValidHero(e0) and GetUnitToUnitDistance(b, e0) <= reach + 50 then
+							return true
+						end
+					end
+				end
+			end
+		end
+	end
+	return false
+end
 a.ConsiderItemDesire["item_bloodstone"] = function(bm)
 	local bq = "none"
 	if b:IsSilenced() or b:HasModifier("modifier_item_bloodstone_active") then
@@ -1721,7 +1764,15 @@ a.ConsiderItemDesire["item_bloodstone"] = function(bm)
 		or f.IsGoingOnSomeone(b)
 		or b:WasRecentlyDamagedByAnyHero(2)
 		or objective
-	if fighting and SpellReadyToCast() then
+	-- Running away: only with a damaging spell that can reach an enemy now. Bloodpact heals only
+	-- from spell damage, so an escape that hits nothing (Leap, Blink, Sinister Gaze) wastes it.
+	local spellOk
+	if f.IsRetreating(b) then
+		spellOk = DamagingSpellOnEnemy(foes)
+	else
+		spellOk = SpellReadyToCast()
+	end
+	if fighting and spellOk then
 		pcall(print, string.format(
 			"[OHA-ITEM] t=%.0f %s bloodstone hp=%.2f foes=%d",
 			DotaTime(),

@@ -146,6 +146,10 @@ local function AnnounceWard(kind)
 			wardLoc and string.format("%d,%d", math.floor(wardLoc.x), math.floor(wardLoc.y)) or "?"
 		)
 	)
+	-- No ping and no team chat on a plant any more: warding is proven to work (user request).
+	if true then
+		return
+	end
 	c.Utils.GameStates = c.Utils.GameStates or {}
 	-- Bot API has no "Enemy Ward Here" wheel ping — danger ping (X) is the closest mark.
 	if kind == "sentry" and wardLoc ~= nil then
@@ -256,6 +260,75 @@ end
 -- nothing to do with it for 3s (ward not castable). Game 014: Dire Lina stood 73 from her spot
 -- (123,-1118) from 0:02 to 0:48. The spot is marked planted (skipped for 6 min) and ward mode
 -- stays off for 15s.
+-- Plant debugging. WardCharges: observers and sentries the bot holds (dispenser: current =
+-- observers, secondary = sentries). LogPlantTry: each cast order at a spot (every 1s at most)
+-- with distance, whether the spot and the bot's spot are walkable, and the charges.
+-- WatchPlant: when the charges go down after a try, [OHA-WARD] planted ... (the try worked).
+local function WardCharges()
+	local obs, sen = 0, 0
+	for slot = 0, 8 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil then
+			local n0 = it:GetName()
+			if n0 == "item_ward_observer" then
+				obs = obs + (it:GetCurrentCharges() or 0)
+			elseif n0 == "item_ward_sentry" then
+				sen = sen + (it:GetCurrentCharges() or 0)
+			elseif n0 == "item_ward_dispenser" then
+				obs = obs + (it:GetCurrentCharges() or 0)
+				sen = sen + DispenserSentryCharges(it)
+			end
+		end
+	end
+	return obs, sen
+end
+local function LogPlantTry(kind, item, loc)
+	local now = DotaTime()
+	local obs, sen = WardCharges()
+	b._wardTry = { at = now, kind = kind, loc = loc, obs = obs, sen = sen }
+	if now < (b._wardTryLogAt or -999) then
+		return
+	end
+	b._wardTryLogAt = now + 1
+	local me = b:GetLocation()
+	pcall(print, string.format(
+		"[OHA-WARD] t=%.0f %s plant-try %s item=%s spot=%.0f,%.0f dist=%d spotPassable=%s me=%.0f,%.0f obs=%d sen=%d",
+		now,
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		kind,
+		item ~= nil and item:GetName() or "?",
+		loc.x,
+		loc.y,
+		GetUnitToLocationDistance(b, loc),
+		tostring(IsLocationPassable(loc)),
+		me.x,
+		me.y,
+		obs,
+		sen
+	))
+end
+local function WatchPlant()
+	local t0 = b._wardTry
+	if t0 == nil then
+		return
+	end
+	if DotaTime() - t0.at > 3 then
+		b._wardTry = nil
+		return
+	end
+	local obs, sen = WardCharges()
+	if obs < t0.obs or sen < t0.sen then
+		pcall(print, string.format(
+			"[OHA-WARD] t=%.0f %s planted %s at=%.0f,%.0f",
+			DotaTime(),
+			(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+			obs < t0.obs and "observer" or "sentry",
+			t0.loc.x,
+			t0.loc.y
+		))
+		b._wardTry = nil
+	end
+end
 local function GiveUpWardSpot(why)
 	local now = DotaTime()
 	if j ~= nil then
@@ -334,6 +407,7 @@ local function ValidateSpot(spot)
 	pcall(print, string.format("[OHA-WARD] t=%.0f spot-invalid at=%.0f,%.0f", DotaTime(), loc.x, loc.y))
 end
 function a.WardThink()
+	pcall(WatchPlant)
 	pcall(ValidateSpot, j)
 	if j then
 		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then
@@ -341,9 +415,11 @@ function a.WardThink()
 				if h:GetName() == "item_ward_observer" then
 					AnnounceWard("observer")
 					a.WardThinkActed = true
+					LogPlantTry("observer", h, j.location)
 					b:Action_UseAbilityOnLocation(h, j.location)
 				else
 					a.WardThinkActed = true
+					LogPlantTry("observer", h, j.location)
 					if DispenserPlant(h, j.location, true) then
 						return
 					end
@@ -384,6 +460,7 @@ function a.WardThink()
 				b._wardToggleAt = nil
 				AnnounceWard("sentry")
 				a.WardThinkActed = true
+				LogPlantTry("sentry", i, j.location)
 				b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
 				j.plant_time_sentry = DotaTime()
 				return

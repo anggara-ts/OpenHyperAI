@@ -247,6 +247,81 @@ local function IsTeamLogger()
 	end
 	return false
 end
+-- Other rune ids at a river spot. The bot API has RUNE_BOUNTY_1..4 from the old map, but these
+-- bots only track 4 ids. Game 019, 0:00: the river gold lay right under Medusa (top) and Queen of
+-- Pain, Pudge and Techies (bottom) for 13s, read as a bounty on the river power-rune id, and
+-- PickUpRune on that id did nothing. If the horn gold sits under another id at the same spot, a
+-- pickup on that id may work. Ids 0-7 whose spawn point is within 400 of the river spot.
+local altIds = {}
+local function AltRuneIds(id)
+	if altIds[id] ~= nil then
+		return altIds[id]
+	end
+	local list = {}
+	local okB, base = pcall(GetRuneSpawnLocation, id)
+	if okB and base ~= nil then
+		for k = 0, 7 do
+			local tracked = false
+			for _, t0 in ipairs(h) do
+				if t0 == k then
+					tracked = true
+				end
+			end
+			if not tracked then
+				local okL, loc = pcall(GetRuneSpawnLocation, k)
+				if okL and loc ~= nil and (loc - base):Length2D() <= 400 then
+					list[#list + 1] = k
+				end
+			end
+		end
+	end
+	altIds[id] = list
+	return list
+end
+-- One-time probe per team at the horn (0.0-1.5s) and once before it (-60s): rune ids 0-7 with
+-- their constant name, spawn point, status and type.
+local RUNE_NAMES = {}
+for _, pair in ipairs({
+	{ RUNE_POWERUP_1, "RUNE_POWERUP_1" },
+	{ RUNE_POWERUP_2, "RUNE_POWERUP_2" },
+	{ RUNE_BOUNTY_1, "RUNE_BOUNTY_1" },
+	{ RUNE_BOUNTY_2, "RUNE_BOUNTY_2" },
+	{ RUNE_BOUNTY_3, "RUNE_BOUNTY_3" },
+	{ RUNE_BOUNTY_4, "RUNE_BOUNTY_4" },
+}) do
+	if pair[1] ~= nil then
+		RUNE_NAMES[pair[1]] = pair[2]
+	end
+end
+function a.RuneProbe()
+	local now = DotaTime()
+	local stage = (now >= -60 and now < -50) and "pre" or (now >= 0 and now <= 1.5) and "horn" or nil
+	if stage == nil or a["_runeProbe_" .. stage] or not IsTeamLogger() then
+		return
+	end
+	a["_runeProbe_" .. stage] = true
+	local parts = {}
+	for k = 0, 7 do
+		local okL, loc = pcall(GetRuneSpawnLocation, k)
+		local okS, st = pcall(GetRuneStatus, k)
+		local okT, ty = pcall(GetRuneType, k)
+		parts[#parts + 1] = string.format(
+			"%d(%s):loc=%s st=%s ty=%s",
+			k,
+			RUNE_NAMES[k] or "-",
+			(okL and loc ~= nil) and string.format("%.0f,%.0f", loc.x, loc.y) or "err",
+			okS and tostring(st) or "err",
+			okT and tostring(ty) or "err"
+		)
+	end
+	pcall(print, string.format(
+		"[OHA-RUNE] t=%.1f probe-%s %s %s",
+		now,
+		stage,
+		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+		table.concat(parts, " ")
+	))
+end
 function a.RuneWatch()
 	local now = DotaTime()
 	if now < 0 or now < (a._runeWatchAt or -999) or not IsTeamLogger() then
@@ -287,6 +362,7 @@ function a.RuneWatch()
 	pcall(print, string.format("[OHA-RUNE] t=%.0f watch %s %s", now, GetTeam() == TEAM_RADIANT and "radiant" or "dire", table.concat(parts, " ")))
 end
 function GetDesire()
+	pcall(a.RuneProbe)
 	pcall(a.RuneWatch)
 	if ShouldSkipBotThink(GetBot()) then
 		runeWhy = "skip"
@@ -722,7 +798,30 @@ function Think()
 				end
 				d._runePickTry = nil
 				d._runePickupAt = now0
-				d:Action_PickUpRune(D.location)
+				-- River spot: alternate the pickup between the tracked id and any other rune id at
+				-- this spot (see AltRuneIds), switching every 0.5s.
+				local pickId = D.location
+				if IsRiverRune(D.location) and liveDist < 200 then
+					local alts = AltRuneIds(D.location)
+					if #alts > 0 then
+						local k = math.floor(now0 * 2) % (#alts + 1)
+						if k > 0 then
+							pickId = alts[k]
+						end
+						if pickId ~= d._runeAltLogged then
+							d._runeAltLogged = pickId
+							pcall(print, string.format(
+								"[OHA-RUNE] %s t=%.1f pickup-alt spot=%s id=%s alts=%s",
+								(string.gsub(d:GetUnitName(), "npc_dota_hero_", "")),
+								now0,
+								tostring(D.location),
+								tostring(pickId),
+								table.concat(alts, ",")
+							))
+						end
+					end
+				end
+				d:Action_PickUpRune(pickId)
 				doing("pickup-fresh")
 				return
 			end

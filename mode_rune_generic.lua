@@ -18,9 +18,10 @@ local h = { RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }
 local function IsRiverRune(id)
 	return id == RUNE_POWERUP_1 or id == RUNE_POWERUP_2
 end
--- Sweep length: one 160 lap (2.4s) for bounty gold; river runes alternate 160 and 300 laps (4.8s).
+-- Sweep length: one 160 lap (2.4s) for every rune; a river rune next to an unpicked one lies as
+-- close as bounty gold does.
 local function SweepTime(id)
-	return IsRiverRune(id) and 4.8 or 2.4
+	return 2.4
 end
 -- Spawn cycle: bounty runes every 180s (the bountyDue check below uses the same), river runes
 -- every 120s (water at 2:00 and 4:00, power runes from 6:00, as the rest of this file assumes).
@@ -815,9 +816,7 @@ function a.ThinkBountySweep()
 	end
 	local step = math.floor((DotaTime() - s.ringStart) / 0.3)
 	local idx = step % #BOUNTY_SWEEP + 1
-	local lap = math.floor(step / #BOUNTY_SWEEP)
-	local scale = (IsRiverRune(s.id) and lap % 2 == 1) and 1.9 or 1
-	local dest = loc + BOUNTY_SWEEP[idx] * scale
+	local dest = loc + BOUNTY_SWEEP[idx]
 	if GetUnitToLocationDistance(d, dest) <= 50 then
 		d._runePickupAt = DotaTime()
 		a.NoteLaneRuneTake(s.id)

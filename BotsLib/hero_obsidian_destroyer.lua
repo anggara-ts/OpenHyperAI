@@ -164,11 +164,15 @@ function a.ConsiderPrisonHammer()
 	end
 	local left = st.endAt - now
 	local dist = GetUnitToLocationDistance(b, st.loc)
-	-- Astral Imprisonment has 650 range and Meteor Hammer 600: at most a short step, which the
-	-- cast order walks by itself. Start that much earlier instead of walking first.
-	local step = math.max(0, dist - 600) / math.max(100, b:GetCurrentMovementSpeed())
-	if left <= HAMMER_LEAD + 0.05 + step then
-		if dist <= 750 then
+	-- Meteor Hammer is a 400-radius area (user note): aimed at a point inside its 600 range toward
+	-- the prison spot, it still covers the prisoner up to ~980 away, so no step at all (Astral
+	-- Imprisonment is cast from up to 650).
+	local aim = st.loc
+	if dist > 580 then
+		aim = b:GetLocation() + (st.loc - b:GetLocation()):Normalized() * 580
+	end
+	if left <= HAMMER_LEAD + 0.05 then
+		if dist <= 580 + 380 then
 			b._prison = nil
 			pcall(print, string.format(
 				"[OHA-OD] t=%.1f prison-hammer target=%s left=%.2f dist=%d",
@@ -177,7 +181,7 @@ function a.ConsiderPrisonHammer()
 				left,
 				math.floor(dist)
 			))
-			b:Action_UseAbilityOnLocation(hammer, st.loc)
+			b:Action_UseAbilityOnLocation(hammer, aim)
 			return true
 		end
 		return false

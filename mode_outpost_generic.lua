@@ -56,9 +56,68 @@ local a1 = c:GetAbilityByName("ability_capture")
 local a2 = false
 local a3 = "none"
 local a4 = 0
+-- Chain Frost bouncing around us (Valve data: bounces to a hero within 550, 10 jumps). The
+-- projectile is visible in GetIncomingTrackingProjectiles of whoever it is flying at. Returns the
+-- ally (or this bot) it is heading to, when that one is this bot or within 700 of it.
+local chainFrostSpread = false
+local function ChainFrostNear()
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if ally ~= nil and not ally:IsNull() and ally:IsAlive() and (ally == c or GetUnitToUnitDistance(c, ally) <= 700) then
+			for _, proj in pairs(ally:GetIncomingTrackingProjectiles() or {}) do
+				local ab = proj.ability
+				if
+					ab ~= nil
+					and not ab:IsNull()
+					and ab:GetName() == "lich_chain_frost"
+					and (proj.caster == nil or proj.caster:GetTeam() ~= GetTeam())
+				then
+					return ally
+				end
+			end
+		end
+	end
+	return nil
+end
+local function ConsiderChainFrostSpread()
+	local ok, on = pcall(ChainFrostNear)
+	if not ok or on == nil then
+		return false
+	end
+	-- Only worth moving when another ally hero is close enough to be the next bounce.
+	local near = 0
+	for _, ally in pairs(c:GetNearbyHeroes(650, false, BOT_MODE_NONE) or {}) do
+		if ally ~= c and ally:IsAlive() then
+			near = near + 1
+		end
+	end
+	if near == 0 then
+		return false
+	end
+	if DotaTime() >= (c._chainFrostLogAt or -999) + 3 then
+		c._chainFrostLogAt = DotaTime()
+		pcall(print, string.format(
+			"[OHA-CHAINFROST] t=%.0f %s spread on=%s alliesNear=%d hp=%.2f",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			(string.gsub(on:GetUnitName(), "npc_dota_hero_", "")),
+			near,
+			a.GetHP(c)
+		))
+	end
+	return true
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
+	end
+	-- Ahead of everything in this mode, above 1 so it beats attack and retreat: the old spread
+	-- rule only knew an enemy Lich had Chain Frost ready, and skipped every fighting bot, so
+	-- bots stood together and let the bounces hit them all.
+	chainFrostSpread = false
+	if c:IsAlive() and c:IsHero() and not c:IsIllusion() and ConsiderChainFrostSpread() then
+		chainFrostSpread = true
+		a4 = DotaTime()
+		return 1.05
 	end
 	local a5 = GetDesireHelper()
 	if a5 > 0 then
@@ -144,6 +203,10 @@ function GetDesireHelper()
 end
 function Think()
 	if a.CanNotUseAction(c) then
+		return
+	end
+	if chainFrostSpread then
+		a.Utils.SmartSpreadOut(c, 650, 600, {}, false)
 		return
 	end
 	if a2 then

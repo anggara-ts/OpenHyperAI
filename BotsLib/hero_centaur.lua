@@ -103,6 +103,14 @@ function a.SkillsComplement()
 		return
 	end
 end
+-- [OHA-CENTAUR] stomp why=kill|group|fight heroes=N, at most once per 3s.
+function a.LogStomp(why, heroes)
+	if DotaTime() < (b._stompLogAt or -999) then
+		return
+	end
+	b._stompLogAt = DotaTime() + 3
+	pcall(print, string.format("[OHA-CENTAUR] t=%.0f stomp why=%s heroes=%d hp=%.2f", DotaTime(), why, heroes, c.GetHP(b)))
+end
 function a.ConsiderHoofStomp()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
@@ -116,16 +124,33 @@ function a.ConsiderHoofStomp()
 			if N:IsChanneling() or c.IsCastingUltimateAbility(N) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			if
-				c.CanKillTarget(N, K, DAMAGE_TYPE_MAGICAL)
-				and not N:HasModifier("modifier_abaddon_borrowed_time")
-				and not N:HasModifier("modifier_dazzle_shallow_grave")
-				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not N:HasModifier("modifier_oracle_false_promise_timer")
-				and not N:HasModifier("modifier_templar_assassin_refraction_absorb")
-			then
+			-- Kill range: stomp even through Shallow Grave and similar saves. The stun still holds
+			-- him for the team; only an already disabled target is skipped.
+			if c.CanKillTarget(N, K, DAMAGE_TYPE_MAGICAL) and not c.IsDisabled(N) then
+				a.LogStomp("kill", 1)
 				return BOT_ACTION_DESIRE_HIGH
 			end
+		end
+	end
+	-- Team fight: the stun is an area. Two or more enemy heroes not already disabled within
+	-- 275 (radius 325 less room for the 0.5s windup), or one in a team fight. The rule below
+	-- only looked at the single target, so Centaur held the stomp with heroes all around him.
+	do
+		local stompable = 0
+		for M, N in pairs(c.GetNearbyHeroes(b, J - 50, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(N)
+				and c.CanCastOnNonMagicImmune(N)
+				and not c.IsSuspiciousIllusion(N)
+				and not c.IsDisabled(N)
+				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				stompable = stompable + 1
+			end
+		end
+		if stompable >= 2 or H and stompable >= 1 then
+			a.LogStomp(stompable >= 2 and "group" or "fight", stompable)
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if D then

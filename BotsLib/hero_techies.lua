@@ -284,6 +284,10 @@ function a.PlantMad(plant, loc, tag)
 	b._madDetonateAt = DotaTime() + castPoint + 0.15
 	b._madUntil = b._madDetonateAt + 2
 	b._madPlantAt = DotaTime()
+	-- No other spell order until the plant is cast: game 019, 8 of 15 plants failed because the
+	-- next think sent Sticky Bomb, the Tazer, a mine or Blast Off and cut the cast short (43:01:
+	-- post-blast plant and post-blast Sticky in the same second).
+	b._madHoldUntil = DotaTime() + castPoint + 0.25
 	a.LogTechies("mad-plant " .. plant:GetName() .. (tag and (" " .. tag) or ""), 0, loc)
 	b:Action_UseAbilityOnLocation(plant, loc)
 end
@@ -347,6 +351,9 @@ function a.SkillsComplement()
 		return
 	end
 	if c.CanNotUseAbility(b) then
+		return
+	end
+	if DotaTime() < (b._madHoldUntil or -999) then
 		return
 	end
 	local Q = d.Build(b)

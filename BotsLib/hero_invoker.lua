@@ -1136,6 +1136,12 @@ function a.CheckTempModifiers(bt, botTarget, bg)
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderCataclysm()
+	-- Cataclysm (Sun Strike cast on himself) is an Aghanim's Scepter upgrade, and he no longer
+	-- buys Scepter. Without it this rule, first in his spell order, would spend Sun Strike on his
+	-- own spot (or an invalid order).
+	if not b:HasScepter() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
 	if not a.CanAbilityPossiblyBeCasted(F) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end

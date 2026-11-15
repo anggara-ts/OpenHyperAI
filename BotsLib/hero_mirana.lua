@@ -895,7 +895,9 @@ function a.IsEnemyUnitBetweenArrow(caster, target, aimLoc, width)
 		if unit:GetTeam() == caster:GetTeam() then
 			return false
 		end
-		if unit:IsBuilding() or unit:IsTower() or unit:IsBarracks() or unit:IsFort() then
+		-- No IsBarracks / IsFort in the bot API ("attempt to call method IsBarracks", game 018);
+		-- IsBuilding covers towers, barracks and the Ancient.
+		if unit:IsBuilding() or unit:IsTower() then
 			return false
 		end
 		local name = unit:GetUnitName()

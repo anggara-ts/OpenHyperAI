@@ -591,15 +591,39 @@ function a.ConsiderE()
 	local T = c.GetAroundEnemyHeroList(1200)
 	local U = nil
 	local V = nil
-	if c.IsGoingOnSomeone(b) then
-		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, M + N + 100)
-			and not c.IsInRange(b, botTarget, M - 30)
-			and not botTarget:IsAttackImmune()
-			and c.CanCastOnMagicImmune(botTarget)
-			and b:IsFacingLocation(botTarget:GetLocation(), 6)
-		then
+	-- Chase: Leap goes 650 the way she faces and gives attack/move speed for 5s (Valve data). It
+	-- used to need the target 620-1380 away and facing within 6 degrees, so a target running
+	-- just ahead never got leapt on (5:00, game 014). Now: where she lands is checked against
+	-- where the target will be, and a fleeing target inside 620 counts too.
+	local chaseWhy = nil
+	if c.IsGoingOnSomeone(b) and c.IsValidHero(botTarget) and c.IsInRange(b, botTarget, M + N + 300) then
+		local fleeing = not botTarget:IsFacingLocation(b:GetLocation(), 90)
+		local dist = GetUnitToUnitDistance(b, botTarget)
+		local face = b:GetFacing() * math.pi / 180
+		local me = b:GetLocation()
+		local land = Vector(me.x + math.cos(face) * M, me.y + math.sin(face) * M, me.z)
+		local there = botTarget:GetExtrapolatedLocation(0.6)
+		local landDist = math.sqrt((land.x - there.x) ^ 2 + (land.y - there.y) ^ 2)
+		if botTarget:IsAttackImmune() or not c.CanCastOnMagicImmune(botTarget) then
+			chaseWhy = "target-immune"
+		elseif landDist > N - 80 then
+			chaseWhy = string.format("lands-far(%d)", landDist)
+		elseif dist < M - 30 and not fleeing then
+			chaseWhy = "close-not-fleeing"
+		end
+		if chaseWhy ~= nil and DotaTime() >= (b._leapChaseLogAt or -999) then
+			b._leapChaseLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-MIRANA] t=%.0f leap-skip why=chase-%s target=%s dist=%d",
+				DotaTime(),
+				chaseWhy,
+				(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+				dist
+			))
+		end
+	end
+	if c.IsGoingOnSomeone(b) and chaseWhy == nil then
+		if c.IsValidHero(botTarget) and c.IsInRange(b, botTarget, M + N + 300) then
 			local a6 = c.GetNearbyHeroes(botTarget, 900, false, BOT_MODE_NONE)
 			local a7 = c.GetNearbyHeroes(botTarget, 1300, true, BOT_MODE_NONE)
 			local a8 = c.GetNumOfAliveHeroes(true)
@@ -611,6 +635,12 @@ function a.ConsiderE()
 			then
 				U = botTarget
 				V = "E-进攻:" .. c.Chat.GetNormName(U)
+				pcall(print, string.format(
+					"[OHA-MIRANA] t=%.0f leap why=chase target=%s dist=%d",
+					DotaTime(),
+					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToUnitDistance(b, botTarget)
+				))
 				return BOT_ACTION_DESIRE_HIGH, U, V
 			end
 		end

@@ -169,6 +169,12 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnLocation(r, spireCombo)
 		return
 	end
+	-- Frost Shield on our Ice Spire right after Chain Frost (before Frost Blast pokes).
+	local shieldSpire = a.ConsiderSpireShield()
+	if shieldSpire ~= nil then
+		b:Action_UseAbilityOnEntity(p, shieldSpire)
+		return
+	end
 	E, F = a.ConsiderR()
 	if E > 0 then
 		c.SetQueuePtToINT(b, true)
@@ -465,21 +471,6 @@ function a.ConsiderW()
 	local W = p:GetManaCost()
 	local Z = p:GetAbilityDamage()
 	local _ = DAMAGE_TYPE_MAGICAL
-	-- Frost Shield on our Ice Spire: each tick heals it by one hero hit (Valve data), so it lasts
-	-- through Chain Frost bounces and enemy hits.
-	do
-		local spire = a.GetOwnSpire()
-		if
-			spire ~= nil
-			and GetUnitToUnitDistance(b, spire) <= T
-			and DotaTime() >= (b._spireShieldAt or -999) + p:GetSpecialValueFloat("duration")
-			and #(c.GetEnemiesNearLoc(spire:GetLocation(), 700) or {}) >= 1
-		then
-			b._spireShieldAt = DotaTime()
-			a.LogLich("shield-spire", nil)
-			return BOT_ACTION_DESIRE_HIGH, spire, "W-spire"
-		end
-	end
 	local aj = c.GetAlliesNearLoc(b:GetLocation(), T + 50)
 	local a0 = p:GetSpecialValueInt("radius")
 	if c.IsInTeamFight(b, 900) then
@@ -829,6 +820,42 @@ function a.LogLich(kind, target)
 		target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
 		c.GetMP(b)
 	))
+end
+-- Frost Shield on our Ice Spire: each shield tick heals it by one hero hit (Valve data). Cast
+-- when the spire has lost HP, or something is hitting near it (enemy heroes or creeps within
+-- 700), or Chain Frost bounced on it in the last 8s, and no shield of ours is on it. It used to
+-- need an enemy hero within 700 and ran after Frost Blast, so a spire chipped by creeps or by the
+-- Chain Frost bounce was never shielded. He walks up to 400 extra to reach it, not when retreating.
+function a.ConsiderSpireShield()
+	if not p:IsFullyCastable() then
+		return nil
+	end
+	local spire = a.GetOwnSpire()
+	if spire == nil then
+		return nil
+	end
+	local reach = p:GetCastRange() + K + (c.IsRetreating(b) and 0 or 400)
+	if GetUnitToUnitDistance(b, spire) > reach then
+		return nil
+	end
+	local duration = p:GetSpecialValueFloat("duration")
+	if duration == nil or duration <= 0 then
+		duration = 4
+	end
+	if DotaTime() < (b._spireShieldAt or -999) + duration then
+		return nil
+	end
+	local damaged = spire:GetHealth() < spire:GetMaxHealth()
+	local loc = spire:GetLocation()
+	local busy = #(c.GetEnemiesNearLoc(loc, 700) or {}) >= 1
+		or #(spire:GetNearbyCreeps(700, true) or {}) >= 1
+		or DotaTime() - (b._chainAt or -99) < 8
+	if not (damaged or busy) then
+		return nil
+	end
+	b._spireShieldAt = DotaTime()
+	a.LogLich(damaged and "shield-spire damaged" or "shield-spire", nil)
+	return spire
 end
 -- Our own Ice Spire, if one stands.
 function a.GetOwnSpire()

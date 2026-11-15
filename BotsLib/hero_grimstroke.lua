@@ -116,28 +116,57 @@ local J
 -- Stroke of Fate on alt-cast goes straight (7.41), easier to aim than the curve. The bot API
 -- has no alt-cast call; the autocast switch is the closest, so it is turned on once Stroke is
 -- learned and the state is logged before and after, to confirm in game that the path is straight.
+-- Checked every 5s: if the switch is found off again (e.g. reset by a death), it is logged with
+-- the gap since the last check (a long gap means he was dead) and turned back on.
 local function StrokeStraight()
-	if b._strokeAltSet or not o:IsTrained() then
+	if not o:IsTrained() then
 		return
 	end
-	b._strokeAltSet = true
+	local now = DotaTime()
+	if b._strokeAltCheckAt ~= nil and now - b._strokeAltCheckAt < 5 then
+		return
+	end
+	local gap = b._strokeAltCheckAt ~= nil and now - b._strokeAltCheckAt or 0
+	local first = b._strokeAltCheckAt == nil
+	b._strokeAltCheckAt = now
 	local okB, before = pcall(function()
 		return o:GetAutoCastState()
 	end)
-	if okB and before == false then
-		pcall(function()
-			o:ToggleAutoCast()
-		end)
+	if not okB or before ~= false then
+		if first then
+			pcall(print, string.format("[OHA-GRIM] t=%.0f stroke-altcast already=%s", now, tostring(okB and before)))
+		end
+		return
 	end
+	pcall(function()
+		o:ToggleAutoCast()
+	end)
 	local okA, after = pcall(function()
 		return o:GetAutoCastState()
 	end)
 	pcall(print, string.format(
-		"[OHA-GRIM] t=%.0f stroke-altcast before=%s after=%s",
-		DotaTime(),
-		tostring(okB and before),
+		"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
+		now,
+		first and "set" or "reset-found",
+		gap,
 		tostring(okA and after)
 	))
+end
+-- Stroke of Fate on creeps keeps mana for Ink Swell + Phantom's Embrace (+ Soulbind when it is
+-- up within 20s), and at least 25% of the pool. It was spammed on waves down to low mana.
+function a.StrokeOnCreepsOk()
+	local reserve = 0
+	if q:IsTrained() then
+		reserve = reserve + q:GetManaCost()
+	end
+	if p:IsTrained() then
+		reserve = reserve + p:GetManaCost()
+	end
+	if t:IsTrained() and t:GetCooldownTimeRemaining() < 20 then
+		reserve = reserve + t:GetManaCost()
+	end
+	local left = b:GetMana() - o:GetManaCost()
+	return left >= reserve and c.GetManaAfter(o:GetManaCost()) >= 0.25
 end
 function a.SkillsComplement()
 	pcall(StrokeStraight)
@@ -255,7 +284,7 @@ function a.ConsiderStrokeOfFate()
 			return BOT_ACTION_DESIRE_HIGH, W[1]:GetLocation()
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b)) and c.GetManaAfter(o:GetManaCost()) > 0.4 and Q >= 3 then
+	if (c.IsPushing(b) or c.IsDefending(b)) and a.StrokeOnCreepsOk() and Q >= 3 then
 		local X = b:FindAoELocation(true, true, b:GetLocation(), L, N, M, 0)
 		if X.count >= 2 then
 			local Y = c.GetVulnerableUnitNearLoc(b, true, true, L, N, X.targetloc)

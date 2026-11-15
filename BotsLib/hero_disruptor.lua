@@ -391,6 +391,37 @@ function a.ConsiderGlimpse()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
+	-- A fleeing enemy: pull it back to where it was 4s ago when that spot is well behind it and
+	-- closer to us. The old chase rule also needed the target to be teleporting or in its fountain,
+	-- so a running enemy was never glimpsed.
+	if H or K then
+		local range = c.GetProperCastRange(false, b, p:GetCastRange())
+		for _, T in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(T)
+				and c.CanCastOnNonMagicImmune(T)
+				and c.CanCastOnTargetAdvanced(T)
+				and not c.IsSuspiciousIllusion(T)
+				and not c.IsDisabled(T)
+				and not T:IsFacingLocation(b:GetLocation(), 90)
+			then
+				local spot = a.GlimpseReturnSpot(T)
+				if
+					spot ~= nil
+					and GetUnitToLocationDistance(T, spot) >= 400
+					and GetUnitToLocationDistance(b, spot) + 300 < GetUnitToUnitDistance(b, T)
+				then
+					pcall(print, string.format(
+						"[OHA-DISRUPTOR] t=%.0f glimpse-flee target=%s back=%d",
+						DotaTime(),
+						(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToLocationDistance(T, spot)
+					))
+					return BOT_ACTION_DESIRE_HIGH, T
+				end
+			end
+		end
+	end
 	local M = c.GetProperCastRange(false, b, p:GetCastRange())
 	local T = c.GetNearbyHeroes(b, M, false, BOT_MODE_NONE)
 	local Q = c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE)
@@ -678,7 +709,8 @@ function a.ConsiderStaticStorm()
 	end
 	local N = s:GetSpecialValueInt("radius")
 	local M = s:GetCastRange()
-	if K and not CanCastKineticStorm() then
+	-- Engaging counts too, not only a team fight: two enemies in a skirmish never got it.
+	if (K or H) and not CanCastKineticStorm() then
 		local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 		local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
 		if
@@ -697,7 +729,7 @@ function a.ConsiderKineticStorm()
 	if CanCastKineticStorm() then
 		local M = c.GetProperCastRange(false, b, q:GetCastRange())
 		local N = q:GetSpecialValueInt("radius")
-		if K then
+		if K or H then
 			local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 			local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
 			if

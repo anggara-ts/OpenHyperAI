@@ -7269,6 +7269,52 @@ local function StuckModeName(mode)
 	end
 	return STUCK_MODE_NAMES[mode] or tostring(mode)
 end
+-- [OHA-FLIP] a bot flipping between modes without getting anywhere: 6+ mode changes in 20s with
+-- under 800 net movement. Game 019, 40:40-41:20: Gyrocopter by his mid T2 went roam 0.89, retreat
+-- 0.29, roam 0.34, push 0.61 while walking back and forth (35 moved over a 2229 path). Lists
+-- each mode with its desire at the switch. Once every 30s per bot at most.
+function a.LogModeFlip()
+	if not b:IsAlive() then
+		b._modeHist = nil
+		return
+	end
+	local now = DotaTime()
+	local mode = b:GetActiveMode()
+	local hist = b._modeHist or {}
+	b._modeHist = hist
+	local last = hist[#hist]
+	if last == nil or last.mode ~= mode then
+		hist[#hist + 1] = { t = now, mode = mode, des = b:GetActiveModeDesire(), loc = b:GetLocation() }
+	end
+	while #hist > 0 and hist[1].t < now - 20 do
+		table.remove(hist, 1)
+	end
+	if #hist < 7 or now < (b._modeFlipLogAt or -999) then
+		return
+	end
+	local moved = f.GetLocationToLocationDistance(hist[1].loc, b:GetLocation())
+	if moved >= 800 then
+		return
+	end
+	b._modeFlipLogAt = now + 30
+	local parts = {}
+	for _, h0 in ipairs(hist) do
+		parts[#parts + 1] = string.format("%s:%.2f@%.0f", StuckModeName(h0.mode), h0.des or 0, h0.t)
+	end
+	local loc = b:GetLocation()
+	pcall(print, string.format(
+		"[OHA-FLIP] t=%.0f %s changes=%d moved=%d at=%.0f,%.0f hp=%.2f enemies=%d modes=%s",
+		now,
+		(string.gsub(c, "npc_dota_hero_", "")),
+		#hist - 1,
+		math.floor(moved),
+		loc.x,
+		loc.y,
+		f.GetHP(b),
+		#(f.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {}),
+		table.concat(parts, ">")
+	))
+end
 function a.LogStuck()
 	-- Laning holds position between last hits by design (239 of 855 lines in one game).
 	if
@@ -7441,6 +7487,7 @@ function ItemUsageThink()
 	end
 	LogHumanPing()
 	pcall(a.LogStuck)
+	pcall(a.LogModeFlip)
 	-- A hero script can ask to keep thinking while invulnerable (Tusk inside his snowball has
 	-- to launch it). Spells only, no items. The return below used to skip it entirely, so the
 	-- snowball always rolled its full duration.

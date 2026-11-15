@@ -5537,7 +5537,8 @@ a.ConsiderItemDesire["item_metamorphic_mandible"] = function(bm)
 	if f.IsGoingOnSomeone(b) then
 		if b:WasRecentlyDamagedByAnyHero(2.0) then
 			local dG = 0
-			for aX, eq in pairs(nEnemyHeroes) do
+			-- nEnemyHeroes was never defined here ("bad argument to pairs", game 020, Pudge).
+			for aX, eq in pairs(f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) do
 				if
 					f.IsValidHero(eq)
 					and not f.IsSuspiciousIllusion(eq)

@@ -995,7 +995,22 @@ function a.ConsiderDetonateMad()
 	local loc = b._madLoc
 	-- Checked before the detonate lookup: a plant that never landed leaves no detonate to find.
 	if loc ~= nil and DotaTime() > (b._madUntil or 0) then
-		a.LogTechies("mad-plant-failed (no detonate in time)", 0, loc)
+		-- Why: was the plant cast at all (M.A.D. on cooldown), is the detonate there, was he alive.
+		-- Game 020: 17 of 37 plants failed even with the hold, some logged long after (he died).
+		local why = ""
+		pcall(function()
+			local plantAb = b:GetAbilityByName("techies_mutually_assured_destruction")
+			local det = b:GetAbilityByName("techies_focused_detonate")
+			why = string.format(
+				" alive=%s plantCd=%.1f det=%s/%s since=%.1f",
+				tostring(b:IsAlive()),
+				plantAb ~= nil and plantAb:GetCooldownTimeRemaining() or -1,
+				det ~= nil and (det:IsHidden() and "hidden" or "shown") or "none",
+				det ~= nil and tostring(det:IsFullyCastable()) or "-",
+				DotaTime() - (b._madPlantAt or DotaTime())
+			)
+		end)
+		a.LogTechies("mad-plant-failed (no detonate in time)" .. why, 0, loc)
 		b._madLoc = nil
 		b._madDetonateAt = nil
 		return BOT_ACTION_DESIRE_NONE

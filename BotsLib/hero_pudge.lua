@@ -168,6 +168,28 @@ local x
 local y
 local z
 local A
+-- Rot read as off right after it was turned on (game 020: "rot-on" 10 times a second while
+-- farming, "rot-off" 11 times all game), so every think toggled it again and it flickered. It
+-- counts as on when the toggle state or Rot's buff on Pudge says so, and it is toggled at most
+-- once every 1.5s.
+local function RotOn(ab)
+	if ab == nil then
+		return false
+	end
+	local okT, on = pcall(function()
+		return ab:GetToggleState()
+	end)
+	return (okT and on == true) or GetBot():HasModifier("modifier_pudge_rot")
+end
+function a.ToggleRot(ab)
+	local now = DotaTime()
+	if now - (b._rotToggleAt or -99) < 1.5 then
+		return false
+	end
+	b._rotToggleAt = now
+	b:Action_UseAbility(ab)
+	return true
+end
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
@@ -194,9 +216,10 @@ function a.SkillsComplement()
 		b:Action_UseAbility(D)
 		return
 	end
-	if C:GetToggleState() and #H <= 0 then
-		b:Action_UseAbility(C)
-		return
+	if RotOn(C) and #H <= 0 then
+		if a.ToggleRot(C) then
+			return
+		end
 	end
 	r, s = a.ConsiderMeatHook(B, C, E, x, F, H)
 	if r > 0 then
@@ -206,9 +229,10 @@ function a.SkillsComplement()
 	end
 	t = a.ConsiderRot(C, x, F, G, H)
 	if t > 0 then
-		a.LogPudge(C:GetToggleState() and "rot-off" or "rot-on", F)
-		b:Action_UseAbility(C)
-		return
+		if a.ToggleRot(C) then
+			a.LogPudge(RotOn(C) and "rot-off" or "rot-on", F)
+			return
+		end
 	end
 	v, w = a.ConsiderDismember(E, x, F, H)
 	if v > 0 then
@@ -217,7 +241,7 @@ function a.SkillsComplement()
 		if c.CanCastAbility(D) and not b:HasModifier("modifier_pudge_flesh_heap_block") then
 			b:ActionQueue_UseAbility(D)
 		end
-		if F > 0.3 and c.CanCastAbility(C) and not C:GetToggleState() then
+		if F > 0.3 and c.CanCastAbility(C) and not RotOn(C) then
 			b:ActionQueue_UseAbility(C)
 		end
 		b:ActionQueue_UseAbilityOnEntity(E, w)
@@ -246,10 +270,11 @@ function a.BlinkComboStep(rot, shield, dismember)
 	end
 	if not st.rot then
 		st.rot = true
-		if rot ~= nil and rot:IsTrained() and rot:IsFullyCastable() and not rot:GetToggleState() then
-			a.LogPudge("blink-combo rot", c.GetHP(b))
-			b:Action_UseAbility(rot)
-			return true
+		if rot ~= nil and rot:IsTrained() and rot:IsFullyCastable() and not RotOn(rot) then
+			if a.ToggleRot(rot) then
+				a.LogPudge("blink-combo rot", c.GetHP(b))
+				return true
+			end
 		end
 	end
 	b._pudgeCombo = nil
@@ -548,14 +573,14 @@ function a.ConsiderRot(C, x, F, G, H)
 	if not C:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if C:GetToggleState() and #H <= 0 then
+	if RotOn(C) and #H <= 0 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	-- Rot hurts Pudge too (Valve data: non-lethal self damage). In fights it stayed on at any HP;
 	-- now off below 30% while engaging and below 40% while running away.
 	local rotFloor = z and 0.4 or 0.3
 	if (y or z) and F < rotFloor then
-		if C:GetToggleState() then
+		if RotOn(C) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		return BOT_ACTION_DESIRE_NONE
@@ -570,7 +595,7 @@ function a.ConsiderRot(C, x, F, G, H)
 				and not S:HasModifier("modifier_dazzle_shallow_grave")
 				and not S:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				if C:GetToggleState() == false then
+				if RotOn(C) == false then
 					return BOT_ACTION_DESIRE_HIGH
 				else
 					return BOT_ACTION_DESIRE_NONE
@@ -587,7 +612,7 @@ function a.ConsiderRot(C, x, F, G, H)
 				and not S:HasModifier("modifier_abaddon_borrowed_time")
 				and not S:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				if C:GetToggleState() == false then
+				if RotOn(C) == false then
 					return BOT_ACTION_DESIRE_HIGH
 				else
 					return BOT_ACTION_DESIRE_NONE
@@ -598,10 +623,10 @@ function a.ConsiderRot(C, x, F, G, H)
 	if c.IsPushing(b) or c.IsDefending(b) then
 		local a1 = b:GetNearbyLaneCreeps(G, true)
 		if a1 ~= nil then
-			if #a1 >= 1 and C:GetToggleState() == false and A and F > 0.2 then
+			if #a1 >= 1 and RotOn(C) == false and A and F > 0.2 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if (#a1 == 0 or F < 0.2) and C:GetToggleState() == true then
+				if (#a1 == 0 or F < 0.2) and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -611,10 +636,10 @@ function a.ConsiderRot(C, x, F, G, H)
 	if c.IsFarming(b) then
 		local a8 = b:GetNearbyNeutralCreeps(G)
 		if a8 ~= nil then
-			if #a8 >= 1 and C:GetToggleState() == false and A and F > 0.35 then
+			if #a8 >= 1 and RotOn(C) == false and A and F > 0.35 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if (#a8 == 0 or F < 0.35) and C:GetToggleState() == true then
+				if (#a8 == 0 or F < 0.35) and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -622,10 +647,10 @@ function a.ConsiderRot(C, x, F, G, H)
 		end
 		local a1 = b:GetNearbyLaneCreeps(G, true)
 		if a1 ~= nil then
-			if #a1 >= 1 and C:GetToggleState() == false and A and F > 0.2 then
+			if #a1 >= 1 and RotOn(C) == false and A and F > 0.2 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if (#a1 == 0 or F < 0.2) and C:GetToggleState() == true then
+				if (#a1 == 0 or F < 0.2) and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -636,10 +661,10 @@ function a.ConsiderRot(C, x, F, G, H)
 		local a1 = b:GetNearbyLaneCreeps(G, true)
 		local Z = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 		if a1 ~= nil and Z ~= nil and #Z == 0 then
-			if #a1 >= 1 and C:GetToggleState() == false and A and F > 0.5 then
+			if #a1 >= 1 and RotOn(C) == false and A and F > 0.5 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if (#a1 == 0 or F < 0.5) and C:GetToggleState() == true then
+				if (#a1 == 0 or F < 0.5) and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -648,10 +673,10 @@ function a.ConsiderRot(C, x, F, G, H)
 	end
 	if c.IsDoingRoshan(b) then
 		if c.IsRoshan(x) and c.CanCastOnNonMagicImmune(x) and c.IsInRange(b, x, G) and A and F > 0.4 then
-			if C:GetToggleState() == false and F > 0.4 then
+			if RotOn(C) == false and F > 0.4 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if F < 0.4 and C:GetToggleState() == true then
+				if F < 0.4 and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -660,10 +685,10 @@ function a.ConsiderRot(C, x, F, G, H)
 	end
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(x) and c.IsInRange(b, x, G) and A then
-			if C:GetToggleState() == false then
+			if RotOn(C) == false then
 				return BOT_ACTION_DESIRE_HIGH
 			else
-				if F < 0.65 and C:GetToggleState() == true then
+				if F < 0.65 and RotOn(C) == true then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 				return BOT_ACTION_DESIRE_NONE
@@ -683,7 +708,7 @@ function a.ConsiderMeatShield(D, C, x, F, G, H)
 	if engaged then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	local rotOn = C:GetToggleState()
+	local rotOn = RotOn(C)
 	local wantsRot = not rotOn and a.ConsiderRot(C, x, F, G, H) > 0
 	if (rotOn or wantsRot) and ((H ~= nil and #H >= 1) or F < 0.7) then
 		return BOT_ACTION_DESIRE_HIGH

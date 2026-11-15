@@ -300,7 +300,41 @@ function Think()
 		end
 	end
 end
+-- A ward spot that is not walkable (cliff edge, tree line) cannot take a ward: the bot stood in
+-- range casting and nothing was planted (bottom-rune spot: Lina in game 014, Techies in games
+-- 016 and 017 at both the old and the moved coordinates). The first time a spot is used it is
+-- checked; if not walkable, the nearest walkable point within 250 replaces it (logged).
+local function ValidateSpot(spot)
+	if spot == nil or spot._checked then
+		return
+	end
+	spot._checked = true
+	local loc = spot.location
+	if IsLocationPassable(loc) then
+		return
+	end
+	for r = 50, 250, 50 do
+		for k = 0, 11 do
+			local ang = k * math.pi / 6
+			local p0 = Vector(loc.x + math.cos(ang) * r, loc.y + math.sin(ang) * r, loc.z)
+			if IsLocationPassable(p0) then
+				pcall(print, string.format(
+					"[OHA-WARD] t=%.0f spot-moved from=%.0f,%.0f to=%.0f,%.0f (not walkable)",
+					DotaTime(),
+					loc.x,
+					loc.y,
+					p0.x,
+					p0.y
+				))
+				spot.location = p0
+				return
+			end
+		end
+	end
+	pcall(print, string.format("[OHA-WARD] t=%.0f spot-invalid at=%.0f,%.0f", DotaTime(), loc.x, loc.y))
+end
 function a.WardThink()
+	pcall(ValidateSpot, j)
 	if j then
 		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then
 			if GetUnitToLocationDistance(b, j.location) <= f then

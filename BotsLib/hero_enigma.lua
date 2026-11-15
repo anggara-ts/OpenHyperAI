@@ -170,6 +170,7 @@ function a.SkillsComplement()
 		end
 		b:ActionQueue_UseAbilityOnLocation(I, F)
 		b:ActionQueue_Delay(0.1)
+		a.QueuePulseBefore(F)
 		b:ActionQueue_UseAbilityOnLocation(t, F)
 		return
 	end
@@ -180,13 +181,13 @@ function a.SkillsComplement()
 	end
 	C, D = a.ConsiderBlackHole()
 	if C > 0 then
+		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
 			b:ActionQueue_Delay(0.1)
-			b:ActionQueue_UseAbilityOnLocation(t, D)
-			return
 		end
-		b:Action_UseAbilityOnLocation(t, D)
+		a.QueuePulseBefore(D)
+		b:ActionQueue_UseAbilityOnLocation(t, D)
 		return
 	end
 	w, x = a.ConsiderMalefice()
@@ -493,69 +494,75 @@ function a.ConsiderMidnightPulse()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Black Hole is for two or more enemy heroes. One enemy only when it kills a core and no other
+-- enemy hero is in sight: the old fallback cast it on a lone target whenever our numbers were
+-- even or better. Damage is read from "damage" (per second) x "duration"; the old "value" key
+-- does not exist on this ability, so every kill check came out 0.
 function a.ConsiderBlackHole()
 	if not t:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local S = c.GetProperCastRange(false, b, t:GetCastRange())
 	local a6 = t:GetSpecialValueInt("radius")
-	local U = t:GetSpecialValueInt("value")
-	local a8 = t:GetSpecialValueInt("duration")
-	if N then
+	local dps = t:GetSpecialValueInt("damage")
+	local a8 = t:GetSpecialValueFloat("duration")
+	if a8 == nil or a8 <= 0 then
+		a8 = 4
+	end
+	if N or L then
 		local a7 = b:FindAoELocation(true, true, b:GetLocation(), S, a6 * 0.8, 0, 0)
 		local W = c.GetEnemiesNearLoc(a7.targetloc, a6)
 		if W ~= nil and #W >= 2 then
+			a.LogBlackHole("group", #W, W[1])
 			return BOT_ACTION_DESIRE_HIGH, a7.targetloc
 		end
 	end
-	if L then
-		if
-			c.IsValidTarget(K)
-			and c.CanCastOnMagicImmune(K)
-			and c.IsInRange(b, K, 800)
-			and not c.IsSuspiciousIllusion(K)
-			and not K:HasModifier("modifier_dazzle_shallow_grave")
-			and not K:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not K:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not K:HasModifier("modifier_item_aeon_disk_buff")
-		then
-			local V = c.GetNearbyHeroes(K, 1200, true, BOT_MODE_NONE)
-			local W = c.GetNearbyHeroes(K, 1200, false, BOT_MODE_NONE)
-			if V ~= nil and W ~= nil then
-				if #W >= #V and #W <= 1 then
-					if c.CanKillTarget(K, U * a8, DAMAGE_TYPE_PURE) and K:GetHealth() > 200 then
-						W = c.GetEnemiesNearLoc(K:GetLocation(), a6)
-						if W ~= nil and #W >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(W)
-						else
-							if c.IsInRange(b, K, S + a6) and not c.IsInRange(b, K, S) then
-								return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
-							else
-								return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-							end
-						end
-					end
-				end
-				if #V >= #W then
-					if #V <= 1 and c.CanKillTarget(K, U * 1.1 * a8, DAMAGE_TYPE_PURE) then
-						return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-					else
-						W = c.GetEnemiesNearLoc(K:GetLocation(), a6)
-						if W ~= nil and #W >= 2 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(W)
-						else
-							if c.IsInRange(b, K, S + a6) and not c.IsInRange(b, K, S) then
-								return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
-							else
-								return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-							end
-						end
-					end
-				end
+	if
+		L
+		and c.IsValidTarget(K)
+		and c.IsCore(K)
+		and c.CanCastOnMagicImmune(K)
+		and c.IsInRange(b, K, S + 200)
+		and not c.IsSuspiciousIllusion(K)
+		and not K:HasModifier("modifier_dazzle_shallow_grave")
+		and not K:HasModifier("modifier_faceless_void_chronosphere_freeze")
+		and not K:HasModifier("modifier_templar_assassin_refraction_absorb")
+		and not K:HasModifier("modifier_item_aeon_disk_buff")
+		and K:GetHealth() > 200
+		and c.CanKillTarget(K, dps * a8, DAMAGE_TYPE_PURE)
+	then
+		local others = c.GetEnemiesNearLoc(K:GetLocation(), 1600)
+		if others ~= nil and #others <= 1 then
+			a.LogBlackHole("kill", 1, K)
+			if c.IsInRange(b, K, S) then
+				return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
 			end
+			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-ENIGMA] black-hole why=group|kill heroes=N target=..., every cast decision (5s apart).
+function a.LogBlackHole(why, heroes, target)
+	if DotaTime() < (b._blackHoleLogAt or -999) then
+		return
+	end
+	b._blackHoleLogAt = DotaTime() + 5
+	pcall(print, string.format(
+		"[OHA-ENIGMA] t=%.0f black-hole why=%s heroes=%d target=%s pulseReady=%s",
+		DotaTime(),
+		why,
+		heroes,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		tostring(s:IsFullyCastable())
+	))
+end
+-- Midnight Pulse in front of Black Hole when it is ready and there is mana for both.
+function a.QueuePulseBefore(loc)
+	if s:IsFullyCastable() and b:GetMana() >= s:GetManaCost() + t:GetManaCost() then
+		b:ActionQueue_UseAbilityOnLocation(s, loc)
+		b:ActionQueue_Delay(0.1)
+	end
 end
 function a.ConsiderBlinkHole()
 	if a.CanDoBlinkHole() then

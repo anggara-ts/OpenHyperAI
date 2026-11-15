@@ -1089,12 +1089,15 @@ function a.LogTeleport(item, target, reason, mode)
 	end
 	local here = b:GetLocation()
 	pcall(print, string.format(
-		"[OHA-TP] t=%.0f %s %s why=%s mode=%s posLane=%s engineLane=%s from=%.0f,%.0f to=%.0f,%.0f targetLane=%s",
+		"[OHA-TP] t=%.0f %s %s why=%s mode=%s hp=%.2f foes=%d allies=%d posLane=%s engineLane=%s from=%.0f,%.0f to=%.0f,%.0f targetLane=%s",
 		DotaTime(),
 		(string.gsub(c, "npc_dota_hero_", "")),
 		(string.gsub(item, "^item_", "")),
 		tostring(reason),
 		tostring(mode),
+		b:GetHealth() / math.max(1, b:GetMaxHealth()),
+		#(b:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}),
+		#(b:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}) - 1,
 		tostring(names[a.GetLaneByPosition(b)]),
 		tostring(names[b:GetAssignedLane()]),
 		here.x,
@@ -4924,8 +4927,15 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 			return BOT_ACTION_DESIRE_HIGH, dL, bq, bw
 		end
 		local e6 = f.GetNearbyHeroes(b, 1500, false, BOT_MODE_ATTACK)
+		-- Retreat TP home: HP under 15% + 24% per enemy hero within 1600 (two enemies: 63%). In
+		-- the laning phase that sent Doom home at 3:57 (game 018) and cost the lane; there it
+		-- needs HP under 35% (40% with 3+ enemies), walking back or regen covers the rest.
+		local tpHpLine = 0.15 + 0.24 * ax
+		if f.IsInLaningPhase() then
+			tpHpLine = math.min(tpHpLine, ax >= 3 and 0.4 or 0.35)
+		end
 		if
-			bR < 0.15 + 0.24 * ax
+			bR < tpHpLine
 			and #e6 == 0
 			and b:WasRecentlyDamagedByAnyHero(6.0)
 			and a.CanJuke()

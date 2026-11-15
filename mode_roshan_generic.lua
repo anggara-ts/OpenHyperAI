@@ -306,7 +306,12 @@ local function TakeFitsWindow(M)
 	local alliesAlive = c.GetNumOfAliveHeroes(false)
 	local missing = c.Utils.CountMissingEnemyHeroes and c.Utils.CountMissingEnemyHeroes() or 0
 	local kw = KillWindow.Tick()
-	local everyone = c.GetNumOfAliveHeroes(true) + (kw.fresh or 0)
+	-- Count enemies that respawn before the take could be done as alive already. Calling on the
+	-- live count alone flipped to "window-short" a second later when two of them were back
+	-- (15:12: called with 2 alive, 4 alive next think).
+	local need0 = TakeTimeNeeded(M)
+	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
+	local everyone = c.GetNumOfAliveHeroes(true) + (kw.fresh or 0) + back
 	if FreshTakeNumbers(alliesAlive, everyone, missing) then
 		return true, "no-window-needed"
 	end
@@ -389,9 +394,15 @@ function GetDesireHelper()
 	-- group has committed at the rally, finish the walk in.
 	local committed = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
 	if not committed then
+		-- A take that just failed the window check is not re-called for 15s; the call-drop-call
+		-- churn walked the team toward the pit and back several times.
+		if DotaTime() < (a._roshFitFailUntil or -999) then
+			return Ret(BOT_MODE_DESIRE_NONE, "recent-window-fail")
+		end
 		local fits, fitWhy = TakeFitsWindow(M)
 		a._roshFitWhy = fitWhy
 		if not fits then
+			a._roshFitFailUntil = DotaTime() + 15
 			return Ret(BOT_MODE_DESIRE_NONE, fitWhy)
 		end
 	end
@@ -405,6 +416,13 @@ function GetDesireHelper()
 	-- The kill window stays open until a respawned enemy could be back at the pit.
 	local inTransit = KillWindow.EnemiesInTransit(KillWindow.TransitGrace(M))
 	local killRosh = (kw.fresh >= 1 or inTransit >= 1) and f and j and not c.IsEarlyGame() and DotaTime() > 8 * 60
+	-- Hold a kill-window call for 8s: the fresh-kill / in-transit counts flicker, and a call
+	-- dropped as "too-early-no-kill" two seconds later was re-called five seconds after that.
+	if killRosh then
+		a._roshKillLatchUntil = DotaTime() + 8
+	elseif f and j and DotaTime() < (a._roshKillLatchUntil or -999) then
+		killRosh = true
+	end
 	if l == nil then
 		l = c.Utils.IsHumanPlayerInTeam(GetTeam())
 	end

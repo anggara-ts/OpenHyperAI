@@ -78,7 +78,7 @@ function a.GetWeakestTower(d, g)
 			a.IsValidTarget(unit)
 			and GetUnitToUnitDistance(g, unit) <= d
 			and not a.IsNotAllowedToAttack(unit)
-			and (unit:IsTower() or unit:IsBarracks() or unit:IsFort() or unit:IsBuilding())
+			and (unit:IsTower() or unit:IsBuilding())
 		then
 			local name = unit:GetUnitName() or ""
 			-- Skip outposts / twin gates (not attack objectives for wards).

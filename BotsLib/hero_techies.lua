@@ -206,6 +206,11 @@ end
 -- The planted barrel is the unit npc_dota_techies_remote_mine (Liquipedia, M.A.D. page). Logged
 -- when one of ours appears and when it is gone, to confirm a plant and a detonation in game.
 function a.WatchBarrel()
+	-- npc_dota_techies_remote_mine also matches his Sticky Bombs (game 018: 61 seen/gone pairs
+	-- from 0:33, before the Shard). Only watch for 6s after a plant order.
+	if b._madPlantAt == nil or DotaTime() - b._madPlantAt > 6 then
+		return
+	end
 	local found = nil
 	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
 		if u ~= nil and not u:IsNull() and u:GetUnitName() == "npc_dota_techies_remote_mine" then
@@ -222,7 +227,9 @@ function a.WatchBarrel()
 		pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-barrel gone", DotaTime()))
 	end
 end
--- The barrel plant ability, or nil (no Shard, or not found / not castable).
+-- The barrel plant ability, or nil (no Shard, or not found / not castable). Game 018 at 25:12
+-- (Shard bought): techies_mutually_assured_destruction itself turned active (behavior 48 = point
+-- + AoE, not passive, not hidden, castable). No IsTrained check: an innate has no skill points.
 function a.MadPlant()
 	local list = MadCandidates()
 	LogMadCandidates(list)
@@ -235,7 +242,6 @@ function a.MadPlant()
 		if
 			not (okP and passive)
 			and not ab:IsHidden()
-			and ab:IsTrained()
 			and targeted
 			and not string.find(ab:GetName(), "detonate", 1, true)
 			and ab:IsFullyCastable()
@@ -250,7 +256,10 @@ end
 function a.MadDetonate()
 	local fallback = nil
 	for _, ab in ipairs(MadCandidates()) do
-		if not ab:IsHidden() and ab:IsFullyCastable() then
+		-- techies_focused_detonate read hidden but castable after the Shard (game 018), so a
+		-- hidden one is allowed by that name once a barrel is down.
+		local hiddenOk = string.find(ab:GetName(), "focused_detonate", 1, true) ~= nil and b._madPlantAt ~= nil
+		if (not ab:IsHidden() or hiddenOk) and ab:IsFullyCastable() then
 			local okP, passive = pcall(function()
 				return ab:IsPassive()
 			end)
@@ -403,6 +412,7 @@ function a.SkillsComplement()
 		local plant = a.MadPlant()
 		b._madDetonateAt = DotaTime() + math.max(0.3, plant:GetCastPoint()) + 0.15
 		a.LogTechies("mad-plant " .. plant:GetName(), 0, D)
+		b._madPlantAt = DotaTime()
 		b:Action_UseAbilityOnLocation(plant, D)
 		return
 	end

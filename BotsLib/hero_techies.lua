@@ -257,10 +257,9 @@ end
 function a.MadDetonate()
 	local fallback = nil
 	for _, ab in ipairs(MadCandidates()) do
-		-- techies_focused_detonate read hidden but castable after the Shard (game 018), so a
-		-- hidden one is allowed by that name once a barrel is down.
-		local hiddenOk = string.find(ab:GetName(), "focused_detonate", 1, true) ~= nil and b._madPlantAt ~= nil
-		if (not ab:IsHidden() or hiddenOk) and ab:IsFullyCastable() then
+		-- Not hidden: techies_focused_detonate shows once a barrel is down (game 018: every
+		-- mad-detonate came after a plant). Ordering it while hidden could cut the plant cast short.
+		if not ab:IsHidden() and ab:IsFullyCastable() then
 			local okP, passive = pcall(function()
 				return ab:IsPassive()
 			end)
@@ -275,6 +274,64 @@ function a.MadDetonate()
 		end
 	end
 	return fallback
+end
+-- Plant M.A.D. and detonate it right away. The barrel counts as out only until the planned
+-- detonate time + 2s: a plant that never landed (interrupted) used to block the next one for
+-- 45s (game 018: three Blast Off combos without M.A.D. for that reason).
+function a.PlantMad(plant, loc, tag)
+	local castPoint = math.max(0.3, plant:GetCastPoint())
+	b._madLoc = loc
+	b._madDetonateAt = DotaTime() + castPoint + 0.15
+	b._madUntil = b._madDetonateAt + 2
+	b._madPlantAt = DotaTime()
+	a.LogTechies("mad-plant " .. plant:GetName() .. (tag and (" " .. tag) or ""), 0, loc)
+	b:Action_UseAbilityOnLocation(plant, loc)
+end
+-- Landing from Blast Off: M.A.D. right after the mines, before Sticky Bomb, once per Blast Off.
+-- Aimed at the stunned enemy hero by the landing spot (or where the nearest one is heading). No
+-- "recently hit" rule here: right after landing he is almost always being hit.
+function a.ConsiderPostBlastMad()
+	if b._blastAt == nil or b._madBlastAt == b._blastAt then
+		return nil, nil
+	end
+	local since = DotaTime() - b._blastAt
+	if since < 1.75 or since > 6 then
+		return nil, nil
+	end
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+		return nil, nil
+	end
+	local plant = a.MadPlant()
+	if plant == nil then
+		return nil, nil
+	end
+	local range = plant:GetCastRange()
+	if range == nil or range < 100 then
+		range = 450
+	end
+	range = c.GetProperCastRange(false, b, range)
+	local best, bestScore = nil, math.huge
+	for _, e0 in pairs(c.GetNearbyHeroes(b, range + 250, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+			local d0 = GetUnitToUnitDistance(b, e0)
+			-- A disabled one first (the Blast Off stun), then the nearest.
+			local score = d0 - (c.IsDisabled(e0) and 10000 or 0)
+			if score < bestScore then
+				best, bestScore = e0, score
+			end
+		end
+	end
+	if best == nil then
+		return nil, nil
+	end
+	local loc = best:GetLocation()
+	if not c.IsDisabled(best) then
+		loc = best:GetExtrapolatedLocation(math.max(0.3, plant:GetCastPoint()) + 0.3)
+	end
+	if GetUnitToLocationDistance(b, loc) > range then
+		loc = c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), loc, range - 40)
+	end
+	return plant, loc
 end
 function a.SkillsComplement()
 	pcall(a.WatchBarrel)
@@ -330,6 +387,12 @@ function a.SkillsComplement()
 	local postMine = a.ConsiderPostBlastMines()
 	if postMine ~= nil then
 		a.OrderMine(postMine, "post-blast")
+		return
+	end
+	local madPlant, madLoc = a.ConsiderPostBlastMad()
+	if madPlant ~= nil then
+		b._madBlastAt = b._blastAt
+		a.PlantMad(madPlant, madLoc, "post-blast")
 		return
 	end
 	local stickyLoc = a.ConsiderPostBlastSticky()
@@ -407,14 +470,7 @@ function a.SkillsComplement()
 	end
 	C, D = a.ConsiderPlantMad()
 	if C > 0 then
-		b._madLoc = D
-		b._madUntil = DotaTime() + 45
-		-- Detonate as soon as it is down (1s cast point; the barrel blows 1.5s after the order).
-		local plant = a.MadPlant()
-		b._madDetonateAt = DotaTime() + math.max(0.3, plant:GetCastPoint()) + 0.15
-		a.LogTechies("mad-plant " .. plant:GetName(), 0, D)
-		b._madPlantAt = DotaTime()
-		b:Action_UseAbilityOnLocation(plant, D)
+		a.PlantMad(a.MadPlant(), D)
 		return
 	end
 	C, D = a.ConsiderProximityMines()
@@ -895,11 +951,15 @@ function a.ConsiderDetonateMad()
 	if b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if a.MadDetonate() == nil then
+	local loc = b._madLoc
+	-- Checked before the detonate lookup: a plant that never landed leaves no detonate to find.
+	if loc ~= nil and DotaTime() > (b._madUntil or 0) then
+		a.LogTechies("mad-plant-failed (no detonate in time)", 0, loc)
+		b._madLoc = nil
+		b._madDetonateAt = nil
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local loc = b._madLoc
-	if loc == nil or DotaTime() > (b._madUntil or 0) then
+	if loc == nil or a.MadDetonate() == nil then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	-- Planted for burst: detonate right away.

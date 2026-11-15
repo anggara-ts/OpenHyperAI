@@ -128,11 +128,52 @@ local M
 local N
 local O
 local P
+-- The M.A.D. detonate sub-ability. Its name is not in Valve's data; techies_focused_detonate is
+-- tried first, then any of his abilities with "detonate" in the name (not Sticky Bomb's). The
+-- names found are logged once when he has the Shard, so the next game shows the real one.
+function a.MadDetonate()
+	if madStop ~= nil and not madStop:IsNull() and madStop:IsTrained() and not madStop:IsHidden() then
+		return madStop
+	end
+	local found = nil
+	local names = {}
+	for slot = 0, 23 do
+		local ab = b:GetAbilityInSlot(slot)
+		if ab ~= nil and not ab:IsNull() then
+			local n = ab:GetName()
+			if string.find(n, "techies", 1, true) and (string.find(n, "detonate", 1, true) or string.find(n, "mutually", 1, true)) then
+				names[#names + 1] = n .. (ab:IsHidden() and "/hidden" or "")
+				if found == nil and string.find(n, "detonate", 1, true) and not ab:IsHidden() then
+					found = ab
+				end
+			end
+		end
+	end
+	if c.HasAghanimsShard(b) and not b._madNamesLogged then
+		b._madNamesLogged = true
+		local okP, passive = pcall(function()
+			return mad:IsPassive()
+		end)
+		pcall(print, string.format(
+			"[OHA-TECHIES] t=%.0f mad-abilities %s mad-passive=%s mad-hidden=%s",
+			DotaTime(),
+			table.concat(names, ","),
+			tostring(okP and passive),
+			tostring(mad ~= nil and mad:IsHidden())
+		))
+	end
+	return found
+end
 function a.SkillsComplement()
 	-- Detonate M.A.D. still works while Techies is dead or already acting.
 	if a.ConsiderDetonateMad() > 0 then
-		b:Action_UseAbility(madStop)
+		local det = a.MadDetonate()
+		if det ~= nil then
+			a.LogTechies("mad-detonate", 0, b._madLoc or b:GetLocation())
+			b:Action_UseAbility(det)
+		end
 		b._madLoc = nil
+		b._madDetonateAt = nil
 		return
 	end
 	if c.CanNotUseAbility(b) then
@@ -163,6 +204,14 @@ function a.SkillsComplement()
 		b._veilBlastAt = b._blastAt
 		a.LogTechies("post-blast-veil", 0, b:GetLocation())
 		b:Action_UseAbility(veil)
+		return
+	end
+	-- Scepter: Minefield Sign first (one per Blast Off), on himself (10 range): the triangle goes
+	-- around him, inside its radius, invulnerable and with +15% damage (Valve data).
+	if a.ConsiderPostBlastSign() then
+		b._signBlastAt = b._blastAt
+		a.LogTechies("post-blast-sign", 0, b:GetLocation())
+		b:Action_UseAbilityOnLocation(t, b:GetLocation())
 		return
 	end
 	local postMine = a.ConsiderPostBlastMines()
@@ -247,6 +296,9 @@ function a.SkillsComplement()
 	if C > 0 then
 		b._madLoc = D
 		b._madUntil = DotaTime() + 45
+		-- Detonate as soon as it is down (1s cast point; the barrel blows 1.5s after the order).
+		b._madDetonateAt = DotaTime() + math.max(0.3, mad:GetCastPoint()) + 0.15
+		a.LogTechies("mad-plant", 0, D)
 		b:Action_UseAbilityOnLocation(mad, D)
 		return
 	end
@@ -662,7 +714,9 @@ function a.ConsiderPlantMad()
 	if not c.HasAghanimsShard(b) or b:WasRecentlyDamagedByAnyHero(1.5) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if mad == nil or mad:IsNull() or mad:IsHidden() or mad:IsPassive() or not mad:IsFullyCastable() then
+	-- With Shard M.A.D. is active. Its base behavior keeps the passive flag (Valve data), so the
+	-- old IsPassive() check refused it every time and it was never planted.
+	if mad == nil or mad:IsNull() or mad:IsHidden() or not mad:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
@@ -683,9 +737,22 @@ function a.ConsiderPlantMad()
 		end
 		return nil
 	end
+	-- Burst: a disabled enemy hero in reach (Blast Off stun, a teammate's stun).
+	for Z, foe in pairs(c.GetNearbyHeroes(b, castRange + 250, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsDisabled(foe) then
+			local loc = Toward(foe)
+			if loc ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, loc
+			end
+		end
+	end
 	if M and c.IsValidTarget(H) and not c.IsSuspiciousIllusion(H) and GetUnitToUnitDistance(b, H) > 400 then
+		-- Where the target will be when it blows: 1s plant + 1.5s fuse.
 		local loc = Toward(H)
 		if loc ~= nil then
+			if not c.IsDisabled(H) then
+				loc = H:GetExtrapolatedLocation(1.5)
+			end
 			return BOT_ACTION_DESIRE_HIGH, loc
 		end
 	end
@@ -708,15 +775,19 @@ function a.ConsiderPlantMad()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderDetonateMad()
-	if madStop == nil or madStop:IsNull() or madStop:IsHidden() or not madStop:IsFullyCastable() then
+	if b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
+	if a.MadDetonate() == nil then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local loc = b._madLoc
 	if loc == nil or DotaTime() > (b._madUntil or 0) then
 		return BOT_ACTION_DESIRE_NONE
+	end
+	-- Planted for burst: detonate right away.
+	if b._madDetonateAt ~= nil and DotaTime() >= b._madDetonateAt then
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	-- The barrel needs 1.5s after the order. Pop it when a hero is already on it.
 	local foes = c.GetEnemiesNearLoc(loc, 280)
@@ -1114,6 +1185,19 @@ function a.ConsiderPostBlastSticky()
 		return nil
 	end
 	return best:GetExtrapolatedLocation(0.5)
+end
+function a.ConsiderPostBlastSign()
+	if b._blastAt == nil or b._signBlastAt == b._blastAt then
+		return false
+	end
+	local land = BlastLandAt()
+	if land == nil or DotaTime() < land or DotaTime() > land + 2 then
+		return false
+	end
+	if not b:HasScepter() or t:IsHidden() or not t:IsFullyCastable() or not u:IsTrained() then
+		return false
+	end
+	return true
 end
 function a.ConsiderPostBlastMines()
 	if b._blastAt == nil or b._blastLoc == nil or DotaTime() - b._blastAt > 3.5 then

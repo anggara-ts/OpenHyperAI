@@ -31,7 +31,8 @@ end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local st = RawGetRuneStatus(id)
-	if st == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and GetRuneType ~= nil then
+	-- Not in the first 10s of a spawn: a new rune can read as not there for a moment.
+	if st == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and DotaTime() % RuneCycle(id) >= 10 and GetRuneType ~= nil then
 		local okT, rType = pcall(GetRuneType, id)
 		if okT and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
 			local okV, seen = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
@@ -620,6 +621,18 @@ function Think()
 			-- The status says up but nothing is there (GetRuneType -1, game 016 at the horn on both
 			-- power spots): skip it at once.
 			local rType = GetRuneType and GetRuneType(D.location) or nil
+			-- Just spawned (first 10s of its cycle, the horn included): keep ordering the pick-up as
+			-- before. Game 017 at 0:00: the rune read as not there yet, the empty-spot check
+			-- started the sweep at 0.3s, the rune then counted as missing and the bot left; only
+			-- one horn gold was taken.
+			local freshSpawn = now0 < 10 or now0 % RuneCycle(D.location) < 10
+			if freshSpawn then
+				d._runePickTry = nil
+				d._runePickupAt = now0
+				d:Action_PickUpRune(D.location)
+				doing("pickup-fresh")
+				return
+			end
 			-- Every rune gets the sweep (name kept): bounty gold and river runes both lie off the
 			-- spawn point.
 			local isBounty = true

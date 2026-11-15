@@ -282,6 +282,15 @@ function SafeCall(O, P, Q)
 			U = GetBot():GetUnitName() .. " "
 		end)
 		log("[ERROR] %s%s: %s", U, Q or "unknown", tostring(R))
+		-- log() is silent unless debug is on, so these errors were never seen. Print the first 3
+		-- per wrapped function as [OHA-ERROR].
+		_G.OHA_SAFECALL_ERRS = _G.OHA_SAFECALL_ERRS or {}
+		local key = Q or "unknown"
+		local n = (_G.OHA_SAFECALL_ERRS[key] or 0) + 1
+		_G.OHA_SAFECALL_ERRS[key] = n
+		if n <= 3 then
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s%s: %s", DotaTime(), U, key, tostring(R)))
+		end
 		return P
 	end
 end

@@ -2152,5 +2152,29 @@ function IsThereHealingInStash(G)
 	end
 	return bf > 0
 end
+-- Engine entry points report their own errors. Unwrapped, an error here showed only as
+-- "Script Runtime Error: error in error handling" (every bot at -89s), with no message.
+-- Up to 3 per function per bot, as [OHA-ERROR].
+local OHA_ERR_COUNT = {}
+local function OHA_Guard(name, fn)
+	if type(fn) ~= "function" then
+		return fn
+	end
+	return function(...)
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			local n = (OHA_ERR_COUNT[name] or 0) + 1
+			OHA_ERR_COUNT[name] = n
+			if n <= 3 then
+				local hero = "?"
+				pcall(function()
+					hero = GetBot():GetUnitName()
+				end)
+				pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(err)))
+			end
+		end
+	end
+end
+ItemPurchaseThink = OHA_Guard("ItemPurchaseThink", ItemPurchaseThink)
 g.ItemPurchaseThink = ItemPurchaseThink
 return g

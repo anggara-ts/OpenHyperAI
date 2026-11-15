@@ -436,9 +436,15 @@ function Think()
 	if a.ThinkBountySweep() then
 		return
 	end
-	-- A pickup order that never lands (knockback, stun, river edge) must be reissued.
+	-- A pick-up order in progress is left to finish for up to 3s while the bot is within 600 of
+	-- the spawn spot. The rune is not always on the spawn point (game 016: water rune and gold on
+	-- the bottom power spot); the engine walks to it, the bot passed 130 from the spawn point, the
+	-- move-on below cancelled the pick-up, and Medusa, Doom and Invoker went back and forth. It
+	-- was protected for 0.6s only. A pick-up that never lands is still reissued after that.
 	if d:GetCurrentActionType() == BOT_ACTION_TYPE_PICK_UP_RUNE then
-		if d._runePickupAt ~= nil and DotaTime() - d._runePickupAt < 0.6 then
+		local target = d.rune and d.rune.normal and d.rune.normal.location
+		local near = target ~= nil and GetUnitToLocationDistance(d, GetRuneSpawnLocation(target)) < 600
+		if d._runePickupAt ~= nil and DotaTime() - d._runePickupAt < (near and 3 or 0.6) then
 			doing("pickup-wait")
 			return
 		end
@@ -624,13 +630,14 @@ function Think()
 			end
 			-- On the rune and the pick-up keeps not happening (game 015, 2:28: Medusa went back
 			-- and forth on the bottom water rune, pick-up action, 64 moved in 10s). Four orders
-			-- over 3s+ on the same rune that is still up: skip it for 30s and say so.
+			-- over 3s+ on the same rune that is still up (3 orders, each now waited on for up to 3s): skip
+			-- it for 30s and say so.
 			local now = DotaTime()
 			if d._runePickTry == nil or d._runePickTry.id ~= D.location or now - d._runePickTry.first > 8 then
 				d._runePickTry = { id = D.location, first = now, n = 0 }
 			end
 			d._runePickTry.n = d._runePickTry.n + 1
-			if d._runePickTry.n >= 4 and now - d._runePickTry.first >= 3 then
+			if d._runePickTry.n >= 3 and now - d._runePickTry.first >= 3 then
 				pcall(print, string.format(
 					"[OHA-RUNE] %s t=%.1f pickup-failed rune=%s tries=%d dist=%.0f type=%s",
 					HeroTag(),

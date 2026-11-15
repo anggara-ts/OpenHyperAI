@@ -137,9 +137,13 @@ local P
 -- sub-ability; detonated, it turns visible and immortal and explodes 1.5s later. Only one planted
 -- barrel at a time. The in-game names of the plant and detonate abilities are not in Valve's data,
 -- so they are found at runtime among his abilities: the plant is a non-passive, point or AoE
--- targeted M.A.D. ability; the detonate is a no-target one with "detonate" in its name (not
--- Sticky Bomb's). With Shard, every candidate is logged once (name, behavior, passive, hidden),
+-- targeted M.A.D. ability; the detonate is a no-target one ("detonate" in its name preferred;
+-- not Sticky Bomb's). With Shard, every candidate is logged once (name, behavior, passive, hidden),
 -- so the next game shows the real names.
+-- Behavior bits (Valve: no target 4, point 16, AoE 32); the named constants may be missing.
+local BEH_NO_TARGET = ABILITY_BEHAVIOR_NO_TARGET or DOTA_ABILITY_BEHAVIOR_NO_TARGET or 4
+local BEH_POINT = ABILITY_BEHAVIOR_POINT or DOTA_ABILITY_BEHAVIOR_POINT or 16
+local BEH_AOE = ABILITY_BEHAVIOR_AOE or DOTA_ABILITY_BEHAVIOR_AOE or 32
 local function MadCandidates()
 	local list = {}
 	for slot = 0, 30 do
@@ -201,8 +205,7 @@ function a.MadPlant()
 			return ab:IsPassive()
 		end)
 		local beh = Behavior(ab)
-		local targeted = c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_POINT)
-			or (ABILITY_BEHAVIOR_AOE ~= nil and c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_AOE))
+		local targeted = c.CheckBitfieldFlag(beh, BEH_POINT) or c.CheckBitfieldFlag(beh, BEH_AOE)
 		if
 			not (okP and passive)
 			and not ab:IsHidden()
@@ -216,14 +219,26 @@ function a.MadPlant()
 	end
 	return nil
 end
--- The detonate sub-ability, or nil.
+-- The detonate sub-ability (no target), or nil. A "detonate" name first, then any castable
+-- no-target, non-passive M.A.D. ability (the plant is point targeted, so it never matches).
 function a.MadDetonate()
+	local fallback = nil
 	for _, ab in ipairs(MadCandidates()) do
-		if string.find(ab:GetName(), "detonate", 1, true) and not ab:IsHidden() and ab:IsFullyCastable() then
-			return ab
+		if not ab:IsHidden() and ab:IsFullyCastable() then
+			local okP, passive = pcall(function()
+				return ab:IsPassive()
+			end)
+			local beh = Behavior(ab)
+			local noTarget = c.CheckBitfieldFlag(beh, BEH_NO_TARGET) and not c.CheckBitfieldFlag(beh, BEH_POINT)
+			if not (okP and passive) and noTarget then
+				if string.find(ab:GetName(), "detonate", 1, true) then
+					return ab
+				end
+				fallback = fallback or ab
+			end
 		end
 	end
-	return nil
+	return fallback
 end
 function a.SkillsComplement()
 	-- Detonate M.A.D. still works while Techies is dead or already acting.

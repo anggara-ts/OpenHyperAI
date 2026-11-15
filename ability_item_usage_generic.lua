@@ -888,22 +888,29 @@ function a.IsDoomed(unit)
 	return unit ~= nil
 		and (unit:HasModifier("modifier_doom_bringer_doom") or unit:HasModifier("modifier_doom_bringer_doom_aura_enemy"))
 end
-local DOOM_WASTED = {
-	item_magic_stick = true,
-	item_magic_wand = true,
-	item_holy_locket = true,
+-- Only healing is blocked; mana still pays for item actives (BKB, Force Staff, Shiva's...).
+-- Pure heals are skipped; HP+mana items only when mana is not low; mana items are not touched.
+local DOOM_HEAL_ONLY = {
 	item_flask = true,
 	item_tango = true,
 	item_tango_single = true,
 	item_faerie_fire = true,
 	item_greater_faerie_fire = true,
-	item_enchanted_mango = true,
-	item_clarity = true,
-	item_bottle = true,
-	item_cheese = true,
-	item_soul_ring = true,
 	item_satanic = true,
 }
+local DOOM_HEAL_AND_MANA = {
+	item_magic_stick = true,
+	item_magic_wand = true,
+	item_holy_locket = true,
+	item_bottle = true,
+	item_cheese = true,
+}
+local function DoomWastes(name)
+	if DOOM_HEAL_ONLY[name] then
+		return true
+	end
+	return DOOM_HEAL_AND_MANA[name] == true and b:GetMana() / math.max(1, b:GetMaxMana()) >= 0.3
+end
 local function bg()
 	a.SetStashItemTimeUpdate()
 	-- WD: cash Gris-Gris before other item logic (bypasses CanCastAbility).
@@ -981,7 +988,7 @@ local function bg()
 			local cd = bm:GetCooldownTimeRemaining()
 			ready = not (type(cd) == "number" and cd > 0)
 		end
-		if ready and bn ~= nil and DOOM_WASTED[bn] and a.IsDoomed(b) then
+		if ready and bn ~= nil and a.IsDoomed(b) and DoomWastes(bn) then
 			ready = false
 		end
 		if ready and bn ~= nil then

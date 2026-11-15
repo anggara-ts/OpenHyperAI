@@ -13,6 +13,15 @@ local h = { RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }
 -- 2:00 water rune on the bottom power spot was taken, the status stayed "up", and Invoker looped
 -- pick-up / move-on there from 2:30 to 2:45 (a skip only covered one of the pick-up paths).
 -- Before 1:00 the horn spots are left to the no-rune check in the pick-up branch.
+-- Every rune is registered for the sweep: bounty gold lies off the spawn point, and an unpicked
+-- river rune leaves the next one spawning next to it (user report, game 016).
+local function IsRiverRune(id)
+	return id == RUNE_POWERUP_1 or id == RUNE_POWERUP_2
+end
+-- Sweep length: one 160 lap (2.4s) for bounty gold; river runes alternate 160 and 300 laps (4.8s).
+local function SweepTime(id)
+	return IsRiverRune(id) and 4.8 or 2.4
+end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local st = RawGetRuneStatus(id)
@@ -605,7 +614,9 @@ function Think()
 			-- The status says up but nothing is there (GetRuneType -1, game 016 at the horn on both
 			-- power spots): skip it at once.
 			local rType = GetRuneType and GetRuneType(D.location) or nil
-			local isBounty = D.location == RUNE_BOUNTY_1 or D.location == RUNE_BOUNTY_2
+			-- Every rune gets the sweep (name kept): bounty gold and river runes both lie off the
+			-- spawn point.
+			local isBounty = true
 			-- Bounty gold can lie off the spawn point: circle the spot (the bounty sweep) before
 			-- giving up on it. Skipping straight away cut the sweep out (game 016, 29:20:
 			-- Disruptor left the jungle gold).
@@ -613,7 +624,7 @@ function Think()
 			local canSweep = isBounty and d._bountySweep == nil and now0 - (d._bountySwept[D.location] or -99) > 20
 			local function StartSweep(why)
 				d._bountySwept[D.location] = now0
-				d._bountySweep = { id = D.location, seen = now0, sweepUntil = now0 + 2.4, ringStart = now0 }
+				d._bountySweep = { id = D.location, seen = now0, sweepUntil = now0 + SweepTime(D.location), ringStart = now0 }
 				d._runePickTry = nil
 				pcall(print, string.format("[OHA-RUNE] %s t=%.1f bounty-sweep why=%s rune=%s", HeroTag(), now0, why, tostring(D.location)))
 				doing("sweep-start")
@@ -729,9 +740,6 @@ local BOUNTY_SWEEP = {
 	Vector(113, -113, 0),
 }
 function a.NoteBountyGrab(runeId)
-	if runeId ~= RUNE_BOUNTY_1 and runeId ~= RUNE_BOUNTY_2 then
-		return
-	end
 	local now = DotaTime()
 	local s = d._bountySweep
 	if s == nil or s.id ~= runeId or (s.sweepUntil ~= nil and now > s.sweepUntil) then
@@ -769,7 +777,7 @@ function a.BountySweepState()
 			end
 			return nil
 		end
-		s.sweepUntil = now + 2.4
+		s.sweepUntil = now + SweepTime(s.id)
 		s.ringStart = now
 	end
 	if dist > 900 then
@@ -794,8 +802,11 @@ function a.ThinkBountySweep()
 	if s == nil then
 		return false
 	end
-	local idx = math.floor((DotaTime() - s.ringStart) / 0.3) % #BOUNTY_SWEEP + 1
-	local dest = loc + BOUNTY_SWEEP[idx]
+	local step = math.floor((DotaTime() - s.ringStart) / 0.3)
+	local idx = step % #BOUNTY_SWEEP + 1
+	local lap = math.floor(step / #BOUNTY_SWEEP)
+	local scale = (IsRiverRune(s.id) and lap % 2 == 1) and 1.9 or 1
+	local dest = loc + BOUNTY_SWEEP[idx] * scale
 	if GetUnitToLocationDistance(d, dest) <= 50 then
 		d._runePickupAt = DotaTime()
 		a.NoteLaneRuneTake(s.id)

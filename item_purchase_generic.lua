@@ -1545,28 +1545,8 @@ function ItemPurchaseThink()
 			a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
 		end
 	end
-	if
-		e.IsInLaningPhase()
-		and (e.GetPosition(a) == 4 or e.GetPosition(a) == 5)
-		and GetItemStockCount("item_blood_grenade") > 0
-		and x < 5
-		and y >= GetItemCost("item_blood_grenade")
-		and c.GetEmptyInventoryAmount(a) >= 3
-		-- The 3 above counts the backpack. A grenade that arrives into a full main inventory
-		-- goes to the backpack and cannot be thrown (Lina at 2:58). Need a free main slot, two
-		-- away from the fountain since the courier brings build parts along with it.
-		and c.GetEmptyNonBackpackInventoryAmount(a) >= (a:DistanceFromFountain() <= 1600 and 1 or 2)
-		and c.GetItemCharges(a, "item_blood_grenade") == 0
-		and D > 0
-	then
-		pcall(print, string.format(
-			"[OHA-BUY] t=%.0f %s bought blood_grenade for=rebuy mainFree=%d",
-			DotaTime(),
-			(string.gsub(b, "npc_dota_hero_", "")),
-			c.GetEmptyNonBackpackInventoryAmount(a)
-		))
-		a:ActionImmediate_PurchaseItem("item_blood_grenade")
-	end
+	-- No Blood Grenade rebuys: the one in the starting build (bought before the horn) is all a
+	-- hero needs. Rebuys landed in full bags (Lina, Earthshaker in the backpack).
 	if not a.hasBuyShard and GetItemStockCount("item_aghanims_shard") > 0 and y >= 1400 then
 		a.hasBuyShard = true
 		a:ActionImmediate_PurchaseItem("item_aghanims_shard")

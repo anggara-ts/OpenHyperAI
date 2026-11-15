@@ -148,17 +148,41 @@ function Think()
 	end
 	if a2 then
 		if c:IsChanneling() or c:HasModifier("modifier_watch_tower_capturing") then
+			c._outpostNearSince = nil
 			return
 		end
 		if Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
 			local dist = GetUnitToUnitDistance(c, Z)
 			-- Hold still after the capture order so the 6s channel is not restarted every frame.
-			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 6.5 and dist <= 380 then
+			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 6.5 and dist <= 650 then
 				return
 			end
-			if dist > 250 then
+			-- The capture order walks the bot into range by itself. Moving to the outpost centre until
+			-- within 250 could never finish against the building edge: game 017, 50:23-52:43,
+			-- Invoker stood at the Radiant outpost ordering a move every frame (moved 0). Within
+			-- 600 the capture is cast; within 600 for 10s with no capture started, the outpost is
+			-- dropped for 90s (logged).
+			if dist > 600 then
 				c.outpostOrderAt = nil
+				c._outpostNearSince = nil
 				c:Action_MoveToLocation(Z:GetLocation())
+				return
+			end
+			c._outpostNearSince = c._outpostNearSince or DotaTime()
+			if DotaTime() - c._outpostNearSince >= 10 then
+				c._outpostNearSince = nil
+				c._outpostOffUntil = DotaTime() + 90
+				local zl = Z:GetLocation()
+				pcall(print, string.format(
+					"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d",
+					DotaTime(),
+					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+					Z:GetUnitName(),
+					zl.x,
+					zl.y,
+					math.floor(dist)
+				))
+				c:Action_ClearActions(true)
 				return
 			end
 			local capture = c:GetAbilityByName("ability_capture")
@@ -2129,6 +2153,9 @@ function ConsiderOutpostCapture()
 		return 0
 	end
 	if not CanThisBotCapture() then
+		return 0
+	end
+	if DotaTime() < (c._outpostOffUntil or -999) then
 		return 0
 	end
 	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 2 then

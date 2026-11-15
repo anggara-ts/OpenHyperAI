@@ -2132,12 +2132,20 @@ function ConsiderOutpostCapture()
 			if DotaTime() - c._outpostFallbackAt >= 5 then
 				c._outpostFallbackAt = nil
 				c._outpostFallbackOffUntil = DotaTime() + 90
+				-- Names of the units near the spot: the outpost scan matched none of them.
+				local near = {}
+				for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+					if u ~= nil and not u:IsNull() and not u:IsHero() and GetUnitToLocationDistance(u, loc) <= 700 then
+						near[#near + 1] = u:GetUnitName() .. "/team" .. tostring(u:GetTeam())
+					end
+				end
 				pcall(print, string.format(
-					"[OHA-OUTPOST] t=%.0f %s fallback-giveup spot=%.0f,%.0f (no outpost found there)",
+					"[OHA-OUTPOST] t=%.0f %s fallback-giveup spot=%.0f,%.0f near=%s",
 					DotaTime(),
 					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
 					loc.x,
-					loc.y
+					loc.y,
+					#near > 0 and table.concat(near, ",") or "-"
 				))
 				return 0
 			end

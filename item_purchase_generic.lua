@@ -2246,13 +2246,51 @@ function SellMarkedItems()
 		return
 	end
 	a._sellMarkAt = now
-	local atShop = a:DistanceFromFountain() <= 500 or a:DistanceFromSecretShop() <= 200 or a:DistanceFromSideShop() <= 200
+	local dF, dS, dD = a:DistanceFromFountain(), a:DistanceFromSecretShop(), a:DistanceFromSideShop()
+	local atShop = dF <= 500 or dS <= 200 or dD <= 200
 	if not atShop then
 		return
 	end
+	-- A sell that did not go through: game 017, the same item was ordered sold every second for up
+	-- to 13 minutes (Magnus Helm of Iron Will 173 times, Medusa Power Treads 172) with no error
+	-- line, far from the fountain. The item still in the bag 1s after the order counts as failed:
+	-- logged once with the shop distances and where it is (sell-failed), then left alone for 30s.
+	a._sellBlock = a._sellBlock or {}
+	local last = a._sellTry
+	if last ~= nil and now - last.at >= 1 then
+		a._sellTry = nil
+		local slot0 = a:FindItemSlot(last.name)
+		if slot0 >= 0 then
+			a._sellBlock[last.name] = now + 30
+			local me = a:GetLocation()
+			local function shopAt(kind)
+				local okL, loc = pcall(GetShopLocation, GetTeam(), kind)
+				if okL and loc ~= nil then
+					return string.format("%.0f,%.0f", loc.x, loc.y)
+				end
+				return "?"
+			end
+			pcall(print, string.format(
+				"[OHA-ITEM] t=%.0f %s sell-failed %s slot=%d at=%.0f,%.0f fountain=%d secret=%d side=%d shops secret=%s secret2=%s side=%s side2=%s",
+				now,
+				(string.gsub(b, "npc_dota_hero_", "")),
+				(string.gsub(last.name, "^item_", "")),
+				slot0,
+				me.x,
+				me.y,
+				math.floor(dF),
+				math.floor(dS),
+				math.floor(dD),
+				shopAt(SHOP_SECRET),
+				shopAt(SHOP_SECRET2),
+				shopAt(SHOP_SIDE),
+				shopAt(SHOP_SIDE2)
+			))
+		end
+	end
 	for name, why in pairs(MarkedForSale()) do
 		local slot = a:FindItemSlot(name)
-		if slot >= 0 and slot <= 14 then
+		if slot >= 0 and slot <= 14 and now >= (a._sellBlock[name] or -999) then
 			local it = a:GetItemInSlot(slot)
 			if it ~= nil then
 				pcall(print, string.format(
@@ -2262,6 +2300,7 @@ function SellMarkedItems()
 					(string.gsub(name, "^item_", "")),
 					why
 				))
+				a._sellTry = { name = name, at = now }
 				a:ActionImmediate_SellItem(it)
 				return
 			end

@@ -7385,6 +7385,34 @@ function a.SetAbilityItemList(fA, fB, fC)
 end
 a.AbilityLevelUpThink = AbilityLevelUpThink
 a.BuybackUsageThink = BuybackUsageThink
+-- Engine entry points report their own errors. Unwrapped, an error here showed only as
+-- "Script Runtime Error: error in error handling" (every bot at -89s), with no message.
+-- Up to 3 per function per bot, as [OHA-ERROR].
+local OHA_ERR_COUNT = {}
+local function OHA_Guard(name, fn)
+	if type(fn) ~= "function" then
+		return fn
+	end
+	return function(...)
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			local n = (OHA_ERR_COUNT[name] or 0) + 1
+			OHA_ERR_COUNT[name] = n
+			if n <= 3 then
+				local hero = "?"
+				pcall(function()
+					hero = GetBot():GetUnitName()
+				end)
+				pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(err)))
+			end
+		end
+	end
+end
+ItemUsageThink = OHA_Guard("ItemUsageThink", ItemUsageThink)
+AbilityUsageThink = OHA_Guard("AbilityUsageThink", AbilityUsageThink)
+BuybackUsageThink = OHA_Guard("BuybackUsageThink", BuybackUsageThink)
+CourierUsageThink = OHA_Guard("CourierUsageThink", CourierUsageThink)
+AbilityLevelUpThink = OHA_Guard("AbilityLevelUpThink", AbilityLevelUpThink)
 a.AbilityUsageThink = AbilityUsageThink
 a.ItemUsageThink = ItemUsageThink
 return a

@@ -407,16 +407,6 @@ function GetDesireRaw()
 			return give(BOT_MODE_DESIRE_NONE, "hurt")
 		end
 	end
-	if b.Utils.IsTeamPushingSecondTierOrHighGround(d) then
-		return give(BOT_MODE_DESIRE_NONE, "team-push")
-	end
-	local x = b.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200)
-	if x >= 1 then
-		return give(BOT_MODE_DESIRE_NONE, "ancient")
-	end
-	if b.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
-		return give(BOT_MODE_DESIRE_NONE, "highground")
-	end
 	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
 	local runeId, runeDist = a.ClosestAvailableRune(400)
 	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
@@ -442,7 +432,8 @@ function GetDesireRaw()
 	-- 1000, in any phase and before the pushing / defending gates, when no ally is closer to it
 	-- and no enemy is closer or about to take it. Laning used to need it within 500, and after
 	-- laning it had to be the "best" rune and the bot not pushing or defending.
-	if not dying and i >= 0.35 then
+	-- Not while enemy heroes are at our Ancient (that exit now comes after this grab).
+	if not dying and i >= 0.35 and b.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200) == 0 then
 		-- Power runes too (user call), with the laning rules for who takes the river runes.
 		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
 			if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
@@ -468,6 +459,19 @@ function GetDesireRaw()
 				end
 			end
 		end
+	end
+	-- These three come after the underfoot grab, the sweep and the passing-by grab (game 020, 79:14: Shadow Demon took
+	-- the Radiant jungle bounty while his team pushed, and "team-push" stopped the sweep for the
+	-- older rune beside it). The sweep only runs within 900 of a spot just taken, for ~2.4s.
+	if b.Utils.IsTeamPushingSecondTierOrHighGround(d) then
+		return give(BOT_MODE_DESIRE_NONE, "team-push")
+	end
+	local x = b.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200)
+	if x >= 1 then
+		return give(BOT_MODE_DESIRE_NONE, "ancient")
+	end
+	if b.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
+		return give(BOT_MODE_DESIRE_NONE, "highground")
 	end
 	if not b.IsInLaningPhase() then
 		if b.IsPushing(d) or b.IsDefending(d) then

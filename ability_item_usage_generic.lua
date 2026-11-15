@@ -1716,6 +1716,17 @@ a.ConsiderItemDesire["item_cyclone"] = function(bm)
 	if b:HasModifier("modifier_nyx_assassin_vendetta") then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Doomed: a self-cyclone is 2.5s invulnerable (Valve data), so it skips ~2 Doom ticks and
+	-- any other damage in that window. Used when hurt or under fire.
+	if a.IsDoomed(b) and (f.GetHP(b) < 0.5 or b:WasRecentlyDamagedByAnyHero(1.5)) then
+		pcall(print, string.format(
+			"[OHA-ITEM] t=%.0f %s cyclone-self why=doom hp=%.2f",
+			DotaTime(),
+			(string.gsub(c, "npc_dota_hero_", "")),
+			f.GetHP(b)
+		))
+		return BOT_ACTION_DESIRE_HIGH, b, bq, "doom"
+	end
 	if
 		f.IsValid(be)
 		and f.CanCastOnNonMagicImmune(be)

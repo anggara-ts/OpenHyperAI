@@ -41,7 +41,7 @@ m["pos_5"] = {
 	"item_pavise",
 	"item_force_staff",
 	"item_pipe",
-	"item_solar_crest",
+	"item_aether_lens",
 	"item_boots_of_bearing",
 	"item_hurricane_pike",
 	"item_sheepstick",

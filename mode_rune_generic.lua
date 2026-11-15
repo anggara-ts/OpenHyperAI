@@ -413,6 +413,23 @@ function Think()
 		doing("pre-shop")
 		return
 	end
+	-- Supports wait in the shop for the 30s the human gets on fresh Observer stock (-90 to
+	-- -60), then buy. Walking out first meant the ward buy needed the shop or 0:20, so wards
+	-- were bought at 0:20.
+	if
+		DotaTime() < -57
+		and b.GetPosition(d) >= 4
+		and GetItemStockCount("item_ward_observer") > 0
+		and d:FindItemSlot("item_ward_observer") < 0
+		and d:FindItemSlot("item_ward_dispenser") < 0
+		and d:DistanceFromFountain() < 2200
+	then
+		if d:DistanceFromFountain() > 350 then
+			d:Action_MoveToLocation(b.GetTeamFountain())
+		end
+		doing("ward-wait")
+		return
+	end
 	if a.ThinkBountySweep() then
 		return
 	end

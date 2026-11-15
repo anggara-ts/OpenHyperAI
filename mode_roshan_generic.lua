@@ -160,7 +160,11 @@ end
 -- declined: names of allies who did not switch after that, so the call does not wait for them
 -- (a core busy defending or farming used to hold the whole group).
 local ACK_GRACE = 4
-local function RoshanGather(pit, callAge)
+-- ackSet: allies who acked inside the grace. A late joiner (decliner whose own mode ended) is
+-- welcome but not waited for: it is neither required nor counted as still walking, so the group
+-- that already gathered does not hold for it (it used to, up to the 40s cap).
+local function RoshanGather(pit, callAge, ackSet)
+	ackSet = ackSet or {}
 	local grouped, pending, required = 0, 0, 0
 	local declined = {}
 	local coming = {}
@@ -170,17 +174,25 @@ local function RoshanGather(pit, callAge)
 		if AllyShouldJoin(ally) then
 			local dist = GetUnitToLocationDistance(ally, pit)
 			local acked = ally == a or (ally:IsBot() and AllyActiveMode(ally) == BOT_MODE_ROSHAN)
+			local inGrace = (callAge or 0) < ACK_GRACE
+			local pid = ally:GetPlayerID()
+			if inGrace and (acked or dist <= 1800) then
+				ackSet[pid] = true
+			end
 			if dist <= 1800 then
 				grouped = grouped + 1
 				required = required + 1
 				coming[#coming + 1] = ally
-			elseif acked then
+			elseif acked and (inGrace or ackSet[pid]) then
 				required = required + 1
 				coming[#coming + 1] = ally
 				if ally ~= a and dist > pending then
 					pending = dist
 				end
-			elseif (callAge or 0) < ACK_GRACE then
+			elseif acked then
+				-- Late joiner: on its way, not waited for.
+				coming[#coming + 1] = ally
+			elseif inGrace then
 				required = required + 1
 				coming[#coming + 1] = ally
 			else
@@ -696,9 +708,11 @@ function Think()
 	if a._roshGatherAt == nil or now - (a._roshThinkAt or 0) > 3 then
 		a._roshGatherAt = now
 		a._roshCommitUntil = nil
+		a._roshAckSet = {}
 	end
 	a._roshThinkAt = now
-	local grouped, pending, required, declined, coming = RoshanGather(M, now - a._roshGatherAt)
+	a._roshAckSet = a._roshAckSet or {}
+	local grouped, pending, required, declined, coming = RoshanGather(M, now - a._roshGatherAt, a._roshAckSet)
 	local elapsed = now - a._roshGatherAt
 	-- Nobody else acked: drop the call (no solo Roshan) and do not re-call for 30s.
 	if elapsed >= ACK_GRACE and required < 2 then

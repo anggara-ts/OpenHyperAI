@@ -1273,6 +1273,11 @@ a.ConsiderItemDesire["item_armlet"] = function(bm)
 			return BOT_ACTION_DESIRE_NONE
 		end
 	end
+	-- The "switch on to survive" uses below rely on the HP gained when Armlet turns on, which
+	-- Doom blocks; under Doom they only add the drain. Switching on to fight still works.
+	if a.IsDoomed(b) and not bB then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	if f.IsRetreating(b) and not f.IsRealInvisible(b) then
 		if f.GetHP(b) < 0.2 then
 			if

@@ -888,6 +888,28 @@ function a.IsDoomed(unit)
 	return unit ~= nil
 		and (unit:HasModifier("modifier_doom_bringer_doom") or unit:HasModifier("modifier_doom_bringer_doom_aura_enemy"))
 end
+-- Doom's talent special_bonus_unique_doom_10 "Doom applies Mute" (Valve data): with it, a
+-- doomed hero cannot use items either. Checked on the enemy Doom, in addition to IsMuted().
+function a.IsDoomMuted(unit)
+	if not a.IsDoomed(unit) then
+		return false
+	end
+	if unit:IsMuted() then
+		return true
+	end
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if enemy ~= nil and not enemy:IsNull() and enemy:GetUnitName() == "npc_dota_hero_doom_bringer" then
+			local ok, trained = pcall(function()
+				local talent = enemy:GetAbilityByName("special_bonus_unique_doom_10")
+				return talent ~= nil and talent:IsTrained()
+			end)
+			if ok and trained then
+				return true
+			end
+		end
+	end
+	return false
+end
 -- Only healing is blocked; mana still pays for item actives (BKB, Force Staff, Shiva's...).
 -- Pure heals are skipped; HP+mana items only when mana is not low; mana items are not touched.
 local DOOM_HEAL_ONLY = {
@@ -928,8 +950,9 @@ local function bg()
 		or b:IsCastingAbility()
 		or b:NumQueuedActions() > 0
 		or b:HasModifier("modifier_teleporting")
-		-- No Doom check: Doom silences and blocks healing but does not mute items (Valve data:
-		-- does_mute empty), and its Scepter aura gives the same effects. Items stay usable.
+		-- Plain Doom silences and blocks healing but leaves items usable (does_mute empty); its
+		-- Mute talent blocks items too.
+		or a.IsDoomMuted(b)
 		or b:HasModifier("modifier_phantom_lancer_phantom_edge_boost")
 		or b:HasModifier("modifier_life_stealer_infest")
 		or b:HasModifier("modifier_nyx_assassin_vendetta") and f.IsRealInvisible(b)

@@ -282,7 +282,11 @@ local function WardCharges()
 	end
 	return obs, sen
 end
+-- Plant tries are no longer printed (ward planting works); kept as a no-op for the call sites.
 local function LogPlantTry(kind, item, loc)
+	if true then
+		return
+	end
 	local now = DotaTime()
 	local obs, sen = WardCharges()
 	b._wardTry = { at = now, kind = kind, loc = loc, obs = obs, sen = sen }
@@ -407,7 +411,6 @@ local function ValidateSpot(spot)
 	pcall(print, string.format("[OHA-WARD] t=%.0f spot-invalid at=%.0f,%.0f", DotaTime(), loc.x, loc.y))
 end
 function a.WardThink()
-	pcall(WatchPlant)
 	pcall(ValidateSpot, j)
 	if j then
 		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then

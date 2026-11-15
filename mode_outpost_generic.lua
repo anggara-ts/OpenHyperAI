@@ -93,17 +93,6 @@ local function ConsiderChainFrostSpread()
 	if near == 0 then
 		return false
 	end
-	if DotaTime() >= (c._chainFrostLogAt or -999) + 3 then
-		c._chainFrostLogAt = DotaTime()
-		pcall(print, string.format(
-			"[OHA-CHAINFROST] t=%.0f %s spread on=%s alliesNear=%d hp=%.2f",
-			DotaTime(),
-			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
-			(string.gsub(on:GetUnitName(), "npc_dota_hero_", "")),
-			near,
-			a.GetHP(c)
-		))
-	end
 	return true
 end
 -- Never inside the enemy fountain: within 1300 of it, leave (above attack and retreat). Game 019,
@@ -2118,7 +2107,6 @@ local function LogOutpostScan()
 	))
 end
 local function RefreshOutpostCache()
-	pcall(LogOutpostScan)
 	X = {}
 	local lists = {
 		UNIT_LIST_ALL,

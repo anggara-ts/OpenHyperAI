@@ -1788,6 +1788,7 @@ function ItemPurchaseThink()
 			end
 		end
 	end
+	pcall(SellMarkedItems)
 	if c.HasItem(a, "item_mask_of_madness") and c.HasItem(a, "item_satanic") then
 		a:ActionImmediate_SellItem(a:GetItemInSlot(a:FindItemSlot("item_mask_of_madness")))
 	end
@@ -2175,6 +2176,94 @@ function ItemPurchaseThink()
 			end
 			if not waiting or a:GetGold() < cost or c.GetEmptyInventoryAmount(a) < 1 then
 				a._openingShopDone = true
+			end
+		end
+	end
+end
+-- Sell marks: the game's "mark for sale" has no bot API (only ActionImmediate_SellItem, at a
+-- shop), so the bot keeps its own list. An item is marked once it is no use any more, and sold at
+-- the first shop visit (fountain, secret shop or side shop), with free slots or not. The old rule
+-- only sold with the backpack nearly full and within 100 of the fountain or at the secret shop,
+-- so Invoker carried Power Treads and Magic Wand next to Boots of Travel for a long time.
+-- Marked:
+-- - the second item of each sell pair (hero and shared sell lists) once the first is owned,
+-- - early boots once Boots of Travel is owned,
+-- - a standalone early item that nothing left in the build is made from (Helm of Iron Will:
+--   game 016, Doom still carried it at 53:00 because his team item was not Crimson Guard).
+local UNUSED_SELL = { item_helm_of_iron_will = true }
+local function NeededLater(name)
+	local list = {}
+	for _, it in ipairs(a.purchaseListInReverseOrder or {}) do
+		list[#list + 1] = it
+	end
+	if a.currBuyingItemInPurchaseList ~= nil then
+		list[#list + 1] = a.currBuyingItemInPurchaseList
+	end
+	for _, it in ipairs(list) do
+		if it == name then
+			return true
+		end
+		local ok, parts = pcall(c.GetBasicItems, { it })
+		if ok and type(parts) == "table" then
+			for _, p in ipairs(parts) do
+				if p == name then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+local function MarkedForSale()
+	local marks = {}
+	local function pairs2(list)
+		if type(list) ~= "table" then
+			return
+		end
+		for k = 2, #list, 2 do
+			if a:FindItemSlot(list[k - 1]) >= 0 then
+				marks[list[k]] = "pair:" .. list[k - 1]
+			end
+		end
+	end
+	pairs2(c.sSellList)
+	pairs2(j)
+	if c.HasItem(a, "item_travel_boots") or c.HasItem(a, "item_travel_boots_2") then
+		for _, boots in ipairs(c["tEarlyBoots"] or {}) do
+			marks[boots] = "travel-boots"
+		end
+	end
+	for name in pairs(UNUSED_SELL) do
+		if a:FindItemSlot(name) >= 0 and not NeededLater(name) then
+			marks[name] = "unused"
+		end
+	end
+	return marks
+end
+function SellMarkedItems()
+	local now = DotaTime()
+	if now < (a._sellMarkAt or -999) + 1 then
+		return
+	end
+	a._sellMarkAt = now
+	local atShop = a:DistanceFromFountain() <= 500 or a:DistanceFromSecretShop() <= 200 or a:DistanceFromSideShop() <= 200
+	if not atShop then
+		return
+	end
+	for name, why in pairs(MarkedForSale()) do
+		local slot = a:FindItemSlot(name)
+		if slot >= 0 and slot <= 14 then
+			local it = a:GetItemInSlot(slot)
+			if it ~= nil then
+				pcall(print, string.format(
+					"[OHA-ITEM] t=%.0f %s sold-marked %s why=%s",
+					now,
+					(string.gsub(b, "npc_dota_hero_", "")),
+					(string.gsub(name, "^item_", "")),
+					why
+				))
+				a:ActionImmediate_SellItem(it)
+				return
 			end
 		end
 	end

@@ -212,6 +212,14 @@ function a.SkillsComplement()
 		return
 	end
 end
+-- Frost Blast on creeps only while he keeps the mana for one more Frost Blast and a Frost Shield
+-- after the cast, so he can still answer a gank or an engage (user: he blasted waves until
+-- he was out of mana).
+local function CreepManaOk()
+	local blast = o:GetManaCost() or 0
+	local shield = (p:IsTrained() and p:GetManaCost()) or 0
+	return b:GetMana() - blast >= blast + shield
+end
 function a.ConsiderQ()
 	if not o:IsFullyCastable() then
 		return 0
@@ -312,6 +320,7 @@ function a.ConsiderQ()
 					if
 						c.IsKeyWordUnit("ranged", ag)
 						and b:GetMana() > 330
+						and CreepManaOk()
 						and c.WillKillTarget(ag, Z, _, V)
 						and not c.IsAllysTarget(ag)
 					then
@@ -319,6 +328,7 @@ function a.ConsiderQ()
 					end
 					if
 						b:GetMana() > 400
+						and CreepManaOk()
 						and c.IsKeyWordUnit("melee", ag)
 						and c.WillKillTarget(ag, Z, _, V)
 						and not c.WillKillTarget(ag, Z * 0.5, _, V)
@@ -368,7 +378,7 @@ function a.ConsiderQ()
 		and not (c.IsPushing(b) or c.IsDefending(b))
 	then
 		local keep = (a.SacrificeCharges and a.SacrificeCharges() or 0) >= 1 and 0.2 or 0.3
-		if c.GetManaAfter(W) >= keep then
+		if c.GetManaAfter(W) >= keep and CreepManaOk() then
 			local aoe = o:GetSpecialValueInt("aoe_damage")
 			local best, bestHit, bestHp = nil, 1, 0
 			for a4, ag in pairs(b:GetNearbyNeutralCreeps(T + 100) or {}) do
@@ -390,13 +400,16 @@ function a.ConsiderQ()
 			end
 		end
 	end
+	-- Was "(pushing ... and #Q <= 1) or IsCore": a core Lich (pos 1) passed in any mode with no
+	-- mana check and blasted every wave. Now pushing, defending or farming for everyone, a core
+	-- may do it with more allies around, and the mana reserve applies.
 	if
 		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
-			and c.IsAllowedToSpam(b, 30)
-			and S >= 3
-			and #P == 0
-			and #Q <= 1
-		or c.IsCore(b)
+		and c.IsAllowedToSpam(b, 30)
+		and S >= 3
+		and #P == 0
+		and (#Q <= 1 or c.IsCore(b))
+		and CreepManaOk()
 	then
 		local af = b:GetNearbyLaneCreeps(999, true)
 		local ai = b:GetNearbyLaneCreeps(888, false)
@@ -582,13 +595,13 @@ function a.ConsiderW()
 		-- level 4, at most two allies, and 4+ creeps, and defending was not covered at all
 		-- (game 016: never cast while defending top). Now level 2+, pushing or defending, 3+
 		-- creeps around the ally, any number of allies, mana kept as before.
-		if (c.IsPushing(am) or c.IsDefending(am)) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 then
+		if (c.IsPushing(am) or c.IsDefending(am)) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 and CreepManaOk() then
 			local ay = am:GetNearbyLaneCreeps(a0, true)
 			if #ay >= 3 and not ay[1]:HasModifier("modifier_fountain_glyph") then
 				return BOT_ACTION_DESIRE_HIGH, am, "W-wave" .. #ay
 			end
 		end
-		if c.IsFarming(am) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 then
+		if c.IsFarming(am) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 and CreepManaOk() then
 			local ay = am:GetNearbyNeutralCreeps(a0)
 			if #ay >= 3 and ay[1]:GetMagicResist() < 0.3 then
 				return BOT_ACTION_DESIRE_HIGH, am, "W-camp" .. #ay

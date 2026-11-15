@@ -77,7 +77,40 @@ local function ReadBaseThreat(ancient, heroesAtAncient, heroesOnHG)
 	end
 	s.exposed = #why > 0
 	s.why = table.concat(why, ",")
+	s.heroes = (heroesAtAncient or 0) + (heroesOnHG or 0)
 	return s
+end
+-- Creeps only (no enemy hero at the Ancient or on high ground): only the allies closest to the
+-- Ancient stay for it, 1 (2 with 8+ creeps or the Ancient below 95%); the rest may take the kill
+-- push. Game 018: after Radiant lost barracks, super creeps kept 2+ creeps near the Ancient most
+-- of the time, so all five held 75 kill windows (54:55: Gyrocopter, Techies and Warlock dead,
+-- held for 4 creeps) and Dire lost no building after 47:28 while Radiant had 22 kills to 8.
+local function MustStayForBase(bot)
+	if not baseThreat.exposed then
+		return false
+	end
+	if (baseThreat.heroes or 0) >= 1 then
+		return true
+	end
+	local ancient = GetAncient(GetTeam())
+	if ancient == nil then
+		return true
+	end
+	local keep = ((baseThreat.creeps or 0) >= 8 or (baseThreat.ancHP or 1) < 0.95) and 2 or 1
+	local myDist = GetUnitToUnitDistance(bot, ancient)
+	local closer = 0
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			ally ~= nil
+			and ally ~= bot
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and GetUnitToUnitDistance(ally, ancient) < myDist
+		then
+			closer = closer + 1
+		end
+	end
+	return closer < keep
 end
 local a3 = a2.getGlobalGameState
 local a4 = a2.getGlobalLocationState
@@ -196,7 +229,7 @@ function l.GetPushDesireHelper(ao, ap)
 		and not kw.buyback
 		and ad.aliveAllyCount > ad.aliveEnemyCount
 		and O.GetHP(ao) >= 0.3
-	local killPush = killOpen and w < 1 and not baseThreat.exposed
+	local killPush = killOpen and w < 1 and not MustStayForBase(ao)
 	if killOpen and not killPush then
 		KillWindow.LogPushHeld(ao, ap, kw, baseThreat.why)
 	end

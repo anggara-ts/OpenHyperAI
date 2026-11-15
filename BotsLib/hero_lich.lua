@@ -349,26 +349,38 @@ function a.ConsiderQ()
 			end
 		end
 	end
+	-- Jungle: Frost Blast hits the target plus everything within 200 (Valve data: 40-160 on the
+	-- target, 80-200 area). It needed level 3, 3+ neutrals, a 600+ HP target with 3 units around
+	-- it, and Lich already facing it, so it almost never went. Now: level 2+, the neutral with
+	-- the most others around it (2+ units hit), the hit worth it (their HP at least twice the
+	-- area damage), and mana kept (30%, or 20% with a Sacrifice charge to refill).
 	if
 		c.IsFarming(b)
-		and S >= 3
-		and c.IsAllowedToSpam(b, W)
+		and S >= 2
 		and #P == 0
 		and (#Q <= 1 or c.IsCore(b))
 		and not (c.IsPushing(b) or c.IsDefending(b))
 	then
-		local ah = b:GetNearbyNeutralCreeps(T + 100)
-		if #ah >= 3 then
-			for a4, ag in pairs(ah) do
-				if
-					c.IsValid(ag)
-					and b:IsFacingLocation(ag:GetLocation(), 30)
-					and ag:GetHealth() >= 600
-					and ag:GetMagicResist() < 0.3
-					and c.GetAroundTargetEnemyUnitCount(ag, a0) >= 3
-				then
-					return BOT_ACTION_DESIRE_HIGH, ag, "Q-打野:" .. #ah
+		local keep = (a.SacrificeCharges and a.SacrificeCharges() or 0) >= 1 and 0.2 or 0.3
+		if c.GetManaAfter(W) >= keep then
+			local aoe = o:GetSpecialValueInt("aoe_damage")
+			local best, bestHit, bestHp = nil, 1, 0
+			for a4, ag in pairs(b:GetNearbyNeutralCreeps(T + 100) or {}) do
+				if c.IsValid(ag) and ag:GetMagicResist() < 0.5 and c.CanBeAttacked(ag) then
+					local hit, hp = 0, 0
+					for a5, other in pairs(b:GetNearbyNeutralCreeps(T + 400) or {}) do
+						if c.IsValid(other) and GetUnitToUnitDistance(ag, other) <= a0 then
+							hit = hit + 1
+							hp = hp + math.min(other:GetHealth(), aoe)
+						end
+					end
+					if hit >= 2 and hp >= aoe * 2 and (hit > bestHit or hit == bestHit and hp > bestHp) then
+						best, bestHit, bestHp = ag, hit, hp
+					end
 				end
+			end
+			if best ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, best, "Q-jungle:" .. bestHit
 			end
 		end
 	end

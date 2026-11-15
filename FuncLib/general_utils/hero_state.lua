@@ -101,18 +101,16 @@ local function a(b)
 		end
 		for e, o in pairs(n) do
 			if b.IsValidBuilding(o) and o:GetAttackTarget() == c then
-				local p = c:GetNearbyLaneCreeps(1600, false)
+				-- Only a creep already in attack range: walking up to one kept the hero under the
+				-- tower longer. (It also right-clicked allied heroes; gone.)
+				local p = c:GetNearbyLaneCreeps(c:GetAttackRange() + 250, false)
 				for e, q in pairs(p) do
-					if b.IsValid(q) and GetUnitToUnitDistance(q, o) <= 700 then
-						c:Action_AttackUnit(q, false)
-						m(g, c, 1.5)
-						return true
-					end
-				end
-				local r = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
-				for e, s in pairs(r) do
-					if b.IsValidHero(s) and s ~= c and GetUnitToUnitDistance(s, o) <= 700 then
-						c:Action_AttackUnit(s, false)
+					if
+						b.IsValid(q)
+						and GetUnitToUnitDistance(q, o) <= (o:GetAttackRange() or 700)
+						and GetUnitToUnitDistance(c, q) <= c:GetAttackRange() + 50
+					then
+						c:Action_AttackUnit(q, true)
 						m(g, c, 1.5)
 						return true
 					end

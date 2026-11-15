@@ -209,16 +209,19 @@ function a.SkillsComplement()
 	end
 	r, s = a.ConsiderMeatHook(B, C, E, x, F, H)
 	if r > 0 then
+		a.LogPudge("hook", F)
 		b:Action_UseAbilityOnLocation(B, s)
 		return
 	end
 	t = a.ConsiderRot(C, x, F, G, H)
 	if t > 0 then
+		a.LogPudge(C:GetToggleState() and "rot-off" or "rot-on", F)
 		b:Action_UseAbility(C)
 		return
 	end
 	v, w = a.ConsiderDismember(E, x, F, H)
 	if v > 0 then
+		a.LogPudge("dismember " .. (c.IsValid(w) and (string.gsub(w:GetUnitName(), "npc_dota_hero_", "")) or "?"), F)
 		b:Action_ClearActions(false)
 		if c.CanCastAbility(D) and not b:HasModifier("modifier_pudge_flesh_heap_block") then
 			b:ActionQueue_UseAbility(D)
@@ -275,6 +278,24 @@ function a.TryBlink()
 	end
 	return false
 end
+-- [OHA-PUDGE] one line per cast decision, with HP, mode and the heroes around him.
+function a.LogPudge(what, hp)
+	pcall(function()
+		local foes = #(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {})
+		local friends = #(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {})
+		print(string.format(
+			"[OHA-PUDGE] t=%.0f %s hp=%.2f mode=%d engaging=%s retreating=%s foes=%d allies=%d",
+			DotaTime(),
+			what,
+			hp or c.GetHP(b),
+			b:GetActiveMode(),
+			tostring(y and true or false),
+			tostring(z and true or false),
+			foes,
+			friends - 1
+		))
+	end)
+end
 function a.ConsiderMeatHook(B, C, E, x, F, H)
 	if not B:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -324,7 +345,8 @@ function a.ConsiderMeatHook(B, C, E, x, F, H)
 			end
 		end
 	end
-	if y then
+	-- Engage hooks need 40%+ HP: the hook drags an enemy onto him, which is a fight he has to win.
+	if y and F >= 0.4 then
 		local X = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
 		local Y = c.GetStrongestUnit(K, b, true, true, 5)
 		local Z = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
@@ -485,6 +507,15 @@ function a.ConsiderRot(C, x, F, G, H)
 	end
 	if C:GetToggleState() and #H <= 0 then
 		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Rot hurts Pudge too (Valve data: non-lethal self damage). In fights it stayed on at any HP;
+	-- now off below 30% while engaging and below 40% while running away.
+	local rotFloor = z and 0.4 or 0.3
+	if (y or z) and F < rotFloor then
+		if C:GetToggleState() then
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		return BOT_ACTION_DESIRE_NONE
 	end
 	if y then
 		for R, S in pairs(H) do
@@ -654,11 +685,10 @@ function a.ConsiderDismember(E, x, F, H)
 			and not ac:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not ac:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local _ = c.GetNearbyHeroes(ac, 1200, false, BOT_MODE_NONE)
-			if X ~= nil and _ ~= nil and #_ > #X and b:WasRecentlyDamagedByAnyHero(2) then
-				return BOT_ACTION_DESIRE_HIGH, ac
-			end
-			if F < 0.2 and c.IsInRange(b, ac, K) and b:WasRecentlyDamagedByAnyHero(3) then
+			-- Running away: only a Dismember that kills. It went on the weakest enemy whenever the
+			-- enemies outnumbered us, or below 20% HP, which kept him channelling 2.75s in place
+			-- while outnumbered.
+			if c.IsInRange(b, ac, K) and c.WillKillTarget(ac, O, DAMAGE_TYPE_MAGICAL, ab) then
 				return BOT_ACTION_DESIRE_HIGH, ac
 			end
 		end

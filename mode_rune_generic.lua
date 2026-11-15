@@ -28,6 +28,42 @@ end
 local function RuneCycle(id)
 	return IsRiverRune(id) and 120 or 180
 end
+-- What is at a river rune spot the API cannot pick up (game 017: river gold seen in game, type -1
+-- or type 5 with pick-ups failing at distance 0). Prints units and dropped items within 350 of
+-- the spawn point, once per spot per 60s.
+local function LogRuneSpot(id, why)
+	d._runeSpotLogAt = d._runeSpotLogAt or {}
+	if DotaTime() < (d._runeSpotLogAt[id] or -999) then
+		return
+	end
+	d._runeSpotLogAt[id] = DotaTime() + 60
+	local loc = GetRuneSpawnLocation(id)
+	local units, items = {}, {}
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+		if u ~= nil and not u:IsNull() and GetUnitToLocationDistance(u, loc) <= 350 and not u:IsHero() then
+			units[#units + 1] = u:GetUnitName()
+		end
+	end
+	for _, dr in pairs(GetDroppedItemList() or {}) do
+		if dr ~= nil and dr.item ~= nil and dr.location ~= nil then
+			local dx, dy = dr.location.x - loc.x, dr.location.y - loc.y
+			if dx * dx + dy * dy <= 350 * 350 then
+				items[#items + 1] = dr.item:GetName()
+			end
+		end
+	end
+	local okT, rType = pcall(GetRuneType, id)
+	pcall(print, string.format(
+		"[OHA-RUNE] t=%.1f spot rune=%s why=%s type=%s status=%s units=%s items=%s",
+		DotaTime(),
+		tostring(id),
+		why,
+		tostring(okT and rType),
+		tostring(GetRuneStatus(id)),
+		#units > 0 and table.concat(units, ",") or "-",
+		#items > 0 and table.concat(items, ",") or "-"
+	))
+end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local st = RawGetRuneStatus(id)
@@ -627,6 +663,9 @@ function Think()
 			-- one horn gold was taken.
 			local freshSpawn = now0 < 10 or now0 % RuneCycle(D.location) < 10
 			if freshSpawn then
+				if IsRiverRune(D.location) and liveDist < 100 and now0 % RuneCycle(D.location) >= 3 then
+					pcall(LogRuneSpot, D.location, "fresh-still-there")
+				end
 				d._runePickTry = nil
 				d._runePickupAt = now0
 				d:Action_PickUpRune(D.location)
@@ -653,6 +692,9 @@ function Think()
 				d._runePickTry = nil
 				pcall(print, string.format("[OHA-RUNE] %s t=%.1f bounty-sweep why=%s rune=%s", HeroTag(), now0, why, tostring(D.location)))
 				doing("sweep-start")
+			end
+			if IsRiverRune(D.location) then
+				pcall(LogRuneSpot, D.location, "pickup-branch")
 			end
 			if canSweep and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
 				StartSweep("no-rune")

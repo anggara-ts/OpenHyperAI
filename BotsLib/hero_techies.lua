@@ -2,6 +2,7 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = require(GetScriptDirectory() .. "/FuncLib/hero/techies")
@@ -187,6 +188,9 @@ function a.SkillsComplement()
 				end
 				b:ActionQueue_UseAbilityOnLocation(u, spot)
 				planted = planted + 1
+			end
+			if planted > 0 then
+				pcall(ChargeTracker.Issued, b, u, nil, planted)
 			end
 		end
 		a.LogTechies(string.format("blast why=%s tazer=%s", yWhy or "?", tostring(tazer)), planted, z)
@@ -859,16 +863,10 @@ function a.ConsiderMineFieldSign()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
--- Proximity Mines is charge based (3 charges, one every 15s). Charges left, or 3 if the
--- API does not report them.
+-- Proximity Mines is charge based (3 charges, one every 15s). Charges left from the shared
+-- tracker (the API has no ability-charge read), or 3 before it has a count.
 function a.MineCharges()
-	local ok, n = pcall(function()
-		return u:GetCurrentAbilityCharges()
-	end)
-	if ok and type(n) == "number" then
-		return n
-	end
-	return 3
+	return ChargeTracker.Count(b, u) or 3
 end
 -- Three spots 120 degrees apart around center. At radius 210 they sit ~364 apart, past the
 -- 350 minimum mine spacing, and the target in the middle is near full damage from each.
@@ -964,6 +962,7 @@ function a.OrderMine(loc, kind)
 		u:GetCastRange(),
 		a.MineCharges()
 	))
+	pcall(ChargeTracker.Issued, b, u)
 	b:Action_UseAbilityOnLocation(u, loc)
 end
 function a.ConsiderPostBlastMines()

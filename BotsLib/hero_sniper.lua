@@ -2,6 +2,7 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
@@ -107,6 +108,7 @@ function a.SkillsComplement()
 	end
 	s, t = a.ConsiderQ()
 	if s > 0 then
+		pcall(ChargeTracker.Issued, b, o)
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(o, t)
 		E = DotaTime()
@@ -263,7 +265,7 @@ function a.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
 		end
 	end
-	if c.IsFarming(b) and #D == 0 and c.GetManaAfter(o:GetManaCost()) > 0.4 and o:GetCurrentCharges() >= 2 then
+	if c.IsFarming(b) and #D == 0 and c.GetManaAfter(o:GetManaCost()) > 0.4 and (ChargeTracker.Count(b, o) or 0) >= 2 then
 		local a4 = b:GetNearbyNeutralCreeps(M)
 		if #a4 >= 3 then
 			local a7 = b:FindAoELocation(true, false, R, M, P, 0.8, 0)

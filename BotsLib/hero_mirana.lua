@@ -2,6 +2,7 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
@@ -118,6 +119,12 @@ function a.SkillsComplement()
 	end
 	x, y = a.ConsiderE()
 	if x > 0 then
+		pcall(ChargeTracker.Issued, b, q)
+		pcall(print, string.format(
+			"[OHA-MIRANA] t=%.0f leap-cast charges=%s",
+			DotaTime(),
+			tostring(ChargeTracker.Count(b, q))
+		))
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbility(q)
 		return
@@ -565,17 +572,9 @@ function a.LeapReady()
 	if b:GetMana() < q:GetManaCost() then
 		return false
 	end
-	if q:IsFullyCastable() then
-		return true
-	end
-	-- Shard stores leap charges. The ability still looks on cooldown while a charge is refilling.
-	if c.HasAghanimsShard(b) then
-		local charges = q:GetCurrentCharges()
-		if type(charges) == "number" and charges >= 1 then
-			return true
-		end
-	end
-	return false
+	-- Leap has 2 charges (Valve data, no Shard needed). Castable means a charge is left; the
+	-- old Shard-only branch read GetCurrentCharges, which is documented for items only.
+	return q:IsFullyCastable()
 end
 function a.ConsiderE()
 	if not a.LeapReady() or b:IsRooted() then

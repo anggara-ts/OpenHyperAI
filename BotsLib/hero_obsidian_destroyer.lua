@@ -121,7 +121,7 @@ local C, D
 -- Astral Imprisonment then Meteor Hammer. Valve data: the prison lasts 1.75/2.5/3.25/4s (the
 -- prisoner is invulnerable), Meteor Hammer channels 2s and lands 0.5s later (600 range, 400
 -- radius, 0.75s stun). So the channel starts when the prison has 2.5s left, on the prison spot,
--- and the meteor lands as the target comes out. Walks into range while waiting.
+-- and the meteor lands as the target comes out.
 local PRISON_DURATION = { 1.75, 2.5, 3.25, 4 }
 local HAMMER_LEAD = 2.5
 function a.NotePrison(target)
@@ -164,8 +164,11 @@ function a.ConsiderPrisonHammer()
 	end
 	local left = st.endAt - now
 	local dist = GetUnitToLocationDistance(b, st.loc)
-	if left <= HAMMER_LEAD + 0.05 then
-		if dist <= 650 then
+	-- Astral Imprisonment has 650 range and Meteor Hammer 600: at most a short step, which the
+	-- cast order walks by itself. Start that much earlier instead of walking first.
+	local step = math.max(0, dist - 600) / math.max(100, b:GetCurrentMovementSpeed())
+	if left <= HAMMER_LEAD + 0.05 + step then
+		if dist <= 750 then
 			b._prison = nil
 			pcall(print, string.format(
 				"[OHA-OD] t=%.1f prison-hammer target=%s left=%.2f dist=%d",
@@ -178,11 +181,6 @@ function a.ConsiderPrisonHammer()
 			return true
 		end
 		return false
-	end
-	-- Waiting for the moment: step into range if needed.
-	if dist > 580 then
-		b:Action_MoveToLocation(c.Utils.GetOffsetLocationTowardsTargetLocation(st.loc, b:GetLocation(), 520))
-		return true
 	end
 	return false
 end

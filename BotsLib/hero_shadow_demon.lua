@@ -107,8 +107,22 @@ function a.SkillsComplement()
 	local J = d.Build(b)
 	H = J.isEngaging
 	I = J.isTeamFight
+	-- An enemy under our Disruption: Shadow Poison on the spot right away (Valve data: "Shadow
+	-- Poison can affect units under Disruption"); the normal rule waited for the target to show.
+	if a.ConsiderPoisonDisrupted() then
+		return
+	end
 	v, w = a.ConsiderDisruption()
 	if v > 0 then
+		if c.IsValidHero(w) and w:GetTeam() ~= GetTeam() then
+			local okD, dur = pcall(function()
+				return p:GetSpecialValueFloat("disruption_duration")
+			end)
+			b._disrupted = {
+				loc = w:GetLocation(),
+				untilAt = DotaTime() + math.max(0, p:GetCastPoint()) + ((okD and type(dur) == "number" and dur > 0) and dur or 2.75),
+			}
+		end
 		b:Action_UseAbilityOnEntity(p, w)
 		return
 	end
@@ -137,6 +151,25 @@ function a.SkillsComplement()
 		b:Action_UseAbility(s)
 		return
 	end
+end
+function a.ConsiderPoisonDisrupted()
+	local st = b._disrupted
+	if st == nil then
+		return false
+	end
+	if DotaTime() > st.untilAt then
+		b._disrupted = nil
+		return false
+	end
+	if not r:IsFullyCastable() then
+		return false
+	end
+	local range = c.GetProperCastRange(false, b, r:GetCastRange())
+	if GetUnitToLocationDistance(b, st.loc) > range then
+		return false
+	end
+	b:Action_UseAbilityOnLocation(r, st.loc)
+	return true
 end
 function a.ConsiderDisruption()
 	if not p:IsFullyCastable() then

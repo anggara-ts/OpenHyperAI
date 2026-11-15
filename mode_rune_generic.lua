@@ -8,6 +8,25 @@ local e = 0
 local f = 0
 local g = false
 local h = { RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }
+-- After 1:00, a rune the status calls available but the game says is not there (GetRuneType -1)
+-- while its spot is in our vision counts as missing, for every check in this file. Game 016: the
+-- 2:00 water rune on the bottom power spot was taken, the status stayed "up", and Invoker looped
+-- pick-up / move-on there from 2:30 to 2:45 (a skip only covered one of the pick-up paths).
+-- Before 1:00 the horn spots are left to the no-rune check in the pick-up branch.
+local RawGetRuneStatus = GetRuneStatus
+local function GetRuneStatus(id)
+	local st = RawGetRuneStatus(id)
+	if st == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and GetRuneType ~= nil then
+		local okT, rType = pcall(GetRuneType, id)
+		if okT and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
+			local okV, seen = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
+			if okV and seen then
+				return RUNE_STATUS_MISSING
+			end
+		end
+	end
+	return st
+end
 local i, j, k, l, m, n
 local o, p
 local q = {}

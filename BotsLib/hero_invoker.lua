@@ -79,8 +79,6 @@ end
 a["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
-	"item_ultimate_scepter",
-	"item_magic_wand",
 	"item_sheepstick",
 	"item_hand_of_midas",
 }

@@ -609,6 +609,31 @@ do
 				end
 			end
 		end
+		-- Melee core: wait at the edge of attack range of the enemy creep that is about to die
+		-- (2.5 hits or less), not 300 behind the wave. From there the last hit only needs the
+		-- attack, not a walk, so it lands in time. Not next to the enemy tower.
+		if IsCoreRole() and m < 326 and b.GetHP(e) >= 0.45 and not CreepAggroUnsafe(e) then
+			local dmg = e:GetAttackDamage()
+			local soon, soonHp = nil, math.huge
+			for D, cr in pairs(i or {}) do
+				if
+					b.IsValid(cr)
+					and b.CanBeAttacked(cr)
+					and cr:GetHealth() <= dmg * 2.5
+					and cr:GetHealth() < soonHp
+					and not (b.IsValidBuilding(_[1]) and GetUnitToUnitDistance(cr, _[1]) < 750)
+				then
+					soon, soonHp = cr, cr:GetHealth()
+				end
+			end
+			if soon ~= nil then
+				local spot = b.GetXUnitsTowardsLocation2(soon:GetLocation(), e:GetLocation(), m + soon:GetBoundingRadius() + 40)
+				if GetUnitToLocationDistance(e, spot) > 60 then
+					e:Action_MoveDirectly(spot)
+				end
+				return
+			end
+		end
 		local ae = GetLaneFrontAmount(GetTeam(), l, false)
 		local af = GetLaneFrontAmount(GetOpposingTeam(), l, false)
 		local ag = LaneStandOff()

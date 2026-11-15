@@ -2,6 +2,7 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
@@ -132,7 +133,17 @@ local G, H
 local I, J
 local K = 0
 local L, M, N, O, P, Q
+-- Sacrifice: 2 charges, one every 120s, none when first learned (Valve data).
+function a.SacrificeCharges()
+	local ok, n = pcall(ChargeTracker.Get, b, t, 2, 120, true)
+	if ok and type(n) == "number" then
+		return n
+	end
+	return 0
+end
 function a.SkillsComplement()
+	-- Before any early return, so the Sacrifice cast phase is seen by the charge tracker.
+	a.SacrificeCharges()
 	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
 	-- below stops everything during a channel, so the weave runs first.
 	if a.ConsiderGazeWeave() then
@@ -154,15 +165,9 @@ function a.SkillsComplement()
 	-- keep pushing it back.
 	I, J = a.ConsiderSacrifice()
 	if I > 0 then
+		pcall(ChargeTracker.Issued, b, t, J)
 		c.SetQueuePtToINT(b, true)
 		b:ActionQueue_UseAbilityOnEntity(t, J)
-		return
-	end
-	-- Meteor Hammer on the gazed target as the Gaze ends.
-	local meteor, meteorLoc = a.ConsiderMeteorAfterGaze()
-	if meteor ~= nil then
-		pcall(print, string.format("[OHA-LICH] t=%.0f meteor why=after-gaze", DotaTime()))
-		b:Action_UseAbilityOnLocation(meteor, meteorLoc)
 		return
 	end
 	-- Ice Spire beside a lone target before Chain Frost, so the orb bounces between them.
@@ -190,10 +195,8 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnEntity(p, B)
 		return
 	end
-	local gazeWhy
-	C, D, gazeWhy = a.ConsiderE()
+	C, D = a.ConsiderE()
 	if C > 0 then
-		b._gazeForMana = type(gazeWhy) == "string" and string.find(gazeWhy, "mana", 1, true) ~= nil
 		c.SetQueuePtToINT(b, true)
 		b._gazeAt = DotaTime()
 		b._gazeTarget = D
@@ -888,27 +891,6 @@ function a.ConsiderGazeWeave()
 	end
 	return false
 end
--- Meteor Hammer (2s channel, 600 range, 0.75s stun, Valve data) on the gazed enemy right as the
--- Gaze ends. Started mid-channel it may cancel the Gaze, so it waits for the end.
-function a.ConsiderMeteorAfterGaze()
-	local gazeAgo = DotaTime() - (b._gazeAt or -99)
-	if gazeAgo < 0.8 or gazeAgo > 3.0 or b:IsChanneling() or b._gazeForMana then
-		return nil
-	end
-	local slot = b:FindItemSlot("item_meteor_hammer")
-	if slot < 0 or slot > 5 then
-		return nil
-	end
-	local meteor = b:GetItemInSlot(slot)
-	local target = b._gazeTarget
-	if meteor == nil or not meteor:IsFullyCastable() or not c.IsValidHero(target) then
-		return nil
-	end
-	if not c.IsInRange(b, target, 600) then
-		return nil
-	end
-	return meteor, target:GetLocation()
-end
 function a.ConsiderSacrifice()
 	if not c.CanCastAbility(t) then
 		return BOT_ACTION_DESIRE_NONE
@@ -919,19 +901,9 @@ function a.ConsiderSacrifice()
 	local T = t:GetCastRange()
 	-- Both charges up (2 max, 120s each, Valve data): use one now even at full mana. It denies an
 	-- allied creep and gives 69% of its experience. Prefer a creep the enemy is about to kill.
-	-- Charges: GetCurrentAbilityCharges looks unavailable (every Techies log showed the fallback),
-	-- so GetCurrentCharges is tried too. Not with an enemy hero near: a fight wants Chain Frost,
-	-- not a 0.4s cast on his own creep.
-	local charges = nil
-	for _, getter in ipairs({ "GetCurrentAbilityCharges", "GetCurrentCharges" }) do
-		local ok, n = pcall(function()
-			return t[getter](t)
-		end)
-		if ok and type(n) == "number" and n > 0 then
-			charges = n
-			break
-		end
-	end
+	-- Charges from our own tracker (the API has no ability-charge read). Not with an enemy hero
+	-- near: a fight wants Chain Frost, not a 0.4s cast on his own creep.
+	local charges = a.SacrificeCharges()
 	local enemyNear = #(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) > 0
 	if charges ~= nil and charges >= 2 and not enemyNear and not c.IsInTeamFight(b, 1200) then
 		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
@@ -952,22 +924,25 @@ function a.ConsiderSacrifice()
 			return BOT_ACTION_DESIRE_HIGH, pick
 		end
 	end
+	-- Mana (below 50%): 42% of the creep's current HP (Valve data), so the creep with the most HP,
+	-- siege creeps included (they come back as lane creeps). The old per-level bonus is not in the
+	-- data and is gone.
 	local aG = t:GetSpecialValueInt("active_mana_restore_pct_of_health") / 100
-	local aH = 3 / 100
 	local aI = b:GetNearbyLaneCreeps(Min(T + 300, 1600), false)
 	if c.GetMP(b) < 0.5 then
 		local aJ = nil
 		local aK = 0
 		for a4, ag in pairs(aI) do
 			if c.IsValid(ag) and c.CanBeAttacked(ag) then
-				local aL = ag:GetHealth() * (aG + b:GetLevel() * aH)
-				if aL >= 200 and aL > aK then
+				local aL = ag:GetHealth() * aG
+				if aL >= 150 and aL > aK then
 					aJ = ag
 					aK = aL
 				end
 			end
 		end
 		if aJ then
+			a.LogLich("sacrifice-mana charges=" .. tostring(charges) .. " gain=" .. string.format("%.0f", aK), nil)
 			return BOT_ACTION_DESIRE_HIGH, aJ
 		end
 	end

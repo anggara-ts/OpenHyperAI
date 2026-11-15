@@ -1,4 +1,43 @@
 -- Shared bot system: global overrides.
+
+-- [OHA-*] diagnostics for behaviour already confirmed working in test games. Muted so the
+-- console log shows what still needs work. Delete a line here to bring that log back.
+local OHA_MUTED = {
+	"^%[OHA%-LANE%]", -- laning standoff / last hits
+	"^%[OHA%-TUSK%] t=%S+ snowball%-launch", -- early launch (median 0.6s)
+	"^%[OHA%-TUSK%] t=%S+ punch ", -- Tag Team before Punch
+	"^%[OHA%-TUSK%] t=%S+ tag%-team ",
+	"^%[OHA%-TUSK%] t=%S+ wave%-", -- Ice Shards / Snowball wave clear
+	"^%[OHA%-TUSK%] t=%S+ escape%-snowball",
+	"^%[OHA%-TECHIES%] t=%S+ blast ", -- Blast Off first, Tazer and mines after
+	"^%[OHA%-TECHIES%] t=%S+ combo ",
+	"^%[OHA%-TECHIES%] t=%S+ triangle ",
+	"^%[OHA%-TECHIES%] t=%S+ tower ",
+	"^%[OHA%-TECHIES%] t=%S+ tazer%-held",
+	"^%[OHA%-ITEM%] t=%S+ %S+ grenade%-throw",
+	"^%[OHA%-ITEM%] t=%S+ %S+ grenade%-moved",
+	"^%[OHA%-ITEM%] t=%S+ %S+ swap%-", -- engine ignores bot swaps; known
+	"^%[OHA%-BUY%] t=%S+ %S+ recipe%-hold", -- courier waits, every 4s
+	"^%[OHA%-FIGHT%] t=%S+ %S+ push %S+ lane=", -- post-kill push floor, every 4s
+	"^%[OHA%-FIGHT%] t=%S+ %S+ rosh %S+ was=",
+	"^%[OHA%-RETREAT%] t=%S+ %S+ summons",
+	"^%[OHA%-MEDUSA%]",
+	"^%[OHA%-WARLOCK%]",
+	"^%[OHA%-QUILL%]",
+}
+if _G.OHA_RAW_PRINT == nil then
+	_G.OHA_RAW_PRINT = print
+	print = function(msg, ...)
+		if type(msg) == "string" and string.sub(msg, 1, 5) == "[OHA-" then
+			for i = 1, #OHA_MUTED do
+				if string.find(msg, OHA_MUTED[i]) then
+					return
+				end
+			end
+		end
+		return _G.OHA_RAW_PRINT(msg, ...)
+	end
+end
 if package and package.path then
 	local a = GetScriptDirectory()
 	if not string.find(package.path, a, 1, true) then

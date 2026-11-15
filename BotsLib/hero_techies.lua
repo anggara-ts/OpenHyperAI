@@ -26,6 +26,8 @@ n["pos_4"] = {
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_kaya",
+	-- Shard before Mekansm (inside Guardian Greaves).
+	"item_aghanims_shard",
 	"item_guardian_greaves",
 	"item_force_staff",
 	"item_lotus_orb",
@@ -33,7 +35,6 @@ n["pos_4"] = {
 	"item_bloodstone",
 	"item_yasha_and_kaya",
 	"item_sheepstick",
-	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }

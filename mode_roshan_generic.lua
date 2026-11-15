@@ -715,7 +715,12 @@ function Think()
 	-- Hold the fountain side until the living team is in the ring, then go in together.
 	-- Two at the rally used to count as ready, so the rest never had to arrive.
 	local now = DotaTime()
-	if a._roshGatherAt == nil or now - (a._roshThinkAt or 0) > 3 then
+	-- A gap of more than 3s out of Roshan mode restarts the gather, but not during a commit: game
+	-- 017, 41:42, Doom, Lich, Mirana and Medusa committed 4/4, Doom left the mode for a few
+	-- seconds in the pit, the restart wiped his commit and acks, and 4s later he dropped the take
+	-- as a weak group with Lich counted as declined (then Lich did the same to Doom and Mirana).
+	local stillCommitted = a._roshCommitUntil ~= nil and now < a._roshCommitUntil
+	if a._roshGatherAt == nil or (now - (a._roshThinkAt or 0) > 3 and not stillCommitted) then
 		a._roshGatherAt = now
 		a._roshCommitUntil = nil
 		a._roshAckSet = {}

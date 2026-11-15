@@ -1907,7 +1907,52 @@ local function AddOutpost(list, unit)
 end
 
 local outpostCacheAt = -999
+-- One-time scan log (first bot of the team, from 0:30): every non-hero unit within 900 of the two
+-- fallback outpost spots, and every unit on the map whose name looks like a building of that
+-- kind, with team. Game 017: Invoker stood by the Radiant outpost and the scan matched nothing;
+-- no game has ever logged an outpost. This shows the real outpost unit name, or that the bot API
+-- does not list it.
+local outpostScanLogged = false
+local function LogOutpostScan()
+	if outpostScanLogged or DotaTime() < 30 then
+		return
+	end
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0:IsBot() then
+			if m0 ~= c then
+				outpostScanLogged = true
+				return
+			end
+			break
+		end
+	end
+	outpostScanLogged = true
+	local near, named = {}, {}
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+		if u ~= nil and not u:IsNull() and not u:IsHero() then
+			local n0 = u:GetUnitName() or "?"
+			local l0 = string.lower(n0)
+			for k = 1, #OUTPOST_FALLBACK do
+				if GetUnitToLocationDistance(u, OUTPOST_FALLBACK[k]) <= 900 then
+					near[#near + 1] = n0 .. "/team" .. tostring(u:GetTeam())
+					break
+				end
+			end
+			if string.find(l0, "watch", 1, true) or string.find(l0, "outpost", 1, true) or string.find(l0, "lantern", 1, true) then
+				named[#named + 1] = n0 .. "/team" .. tostring(u:GetTeam())
+			end
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-OUTPOST] t=%.0f scan near-spots=%s named=%s",
+		DotaTime(),
+		#near > 0 and table.concat(near, ",") or "-",
+		#named > 0 and table.concat(named, ",") or "-"
+	))
+end
 local function RefreshOutpostCache()
+	pcall(LogOutpostScan)
 	X = {}
 	local lists = {
 		UNIT_LIST_ALL,

@@ -2106,6 +2106,12 @@ function ConsiderOutpostCapture()
 		end
 		-- Scan missed the buildings. Walk to the outpost closer to the enemy fountain
 		-- (their jungle outpost, or ours if they already took it and it is the nearer spot).
+		-- Arrived and still no outpost found: drop the fallback for 90s. Game 017, 50:23-52:43:
+		-- Invoker stood on the fallback spot by the Radiant outpost at desire 0.98, re-ordering a
+		-- move to where he already was, with nothing to capture.
+		if DotaTime() < (c._outpostFallbackOffUntil or -999) then
+			return 0
+		end
 		local enemyFountain = a.GetEnemyFountain()
 		local best = 100000
 		for i = 1, #OUTPOST_FALLBACK do
@@ -2121,6 +2127,23 @@ function ConsiderOutpostCapture()
 			return 0
 		end
 		_ = GetUnitToLocationDistance(c, loc)
+		if _ <= 600 then
+			c._outpostFallbackAt = c._outpostFallbackAt or DotaTime()
+			if DotaTime() - c._outpostFallbackAt >= 5 then
+				c._outpostFallbackAt = nil
+				c._outpostFallbackOffUntil = DotaTime() + 90
+				pcall(print, string.format(
+					"[OHA-OUTPOST] t=%.0f %s fallback-giveup spot=%.0f,%.0f (no outpost found there)",
+					DotaTime(),
+					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+					loc.x,
+					loc.y
+				))
+				return 0
+			end
+		else
+			c._outpostFallbackAt = nil
+		end
 		outpostMoveLoc = loc
 	end
 	if loc == nil then

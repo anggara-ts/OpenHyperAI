@@ -623,7 +623,7 @@ function t.ShouldUseAllyDispelItem(P)
 									or aa == "npc_dota_hero_necrolyte"
 									or aa == "npc_dota_hero_bane"
 								then
-									if a9.IsFacingLocation(a6:GetLocation(), 30) then
+									if a9:IsFacingLocation(a6:GetLocation(), 30) then
 										a4 = a6
 										a5 = 10
 									end

@@ -487,6 +487,32 @@ function a.IsSuitableToWard()
 	then
 		return false
 	end
+	-- Not into visible enemies: game 020, -0:29 to -0:12, Mirana walked alone to the Dire-bank
+	-- ward spot by the top rune and three Dire heroes killed her there (first blood). It only
+	-- stopped once someone attacked her. Now: no ward trip while outnumbered by visible enemy
+	-- heroes within 1200, or toward a spot on the enemy's side of the river with an enemy hero
+	-- within 1000 of it.
+	local foes = 0
+	for _, e0 in pairs(v or {}) do
+		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+			foes = foes + 1
+		end
+	end
+	local friends = #(b:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
+	if foes >= 1 and foes > friends then
+		return false
+	end
+	local spot = j
+	if spot ~= nil and spot.location ~= nil then
+		local ours = GetTeam() == TEAM_RADIANT and "radiant" or "dire"
+		if spot.side ~= nil and spot.side ~= ours then
+			for _, e0 in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+				if c.IsValidHero(e0) and e0:CanBeSeen() and GetUnitToLocationDistance(e0, spot.location) <= 1000 then
+					return false
+				end
+			end
+		end
+	end
 	return true
 end
 function a.IsIBecameTheTarget(y)

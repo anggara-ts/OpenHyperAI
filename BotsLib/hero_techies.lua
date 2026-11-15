@@ -482,7 +482,11 @@ function a.ConsiderReactiveTazer()
 	local range = TazerCastRange()
 	-- Self first when he is the one being hit or chased. The buff is speed plus a disarm on attackers.
 	if not b:HasModifier("modifier_techies_reactive_tazer") then
-		if HeroIsBeingHit(b) then
+		-- Same bar as for allies: one lane harass hit was enough (36 of 55 casts last game).
+		if
+			HeroIsBeingHit(b)
+			and (c.GetHP(b) < 0.7 or #(c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE) or {}) >= 2)
+		then
 			a.LogTazer(b, "self-hit")
 			return BOT_ACTION_DESIRE_HIGH, b
 		end

@@ -4513,15 +4513,19 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		end
 		local dS = GetLaneFrontLocation(GetTeam(), dO, -500)
 		local dT = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
-		pcall(print, string.format(
-			"[OHA-TP] diag-fountain %s pos=%s assigned=%s chose=%s mode=%s lan=%s",
-			c,
-			tostring(f.GetPosition(b)),
-			tostring(dT[b:GetAssignedLane()] or b:GetAssignedLane()),
-			tostring(dT[dO] or dO),
-			tostring(bf),
-			tostring(IsLanMode and IsLanMode())
-		))
+		-- Printed every think while at the fountain (6,541 lines in one game); once per 10s now.
+		if DotaTime() >= (b._diagFountainLogAt or -999) then
+			b._diagFountainLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-TP] diag-fountain %s pos=%s assigned=%s chose=%s mode=%s lan=%s",
+				c,
+				tostring(f.GetPosition(b)),
+				tostring(dT[b:GetAssignedLane()] or b:GetAssignedLane()),
+				tostring(dT[dO] or dO),
+				tostring(bf),
+				tostring(IsLanMode and IsLanMode())
+			))
+		end
 		if dS ~= nil and GetUnitToLocationDistance(b, dS) > 3500 then
 			local dU = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
 			local dV = f.GetLastSeenEnemiesNearLoc(dS, 1600)
@@ -7059,7 +7063,14 @@ local function StuckModeName(mode)
 	return STUCK_MODE_NAMES[mode] or tostring(mode)
 end
 function a.LogStuck()
-	if not b:IsAlive() or b:IsChanneling() or b:IsCastingAbility() or b:DistanceFromFountain() < 1200 then
+	-- Laning holds position between last hits by design (239 of 855 lines in one game).
+	if
+		not b:IsAlive()
+		or b:IsChanneling()
+		or b:IsCastingAbility()
+		or b:DistanceFromFountain() < 1200
+		or b:GetActiveMode() == BOT_MODE_LANING
+	then
 		b._stuckTrail = nil
 		return
 	end

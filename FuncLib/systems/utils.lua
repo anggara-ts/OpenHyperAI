@@ -519,7 +519,10 @@ local aY = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
 local aZ = aY.HeroName
 local a_ = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
 function aD.IsValidUnit(E)
-	if E == nil then
+	-- A number reached here from the defend desire in every game ("attempt to index local
+	-- E (a number value)", pos 4 heroes, all three lanes); the caller could not be traced (no
+	-- debug.traceback in the game sandbox). Not a unit, so not valid.
+	if E == nil or type(E) == "number" or type(E) == "string" or type(E) == "boolean" then
 		return false
 	end
 	return not E:IsNull() and E:CanBeSeen() and E:IsAlive() and not E:IsInvulnerable()

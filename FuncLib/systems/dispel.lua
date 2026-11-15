@@ -428,10 +428,20 @@ function t.AnalyzeDebuffs(z)
 			repeat
 				if z:HasModifier(J) then
 					local M
-					if z.GetModifierRemainingDuration then
-						M = z.GetModifierRemainingDuration(J)
-					else
-						M = 999
+					-- Was z.GetModifierRemainingDuration(J): a dot call with a modifier name
+					-- ("called with 1 arguments - expected 2", game 015). The API takes the
+					-- modifier index from GetModifierByName.
+					M = 999
+					local okIdx, idx = pcall(function()
+						return z:GetModifierByName(J)
+					end)
+					if okIdx and type(idx) == "number" and idx >= 0 then
+						local okDur, dur = pcall(function()
+							return z:GetModifierRemainingDuration(idx)
+						end)
+						if okDur and type(dur) == "number" then
+							M = dur
+						end
 					end
 					local N = M
 					if N < 0.5 then
@@ -480,7 +490,7 @@ local function O(P)
 		local Q = 0
 		while Q < 6 do
 			local R = P:GetAbilityInSlot(Q)
-			if R and R:IsTrained() and not R.IsPassive() and R.IsCooldownReady() then
+			if R and R:IsTrained() and not R:IsPassive() and R:IsCooldownReady() then
 				return true
 			end
 			Q = Q + 1

@@ -898,7 +898,9 @@ function a.ConsiderSacrifice()
 	-- Charges from our own tracker (the API has no ability-charge read). Not with an enemy hero
 	-- near: a fight wants Chain Frost, not a 0.4s cast on his own creep.
 	local charges = a.SacrificeCharges()
-	local enemyNear = #(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) > 0
+	-- In lane an enemy hero is almost always within 1200, which blocked this rule; 600 is a hero
+	-- right on him.
+	local enemyNear = #(c.GetNearbyHeroes(b, 600, true, BOT_MODE_NONE) or {}) > 0
 	if charges ~= nil and charges >= 2 and not enemyNear and not c.IsInTeamFight(b, 1200) then
 		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
 		for a4, ag in pairs(b:GetNearbyLaneCreeps(Min(T + 300, 1600), false) or {}) do
@@ -923,17 +925,31 @@ function a.ConsiderSacrifice()
 	-- data and is gone.
 	local aG = t:GetSpecialValueInt("active_mana_restore_pct_of_health") / 100
 	local aI = b:GetNearbyLaneCreeps(Min(T + 300, 1600), false)
-	if c.GetMP(b) < 0.5 then
+	-- Game 014: with a charge and 11-14% mana he waited 85s, because 150 mana needs a creep with
+	-- 357+ HP and laning creeps rarely have that. Now 100+ below 50% mana, any 40+ below 25%.
+	local mp = c.GetMP(b)
+	if mp < 0.5 then
+		local need = mp < 0.25 and 40 or 100
 		local aJ = nil
 		local aK = 0
 		for a4, ag in pairs(aI) do
 			if c.IsValid(ag) and c.CanBeAttacked(ag) then
 				local aL = ag:GetHealth() * aG
-				if aL >= 150 and aL > aK then
+				if aL > aK then
 					aJ = ag
 					aK = aL
 				end
 			end
+		end
+		if aJ ~= nil and aK < need then
+			if DotaTime() >= (b._sacSkipLogAt or -999) then
+				b._sacSkipLogAt = DotaTime() + 10
+				pcall(print, string.format(
+					"[OHA-LICH] t=%.0f sacrifice-skip best=%.0f need=%d creeps=%d mp=%.2f",
+					DotaTime(), aK, need, #aI, mp
+				))
+			end
+			aJ = nil
 		end
 		if aJ then
 			a.LogLich("sacrifice-mana charges=" .. tostring(charges) .. " gain=" .. string.format("%.0f", aK), nil)

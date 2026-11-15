@@ -920,6 +920,15 @@ function a.ConsiderSacrifice()
 			return BOT_ACTION_DESIRE_HIGH, pick
 		end
 	end
+	-- Both charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
+	-- 118s and 174s after laning).
+	if charges ~= nil and charges >= 2 and DotaTime() >= (b._sac2SkipLogAt or -999) then
+		b._sac2SkipLogAt = DotaTime() + 15
+		local why = enemyNear and "enemy-within-600"
+			or c.IsInTeamFight(b, 1200) and "team-fight"
+			or "no-allied-lane-creep-in-" .. tostring(Min(T + 300, 1600))
+		pcall(print, string.format("[OHA-LICH] t=%.0f sacrifice2-skip why=%s mp=%.2f", DotaTime(), why, c.GetMP(b)))
+	end
 	-- Mana (below 50%): 42% of the creep's current HP (Valve data), so the creep with the most HP,
 	-- siege creeps included (they come back as lane creeps). The old per-level bonus is not in the
 	-- data and is gone.

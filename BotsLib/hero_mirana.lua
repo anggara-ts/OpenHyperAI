@@ -729,14 +729,56 @@ function a.ConsiderE()
 	local lowAndOutnumbered = c.GetHP(b) < 0.4 and #T >= 2
 	if (c.IsRetreating(b) or lowAndOutnumbered) and b:WasRecentlyDamagedByAnyHero(3.0) then
 		local why = #S == 0 and "no-enemy-in-800" or "facing-enemy"
-		for W, X in pairs(S) do
-			if c.IsValid(X) and not c.IsDisabled(X) and not b:IsFacingLocation(X:GetLocation(), 155) then
-				U = X
-				V = "E-逃跑:" .. c.Chat.GetNormName(U)
+		-- Judge the landing spot (650 along her facing) against every enemy unit near her, illusions
+		-- included: farther from the closest one, farther from their centre, and no more of them
+		-- around it. It used to be enough to face away from one enemy: at 7:30 (game 016) she
+		-- leapt out from Phantom Lancer, then 2s later "away from" one Lancer straight into the
+		-- others.
+		if #S > 0 then
+			local foes = {}
+			for W, X in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+				if c.IsValid(X) and X:IsAlive() and GetUnitToUnitDistance(b, X) <= 1400 then
+					foes[#foes + 1] = X
+				end
+			end
+			local me = b:GetLocation()
+			local face = b:GetFacing() * math.pi / 180
+			local land = Vector(me.x + math.cos(face) * M, me.y + math.sin(face) * M, me.z)
+			local function Closest(p0)
+				local best = math.huge
+				for _, X in ipairs(foes) do
+					local q = X:GetLocation()
+					best = math.min(best, math.sqrt((q.x - p0.x) ^ 2 + (q.y - p0.y) ^ 2))
+				end
+				return best
+			end
+			local function Around(p0)
+				local n0 = 0
+				for _, X in ipairs(foes) do
+					local q = X:GetLocation()
+					if (q.x - p0.x) ^ 2 + (q.y - p0.y) ^ 2 <= 600 * 600 then
+						n0 = n0 + 1
+					end
+				end
+				return n0
+			end
+			local center = c.GetCenterOfUnits(foes)
+			local fromCenterNow = math.sqrt((me.x - center.x) ^ 2 + (me.y - center.y) ^ 2)
+			local fromCenterLand = math.sqrt((land.x - center.x) ^ 2 + (land.y - center.y) ^ 2)
+			if
+				IsLocationPassable(land)
+				and Closest(land) > Closest(me) + 200
+				and fromCenterLand > fromCenterNow + 300
+				and Around(land) <= Around(me)
+			then
+				U = S[1]
+				V = "E-逃跑"
 				pcall(print, string.format(
-					"[OHA-MIRANA] t=%.0f leap why=escape from=%s hp=%.2f",
+					"[OHA-MIRANA] t=%.0f leap why=escape foes=%d closest=%d->%d hp=%.2f",
 					DotaTime(),
-					(string.gsub(X:GetUnitName(), "npc_dota_hero_", "")),
+					#foes,
+					math.floor(Closest(me)),
+					math.floor(Closest(land)),
 					c.GetHP(b)
 				))
 				return BOT_ACTION_DESIRE_HIGH, U, V

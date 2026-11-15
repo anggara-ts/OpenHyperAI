@@ -288,9 +288,15 @@ local function TakeTimeNeeded(M)
 		return x.eta < y.eta
 	end)
 	local n = math.min(#etas, GatherMinimum())
+	-- Damage of everyone who is coming and arrives within 15s of the gather minimum, not only
+	-- the first n. With only the first two, the estimate jumped as soon as the walk started and
+	-- the closest heroes changed (game 014: called at need=31, dropped 5s later at need=55;
+	-- 19 calls, 19 drops, no Roshan all game).
 	local groupDps = 0
-	for i = 1, n do
-		groupDps = groupDps + etas[i].dps
+	for i = 1, #etas do
+		if i <= n or etas[i].eta <= etas[n].eta + 15 then
+			groupDps = groupDps + etas[i].dps
+		end
 	end
 	local roshHp = 6000 + 130 * math.max(0, DotaTime() / 60)
 	if c.Utils.IsValidUnit(k) and k:CanBeSeen() then

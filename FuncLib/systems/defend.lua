@@ -1550,6 +1550,33 @@ function r.DefendThink(af, aF)
 				af:Action_AttackUnit(best, true)
 				return
 			end
+			-- No creep within 1200 of him, but the wave the defense counted (within the
+			-- high-ground radius of the building, or of our Ancient) is elsewhere: go hit the
+			-- nearest of it. He used to attack-move around the building and wait (game 020,
+			-- 67:20-68:06: Techies in the Dire base, 6-14 creeps on the high ground, none
+			-- within reach of him, no attack).
+			local hgR = Z.Utils.HG_WAVE_RADIUS or 2600
+			local anc = GetAncient(Q)
+			local far, farD = nil, math.huge
+			for _, cr in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+				if
+					Z.IsValid(cr)
+					and Z.CanBeAttacked(cr)
+					and (
+						GetUnitToLocationDistance(cr, dZ) <= hgR
+						or anc ~= nil and GetUnitToUnitDistance(cr, anc) <= hgR
+					)
+				then
+					local d0 = GetUnitToUnitDistance(af, cr)
+					if d0 < farD then
+						far, farD = cr, d0
+					end
+				end
+			end
+			if far ~= nil then
+				af:Action_AttackUnit(far, true)
+				return
+			end
 		end
 		if d_ == 0 and #e0 > 0 and #e1 >= #e0 + 1 then
 			local e2 = a8(dZ, Z.RandomForwardVector(120))

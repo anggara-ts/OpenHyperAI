@@ -822,8 +822,8 @@ function a.LogLich(kind, target)
 	))
 end
 -- Frost Shield on our Ice Spire: each shield tick heals it by one hero hit (Valve data). Cast
--- when the spire has lost HP, or something is hitting near it (enemy heroes or creeps within
--- 700), or Chain Frost bounced on it in the last 8s, and no shield of ours is on it. It used to
+-- when the spire has lost HP (a Chain Frost bounce costs it a hit, so that is covered too) or
+-- enemy heroes or creeps are within 700 of it, and no shield of ours is on it. It used to
 -- need an enemy hero within 700 and ran after Frost Blast, so a spire chipped by creeps or by the
 -- Chain Frost bounce was never shielded. He walks up to 400 extra to reach it, not when retreating.
 function a.ConsiderSpireShield()
@@ -847,9 +847,7 @@ function a.ConsiderSpireShield()
 	end
 	local damaged = spire:GetHealth() < spire:GetMaxHealth()
 	local loc = spire:GetLocation()
-	local busy = #(c.GetEnemiesNearLoc(loc, 700) or {}) >= 1
-		or #(spire:GetNearbyCreeps(700, true) or {}) >= 1
-		or DotaTime() - (b._chainAt or -99) < 8
+	local busy = #(c.GetEnemiesNearLoc(loc, 700) or {}) >= 1 or #(spire:GetNearbyCreeps(700, true) or {}) >= 1
 	if not (damaged or busy) then
 		return nil
 	end

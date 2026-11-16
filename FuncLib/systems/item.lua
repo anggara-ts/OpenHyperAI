@@ -1719,6 +1719,22 @@ function b.TryPickupRoshanDrop(bot)
 		local pack = b.GetEmptyBackpackSlot(bot)
 		if cheap ~= nil and cheap >= 0 and pack ~= nil and pack >= 0 then
 			bot:ActionImmediate_SwapItems(cheap, pack)
+		elseif cheap ~= nil and cheap >= 0 and bestDist <= 600 then
+			-- Backpack full too: drop the cheapest main-slot item at his feet to make room. Game
+			-- 021, 32:48: Roshan died and nobody took the Aegis; the claimant's bag was full (OD
+			-- with a Null Talisman) and the swap needs an empty backpack slot.
+			local it = bot:GetItemInSlot(cheap)
+			if it ~= nil then
+				pcall(print, string.format(
+					"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					b.RoshanClaimKind(best.item:GetName()) or "drop",
+					(string.gsub(it:GetName(), "^item_", ""))
+				))
+				bot:Action_DropItem(it, bot:GetLocation())
+				return true
+			end
 		end
 	end
 	if bestDist > 120 then

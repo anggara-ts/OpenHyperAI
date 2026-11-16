@@ -756,6 +756,21 @@ local aM = CDOTA_Bot_Script.ActionImmediate_SwapItems
 -- backpack on a 6s cooldown, plus 5s, so two routines that want opposite slots for the same
 -- items cannot ping-pong them and keep both on cooldown.
 local aN = 6 + 5
+-- Backpack items allowed into the main inventory during a fight (names without "item_").
+local SWAP_IN_DURING_FIGHT = {
+	dust = true,
+	cheese = true,
+	famango = true,
+	great_famango = true,
+	greater_famango = true,
+	roshans_banner = true,
+	refresher_shard = true,
+	blood_grenade = true,
+	foragers_health = true,
+	foragers_stats = true,
+	foragers_mana = true,
+	gem = true,
+}
 local function SwapMovesBranchToBackpack(self, fromSlot, toSlot)
 	if toSlot < 6 or toSlot > 8 then
 		return false
@@ -785,6 +800,12 @@ local SWAP_WATCH = {
 	foragers_health = true,
 	foragers_stats = true,
 	foragers_mana = true,
+	cheese = true,
+	famango = true,
+	great_famango = true,
+	greater_famango = true,
+	refresher_shard = true,
+	gem = true,
 }
 local function LogGrenadeSwap(self, aO, aP, result)
 	local a, b = SlotName(self, aO), SlotName(self, aP)
@@ -876,13 +897,17 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	local fighting = self:WasRecentlyDamagedByAnyHero(3.0)
 		or enemies > 0
 			and (mode == BOT_MODE_ATTACK or mode == BOT_MODE_RETREAT or mode == BOT_MODE_TEAM_ROAM or mode == BOT_MODE_DEFEND_ALLY)
+	-- Items that are worth bringing in mid-fight: used once and soon, and never moved back out
+	-- (they are all in sCanNotSwitchItems, so no other routine picks them to make room).
+	local incoming = (aO >= 6 and aO <= 8 and aP <= 5) and nameA or ((aP >= 6 and aP <= 8 and aO <= 5) and nameB or nil)
+	local fightOk = fighting and incoming ~= nil and SWAP_IN_DURING_FIGHT[incoming] == true
 	local cooldown = aN - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
-	if (forced or not fighting) and (cooldown < 0 or urgent) then
+	if (forced or not fighting or fightOk) and (cooldown < 0 or urgent) then
 		self._swapPairTime[pairKey] = DotaTime()
 		-- After a swap the engine ignored, try the slots the other way round once.
 		local reversed = self._swapTryReverse == true
 		self._swapTryReverse = nil
-		LogGrenadeSwap(self, aO, aP, (forced and "ok-forced" or "ok") .. (reversed and "-reversed" or ""))
+		LogGrenadeSwap(self, aO, aP, (forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or ""))
 		self._swapCheck = { a = aO, b = aP, nameA = nameA, nameB = nameB, at = DotaTime(), reversed = reversed }
 		if reversed then
 			return aM(self, aP, aO)

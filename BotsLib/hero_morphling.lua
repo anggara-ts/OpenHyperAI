@@ -23,6 +23,7 @@ else
 	m = c.Skill.GetTalentBuild(j[1])
 end
 local n = {}
+-- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 n["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
@@ -38,9 +39,10 @@ n["pos_1"] = {
 	"item_greater_crit",
 	"item_skadi",
 	"item_moon_shard",
-	"item_satanic",
+	"item_hydras_breath",
 	"item_ultimate_scepter_2",
 }
+-- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 n["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
@@ -55,7 +57,7 @@ n["pos_2"] = {
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_greater_crit",
-	"item_disperser",
+	"item_hydras_breath",
 	"item_moon_shard",
 	"item_satanic",
 	"item_ultimate_scepter_2",
@@ -64,7 +66,7 @@ n["pos_3"] = n["pos_1"]
 n["pos_4"] = n["pos_1"]
 n["pos_5"] = n["pos_1"]
 a["sBuyList"] = n[i]
-a["sSellList"] = { "item_magic_wand", "item_circlet", "item_satanic", "item_vladmir" }
+a["sSellList"] = { "item_magic_wand", "item_circlet", "item_hydras_breath", "item_vladmir" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
 end

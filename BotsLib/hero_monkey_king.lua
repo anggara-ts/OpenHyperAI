@@ -5,13 +5,23 @@ local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
+-- Fixed list by name. GetAbilityList skips only abilities that are both unlearnable and hidden at
+-- spawn, so Primal Spring (slot 3) and Mischief (slot 5) could shift Jingu Mastery's index; the
+-- old arrays had 16 entries, the ultimate first at level 9 and 5 points in one basic ability.
+local g = {
+	"monkey_king_boundless_strike",
+	"monkey_king_tree_dance",
+	"monkey_king_jingu_mastery",
+	[6] = "monkey_king_wukongs_command",
+}
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 4, 4, 2, 4, 2, 2, 2, 6, 1, 1, 1, 4, 2, 6, 6 }, { 4, 1, 4, 2, 4, 1, 4, 1, 1, 6, 2, 2, 2, 2, 6, 6 } }
+-- User call: one point in each basic ability at levels 1-3, Jingu Mastery maxed, ultimate at
+-- 6/12/18, then Boundless Strike, Tree Dance last.
+local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 }, { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k
 local l
 if h == "pos_1" then

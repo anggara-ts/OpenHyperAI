@@ -8,7 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
+-- 1 Refraction, 2 Meld, 3 Psi Blades, 6 Psionic Trap. Dotabuff (2026-11-17): Meld at 1/3/5/7, Psi Blades
+-- at 2/4/8/9, and one early Refraction point (17-38% of players take it at each of levels 1-7),
+-- then Refraction maxed at 12-15. One Refraction at 3, so the bot is not without it until 11.
+local j = { { 2, 3, 1, 3, 2, 6, 2, 3, 3, 2, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = RandomInt(1, 9) > 6 and "item_sphere" or "item_black_king_bar"

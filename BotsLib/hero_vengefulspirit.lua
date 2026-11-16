@@ -57,6 +57,7 @@ m["pos_5"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- Hydra's Breath (user call; Dotabuff 44%, #4 of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 m["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
@@ -71,7 +72,7 @@ m["pos_3"] = {
 	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_manta",
-	"item_devastator",
+	"item_hydras_breath",
 	"item_sheepstick",
 	"item_travel_boots",
 	"item_moon_shard",

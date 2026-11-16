@@ -405,6 +405,8 @@ local tPromoteFromBackpack = {
 	item_blade_mail = true,
 	item_glimmer_cape = true,
 	item_nullifier = true,
+	-- Cast from a main slot only (game 032, 11:51: Grimstroke's Dust ended up in the backpack).
+	item_dust = true,
 }
 local promoteNextCheck = 0
 -- Consumables that can sit in the backpack. A branch cannot: it is a wand component,

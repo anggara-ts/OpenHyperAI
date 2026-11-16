@@ -361,8 +361,74 @@ function a.RuneWatch()
 	end
 	pcall(print, string.format("[OHA-RUNE] t=%.0f watch %s %s", now, GetTeam() == TEAM_RADIANT and "radiant" or "dire", table.concat(parts, " ")))
 end
+-- River gold id test (user call): on the gold, try rune ids 0-7 with Action_PickUpRune, then with
+-- ActionPush_PickUpRune, 0.4s each, and log the one after which his gold jumps by 30+. Sticky:
+-- once started it holds rune mode and the bot at the gold until all 16 tries are done or 0:15
+-- (game 024: other rune rules pulled the testers off after 3-4 tries, no result).
+function a.GoldCycleStep()
+	local cy = d._goldCycle
+	if cy == nil then
+		return false
+	end
+	local now = DotaTime()
+	local function finish(msg)
+		pcall(print, msg)
+		d._goldCycle = nil
+		d._goldCycleDone = true
+	end
+	local gained = d:GetGold() - cy.g0
+	if gained >= 30 and cy.last ~= nil then
+		finish(string.format(
+			"[OHA-RUNE] %s t=%.1f river-gold PICKED spot=%s id=%d order=%s gold+%d",
+			HeroTag(),
+			now,
+			tostring(cy.spot),
+			cy.last.id,
+			cy.last.push and "ActionPush_PickUpRune" or "Action_PickUpRune",
+			gained
+		))
+		return false
+	end
+	if now >= 15 or not d:IsAlive() then
+		finish(string.format("[OHA-RUNE] %s t=%.1f river-gold test cut at try %d (time or death)", HeroTag(), now, cy.k))
+		return false
+	end
+	if GetUnitToLocationDistance(d, cy.gold) > 40 then
+		d:Action_MoveToLocation(cy.gold)
+		doing("river-gold-ids")
+		return true
+	end
+	if now - cy.at < 0.4 then
+		doing("river-gold-ids")
+		return true
+	end
+	if cy.k >= 16 then
+		finish(string.format("[OHA-RUNE] %s t=%.1f river-gold tried ids 0-7 x2 at spot=%s, no gold", HeroTag(), now, tostring(cy.spot)))
+		return false
+	end
+	local id = cy.k % 8
+	local push = cy.k >= 8
+	cy.k = cy.k + 1
+	cy.at = now
+	cy.g0 = d:GetGold()
+	cy.last = { id = id, push = push }
+	d._runePickupAt = now
+	pcall(function()
+		if push then
+			d:ActionPush_PickUpRune(id)
+		else
+			d:Action_PickUpRune(id)
+		end
+	end)
+	doing("river-gold-ids")
+	return true
+end
 function GetDesire()
 	pcall(a.RuneWatch)
+	if d._goldCycle ~= nil and DotaTime() < 15 then
+		runeWhy = "river-gold-test"
+		return BOT_MODE_DESIRE_ABSOLUTE + 0.05
+	end
 	if ShouldSkipBotThink(GetBot()) then
 		runeWhy = "skip"
 		a.RuneDbg(0)
@@ -654,6 +720,12 @@ end
 local M = -math.huge
 function Think()
 	d._runeDo = "fall"
+	if d._goldCycle ~= nil then
+		local okG, held = pcall(a.GoldCycleStep)
+		if okG and held then
+			return
+		end
+	end
 	if d:IsInvulnerable() and d:DistanceFromFountain() < 500 then
 		d:Action_MoveToLocation(d:GetLocation() + RandomVector(500))
 		doing("fountain")
@@ -898,60 +970,22 @@ function Think()
 						doing("river-gold-walk")
 						return
 					end
-					-- On the gold: try every rune id 0-7 with both pick-up orders, 0.4s each, and log
-					-- the one after which his gold jumps by 30+ (user call: is the river gold under
-					-- another id?). Game 023: Medusa stood on it 6s ordering id 0, nothing.
-					if GetUnitToLocationDistance(d, gold) <= 60 then
-						local cy = ft.cycle
-						if cy == nil then
-							cy = { k = 0, at = now0 - 1, gold = d:GetGold() }
-							ft.cycle = cy
-						end
-						local gained = d:GetGold() - cy.gold
-						if gained >= 30 and cy.last ~= nil then
-							pcall(print, string.format(
-								"[OHA-RUNE] %s t=%.1f river-gold PICKED spot=%s id=%d order=%s gold+%d",
-								HeroTag(),
-								now0,
-								tostring(D.location),
-								cy.last.id,
-								cy.last.push and "ActionPush_PickUpRune" or "Action_PickUpRune",
-								gained
-							))
-							cy.last = nil
-							cy.gold = d:GetGold()
-						end
-						if now0 - cy.at >= 0.4 and cy.k < 16 then
-							local id = cy.k % 8
-							local push = cy.k >= 8
-							cy.k = cy.k + 1
-							cy.at = now0
-							cy.gold = d:GetGold()
-							cy.last = { id = id, push = push }
-							if push then
-								pcall(function()
-									d:ActionPush_PickUpRune(id)
-								end)
-							else
-								pcall(function()
-									d:Action_PickUpRune(id)
-								end)
+					-- On the gold: start the id test (sticky, see a.GoldCycleStep).
+					if GetUnitToLocationDistance(d, gold) <= 60 and d._goldCycle == nil and not d._goldCycleDone then
+						-- One tester per spot: three bots on one spot block each other (game 024).
+						local busy = false
+						for i = 1, 5 do
+							local m0 = GetTeamMember(i)
+							if m0 ~= nil and m0 ~= d and m0._goldCycle ~= nil and m0._goldCycle.spot == D.location then
+								busy = true
 							end
-							if cy.k == 16 then
-								pcall(print, string.format(
-									"[OHA-RUNE] %s t=%.1f river-gold tried ids 0-7 x2 at spot=%s, no gold",
-									HeroTag(),
-									now0,
-									tostring(D.location)
-								))
-							end
-							doing("river-gold-ids")
-							return
 						end
-						if cy.k < 16 or now0 - cy.at < 0.4 then
-							doing("river-gold-ids")
-							return
+						if not busy then
+							d._goldCycle = { spot = D.location, gold = gold, k = 0, at = now0 - 1, g0 = d:GetGold() }
 						end
+					end
+					if d._goldCycle ~= nil and a.GoldCycleStep() then
+						return
 					end
 				end
 				if ft.backTo ~= nil then

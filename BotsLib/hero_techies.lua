@@ -325,7 +325,7 @@ function a.ConsiderPostBlastMad()
 	if since < 1.75 or since > 6 then
 		return nil, nil
 	end
-	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) or a.MadDetonate() ~= nil then
 		return nil, nil
 	end
 	local plant = a.MadPlant()
@@ -365,11 +365,12 @@ function a.SkillsComplement()
 	if a.ConsiderDetonateMad() > 0 then
 		local det = a.MadDetonate()
 		if det ~= nil then
-			a.LogTechies("mad-detonate", 0, b._madLoc or b:GetLocation())
+			a.LogTechies("mad-detonate why=" .. tostring(b._madDetonateWhy), 0, b._madLoc or b:GetLocation())
 			b:Action_UseAbility(det)
 		end
 		b._madLoc = nil
 		b._madDetonateAt = nil
+		b._madBarrelAt = nil
 		return
 	end
 	-- An escape Blast Off that never went on cooldown (game 031, 6:56: ordered, then not cast;
@@ -1012,7 +1013,7 @@ function a.ConsiderPlantMad()
 	if plant == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) or a.MadDetonate() ~= nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = plant:GetCastRange()
@@ -1043,8 +1044,13 @@ function a.ConsiderPlantMad()
 		-- Where the target will be when it blows: 1s plant + 1.5s fuse.
 		local loc = Toward(H)
 		if loc ~= nil then
+			-- Where he will be when the plant lands (1s cast point); the barrel then waits until he
+			-- is within 350 of it.
 			if not c.IsDisabled(H) then
-				loc = H:GetExtrapolatedLocation(1.5)
+				loc = H:GetExtrapolatedLocation(1.1)
+				if GetUnitToLocationDistance(b, loc) > castRange then
+					loc = c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), loc, castRange - 40)
+				end
 			end
 			return BOT_ACTION_DESIRE_HIGH, loc
 		end
@@ -1087,14 +1093,42 @@ end
 -- so it is clicked as soon as it is castable, unless he is dead, stunned, hexed, silenced or
 -- nightmared. No timer and no enemy check. A plant that never shows the detonate is logged:
 -- 'not cast' when M.A.D. never went on cooldown, 'no detonate' when it did.
+-- A planted M.A.D. waits for its victim (user call; datafeed Shard text: detonated manually with a
+-- sub-ability, one at a time, no time limit). It used to go off as soon as the detonate button showed,
+-- wherever the enemies were. Now: an enemy hero within 350 of the barrel (blast radius 400). Two
+-- exceptions free the one-barrel slot: the barrel is 30s old, or Techies is more than 1500 from it
+-- after 5s. No known barrel spot: as before, at once.
+local MAD_TRIGGER = 350
 function a.ConsiderDetonateMad()
 	local now = DotaTime()
 	if a.MadDetonate() ~= nil then
 		if not b:IsAlive() or b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
 			return BOT_ACTION_DESIRE_NONE
 		end
-		return BOT_ACTION_DESIRE_HIGH
+		b._madBarrelAt = b._madBarrelAt or now
+		local loc = b._madLoc
+		if loc == nil then
+			b._madDetonateWhy = "no-spot"
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		for _, e0 in pairs(c.GetEnemiesNearLoc(loc, MAD_TRIGGER) or {}) do
+			if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+				b._madDetonateWhy = "enemy-in"
+				return BOT_ACTION_DESIRE_HIGH
+			end
+		end
+		local age = now - b._madBarrelAt
+		if age > 30 then
+			b._madDetonateWhy = "stale"
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		if age > 5 and GetUnitToLocationDistance(b, loc) > 1500 then
+			b._madDetonateWhy = "left-behind"
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		return BOT_ACTION_DESIRE_NONE
 	end
+	b._madBarrelAt = nil
 	if b._madLoc ~= nil and now - (b._madPlantAt or now) > 3.5 then
 		local plantAb = b:GetAbilityByName("techies_mutually_assured_destruction")
 		local cast = plantAb ~= nil and plantAb:GetCooldownTimeRemaining() > 0

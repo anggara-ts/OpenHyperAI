@@ -1499,6 +1499,13 @@ function a.ApplyEarlyLaneRuneGate(desire, dist, status, tag)
 	dist = dist or 99999
 	local startDist = 1050
 	local stickDist = 1900
+	-- The horn jungle bounty, while the lanes are still empty (first 30s): start from up to 2200.
+	-- Game 023: the Dire bot for the top jungle bounty was pulled into a pre-horn fight, stood
+	-- 1450-1600 away at the horn, read "bounty-wait" (start needed 1050) and the gold was left.
+	if tag == "bounty" and t < 30 then
+		startDist = 2200
+		stickDist = 2400
+	end
 	if dist > stickDist then
 		d._earlyRuneCommit = nil
 		runeWhy = tag .. "-far"

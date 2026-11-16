@@ -535,8 +535,11 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 	if bot == nil or c.CanNotUseAction(bot) or bot:IsDisarmed() then
 		return 0, nil
 	end
-	-- Team fights come first — do not peel for snakes while a real fight is on.
-	if c.IsInTeamFight(bot, 1200) then
+	-- Team fights come first for an ally's trap. A bot trapped itself escapes even in a fight (game 034,
+	-- 11:30: Axe in a Mass Serpent Ward ring during a fight killed some snakes, never left, died;
+	-- datafeed: 10 wards, spawn radius 150, 2 hits each, 45s).
+	local inFight = c.IsInTeamFight(bot, 1200)
+	if inFight and not a.IsHeroTrappedBySerpentWards(bot) then
 		return 0, nil
 	end
 
@@ -580,6 +583,16 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 	local target = a.GetBestSerpentWardToKill(trapWards, bot, attackRange, trapped)
 	if target == nil then
 		return 0, nil
+	end
+	-- Remember the snake opening our own way out: when it dies, the item think walks the bot out
+	-- through the gap (a.WalkOutOfSnakes in ability_item_usage_generic.lua).
+	if trapped == bot then
+		bot._snakeExitWard = target
+		bot._snakeExitWardLoc = target:GetLocation()
+		bot._snakeExitWardAt = DotaTime()
+		if inFight then
+			return 1.05, target
+		end
 	end
 
 	-- No enemy heroes: kill a snake over creeps / farm.

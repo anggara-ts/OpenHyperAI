@@ -8050,6 +8050,47 @@ function a.WatchArrivals()
 		))
 	end
 end
+-- Walk out of a Serpent Ward ring through the gap (see GetSerpentWardEscapeDesire in
+-- FuncLib/hero/special_units.lua): once the snake on our way out is dead, move 250 past where it
+-- stood for 1.5s. Runs from the item think, which acts after the mode thinks, so no mode turns the
+-- bot back into the ring. Logged once per escape.
+function a.WalkOutOfSnakes()
+	local now = DotaTime()
+	if not b:IsAlive() then
+		b._snakeExit = nil
+		b._snakeExitWard = nil
+		return false
+	end
+	local w = b._snakeExitWard
+	if w ~= nil and now - (b._snakeExitWardAt or -999) < 6 then
+		local dead = w:IsNull() or not w:IsAlive()
+		if dead and b._snakeExitWardLoc ~= nil then
+			local from = b:GetLocation()
+			local dir = b._snakeExitWardLoc - from
+			if dir:Length2D() < 1 then
+				dir = f.GetTeamFountain() - from
+			end
+			b._snakeExit = { loc = b._snakeExitWardLoc + dir:Normalized() * 250, untilAt = now + 1.5 }
+			b._snakeExitWard = nil
+			pcall(print, string.format("[OHA-SNAKE] t=%.0f %s walk-out hp=%.2f", now, (string.gsub(c, "npc_dota_hero_", "")), f.GetHP(b)))
+		end
+	elseif w ~= nil then
+		b._snakeExitWard = nil
+	end
+	local e = b._snakeExit
+	if e == nil then
+		return false
+	end
+	if now > e.untilAt or GetUnitToLocationDistance(b, e.loc) < 60 then
+		b._snakeExit = nil
+		return false
+	end
+	if b:IsStunned() or b:IsRooted() or b:IsHexed() or b:IsChanneling() then
+		return false
+	end
+	b:Action_MoveToLocation(e.loc)
+	return true
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -8092,6 +8133,11 @@ function ItemUsageThink()
 		end
 		local okD, dusted = pcall(a.UseDustNow)
 		if okD and dusted then
+			_perfDone()
+			return
+		end
+		local okS, walking = pcall(a.WalkOutOfSnakes)
+		if okS and walking then
 			_perfDone()
 			return
 		end

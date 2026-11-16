@@ -1207,8 +1207,33 @@ function a.ComboDamage()
 	end
 	return dmg
 end
+-- Allied heroes who can follow up on the target: within 1200 of him, alive, not illusions, not
+-- retreating, 30%+ HP. Each counts as 15% of his max HP on top of the combo (user call: alone the
+-- combo must kill, with allies near Techies can start a fight that they finish).
+local FOLLOW_UP_SHARE = 0.15
+function a.FollowUpAllies(target)
+	local n = 0
+	for _, ally in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+		if
+			ally ~= b
+			and c.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and GetUnitToUnitDistance(ally, target) <= 1200
+			and c.GetHP(ally) >= 0.3
+			and not c.IsRetreating(ally)
+		then
+			n = n + 1
+		end
+	end
+	return math.min(n, 4)
+end
 function a.ComboKills(target)
-	return c.IsValidHero(target) and c.CanKillTarget(target, a.ComboDamage(), DAMAGE_TYPE_MAGICAL)
+	if not c.IsValidHero(target) then
+		return false
+	end
+	local dealt = target:GetActualIncomingDamage(a.ComboDamage(), DAMAGE_TYPE_MAGICAL)
+	local followUp = a.FollowUpAllies(target) * FOLLOW_UP_SHARE * target:GetMaxHealth()
+	return dealt + followUp >= target:GetHealth()
 end
 function a.LogBlastSkip(target, why)
 	if DotaTime() < (b._blastSkipLogAt or -99) + 10 or target == nil then
@@ -1216,12 +1241,15 @@ function a.LogBlastSkip(target, why)
 	end
 	b._blastSkipLogAt = DotaTime()
 	pcall(print, string.format(
-		"[OHA-TECHIES] t=%.0f blast-skip why=%s target=%s combo=%d hp=%d",
+		"[OHA-TECHIES] t=%.0f blast-skip why=%s target=%s combo=%d dealt=%d allies=%d hp=%d/%d",
 		DotaTime(),
 		why,
 		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
 		a.ComboDamage(),
-		target:GetHealth()
+		target:GetActualIncomingDamage(a.ComboDamage(), DAMAGE_TYPE_MAGICAL),
+		a.FollowUpAllies(target),
+		target:GetHealth(),
+		target:GetMaxHealth()
 	))
 end
 function a.ConsiderBlastOff(ignoreMana)

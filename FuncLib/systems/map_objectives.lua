@@ -1042,8 +1042,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 			elseif not mainRoom then
 				failWhy = "room"
-				-- Otherwise good to go: make room now, the next think takes the trip.
-				if loc ~= nil and dist <= maxWalk and hp >= 0.28 then
+				-- Full main inventory (user call): only a hurt bot (under 50% HP, above the 28% floor) makes
+				-- room (cheapest main item to the backpack) and takes the trip; otherwise the lotus is
+				-- skipped and nothing is moved.
+				if loc ~= nil and dist <= maxWalk and hp >= 0.28 and hp < 0.5 then
 					pcall(MapObjectives.EnsureInventorySlot, bot)
 				end
 			elseif loc == nil then

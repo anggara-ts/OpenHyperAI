@@ -7595,6 +7595,51 @@ function a.WatchStuckQueue()
 	b:Action_ClearActions(true)
 	return true
 end
+-- Game 031, 29:42-29:50: Doom teleported to the bottom lane and stood still while 3 enemies hit
+-- him, with nothing in the log. Standing (moved under 40 in 2s) while a hero hit him in the last
+-- second, not disabled, not casting: log the mode, desire, action and his debuffs, once per 8s.
+function a.WatchStillUnderHit()
+	if not b:IsAlive() or not b:WasRecentlyDamagedByAnyHero(1.0) then
+		b._stillWatch = nil
+		return
+	end
+	local now = DotaTime()
+	local here = b:GetLocation()
+	local w = b._stillWatch
+	if w == nil or f.GetLocationToLocationDistance(w.loc, here) >= 40 then
+		b._stillWatch = { since = now, loc = here }
+		return
+	end
+	if now - w.since < 2 or now < (b._stillLogAt or -999) then
+		return
+	end
+	if b:IsStunned() or b:IsRooted() or b:IsHexed() or b:IsNightmared() or b:IsChanneling() or b:IsCastingAbility() then
+		return
+	end
+	b._stillLogAt = now + 8
+	local mods = {}
+	for i = 0, math.min(b:NumModifiers(), 24) - 1 do
+		local name = b:GetModifierName(i)
+		if name ~= nil then
+			table.insert(mods, (string.gsub(name, "^modifier_", "")))
+		end
+	end
+	local target = b:GetAttackTarget()
+	pcall(print, string.format(
+		"[OHA-STILL] t=%.0f %s still=%.1fs mode=%d desire=%.2f action=%s queued=%d target=%s hp=%.2f foes=%d mods=%s",
+		now,
+		(string.gsub(c, "npc_dota_hero_", "")),
+		now - w.since,
+		b:GetActiveMode(),
+		b:GetActiveModeDesire(),
+		tostring(b:GetCurrentActionType()),
+		b:NumQueuedActions(),
+		target ~= nil and not target:IsNull() and (string.gsub(target:GetUnitName(), "npc_dota_", "")) or "-",
+		f.GetHP(b),
+		#(f.GetEnemiesNearLoc(here, 1200) or {}),
+		#mods > 0 and table.concat(mods, ",") or "-"
+	))
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7614,6 +7659,7 @@ function ItemUsageThink()
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, b)
 	pcall(a.TrackTeleportJump)
+	pcall(a.WatchStillUnderHit)
 	pcall(a.LogHomeWalk)
 	local okQ, cleared = pcall(a.WatchStuckQueue)
 	if okQ and cleared then

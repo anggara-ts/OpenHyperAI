@@ -402,6 +402,24 @@ function MapObjectives.IsLotusContester(bot, loc)
 	return (lane == LANE_TOP) == (loc.y > 0)
 end
 
+-- Team memory for a pool: a teammate stood in it this spawn cycle and left it (empty, a stalled
+-- pluck, or a full inventory).
+function MapObjectives.LotusCheckedThisMark(loc)
+	local mark = math.floor(math.max(0, DotaTime()) / MapObjectives.LotusInterval()) * MapObjectives.LotusInterval()
+	for i = 1, 5 do
+		local m = GetTeamMember(i)
+		if
+			m ~= nil
+			and m._lotusSkipMark == mark
+			and m._lotusSkipPool ~= nil
+			and (m._lotusSkipPool - loc):Length2D() < 1000
+		then
+			return true
+		end
+	end
+	return false
+end
+
 function MapObjectives.LotusScore(hero, loc)
 	if hero == nil or not hero:IsAlive() then
 		return -99999
@@ -873,9 +891,34 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		local spawnOpen = DotaTime() >= lInterval - 1
 		-- Walk window is short. A lotus that nobody took is still in the pool well after that.
 		local nearSpawn = toNext <= 32 or (spawnOpen and sinceLast <= 45)
-		if nearSpawn then
+		-- Passing by (user call; game 031, 32:28: Techies passed 1304 from the right-side pool
+		-- outside the spawn window and nobody looked in it). After the laning phase, a pool within
+		-- 1000 with no enemy hero within 1600 of it, not checked by the team this spawn cycle, is
+		-- worth a short detour at any time; the lotus count cannot be read, so a stand that finds
+		-- nothing marks it checked for the team until the next spawn.
+		local passBy = false
+		if not nearSpawn and spawnOpen then
+			local okLP, laningNow = pcall(function()
+				return require(GetScriptDirectory() .. "/FuncLib/func_utils").IsInLaningPhase()
+			end)
+			if okLP and not laningNow then
+				local ploc, pdist = MapObjectives.PickClosestLocation(bot, (MapObjectives.GetLotusPoolLocations()))
+				if
+					ploc ~= nil
+					and pdist <= 1000
+					and HeroesNearLoc(ploc, 1600) == 0
+					and not MapObjectives.LotusCheckedThisMark(ploc)
+				then
+					passBy = true
+				end
+			end
+		end
+		if nearSpawn or passBy then
 			local locs, units = MapObjectives.GetLotusPoolLocations()
 			local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
+			if passBy then
+				loc, dist = MapObjectives.PickClosestLocation(bot, locs)
+			end
 			local maxWalk = MapObjectives.MaxWalk(bot, true)
 			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
@@ -892,6 +935,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 			end
 			if beside then
+				inLotus = true
+				etaL = -sinceLast
+			end
+			if passBy then
 				inLotus = true
 				etaL = -sinceLast
 			end
@@ -1019,7 +1066,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and not (danger and dist > 700)
 				and (beside or contester or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
 			then
-				note(beside and "beside" or (contester and "contest" or "walk"))
+				note(passBy and "pass-by" or (beside and "beside" or (contester and "contest" or "walk")))
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
 				if beside then
 					-- Has to beat laning and a nearby fight, or Think never runs and they never say it.
@@ -1034,6 +1081,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 				if count ~= nil and count > 0 and #foes == 0 and hp >= 0.45 and not danger then
 					desire = BOT_MODE_DESIRE_ABSOLUTE + 0.02
+				end
+				-- A pass-by detour beats farming or pushing, not a fight or a retreat.
+				if passBy then
+					desire = math.min(desire, 0.7)
 				end
 				return desire, loc, "lotus", etaL
 			end
@@ -1176,6 +1227,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			bot._lotusSkipPool = loc
 			MarkLotusDo(bot, "full")
 			return false
 		end
@@ -1184,6 +1236,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		if count == 0 and MapObjectives.LotusSpawnOpen() then
 			local interval = MapObjectives.LotusInterval()
 			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			bot._lotusSkipPool = loc
 			MarkLotusDo(bot, "empty")
 			return false
 		end
@@ -1191,6 +1244,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
 				local interval = MapObjectives.LotusInterval()
 				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+				bot._lotusSkipPool = loc
 				MarkLotusDo(bot, "stalled")
 				return false
 			end

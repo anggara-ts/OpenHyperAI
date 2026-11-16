@@ -1806,6 +1806,8 @@ function g.FindLeastExpensiveItemSlot()
 	end
 	return cG
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "team_roam", BOT_MODE_TEAM_ROAM)
 if SafeCall then
 	local cH = GetDesire
 	local cI = Think

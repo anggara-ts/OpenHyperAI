@@ -809,6 +809,8 @@ function a.ConsiderCompleteItem()
 	end
 	return 0
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "retreat", BOT_MODE_RETREAT)
 if SafeCall then
 	local aT = GetDesire
 	if aT then

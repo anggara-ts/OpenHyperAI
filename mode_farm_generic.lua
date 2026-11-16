@@ -1118,3 +1118,5 @@ function f.IsLocCanBeSeen(bN)
 		and IsLocationVisible(c4)
 		and IsRadiusVisible(bN, 10)
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "farm", BOT_MODE_FARM)

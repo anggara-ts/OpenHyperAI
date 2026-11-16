@@ -1,0 +1,181 @@
+<title>OpenHyperAI Hero Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; a summary band, shared fixes, open items, then a filterable 127-hero checklist */
+:root {
+  --bg: #f3f4f1; --surface: #ffffff; --fg: #1d2222; --muted: #5f6866; --line: #d9dddb;
+  --accent: #8a5a1c; --accent-soft: #f1e6d4;
+  --chg: #1f5fa8; --chg-soft: #e2ecf8; --flag: #9a6200; --flag-soft: #fbefd6; --ok: #2f7a45; --ok-soft: #e1f1e5;
+  --code-bg: #eceeea;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141817; --surface: #1c2120; --fg: #e4e8e6; --muted: #9aa4a1; --line: #2f3735;
+  --accent: #d9a75e; --accent-soft: #3a2e1d;
+  --chg: #7fb0ec; --chg-soft: #1d2d42; --flag: #e9b65a; --flag-soft: #3a2f17; --ok: #7cc996; --ok-soft: #1b3324;
+  --code-bg: #262c2b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141817; --surface: #1c2120; --fg: #e4e8e6; --muted: #9aa4a1; --line: #2f3735;
+  --accent: #d9a75e; --accent-soft: #3a2e1d;
+  --chg: #7fb0ec; --chg-soft: #1d2d42; --flag: #e9b65a; --flag-soft: #3a2f17; --ok: #7cc996; --ok-soft: #1b3324;
+  --code-bg: #262c2b; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 40px 64px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 700; letter-spacing: .01em; text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(34px, 6vw, 48px); }
+h2 { font-size: 26px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 10px; }
+header p { margin: 0; color: var(--muted); max-width: 66ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 500; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.stat { background: var(--surface); padding: 14px 16px; display: grid; gap: 2px; }
+.stat .n { font-family: var(--display); font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.stat .l { font-size: 13px; color: var(--muted); }
+.stat.chg .n { color: var(--chg); } .stat.flag .n { color: var(--flag); } .stat.ok .n { color: var(--ok); }
+section { display: grid; gap: 14px; }
+section > p { margin: 0; color: var(--muted); max-width: 66ch; }
+.items { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.items li { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.items .what { font-weight: 500; }
+.items .why { color: var(--muted); font-size: 14px; }
+.file { font-family: var(--mono); font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
+code { font-family: var(--mono); font-size: .88em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; overflow-wrap: anywhere; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { font: 500 13px var(--body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip:focus-visible, .search:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.search { flex: 1 1 200px; min-width: 0; font: 14px var(--body); padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
+.btn { font: 500 13px var(--body); background: none; border: none; color: var(--accent); cursor: pointer; padding: 5px 4px; }
+.list { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); overflow: hidden; }
+details { border-top: 1px solid var(--line); }
+details:first-child { border-top: none; }
+summary { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.box { width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid var(--ok); display: grid; place-items: center; color: var(--ok); font-size: 12px; line-height: 1; }
+.hname { font-weight: 600; min-width: 0; }
+.hkey { font-family: var(--mono); font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.counts { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill { font: 600 11px var(--mono); letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
+.pill.CHANGED { background: var(--chg-soft); color: var(--chg); }
+.pill.FLAGGED { background: var(--flag-soft); color: var(--flag); }
+.pill.OK { background: var(--ok-soft); color: var(--ok); }
+.body { padding: 2px 14px 14px 46px; display: grid; gap: 8px; }
+.entry { display: grid; gap: 2px; padding-left: 10px; border-left: 3px solid var(--chg); min-width: 0; }
+.entry.flag { border-left-color: var(--flag); }
+.entry .why { color: var(--muted); font-size: 14px; }
+.ok-note { color: var(--muted); font-size: 14px; margin: 0; }
+.empty { padding: 16px; color: var(--muted); margin: 0; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 520px) {
+  summary { grid-template-columns: 22px 1fr auto; }
+  .counts { display: none; }
+  .body { padding-left: 14px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">OpenHyperAI · patch review</div>
+    <h1>Hero review, all 127 heroes</h1>
+    <p>Every hero in Valve's datafeed hero list was checked against the current patch: ability names, damage types, cast types, special-value keys, Shard and Scepter texts, talents, skill builds and item builds. Obvious gaps were fixed directly in the hero files.</p>
+    <div class="meta">
+      <span>commit <b>9a2d7e6</b></span>
+      <span>build <b>2026.11.16-086</b></span>
+      <span>map <b>0.7.41 - 2026/11/16</b></span>
+      <span>8 parallel reviewers</span>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <section>
+    <h2>What kinds of bugs were found</h2>
+    <ul class="items">
+      <li><span class="what">Special-value keys that no longer exist</span><span class="why">The game returns 0 for a missing key, so kill checks, ranges and radii silently never worked. Examples: Tiny Avalanche, Zeus Lightning Bolt, Lina Dragon Slave, Lion Earth Spike, Enigma Malefice, Jakiro Macropyre, Tidehunter Anchor Smash, Omniknight Martyr, Witch Doctor Cask bounce, Gyrocopter rockets.</span></li>
+      <li><span class="what">Wrong damage types</span><span class="why">Kill checks used magical for physical spells or the reverse (Slardar, Spectre, Ursa, Silencer, Grimstroke, Primal Beast, Monkey King, Kez, Riki, Lina Laguna with Scepter).</span></li>
+      <li><span class="what">Abilities that were never cast</span><span class="why">Never called, gated on the wrong variable or fetched by an old name: Lifestealer Infest, Clinkz Burning Army, Jakiro Liquid Ice, Tiny Tree Volley, Spirit Breaker Planar Pocket, Chen Zealot, Lone Druid Entangle, Shadow Demon Demonic Cleanse and more.</span></li>
+      <li><span class="what">Wrong or empty targets</span><span class="why">Spells aimed at nil, at the bot itself or at the wrong side (Chen Divine Favor on enemies, Silencer Glaives on nil, Night Stalker Void with a Scepter, Centaur Double Edge).</span></li>
+      <li><span class="what">Skill and item builds</span><span class="why">Ultimates placed a level late or at an unlearnable level, an invalid item name (Tidehunter), support builds full of carry items (Kunkka, Snapfire), reversed sell pairs (Outworld Destroyer, Marci, Batrider), duplicate items, unused starting Circlets.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Shared files</h2>
+    <p>Fixes outside the hero files that the reviewers pointed to.</p>
+    <ul class="items" id="shared"></ul>
+  </section>
+
+  <section>
+    <h2>Still open</h2>
+    <p>Flagged but not changed: these need a game test, a design call or a new API.</p>
+    <ul class="items" id="open"></ul>
+  </section>
+
+  <section>
+    <h2>Hero checklist</h2>
+    <div class="tools">
+      <button class="chip" data-f="ALL" aria-pressed="true">All</button>
+      <button class="chip" data-f="CHANGED" aria-pressed="false">Changed</button>
+      <button class="chip" data-f="FLAGGED" aria-pressed="false">Flagged</button>
+      <button class="chip" data-f="OK" aria-pressed="false">OK</button>
+      <input class="search" id="q" type="search" placeholder="Find a hero or an ability" aria-label="Find a hero or an ability">
+      <button class="btn" id="toggle">Expand all</button>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <footer>Sources: Valve datafeed (herodata, itemdata, itemlist) and, for some heroes, the installed game's ability files. No change has been tested in a game yet; branches marked newly live have never run before.</footer>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = s => String(s).split("`").map((p, i) => i % 2 ? "<code>" + esc(p) + "</code>" : esc(p).replace(/(^|[^A-Za-z0-9_])([a-z][a-z0-9]*(?:_[a-z0-9]+)+)/g, (m, a, b) => a + "<code>" + b + "</code>")).join("");
+document.getElementById("stats").innerHTML = [
+  ["", DATA.total, "heroes reviewed"],
+  ["chg", DATA.counts.CHANGED, "hero files changed"],
+  ["flag", DATA.counts.FLAGGED, "flagged, not changed"],
+  ["ok", DATA.counts.OK, "checked, all correct"],
+  ["", DATA.nChanges, "individual fixes"],
+].map(([c, n, l]) => `<div class="stat ${c}"><span class="n">${n}</span><span class="l">${l}</span></div>`).join("");
+document.getElementById("shared").innerHTML = DATA.shared.map(s => `<li><span class="file">${esc(s.file)}</span><span class="what">${fmt(s.what)}</span><span class="why">${fmt(s.why)}</span></li>`).join("");
+document.getElementById("open").innerHTML = DATA.open.map(s => `<li><span class="what">${fmt(s.what)}</span><span class="why">${fmt(s.why)}</span></li>`).join("");
+const list = document.getElementById("list");
+list.innerHTML = DATA.heroes.map((h, i) => {
+  const ent = h.changes.map(c => `<div class="entry"><span>${fmt(c.what)}</span>${c.why ? `<span class="why">${fmt(c.why)}</span>` : ""}</div>`).join("")
+    + h.flags.map(c => `<div class="entry flag"><span>${fmt(c.what)}</span>${c.why ? `<span class="why">${fmt(c.why)}</span>` : ""}</div>`).join("");
+  const note = h.note ? `<p class="ok-note">${fmt(h.note)}</p>` : "";
+  const cnt = [h.changes.length ? h.changes.length + " fix" + (h.changes.length > 1 ? "es" : "") : "", h.flags.length ? h.flags.length + " flag" + (h.flags.length > 1 ? "s" : "") : ""].filter(Boolean).join(" · ");
+  const text = (h.name + " " + h.key + " " + h.note + " " + h.changes.concat(h.flags).map(c => c.what + " " + c.why).join(" ")).toLowerCase();
+  return `<details data-s="${h.status}" data-t="${esc(text)}"><summary><span class="box" aria-hidden="true">✓</span><span class="hname">${esc(h.name)}<span class="hkey">${esc(h.key)}</span></span><span class="counts">${cnt}</span><span class="pill ${h.status}">${h.status}</span></summary><div class="body">${note}${ent}</div></details>`;
+}).join("") + `<p class="empty" id="none" hidden>No hero matches.</p>`;
+let filter = "ALL";
+function apply() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  let shown = 0;
+  list.querySelectorAll("details").forEach(d => {
+    const ok = (filter === "ALL" || d.dataset.s === filter) && (!q || d.dataset.t.includes(q));
+    d.hidden = !ok; if (ok) shown++;
+  });
+  document.getElementById("none").hidden = shown > 0;
+}
+document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+  filter = b.dataset.f;
+  document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  apply();
+}));
+document.getElementById("q").addEventListener("input", apply);
+const tg = document.getElementById("toggle");
+tg.addEventListener("click", () => {
+  const open = tg.textContent === "Expand all";
+  list.querySelectorAll("details:not([hidden])").forEach(d => d.open = open);
+  tg.textContent = open ? "Collapse all" : "Expand all";
+});
+</script>

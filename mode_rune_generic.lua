@@ -1218,11 +1218,18 @@ function a.LaneBusy()
 	if front == nil or GetUnitToLocationDistance(d, front) > 1500 then
 		return false
 	end
-	if #(d:GetNearbyLaneCreeps(1000, true) or {}) == 0 then
+	local theirs = #(d:GetNearbyLaneCreeps(1000, true) or {})
+	if theirs == 0 then
 		return false
 	end
+	-- Pushed: the front within 1600 of their T1 (was 1000), or our creeps near him clearly
+	-- outnumber theirs (game 023, 3:00: Disruptor's lane pushed, he was by the bottom lotus pool
+	-- and the deferral still held).
 	local t1 = LANE_T1[lane] and GetTower(GetOpposingTeam(), LANE_T1[lane]) or nil
-	if t1 ~= nil and GetUnitToLocationDistance(t1, front) <= 1000 then
+	if t1 ~= nil and GetUnitToLocationDistance(t1, front) <= 1600 then
+		return false
+	end
+	if #(d:GetNearbyLaneCreeps(1000, false) or {}) >= theirs + 2 then
 		return false
 	end
 	return true

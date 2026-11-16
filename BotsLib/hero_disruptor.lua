@@ -260,6 +260,21 @@ function a.SkillsComplement()
 	end
 	x, y = a.ConsiderKineticField()
 	if x > 0 then
+		-- Static Storm on the same spot right behind the field when it is ready, an enemy hero
+		-- is inside the field's radius, and he is engaging or in a team fight.
+		local stormOk = (H or K)
+			and s:IsTrained()
+			and s:IsFullyCastable()
+			and b:GetMana() >= q:GetManaCost() + s:GetManaCost()
+			and #(c.GetEnemiesNearLoc(y, q:GetSpecialValueInt("radius")) or {}) >= 1
+		if stormOk then
+			b:Action_ClearActions(false)
+			b:ActionQueue_UseAbilityOnLocation(q, y)
+			b:ActionQueue_Delay(0.05)
+			b:ActionQueue_UseAbilityOnLocation(s, y)
+			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f field-storm at=%.0f,%.0f", DotaTime(), y.x, y.y))
+			return
+		end
 		b:Action_UseAbilityOnLocation(q, y)
 		return
 	end
@@ -754,9 +769,17 @@ function a.ConsiderKineticStorm()
 		if K or H then
 			local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 			local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
+			-- One hero is enough when he is engaging it as his target and it is below 60% HP or he
+			-- has an ally with him (user call: Kinetic Field + Static Storm; the field does not block
+			-- the storm). Before, only 2+ enemy heroes in the field area.
+			local oneOk = false
+			if H and X ~= nil and #X == 1 and c.IsValidHero(G) and X[1] == G then
+				local allies = #(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {})
+				oneOk = c.GetHP(G) < 0.6 or allies >= 2
+			end
 			if
 				X ~= nil
-				and #X >= 2
+				and (#X >= 2 or oneOk)
 				and GetUnitToLocationDistance(b, a8.targetloc) <= M
 				and not c.IsLocationInChrono(a8.targetloc)
 				and not c.IsLocationInBlackHole(a8.targetloc)

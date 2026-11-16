@@ -117,6 +117,15 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(o, u)
 		return
 	end
+	-- Terrorize is considered before Bedlam: casting one puts the other on cooldown (shared levels
+	-- and cooldown), and Bedlam fired on any enemy near Dark Willow in a fight, so the fear was
+	-- almost never cast.
+	A, B = a.ConsiderTerrorize()
+	if A > 0 then
+		b:Action_UseAbilityOnLocation(s, B)
+		D = DotaTime()
+		return
+	end
 	y, z = a.ConsiderBedlam()
 	if y > 0 then
 		b:Action_UseAbility(r)
@@ -126,16 +135,12 @@ function a.SkillsComplement()
 	v = a.ConsiderShadowRealm()
 	if v > 0 then
 		b:Action_UseAbility(p)
+		-- return: without it the Cursed Crown order below replaced Shadow Realm in the same frame.
+		return
 	end
 	w, x = a.ConsiderCurseCrown()
 	if w > 0 then
 		b:Action_UseAbilityOnEntity(q, x)
-		return
-	end
-	A, B = a.ConsiderTerrorize()
-	if A > 0 then
-		b:Action_UseAbilityOnLocation(s, B)
-		D = DotaTime()
 		return
 	end
 end
@@ -326,7 +331,13 @@ function a.ConsiderBedlam()
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
 	end
-	local K = c.GetProperCastRange(false, b, r:GetCastRange())
+	-- Bedlam has no cast range: the wisp circles 200 around her and hits within 300 (datafeed
+	-- roaming_radius, attack_radius). GetProperCastRange(0) gave attack range + 200, so it was cast
+	-- on heroes the wisp could not reach.
+	local K = r:GetSpecialValueInt("roaming_radius") + r:GetSpecialValueInt("attack_radius")
+	if K <= 0 then
+		K = 500
+	end
 	E = c.GetProperTarget(b)
 	local L = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
 	if I then
@@ -384,11 +395,26 @@ function a.ConsiderTerrorize()
 			end
 		end
 		if a6 ~= nil and a5 then
-			return BOT_ACTION_DESIRE_HIGH, ChronodAlly:GetLocation()
+			-- was ChronodAlly (an undefined global), a runtime error every time this case matched
+			return BOT_ACTION_DESIRE_HIGH, a6:GetLocation()
 		end
 		if a3 >= 2 then
 			local a7 = b:FindAoELocation(true, true, b:GetLocation(), K, a0, 0, 0)
 			if a7.count >= 2 then
+				return BOT_ACTION_DESIRE_HIGH, a7.targetloc
+			end
+		end
+		-- Plain team fight: fear 3+ enemies standing in one Terrorize area (1s cast point, so
+		-- predict 1s ahead). Without this the fear only went out for disabled allies, Chrono or
+		-- Arena, and Bedlam took the shared cooldown first.
+		local a7 = b:FindAoELocation(true, true, b:GetLocation(), K, a0 * 0.8, 1.0, 0)
+		if a7 ~= nil and a7.count ~= nil and a7.count >= 3 then
+			local realFeared = c.GetEnemiesNearLoc(a7.targetloc, a0 * 0.8)
+			if realFeared ~= nil and #realFeared >= 3 then
+				if DotaTime() >= (b._terrorizeLogAt or -999) then
+					b._terrorizeLogAt = DotaTime() + 5
+					pcall(print, string.format("[OHA-DARK_WILLOW] t=%.0f terrorize fight heroes=%d", DotaTime(), #realFeared))
+				end
 				return BOT_ACTION_DESIRE_HIGH, a7.targetloc
 			end
 		end

@@ -121,6 +121,10 @@ function a.SkillsComplement()
 	F = I.target
 	C, D = a.ConsiderVacuumWall()
 	if C > 0 then
+		if DotaTime() >= (b._vacWallLogAt or -999) then
+			b._vacWallLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-DARK_SEER] t=%.0f blink-vacuum-wall dist=%d", DotaTime(), GetUnitToLocationDistance(b, D)))
+		end
 		b:Action_ClearActions(false)
 		b:ActionQueue_UseAbilityOnLocation(E, D)
 		b:ActionQueue_Delay(0.1)
@@ -261,6 +265,29 @@ function a.ConsiderIonShell()
 				U = b
 			end
 		end
+		-- W always holds Dark Seer himself, so the "no allies: shell myself" branch above never ran
+		-- and in a fight the shell went out only on a melee ally hit by 2+ units. Fall back to the
+		-- unshelled ally hero (self included) closest to the target, once within shell radius +150.
+		if U == nil and c.IsValidTarget(F) and not c.IsSuspiciousIllusion(F) then
+			local best = nil
+			for O, X in pairs(W or {}) do
+				if
+					c.IsValidHero(X)
+					and not X:IsIllusion()
+					and not X:HasModifier("modifier_dark_seer_ion_shell")
+					and not X:HasModifier("modifier_necrolyte_reapers_scythe")
+					and GetUnitToUnitDistance(X, F) <= L + 150
+					and (best == nil or GetUnitToUnitDistance(X, F) < GetUnitToUnitDistance(best, F))
+				then
+					best = X
+				end
+			end
+			U = best
+			if U ~= nil and DotaTime() >= (b._shellFallbackLogAt or -999) then
+				b._shellFallbackLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DARK_SEER] t=%.0f ion shell fight fallback on=%s", DotaTime(), U:GetUnitName()))
+			end
+		end
 		if U ~= nil then
 			return BOT_ACTION_DESIRE_HIGH, U
 		end
@@ -323,7 +350,8 @@ function a.ConsiderIonShell()
 		local a8 = b:GetNearbyLaneCreeps(L, true)
 		local R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 		local a9 = b:GetNearbyTowers(700, true)
-		if a8 ~= nil and #a8 >= 3 and R ~= nil and #R == 0 and a9 ~= nil and #R == 0 and T >= 2 then
+		-- #a9 == 0: the tower list was fetched but #R was tested twice, so he shelled under towers.
+		if a8 ~= nil and #a8 >= 3 and R ~= nil and #R == 0 and a9 ~= nil and #a9 == 0 and T >= 2 then
 			if c.IsAttacking(b) and c.CanBeAttacked(a8[1]) and not b:HasModifier("modifier_dark_seer_ion_shell") then
 				return BOT_ACTION_DESIRE_HIGH, b
 			end
@@ -382,12 +410,13 @@ function a.ConsiderSurge()
 	if c.IsRetreating(b) and b:GetActiveModeDesire() > 0.75 then
 		local R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 		for O, P in pairs(R) do
+			-- Surge is self-cast here: the chaser being magic immune and Dark Seer wearing his own Ion
+			-- Shell (both copied from the shell branch) have nothing to do with it, and the shell check
+			-- stopped the escape whenever he had shelled himself.
 			if
 				c.IsValidHero(P)
-				and c.CanCastOnNonMagicImmune(P)
 				and c.IsChasingTarget(P, b)
 				and c.IsInRange(b, P, 600)
-				and not b:HasModifier("modifier_dark_seer_ion_shell")
 				and not c.IsSuspiciousIllusion(P)
 				and not c.IsDisabled(P)
 				and not c.IsRealInvisible(b)
@@ -462,7 +491,9 @@ end
 function a.ConsiderVacuumWall()
 	if CanDoVacuumWall() then
 		local ah = t:GetCastPoint() + 0.73
-		local ai = c.GetProperCastRange(false, b, q:GetCastRange())
+		-- The combo blinks onto the spot first, so search within Blink range (1200), not Vacuum's
+		-- 450-600: with Vacuum range the Blink only fired on fights already next to Dark Seer.
+		local ai = math.max(c.GetProperCastRange(false, b, q:GetCastRange()), 1150)
 		local aj = q:GetSpecialValueInt("radius")
 		if c.IsInTeamFight(b, 1600) then
 			local Q = b:FindAoELocation(true, true, b:GetLocation(), ai, aj, ah, 0)

@@ -484,6 +484,36 @@ function a.ConsiderDoom()
 			end
 		end
 	end
+	-- Retreat: Doom was cast only while engaging. Doom silences its target (datafeed: "prevents them
+	-- from casting spells"), so when Doom is low and being hit, put it on the chaser hurting him
+	-- most, so the chaser cannot stun or blink after him.
+	if K and c.GetHP(b) < 0.5 and b:WasRecentlyDamagedByAnyHero(2) then
+		local best, bestDmg = nil, 0
+		for R, W in pairs(c.GetNearbyHeroes(b, 550, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(W)
+				and c.CanCastOnTargetAdvanced(W)
+				and c.IsChasingTarget(W, b)
+				and c.CanCastOnMagicImmune(W)
+				and not c.IsHaveAegis(W) -- same guards as the engage branch
+				and not c.IsSuspiciousIllusion(W)
+				and not W:HasModifier("modifier_doom_bringer_doom")
+				and not W:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				local dmg = W:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_ALL)
+				if dmg > bestDmg then
+					best, bestDmg = W, dmg
+				end
+			end
+		end
+		if best ~= nil then
+			if DotaTime() >= (b._doomRetreatLogAt or -999) then
+				b._doomRetreatLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DOOM] t=%.0f doom retreat target=%s hp=%.2f", DotaTime(), best:GetUnitName(), c.GetHP(b)))
+			end
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 DEVOUR_ABILITIES = {

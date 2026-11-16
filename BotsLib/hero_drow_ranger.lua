@@ -485,7 +485,9 @@ function a.ConsiderGlacier()
 	local ap = c.GetNearbyHeroes(b, a6, true, BOT_MODE_ATTACK)
 	botTarget = c.GetProperTarget(b)
 	local aq = c.GetAlliesNearLoc(b:GetLocation(), 500)
-	if #aq > 1 then
+	-- #R >= 1: an ally within 500 alone cast it (any desire above 0 casts), so Glacier went out every
+	-- 25s in lane or while farming with no enemy hero near. Now only with an enemy hero in range.
+	if #aq > 1 and #R >= 1 then
 		return BOT_ACTION_DESIRE_LOW
 	end
 	if c.IsRetreating(b) and (#R ~= nil and #R >= 2 or c.GetHP(b) < 0.3) then

@@ -351,6 +351,40 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Silence was only cast on channelers and while going on someone. Also cast it in a team fight
+	-- (2+ heroes in the area) and while retreating on a hero chasing her, so the chaser cannot
+	-- cast his stun or gap closer.
+	if c.IsInTeamFight(b, 1200) then
+		local W = c.GetAoeEnemyHeroLocation(b, L, Q, 2)
+		if W ~= nil then
+			if DotaTime() >= (b._dpSilenceFightLogAt or -999) then
+				b._dpSilenceFightLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f silence fight", DotaTime()))
+			end
+			return BOT_ACTION_DESIRE_HIGH, W, "W-Fight"
+		end
+	end
+	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(3.0) then
+		for T, U in pairs(R) do
+			if
+				c.IsValidHero(U)
+				and c.CanCastOnNonMagicImmune(U)
+				and c.IsChasingTarget(U, b)
+				and not c.IsSuspiciousIllusion(U)
+				and not c.IsDisabled(U)
+				and not U:IsSilenced()
+			then
+				S = c.GetCastLocation(b, U, L, Q)
+				if S ~= nil then
+					if DotaTime() >= (b._dpSilenceLogAt or -999) then
+						b._dpSilenceLogAt = DotaTime() + 5
+						pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f silence chaser=%s", DotaTime(), U:GetUnitName()))
+					end
+					return BOT_ACTION_DESIRE_HIGH, S, "W-Retreat:" .. c.Chat.GetNormName(U)
+				end
+			end
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderE()
@@ -419,6 +453,18 @@ function a.ConsiderR()
 			and c.CanCastOnMagicImmune(botTarget)
 		then
 			return BOT_ACTION_DESIRE_HIGH, "R-Attack:" .. c.Chat.GetNormName(botTarget)
+		end
+	end
+	-- Team fight with 2+ enemy heroes inside the spirits' radius (700, datafeed): Exorcism was only
+	-- cast while going on a target, so a fight that came to her was fought without the ultimate.
+	if c.IsInTeamFight(b, 1200) then
+		local nearFoes = c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE)
+		if nearFoes ~= nil and #nearFoes >= 2 then
+			if DotaTime() >= (b._dpExorcismLogAt or -999) then
+				b._dpExorcismLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f exorcism fight heroes=%d", DotaTime(), #nearFoes))
+			end
+			return BOT_ACTION_DESIRE_HIGH, "R-Fight"
 		end
 	end
 	local a1 = b:GetNearbyLaneCreeps(1000, false)

@@ -6248,6 +6248,64 @@ end
 local eT = nil
 a.ConsiderItemDesire["item_dust"] = function(aT)
 	local ek = 1050
+	-- Game 031, 28:40: Dazzle used Glimmer Cape (datafeed: 0.5s fade, 5s invisible) and no Dust
+	-- came; the rules below only catch the half-second fade, or 0.2-0.5s after he vanished within
+	-- 600. An enemy hero seen fading is remembered for 4s; while he is out of sight within 900 of
+	-- where he was last seen (Dust: 1050 around the caster), the closest Dust holder reveals.
+	do
+		local now = DotaTime()
+		b._invisSeen = b._invisSeen or {}
+		for _, eq in pairs(f.GetEnemiesNearLoc(b:GetLocation(), 1600) or {}) do
+			if
+				f.IsValidHero(eq)
+				and f.IsUnitWillGoInvisible(eq)
+				and not f.HasInvisCounterBuff(eq)
+				and not f.IsSuspiciousIllusion(eq)
+			then
+				local pid = eq:GetPlayerID()
+				if b._invisSeen[pid] == nil then
+					b._invisSeen[pid] = { t = now, loc = eq:GetLocation(), name = eq:GetUnitName(), logged = false }
+				else
+					b._invisSeen[pid].loc = eq:GetLocation()
+				end
+			end
+		end
+		for pid, v in pairs(b._invisSeen) do
+			if now - v.t > 4 or not IsHeroAlive(pid) then
+				b._invisSeen[pid] = nil
+			else
+				local info = GetHeroLastSeenInfo(pid)
+				local ls = info ~= nil and info[1] or nil
+				local loc = ls ~= nil and ls.location or v.loc
+				local gone = ls == nil or ls.time_since_seen > 0.1
+				local dist = GetUnitToLocationDistance(b, loc)
+				local closest = f.IsClosestToDustLocation(b, loc)
+				if not v.logged and b:FindItemSlot("item_dust") >= 0 then
+					v.logged = true
+					pcall(print, string.format(
+						"[OHA-DUST] t=%.0f %s saw %s fade dist=%.0f slot=%d closest=%s",
+						now,
+						(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(v.name, "npc_dota_hero_", "")),
+						dist,
+						b:FindItemSlot("item_dust"),
+						tostring(closest)
+					))
+				end
+				if gone and dist <= 900 and closest then
+					b._invisSeen[pid] = nil
+					pcall(print, string.format(
+						"[OHA-DUST] t=%.0f %s dust on %s dist=%.0f",
+						now,
+						(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(v.name, "npc_dota_hero_", "")),
+						dist
+					))
+					return BOT_ACTION_DESIRE_HIGH, b, "none", nil
+				end
+			end
+		end
+	end
 	if eT == nil then
 		eT = GetTeamPlayers(GetOpposingTeam())
 	end

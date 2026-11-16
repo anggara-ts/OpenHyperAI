@@ -6477,6 +6477,7 @@ function a.BannerFromBackpack()
 	-- Forced: the swap wrapper (global_overrides) refuses a swap with an enemy hero within 1000,
 	-- and an enemy base always has one (game 029, 52:33-53:24: 9 tries, the banner never moved).
 	b._swapDespiteEnemies = true
+	b._swapDespiteCooldown = true
 	pcall(print, string.format(
 		"[OHA-BANNER] t=%.0f %s swap slot%d->%d out=%s building=%s dist=%.0f",
 		DotaTime(),

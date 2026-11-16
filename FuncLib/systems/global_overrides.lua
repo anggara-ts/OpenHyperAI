@@ -773,9 +773,19 @@ local function SlotName(unit, slot)
 	return it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
 end
 -- [OHA-ITEM]: every swap that touches the blood grenade, and why a blocked one was refused.
+-- Swaps logged: the grenade, and (game 031: the banner never left the backpack in 24 tries, with
+-- nothing in the log) the banner, Dust and Forager mushrooms.
+local SWAP_WATCH = {
+	blood_grenade = true,
+	roshans_banner = true,
+	dust = true,
+	foragers_health = true,
+	foragers_stats = true,
+	foragers_mana = true,
+}
 local function LogGrenadeSwap(self, aO, aP, result)
 	local a, b = SlotName(self, aO), SlotName(self, aP)
-	if a ~= "blood_grenade" and b ~= "blood_grenade" then
+	if not SWAP_WATCH[a] and not SWAP_WATCH[b] then
 		return
 	end
 	if result ~= "ok" then
@@ -838,6 +848,10 @@ end
 function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	local forced = self._swapDespiteEnemies
 	self._swapDespiteEnemies = nil
+	-- A swap that must not wait for the 11s gap after the last swap (the banner at the enemy base:
+	-- every other routine's swaps keep that gap running).
+	local urgent = self._swapDespiteCooldown
+	self._swapDespiteCooldown = nil
 	-- A branch parked for any other item gets pulled straight back, and that round trip
 	-- leaves it on cooldown. The grenade is the exception: it has to stay throwable.
 	if SwapMovesBranchToBackpack(self, aO, aP) or SwapMovesBranchToBackpack(self, aP, aO) then
@@ -851,7 +865,7 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	end
 	local enemies = #(self:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {})
 	local cooldown = aN - (DotaTime() - self.itemSwapTime)
-	if (forced or enemies == 0) and cooldown < 0 then
+	if (forced or enemies == 0) and (cooldown < 0 or urgent) then
 		self.itemSwapTime = DotaTime()
 		local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
 		-- After a swap the engine ignored, try the slots the other way round once.

@@ -182,6 +182,22 @@ function a.ConsiderPoisonAttack()
 			end
 		end
 	end
+	-- Lane poke with Poison Attack (user call; Viper Strike is no longer used for that). Laning, not
+	-- retreating, over 40% mana and HP: an enemy hero within cast range, not standing under his
+	-- tower, gets one (20 mana, 600 range, slows and stacks).
+	if not E and c.IsInLaningPhase() and G > 0.4 and c.GetHP(b) > 0.4 then
+		for _, N in pairs(c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(N)
+				and c.CanCastOnNonMagicImmune(N)
+				and not c.IsSuspiciousIllusion(N)
+				and not N:IsAttackImmune()
+				and #(N:GetNearbyTowers(750, false) or {}) == 0
+			then
+				return BOT_ACTION_DESIRE_HIGH, N
+			end
+		end
+	end
 	if D then
 		if
 			c.IsValidTarget(C)
@@ -369,96 +385,113 @@ function a.ConsiderNetherToxin()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Viper Strike (datafeed: 750 range, 70/110/150 per second for 6s, breaks passives, 50/40/30s).
+-- Rework (user call, game 031: he ulted a hero to poke in lane and then did nothing; lane pokes are
+-- for Poison Attack). It used to go on any enemy hero within ~830. Now only:
+-- 1. a kill: the full poison kills an enemy hero in range;
+-- 2. a team fight: the best target in range, a core first (estimated position 1-2), then a hero
+--    whose passive matters (the list below), then his attack target;
+-- 3. going on someone: his target in range; while laning only when it is an all-in (target under
+--    60% HP, or our heroes there outnumber his);
+-- 4. Roshan.
+local PASSIVE_HEROES = {
+	npc_dota_hero_bristleback = true,
+	npc_dota_hero_spectre = true,
+	npc_dota_hero_huskar = true,
+	npc_dota_hero_dragon_knight = true,
+	npc_dota_hero_tidehunter = true,
+	npc_dota_hero_phantom_assassin = true,
+	npc_dota_hero_antimage = true,
+	npc_dota_hero_mars = true,
+	npc_dota_hero_centaur = true,
+	npc_dota_hero_necrolyte = true,
+}
+local function StrikeOk(N)
+	return c.IsValidHero(N)
+		and c.CanCastOnNonMagicImmune(N)
+		and c.CanCastOnTargetAdvanced(N)
+		and not c.IsSuspiciousIllusion(N)
+		and not N:HasModifier("modifier_abaddon_borrowed_time")
+		and not N:HasModifier("modifier_dazzle_shallow_grave")
+		and not N:HasModifier("modifier_necrolyte_reapers_scythe")
+		and not N:HasModifier("modifier_oracle_false_promise_timer")
+		and not N:HasModifier("modifier_item_aeon_disk_buff")
+		and not N:HasModifier("modifier_item_sphere_target")
+end
+local function LogStrike(why, N)
+	pcall(print, string.format(
+		"[OHA-VIPER] t=%.0f strike why=%s target=%s hp=%.2f",
+		DotaTime(),
+		why,
+		(string.gsub(N:GetUnitName(), "npc_dota_hero_", "")),
+		c.GetHP(N)
+	))
+end
 function a.ConsiderViperStrike()
 	if not t:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local H = t:GetCastRange()
-	local J = t:GetSpecialValueInt("damage")
-	local K = t:GetSpecialValueInt("duration")
-	local Z = c.GetNearbyHeroes(b, H + 80, true, BOT_MODE_NONE)
-	local _ = c.GetVulnerableWeakestUnit(b, true, true, H + 80)
-	if D then
-		local P = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-		for M, N in pairs(P) do
-			if
-				c.IsValidTarget(N)
-				and c.CanCastOnTargetAdvanced(N)
-				and J + K < N:GetHealth()
-				and not N:HasModifier("modifier_abaddon_borrowed_time")
-				and not N:HasModifier("modifier_dazzle_shallow_grave")
-				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not N:HasModifier("modifier_oracle_false_promise_timer")
-				and not N:HasModifier("modifier_item_aeon_disk_buff")
-				and not N:HasModifier("modifier_item_blade_mail_reflect")
-			then
-				local O = c.GetNearbyHeroes(N, 1200, true, BOT_MODE_NONE)
-				local V = c.GetNearbyHeroes(N, 1200, false, BOT_MODE_NONE)
-				if O ~= nil and V ~= nil and #O >= #V then
-					if
-						N:GetUnitName() == "npc_dota_hero_bristleback"
-						or N:GetUnitName() == "npc_dota_hero_spectre"
-						or N:GetUnitName() == "npc_dota_hero_huskar"
-						or N:GetUnitName() == "npc_dota_hero_dragon_knight"
-						or N:GetUnitName() == "npc_dota_hero_tidehunter"
-						or N:GetUnitName() == "npc_dota_hero_phantom_assassin"
-						or N:GetUnitName() == "npc_dota_hero_antimage"
-						or N:GetUnitName() == "npc_dota_hero_mars"
-						or N:GetUnitName() == "npc_dota_hero_centaur"
-						or N:GetUnitName() == "npc_dota_hero_necrolyte"
-					then
-						return BOT_ACTION_DESIRE_HIGH, N
-					end
-				end
-			end
+	local H = t:GetCastRange() + 50
+	local total = t:GetSpecialValueInt("damage") * t:GetSpecialValueInt("duration")
+	local inRange = {}
+	for _, N in pairs(c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE) or {}) do
+		if StrikeOk(N) then
+			inRange[#inRange + 1] = N
 		end
 	end
-	if c.IsValidHero(Z[1]) and not c.IsSuspiciousIllusion(Z[1]) then
-		if _ ~= nil then
-			if
-				_:GetHealth() < _:GetActualIncomingDamage(J * K, DAMAGE_TYPE_MAGICAL)
-				and c.CanCastOnNonMagicImmune(_)
-				and not c.IsSuspiciousIllusion(_)
-				and not _:HasModifier("modifier_abaddon_borrowed_time")
-				and not _:HasModifier("modifier_dazzle_shallow_grave")
-				and not _:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not _:HasModifier("modifier_oracle_false_promise_timer")
-				and not _:HasModifier("modifier_item_sphere_target")
-			then
-				return BOT_ACTION_DESIRE_HIGH, _
-			end
-			if c.IsValidHero(C) then
-				if
-					c.IsInRange(b, C, H + 75)
-					and c.CanCastOnNonMagicImmune(C)
-					and c.CanCastOnTargetAdvanced(C)
-					and not c.IsSuspiciousIllusion(C)
-					and not C:HasModifier("modifier_necrolyte_reapers_scythe")
-					and not C:HasModifier("modifier_item_sphere_target")
-				then
-					return BOT_ACTION_DESIRE_HIGH, C
-				else
-					if c.CanCastOnTargetAdvanced(_) then
-						return BOT_ACTION_DESIRE_HIGH, _
-					end
-				end
-			end
-		end
-		if
-			c.CanCastOnNonMagicImmune(Z[1])
-			and c.CanCastOnTargetAdvanced(Z[1])
-			and not Z[1]:HasModifier("modifier_abaddon_borrowed_time")
-			and not Z[1]:HasModifier("modifier_dazzle_shallow_grave")
-			and not Z[1]:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not Z[1]:HasModifier("modifier_oracle_false_promise_timer")
-			and not Z[1]:HasModifier("modifier_item_sphere_target")
-		then
-			return BOT_ACTION_DESIRE_HIGH, Z[1]
-		end
-	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(C) and c.IsInRange(b, C, 500) and F and not C:HasModifier("modifier_roshan_spell_block") then
+	if #inRange == 0 then
+		if c.IsDoingRoshan(b) and c.IsRoshan(C) and c.IsInRange(b, C, 500) and F and not C:HasModifier("modifier_roshan_spell_block") then
 			return BOT_ACTION_DESIRE_HIGH, C
+		end
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	-- 1. A kill.
+	for _, N in ipairs(inRange) do
+		if N:GetHealth() < N:GetActualIncomingDamage(total, DAMAGE_TYPE_MAGICAL) then
+			LogStrike("kill", N)
+			return BOT_ACTION_DESIRE_HIGH, N
+		end
+	end
+	-- 2. A team fight: a core, then a passive hero, then his target.
+	if c.IsInTeamFight(b, 1200) then
+		local core, passive = nil, nil
+		for _, N in ipairs(inRange) do
+			local okP, pos = pcall(c.GetPosition, N)
+			if core == nil and okP and type(pos) == "number" and pos <= 2 then
+				core = N
+			end
+			if passive == nil and PASSIVE_HEROES[N:GetUnitName()] then
+				passive = N
+			end
+		end
+		local pick = core or passive
+		if pick == nil and c.IsValidHero(C) then
+			for _, N in ipairs(inRange) do
+				if N == C then
+					pick = N
+				end
+			end
+		end
+		if pick ~= nil then
+			LogStrike(pick == core and "fight-core" or (pick == passive and "fight-passive" or "fight-target"), pick)
+			return BOT_ACTION_DESIRE_HIGH, pick
+		end
+	end
+	-- 3. Going on someone: his target; while laning only on an all-in.
+	if D and c.IsValidHero(C) then
+		for _, N in ipairs(inRange) do
+			if N == C then
+				local allIn = true
+				if c.IsInLaningPhase() then
+					local ours = #(c.GetNearbyHeroes(C, 1200, true, BOT_MODE_NONE) or {})
+					local theirs = #(c.GetNearbyHeroes(C, 1200, false, BOT_MODE_NONE) or {})
+					allIn = c.GetHP(C) < 0.6 or ours > theirs
+				end
+				if allIn then
+					LogStrike("engage", N)
+					return BOT_ACTION_DESIRE_HIGH, N
+				end
+			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

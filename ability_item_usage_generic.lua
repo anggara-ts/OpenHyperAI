@@ -6394,6 +6394,78 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Roshan's Banner (datafeed: placed within 1200, 120s, buffs our lane creeps in a 600/900/1200
+-- radius by level; can be destroyed, melee heroes hit it twice as hard). Bots had no rule for it.
+-- Pushing (user call): planted behind our wave once the wave is at an enemy tower, barracks or
+-- the ancient, so the creeps fighting the building get the buff. One banner per push.
+a.ConsiderItemDesire["item_roshans_banner"] = function(bm)
+	if not f.IsPushing(b) or b:WasRecentlyDamagedByAnyHero(1.5) and f.GetHP(b) < 0.4 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local building = nil
+	local bd = 99999
+	local cands = {}
+	for _, t in pairs(b:GetNearbyTowers(1600, true) or {}) do
+		table.insert(cands, t)
+	end
+	for _, r in pairs(b:GetNearbyBarracks(1600, true) or {}) do
+		table.insert(cands, r)
+	end
+	local anc = GetAncient(GetOpposingTeam())
+	if anc ~= nil and GetUnitToUnitDistance(b, anc) <= 1600 then
+		table.insert(cands, anc)
+	end
+	for _, u in ipairs(cands) do
+		if f.IsValidBuilding(u) and not u:IsInvulnerable() then
+			local d0 = GetUnitToUnitDistance(b, u)
+			if d0 < bd then
+				building, bd = u, d0
+			end
+		end
+	end
+	if building == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- Our creeps at the building (within 900 of it).
+	local wave = {}
+	for _, cr in pairs(b:GetNearbyLaneCreeps(1600, false) or {}) do
+		if f.IsValid(cr) and GetUnitToUnitDistance(cr, building) <= 900 then
+			table.insert(wave, cr)
+		end
+	end
+	if #wave < 3 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- Not on top of another of our banners.
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
+		if
+			u ~= nil
+			and not u:IsNull()
+			and u:IsAlive()
+			and string.find(u:GetUnitName(), "roshans_banner")
+			and GetUnitToUnitDistance(u, building) <= 1500
+		then
+			return BOT_ACTION_DESIRE_NONE
+		end
+	end
+	-- Behind the wave, 250 toward our fountain from its center: the creeps stay in the radius,
+	-- and the banner is not the first thing the building shoots.
+	local loc = f.GetXUnitsTowardsLocation2(f.GetCenterOfUnits(wave), f.GetTeamFountain(), 250)
+	if GetUnitToLocationDistance(b, loc) > 1150 or not IsLocationPassable(loc) then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	pcall(print, string.format(
+		"[OHA-BANNER] t=%.0f %s plant at=%.0f,%.0f building=%s dist=%.0f creeps=%d",
+		DotaTime(),
+		(string.gsub(c, "npc_dota_hero_", "")),
+		loc.x,
+		loc.y,
+		(string.gsub(building:GetUnitName(), "npc_dota_", "")),
+		bd,
+		#wave
+	))
+	return BOT_ACTION_DESIRE_HIGH, loc, "ground", nil
+end
 a.ConsiderItemDesire["item_trusty_shovel"] = function(bm)
 	if GetTeamMember(1):IsBot() then
 		return BOT_ACTION_DESIRE_NONE

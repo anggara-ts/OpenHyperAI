@@ -237,6 +237,9 @@ function a.ConsiderIcarusDive()
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Not diving now: clear the reason flags so a past retreat dive does not make the next engage
+	-- dive stop halfway (they were never reset before).
+	b.icarus_dive_kill, b.icarus_dive_engage, b.icarus_dive_stuck, b.icarus_dive_retreat = false, false, false, false
 	local U = o:GetSpecialValueInt("dash_length")
 	local V = o:GetSpecialValueInt("dash_width")
 	local W = o:GetSpecialValueInt("hp_cost_perc") / 100 * b:GetHealth()
@@ -315,9 +318,11 @@ function a.ConsiderIcarusDive()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderIcarusDiveStop()
+	-- Stop only exists DURING the dive: the old guard returned when Phoenix had the dive modifier, so Stop
+	-- never fired and a retreat dive (an arc of dive_duration 2s) carried Phoenix back to where it started.
 	if
 		not c.CanCastAbility(p)
-		or b:HasModifier("modifier_phoenix_icarus_dive")
+		or not b:HasModifier("modifier_phoenix_icarus_dive")
 		or b:HasModifier("modifier_phoenix_supernova_hiding")
 	then
 		return BOT_ACTION_DESIRE_NONE
@@ -328,7 +333,12 @@ function a.ConsiderIcarusDiveStop()
 		end
 	end
 	if b.icarus_dive_stuck or b.icarus_dive_retreat then
+		-- Half of the 2s arc is the far end, nearest the fountain.
 		if DotaTime() > J + K / 2 then
+			if DotaTime() >= (b._diveStopLogAt or -999) then
+				b._diveStopLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), c.GetHP(b)))
+			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

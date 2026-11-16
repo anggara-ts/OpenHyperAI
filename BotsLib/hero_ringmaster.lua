@@ -169,14 +169,18 @@ function a.SkillsComplement()
 		return
 	end
 	E, F = a.ConsiderEscapeAct()
+	-- return after queueing: without it a later Action_* (Tonic, Funhouse Mirror, Unicycle) in the same
+	-- think replaced the queue, so the Box save or the dagger was dropped.
 	if E > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnEntity(q, F)
+		return
 	end
 	G, H = a.ConsiderImpalementArts()
 	if G > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(r, H)
+		return
 	end
 	N, O = a.ConsiderStrongmanTonic()
 	if N > 0 then
@@ -614,9 +618,14 @@ function a.ConsiderSpotlight()
 	local a9 = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local aa = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	if c.IsInTeamFight(b, 1200) then
-		local ad = b:FindAoELocation(false, true, b:GetLocation(), a2, am, 0, 0)
-		local aw = c.GetAlliesNearLoc(ad.targetloc, am)
+		-- datafeed: the light makes ENEMIES miss and reveals them; this searched for a spot with 2+ allies.
+		local ad = b:FindAoELocation(true, true, b:GetLocation(), a2, am, 0, 0)
+		local aw = c.GetEnemiesNearLoc(ad.targetloc, am)
 		if #aw >= 2 then
+			if DotaTime() >= (b._spotlightLogAt or -999) then
+				b._spotlightLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-RINGMASTER] t=%.0f spotlight on %d enemies", DotaTime(), #aw))
+			end
 			return BOT_ACTION_DESIRE_HIGH, ad.targetloc
 		end
 	end
@@ -666,7 +675,10 @@ function a.ConsiderWheelOfWonder()
 	if c.IsInTeamFight(b, 1600) then
 		local ad = b:FindAoELocation(true, true, b:GetLocation(), a2, am, 0, 0)
 		local ax = c.GetEnemiesNearLoc(ad.targetloc, am)
-		if #ax >= 2 then
+		-- datafeed: Wheel has a 700 minimum range (min_range). A spot much closer than that makes the wheel
+		-- stop past the group, so skip spots nearer than min_range minus most of the mesmerize radius.
+		local minRange = t:GetSpecialValueInt("min_range")
+		if #ax >= 2 and GetUnitToLocationDistance(b, ad.targetloc) >= minRange - am * 0.6 then
 			return BOT_ACTION_DESIRE_HIGH, ad.targetloc
 		end
 	end
@@ -692,7 +704,8 @@ function a.ConsiderFunhouseMirror()
 		end
 	end
 	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(W) or c.IsTormentor(b)) and c.IsInRange(b, W, 900) and _ then
+		-- was c.IsTormentor(b) (Ringmaster himself), never true
+		if (c.IsRoshan(W) or c.IsTormentor(W)) and c.IsInRange(b, W, 900) and _ then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -827,11 +840,20 @@ function a.ConsiderUnicycle()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- It checked c.IsValid(aE) instead of the attacker and never asked what the enemy was attacking, so any
+-- visible enemy hero or tower made it true: Box on self below 25% HP and Tonic on self below 50% fired
+-- anywhere on the map. Now the enemy must be attacking aE.
 function a.IsBeingAttacked(aE)
+	if not c.IsValid(aE) then
+		return false
+	end
 	for ab, ac in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if c.IsValid(aE) then
+		if c.IsValid(ac) then
 			local aF = ac:GetUnitName()
-			if c.IsValidHero(ac) or c.IsValidBuilding(ac) or string.find(aF, "warlock_golem") then
+			if
+				(c.IsValidHero(ac) or c.IsValidBuilding(ac) or string.find(aF, "warlock_golem"))
+				and ac:GetAttackTarget() == aE
+			then
 				return true
 			end
 		end

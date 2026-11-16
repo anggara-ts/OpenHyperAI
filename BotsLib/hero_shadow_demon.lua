@@ -376,7 +376,9 @@ function a.ConsiderShadowPoisonRelease()
 		if c.IsValidHero(enemyHero) and c.IsInRange(enemyHero, b, 3000) and not c.IsSuspiciousIllusion(enemyHero) then
 			local Z = c.GetModifierCount(enemyHero, "modifier_shadow_demon_shadow_poison")
 			local _ = r:GetSpecialValueFloat("stack_damage")
-			if Z >= 5 or Z > 0 and c.CanKillTarget(enemyHero, _ * Z * Y[Z], DAMAGE_TYPE_MAGICAL) then
+			-- datafeed: release deals 1/2/4/8/16 times the stack damage for 1-5 stacks. The extra "* Z"
+			-- overrated it (3 stacks counted 12x instead of 4x), so Release fired early on targets it could not kill.
+			if Z >= 5 or Z > 0 and c.CanKillTarget(enemyHero, _ * Y[Z], DAMAGE_TYPE_MAGICAL) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

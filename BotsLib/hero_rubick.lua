@@ -199,6 +199,9 @@ function a.ConsiderTelekinesis()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local J = c.GetProperCastRange(false, b, q:GetCastRange())
+	-- Clear the landing reason: flags were only cleared when Land was cast, so a lift that ended without
+	-- a Land left a stale flag that the next lift's landing used first.
+	b.isChannelLand, b.isSaveUltLand, b.isEngagingLand, b.isRetreatLand, b.isSaveAllyLand = false, false, false, false, false
 	local I = c.GetNearbyHeroes(b, J + 300, true, BOT_MODE_NONE)
 	for K, L in pairs(I) do
 		if
@@ -216,7 +219,9 @@ function a.ConsiderTelekinesis()
 	if c.IsGoingOnSomeone(b) then
 		local M = c.GetAlliesNearLoc(b:GetLocation(), 1200)
 		local N = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-		for K, O in pairs(M) do
+		-- Telekinesis targets ENEMY units (game files); only the Shard adds teammates
+		-- (shard_teammate_throw_delay). Without it this order on an ally is refused every frame.
+		for K, O in pairs(c.HasAghanimsShard(b) and M or {}) do
 			if
 				c.IsValidHero(O)
 				and c.IsCore(O)
@@ -319,11 +324,11 @@ function a.ConsiderTelekinesisLand()
 	if r:IsHidden() or not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local S = r:GetSpecialValueInt("radius")
-	local T =
-		SafeAbility(b:GetAbilityByName("special_bonus_unique_rubick_8"), "special_bonus_unique_rubick_8", "rubick")
-	if T:IsTrained() then
-		S = S + T:GetSpecialValueInt("value")
+	-- Throw distance is Telekinesis' max_land_distance (375, Shard +225), not the impact "radius"; the
+	-- rubick_8 talent is landing DAMAGE (game files), so it no longer adds 300 to the distance.
+	local S = q:GetSpecialValueInt("max_land_distance")
+	if S <= 0 then
+		S = 375
 	end
 	local M = c.GetAlliesNearLoc(b:GetLocation(), 1200)
 	local N = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
@@ -351,14 +356,32 @@ function a.ConsiderTelekinesisLand()
 		if b.isEngagingLand ~= nil and b.isEngagingLand == true then
 			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
 		end
+		-- datafeed: Land "throws the enemy in a targeted direction", so the point is read from the lifted
+		-- unit. Both cases aimed S units from RUBICK (retreat) or toward OUR fountain (save-ally), which
+		-- dropped the chaser next to Rubick or onto the fleeing ally. Throw it toward its own fountain.
 		if b.isRetreatLand ~= nil and b.isRetreatLand == true then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEnemyFountain(), S)
+			a.LogLand("retreat")
+			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b.teleTarget, c.GetEnemyFountain(), S)
 		end
 		if b.isSaveAllyLand ~= nil and b.isSaveAllyLand == true then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), S)
+			a.LogLand("save-ally")
+			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b.teleTarget, c.GetEnemyFountain(), S)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-RUBICK] telekinesis land why, at most once per 5s.
+function a.LogLand(why)
+	if DotaTime() < (b._landLogAt or -999) then
+		return
+	end
+	b._landLogAt = DotaTime() + 5
+	pcall(print, string.format(
+		"[OHA-RUBICK] t=%.0f tele-land %s target=%s",
+		DotaTime(),
+		why,
+		c.IsValid(b.teleTarget) and b.teleTarget:GetUnitName() or "-"
+	))
 end
 function a.ConsiderFadeBolt()
 	if not s:IsFullyCastable() then
@@ -573,20 +596,45 @@ function a.ConsiderSpellSteal()
 			and not c.IsMeepoClone(L)
 		then
 			if L:IsUsingAbility() or L:IsCastingAbility() or c.IsCastingUltimateAbility(L) or L:GetLevel() > 10 then
-				local a0 = f.GetSpellReplaceWeight(t) * 100
-				local a1 = RandomInt(1, 70)
+				-- The weight table is keyed by spell NAME; passing the handle always gave the default 1,
+				-- and "weight*100*100 >= rand(1,70)" was always true, so Rubick re-stole every cooldown and
+				-- threw away good stolen spells. Now: weight of the held spell (0 keep .. 1 replace) against
+				-- a roll that is redrawn only every 15s (a per-frame roll passes within a second anyway).
+				if DotaTime() >= (b._stealRollAt or -999) then
+					b._stealRollAt = DotaTime() + 15
+					b._stealRoll = RandomInt(1, 100)
+					b._stealRoll2 = RandomInt(1, 100)
+				end
+				local a0 = f.GetSpellReplaceWeight(t:GetName()) * 100
+				local a1 = b._stealRoll
+				local steal = false
 				if b:HasScepter() then
-					local a2 = f.GetSpellReplaceWeight(u) * 100
-					if a0 * 100 >= a1 and a2 * 100 >= RandomInt(1, 70) then
-						return BOT_ACTION_DESIRE_HIGH, L
+					local a2 = f.GetSpellReplaceWeight(u:GetName()) * 100
+					if a0 >= a1 and a2 >= b._stealRoll2 then
+						steal = true
 					end
-					if a2 * 100 >= a1 then
-						return BOT_ACTION_DESIRE_HIGH, L
+					if a2 >= a1 then
+						steal = true
 					end
 				else
-					if a0 * 100 >= a1 then
-						return BOT_ACTION_DESIRE_HIGH, L
+					if a0 >= a1 then
+						steal = true
 					end
+				end
+				if steal then
+					if DotaTime() >= (b._stealLogAt or -999) then
+						b._stealLogAt = DotaTime() + 5
+						pcall(print, string.format(
+							"[OHA-RUBICK] t=%.0f spell-steal from=%s held=%s w=%.0f roll=%d",
+							DotaTime(),
+							(string.gsub(L:GetUnitName(), "npc_dota_hero_", "")),
+							t:GetName(),
+							a0,
+							a1
+						))
+					end
+					b._stealRollAt = -999
+					return BOT_ACTION_DESIRE_HIGH, L
 				end
 			end
 		end

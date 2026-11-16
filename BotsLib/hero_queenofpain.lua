@@ -415,7 +415,8 @@ function a.ConsiderE()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
-		if c.IsValidHero(botTarget) and c.IsInRange(botTarget, b, ac - 20) and c.CanCastOnMagicImmune(botTarget) then
+		-- Scream of Pain is SPELL_IMMUNITY_ENEMIES_NO (game files): a magic-immune target takes nothing.
+		if c.IsValidHero(botTarget) and c.IsInRange(botTarget, b, ac - 20) and c.CanCastOnNonMagicImmune(botTarget) then
 			S = botTarget
 			T = "E-攻击" .. c.Chat.GetNormName(S)
 			return BOT_ACTION_DESIRE_HIGH, S, T

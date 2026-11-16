@@ -431,7 +431,21 @@ function a.ConsiderChakramReturn()
 			af = af + 1
 		end
 	end
-	if S < 0.15 or GetUnitToLocationDistance(b, I) > 1600 or af == 0 then
+	-- Count enemy heroes under the blade too: "af == 0" counted only creeps, so a Chakram thrown at heroes
+	-- (no creeps there) was recalled the moment it stopped, wasting its damage over time and slow.
+	local heroesUnder = 0
+	for U, V in pairs(c.GetEnemiesNearLoc(I, P)) do
+		if c.IsValidHero(V) then
+			heroesUnder = heroesUnder + 1
+		end
+	end
+	if heroesUnder > 0 and af == 0 and S >= 0.15 and GetUnitToLocationDistance(b, I) <= 1600 then
+		if DotaTime() >= (b._chakramLogAt or -999) then
+			b._chakramLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-SHREDDER] t=%.0f chakram kept on %d heroes", DotaTime(), heroesUnder))
+		end
+	end
+	if S < 0.15 or GetUnitToLocationDistance(b, I) > 1600 or af + heroesUnder == 0 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if N or M then
@@ -480,6 +494,8 @@ function StillTraveling(ak)
 	for U, am in pairs(al) do
 		if
 			am ~= nil
+			-- ability can be nil on a linear projectile (hero_ancient_apparition guards it too)
+			and am.ability ~= nil
 			and (
 				ak == 1 and am.ability:GetName() == "shredder_chakram"
 				or ak == 2 and am.ability:GetName() == "shredder_chakram_2"

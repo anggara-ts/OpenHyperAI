@@ -494,7 +494,9 @@ function a.ConsiderR()
 			local ae = GetUnitList(UNIT_LIST_ALLIES)
 			for T, af in pairs(ae) do
 				if string.find(af:GetUnitName(), "nether_ward") and c.IsInRange(b, af, L) then
-					return BOT_ACTION_DESIRE_HIGH, af, "Nether Ward" .. c.Chat.GetNormName(botTarget)
+					-- The debug label read GetNormName(botTarget), which errors when botTarget is nil
+					-- and aborted the whole think; the ward's own name is enough.
+					return BOT_ACTION_DESIRE_HIGH, af, "Nether Ward"
 				end
 			end
 		end

@@ -97,9 +97,10 @@ local s = SafeAbility(
 	"ancient_apparition_ice_blast_release",
 	"ancient_apparition"
 )
+-- datafeed: the AoE Cold Feet talent is special_bonus_unique_ancient_apparition_1; _7 is now Chilling Touch range
 local t = SafeAbility(
-	b:GetAbilityByName("special_bonus_unique_ancient_apparition_7"),
-	"special_bonus_unique_ancient_apparition_7",
+	b:GetAbilityByName("special_bonus_unique_ancient_apparition_1"),
+	"special_bonus_unique_ancient_apparition_1",
 	"ancient_apparition"
 )
 local u, v
@@ -262,7 +263,8 @@ function a.ConsiderIceVortex()
 	if c.IsInTeamFight(b, 1200) then
 		local L = b:FindAoELocation(true, true, b:GetLocation(), K, T, 0, 0)
 		local R = c.GetEnemiesNearLoc(L.targetloc, T)
-		if R ~= nil and #R and GetUnitToLocationDistance(b, L.targetloc) <= K then
+		-- fix: `#R` alone is always true; require an enemy hero in the vortex
+		if R ~= nil and #R >= 1 and GetUnitToLocationDistance(b, L.targetloc) <= K then
 			return BOT_ACTION_DESIRE_HIGH, L.targetloc
 		end
 	end

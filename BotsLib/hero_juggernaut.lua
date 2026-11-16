@@ -59,7 +59,9 @@ local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "juggernaut")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "juggernaut")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "juggernaut")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "juggernaut")
-local s = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "juggernaut")
+-- datafeed: Swift Slash is granted by Aghanim's Scepter; fetch it by name, since entry 4 of the ability list is
+-- not guaranteed to be it (the hero also has the innate Bladeform).
+local s = SafeAbility(b:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
 local t = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "juggernaut")
 local u = SafeAbility(b:GetAbilityByName(f[6]), "sTalentList[6]", "juggernaut")
 local v, w

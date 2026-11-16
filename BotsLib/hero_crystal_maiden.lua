@@ -74,7 +74,13 @@ local p = 0
 local q = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "crystal_maiden")
 local r = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "crystal_maiden")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "crystal_maiden")
-local t = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "crystal_maiden")
+-- datafeed: Crystal Clone is granted by the Shard; fetch it by name, since entry 4 of the ability list is
+-- not guaranteed to be it (the hero also has the innate Glacial Guard).
+local t = SafeAbility(
+	b:GetAbilityByName("crystal_maiden_crystal_clone"),
+	"crystal_maiden_crystal_clone",
+	"crystal_maiden"
+)
 local u = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "crystal_maiden")
 local v = SafeAbility(
 	b:GetAbilityByName("crystal_maiden_brilliance_aura"),

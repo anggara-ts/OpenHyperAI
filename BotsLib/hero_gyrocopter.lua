@@ -94,7 +94,8 @@ function a.ConsiderRocketBarrage()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local B = o:GetSpecialValueInt("radius")
-	local C = o:GetSpecialValueInt("value")
+	-- datafeed: per-rocket damage is "rocket_damage"; "value" does not exist (read 0, no kill check)
+	local C = o:GetSpecialValueInt("rocket_damage")
 	local D = o:GetSpecialValueInt("rockets_per_second")
 	local E = 3
 	local F = o:GetLevel()
@@ -184,7 +185,8 @@ function a.ConsiderHomingMissile()
 	end
 	local O = p:GetCastRange()
 	local P = p:GetSpecialValueFloat("pre_flight_time")
-	local C = p:GetAbilityDamage()
+	-- datafeed: Homing Missile damage is "hit_damage" (90/180/270/360); there is no AbilityDamage
+	local C = p:GetSpecialValueInt("hit_damage")
 	local G = b:GetMana() / b:GetMaxMana()
 	y = c.GetProperTarget(b)
 	local H = c.GetNearbyHeroes(b, O, true, BOT_MODE_NONE)
@@ -349,7 +351,8 @@ function a.ConsiderCallDown()
 	local O = r:GetCastRange()
 	local W = r:GetCastPoint()
 	local B = r:GetSpecialValueInt("radius")
-	local C = r:GetSpecialValueInt("damage_first")
+	-- datafeed: per-strike damage is "damage" (200/350/500); "damage_first" no longer exists
+	local C = r:GetSpecialValueInt("damage")
 	if A then
 		local X = b:FindAoELocation(true, true, b:GetLocation(), O, B / 2, W, 0)
 		if X.count >= 2 then

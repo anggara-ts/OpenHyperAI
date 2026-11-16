@@ -359,7 +359,9 @@ function a.ConsiderFiendsGate()
 					and #I == 0
 					and #S == 0
 				then
-					local R = c.GetCenterOfUnits(V:GetExtrapolatedLocation(1))
+					-- GetCenterOfUnits takes a unit list; given a Vector it gave Vector(0,0) (map centre)
+				-- or errored. Open the portal at the ally's predicted spot instead.
+				local R = V:GetExtrapolatedLocation(1)
 					if
 						IsLocationPassable(R)
 						and not c.IsLocationInChrono(R)

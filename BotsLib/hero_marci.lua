@@ -95,9 +95,11 @@ m["pos_5"] = {
 }
 a["sBuyList"] = m[h]
 local n = {}
-n["pos_1"] = { "item_magic_wand", "item_greater_crit", "item_armlet", "item_abyssal_blade" }
+-- Pairs are { owned, sold }: the old order sold Daedalus once she held a Wand, Abyssal once she held
+-- Armlet, and Nullifier once she held a Wand. Swapped so the late item replaces the early one.
+n["pos_1"] = { "item_greater_crit", "item_magic_wand", "item_abyssal_blade", "item_armlet" }
 n["pos_2"] = n["pos_1"]
-n["pos_3"] = { "item_magic_wand", "item_nullifier" }
+n["pos_3"] = { "item_nullifier", "item_magic_wand" }
 n["pos_4"] = { "item_quelling_blade" }
 n["pos_5"] = { "item_quelling_blade" }
 a["sSellList"] = n[h] or {}

@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 2, 6, 2, 2, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+-- j[2]: Flaming Lasso moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
 local k
 local l
 if h == "pos_2" then
@@ -104,8 +105,8 @@ m["pos_5"] = {
 	"item_moon_shard",
 }
 a["sBuyList"] = m[h]
-Pos2SellList = { "item_branches", "item_bottle", "item_magic_wand" }
-Pos3SellList = { "item_magic_wand" }
+-- sSellList is read in pairs {owned, sold}. The per-position lists that used to overwrite it were
+-- broken: pos_2 sold the Bottle as soon as Iron Branches were held, the pos_3 one-entry list sold nothing.
 a["sSellList"] = {
 	"item_shivas_guard",
 	"item_branches",
@@ -114,11 +115,6 @@ a["sSellList"] = {
 	"item_black_king_bar",
 	"item_magic_wand",
 }
-if h == "pos_2" then
-	a["sSellList"] = Pos2SellList
-else
-	a["sSellList"] = Pos3SellList
-end
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
 end

@@ -358,8 +358,10 @@ function a.ConsiderWhirlingAxesMelee()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local P = q:GetSpecialValueInt("max_range")
-	local R = q:GetSpecialValueInt("damage")
+	-- datafeed: max_range and damage belong to Whirling Axes (Melee) (r); read from the ranged
+	-- axes (q) they were 0, so the search radius was 0.
+	local P = r:GetSpecialValueInt("max_range")
+	local R = r:GetSpecialValueInt("damage")
 	local G = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
 	for L, M in pairs(G) do
 		if

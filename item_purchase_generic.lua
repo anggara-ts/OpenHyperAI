@@ -2246,7 +2246,10 @@ end
 -- - early boots once Boots of Travel is owned,
 -- - a standalone early item that nothing left in the build is made from (Helm of Iron Will:
 --   game 016, Doom still carried it at 53:00 because his team item was not Crimson Guard).
-local UNUSED_SELL = { item_helm_of_iron_will = true }
+-- Item -> earliest game time it may be sold once nothing left in the build uses it. Circlet: a
+-- starting stat item in many builds that is never turned into a Wraith Band / Null Talisman / Bracer
+-- (game 033, 20:00: Death Prophet still carried hers; 20 build lists across 17 heroes do this).
+local UNUSED_SELL = { item_helm_of_iron_will = 0, item_circlet = 15 * 60 }
 local function NeededLater(name)
 	local list = {}
 	for _, it in ipairs(a.purchaseListInReverseOrder or {}) do
@@ -2307,8 +2310,8 @@ local function MarkedForSale()
 			marks[boots] = "travel-boots"
 		end
 	end
-	for name in pairs(UNUSED_SELL) do
-		if a:FindItemSlot(name) >= 0 and not NeededLater(name) then
+	for name, after in pairs(UNUSED_SELL) do
+		if DotaTime() >= (tonumber(after) or 0) and a:FindItemSlot(name) >= 0 and not NeededLater(name) then
 			marks[name] = "unused"
 		end
 	end

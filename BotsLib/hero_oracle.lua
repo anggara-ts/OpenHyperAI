@@ -76,7 +76,9 @@ local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "oracle")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "oracle")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "oracle")
 local s = SafeAbility(b:GetAbilityByName(f[3]), "sTalentList[3]", "oracle")
-local t = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "oracle")
+-- datafeed: Rain of Destiny is the Shard ability "oracle_rain_of_destiny" (hidden + not learnable,
+-- so GetAbilityList skips it and g[4] can be the innate Prognosticate). Fetch it by name.
+local t = SafeAbility(b:GetAbilityByName("oracle_rain_of_destiny"), "oracle_rain_of_destiny", "oracle")
 local u, v
 local w, x
 local y, z

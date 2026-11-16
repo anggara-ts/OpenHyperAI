@@ -381,7 +381,8 @@ function a.ConsiderW()
 	local U = 0
 	local V = DAMAGE_TYPE_MAGICAL
 	local ag = r:GetSpecialValueInt("duration")
-	local ah = r:GetSpecialValueInt("hp_regen") * ag
+	-- datafeed: the Martyr regen key is "base_hpregen" ("hp_regen" read 0, so the missing-HP checks always passed)
+	local ah = r:GetSpecialValueInt("base_hpregen") * ag
 	local _ = nil
 	local a0 = nil
 	for a2, a6 in pairs(L) do

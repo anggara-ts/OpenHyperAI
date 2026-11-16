@@ -74,8 +74,9 @@ function a.MinionThink(n)
 end
 local o =
 	SafeAbility(b:GetAbilityByName("skeleton_king_hellfire_blast"), "skeleton_king_hellfire_blast", "skeleton_king")
-local p =
-	SafeAbility(b:GetAbilityByName("skeleton_king_spectral_blade"), "skeleton_king_spectral_blade", "skeleton_king")
+-- datafeed: skeleton_king_spectral_blade no longer exists; W is skeleton_king_bone_guard. The old
+-- fallback below never ran (the safe proxy's IsHidden() returns false), so ConsiderW could not cast it.
+local p = SafeAbility(b:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
 local q = SafeAbility(b:GetAbilityByName("skeleton_king_mortal_strike"), "skeleton_king_mortal_strike", "skeleton_king")
 local r = SafeAbility(b:GetAbilityByName("skeleton_king_reincarnation"), "skeleton_king_reincarnation", "skeleton_king")
 local s = SafeAbility(b:GetAbilityByName(f[5]), "sTalentList[5]", "skeleton_king")

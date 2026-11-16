@@ -263,7 +263,9 @@ function a.ConsiderSoulAssumption()
 				local M = c.GetNearbyHeroes(L, 1200, true, BOT_MODE_NONE)
 				local N = c.GetNearbyHeroes(L, 1200, false, BOT_MODE_NONE)
 				local X = L:GetHealth()
-				if M ~= nil and N ~= nil and #M >= #N and W < X then
+				-- Lowest-HP target: it read "W < X" with W = 20000, so only a hero above 20000 HP
+				-- qualified and the full-stack engage cast never fired.
+				if M ~= nil and N ~= nil and #M >= #N and X < W then
 					W = X
 					H = L
 				end

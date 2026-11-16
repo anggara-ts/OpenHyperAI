@@ -91,7 +91,8 @@ function a.ConsiderEarthshock()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local x = o:GetSpecialValueInt("shock_radius")
-	local y = o:GetSpecialValueInt("hop_duration")
+	-- datafeed: hop_duration is 0.25; GetSpecialValueInt truncated it to 0
+	local y = o:GetSpecialValueFloat("hop_duration")
 	local z = o:GetAbilityDamage()
 	local A = b:GetMana() / b:GetMaxMana()
 	u = c.GetProperTarget(b)
@@ -177,7 +178,8 @@ function a.ConsiderEarthshock()
 				and (c.IsKeyWordUnit("ranged", L) or c.IsKeyWordUnit("siege", L))
 				and b:IsFacingLocation(L:GetLocation(), 15)
 			then
-				if c.WillKillTarget(L, z, DAMAGE_TYPE_PHYSICAL, 0.25) then
+				-- datafeed: Earthshock deals magical damage (damage 2)
+				if c.WillKillTarget(L, z, DAMAGE_TYPE_MAGICAL, 0.25) then
 					b:SetTarget(L)
 					return BOT_ACTION_DESIRE_HIGH
 				end

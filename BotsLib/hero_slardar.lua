@@ -142,8 +142,10 @@ function a.ConsiderW()
 	local M = p:GetSpecialValueInt("crush_radius")
 	local N = p:GetCastPoint()
 	local O = p:GetManaCost()
-	local P = p:GetAbilityDamage()
-	local Q = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Slithereen Crush deals physical damage (1) from "crush_damage" (60/140/220/300); it has no
+	-- AbilityDamage (read 0) and was checked as magical.
+	local P = p:GetSpecialValueInt("crush_damage")
+	local Q = DAMAGE_TYPE_PHYSICAL
 	local R = c.GetAroundEnemyHeroList(L - 30)
 	local S = c.GetAroundEnemyHeroList(L - 100)
 	local T = nil

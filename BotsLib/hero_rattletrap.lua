@@ -209,7 +209,8 @@ function a.ConsiderBatteryAssault()
 		end
 	end
 	if c.IsDoingTormentor(b) then
-		if c.IsRoshan(E) and c.IsInRange(b, E, J) and H then
+		-- was c.IsRoshan(E), which is never true at the Tormentor
+		if c.IsTormentor(E) and c.IsInRange(b, E, J) and H then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -356,7 +357,8 @@ function a.ConsiderRocketFlare()
 		end
 	end
 	if c.IsDoingTormentor(b) then
-		if c.IsRoshan(E) and c.IsInRange(b, E, J) and H then
+		-- was c.IsRoshan(E), which is never true at the Tormentor
+		if c.IsTormentor(E) and c.IsInRange(b, E, J) and H then
 			return BOT_ACTION_DESIRE_HIGH, E:GetLocation()
 		end
 	end
@@ -433,7 +435,8 @@ function a.ConsiderHookshot()
 							and M:DistanceFromFountain() > 1600
 							and b:DistanceFromFountain() > M:DistanceFromFountain()
 							and GetUnitToUnitDistance(b, M) > 1200
-							and not c.IsNotSelf(b, M)
+							-- was "not c.IsNotSelf" (= M is Clockwerk himself), so the hook-to-ally escape never fired
+							and c.IsNotSelf(b, M)
 						then
 							local a2 = GetUnitToUnitDistance(b, M) / a1 + U
 							local a3 = c.GetCorrectLoc(M, a2)

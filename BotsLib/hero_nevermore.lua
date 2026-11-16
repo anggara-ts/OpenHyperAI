@@ -239,10 +239,15 @@ function a.Consider(T, U)
 	local X = T:GetCastPoint()
 	local Y = DAMAGE_TYPE_MAGICAL
 	local Z = T:GetLevel()
-	local _ = 20 + 70 * Z
-	if u:IsTrained() then
-		_ = _ + u:GetSpecialValueInt("value")
+	-- datafeed: Shadowraze deals shadowraze_damage 85/150/215/280 plus damage_per_soul (2) per Necromastery soul;
+	-- the old 20 + 70 * level was too high and ignored souls. The talent f[4] is now a Feast of Souls talent, so it
+	-- is no longer added here.
+	local _ = T:GetSpecialValueInt("shadowraze_damage")
+	if _ <= 0 then
+		_ = 20 + 65 * Z
 	end
+	local aSouls = b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery"))
+	_ = _ + aSouls * T:GetSpecialValueInt("damage_per_soul")
 	local a0 = T:GetSpecialValueInt("stack_bonus_damage")
 	local a1 = "ranged"
 	local a2 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
@@ -338,9 +343,8 @@ function a.ConsiderFeastOfSouls()
 	local aa = b:GetAttackRange()
 	local K = b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery"))
 	local ab = c.GetManaAfter(s:GetManaCost()) * b:GetMana()
-	if K < 25 then
-		return BOT_ACTION_DESIRE_NONE
-	end
+	-- datafeed: Necromastery max souls is 20 and Feast of Souls (nevermore_frenzy) gathers souls rather than
+	-- spending them, so the old "K < 25 souls" gate kept it unused unless max souls were raised. Gate removed.
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidTarget(H)

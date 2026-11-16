@@ -49,7 +49,7 @@ n["pos_1"] = {
 	"item_harpoon",
 	"item_aghanims_shard",
 	"item_assault",
-	"item_great_scepter",
+	"item_greater_crit", -- was "item_great_scepter", not an item in items.txt; Daedalus fills the damage slot (pos_2 has MKB here)
 	"item_ultimate_scepter",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
@@ -369,7 +369,9 @@ function a.ConsiderE()
 		return 0
 	end
 	local S = r:GetLevel()
-	local U = r:GetSpecialValueInt("radius")
+	-- datafeed: Anchor Smash has no "radius" value (it read 0, so E never found a target); its radius is
+	-- Tidehunter's attack range + additional_range (225).
+	local U = b:GetAttackRange() + r:GetSpecialValueInt("additional_range")
 	local T = U
 	local V = r:GetCastPoint()
 	local W = r:GetManaCost()

@@ -180,7 +180,9 @@ function a.ConsiderW()
 	if c.IsWithoutTarget(b) and c.GetAttackProjectileDamageByRange(b, 1600) >= b:GetHealth() then
 		return BOT_ACTION_DESIRE_MODERATE
 	end
-	if c.IsGoingOnSomeone(b) and false then
+	-- Was switched off with "and false". Datafeed: Ghost Shroud emits a 700 slow aura, so a lone running
+	-- target out of reach is chased with it.
+	if c.IsGoingOnSomeone(b) then
 		local M = b:GetTarget()
 		if
 			c.IsValidHero(M)

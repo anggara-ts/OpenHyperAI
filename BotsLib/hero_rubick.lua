@@ -154,7 +154,9 @@ function a.SkillsComplement()
 	local H = d.Build(b)
 	G = H.isRetreating
 	if c.GetHP(b) > 0.3 and not G and (b:IsChanneling() or b:IsUsingAbility() or b:IsCastingAbility()) then
-		local I = c.GetNearbyHeroes(b, nRadius + 300, true, BOT_MODE_NONE)
+		-- nRadius is a local of ConsiderFadeBolt and nil here, so this line raised an error every
+		-- time he was casting; use the 1200 radius the rest of the file checks.
+		local I = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 		if I ~= nil and #I > 0 then
 			return
 		end

@@ -58,8 +58,35 @@ m["pos_1"] = {
 	"item_ultimate_scepter_2",
 }
 m["pos_3"] = m["pos_1"]
-m["pos_4"] = m["pos_1"]
-m["pos_5"] = m["pos_1"]
+-- Supports had the carry list (Maelstrom, Daedalus, BKB). Snapfire's most common role is pos 4
+-- (hero_pos_weights 60), so give pos 4/5 a support build like Hoodwink's. Aghanim's Scepter grants
+-- Gobble Up / Spit Out, and the Shard makes Firesnap Cookie heal and launch a Mortimer Kiss (datafeed).
+m["pos_4"] = {
+	"item_priest_outfit",
+	"item_mekansm",
+	"item_glimmer_cape",
+	"item_guardian_greaves",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_octarine_core",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+m["pos_5"] = {
+	"item_mage_outfit",
+	"item_ancient_janggo",
+	"item_glimmer_cape",
+	"item_boots_of_bearing",
+	"item_pipe",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 a["sBuyList"] = m[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then

@@ -161,7 +161,8 @@ function a.ConsiderQ()
 	local H = o:GetCastRange() + z
 	local I = o:GetCastPoint()
 	local J = o:GetManaCost()
-	local K = o:GetSpecialValueInt("bolt_damage") + b:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.6
+	-- datafeed: Arcane Bolt int_multiplier=1.5 (was 1.6)
+	local K = o:GetSpecialValueInt("bolt_damage") + b:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.5
 	local L = DAMAGE_TYPE_MAGICAL
 	local nInRangeEnemyHeroList = c.GetNearbyHeroes(b, math.min(H + 50, 1600), true, BOT_MODE_NONE)
 	local M = b:GetAttackDamage()

@@ -203,7 +203,8 @@ function a.ConsiderQ()
 	local N = o:GetCastRange() + D
 	local O = o:GetCastPoint()
 	local P = o:GetManaCost()
-	local Q = o:GetSpecialValueInt("AbilityDamage")
+	-- datafeed: Dragon Slave damage is "dragon_slave_damage" (65/125/185/245); it has no AbilityDamage (read 0).
+	local Q = o:GetSpecialValueInt("dragon_slave_damage")
 	local R = o:GetSpecialValueInt("dragon_slave_width_end")
 	local S = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N - 80, true, BOT_MODE_NONE)
@@ -473,7 +474,8 @@ function a.ConsiderR()
 	local O = r:GetCastPoint()
 	local P = r:GetManaCost()
 	local Q = r:GetSpecialValueInt("damage")
-	local S = b:HasScepter() and DAMAGE_TYPE_PURE or DAMAGE_TYPE_MAGICAL
+	-- datafeed: Laguna Blade is magical (2) with no Scepter upgrade (the Scepter now grants Flame Cloak).
+	local S = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N + 80, true, BOT_MODE_NONE)
 	local a6 = c.GetNearbyHeroes(b, N + 240, true, BOT_MODE_NONE)
 	for V, W in pairs(a6) do
@@ -510,11 +512,8 @@ function a.ConsiderR()
 end
 function a.CanCastAbilityROnTarget(aa)
 	if c.CanCastOnTargetAdvanced(aa) and not aa:HasModifier("modifier_arc_warden_tempest_double") then
-		if b:HasScepter() then
-			return c.CanCastOnMagicImmune(aa)
-		else
-			return c.CanCastOnNonMagicImmune(aa)
-		end
+		-- datafeed: Laguna has no Scepter upgrade any more, so it never goes through magic immunity.
+		return c.CanCastOnNonMagicImmune(aa)
 	end
 	return false
 end

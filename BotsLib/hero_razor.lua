@@ -127,7 +127,11 @@ function a.ConsiderQ()
 		return 0
 	end
 	local E = o:GetLevel()
-	local F = 777
+	-- datafeed: Plasma Field radius is 700; the old 777 counted enemies the field never reaches.
+	local F = o:GetSpecialValueInt("radius")
+	if F <= 0 then
+		F = 700
+	end
 	local G = o:GetCastPoint()
 	local H = o:GetManaCost()
 	local I = o:GetAbilityDamage()

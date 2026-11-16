@@ -627,7 +627,13 @@ function a.CastInvokerSpell(b3, b4)
 			b:ActionQueue_UseAbilityOnEntity(b3, b)
 		elseif b3 == C or b3 == D or b3 == w then
 			b:ActionQueue_UseAbility(b3)
-		elseif b3 == E and b:GetLevel() >= 25 then
+		-- Radial (no-target) Deafening Blast only with its talent, special_bonus_unique_invoker_2 (datafeed),
+		-- not at any level 25: the default talent build takes the other level-25 talent, and a no-target
+		-- order for the point-cast blast does nothing.
+		elseif b3 == E and (function()
+			local tal = b:GetAbilityByName("special_bonus_unique_invoker_2")
+			return tal ~= nil and tal:IsTrained()
+		end)() then
 			b:ActionQueue_UseAbility(b3)
 		elseif b3 == E or b3 == B or b3 == A or b3 == y or b3 == x then
 			b:ActionQueue_UseAbilityOnLocation(b3, b4)

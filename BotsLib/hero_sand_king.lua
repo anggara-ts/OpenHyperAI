@@ -424,9 +424,11 @@ function a.ConsiderR()
 	local P = t:GetAbilityDamage()
 	local Q = DAMAGE_TYPE_MAGICAL
 	local R = c.GetNearbyHeroes(b, J, true, BOT_MODE_NONE)
-	local M = t:GetSpecialValueInt("epicenter_radius")
+	-- datafeed: there is no "epicenter_radius" (it read 0); the radius starts at epicenter_radius_base (450) and
+	-- grows by epicenter_radius_increment (13) per pulse.
+	local M = t:GetSpecialValueInt("epicenter_radius_base")
 	local a9 = t:GetSpecialValueInt("epicenter_pulses")
-	local aa = M + a9 * 50
+	local aa = M + a9 * t:GetSpecialValueInt("epicenter_radius_increment")
 	if c.IsInTeamFight(b, 1600) then
 		local W = c.GetAoeEnemyHeroLocation(b, 1200, 400, 2)
 		if W ~= nil and #H >= 2 then

@@ -134,6 +134,8 @@ function a.ConsiderAcidSpray()
 	end
 	if F then
 		local P = c.GetNearbyHeroes(b, 900, false, BOT_MODE_NONE)
+		-- fix: nInRangeEnemy was an undefined global here, so engaging never used Acid Spray
+		local nInRangeEnemy = c.GetNearbyHeroes(b, 900, true, BOT_MODE_NONE)
 		if
 			c.IsValidTarget(E)
 			and c.CanCastOnNonMagicImmune(E)

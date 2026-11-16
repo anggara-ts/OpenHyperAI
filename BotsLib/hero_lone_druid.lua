@@ -12,7 +12,9 @@ if c.GetLoneDruid(b).hero == nil then
 	c.GetLoneDruid(b).hero = b
 end
 local j = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local k = { { 2, 2, 6, 2, 2, 3, 6, 3, 3, 3, 6, 1, 1, 1, 1 } }
+-- fix: the ultimate (6) was at entry 3 (level 3, unlearnable) and missing from entry 6; moved it to
+-- entries 6/11/15 and kept the old Spirit Link, Savage Roar, Entangle order.
+local k = { { 2, 2, 3, 2, 2, 6, 3, 3, 3, 1, 6, 1, 1, 1, 6 } }
 local l = { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }
 local m = d.Skill.GetRandomBuild(k)
 local n = d.Skill.GetTalentBuild(j)
@@ -87,6 +89,8 @@ end
 local t = SafeAbility(b:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid")
 local u = SafeAbility(b:GetAbilityByName("lone_druid_savage_roar"), "lone_druid_savage_roar", "lone_druid")
 local v = SafeAbility(b:GetAbilityByName("lone_druid_true_form"), "lone_druid_true_form", "lone_druid")
+-- datafeed: Entangle is an active point/AoE spell (behavior 48) and was never cast
+local entangle = SafeAbility(b:GetAbilityByName("lone_druid_entangle"), "lone_druid_entangle", "lone_druid")
 local w
 local x
 local y
@@ -109,11 +113,55 @@ function a.SkillsComplement()
 		b:Action_UseAbility(v)
 		return
 	end
+	local entangleDesire, entangleLoc = a.ConsiderEntangle()
+	if entangleDesire > 0 then
+		b:Action_UseAbilityOnLocation(entangle, entangleLoc)
+		return
+	end
 	x = a.ConsiderSavageRoar()
 	if x > 0 then
 		b:Action_UseAbility(u)
 		return
 	end
+end
+-- datafeed: Entangle, cast range 700, active_radius 350; the cast adds stacks to enemy heroes in the
+-- area and empowers Lone Druid's attacks.
+function a.ConsiderEntangle()
+	if not entangle:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local range = d.GetProperCastRange(false, b, entangle:GetCastRange())
+	local radius = entangle:GetSpecialValueInt("active_radius")
+	if d.IsInTeamFight(b, 1200) then
+		local aoe = b:FindAoELocation(true, true, b:GetLocation(), range, radius, 0, 0)
+		if aoe.count >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+		end
+	end
+	if d.IsGoingOnSomeone(b) then
+		if
+			d.IsValidHero(z)
+			and d.IsInRange(b, z, range)
+			and d.CanCastOnNonMagicImmune(z)
+			and not d.IsSuspiciousIllusion(z)
+		then
+			return BOT_ACTION_DESIRE_HIGH, z:GetLocation()
+		end
+	end
+	if d.IsRetreating(b) then
+		for _, F in pairs(d.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				d.IsValidHero(F)
+				and d.IsChasingTarget(F, b)
+				and d.CanCastOnNonMagicImmune(F)
+				and not d.IsSuspiciousIllusion(F)
+				and not d.IsDisabled(F)
+			then
+				return BOT_ACTION_DESIRE_HIGH, F:GetLocation()
+			end
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderSummonSpiritBear()
 	if not t:IsFullyCastable() or c.GetLoneDruid(b).roleType ~= "pos_1_w_bear" then

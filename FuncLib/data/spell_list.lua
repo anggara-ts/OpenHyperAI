@@ -284,7 +284,7 @@ a["spells"] = {
 		["jakiro_dual_breath"] = { weight = 0.8 },
 		["jakiro_ice_path"] = { weight = 0.1 },
 		["jakiro_liquid_fire"] = { weight = 1 },
-		["jakiro_liquid_frost"] = { weight = 1 },
+		["jakiro_liquid_ice"] = { weight = 1 },
 		["jakiro_macropyre"] = { weight = 0.1 },
 	},
 	["npc_dota_hero_juggernaut"] = {

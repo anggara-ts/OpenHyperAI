@@ -8,11 +8,13 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
+-- Ultimate ranks need levels 6/12/18: entry 10 (level 11) and entry 14 (level 16) could not take
+-- it, so those points went to the fallback. Moved to entry 11 (level 12) / entry 15.
 local j = {
-	["pos_2"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 6, 2, 3, 3, 3, 6 },
-	["pos_3"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 6, 2, 3, 3, 3, 6 },
-	["pos_4"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 6, 2 },
-	["pos_5"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 6, 2 },
+	["pos_2"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 },
+	["pos_3"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 },
+	["pos_4"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 2, 6 },
+	["pos_5"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 2, 6 },
 }
 local k = j[h] or { 1, 3, 2, 2, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }
 local l = c.Skill.GetTalentBuild(i)

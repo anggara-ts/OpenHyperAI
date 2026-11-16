@@ -66,13 +66,15 @@ l["pos_3"] = l["pos_2"]
 l["pos_4"] = l["pos_2"]
 l["pos_5"] = l["pos_2"]
 a["sBuyList"] = l[g]
+-- fix: pairs are { owned, sold }; they were reversed (owning a Magic Wand sold the Black King Bar,
+-- owning a Null Talisman sold Scythe of Vyse / Shiva's Guard)
 a["sSellList"] = {
-	"item_magic_wand",
 	"item_black_king_bar",
-	"item_null_talisman",
+	"item_magic_wand",
 	"item_sheepstick",
 	"item_null_talisman",
 	"item_shivas_guard",
+	"item_null_talisman",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
@@ -293,6 +295,8 @@ function a.ConsiderArcaneOrb()
 	local E = b:GetAttackRange()
 	local F = n:GetSpecialValueInt("mana_pool_damage_pct") / 100
 	local G = b:GetAttackDamage() + b:GetMana() * F
+	-- datafeed: Arcane Orb's bonus is pure (damage 4); the attack itself is physical
+	local orbPhys, orbPure = b:GetAttackDamage(), b:GetMana() * F
 	local H = n:GetLevel()
 	local I = n:GetAutoCastState()
 	local J = n:GetManaCost()
@@ -308,7 +312,7 @@ function a.ConsiderArcaneOrb()
 		if c.IsValidHero(N) and c.CanBeAttacked(N) and c.IsInRange(b, N, E + 300) and c.CanCastOnNonMagicImmune(N) then
 			local O = GetUnitToUnitDistance(b, N) / b:GetAttackProjectileSpeed()
 			if
-				c.WillKillTarget(N, G, DAMAGE_TYPE_MAGICAL, O)
+				c.WillMixedDamageKillTarget(N, orbPhys, 0, orbPure, O)
 				and not N:HasModifier("modifier_abaddon_borrowed_time")
 				and not N:HasModifier("modifier_dazzle_shallow_grave")
 				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -354,7 +358,7 @@ function a.ConsiderArcaneOrb()
 		for M, Q in pairs(P) do
 			if c.IsValid(Q) and c.CanBeAttacked(Q) and (c.IsCore(b) or not c.IsOtherAllysTarget(Q)) then
 				local O = GetUnitToUnitDistance(b, Q) / b:GetAttackProjectileSpeed()
-				if c.WillKillTarget(Q, G, DAMAGE_TYPE_MAGICAL, O) then
+				if c.WillMixedDamageKillTarget(Q, orbPhys, 0, orbPure, O) then
 					return BOT_ACTION_DESIRE_HIGH, Q
 				end
 			end
@@ -378,7 +382,8 @@ function a.ConsiderAstralImprisonment()
 	end
 	local R = o:GetCastRange()
 	local G = o:GetSpecialValueInt("damage")
-	local S = o:GetSpecialValueInt("prison_duration")
+	-- datafeed: prison_duration is 1.75/2.5/3.25/4; GetSpecialValueInt truncated it
+	local S = o:GetSpecialValueFloat("prison_duration")
 	local J = o:GetManaCost()
 	local K = c.GetManaAfter(J)
 	local L = c.GetManaThreshold(b, J, { r })
@@ -591,7 +596,8 @@ function a.ConsiderSanitysEclipse()
 			and not N:HasModifier("modifier_oracle_false_promise_timer")
 		then
 			local O = GetUnitToUnitDistance(b, N) / b:GetCurrentMovementSpeed() + a1
-			local a4 = math.abs(b:GetMana() - N:GetMana())
+			-- datafeed: damage uses the difference in MAX mana (OD's minus the target's), not current mana
+			local a4 = math.max(0, b:GetMaxMana() - N:GetMaxMana())
 			local G = a4 * a2
 			if c.WillKillTarget(N, a3 + G, DAMAGE_TYPE_MAGICAL, O) then
 				return BOT_ACTION_DESIRE_HIGH, N:GetLocation()

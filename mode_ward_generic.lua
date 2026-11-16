@@ -272,6 +272,27 @@ function GetDesireHelper()
 	if h ~= nil and DotaTime() < 0 and c.GetPosition(b) ~= 5 then
 		h = nil
 	end
+	-- Objective ward first (FuncLib/systems/ward.lua GetObjectiveWardSpot): a teammate heading for
+	-- Roshan or the enemy outpost gets the enemy-side spot next to it warded before he arrives.
+	if h ~= nil and (I and c.CanCastAbility(h) or not I) and DotaTime() > 0 and DotaTime() > k + 1.0 then
+		local obj, kind = d.GetObjectiveWardSpot(b)
+		if obj and (not a.IsEnemyCloserToWardLocation(obj.location) or c.IsRealInvisible(b)) then
+			j = obj
+			if DotaTime() >= (b._objWardLogAt or -999) + 20 then
+				b._objWardLogAt = DotaTime()
+				pcall(print, string.format(
+					"[OHA-WARD] t=%.0f %s objective-ward for=%s spot=%d,%d dist=%d",
+					DotaTime(),
+					(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(kind),
+					math.floor(obj.location.x),
+					math.floor(obj.location.y),
+					math.floor(GetUnitToLocationDistance(b, obj.location))
+				))
+			end
+			return BOT_MODE_DESIRE_VERYHIGH
+		end
+	end
 	if h ~= nil and (I and c.CanCastAbility(h) or not I) then
 		local r = d.GetAvailabeObserverWardSpots(b)
 		j = d.GetClosestObserverWardSpot(b, r)

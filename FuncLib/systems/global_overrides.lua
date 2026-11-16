@@ -13,7 +13,7 @@ local OHA_MUTED = {
 	"^%[OHA%-TECHIES%] t=%S+ tower ",
 	"^%[OHA%-TECHIES%] t=%S+ tazer%-held",
 	"^%[OHA%-ITEM%] t=%S+ %S+ grenade%-throw",
-	"^%[OHA%-ITEM%] t=%S+ %S+ grenade%-moved",
+	-- grenade-moved unmuted: game 034, Abaddon's grenade ended in the backpack with a branch in the bag.
 	"^%[OHA%-ITEM%] t=%S+ %S+ swap%-", -- engine ignores bot swaps; known
 	"^%[OHA%-BUY%] t=%S+ %S+ recipe%-hold", -- courier waits, every 4s
 	"^%[OHA%-FIGHT%] t=%S+ %S+ push %S+ lane=", -- post-kill push floor, every 4s

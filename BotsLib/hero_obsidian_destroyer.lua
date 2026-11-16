@@ -123,7 +123,8 @@ local C, D
 -- radius, 0.75s stun). So the channel starts when the prison has 2.5s left, on the prison spot,
 -- and the meteor lands as the target comes out.
 local PRISON_DURATION = { 1.75, 2.5, 3.25, 4 }
-local HAMMER_LEAD = 2.5
+-- Lands 0.15s after the prisoner comes out (game 032, 21:50: landed while he was still inside).
+local HAMMER_LEAD = 2.35
 function a.NotePrison(target)
 	if not c.IsValidHero(target) or target:GetTeam() == GetTeam() then
 		return
@@ -137,7 +138,16 @@ function a.NotePrison(target)
 		dur = v
 	end
 	local cast = math.max(0, o:GetCastPoint())
-	b._prison = { target = target, loc = target:GetLocation(), castAt = DotaTime(), endAt = DotaTime() + cast + dur }
+	-- endAt is provisional: the order can wait for a turn or a walk into range. It is set again
+	-- when Astral Imprisonment goes on cooldown (the cast itself).
+	b._prison = {
+		target = target,
+		loc = target:GetLocation(),
+		castAt = DotaTime(),
+		dur = dur,
+		confirmed = false,
+		endAt = DotaTime() + cast + dur,
+	}
 end
 function a.ConsiderPrisonHammer()
 	local st = b._prison
@@ -145,8 +155,19 @@ function a.ConsiderPrisonHammer()
 		return false
 	end
 	local now = DotaTime()
+	if not st.confirmed then
+		if o:GetCooldownTimeRemaining() > 0 then
+			st.confirmed = true
+			st.confirmedAt = now
+			st.endAt = now + st.dur
+		elseif now - st.castAt > 2 then
+			-- Ordered but never cast.
+			b._prison = nil
+		end
+		return false
+	end
 	-- The prison did not land: the target is still there and can be hurt.
-	if now - st.castAt > 0.7 and c.IsValidHero(st.target) and st.target:CanBeSeen() and not st.target:IsInvulnerable() and now < st.endAt - 0.3 then
+	if now - st.confirmedAt > 0.4 and c.IsValidHero(st.target) and st.target:CanBeSeen() and not st.target:IsInvulnerable() and now < st.endAt - 0.3 then
 		b._prison = nil
 		return false
 	end

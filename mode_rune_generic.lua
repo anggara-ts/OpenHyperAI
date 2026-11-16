@@ -965,6 +965,21 @@ function Think()
 							GetUnitToLocationDistance(d, gold)
 						))
 					end
+					-- A teammate is running the id test here: stay where you are and leave the gold to
+					-- the tester (bots group up on the rune spots at the start; game 024, three Dire bots
+					-- body-blocked each other on the bottom spot).
+					if d._goldCycle == nil then
+						for i = 1, 5 do
+							local m0 = GetTeamMember(i)
+							if m0 ~= nil and m0 ~= d and m0._goldCycle ~= nil and m0._goldCycle.spot == D.location then
+								if GetUnitToLocationDistance(d, gold) < 160 then
+									d:Action_MoveToLocation(b.AdjustLocationWithOffsetTowardsFountain(gold, 200))
+								end
+								doing("river-gold-hold")
+								return
+							end
+						end
+					end
 					if GetUnitToLocationDistance(d, gold) > 40 and now0 - ft.first < 4 then
 						d:Action_MoveToLocation(gold)
 						doing("river-gold-walk")

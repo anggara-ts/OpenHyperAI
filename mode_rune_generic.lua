@@ -1278,7 +1278,22 @@ function a.CheckedEmpty(id)
 	local lastSpawn = math.floor(now / cycle) * cycle
 	return now - seen >= lastSpawn + 1
 end
+-- River gold (a bounty on a power spot, the horn) and water runes cannot be picked up by bots: game
+-- 025, Medusa stood on the gold (user pings) and tried rune ids 0-7 with Action_PickUpRune and 0-6
+-- with ActionPush_PickUpRune, no gold; every game since game 015 failed the same way, water runes
+-- included. They are skipped once the game starts; the pre-horn grouping at the rune spots stays.
+-- Jungle bounties and river power runes are picked up normally.
+local function UnpickableRiverRune(id)
+	if not IsRiverRune(id) or DotaTime() < 0 then
+		return false
+	end
+	local ty = GetRuneType and GetRuneType(id) or nil
+	return ty == RUNE_BOUNTY or (RUNE_WATER ~= nil and ty == RUNE_WATER)
+end
 function a.RuneSkipped(id)
+	if UnpickableRiverRune(id) then
+		return true
+	end
 	local untilAt = d._runeSkip and d._runeSkip[id]
 	if untilAt ~= nil and DotaTime() < untilAt then
 		return true
@@ -1745,7 +1760,7 @@ function a.GetLaningRuneDesire(z)
 		local awStatus = nil
 		local ax = z
 		for F, D in pairs(av) do
-			if k ~= 2 or a.SkipSecondLaningRune(D) then
+			if k ~= 2 or a.SkipSecondLaningRune(D) or a.RuneSkipped(D) then
 				goto continue_power
 			end
 			local ay = GetRuneStatus(D)

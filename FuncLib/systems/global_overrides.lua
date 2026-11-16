@@ -867,9 +867,17 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
 	local pairKey = nameA < nameB and (nameA .. "|" .. nameB) or (nameB .. "|" .. nameA)
 	self._swapPairTime = self._swapPairTime or {}
-	local enemies = #(self:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {})
+	-- Hold swaps only during a fight. An item that comes out of the backpack cannot be used for 6s
+	-- and the one sent in cannot be used at all, so a fight is the wrong moment to reshuffle. Any
+	-- enemy hero within 1000 used to block every swap, which meant almost none in the laning stage
+	-- (game 032: 67 logged swaps refused for enemies).
+	local enemies = #(self:GetNearbyHeroes(700, true, BOT_MODE_NONE) or {})
+	local mode = self:GetActiveMode()
+	local fighting = self:WasRecentlyDamagedByAnyHero(3.0)
+		or enemies > 0
+			and (mode == BOT_MODE_ATTACK or mode == BOT_MODE_RETREAT or mode == BOT_MODE_TEAM_ROAM or mode == BOT_MODE_DEFEND_ALLY)
 	local cooldown = aN - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
-	if (forced or enemies == 0) and (cooldown < 0 or urgent) then
+	if (forced or not fighting) and (cooldown < 0 or urgent) then
 		self._swapPairTime[pairKey] = DotaTime()
 		-- After a swap the engine ignored, try the slots the other way round once.
 		local reversed = self._swapTryReverse == true
@@ -884,7 +892,7 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	if cooldown >= 0 then
 		LogGrenadeSwap(self, aO, aP, string.format("blocked-cooldown(%.0fs)", cooldown))
 	else
-		LogGrenadeSwap(self, aO, aP, string.format("blocked-enemies(%d)", enemies))
+		LogGrenadeSwap(self, aO, aP, string.format("blocked-fight(enemies=%d)", enemies))
 	end
 	return nil
 end

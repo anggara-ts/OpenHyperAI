@@ -496,6 +496,9 @@ function GetDesireRaw()
 	end
 	-- A rune underfoot still beats a leftover fight. Farther than the bank, lotus and wisdom win.
 	local runeId, runeDist = a.ClosestAvailableRune(400)
+	if runeId ~= nil and not a.IsTheClosestAlly(d, GetRuneSpawnLocation(runeId)) then
+		runeId = nil
+	end
 	local dying = i < 0.25 and #p > 0 and d:WasRecentlyDamagedByAnyHero(1.2)
 	if
 		runeId ~= nil
@@ -804,21 +807,21 @@ function Think()
 		end
 		if GetTeam() == TEAM_RADIANT then
 			if n == LANE_BOT then
-				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_BOUNTY_2) + RandomVector(50))
+				d:Action_MoveToLocation(a.PickerSpot(RUNE_BOUNTY_2))
 				doing("pre-bounty2")
 				return
 			else
-				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_POWERUP_1) + RandomVector(50))
+				d:Action_MoveToLocation(a.PickerSpot(RUNE_POWERUP_1))
 				doing("pre-power1")
 				return
 			end
 		else
 			if n == LANE_TOP then
-				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_BOUNTY_1) + RandomVector(50))
+				d:Action_MoveToLocation(a.PickerSpot(RUNE_BOUNTY_1))
 				doing("pre-bounty1")
 				return
 			else
-				d:Action_MoveToLocation(GetRuneSpawnLocation(RUNE_POWERUP_2) + RandomVector(50))
+				d:Action_MoveToLocation(a.PickerSpot(RUNE_POWERUP_2))
 				doing("pre-power2")
 				return
 			end
@@ -868,6 +871,9 @@ function Think()
 			return 1.5 * myDmg > theirDmg
 		end
 		if D.status == RUNE_STATUS_AVAILABLE then
+			if a.BackUpPicker(D.location) then
+				return
+			end
 			-- Pickup from the bank does not collect a river rune. Walk onto the point.
 			-- If that walk makes no progress, leave so the lane is not abandoned.
 			if liveDist > 130 then
@@ -1287,6 +1293,10 @@ local function UnpickableRiverRune(id)
 	if not IsRiverRune(id) or DotaTime() < 0 then
 		return false
 	end
+	-- One more attempt by the single picker in the first 15s (user call), the others backing up.
+	if DotaTime() < 15 and a.IsTheClosestAlly(d, GetRuneSpawnLocation(id)) then
+		return false
+	end
 	local ty = GetRuneType and GetRuneType(id) or nil
 	return ty == RUNE_BOUNTY or (RUNE_WATER ~= nil and ty == RUNE_WATER)
 end
@@ -1467,6 +1477,40 @@ function a.GetBestRune()
 		end
 	end
 	return Z, _
+end
+-- One picker per rune (user call): only the ally closest to a rune spot walks onto it; the others
+-- back it up from 450 toward our side. Bots grouped on the rune spots at the start and blocked
+-- each other's way onto the rune (games 023-025).
+local BACKUP_DIST = 450
+function a.PickerSpot(id)
+	local loc = GetRuneSpawnLocation(id)
+	if a.IsTheClosestAlly(d, loc) then
+		return loc + RandomVector(50)
+	end
+	return b.AdjustLocationWithOffsetTowardsFountain(loc, BACKUP_DIST)
+end
+-- Not the picker for this rune while the picker is near it: hold the backup spot. True if it acted.
+function a.BackUpPicker(id)
+	local loc = GetRuneSpawnLocation(id)
+	if a.IsTheClosestAlly(d, loc) then
+		return false
+	end
+	local pickerNear = false
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0 ~= d and m0:IsAlive() and GetUnitToLocationDistance(m0, loc) <= 1500 then
+			pickerNear = true
+		end
+	end
+	if not pickerNear then
+		return false
+	end
+	local spot = b.AdjustLocationWithOffsetTowardsFountain(loc, BACKUP_DIST)
+	if GetUnitToLocationDistance(d, spot) > 120 then
+		d:Action_MoveToLocation(spot)
+	end
+	doing("rune-backup")
+	return true
 end
 function a.IsTheClosestAlly(X, Q)
 	local a1 = X

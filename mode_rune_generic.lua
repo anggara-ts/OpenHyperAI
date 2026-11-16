@@ -865,15 +865,28 @@ function Think()
 				-- one taken was walked onto from ~390 away). After 1.5s of orders within 80 of the
 				-- spot, step back 160 toward our side and order the pick-up from there, so the
 				-- order walks onto the rune. One step-back per second at most.
+				-- Two phases: walk 160 back (held until there, at most 1s; build 016 re-ordered the
+				-- pick-up on the very next think, so the walk lasted one frame: game 022, OD and
+				-- Techies moved 15 in 2s on the bottom river spot), then order the pick-up from
+				-- there so the walk-in collects it. Again after 1.5s more within 80.
 				local ft = d._freshTry
 				if ft == nil or ft.id ~= D.location or now0 - ft.last > 3 then
-					ft = { id = D.location, first = now0, last = now0, backAt = -99 }
+					ft = { id = D.location, first = now0, last = now0 }
 					d._freshTry = ft
 				end
 				ft.last = now0
-				if liveDist < 80 and now0 - ft.first >= 1.5 and now0 - ft.backAt >= 1 then
-					ft.backAt = now0
-					local back = b.AdjustLocationWithOffsetTowardsFountain(E, 160)
+				if ft.backTo ~= nil then
+					if now0 < ft.backUntil and GetUnitToLocationDistance(d, ft.backTo) > 40 then
+						d:Action_MoveToLocation(ft.backTo)
+						doing("pickup-stepback")
+						return
+					end
+					ft.backTo = nil
+					ft.first = now0
+				end
+				if liveDist < 80 and now0 - ft.first >= 1.5 then
+					ft.backTo = b.AdjustLocationWithOffsetTowardsFountain(E, 160)
+					ft.backUntil = now0 + 1
 					if not ft.logged then
 						ft.logged = true
 						pcall(print, string.format(
@@ -885,8 +898,7 @@ function Think()
 							tostring(rType)
 						))
 					end
-					d:Action_MoveToLocation(back)
-					d:ActionQueue_PickUpRune(D.location)
+					d:Action_MoveToLocation(ft.backTo)
 					doing("pickup-stepback")
 					return
 				end

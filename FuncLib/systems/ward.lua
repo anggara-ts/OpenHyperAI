@@ -41,16 +41,15 @@ local E = {
 	[5] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 local F = {
-	-- Radiant bank of the bottom rune. The dire bank looks back into Dire's own jungle.
-	-- Kept off (-245, -996): walking there pulled Dire supports toward the Radiant tower.
-	-- Was (123, -1118): against the cliff where a ward cannot go (Lina stood there 46s, game 014).
-	-- Then (94, -1145): not walkable either; the spot check moved it to (44, -1232).
-	-- WORKING SPOT (game 018, build 123): Techies planted an observer and a sentry at (44, -1232)
-	-- at -0:24, cast from 449 away. Keep this one.
-	[1] = { location = Vector(44, -1232, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
-	[2] = { location = Vector(-627, 850, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[3] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[4] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	-- Dire mid: the user's safe spots, pinged in game 022 (2026-11-16): (-501, 696), (12, 257) and
+	-- (632, -281), on Dire's side of the river. Replace the Radiant bank of the bottom rune
+	-- (44, -1232; it planted, but across the river) and (-627, 850). safe = true lets them through
+	-- the "early wards go on the enemy side" filter.
+	[1] = { location = Vector(-501, 696, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[2] = { location = Vector(12, 257, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[3] = { location = Vector(632, -281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[4] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
+	[5] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 function a.GetEarlyGameWardSpots()
 	return GetTeam() == TEAM_RADIANT and E or F

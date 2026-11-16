@@ -277,8 +277,29 @@ end
 -- Plant M.A.D. and detonate it right away. The barrel counts as out only until the planned
 -- detonate time + 2s: a plant that never landed (interrupted) used to block the next one for
 -- 45s (game 018: three Blast Off combos without M.A.D. for that reason).
+-- The plant hold: no other spell (or item) order until M.A.D. is on cooldown or the hold ends.
+function a.MadHoldActive()
+	if DotaTime() >= (b._madHoldUntil or -999) then
+		return false
+	end
+	local plantAb = b:GetAbilityByName("techies_mutually_assured_destruction")
+	if plantAb ~= nil and plantAb:GetCooldownTimeRemaining() > 0 then
+		b._madHoldUntil = nil
+		return false
+	end
+	return true
+end
 function a.PlantMad(plant, loc, tag)
 	local castPoint = math.max(0.3, plant:GetCastPoint())
+	-- Always inside cast range, so the order is a cast and not a walk first (game 021: all 7
+	-- failed plants had M.A.D. off cooldown, never cast; a walk-in leaves time for other orders).
+	local range = plant:GetCastRange()
+	if range == nil or range < 100 then
+		range = 450
+	end
+	if GetUnitToLocationDistance(b, loc) > range - 20 then
+		loc = c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), loc, range - 40)
+	end
 	b._madLoc = loc
 	b._madDetonateAt = DotaTime() + castPoint + 0.15
 	-- 4s after the planned detonate: game 019, plants into a spot beyond cast range (he walks in
@@ -288,7 +309,8 @@ function a.PlantMad(plant, loc, tag)
 	-- No other spell order until the plant is cast: game 019, 8 of 15 plants failed because the
 	-- next think sent Sticky Bomb, the Tazer, a mine or Blast Off and cut the cast short (43:01:
 	-- post-blast plant and post-blast Sticky in the same second).
-	b._madHoldUntil = DotaTime() + castPoint + 0.25
+	-- Held until M.A.D. is on cooldown (the plant was cast) or 1.2s pass; see MadHoldActive.
+	b._madHoldUntil = DotaTime() + math.max(castPoint + 0.25, 1.2)
 	a.LogTechies("mad-plant " .. plant:GetName() .. (tag and (" " .. tag) or ""), 0, loc)
 	b:Action_UseAbilityOnLocation(plant, loc)
 end
@@ -353,7 +375,7 @@ function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
 	end
-	if DotaTime() < (b._madHoldUntil or -999) then
+	if a.MadHoldActive() then
 		return
 	end
 	local Q = d.Build(b)

@@ -7568,6 +7568,14 @@ function ItemUsageThink()
 	if a.RunePickupLock() then
 		return
 	end
+	-- A hero script holding for a cast it just ordered (Techies' M.A.D. plant): no item order
+	-- that would replace it.
+	if h ~= nil and h.MadHoldActive ~= nil then
+		local okH, held = pcall(h.MadHoldActive)
+		if okH and held then
+			return
+		end
+	end
 	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
 	local okDeaggro, deaggroed = pcall(a.DeflectTowerAggro)
 	if okDeaggro and deaggroed then

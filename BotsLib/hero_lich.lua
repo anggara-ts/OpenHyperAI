@@ -578,6 +578,18 @@ function a.ConsiderW()
 				end
 			end
 		end
+		-- Ally (or Lich) being hit by a hero outside a team fight and not retreating, e.g. harassed in
+		-- lane: no case covered it. Frost Shield cuts 45-60% of attack damage (Valve data).
+		if
+			c.IsValidHero(am)
+			and am:WasRecentlyDamagedByAnyHero(1.5)
+			and c.GetHP(am) < 0.6
+			and #(c.GetNearbyHeroes(am, 700, true, BOT_MODE_NONE) or {}) >= 1
+			and not am:HasModifier("modifier_lich_frost_shield")
+		then
+			a.LogLich("shield-harassed", am)
+			return BOT_ACTION_DESIRE_HIGH, am, "W-harassed"
+		end
 		if c.IsGoingOnSomeone(am) then
 			local ax = c.GetProperTarget(am)
 			if c.IsValidHero(ax) and c.CanCastOnNonMagicImmune(ax) and c.IsInRange(am, ax, a0) then
@@ -646,8 +658,16 @@ function a.ConsiderE()
 		if #a2 >= 2 or #Q >= 3 then
 			local az = nil
 			local aA = 0
+			-- In-range filter added: the best one was picked from T+420 and then dropped when out of
+			-- range, so Gaze was skipped while a reachable enemy stood next to Lich.
 			for a4, a5 in pairs(a2) do
-				if c.IsValid(a5) and c.CanCastOnNonMagicImmune(a5) and not c.IsDisabled(a5) and not a5:IsDisarmed() then
+				if
+					c.IsValid(a5)
+					and c.IsInRange(b, a5, T + 50)
+					and c.CanCastOnNonMagicImmune(a5)
+					and not c.IsDisabled(a5)
+					and not a5:IsDisarmed()
+				then
 					local aB = a5:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_PHYSICAL)
 					if aB > aA then
 						aA = aB

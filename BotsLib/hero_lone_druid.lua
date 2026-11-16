@@ -148,7 +148,9 @@ function a.ConsiderEntangle()
 			return BOT_ACTION_DESIRE_HIGH, z:GetLocation()
 		end
 	end
-	if d.IsRetreating(b) then
+	-- Data: root_heroes_on_cast is 0 without Scepter (the cast only adds 2 stacks, 5 are needed to
+	-- root), so a retreat cast without Scepter wasted the spell and did not stop the chaser.
+	if d.IsRetreating(b) and b:HasScepter() then
 		for _, F in pairs(d.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
 			if
 				d.IsValidHero(F)
@@ -178,10 +180,16 @@ function a.ConsiderSavageRoar()
 	end
 	local C = u:GetSpecialValueInt("radius")
 	local D = d.GetNearbyHeroes(b, C, true, BOT_MODE_NONE)
+	-- Was: any enemy hero in radius that was moving or attacking anything, i.e. nearly always, so the
+	-- roar feared Lone Druid's own chase target away from him and the bear. Now only an enemy on Lone
+	-- Druid or the bear, chasing him, channeling or casting.
+	local bear = c.GetLoneDruid(b).bear
 	for E, F in pairs(D) do
+		local onUs = d.IsValidHero(F)
+			and (F:GetAttackTarget() == b or (bear ~= nil and F:GetAttackTarget() == bear))
 		if
 			d.IsValidTarget(F)
-			and (d.IsChasingTarget(F, b) or d.IsAttacking(F) or d.IsMoving(F) or F:IsChanneling() or F:IsUsingAbility())
+			and (d.IsChasingTarget(F, b) or onUs or F:IsChanneling() or F:IsUsingAbility())
 			and not d.IsSuspiciousIllusion(F)
 			and not d.IsDisabled(F)
 			and d.CanCastOnNonMagicImmune(F)
@@ -190,17 +198,18 @@ function a.ConsiderSavageRoar()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if d.IsGoingOnSomeone(b) then
-		if d.IsValidTarget(z) and d.IsInRange(b, z, C) and not d.IsSuspiciousIllusion(z) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if d.IsDoingRoshan(b) then
+	-- Removed the "going on someone, target in radius" cast: the fear sends the target toward its
+	-- base, out of the bear's reach. A target hitting Lone Druid or the bear is handled above.
+	-- Roshan / Tormentor: the ability data sets only_affects_player_units 1, which suggests Roshan and
+	-- the Tormentor are not feared, so without Shard the cast likely did nothing. With Shard the roar
+	-- grants allies attack speed (datafeed shard text, shard_attack_speed 40).
+	local hasShard = b:HasModifier("modifier_item_aghanims_shard")
+	if d.IsDoingRoshan(b) and hasShard then
 		if d.IsRoshan(z) and d.IsInRange(b, z, 500) and d.IsAttacking(b) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if d.IsDoingTormentor(b) then
+	if d.IsDoingTormentor(b) and hasShard then
 		if d.IsTormentor(z) and d.IsInRange(b, z, 500) and d.IsAttacking(b) then
 			return BOT_ACTION_DESIRE_HIGH
 		end

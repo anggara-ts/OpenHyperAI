@@ -163,6 +163,10 @@ function a.SkillsComplement()
 	o = c.GetProperTarget(b)
 	r = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	s = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	-- Mode flags every frame, before Consume: they were only set outside Infest (after Consume ran),
+	-- so ConsiderConsume read the values from the moment he went in.
+	Q = c.IsGoingOnSomeone(b)
+	R = c.IsRetreating(b)
 	L = a.ConsiderConsume()
 	if L > 0 then
 		b:Action_UseAbility(E)
@@ -172,8 +176,6 @@ function a.SkillsComplement()
 		if c.CanNotUseAbility(b) then
 			return
 		end
-		Q = c.IsGoingOnSomeone(b)
-		R = c.IsRetreating(b)
 	end
 	G = a.ConsiderRage()
 	if G > 0 then
@@ -211,7 +213,14 @@ function a.ConsiderRage()
 				or c.IsWillBeCastUnitTargetSpell(b, 500)
 				or c.IsWillBeCastPointSpell(b, 500)
 			then
-				if Q and c.IsValidTarget(o) and not c.IsInRange(b, o, b:GetAttackRange()) or R and N < 0.55 then
+				-- Rage gives debuff immunity and 80% magic resistance (Valve data), so it answers an
+				-- incoming spell in any fight. It needed the target out of attack range or a retreat
+				-- below 55% HP, so a hex or stun cast on him in melee was never blocked.
+				if Q or R or N < 0.6 then
+					if DotaTime() >= (b._rageLogAt or -999) then
+						b._rageLogAt = DotaTime() + 5
+						pcall(print, string.format("[OHA-LIFESTEALER] t=%.0f rage vs incoming spell hp=%.2f", DotaTime(), N))
+					end
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -282,7 +291,13 @@ function a.ConsiderOpenWounds()
 			and not o:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not o:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			if c.IsChasingTarget(b, o) or #c.GetHeroesTargetingUnit(r, o) >= 2 and c.GetHP(o) > 0.2 then
+			-- Added "he is hitting it": a 1v1 in melee range (no chase, one attacker) never got Open
+			-- Wounds, his lifesteal and slow for the fight.
+			if
+				c.IsChasingTarget(b, o)
+				or #c.GetHeroesTargetingUnit(r, o) >= 2 and c.GetHP(o) > 0.2
+				or M and b:GetAttackTarget() == o and c.GetHP(o) > 0.2
+			then
 				if W > X then
 					return BOT_ACTION_DESIRE_HIGH, o
 				end

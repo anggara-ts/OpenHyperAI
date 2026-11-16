@@ -125,6 +125,16 @@ local O
 local P
 local Q
 local R, S, T, U, V
+-- [OHA-KEZ] one line per new behaviour, at most once per 3s per kind.
+function a.LogKez(what)
+	b._kezLogAt = b._kezLogAt or {}
+	local kind = string.match(what, "^%S+") or what
+	if DotaTime() < (b._kezLogAt[kind] or -999) then
+		return
+	end
+	b._kezLogAt[kind] = DotaTime() + 3
+	pcall(print, string.format("[OHA-KEZ] t=%.0f %s", DotaTime(), what))
+end
 function a.SkillsComplement()
 	N = c.IsGoingOnSomeone(b)
 	O = c.IsRetreating(b)
@@ -152,7 +162,11 @@ function a.SkillsComplement()
 	if c.CanNotUseAbility(b) or b:HasModifier("modifier_kez_raptor_dance_immune") then
 		return
 	end
-	a.DoCombo()
+	-- DoCombo queues Veil > Switch > Claw > Echo Slash; without this return the casts below (Switch,
+	-- Ravens Veil, Talon Toss) ran in the same tick and an Action_ call cleared the queued combo.
+	if a.DoCombo() then
+		return
+	end
 	M = a.ConsiderSwitchDiscipline()
 	if M > 0 then
 		b:Action_UseAbility(o)
@@ -457,7 +471,8 @@ function a.ConsiderRaptorDance()
 	local aj = s:GetSpecialValueInt("base_damage")
 	local ak = s:GetSpecialValueInt("strikes")
 	local al = s:GetSpecialValueFloat("strike_interval") or 0.2
-	local am = s:GetSpecialValueInt("max_health_damage_pct")
+	-- max_health_damage_pct is 2.5 (game KV): the Int read truncated it to 2.
+	local am = s:GetSpecialValueFloat("max_health_damage_pct")
 	local an = s:GetCastPoint()
 	if not b:IsMagicImmune() then
 		if c.IsStunProjectileIncoming and c.IsStunProjectileIncoming(b, 800) then
@@ -466,7 +481,9 @@ function a.ConsiderRaptorDance()
 	end
 	for a5, ao in pairs(U) do
 		if c.IsValidHero(ao) and c.IsInRange(b, ao, _) and c.CanBeAttacked(ao) then
-			local a2 = (aj + b:GetAttackDamage() + am / 100 * ao:GetMaxHealth()) * ak
+			-- Each strike is base_damage + max_health_damage_pct of max HP, both pure (game KV); no attack
+			-- damage. Adding Kez's attack damage per strike over-counted and cast Raptor Dance on survivors.
+			local a2 = (aj + am / 100 * ao:GetMaxHealth()) * ak
 			if
 				c.CanKillTarget(ao, a2, DAMAGE_TYPE_PURE)
 				and not ao:HasModifier("modifier_abaddon_borrowed_time")
@@ -558,12 +575,21 @@ function a.ConsiderKazuraiKatana()
 	-- lookup read 0 and the impale was never cast.
 	local ac = o:GetSpecialValueInt("katana_attack_range")
 	local as = r:GetSpecialValueInt("katana_bonus_damage") / 100
+	-- The impale bursts bleed_as_rupture_pct (50%) of the target's Katana stacks at once (datafeed:
+	-- "STACKS AS BURST DAMAGE"; shard +50). Modifier name and "1 stack = 1 damage" are inherited from the
+	-- old code and not verified.
+	local burstPct = r:GetSpecialValueInt("bleed_as_rupture_pct") / 100
+	if burstPct <= 0 then
+		burstPct = 0.5
+	end
 	for a5, a6 in pairs(U) do
 		if c.IsValidHero(a6) and c.IsInRange(b, a6, ac) and c.CanCastOnTargetAdvanced(a6) then
 			if a6:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, a6
 			end
-			local a2 = c.GetModifierCount(b, "modifier_kez_katana_bleed")
+			-- The Katana bleed is a debuff on the enemy (datafeed: "applies stacking damage over time to
+			-- enemies"); the stacks were read from Kez himself, so this kill check never passed.
+			local a2 = c.GetModifierCount(a6, "modifier_kez_katana_bleed") * burstPct
 			if
 				c.CanKillTarget(a6, a2, DAMAGE_TYPE_PHYSICAL)
 				and not a6:HasModifier("modifier_abaddon_borrowed_time")
@@ -573,6 +599,7 @@ function a.ConsiderKazuraiKatana()
 				and not a6:HasModifier("modifier_troll_warlord_battle_trance")
 				and not a6:HasModifier("modifier_ursa_enrage")
 			then
+				a.LogKez("impale-kill target=" .. a6:GetUnitName() .. " burst=" .. math.floor(a2))
 				return BOT_ACTION_DESIRE_HIGH, a6
 			end
 		end
@@ -586,8 +613,11 @@ function a.ConsiderKazuraiKatana()
 			and not botTarget:HasModifier("modifier_troll_warlord_battle_trance")
 			and not botTarget:HasModifier("modifier_ursa_enrage")
 		then
-			local a2 = c.GetModifierCount(b, "modifier_kez_katana_bleed")
-			if a2 / b:GetHealth() > RemapValClamped(r:GetLevel(), 2, 4, 0.1, 0.25) then
+			-- Stacks are on the target and the burst is measured against the target's HP (it used Kez's
+			-- own stacks and Kez's own HP).
+			local a2 = c.GetModifierCount(botTarget, "modifier_kez_katana_bleed") * burstPct
+			if a2 / botTarget:GetHealth() > RemapValClamped(r:GetLevel(), 2, 4, 0.1, 0.25) then
+				a.LogKez("impale-burst target=" .. botTarget:GetUnitName() .. " burst=" .. math.floor(a2))
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 			if a2 > RemapValClamped(r:GetLevel(), 2, 4, 75, 300) then
@@ -682,23 +712,20 @@ function a.ConsiderTalonToss()
 			return BOT_ACTION_DESIRE_HIGH, a6
 		end
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local ap = c.GetEnemiesNearLoc(b:GetLocation(), ac)
-		for a5, a6 in pairs(ap) do
-			if
-				c.IsValidHero(a6)
-				and c.CanCastOnNonMagicImmune(a6)
-				and c.CanCastOnTargetAdvanced(a6)
-				and c.IsInRange(b, a6, ac)
-				and not c.IsDisabled(a6)
-				and not a6:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not a6:HasModifier("modifier_troll_warlord_battle_trance")
-			then
-				U = c.GetEnemiesNearLoc(a6:GetLocation(), _)
-				if #U >= 2 then
-					return BOT_ACTION_DESIRE_HIGH, a6
-				end
-			end
+	-- Talon Toss "radius" is 0 now (game KV), so the old team-fight branch (2+ enemies within radius of
+	-- the target) never fired, and it overwrote the shared enemy list U. Use the silence to cut a
+	-- channel instead, which nothing else in Sai stance did.
+	local ap = c.GetEnemiesNearLoc(b:GetLocation(), ac)
+	for a5, a6 in pairs(ap) do
+		if
+			c.IsValidHero(a6)
+			and c.CanCastOnNonMagicImmune(a6)
+			and c.CanCastOnTargetAdvanced(a6)
+			and c.IsInRange(b, a6, ac)
+			and a6:IsChanneling()
+		then
+			a.LogKez("toss-channel target=" .. a6:GetUnitName())
+			return BOT_ACTION_DESIRE_HIGH, a6
 		end
 	end
 	if N then
@@ -741,20 +768,41 @@ function a.ConsiderShodoSai()
 		local av = c.GetAlliesNearLoc(b:GetLocation(), 900)
 		if #av >= 1 then
 			local aw = 0
+			local parryAt = nil
 			local ax = b:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 			for a5, a6 in pairs(ax) do
+				-- No facing test: the parry is point-targeted and locks Kez's facing toward the point
+				-- (datafeed), and a retreating Kez faces away from his chasers, so it almost never passed.
 				if
 					c.IsValidHero(a6)
 					and c.CanCastOnMagicImmune(a6)
-					and b:IsFacingLocation(a6:GetLocation(), 30)
 					and (a6:GetAttackTarget() == b or c.IsChasingTarget(a6, b))
 					and not c.IsDisabled(a6)
 				then
 					aw = aw + 1
+					parryAt = parryAt or a6:GetLocation()
 				end
 			end
-			if aw >= 1 and #ax > #av then
-				return BOT_ACTION_DESIRE_HIGH, ax[1]:GetLocation()
+			-- Parry toward the attacker that was counted (it used ax[1], which may be someone else).
+			if aw >= 1 and #ax > #av and parryAt ~= nil then
+				a.LogKez("parry-retreat")
+				return BOT_ACTION_DESIRE_HIGH, parryAt
+			end
+		end
+	end
+	-- Fight use (was missing): a hero right-clicking Kez in melee range gets parried, stunned and Marked.
+	if N and not c.IsRealInvisible(b) then
+		local ax = b:GetNearbyHeroes(400, true, BOT_MODE_NONE)
+		for a5, a6 in pairs(ax) do
+			if
+				c.IsValidHero(a6)
+				and not c.IsSuspiciousIllusion(a6)
+				and a6:GetAttackTarget() == b
+				and c.IsAttacking(a6)
+				and not c.IsDisabled(a6)
+			then
+				a.LogKez("parry-fight attacker=" .. a6:GetUnitName())
+				return BOT_ACTION_DESIRE_HIGH, a6:GetLocation()
 			end
 		end
 	end
@@ -791,6 +839,15 @@ function a.ConsiderRavensVeil()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local _ = x:GetSpecialValueInt("blast_radius")
+	-- Escape use (was missing): Raven's Veil gives a basic dispel, bonus move speed and invisibility
+	-- (datafeed), so cast it when chased and hurt while retreating.
+	if O and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(2.0) and Q < 0.5 then
+		local ap = c.GetEnemiesNearLoc(b:GetLocation(), 900)
+		if #ap >= 1 then
+			a.LogKez("veil-escape enemies=" .. #ap .. " hp=" .. string.format("%.2f", Q))
+			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
 	if c.IsInTeamFight(b, 1200) then
 		local ap = c.GetEnemiesNearLoc(b:GetLocation(), _ * 0.6)
 		if c.IsLateGame() and #ap >= 3 or not c.IsLateGame() and #ap >= 2 then
@@ -885,7 +942,8 @@ function a.DoCombo()
 						b:ActionQueue_UseAbilityOnEntity(q, aD)
 						b:ActionQueue_Delay(aH)
 						b:ActionQueue_UseAbility(p)
-						return
+						a.LogKez("scepter-combo target=" .. aD:GetUnitName())
+						return true
 					end
 				end
 			end
@@ -962,7 +1020,8 @@ function a.GetBestRetreatGrapplingTarget(ac)
 			local b9 = c.GetDistance(b4, b7)
 			local ba = (b7 - b5):Normalized()
 			local aT = c.DotProduct(ba, b6)
-			if aT >= math.cos(45) and b8 > b2 and b9 < b3 then
+			-- math.cos takes radians: cos(45) is a 58-degree cone, not the intended 45.
+			if aT >= math.cos(math.rad(45)) and b8 > b2 and b9 < b3 then
 				b2 = b8
 				b3 = b9
 				b1 = aJ[aQ]
@@ -977,13 +1036,14 @@ function a.GetBestRetreatGrapplingTarget(ac)
 	local bd = 100000
 	local aX = b:GetNearbyCreeps(ac, true)
 	for aQ = #aX, 1, -1 do
-		if c.IsValid(aX[aQ]) and not c.IsInRange(b, aX[1], ac * 0.4) then
+		-- Was aX[1] (the first creep) for every creep: each candidate must itself be far enough away.
+		if c.IsValid(aX[aQ]) and not c.IsInRange(b, aX[aQ], ac * 0.4) then
 			local be = aX[aQ]:GetLocation()
 			local b8 = GetUnitToLocationDistance(b, be)
 			local b9 = c.GetDistance(b4, be)
 			local ba = (be - b5):Normalized()
 			local aT = c.DotProduct(ba, b6)
-			if aT >= math.cos(45) and b8 > bc and b9 < bd then
+			if aT >= math.cos(math.rad(45)) and b8 > bc and b9 < bd then
 				bc = b8
 				bd = b9
 				bb = aX[aQ]

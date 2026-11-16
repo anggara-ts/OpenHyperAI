@@ -288,7 +288,11 @@ function a.ConsiderLunarOrbit()
 	if not q:IsTrained() or not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Glaives orbit at rotating_glaives_movement_radius (225) and hit within rotating_glaives_hit_radius
+	-- (200) of each glaive, so they reach ~425. Using 225 alone needed the target almost in melee range
+	-- (Luna is ranged), and 3 neutrals inside 225, so the orbit was rarely cast to fight or farm.
 	local W = q:GetSpecialValueInt("rotating_glaives_movement_radius")
+		+ q:GetSpecialValueInt("rotating_glaives_hit_radius")
 	local G = c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE)
 	if c.GetHP(b) < 0.5 and b:WasRecentlyDamagedByAnyHero(1) and G ~= nil and #G >= 1 then
 		return BOT_ACTION_DESIRE_HIGH
@@ -388,6 +392,14 @@ function a.ConsiderEclipse()
 	if c.IsInTeamFight(b, 1200) then
 		local N = c.GetEnemiesNearLoc(b:GetLocation(), W + 75)
 		if N ~= nil and #N >= 2 then
+			-- Was: needed a hero killable by ONE beam, so in most fights Eclipse waited for someone
+			-- nearly dead. Eclipse fires `beams` beams at random nearby enemies, at most `hit_count` on
+			-- one unit. Estimate one hero's share as beams / heroes in range (creeps, if beams can hit
+			-- them, are not counted, so this is an upper estimate).
+			local beams = math.max(1, r:GetSpecialValueInt("beams"))
+			local perUnitCap = math.max(1, r:GetSpecialValueInt("hit_count"))
+			local share = math.max(1, math.min(perUnitCap, math.floor(beams / #N)))
+			F = F * share
 			local Y = false
 			for H, I in pairs(N) do
 				if
@@ -406,6 +418,15 @@ function a.ConsiderEclipse()
 				end
 			end
 			if Y then
+				if share > 1 and DotaTime() >= (b._ohaLunaEclipseLogAt or -999) then
+					b._ohaLunaEclipseLogAt = DotaTime() + 5
+					pcall(print, string.format(
+						"[OHA-LUNA] t=%.0f eclipse team fight heroes=%d beams/hero=%d",
+						DotaTime(),
+						#N,
+						share
+					))
+				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

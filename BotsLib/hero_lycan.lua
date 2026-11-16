@@ -141,6 +141,61 @@ function a.SkillsComplement()
 		b:Action_UseAbility(q)
 		return
 	end
+	-- Wolf Bite (Scepter) was loaded but never cast. Last in the order so it never blocks the rest.
+	local biteDesire, biteTarget = a.ConsiderWolfBite()
+	if biteDesire > 0 then
+		b:Action_UseAbilityOnEntity(t, biteTarget)
+		return
+	end
+end
+-- Data/datafeed: Wolf Bite is unit-target on an allied hero or creep-hero, cast range 300; the
+-- bitten ally gets Shapeshift's properties and shares lifesteal with Lycan. Cast it on the
+-- hardest-hitting allied hero in a fight.
+function a.ConsiderWolfBite()
+	if t:IsHidden() or not t:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	-- After an attempt, wait 3 s: if the game ever rejects the order, it must not be re-issued every
+	-- think and keep replacing Lycan's attack order.
+	if DotaTime() < (b._ohaWolfBiteTryAt or -999) + 3 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not (B or c.IsInTeamFight(b, 1200)) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local biteRange = t:GetCastRange() + 200
+	local bestAlly, bestScore = nil, -1
+	for _, ally in pairs(c.GetNearbyHeroes(b, biteRange, false, BOT_MODE_NONE) or {}) do
+		if
+			c.IsValidHero(ally)
+			and ally ~= b
+			and not ally:IsIllusion()
+			and not c.IsMeepoClone(ally)
+			and (c.IsGoingOnSomeone(ally) or c.IsInTeamFight(ally, 1200))
+			and c.IsValidHero(ally:GetAttackTarget())
+		then
+			local score = ally:GetAttackDamage() * ally:GetAttackSpeed()
+			if c.IsCore(ally) then
+				score = score + 10000
+			end
+			if score > bestScore then
+				bestAlly, bestScore = ally, score
+			end
+		end
+	end
+	if bestAlly ~= nil then
+		b._ohaWolfBiteTryAt = DotaTime()
+		if DotaTime() >= (b._ohaWolfBiteLogAt or -999) then
+			b._ohaWolfBiteLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-LYCAN] t=%.0f wolf bite on %s",
+				DotaTime(),
+				(string.gsub(bestAlly:GetUnitName(), "npc_dota_hero_", ""))
+			))
+		end
+		return BOT_ACTION_DESIRE_HIGH, bestAlly
+	end
+	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderSummonWolves()
 	if not q:IsFullyCastable() then
@@ -212,7 +267,9 @@ function a.ConsiderHowl()
 					local M = L:GetAttackTarget()
 					if
 						c.IsValidTarget(M)
-						and c.IsInRange(b, M, L:GetAttackRange())
+						-- Was IsInRange(b, ...): measured from Lycan, so the global night Howl only
+						-- helped an ally core fighting next to Lycan. The ally must be in range.
+						and c.IsInRange(L, M, L:GetAttackRange() + 150)
 						and L:IsFacingLocation(M:GetLocation(), 30)
 						and c.IsAttacking(L)
 						and not c.IsSuspiciousIllusion(M)

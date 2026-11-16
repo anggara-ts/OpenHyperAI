@@ -251,7 +251,18 @@ function a.ConsiderQ()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
-		if c.IsValidHero(botTarget) and c.CanCastOnNonMagicImmune(botTarget) and c.IsInRange(botTarget, b, N - 80) then
+		-- Light Strike Array first when it is up and the target is in its range and not disabled:
+		-- this branch fired first (Q is checked before W), so the stun came after Dragon Slave.
+		local lsaFirst = p:IsFullyCastable()
+			and c.IsValidHero(botTarget)
+			and c.IsInRange(b, botTarget, p:GetCastRange() + D - 30)
+			and not c.IsDisabled(botTarget)
+		if
+			c.IsValidHero(botTarget)
+			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.IsInRange(botTarget, b, N - 80)
+			and not lsaFirst
+		then
 			if M >= 2 or H > 0.68 or c.GetHP(botTarget) < 0.38 then
 				U = botTarget:GetExtrapolatedLocation(O)
 				if c.IsInLocRange(b, U, N) then
@@ -525,6 +536,24 @@ function a.ConsiderFlameCloak()
 	local ac = c.GetNearbyHeroes(b, ab, true, BOT_MODE_NONE)
 	local ad = c.GetNearbyHeroes(b, ab, false, BOT_MODE_NONE)
 	if c.IsRetreating(b) and (ac ~= nil and ad ~= nil and #ac >= #ad) and not c.WeAreStronger(b, ab) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Before Laguna Blade: Flame Cloak gives 35% spell amp (Valve data), and it is ordered before
+	-- ConsiderR, so the blade gets the amp. It only went with 2+ enemies in attack range.
+	if
+		c.IsGoingOnSomeone(b)
+		and r:IsFullyCastable()
+		and b:GetMana() >= s:GetManaCost() + r:GetManaCost()
+		and c.IsValidHero(botTarget)
+		and not c.IsSuspiciousIllusion(botTarget)
+		and a.CanCastAbilityROnTarget(botTarget)
+		and c.IsInRange(b, botTarget, r:GetCastRange() + D)
+		and c.GetHP(botTarget) < 0.6
+	then
+		if DotaTime() >= (b._cloakLogAt or -999) then
+			b._cloakLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-LINA] t=%.0f flame cloak before laguna", DotaTime()))
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if c.IsGoingOnSomeone(b) and (ac ~= nil and #ac >= 2) then

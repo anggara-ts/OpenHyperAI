@@ -188,8 +188,22 @@ function a.ConsiderPrisonHammer()
 	end
 	return false
 end
+-- Items still work while silenced (game 021, 24:30: OD imprisoned Mirana, was silenced by
+-- Static Storm, and the hammer check, behind the "cannot use abilities" gate, never ran).
+local function CanUseItemsNow()
+	if not b:IsAlive() or b:IsStunned() or b:IsHexed() or b:IsChanneling() or b:IsNightmared() then
+		return false
+	end
+	local okM, muted = pcall(function()
+		return b:IsMuted()
+	end)
+	return not (okM and muted)
+end
 function a.SkillsComplement()
 	b = GetBot()
+	if b._prison ~= nil and CanUseItemsNow() and a.ConsiderPrisonHammer() then
+		return
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end

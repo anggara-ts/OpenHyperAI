@@ -427,13 +427,18 @@ local function DeathWatch(bot)
 				break
 			end
 		end
+		-- The bot's think does not run while it is dead, so the count changes at respawn (game 034:
+		-- 12-18s late). t= is the last snapshot taken alive (within 0.5s of the death), and the
+		-- snapshot ages are counted from there.
+		local diedAt = last ~= nil and last.t or now
 		pcall(print, string.format(
-			"[OHA-DEATH] t=%.0f %s deaths=%d last: %s | before: %s",
-			now,
+			"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
+			diedAt,
 			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 			count,
-			SnapText(last, now),
-			SnapText(before, now)
+			now,
+			SnapText(last, diedAt),
+			SnapText(before, diedAt)
 		))
 		w.count = count
 		w.snaps = {}

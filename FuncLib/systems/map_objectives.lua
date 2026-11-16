@@ -328,6 +328,11 @@ function MapObjectives.EnsureInventorySlot(bot)
 		item_ward_dispenser = true,
 		item_smoke_of_deceit = true,
 		item_grisgris = true,
+		-- Cast from a main slot only. Game 032, 11:38-11:51: Grimstroke's lotus "room" check parked
+		-- his Dust (the cheapest item) in the backpack, and Mirana's ult went undusted.
+		item_dust = true,
+		item_roshans_banner = true,
+		item_blood_grenade = true,
 	}
 	local pack = nil
 	for slot = 6, 8 do

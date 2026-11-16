@@ -4218,9 +4218,53 @@ end
 a.ConsiderItemDesire["item_spirit_vessel"] = function(bm)
 	return a.ConsiderItemDesire["item_urn_of_shadows"](bm)
 end
+-- Essence Distiller on the ground (datafeed: placed on the ground it stays dormant 15s, latches onto
+-- the first enemy within 450 and gives True Sight and shared vision on it; cast range 1000). Used
+-- on an enemy hero seen turning invisible in the last 4s whose last spot is within cast range and
+-- still in our vision, when the bot has no Dust ready to do it. [OHA-ITEM] distiller-ground.
+local function DistillerGroundSpot()
+	local now = DotaTime()
+	b._distillerFaders = b._distillerFaders or {}
+	for _, eq in pairs(f.GetEnemiesNearLoc(b:GetLocation(), 1600) or {}) do
+		if f.IsValidHero(eq) and f.IsUnitWillGoInvisible(eq) and not f.HasInvisCounterBuff(eq) and not f.IsSuspiciousIllusion(eq) then
+			b._distillerFaders[eq:GetPlayerID()] = { t = now, loc = eq:GetLocation(), name = eq:GetUnitName() }
+		end
+	end
+	local dustSlot = b:FindItemSlot("item_dust")
+	local dust = dustSlot >= 0 and dustSlot <= 5 and b:GetItemInSlot(dustSlot) or nil
+	local dustReady = dust ~= nil and f.CanCastAbility(dust)
+	for pid, v in pairs(b._distillerFaders) do
+		if now - v.t > 4 or not IsHeroAlive(pid) then
+			b._distillerFaders[pid] = nil
+		elseif not dustReady then
+			local info = GetHeroLastSeenInfo(pid)
+			local ls = info ~= nil and info[1] or nil
+			local loc = ls ~= nil and ls.location or v.loc
+			local gone = ls == nil or ls.time_since_seen > 0.1
+			if gone and GetUnitToLocationDistance(b, loc) <= 1000 + b8 and IsLocationVisible(loc) then
+				b._distillerFaders[pid] = nil
+				return loc, v.name
+			end
+		end
+	end
+	return nil
+end
 a.ConsiderItemDesire["item_essence_distiller"] = function(bm)
 	if bm:GetCurrentCharges() == 0 then
 		return BOT_ACTION_DESIRE_NONE
+	end
+	do
+		local spot, who = DistillerGroundSpot()
+		if spot ~= nil then
+			pcall(print, string.format(
+				"[OHA-ITEM] t=%.0f %s distiller-ground on %s dist=%d",
+				DotaTime(),
+				(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+				(string.gsub(tostring(who), "npc_dota_hero_", "")),
+				math.floor(GetUnitToLocationDistance(b, spot))
+			))
+			return BOT_ACTION_DESIRE_HIGH, spot, "ground", "distiller-reveal"
+		end
 	end
 	local bv = 950 + b8
 	local bq = "unit"

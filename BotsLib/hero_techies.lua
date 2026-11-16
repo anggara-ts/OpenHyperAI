@@ -325,7 +325,7 @@ function a.ConsiderPostBlastMad()
 	if since < 1.75 or since > 6 then
 		return nil, nil
 	end
-	if a.BarrelDown() or b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
 		return nil, nil
 	end
 	local plant = a.MadPlant()
@@ -370,7 +370,6 @@ function a.SkillsComplement()
 		end
 		b._madLoc = nil
 		b._madDetonateAt = nil
-		b._barrel = nil
 		return
 	end
 	if c.CanNotUseAbility(b) then
@@ -956,7 +955,7 @@ function a.ConsiderPlantMad()
 	if plant == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if a.BarrelDown() or b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
+	if b._madLoc ~= nil and DotaTime() < (b._madUntil or 0) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = plant:GetCastRange()
@@ -1011,33 +1010,6 @@ function a.ConsiderPlantMad()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
--- Barrel-driven detonate (user call): find the barrel itself and blow it when an enemy hero is in
--- its blast radius, instead of a timed detonate. Valve data: M.A.D. radius 400, cast range 450,
--- cast point 1s, cooldown 30s, "only one M.A.D. from the active ability can be placed at a time";
--- no barrel lifetime is listed, so an unused barrel waits as a trap. The barrel is the allied
--- npc_dota_techies_remote_mine near the aimed spot after the plant went out (Sticky Bombs use the
--- same unit name, but fly onto an enemy and go off within ~2s).
-local BARREL_NAME = "npc_dota_techies_remote_mine"
-local BLOW_RADIUS = 320
-function a.FindBarrel(loc)
-	if loc == nil then
-		return nil
-	end
-	local best, bestD = nil, 350
-	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
-		if u ~= nil and not u:IsNull() and u:IsAlive() and u:GetUnitName() == BARREL_NAME then
-			local d0 = GetUnitToLocationDistance(u, loc)
-			if d0 < bestD then
-				best, bestD = u, d0
-			end
-		end
-	end
-	return best
-end
-function a.BarrelDown()
-	local u = b._barrel
-	return u ~= nil and not u:IsNull() and u:IsAlive()
-end
 local function PlantFailWhy()
 	local why = ""
 	pcall(function()
@@ -1054,40 +1026,24 @@ local function PlantFailWhy()
 	end)
 	return why
 end
+-- Detonate whenever it is shown (user call): techies_focused_detonate shows once a barrel is down,
+-- so it is clicked as soon as it is castable, unless he is dead, stunned, hexed, silenced or
+-- nightmared. No timer and no enemy check. A plant that never shows the detonate is logged:
+-- 'not cast' when M.A.D. never went on cooldown, 'no detonate' when it did.
 function a.ConsiderDetonateMad()
 	local now = DotaTime()
-	-- A plant in flight: look for its barrel.
-	if b._madLoc ~= nil and not a.BarrelDown() then
-		local plantAb = b:GetAbilityByName("techies_mutually_assured_destruction")
-		local cast = plantAb ~= nil and plantAb:GetCooldownTimeRemaining() > 0
-		local found = cast and a.FindBarrel(b._madLoc) or nil
-		if found ~= nil then
-			b._barrel = found
-			b._barrelAt = now
-			-- Down: no longer in flight (a barrel destroyed later is not a failed plant).
-			b._madLoc = nil
-		elseif now - (b._madPlantAt or now) > (cast and 3.5 or 2.5) then
-			a.LogTechies("mad-plant-failed (" .. (cast and "no barrel" or "not cast") .. ")" .. PlantFailWhy(), 0, b._madLoc)
-			b._madLoc = nil
-			b._madDetonateAt = nil
+	if a.MadDetonate() ~= nil then
+		if not b:IsAlive() or b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
 			return BOT_ACTION_DESIRE_NONE
 		end
+		return BOT_ACTION_DESIRE_HIGH
 	end
-	if not a.BarrelDown() then
-		b._barrel = nil
-		return BOT_ACTION_DESIRE_NONE
-	end
-	if b:IsStunned() or b:IsHexed() or b:IsSilenced() or b:IsNightmared() then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	if a.MadDetonate() == nil then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local foes = c.GetEnemiesNearLoc(b._barrel:GetLocation(), BLOW_RADIUS) or {}
-	for _, e0 in pairs(foes) do
-		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
+	if b._madLoc ~= nil and now - (b._madPlantAt or now) > 3.5 then
+		local plantAb = b:GetAbilityByName("techies_mutually_assured_destruction")
+		local cast = plantAb ~= nil and plantAb:GetCooldownTimeRemaining() > 0
+		a.LogTechies("mad-plant-failed (" .. (cast and "no detonate" or "not cast") .. ")" .. PlantFailWhy(), 0, b._madLoc)
+		b._madLoc = nil
+		b._madDetonateAt = nil
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

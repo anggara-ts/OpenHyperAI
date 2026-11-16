@@ -176,8 +176,24 @@ function a.ConsiderChargeOfDarkness()
 	end
 	local L = c.GetTeamFightLocation(b)
 	if L ~= nil and GetUnitToLocationDistance(b, L) > 1600 and not c.IsInLaningPhase() then
-		if B ~= nil and #B >= 1 and not c.IsLocationInChrono(L) then
-			return BOT_ACTION_DESIRE_HIGH, B[1]
+		-- Review fix: this charged B[1], the nearest enemy within 1600 of Spirit Breaker, i.e. NOT
+		-- one at the fight (which is 1600+ away), and needed an enemy next to him to fire at all.
+		-- Charge (global cast range) an enemy hero standing at the fight instead.
+		if not c.IsLocationInChrono(L) and not E then
+			for _, J in pairs(c.GetEnemiesNearLoc(L, 1200)) do
+				if
+					c.IsValidHero(J)
+					and c.CanCastOnNonMagicImmune(J)
+					and not c.IsSuspiciousIllusion(J)
+					and not c.IsLocationInChrono(J:GetLocation())
+				then
+					if DotaTime() - (a.lastChargeLog or -99) > 10 then
+						a.lastChargeLog = DotaTime()
+						pcall(print, string.format("[OHA-SB] t=%.0f charge-fight target=%s dist=%d", DotaTime(), J:GetUnitName(), GetUnitToUnitDistance(b, J)))
+					end
+					return BOT_ACTION_DESIRE_HIGH, J
+				end
+			end
 		end
 	end
 	if D then
@@ -208,14 +224,26 @@ function a.ConsiderChargeOfDarkness()
 		end
 	end
 	if E and c.GetHP(b) < 0.5 and c.IsValidHero(B[1]) and c.IsInRange(b, B[1], 500) then
+		-- Review fix: the escape charge took the first creep 1600+ away in any direction, often
+		-- one deeper in enemy territory. Only charge a creep that is clearly nearer our escape spot.
+		local escape = c.GetEscapeLoc()
+		local myEscDist = GetUnitToLocationDistance(b, escape)
 		for I, Q in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS)) do
-			if c.IsValid(Q) and GetUnitToUnitDistance(Q, b) > 1600 then
+			if
+				c.IsValid(Q)
+				and GetUnitToUnitDistance(Q, b) > 1600
+				and GetUnitToLocationDistance(Q, escape) < myEscDist - 1000
+			then
 				b.chargeRetreat = true
 				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 		end
 		for I, Q in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
-			if c.IsValid(Q) and GetUnitToUnitDistance(Q, b) > 1600 then
+			if
+				c.IsValid(Q)
+				and GetUnitToUnitDistance(Q, b) > 1600
+				and GetUnitToLocationDistance(Q, escape) < myEscDist - 1000
+			then
 				b.chargeRetreat = true
 				return BOT_ACTION_DESIRE_HIGH, Q
 			end

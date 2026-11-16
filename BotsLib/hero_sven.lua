@@ -426,12 +426,21 @@ function a.SvenConsiderTarget()
 	local a9 = b:GetAttackRange() + 50
 	local aa = c.GetNearbyHeroes(b, a9, true, BOT_MODE_NONE)
 	local ab = aa[1]
+	-- Review fix: this read nInAttackRangeWeakestEnemyHero, a global that is never set (always nil),
+	-- so Sven never switched off a far or untouchable target. Use the weakest attackable hero in
+	-- attack range (same helper as Sniper's ConsiderTarget), else the nearest one.
+	ab = c.GetAttackableWeakestUnit(b, a9, true, true) or ab
 	if
-		c.IsValidHero(nInAttackRangeWeakestEnemyHero)
-		and c.CanBeAttacked(nInAttackRangeWeakestEnemyHero)
+		c.IsValidHero(ab)
+		and ab ~= A
+		and c.CanBeAttacked(ab)
 		and (GetUnitToUnitDistance(A, b) > 350 or c.HasForbiddenModifier(A))
 	then
-		b:SetTarget(nInAttackRangeWeakestEnemyHero)
+		if DotaTime() - (a.lastRetargetLog or -99) > 10 then
+			a.lastRetargetLog = DotaTime()
+			pcall(print, string.format("[OHA-SVEN] t=%.0f retarget from=%s to=%s", DotaTime(), A:GetUnitName(), ab:GetUnitName()))
+		end
+		b:SetTarget(ab)
 		return
 	end
 end

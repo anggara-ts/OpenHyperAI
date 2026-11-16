@@ -464,7 +464,14 @@ function a.ConsiderAS()
 		local az = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
 		local aA = az[1]
 		if c.IsValidHero(aA) and c.CanCastOnNonMagicImmune(aA) and not aA:IsDisarmed() then
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			-- Review fix: the grenade landed on Sniper's own spot, so no knockback direction was defined
+			-- for the attacker on top of him. Land it 150 toward the attacker so the attacker is pushed
+			-- away from Sniper. Unverified: which way Sniper himself (self_push 1) is pushed.
+			if DotaTime() - (a.lastGrenadeLog or -99) > 10 then
+				a.lastGrenadeLog = DotaTime()
+				pcall(print, string.format("[OHA-SNIPER] t=%.0f grenade-retreat enemy=%s dist=%d", DotaTime(), aA:GetUnitName(), GetUnitToUnitDistance(b, aA)))
+			end
+			return BOT_ACTION_DESIRE_HIGH, c.GetUnitTowardDistanceLocation(b, aA, math.min(150, GetUnitToUnitDistance(b, aA)))
 		end
 	end
 	if c.IsInTeamFight(b, 1400) then

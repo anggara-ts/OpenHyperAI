@@ -494,12 +494,26 @@ function a.ConsiderR()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
+		-- Review fix: Ravage (1250 radius, 140-150s cooldown) went out on any single target within 600,
+		-- so a lane gank spent the teamfight ult. Now only when it also hits a second hero, or the
+		-- lone target is below half HP (a kill).
+		local inRavage = 0
+		for Q, R in pairs(Z) do
+			if c.IsValidHero(R) and c.CanCastOnNonMagicImmune(R) and not c.IsSuspiciousIllusion(R) then
+				inRavage = inRavage + 1
+			end
+		end
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, 600)
 			and c.CanCastOnNonMagicImmune(botTarget)
 			and not c.IsDisabled(botTarget)
+			and (inRavage >= 2 or c.GetHP(botTarget) < 0.5)
 		then
+			if DotaTime() - (a.lastRavageLog or -99) > 10 then
+				a.lastRavageLog = DotaTime()
+				pcall(print, string.format("[OHA-TIDE] t=%.0f ravage-engage heroes=%d targetHp=%.2f", DotaTime(), inRavage, c.GetHP(botTarget)))
+			end
 			a0 = botTarget
 			a1 = "R-先手" .. c.Chat.GetNormName(a0)
 			return BOT_ACTION_DESIRE_HIGH, a1

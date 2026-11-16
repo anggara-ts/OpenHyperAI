@@ -290,6 +290,8 @@ function Think()
 	end
 	a:Action_MoveToLocation(B + RandomVector(50))
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "assemble", BOT_MODE_ASSEMBLE)
 if SafeCall then
 	local a7 = GetDesire
 	local a8 = Think

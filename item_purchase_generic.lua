@@ -407,6 +407,26 @@ local tPromoteFromBackpack = {
 	item_nullifier = true,
 	-- Cast from a main slot only (game 032, 11:51: Grimstroke's Dust ended up in the backpack).
 	item_dust = true,
+	-- Used once, at a moment the bot cannot see 6s ahead (the backpack cooldown), so they are
+	-- brought into the main inventory as soon as they sit in the backpack, and never moved out
+	-- again (sCanNotSwitchItems). A Gem gives no true sight from the backpack.
+	item_cheese = true,
+	item_famango = true,
+	item_great_famango = true,
+	item_greater_famango = true,
+	item_refresher_shard = true,
+	item_gem = true,
+}
+-- Promoted whatever they cost: these items cost little or nothing (Roshan and lotus drops), so the
+-- "only replace something cheaper" rule would never find them a slot.
+local tPromoteAnyCost = {
+	item_dust = true,
+	item_cheese = true,
+	item_famango = true,
+	item_great_famango = true,
+	item_greater_famango = true,
+	item_refresher_shard = true,
+	item_gem = true,
 }
 local promoteNextCheck = 0
 -- Consumables that can sit in the backpack. A branch cannot: it is a wand component,
@@ -540,7 +560,7 @@ local function PromoteBackpackCounters()
 			tries = nil
 		end
 		if hBpItem ~= nil and tPromoteFromBackpack[hBpItem:GetName()] and not (tries ~= nil and tries.n >= 2) then
-			local nBpCost = GetItemCost(hBpItem:GetName())
+			local nBpCost = tPromoteAnyCost[hBpItem:GetName()] and math.huge or GetItemCost(hBpItem:GetName())
 			local nBestSlot, nBestCost = -1, nBpCost
 			for nSlot = 0, 5 do
 				local hItem = a:GetItemInSlot(nSlot)

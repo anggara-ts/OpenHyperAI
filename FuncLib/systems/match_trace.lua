@@ -362,9 +362,98 @@ function MatchTrace.Markers()
 	MatchTrace.MatchMarker("end", "winner=" .. winner)
 end
 
+-- [OHA-DEATH]: one line per death of this bot, printed even when tracing is off. The death count
+-- comes from GetHeroDeaths, so a death is caught whether or not this tick runs while dead. The
+-- line shows the bot's state from the last snapshots before it died: "last" is the final one,
+-- "before" the one about 4s earlier (what it was doing before it got caught).
+-- Game 033: the summary's death list came from kill_window, which logs only some enemy deaths,
+-- and showed 26 of the 125 on the scoreboard.
+local function DeathSnap(bot, now)
+	local enemies = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+	local names = {}
+	for _, e in ipairs(enemies) do
+		if e ~= nil and e:IsHero() and not e:IsIllusion() then
+			names[#names + 1] = (string.gsub(e:GetUnitName(), "npc_dota_hero_", ""))
+		end
+	end
+	local loc = bot:GetLocation()
+	return {
+		t = now,
+		mode = bot:GetActiveMode(),
+		desire = bot:GetActiveModeDesire() or 0,
+		hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+		x = math.floor(loc.x),
+		y = math.floor(loc.y),
+		enemies = names,
+		allies = math.max(0, #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) - 1),
+		fountain = math.floor(bot:DistanceFromFountain()),
+		hit = bot:WasRecentlyDamagedByAnyHero(1.0),
+	}
+end
+local function SnapText(s, now)
+	if s == nil then
+		return "-"
+	end
+	return string.format(
+		"%.1fs-ago mode=%s/%.2f hp=%.2f xy=%d,%d fountain=%d allies=%d enemies=%d(%s)%s",
+		now - s.t,
+		ModeName(s.mode),
+		s.desire,
+		s.hp,
+		s.x,
+		s.y,
+		s.fountain,
+		s.allies,
+		#s.enemies,
+		table.concat(s.enemies, ","),
+		s.hit and " hit" or ""
+	)
+end
+local function DeathWatch(bot)
+	local now = DotaTime()
+	local w = bot._deathWatch
+	if w == nil then
+		w = { count = GetHeroDeaths(bot:GetPlayerID()) or 0, snaps = {}, nextSnap = now }
+		bot._deathWatch = w
+	end
+	local count = GetHeroDeaths(bot:GetPlayerID()) or 0
+	if count > w.count then
+		local snaps = w.snaps
+		local last = snaps[#snaps]
+		local before = nil
+		for i = #snaps, 1, -1 do
+			if last ~= nil and last.t - snaps[i].t >= 3.5 then
+				before = snaps[i]
+				break
+			end
+		end
+		pcall(print, string.format(
+			"[OHA-DEATH] t=%.0f %s deaths=%d last: %s | before: %s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			count,
+			SnapText(last, now),
+			SnapText(before, now)
+		))
+		w.count = count
+		w.snaps = {}
+	end
+	if bot:IsAlive() and now >= w.nextSnap then
+		w.nextSnap = now + 0.5
+		local snaps = w.snaps
+		snaps[#snaps + 1] = DeathSnap(bot, now)
+		if #snaps > 12 then
+			table.remove(snaps, 1)
+		end
+	end
+end
+
 function MatchTrace.Tick(bot)
 	if bot ~= nil and bot:IsHero() then
 		MatchTrace.Markers()
+		if not bot:IsIllusion() then
+			pcall(DeathWatch, bot)
+		end
 	end
 	if not enabled or bot == nil or not bot:IsHero() then
 		return

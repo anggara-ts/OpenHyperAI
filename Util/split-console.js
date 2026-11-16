@@ -219,21 +219,48 @@ function summarize(g) {
 	out.push(`tags ${Object.entries(tags).map(([k, v]) => k + "=" + v).join(" ") || "none"}`);
 	out.push("");
 
-	const bySide = { radiant: {}, dire: {} };
-	out.push(`deaths ${deaths.length}`);
-	for (const d of deaths) {
-		const side = otherTeam(d.observer);
-		bySide[side][d.hero] = (bySide[side][d.hero] || 0) + 1;
-		out.push(`  ${fmtClock(d.t)}  ${side} ${d.hero}  respawn=${d.respawn} known=${d.known}`);
+	// Scoreboard: the engine's end-of-match player stats (kills/deaths/assists per player slot;
+	// slots 0-4 are Radiant and 128-132 Dire, in the lineup order of the "game" marker).
+	// [OHA-FIGHT] death lines are not a death count: kill_window logs only some enemy deaths
+	// (game 033: 26 of 125).
+	const board = [];
+	{
+		let cur = {};
+		for (const line of g.lines) {
+			const m = line.match(/^\S+ \S+\s+(kills|deaths|assists|net_worth|player_slot): (\d+)\s*$/);
+			if (!m) continue;
+			cur[m[1]] = Number(m[2]);
+			if (m[1] === "player_slot") {
+				if (cur.kills != null && cur.deaths != null) board.push(cur);
+				cur = {};
+			}
+		}
 	}
-	for (const side of ["radiant", "dire"]) {
-		const rows = Object.entries(bySide[side]);
-		const total = rows.reduce((n, [, c]) => n + c, 0);
+	const lineups = { radiant: (g.radiant || "").split(","), dire: (g.dire || "").split(",") };
+	out.push(`scoreboard ${board.length ? "" : "(no end-of-match stats in this log)"}`);
+	const seen = new Set();
+	for (const p of board) {
+		if (seen.has(p.player_slot)) continue;
+		seen.add(p.player_slot);
+		const side = p.player_slot >= 128 ? "dire" : "radiant";
+		const hero = lineups[side][p.player_slot % 128] || "slot" + p.player_slot;
 		out.push(
-			`  ${side} total ${total}` +
-				(rows.length ? "  " + rows.map(([h, c]) => h + " " + c).join(", ") : "")
+			`  ${side.padEnd(7)} ${hero.padEnd(20)} ${String(p.kills).padStart(2)}/${String(p.deaths).padStart(2)}/${String(p.assists ?? "?").padStart(2)}  net_worth=${p.net_worth ?? "?"}`
 		);
 	}
+	out.push("");
+
+	// [OHA-DEATH]: one line per bot death with its state just before (FuncLib/systems/match_trace.lua).
+	const botDeaths = bodies
+		.map((b) => b.match(/\[OHA-DEATH\] t=([-\d.]+) (\w+) deaths=(\d+) (.*)$/))
+		.filter(Boolean);
+	out.push(`deaths ${botDeaths.length}${botDeaths.length ? "" : "  (no [OHA-DEATH] lines: build before 2026.11.17-093)"}`);
+	for (const m of botDeaths) {
+		out.push(`  ${fmtClock(Number(m[1]))}  ${m[2]} #${m[3]}  ${m[4]}`);
+	}
+	out.push("");
+	void deaths;
+	void otherTeam;
 	out.push("");
 
 	const lost = { radiant: 0, dire: 0 };

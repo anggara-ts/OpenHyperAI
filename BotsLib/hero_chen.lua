@@ -247,8 +247,11 @@ function a.ConsiderHolyPersuasion()
 		"npc_dota_neutral_warpine_raider",
 	}
 	if S < 5 then
+		-- Low levels: this took any neutral in range. A creep above level_req cannot be converted
+		-- (datafeed level_req 3/4), ancients need the shard, and past max_units each cast just swaps
+		-- a creep, so Chen kept re-casting (and returning before Divine Favor). Same limits as below.
 		for K, X in pairs(T) do
-			if c.IsValid(X) then
+			if c.IsValid(X) and D ~= nil and #D < R and X:GetLevel() <= S and not X:IsAncientCreep() then
 				return BOT_ACTION_DESIRE_HIGH, X
 			end
 		end

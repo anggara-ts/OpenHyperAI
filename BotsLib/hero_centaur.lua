@@ -365,13 +365,37 @@ function a.ConsiderStampede()
 			end
 		end
 	end
+	-- Ally save: Stampede moves every allied hero (datafeed: "leads all allies"), but it was only
+	-- cast for Centaur's own fight or escape. Cast it when an ally anywhere is low, retreating,
+	-- being hit by heroes and has an enemy hero next to him.
+	for _, a1 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			a1 ~= b
+			and c.IsValidHero(a1)
+			and not a1:IsIllusion()
+			and not a1:HasModifier("modifier_arc_warden_tempest_double")
+			and c.GetHP(a1) < 0.35
+			and a1:WasRecentlyDamagedByAnyHero(1.5)
+			and c.IsRetreating(a1)
+			and #c.GetEnemiesNearLoc(a1:GetLocation(), 600) >= 1
+		then
+			if DotaTime() >= (b._stampedeSaveLogAt or -999) then
+				b._stampedeSaveLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-CENTAUR] t=%.0f stampede save ally=%s hp=%.2f", DotaTime(), a1:GetUnitName(), c.GetHP(a1)))
+			end
+			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderWorkHorse()
 	if not s:IsTrained() or not s:IsFullyCastable() or b:HasModifier("modifier_centaur_stampede") then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if H then
+	-- Team fight: Work Horse gives the Stampede run to Centaur only (datafeed), while Stampede
+	-- carries every ally. The cart was cast first and then blocked Stampede (cart check there), so
+	-- the team never got the charge. Use the cart in a fight only while Stampede is not ready.
+	if H and not (u:IsTrained() and u:IsFullyCastable()) then
 		local _ = c.GetTeamFightLocation(b)
 		local P = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
 		if P ~= nil and #P >= 2 and _ ~= nil then
@@ -408,8 +432,10 @@ function a.ConsiderHitchARide()
 	if D or H then
 		local O = c.GetAlliesNearLoc(b:GetLocation(), S)
 		for M, a0 in pairs(O) do
+			-- a0 ~= b: GetAlliesNearLoc includes Centaur himself; he cannot ride his own cart.
 			if
-				c.IsValidHero(a0)
+				a0 ~= b
+				and c.IsValidHero(a0)
 				and a0:WasRecentlyDamagedByAnyHero(1.1)
 				and c.GetHP(a0) < 0.5
 				and not a0:IsIllusion()
@@ -422,8 +448,10 @@ function a.ConsiderHitchARide()
 	if E then
 		local O = c.GetAlliesNearLoc(b:GetLocation(), S)
 		for M, a0 in pairs(O) do
+			-- a0 ~= b: same self-target guard (a retreating Centaur matched himself).
 			if
-				c.IsValidHero(a0)
+				a0 ~= b
+				and c.IsValidHero(a0)
 				and c.IsRetreating(a0)
 				and a0:WasRecentlyDamagedByAnyHero(1.1)
 				and not a0:IsIllusion()

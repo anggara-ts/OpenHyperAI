@@ -560,7 +560,8 @@ function a.ConsiderGlimpse()
 			c.IsValidHero(S)
 			and c.CanCastOnNonMagicImmune(S)
 			and c.CanCastOnTargetAdvanced(S)
-			and not c.IsSuspiciousIllusion(S)
+			-- no IsSuspiciousIllusion filter here: it dropped every illusion before the count below,
+			-- so "Glimpse kills illusions" (datafeed) could never fire.
 			and p:GetLevel() >= 3
 		then
 			if c.IsSuspiciousIllusion(S) then
@@ -572,6 +573,10 @@ function a.ConsiderGlimpse()
 		end
 	end
 	if a2 == 0 and a3 >= 1 then
+		if DotaTime() >= (b._glimpseIllLogAt or -999) then
+			b._glimpseIllLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f glimpse illusion=%s", DotaTime(), a4:GetUnitName()))
+		end
 		return BOT_ACTION_DESIRE_HIGH, a4
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

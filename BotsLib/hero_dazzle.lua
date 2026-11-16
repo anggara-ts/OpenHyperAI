@@ -132,9 +132,13 @@ function a.SkillsComplement()
 	if S then
 		c.Utils.GameStates.dazzleNothl[b:GetPlayerID()].body = b
 	end
-	if c.CanNotUseAbility(b) or b:IsInvisible() or S then
+	if c.CanNotUseAbility(b) or S then
 		return
 	end
+	-- Invisible (Glimmer Cape is in his build): keep other spells quiet so the invisibility is not
+	-- broken, but still allow Shallow Grave. The old early return let allies die next to an
+	-- invisible Dazzle.
+	local invisOnlyGrave = b:IsInvisible()
 	o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "dazzle")
 	p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "dazzle")
 	q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "dazzle")
@@ -152,8 +156,15 @@ function a.SkillsComplement()
 	R = T.allies
 	z, A = a.ConsiderW()
 	if z > 0 then
+		if invisOnlyGrave and DotaTime() >= (b._graveInvisLogAt or -999) then
+			b._graveInvisLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-DAZZLE] t=%.0f grave while invisible on=%s", DotaTime(), A:GetUnitName()))
+		end
 		c.SetQueuePtToINT(b, true)
 		b:ActionQueue_UseAbilityOnEntity(p, A)
+		return
+	end
+	if invisOnlyGrave then
 		return
 	end
 	H, I = a.ConsiderNothlProjection()

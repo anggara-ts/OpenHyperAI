@@ -496,7 +496,13 @@ function GetDesireRaw()
 			-- 2:00 and 4:00 river runes are the mid's. A sidelaner who camped the
 			-- 0:00 gold stays through the water spawn and picks up both.
 			if A == RUNE_STATUS_AVAILABLE or A == RUNE_STATUS_UNKNOWN then
-				if a.SidelaneSkipsRiver(d.rune.normal.location, here) or a.SkipSecondLaningRune(d.rune.normal.location) then
+				-- A skipped rune too: game 021, 1:28-2:26, Medusa stayed by the top river spot on
+				-- "laning-close" with the horn gold there given up as unpickable (skipped).
+				if
+					a.SidelaneSkipsRiver(d.rune.normal.location, here)
+					or a.SkipSecondLaningRune(d.rune.normal.location)
+					or a.RuneSkipped(d.rune.normal.location)
+				then
 					-- fall through and let lane desire win
 				elseif A == RUNE_STATUS_AVAILABLE and here <= 800 then
 					return give(BOT_MODE_DESIRE_ABSOLUTE, "laning-close")
@@ -936,7 +942,14 @@ function Think()
 					tostring(GetRuneType and GetRuneType(D.location) or "?")
 				))
 				d._runePickTry = nil
-				a.SkipRune(D.location, 30)
+				-- River gold (a bounty on a power spot) that will not pick up stays that way: skip
+				-- it until the next power rune spawn (every 2 min), not just 30s, so the water or
+				-- power rune that spawns there is still taken.
+				local skipFor = 30
+				if IsRiverRune(D.location) and GetRuneType and GetRuneType(D.location) == RUNE_BOUNTY then
+					skipFor = math.max(30, 120 - (now % 120) + 1)
+				end
+				a.SkipRune(D.location, skipFor)
 				d:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), n or d:GetAssignedLane(), -600))
 				doing("pickup-failed")
 				return

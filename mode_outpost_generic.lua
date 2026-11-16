@@ -2364,7 +2364,7 @@ function ConsiderOutpostCapture()
 				loc = spot
 			end
 		end
-		if loc == nil then
+		if loc == nil or not CanCaptureOutpostAt(loc) then
 			return 0
 		end
 		_ = GetUnitToLocationDistance(c, loc)
@@ -2426,8 +2426,65 @@ function IsOurSideOutpost(loc)
 	end
 	return a.GetDistance(loc, ours) < a.GetDistance(loc, theirs)
 end
+-- Kills by team, from the scoreboard counters (no vision needed).
+local function TeamKills(team)
+	local n = 0
+	for _, pid in pairs(GetTeamPlayers(team) or {}) do
+		n = n + (GetHeroKills(pid) or 0)
+	end
+	return n
+end
+-- The lane whose front is closest to the outpost, and how far our wave has pushed along it
+-- (0 = our base, 1 = theirs).
+local function OutpostLaneFront(loc)
+	local bestLane, bestDist = nil, math.huge
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local front = GetLaneFrontLocation(GetTeam(), lane, 0)
+		if front ~= nil then
+			local d = a.GetDistance(front, loc)
+			if d < bestDist then
+				bestLane, bestDist = lane, d
+			end
+		end
+	end
+	if bestLane == nil then
+		return nil, 0
+	end
+	return bestLane, GetLaneFrontAmount(GetTeam(), bestLane, false) or 0
+end
+-- The enemy-side outpost sits in their jungle. User call (game 035, 34:04: Leshrac walked alone
+-- to the Dire outpost while Radiant was well behind on kills and no wave pushed toward Dire, and
+-- Necrophos, Dragon Knight and Winter Wyvern killed him there): besides an enemy lane with T1 and
+-- T2 down, our wave must be past the middle of the outpost's lane and the team must not be
+-- 8+ kills behind.
+local ENEMY_OUTPOST_KILL_DEFICIT = 8
+local enemyOutpostLogAt = -999
+local function EnemyOutpostSafe(loc)
+	local why = nil
+	if not EnemyTier2Down() then
+		why = "no-tier2-down"
+	else
+		local deficit = TeamKills(GetOpposingTeam()) - TeamKills(GetTeam())
+		local lane, amount = OutpostLaneFront(loc)
+		if deficit >= ENEMY_OUTPOST_KILL_DEFICIT then
+			why = string.format("behind-on-kills(%d)", deficit)
+		elseif amount <= 0.5 then
+			why = string.format("wave-not-pushed(lane=%s front=%.2f)", tostring(lane), amount)
+		end
+	end
+	if why ~= nil and why ~= "no-tier2-down" and DotaTime() >= enemyOutpostLogAt + 60 then
+		enemyOutpostLogAt = DotaTime()
+		pcall(print, string.format(
+			"[OHA-OUTPOST] t=%.0f %s enemy-outpost-skip why=%s",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			why
+		))
+	end
+	return why == nil
+end
 function CanCaptureOutpostAt(loc)
-	return IsOurSideOutpost(loc) or EnemyTier2Down()
+	return IsOurSideOutpost(loc) or EnemyOutpostSafe(loc)
 end
 function GetClosestOutpost()
 	local bV = nil

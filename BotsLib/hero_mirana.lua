@@ -680,16 +680,27 @@ function a.ConsiderE()
 		local land = Vector(me.x + math.cos(face) * M, me.y + math.sin(face) * M, me.z)
 		local there = botTarget:GetExtrapolatedLocation(0.6)
 		local landDist = math.sqrt((land.x - there.x) ^ 2 + (land.y - there.y) ^ 2)
+		-- Game 031: one leap brought her next to the target, the next one carried her past him (650
+		-- forward, wherever he is) and a third brought her back: two charges wasted. No chase leap
+		-- with the target already in attack range, unless the landing is at least 150 closer than
+		-- she is now, or within 3s of the last chase leap (its speed bonus lasts 5s).
 		if botTarget:IsAttackImmune() or not c.CanCastOnMagicImmune(botTarget) then
 			chaseWhy = "target-immune"
+		elseif dist <= N + 50 then
+			chaseWhy = "in-attack-range"
+		elseif DotaTime() - (b._chaseLeapAt or -999) < 3 then
+			chaseWhy = "recent-leap"
+		elseif landDist > dist - 150 then
+			chaseWhy = string.format("no-gain(%d->%d)", dist, landDist)
 		elseif landDist > N - 80 then
 			chaseWhy = string.format("lands-far(%d)", landDist)
 		elseif dist < M - 30 and not fleeing then
 			chaseWhy = "close-not-fleeing"
 		end
+		-- Logged again (the other Mirana lines stay off) while this rule is new.
 		if chaseWhy ~= nil and DotaTime() >= (b._leapChaseLogAt or -999) then
 			b._leapChaseLogAt = DotaTime() + 5
-			pcall(print, string.format(
+			pcall(_G.print, string.format(
 				"[OHA-MIRANA] t=%.0f leap-skip why=chase-%s target=%s dist=%d",
 				DotaTime(),
 				chaseWhy,
@@ -711,7 +722,8 @@ function a.ConsiderE()
 			then
 				U = botTarget
 				V = "E-进攻:" .. c.Chat.GetNormName(U)
-				pcall(print, string.format(
+				b._chaseLeapAt = DotaTime()
+				pcall(_G.print, string.format(
 					"[OHA-MIRANA] t=%.0f leap why=chase target=%s dist=%d",
 					DotaTime(),
 					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),

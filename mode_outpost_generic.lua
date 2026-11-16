@@ -2413,7 +2413,13 @@ function ConsiderOutpostCapture()
 	if dist <= 500 then
 		return 0.98
 	end
-	if dist <= 2500 then
+	-- Not on the way to Roshan or the Tormentor (game 035, 33:55: Leshrac, walking to the bottom
+	-- Tormentor, passed within 2500 of the Dire outpost and the 0.95 here took him off his trip).
+	if a.IsDoingRoshan(c) or a.IsDoingTormentor(c) then
+		return 0
+	end
+	-- User call: 2500 pulled bots off whatever they were doing from too far away.
+	if dist <= 1200 then
 		return 0.95
 	end
 	return BOT_MODE_DESIRE_MODERATE

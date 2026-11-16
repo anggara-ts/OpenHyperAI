@@ -297,7 +297,7 @@ local function StandingStillOk(bot, mode)
 	return mode == BOT_MODE_SECRET_SHOP or mode == BOT_MODE_WARD or mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM
 end
 
--- Game boundary lines for split-console.js. Printed even when tracing is off.
+-- Game boundary lines for Util/split-console.js. Printed even when tracing is off.
 -- Module state is per script VM, so a team can print the same marker more than once.
 local markerSent = {}
 local nextEndCheck = 0

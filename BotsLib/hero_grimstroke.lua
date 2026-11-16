@@ -1,3 +1,5 @@
+-- [OHA-GRIM] logs off: the behaviour they traced works (game 029).
+local print = function() end
 -- Grimstroke: skill build, item build, and ability use for this hero.
 local a = {}
 local b = GetBot()

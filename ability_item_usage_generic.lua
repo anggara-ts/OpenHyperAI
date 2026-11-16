@@ -11,6 +11,8 @@ end
 local d = GetTeam()
 local e = 10 == 10
 local f = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+-- Logs switched off once their feature works (the TP diag lines, game 029).
+local function NoLog() end
 local g = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local h = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(c, "npc_dota_", ""))
 local i = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
@@ -4486,7 +4488,7 @@ function a.GetLaningTPLocation(b, dt, botLocation)
 	end
 	local dy = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
 	if dv then
-		pcall(print, string.format(
+		pcall(NoLog, string.format(
 			"[OHA-TP] diag-laning %s pos=%s assigned=%s chose=%s lan=%s",
 			b:GetUnitName(),
 			tostring(f.GetPosition(b)),
@@ -4707,7 +4709,7 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		-- Printed every think while at the fountain (6,541 lines in one game); once per 10s now.
 		if DotaTime() >= (b._diagFountainLogAt or -999) then
 			b._diagFountainLogAt = DotaTime() + 10
-			pcall(print, string.format(
+			pcall(NoLog, string.format(
 				"[OHA-TP] diag-fountain %s pos=%s assigned=%s chose=%s mode=%s lan=%s",
 				c,
 				tostring(f.GetPosition(b)),
@@ -6296,6 +6298,17 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 		end
 		for pid, v in pairs(b._invisSeen) do
 			if now - v.t > 4 or not IsHeroAlive(pid) then
+				-- Game 029: 15 fades seen, Grimstroke the closest holder 553-999 away, no Dust at all.
+				-- Say which condition held it back the last time it was checked.
+				if v.wasClosest and v.why ~= nil then
+					pcall(print, string.format(
+						"[OHA-DUST] t=%.0f %s no-dust on %s why=%s",
+						now,
+						(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(v.name, "npc_dota_hero_", "")),
+						v.why
+					))
+				end
 				b._invisSeen[pid] = nil
 			else
 				local info = GetHeroLastSeenInfo(pid)
@@ -6304,6 +6317,20 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 				local gone = ls == nil or ls.time_since_seen > 0.1
 				local dist = GetUnitToLocationDistance(b, loc)
 				local closest = f.IsClosestToDustLocation(b, loc)
+				if closest then
+					v.wasClosest = true
+				end
+				if not gone then
+					v.why = "still-visible"
+				elseif dist > 900 then
+					v.why = string.format("far(%.0f)", dist)
+				elseif not closest then
+					v.why = "not-closest"
+				elseif not IsLocationVisible(loc) then
+					v.why = "spot-in-fog"
+				else
+					v.why = "cast-blocked"
+				end
 				if not v.logged and b:FindItemSlot("item_dust") >= 0 then
 					v.logged = true
 					pcall(print, string.format(
@@ -6440,6 +6467,9 @@ function a.BannerFromBackpack()
 	end
 	b._bannerSwapAt = DotaTime() + 5
 	local out = b:GetItemInSlot(dest)
+	-- Forced: the swap wrapper (global_overrides) refuses a swap with an enemy hero within 1000,
+	-- and an enemy base always has one (game 029, 52:33-53:24: 9 tries, the banner never moved).
+	b._swapDespiteEnemies = true
 	pcall(print, string.format(
 		"[OHA-BANNER] t=%.0f %s swap slot%d->%d out=%s building=%s dist=%.0f",
 		DotaTime(),
@@ -7764,6 +7794,11 @@ function a.WatchStillUnderHit()
 	if b:IsStunned() or b:IsRooted() or b:IsHexed() or b:IsNightmared() or b:IsChanneling() or b:IsCastingAbility() then
 		return
 	end
+	-- Attacking in place is fine (game 029, 52:22 and 52:30: Medusa and Pudge hitting a hero).
+	local tgt0 = b:GetAttackTarget()
+	if tgt0 ~= nil and not tgt0:IsNull() and tgt0:IsAlive() and GetUnitToUnitDistance(b, tgt0) <= b:GetAttackRange() + 150 then
+		return
+	end
 	b._stillLogAt = now + 8
 	local mods = {}
 	for i = 0, math.min(b:NumModifiers(), 24) - 1 do
@@ -7825,6 +7860,34 @@ function a.EatForage()
 	end
 	return false
 end
+-- Dust ahead of the item think's busy gate (queued orders and the like), as for the mushrooms:
+-- the Dust rule decides, this only makes sure it can act. Dust is no-target (datafeed).
+function a.UseDustNow()
+	if not b:IsAlive() or b:IsStunned() or b:IsHexed() or b:IsChanneling() or b:IsCastingAbility() then
+		return false
+	end
+	local okM, muted = pcall(function()
+		return b:IsMuted()
+	end)
+	if okM and muted then
+		return false
+	end
+	local slot = b:FindItemSlot("item_dust")
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local dust = b:GetItemInSlot(slot)
+	local rule = a.ConsiderItemDesire["item_dust"]
+	if dust == nil or rule == nil or not f.CanCastAbility(dust) then
+		return false
+	end
+	local desire = rule(dust)
+	if type(desire) == "number" and desire > 0 then
+		b:Action_UseAbility(dust)
+		return true
+	end
+	return false
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7860,6 +7923,11 @@ function ItemUsageThink()
 	do
 		local okF, ate = pcall(a.EatForage)
 		if okF and ate then
+			_perfDone()
+			return
+		end
+		local okD, dusted = pcall(a.UseDustNow)
+		if okD and dusted then
 			_perfDone()
 			return
 		end

@@ -731,6 +731,9 @@ local function CampNeutrals(bot, campLoc)
 	return found
 end
 function Think()
+	if OhaCastGuard ~= nil and OhaCastGuard(GetBot()) then
+		return
+	end
 	if IsDebug then
 		local b1 = DotaTime()
 		if b1 > b0 + 3 then

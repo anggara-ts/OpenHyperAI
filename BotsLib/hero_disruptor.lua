@@ -1,3 +1,5 @@
+-- [OHA-DISRUPTOR] logs off: the behaviour they traced works (game 029).
+local print = function() end
 -- Disruptor: skill build, item build, and ability use for this hero.
 local a = {}
 local b = GetBot()

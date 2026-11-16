@@ -263,8 +263,27 @@ local function LoadSafeCallPerf()
 	end
 	return SafeCallPerf
 end
+-- A mode Think that runs during a cast point or a channel replaces it with its own order. Game 029,
+-- 27:48: Techies' escape Blast Off (1s cast point) was cancelled while he was in a defend mode.
+-- Every mode Think wrapped here (name ending in _Think) is skipped while the bot casts or
+-- channels; farm, ward, Roshan and lotus Thinks call OhaCastGuard themselves.
+function OhaCastGuard(bot)
+	if bot == nil or not bot:IsAlive() then
+		return false
+	end
+	return bot:IsCastingAbility() or bot:IsChanneling()
+end
 function SafeCall(O, P, Q)
+	local isThink = type(Q) == "string" and string.sub(Q, -6) == "_Think"
 	return function(...)
+		if isThink then
+			local okG, guarded = pcall(function()
+				return OhaCastGuard(GetBot())
+			end)
+			if okG and guarded then
+				return P
+			end
+		end
 		local perf = LoadSafeCallPerf()
 		local t0 = nil
 		if perf and RealTime then

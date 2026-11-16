@@ -628,6 +628,9 @@ end
 local a1 = 900
 local a2 = 300
 function Think()
+	if OhaCastGuard ~= nil and OhaCastGuard(GetBot()) then
+		return
+	end
 	if not a:IsAlive() or c.CanNotUseAction(a) then
 		return
 	end

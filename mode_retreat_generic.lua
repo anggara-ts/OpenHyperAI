@@ -141,6 +141,16 @@ function GetDesireHelper()
 	then
 		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
 	end
+	-- Disarmed in a fight: game 029, 29:25, Mirana, disarmed by Techies' Reactive Tazer, 46% HP,
+	-- 4 enemies near, stood idle in attack mode (0.95). 2+ enemy heroes within 1200 under 60% HP,
+	-- or 1 under 35%: retreat, above the attack mode.
+	if c:IsDisarmed() then
+		local foesD = #(c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+		local hpD = b.GetHP(c)
+		if foesD >= 2 and hpD < 0.6 or foesD >= 1 and hpD < 0.35 then
+			return RetreatTag(143, 0.98)
+		end
+	end
 	d = b.GetHP(c)
 	e = b.GetMP(c)
 	f = c:GetUnitName()

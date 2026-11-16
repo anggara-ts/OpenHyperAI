@@ -7505,6 +7505,38 @@ end
 function a.JustTeleported()
 	return DotaTime() - (b._jumpAt or -999) < 20
 end
+-- Stuck order queue: queued orders, not channelling or in a cast, and under 50 moved for 4s.
+-- Game 021, 36:51-37:25: Doom stood still 12,500 from his base in defend mode with enemies at
+-- his Ancient (current action idle / use-ability); the item think skips everything while
+-- orders are queued, so a Forager mushroom in his bag was never eaten either. The orders are
+-- cleared so modes and items work again.
+function a.WatchStuckQueue()
+	if not b:IsAlive() or b:NumQueuedActions() <= 0 or b:IsChanneling() or b:IsCastingAbility() then
+		b._qWatch = nil
+		return false
+	end
+	local now = DotaTime()
+	local here = b:GetLocation()
+	local w = b._qWatch
+	if w == nil or f.GetLocationToLocationDistance(w.loc, here) >= 50 then
+		b._qWatch = { since = now, loc = here }
+		return false
+	end
+	if now - w.since < 4 then
+		return false
+	end
+	b._qWatch = nil
+	pcall(print, string.format(
+		"[OHA-STUCK] t=%.0f %s queue-cleared queued=%d action=%s mode=%d",
+		now,
+		(string.gsub(c, "npc_dota_hero_", "")),
+		b:NumQueuedActions(),
+		tostring(b:GetCurrentActionType()),
+		b:GetActiveMode()
+	))
+	b:Action_ClearActions(true)
+	return true
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7525,6 +7557,10 @@ function ItemUsageThink()
 	pcall(ChargeTracker.Tick, b)
 	pcall(a.TrackTeleportJump)
 	pcall(a.LogHomeWalk)
+	local okQ, cleared = pcall(a.WatchStuckQueue)
+	if okQ and cleared then
+		return
+	end
 	-- Rune mode just ordered a rune pick-up: no item or spell order this frame, it would replace
 	-- the pick-up. The river horn gold stopped being taken from build 043 on, the build that fixed
 	-- a crash in this think (before it, this think issued no orders at all for most bots); the

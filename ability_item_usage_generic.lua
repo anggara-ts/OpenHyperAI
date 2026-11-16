@@ -7969,6 +7969,63 @@ function a.DumpBotApi()
 	end
 	-- The bot's own handle, in case its class table is not a global.
 	ApiPrint("bot-handle", ApiNames(b))
+	-- Numeric constants for shrines and ability behaviors (is ABILITY_BEHAVIOR_VECTOR_TARGETING
+	-- defined for bots?), and what the old healing-shrine API returns now that 7.33 replaced those
+	-- shrines with lotus pools and watchers: GetShrine for every SHRINE_* id on both teams.
+	local consts = {}
+	for k, v in pairs(_G) do
+		if type(k) == "string" and type(v) == "number" and (string.find(k, "^SHRINE_") or string.find(k, "^ABILITY_BEHAVIOR_")) then
+			consts[#consts + 1] = k .. "=" .. tostring(v)
+		end
+	end
+	table.sort(consts)
+	ApiPrint("constants", consts)
+	local shrineIds = {}
+	for k, v in pairs(_G) do
+		if type(k) == "string" and type(v) == "number" and string.find(k, "^SHRINE_") then
+			shrineIds[#shrineIds + 1] = { name = k, id = v }
+		end
+	end
+	table.sort(shrineIds, function(x, y)
+		return x.id < y.id
+	end)
+	if #shrineIds == 0 then
+		pcall(print, "[OHA-API] shrine no SHRINE_* constants defined")
+	end
+	for _, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+		for _, s in ipairs(shrineIds) do
+			local ok, shrine = pcall(GetShrine, team, s.id)
+			local detail
+			if not ok then
+				detail = "error=" .. tostring(shrine)
+			elseif shrine == nil then
+				detail = "nil"
+			else
+				local okL, loc = pcall(function()
+					return shrine:GetLocation()
+				end)
+				local okN, name = pcall(function()
+					return shrine:GetUnitName()
+				end)
+				local okC, cd = pcall(GetShrineCooldown, shrine)
+				local okH, healing = pcall(IsShrineHealing, shrine)
+				detail = string.format(
+					"unit=%s xy=%s cooldown=%s healing=%s",
+					okN and tostring(name) or "?",
+					okL and loc ~= nil and string.format("%d,%d", math.floor(loc.x), math.floor(loc.y)) or "?",
+					okC and tostring(cd) or "error",
+					okH and tostring(healing) or "error"
+				)
+			end
+			pcall(print, string.format(
+				"[OHA-API] shrine team=%s %s(%d): %s",
+				team == TEAM_RADIANT and "radiant" or "dire",
+				s.name,
+				s.id,
+				detail
+			))
+		end
+	end
 end
 function a.LogCourier(kind)
 	local now = DotaTime()

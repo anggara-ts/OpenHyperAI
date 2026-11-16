@@ -82,7 +82,7 @@ local function LogDesireChange(final)
 	a._roshOn = on
 	local M = c.GetCurrentRoshanLocation()
 	RoshLog(
-		"%s desire=%.2f why=%s mode=%s dist=%d allies=%d enemies=%d fit=%s",
+		"%s desire=%.2f why=%s mode=%s dist=%d allies=%d enemies=%d held=%d fit=%s",
 		on and "call" or "drop",
 		final,
 		tostring(a._roshWhy),
@@ -90,6 +90,7 @@ local function LogDesireChange(final)
 		M ~= nil and math.floor(GetUnitToLocationDistance(a, M)) or -1,
 		c.GetNumOfAliveHeroes(false),
 		c.GetNumOfAliveHeroes(true),
+		a._roshHeld or 0,
 		tostring(a._roshFitWhy)
 	)
 end
@@ -244,11 +245,48 @@ end
 -- finishing=true allows a looser gate when Roshan is already low and allies are in the pit.
 -- Enemies that can reach the pit now. One who just respawned is still walking back
 -- from the fountain, so the numbers a kill bought last a little past the respawn.
+-- Enemies held at their base (user call, game 031, 70:00: Radiant's mega creeps were deep in Dire's
+-- base and Radiant farmed the jungle instead of taking Roshan; with 4-5 Dire heroes alive the
+-- numbers rule never allowed it). 4+ of our lane creeps within 3000 of the enemy ancient: an enemy
+-- hero seen there (within 3500 of it) in the last 5s does not contest Roshan. Cached for 1s.
+local heldAt, heldN = -999, 0
+local function EnemiesHeldAtBase()
+	local now = DotaTime()
+	if now - heldAt < 1 then
+		return heldN
+	end
+	heldAt, heldN = now, 0
+	a._roshHeld = 0
+	local anc = GetAncient(GetOpposingTeam())
+	if anc == nil then
+		return 0
+	end
+	local creeps = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIED_CREEPS) or {}) do
+		if u ~= nil and not u:IsNull() and u:IsAlive() and GetUnitToUnitDistance(u, anc) <= 3000 then
+			creeps = creeps + 1
+		end
+	end
+	if creeps < 4 then
+		return 0
+	end
+	for _, pid in ipairs(GetTeamPlayers(GetOpposingTeam())) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local ls = info ~= nil and info[1] or nil
+			if ls ~= nil and ls.time_since_seen <= 5 and GetUnitToLocationDistance(anc, ls.location) <= 3500 then
+				heldN = heldN + 1
+			end
+		end
+	end
+	a._roshHeld = heldN
+	return heldN
+end
 local function ContestingEnemies(M)
 	local alive = c.GetNumOfAliveHeroes(true)
 	local grace = KillWindow.TransitGrace(M)
 	local transit = KillWindow.EnemiesInTransit(grace)
-	return math.max(0, alive - transit), transit
+	return math.max(0, alive - transit - EnemiesHeldAtBase()), transit
 end
 -- Numbers rule for a fresh take. Returns ok, why.
 local function FreshTakeNumbers(alliesAlive, enemiesAlive, missing)
@@ -346,7 +384,7 @@ local function TakeFitsWindow(M)
 	-- (15:12: called with 2 alive, 4 alive next think).
 	local need0 = TakeTimeNeeded(M)
 	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
-	local everyone = c.GetNumOfAliveHeroes(true) + (kw.fresh or 0) + back
+	local everyone = math.max(0, c.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase()) + (kw.fresh or 0) + back
 	if FreshTakeNumbers(alliesAlive, everyone, missing) then
 		return true, "no-window-needed"
 	end
@@ -371,7 +409,7 @@ local function RunningCallFits(M)
 	local kw = KillWindow.Tick()
 	local need0, eta0 = TakeTimeNeeded(M)
 	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
-	if FreshTakeNumbers(alliesAlive, c.GetNumOfAliveHeroes(true) + (kw.fresh or 0) + back, missing) then
+	if FreshTakeNumbers(alliesAlive, math.max(0, c.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase()) + (kw.fresh or 0) + back, missing) then
 		return true, "running-no-window-needed"
 	end
 	local left = KillWindow.WindowLeft()

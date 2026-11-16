@@ -209,7 +209,13 @@ function a.SkillsComplement()
 	if a.BlinkComboStep(C, D, E) then
 		return
 	end
+	if a.BlinkHookStep(B) then
+		return
+	end
 	if a.TryBlink(C, D, E) then
+		return
+	end
+	if a.TryBlinkHook(B) then
 		return
 	end
 	u = a.ConsiderMeatShield(D, C, x, F, G, H)
@@ -346,6 +352,123 @@ function a.TryBlink(rot, shield, dismember)
 		end
 	end
 	return false
+end
+-- Blink then hook (user call): an enemy hero Pudge cannot hook from where he stands (out of range,
+-- or a unit in the way) but could from a blink away. Blink to a spot on a ring around the target
+-- (hook range - 250) that has a clear hook line, no enemy hero within 500, and is closest to an
+-- allied hero or one of our towers (one of those within 1200), so the target is pulled into our
+-- side; hook on the next think. Not while retreating, 50%+ HP, mana for the hook.
+-- Logged: [OHA-PUDGE] blink-hook.
+local function HookLineClear(from, to, width, target)
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+		if
+			c.IsValid(u)
+			and u ~= b
+			and u ~= target
+			and not u:IsBuilding()
+			and not string.find(u:GetUnitName(), "ward")
+			and GetUnitToLocationDistance(u, from) <= 1600
+		then
+			local l = PointToLineDistance(from, to, u:GetLocation())
+			if l ~= nil and l.within and l.distance <= width + u:GetBoundingRadius() then
+				return false
+			end
+		end
+	end
+	return true
+end
+local function NearestAnchor(p)
+	local best = math.huge
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if ally ~= b and ally:IsAlive() and not ally:IsIllusion() then
+			best = math.min(best, GetUnitToLocationDistance(ally, p))
+		end
+	end
+	for _, t in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+		if t ~= nil and t:IsAlive() and t:IsTower() then
+			best = math.min(best, GetUnitToLocationDistance(t, p))
+		end
+	end
+	return best
+end
+function a.TryBlinkHook(hook)
+	if not c.CanBlinkDagger(b) or b.Blink == nil or b:IsRooted() or not c.CanCastAbility(hook) then
+		return false
+	end
+	if z or c.GetHP(b) < 0.5 or b:GetMana() < hook:GetManaCost() then
+		return false
+	end
+	local blinkRange = b.Blink:GetName() == "item_arcane_blink" and 1400 or 1200
+	local hookRange = c.GetProperCastRange(false, b, hook:GetCastRange())
+	local width = hook:GetSpecialValueInt("hook_width")
+	local target = nil
+	for _, e in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if c.IsValidHero(e) and not c.IsSuspiciousIllusion(e) and c.CanCastOnNonMagicImmune(e) and not e:IsInvulnerable() then
+			local d = GetUnitToUnitDistance(b, e)
+			local hookableNow = d <= hookRange - 100 and HookLineClear(b:GetLocation(), e:GetLocation(), width, e)
+			if not hookableNow and d > hookRange - 100 - blinkRange and d <= blinkRange + hookRange - 250 then
+				if target == nil or c.GetHP(e) < c.GetHP(target) then
+					target = e
+				end
+			end
+		end
+	end
+	if target == nil then
+		return false
+	end
+	local tl = target:GetLocation()
+	local ring = hookRange - 250
+	local best, bestScore = nil, 1200
+	for deg = 0, 330, 30 do
+		local rad = math.rad(deg)
+		local p = Vector(tl.x + math.cos(rad) * ring, tl.y + math.sin(rad) * ring, tl.z)
+		if
+			GetUnitToLocationDistance(b, p) <= blinkRange
+			and IsLocationPassable(p)
+			and #(c.GetEnemiesNearLoc(p, 500) or {}) == 0
+			and HookLineClear(p, tl, width, target)
+		then
+			local score = NearestAnchor(p)
+			if score < bestScore then
+				best, bestScore = p, score
+			end
+		end
+	end
+	if best == nil then
+		return false
+	end
+	b._pudgeBlinkHook = { target = target, at = DotaTime() }
+	pcall(print, string.format(
+		"[OHA-PUDGE] t=%.0f blink-hook start target=%s dist=%d anchor=%d",
+		DotaTime(),
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		math.floor(GetUnitToUnitDistance(b, target)),
+		math.floor(bestScore)
+	))
+	b:Action_UseAbilityOnLocation(b.Blink, best)
+	return true
+end
+-- The hook after a blink-hook blink (Blink is instant; this runs on the next think).
+function a.BlinkHookStep(hook)
+	local st = b._pudgeBlinkHook
+	if st == nil then
+		return false
+	end
+	b._pudgeBlinkHook = nil
+	local t = st.target
+	if DotaTime() - st.at > 1.5 or not c.IsValidHero(t) or not t:IsAlive() or not c.CanCastAbility(hook) then
+		return false
+	end
+	local speed = math.max(1, hook:GetSpecialValueInt("hook_speed"))
+	local d = GetUnitToUnitDistance(b, t)
+	b:Action_UseAbilityOnLocation(hook, t:GetExtrapolatedLocation(hook:GetCastPoint() + d / speed))
+	pcall(print, string.format(
+		"[OHA-PUDGE] t=%.0f blink-hook hook target=%s dist=%d",
+		DotaTime(),
+		(string.gsub(t:GetUnitName(), "npc_dota_hero_", "")),
+		math.floor(d)
+	))
+	return true
 end
 -- [OHA-PUDGE] one line per cast decision, with HP, mode and the heroes around him.
 -- The combo, hooks, Rot and Dismember work as intended: no longer printed (call sites kept).
@@ -523,31 +646,52 @@ function a.ConsiderMeatHook(B, C, E, x, F, H)
 		then
 			return BOT_ACTION_DESIRE_HIGH, a6:GetLocation()
 		end
-		local a7 = a6:GetNearbyHeroes(K, true, BOT_MODE_NONE)
+		-- Save hook on an ally running from a chaser (user call, rework): the ally must be in hook
+		-- range and 400+ away (a pull worth having), the chaser within 700 of the ALLY (it used to be
+		-- "within half a hook range of Pudge", so it fired only with the enemy already on Pudge and
+		-- never checked the ally's own distance), and Pudge 300+ closer to safety than the ally (it
+		-- was half a hook range, keeping Pudge too far back). Logged: [OHA-PUDGE] ally-hook.
+		local allyDist = GetUnitToUnitDistance(b, a6)
 		if
 			c.IsValidHero(a6)
+			and a6 ~= b
+			and not a6:IsIllusion()
 			and c.IsRetreating(a6)
 			and a6:WasRecentlyDamagedByAnyHero(2.1)
-			and not a6:IsIllusion()
+			and c.IsRunning(a6)
 			and c.GetMP(b) > 0.31
+			and allyDist >= 400
+			and allyDist <= K
 		then
+			local chaser = nil
+			for _, e in pairs(a6:GetNearbyHeroes(700, true, BOT_MODE_NONE) or {}) do
+				if
+					c.IsValidHero(e)
+					and not c.IsSuspiciousIllusion(e)
+					and not c.IsDisabled(e)
+					and not c.IsTaunted(e)
+					and e:IsFacingLocation(a6:GetLocation(), 30)
+					and not e:HasModifier("modifier_enigma_black_hole_pull")
+					and not e:HasModifier("modifier_faceless_void_chronosphere_freeze")
+					and not e:HasModifier("modifier_necrolyte_reapers_scythe")
+				then
+					chaser = e
+					break
+				end
+			end
+			local esc = c.GetEscapeLoc()
 			if
-				a7 ~= nil
-				and #a7 >= 1
-				and c.IsValidHero(a7[1])
-				and c.IsInRange(b, a7[1], K * 0.5)
-				and c.IsRunning(a6)
-				and a7[1]:IsFacingLocation(a6:GetLocation(), 30)
-				and GetUnitToLocationDistance(b, c.GetEscapeLoc()) > GetUnitToLocationDistance(a6, c.GetEscapeLoc())
-				and GetUnitToLocationDistance(b, c.GetEscapeLoc()) - GetUnitToLocationDistance(a6, c.GetEscapeLoc()) > K * 0.5
-				and not c.IsSuspiciousIllusion(a7[1])
-				and not c.IsDisabled(a7[1])
-				and not c.IsTaunted(a7[1])
-				and not a7[1]:HasModifier("modifier_enigma_black_hole_pull")
-				and not a7[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not a7[1]:HasModifier("modifier_necrolyte_reapers_scythe")
+				chaser ~= nil
+				and GetUnitToLocationDistance(a6, esc) - GetUnitToLocationDistance(b, esc) >= 300
 				and not c.IsUnitBetweenMeAndLocation(b, a6, a6:GetLocation(), M)
 			then
+				pcall(print, string.format(
+					"[OHA-PUDGE] t=%.0f ally-hook %s chaser=%s dist=%d",
+					DotaTime(),
+					(string.gsub(a6:GetUnitName(), "npc_dota_hero_", "")),
+					(string.gsub(chaser:GetUnitName(), "npc_dota_hero_", "")),
+					math.floor(allyDist)
+				))
 				return BOT_ACTION_DESIRE_HIGH, a6:GetLocation()
 			end
 		end

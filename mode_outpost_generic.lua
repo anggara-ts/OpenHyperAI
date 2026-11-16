@@ -100,6 +100,43 @@ end
 -- at -7250,-6845) and four of them died. The Radiant Ancient is ~1860 from its fountain, so
 -- fights at the Ancient (even its fountain side, ~1550+) stay outside this radius.
 local leaveFountain = nil
+-- After an early mid ward is down (ward mode set c._earlyWardPending with the observer count):
+-- back behind our mid T1 (350 toward the fountain) before going to lane, up to 25s.
+local wardReturnTo = nil
+local function ObserverCount()
+	local n = 0
+	for slot = 0, 8 do
+		local it = c:GetItemInSlot(slot)
+		if it ~= nil then
+			local nm = it:GetName()
+			if nm == "item_ward_observer" or nm == "item_ward_dispenser" then
+				n = n + (it:GetCurrentCharges() or 0)
+			end
+		end
+	end
+	return n
+end
+local function WardReturnTarget()
+	local now = DotaTime()
+	local p = c._earlyWardPending
+	if p ~= nil then
+		if ObserverCount() < (p.obs or 0) then
+			c._wardReturn = { to = p.to, untilAt = now + 25 }
+			c._earlyWardPending = nil
+		elseif now - p.at > 6 then
+			c._earlyWardPending = nil
+		end
+	end
+	local r = c._wardReturn
+	if r == nil then
+		return nil
+	end
+	if now > r.untilAt or GetUnitToLocationDistance(c, r.to) <= 350 or not c:IsAlive() then
+		c._wardReturn = nil
+		return nil
+	end
+	return r.to
+end
 local function EnemyFountainEscape()
 	local fountain = a.GetEnemyFountain()
 	if fountain == nil or not c:IsAlive() then
@@ -127,6 +164,15 @@ function GetDesire()
 			leaveFountain = dest
 			a4 = DotaTime()
 			return 1.06
+		end
+	end
+	wardReturnTo = nil
+	if c:IsHero() and not c:IsIllusion() then
+		local okW, to = pcall(WardReturnTarget)
+		if okW and to ~= nil then
+			wardReturnTo = to
+			a4 = DotaTime()
+			return 0.9
 		end
 	end
 	-- Ahead of everything in this mode, above 1 so it beats attack and retreat: the old spread
@@ -226,6 +272,10 @@ function Think()
 	end
 	if leaveFountain ~= nil then
 		c:Action_MoveToLocation(leaveFountain)
+		return
+	end
+	if wardReturnTo ~= nil then
+		c:Action_MoveToLocation(wardReturnTo)
 		return
 	end
 	if chainFrostSpread then

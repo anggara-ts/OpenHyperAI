@@ -410,6 +410,28 @@ local function ValidateSpot(spot)
 	end
 	pcall(print, string.format("[OHA-WARD] t=%.0f spot-invalid at=%.0f,%.0f", DotaTime(), loc.x, loc.y))
 end
+-- An early ward near mid: remember the observer count when the plant is ordered; general roaming
+-- walks the bot back behind our mid T1 once the ward is down (count dropped), before it goes to
+-- lane (user call: after the mid ward they walked on the river and were exposed).
+local function MarkEarlyWard(spot)
+	if spot == nil or spot.role ~= "early" or spot.location == nil then
+		return
+	end
+	local t1 = GetTower(GetTeam(), TOWER_MID_1)
+	if t1 == nil or GetUnitToLocationDistance(t1, spot.location) > 3000 then
+		return
+	end
+	local p = b._earlyWardPending
+	if p ~= nil and DotaTime() - p.at < 4 then
+		return
+	end
+	local obs = WardCharges()
+	b._earlyWardPending = {
+		at = DotaTime(),
+		obs = obs,
+		to = c.AdjustLocationWithOffsetTowardsFountain(t1:GetLocation(), 350),
+	}
+end
 function a.WardThink()
 	pcall(ValidateSpot, j)
 	if j then
@@ -419,10 +441,12 @@ function a.WardThink()
 					AnnounceWard("observer")
 					a.WardThinkActed = true
 					LogPlantTry("observer", h, j.location)
+					pcall(MarkEarlyWard, j)
 					b:Action_UseAbilityOnLocation(h, j.location)
 				else
 					a.WardThinkActed = true
 					LogPlantTry("observer", h, j.location)
+					pcall(MarkEarlyWard, j)
 					if DispenserPlant(h, j.location, true) then
 						return
 					end

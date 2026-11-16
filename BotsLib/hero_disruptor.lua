@@ -262,11 +262,20 @@ function a.SkillsComplement()
 	if x > 0 then
 		-- Static Storm on the same spot right behind the field when it is ready, an enemy hero
 		-- is inside the field's radius, and he is engaging or in a team fight.
+		local inField = c.GetEnemiesNearLoc(y, q:GetSpecialValueInt("radius")) or {}
+		local coreIn = false
+		for _, e0 in pairs(inField) do
+			local okP, pos = pcall(c.GetPosition, e0)
+			if okP and type(pos) == "number" and pos <= 2 then
+				coreIn = true
+			end
+		end
+		-- A group (2+) in the field, or one high-value core (estimated position 1 or 2).
 		local stormOk = (H or K)
 			and s:IsTrained()
 			and s:IsFullyCastable()
 			and b:GetMana() >= q:GetManaCost() + s:GetManaCost()
-			and #(c.GetEnemiesNearLoc(y, q:GetSpecialValueInt("radius")) or {}) >= 1
+			and (#inField >= 2 or coreIn)
 		if stormOk then
 			b:Action_ClearActions(false)
 			b:ActionQueue_UseAbilityOnLocation(q, y)
@@ -769,13 +778,13 @@ function a.ConsiderKineticStorm()
 		if K or H then
 			local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 			local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
-			-- One hero is enough when he is engaging it as his target and it is below 60% HP or he
-			-- has an ally with him (user call: Kinetic Field + Static Storm; the field does not block
-			-- the storm). Before, only 2+ enemy heroes in the field area.
+			-- A group (2+) as before, or one hero when it is his target while engaging and a
+			-- high-value core: estimated position 1 or 2 (user call). An unknown role reads as 3 and
+			-- does not count.
 			local oneOk = false
 			if H and X ~= nil and #X == 1 and c.IsValidHero(G) and X[1] == G then
-				local allies = #(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {})
-				oneOk = c.GetHP(G) < 0.6 or allies >= 2
+				local okP, pos = pcall(c.GetPosition, G)
+				oneOk = okP and type(pos) == "number" and pos <= 2
 			end
 			if
 				X ~= nil

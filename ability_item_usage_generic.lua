@@ -5747,8 +5747,20 @@ a.ConsiderItemDesire["item_meteor_hammer"] = function(bm)
 			end
 		end
 	end
+	-- Not during OD's timed prison hammer (it lands as the prison ends), and never on an
+	-- invulnerable target: game 021, 22:07, OD imprisoned an enemy and this rule cast the hammer
+	-- at once on the "disabled" prisoner, which it cannot hit.
+	if b._prison ~= nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	for _, e in pairs(f.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
-		if f.IsValidHero(e) and f.IsDisabled(e) and f.CanCastOnNonMagicImmune(e) and not f.IsSuspiciousIllusion(e) then
+		if
+			f.IsValidHero(e)
+			and f.IsDisabled(e)
+			and not e:IsInvulnerable()
+			and f.CanCastOnNonMagicImmune(e)
+			and not f.IsSuspiciousIllusion(e)
+		then
 			return BOT_ACTION_DESIRE_HIGH, e:GetLocation(), "ground", "meteor-disabled"
 		end
 	end

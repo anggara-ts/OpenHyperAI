@@ -304,12 +304,16 @@ function MapObjectives.MaxWalk(bot, inWindow)
 end
 
 -- Free one slot so a lotus can land (early bags are often full of consumables).
+-- A free main slot for a lotus: swap the cheapest main-slot item (not a key item) into an empty
+-- backpack slot. Called when a lotus trip fails only on room (game 023, 3:01-3:04: Disruptor by
+-- the bottom pool, "room"). It used to sell (shop only), was never called, and counted the
+-- backpack as room.
 function MapObjectives.EnsureInventorySlot(bot)
 	if bot == nil then
 		return false
 	end
 	local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-	if Item.GetEmptyInventoryAmount(bot) > 0 then
+	if Item.GetEmptyNonBackpackInventoryAmount(bot) > 0 then
 		return true
 	end
 	local keep = {
@@ -325,17 +329,26 @@ function MapObjectives.EnsureInventorySlot(bot)
 		item_smoke_of_deceit = true,
 		item_grisgris = true,
 	}
-	local best = nil
-	local bestCost = 999999
-	for slot = 0, 8 do
+	local pack = nil
+	for slot = 6, 8 do
+		if bot:GetItemInSlot(slot) == nil then
+			pack = slot
+			break
+		end
+	end
+	if pack == nil then
+		return false
+	end
+	local best, bestCost = nil, 999999
+	for slot = 0, 5 do
 		local it = bot:GetItemInSlot(slot)
 		if it ~= nil and not it:IsNull() then
 			local name = it:GetName()
-			if not keep[name] and not string.find(name, "token") then
+			if not keep[name] and not string.find(name, "token", 1, true) then
 				local cost = GetItemCost(name) or 0
-				if cost < bestCost and cost <= 90 then
+				if cost < bestCost then
 					bestCost = cost
-					best = it
+					best = slot
 				end
 			end
 		end
@@ -343,7 +356,7 @@ function MapObjectives.EnsureInventorySlot(bot)
 	if best == nil then
 		return false
 	end
-	bot:ActionImmediate_SellItem(best)
+	bot:ActionImmediate_SwapItems(best, pack)
 	return true
 end
 
@@ -935,6 +948,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 			elseif not mainRoom then
 				failWhy = "room"
+				-- Otherwise good to go: make room now, the next think takes the trip.
+				if loc ~= nil and dist <= maxWalk and hp >= 0.28 then
+					pcall(MapObjectives.EnsureInventorySlot, bot)
+				end
 			elseif loc == nil then
 				failWhy = "no-pool"
 			elseif dist > maxWalk then

@@ -152,7 +152,11 @@ function a.SkillsComplement()
 	end
 	u, v = a.ConsiderPoisonAttack()
 	if u > 0 then
-		b:Action_UseAbilityOnEntity(q, v)
+		-- The autocast branches toggle autocast and return no target: nothing to cast then (game
+		-- 034, 25:27 and 63:20: two casts refused for a nil target).
+		if v ~= nil then
+			b:Action_UseAbilityOnEntity(q, v)
+		end
 		return
 	end
 end

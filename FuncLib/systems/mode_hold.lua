@@ -10,8 +10,15 @@ local HOLD_SECONDS = 2.0
 -- held an override desire (1.0+, e.g. team roam 1.42 after its target was gone), which blocks every
 -- other mode. Only ordinary desires (0.05-0.9) are held.
 local HOLD_MAX = 0.9
-function M.Hold(bot, key, mode, desire)
+function M.Hold(bot, key, mode, desire, cond)
 	if bot == nil or type(desire) ~= "number" then
+		return desire
+	end
+	-- An optional condition (retreat: only while hurt).
+	if cond ~= nil and not cond(bot) then
+		if bot._modeHold ~= nil then
+			bot._modeHold[key] = nil
+		end
 		return desire
 	end
 	local now = DotaTime()
@@ -40,13 +47,13 @@ function M.Hold(bot, key, mode, desire)
 	return desire
 end
 -- Wraps a mode file's GetDesire.
-function M.Wrap(getDesire, key, mode)
+function M.Wrap(getDesire, key, mode, cond)
 	if getDesire == nil or mode == nil then
 		return getDesire
 	end
 	return function(...)
 		local d = getDesire(...)
-		local ok, held = pcall(M.Hold, GetBot(), key, mode, d)
+		local ok, held = pcall(M.Hold, GetBot(), key, mode, d, cond)
 		if ok then
 			return held
 		end

@@ -819,7 +819,12 @@ function a.ConsiderCompleteItem()
 	end
 	return 0
 end
--- No desire hold for retreat (game 030: it kept bots running 2s after the danger was gone).
+-- Retreat is held only below 60% HP. Game 030: held at any HP it kept healthy bots running 2s after
+-- the danger was gone. Game 031, 1:20-1:37: without it Earthshaker (30-57% HP, no enemy near)
+-- flipped retreat 0.70 / laning 0.30 27 times and stood in place.
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "retreat", BOT_MODE_RETREAT, function(bot)
+	return bot:GetHealth() < 0.6 * bot:GetMaxHealth()
+end)
 if SafeCall then
 	local aT = GetDesire
 	if aT then

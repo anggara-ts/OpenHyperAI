@@ -50,6 +50,24 @@ end
 -- the secondary). The wanted count went down: done. The other one went down: wrong mode, toggle
 -- once for next time. Nothing changed for 1s: toggle once and cast again. Returns true when it
 -- issued an order or is waiting on one.
+-- Game 031, 0:31: Earthshaker at a top ward spot with a dispenser holding 1 observer kept
+-- switching it and never planted; nothing in the log. Each dispenser order is logged.
+local function DispLog(step, item, loc, wantObs, obs, sen)
+	local okT, tog = pcall(function()
+		return item:GetToggleState()
+	end)
+	pcall(print, string.format(
+		"[OHA-WARD] t=%.1f %s dispenser %s want=%s obs=%d sen=%d toggle=%s dist=%.0f",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		step,
+		wantObs and "obs" or "sentry",
+		obs,
+		sen,
+		okT and tostring(tog) or "?",
+		GetUnitToLocationDistance(b, loc)
+	))
+end
 local function DispenserPlant(item, loc, wantObs)
 	local now = DotaTime()
 	local obs = item:GetCurrentCharges() or 0
@@ -60,12 +78,14 @@ local function DispenserPlant(item, loc, wantObs)
 	end
 	if t == nil then
 		b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = false, castAt = now }
+		DispLog("cast", item, loc, wantObs, obs, sen)
 		b:Action_UseAbilityOnLocation(item, loc)
 		return true
 	end
 	local gotWanted = wantObs and obs < t.obs or not wantObs and sen < t.sen
 	local gotOther = wantObs and sen < t.sen or not wantObs and obs < t.obs
 	if gotWanted then
+		DispLog("planted", item, loc, wantObs, obs, sen)
 		b._dispTry = nil
 		return false
 	end
@@ -80,12 +100,14 @@ local function DispenserPlant(item, loc, wantObs)
 		t.toggled = true
 		t.recast = true
 		t.castAt = now + 0.5
+		DispLog("toggle", item, loc, wantObs, obs, sen)
 		b:Action_UseAbilityOnEntity(item, b)
 		return true
 	end
 	if t.recast and now >= t.castAt then
 		t.recast = false
 		t.castAt = now
+		DispLog("recast", item, loc, wantObs, obs, sen)
 		b:Action_UseAbilityOnLocation(item, loc)
 	end
 	return true

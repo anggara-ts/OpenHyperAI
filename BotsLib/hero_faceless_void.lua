@@ -152,7 +152,9 @@ function a.ConsiderTimeWalk()
 						local U = c.GetHP(b)
 						local V = E:GetHealth()
 						local W = b:GetAttackDamage()
-						local X = U < 0.3
+						-- Target low, not Void low: "U < 0.3" (Void's own HP) made him Time Walk in when he
+					-- was nearly dead and skip it when the target was.
+					local X = c.GetHP(E) < 0.3
 						local Y = V <= W * 3
 						local Z = E:GetNearbyTowers(700, false)
 						if (X or Y) and Z ~= nil and #Z == 0 then
@@ -293,7 +295,13 @@ function a.ConsiderChronosphere()
 	if c.IsInTeamFight(b, 1200) then
 		local ag = b:FindAoELocation(true, true, b:GetLocation(), H, aa / 1.2, M, 0)
 		local R = c.GetEnemiesNearLoc(ag.targetloc, aa / 1.2)
-		if R ~= nil and #R >= 2 then
+		-- Chronosphere pauses allies too (datafeed: "friendly or enemy, except those owned by
+		-- Faceless Void"). Skip a sphere that freezes as many of our heroes as enemies.
+		local frozen = a.AlliesInChrono(ag.targetloc, aa)
+		if R ~= nil and #R >= 2 and frozen >= #R then
+			a.LogChrono("skip-allies", #R, frozen)
+		end
+		if R ~= nil and #R >= 2 and frozen < #R then
 			local ah = nil
 			local ai = 10000
 			for _, a0 in pairs(R) do
@@ -368,6 +376,7 @@ function a.ConsiderChronosphere()
 						and not c.IsLocationInChrono(ag.targetloc)
 						and not c.IsLocationInBlackHole(ag.targetloc)
 						and not c.IsLocationInArena(ag.targetloc, aa)
+						and a.AlliesInChrono(ag.targetloc, aa) < #aj
 					then
 						return BOT_ACTION_DESIRE_HIGH, ag.targetloc
 					end
@@ -376,6 +385,23 @@ function a.ConsiderChronosphere()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Our heroes (not Void) that a sphere at loc would pause.
+function a.AlliesInChrono(loc, radius)
+	local n = 0
+	for _, ally in pairs(c.GetAlliesNearLoc(loc, radius) or {}) do
+		if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() then
+			n = n + 1
+		end
+	end
+	return n
+end
+function a.LogChrono(why, enemies, allies)
+	if DotaTime() < (b._chronoLogAt or -999) then
+		return
+	end
+	b._chronoLogAt = DotaTime() + 5
+	pcall(print, string.format("[OHA-VOID] t=%.0f chrono %s enemies=%d allies=%d", DotaTime(), why, enemies, allies))
 end
 function a.ConsiderTimeWalkReverse()
 	if not r:IsTrained() or not r:IsFullyCastable() or not r:IsActivated() then

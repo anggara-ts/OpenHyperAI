@@ -154,6 +154,7 @@ function a.SkillsComplement()
 	end
 	G, H = a.ConsiderBlinkPulseHole()
 	if G > 0 then
+		a.LogBlackHole("blink-pulse", #c.GetEnemiesNearLoc(H, t:GetSpecialValueInt("radius")), nil)
 		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
@@ -168,6 +169,7 @@ function a.SkillsComplement()
 	end
 	E, F = a.ConsiderBlinkHole()
 	if E > 0 then
+		a.LogBlackHole("blink", #c.GetEnemiesNearLoc(F, t:GetSpecialValueInt("radius")), nil)
 		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
@@ -631,7 +633,9 @@ function a.ConsiderBlinkHole()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.CanDoBlinkHole()
-	if t:IsFullyCastable() and I ~= nil and I:IsFullyCastable() then
+	-- a.HasBlink() is what sets I (the blink item); nothing called it, so I stayed nil and the
+	-- Blink + Black Hole initiation never fired.
+	if t:IsFullyCastable() and a.HasBlink() then
 		local a9 = t:GetManaCost()
 		if b:GetMana() >= a9 then
 			return true
@@ -653,7 +657,8 @@ function a.ConsiderBlinkPulseHole()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.CanDoBlinkPulseHole()
-	if t:IsFullyCastable() and s:IsFullyCastable() and I ~= nil and I:IsFullyCastable() then
+	-- a.HasBlink() sets I; it was never called (see CanDoBlinkHole).
+	if t:IsFullyCastable() and s:IsFullyCastable() and a.HasBlink() then
 		local a9 = t:GetManaCost() + s:GetManaCost()
 		if b:GetMana() >= a9 then
 			return true

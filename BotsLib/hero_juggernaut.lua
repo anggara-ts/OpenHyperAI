@@ -243,6 +243,9 @@ function a.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Omnislash and Swift Slash pierce spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
+-- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR/ConsiderD check CanCastOnMagicImmune; they were held
+-- on any target under BKB.
 function a.ConsiderR()
 	if
 		not r:IsFullyCastable()
@@ -264,7 +267,7 @@ function a.ConsiderR()
 	local X = nil
 	if c.IsStunProjectileIncoming(b, 1000) then
 		for Z, _ in pairs(V) do
-			if c.IsValid(_) and c.CanCastOnNonMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
+			if c.IsValid(_) and c.CanCastOnMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
 				W = _
 				X = "R-防御:" .. c.Chat.GetNormName(W)
 				return BOT_ACTION_DESIRE_HIGH, W, X
@@ -278,7 +281,7 @@ function a.ConsiderR()
 			and (botTarget:GetHealth() > b:GetAttackDamage() * 4 or J < 0.2 or #V >= 2)
 		then
 			for Z, _ in pairs(U) do
-				if c.IsValid(_) and c.CanCastOnNonMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
+				if c.IsValid(_) and c.CanCastOnMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
 					W = _
 					X = "R-攻击:" .. c.Chat.GetNormName(W)
 					return BOT_ACTION_DESIRE_HIGH, W, X
@@ -291,7 +294,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(_)
 				and b:WasRecentlyDamagedByHero(_, 5.0)
-				and c.CanCastOnNonMagicImmune(_)
+				and c.CanCastOnMagicImmune(_)
 				and c.CanCastOnTargetAdvanced(_)
 			then
 				W = _
@@ -328,7 +331,7 @@ function a.ConsiderD()
 				if
 					c.IsValid(_)
 					and c.IsInRange(botTarget, _, 425)
-					and c.CanCastOnNonMagicImmune(_)
+					and c.CanCastOnMagicImmune(_)
 					and c.CanCastOnTargetAdvanced(_)
 				then
 					W = _
@@ -343,7 +346,7 @@ function a.ConsiderD()
 			if
 				c.IsValid(_)
 				and b:WasRecentlyDamagedByHero(_, 2.0)
-				and c.CanCastOnNonMagicImmune(_)
+				and c.CanCastOnMagicImmune(_)
 				and c.CanCastOnTargetAdvanced(_)
 			then
 				W = _

@@ -66,6 +66,7 @@ o["pos_2"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 o["pos_4"] = {
 	"item_priest_outfit",
 	"item_hand_of_midas",
@@ -77,9 +78,7 @@ o["pos_4"] = {
 	"item_black_king_bar",
 	"item_sheepstick",
 	"item_aghanims_shard",
-	"item_travel_boots",
 	"item_arcane_blink",
-	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }

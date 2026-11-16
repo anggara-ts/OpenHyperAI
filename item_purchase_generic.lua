@@ -2103,7 +2103,15 @@ function ItemPurchaseThink()
 		while #a.purchaseListInReverseOrder > 0 do
 			local b4 = a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder]
 			local otherBoots = b3[b4] and OwnsOtherBoots(b4) or nil
-			if otherBoots ~= nil then
+			-- Aura boots stay: a bot with Guardian Greaves or Boots of Bearing does not also buy Boots of
+			-- Travel (one pair of boots, user rule). Neither the sell-the-old-pair rule above nor the
+			-- travel-boots sell marks cover the aura boots, so 5 builds carried both.
+			local auraBoots = (b4 == "item_travel_boots" or b4 == "item_travel_boots_2")
+				and (a:FindItemSlot("item_guardian_greaves") >= 0 or a:FindItemSlot("item_boots_of_bearing") >= 0)
+			if auraBoots then
+				log("[Purchase] Skipping %s — aura boots already owned", b4)
+				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
+			elseif otherBoots ~= nil then
 				-- A second pair never combines with the first. Sell the old one and buy this.
 				local slot = a:FindItemSlot(otherBoots)
 				if slot >= 0 and slot <= 8 then

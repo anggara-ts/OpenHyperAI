@@ -14,6 +14,7 @@ local l = c.Skill.GetTalentBuild(i)
 local n = "item_team_aura"
 local o = {}
 -- One pair of boots in this build (user rule; Util/boots-check.js).
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 o["pos_4"] = {
 	"item_blood_grenade",
 	"item_tango",
@@ -26,11 +27,9 @@ o["pos_4"] = {
 	"item_aghanims_shard",
 	"item_blade_mail",
 	"item_lotus_orb",
-	"item_travel_boots",
 	"item_assault",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 o["pos_5"] = {
 	"item_blood_grenade",

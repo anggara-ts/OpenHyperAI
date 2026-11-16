@@ -34,6 +34,10 @@ for (const f of fs.readdirSync(REPO + "/BotsLib").filter(x => /^hero_.*\.lua$/.t
     const items = [...body.matchAll(/"(item_[a-z0-9_]+)"/g)].map(x => x[1]).flatMap(x => expand(x));
     const lines = [...new Set(items.map(LINE).filter(Boolean))];
     if (lines.length > 1) out.push(`${f.replace(/^hero_|\.lua$/g, "")} ${k}: ${lines.join(" + ")}`);
+    // Aura boots are kept when Boots of Travel arrive; item_purchase_generic skips Travel for a bot
+    // that owns them, so a Travel entry after them is dead weight in the list.
+    const aura = items.find(x => x === "item_guardian_greaves" || x === "item_boots_of_bearing");
+    if (aura && items.some(x => /^item_travel_boots/.test(x))) out.push(`${f.replace(/^hero_|\.lua$/g, "")} ${k}: ${aura.replace("item_", "")} + travel_boots (Travel is skipped in game)`);
   }
 }
 console.log(out.length ? out.join("\n") : "no position buys more than one pair of boots");

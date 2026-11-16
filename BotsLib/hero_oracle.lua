@@ -119,7 +119,8 @@ function a.SkillsComplement()
 	if u > 0 then
 		c.SetQueuePtToINT(b, true)
 		b:ActionQueue_UseAbilityOnEntity(o, v)
-		if q:IsFullyCastable() then
+		-- Purifying Flames after it on an enemy only: on an ally just dispelled it would be damage.
+		if q:IsFullyCastable() and v ~= nil and v.GetTeam ~= nil and v:GetTeam() ~= GetTeam() then
 			b:ActionQueue_UseAbilityOnEntity(q, v)
 		end
 		return

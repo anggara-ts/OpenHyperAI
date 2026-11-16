@@ -322,6 +322,47 @@ function a.RuneProbe()
 		table.concat(parts, " ")
 	))
 end
+-- Water runes (2:00, 4:00): the bot API never reports them at the river spot (game 031, 4:02: the
+-- top spot read "missing" though seen 2s before, the rune lying there), and only Valve's default
+-- item mode picks them up, for a bot close by. So the ally closest to a river spot (within 2200,
+-- not outnumbered there) walks to it from 8s before the spawn; within 200, rune mode stands down
+-- so the item mode can take the rune, until 6s after the spawn.
+local WATER_AT = { 120, 240 }
+function a.WaterWalk()
+	local now = DotaTime()
+	local w = d._waterWalk
+	if w ~= nil then
+		if not d:IsAlive() or now > w.t0 + 6 then
+			d._waterWalk = nil
+			return nil
+		end
+		if GetUnitToLocationDistance(d, w.loc) <= 200 then
+			-- Before the spawn: hold the spot (laning would pull him back). From the spawn: stand down.
+			return now < w.t0 and "hold" or "near"
+		end
+		return "walk"
+	end
+	d._waterDone = d._waterDone or {}
+	for _, t0 in ipairs(WATER_AT) do
+		if now >= t0 - 8 and now <= t0 + 4 then
+			for _, id in ipairs({ RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
+				local key = t0 .. ":" .. id
+				local loc = GetRuneSpawnLocation(id)
+				if
+					not d._waterDone[key]
+					and GetUnitToLocationDistance(d, loc) <= 2200
+					and a.IsTheClosestAlly(d, loc)
+					and #(b.GetEnemiesNearLoc(loc, 1000) or {}) <= #(b.GetAlliesNearLoc(loc, 1000) or {}) + 1
+				then
+					d._waterDone[key] = true
+					d._waterWalk = { id = id, loc = loc, t0 = t0 }
+					return "walk"
+				end
+			end
+		end
+	end
+	return nil
+end
 function a.RuneWatch()
 	local now = DotaTime()
 	if now < 0 or now < (a._runeWatchAt or -999) or not IsTeamLogger() then
@@ -453,6 +494,14 @@ function GetDesireRaw()
 	p = d:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
 		return give(BOT_MODE_DESIRE_ABSOLUTE, "fountain")
+	end
+	do
+		local okW, ww = pcall(a.WaterWalk)
+		if okW and (ww == "walk" or ww == "hold") then
+			return give(BOT_MODE_DESIRE_HIGH, "water-" .. ww)
+		elseif okW and ww == "near" then
+			return give(BOT_MODE_DESIRE_NONE, "water-item-mode")
+		end
 	end
 	-- Laning first (user call): while the bot's lane needs it, runes, lotus pools and wisdom
 	-- shrines wait unless one is within 500. Re-checked every think, so a deferred spot is taken
@@ -723,6 +772,17 @@ end
 local M = -math.huge
 function Think()
 	d._runeDo = "fall"
+	if d._waterWalk ~= nil then
+		if GetUnitToLocationDistance(d, d._waterWalk.loc) > 200 then
+			d:Action_MoveToLocation(d._waterWalk.loc)
+			doing("water-walk")
+			return
+		end
+		if DotaTime() < d._waterWalk.t0 then
+			doing("water-hold")
+			return
+		end
+	end
 	if d._goldCycle ~= nil then
 		local okG, held = pcall(a.GoldCycleStep)
 		if okG and held then

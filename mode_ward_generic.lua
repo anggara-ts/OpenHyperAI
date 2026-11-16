@@ -234,6 +234,10 @@ function GetDesireHelper()
 		end
 	end
 	-- Enter ward mode even if wards are still in backpack so purchase can promote them.
+	-- Before the horn the observer is pos 5's (user call).
+	if h ~= nil and DotaTime() < 0 and c.GetPosition(b) ~= 5 then
+		h = nil
+	end
 	if h ~= nil and (I and c.CanCastAbility(h) or not I) then
 		local r = d.GetAvailabeObserverWardSpots(b)
 		j = d.GetClosestObserverWardSpot(b, r)
@@ -453,10 +457,19 @@ local function MarkEarlyWard(spot)
 		return
 	end
 	local obs = WardCharges()
+	local to = c.AdjustLocationWithOffsetTowardsFountain(t1:GetLocation(), 350)
+	local window = 25
+	-- Pos 5 before the horn: on to our own jungle's bounty spot (user call), through our jungle.
+	-- Radiant's jungle holds the bottom bounty, Dire's the top one.
+	if DotaTime() < 0 and c.GetPosition(b) == 5 then
+		to = GetRuneSpawnLocation(GetTeam() == TEAM_RADIANT and RUNE_BOUNTY_2 or RUNE_BOUNTY_1)
+		window = 40
+	end
 	b._earlyWardPending = {
 		at = DotaTime(),
 		obs = obs,
-		to = c.AdjustLocationWithOffsetTowardsFountain(t1:GetLocation(), 350),
+		to = to,
+		window = window,
 	}
 end
 -- Plant the observer from where he stands, as far toward the spot as the cast range allows.

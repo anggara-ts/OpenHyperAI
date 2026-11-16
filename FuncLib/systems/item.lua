@@ -361,6 +361,10 @@ b["sCanNotSwitchItems"] = {
 	"item_branches",
 	-- Thrown from the main inventory only. Do not park it to make room for something else.
 	"item_blood_grenade",
+	-- Cast from a main slot only. Game 033: Witch Doctor and Shadow Shaman tried to swap a backpack
+	-- Clarity in for their Dust every 6-13s from 7:21 to 33:39 (31 sent, none ever swapped back, so none took effect),
+	-- and each one restarted the 11s swap gap for every other swap.
+	"item_dust",
 }
 b["sSellList"] = {
 	"item_black_king_bar",

@@ -8,10 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
--- 1 Split Shot, 2 Mystic Snake, 3 Gorgon's Grasp, 6 Stone Gaze. Snake, Grasp, Snake maxed by 5,
--- Split Shot maxed by 11, Grasp last. Ultimate at 6, 12 and with the last point (entry 15,
--- after level 16). Entries skip talent levels 10 and 15.
-local j = { { 2, 3, 2, 2, 2, 6, 1, 1, 1, 1, 6, 3, 3, 3, 6 } }
+-- 1 Split Shot, 2 Mystic Snake, 3 Gorgon's Grasp, 6 Stone Gaze. Snake maxed first (levels 1/3/5/7),
+-- Split Shot second, Grasp last (Dotabuff most picked order). The old order put Snake at levels 4
+-- and 5, which the hero level does not allow yet. Ultimate at entries 6/11/15 (levels 6/12/18).
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -23,18 +23,18 @@ m["pos_1"] = {
 	"item_magic_wand",
 	"item_ring_of_basilius",
 	"item_power_treads",
+	"item_manta",
 	"item_dragon_lance",
 	"item_hurricane_pike",
-	"item_manta",
-	"item_ultimate_scepter",
 	"item_skadi",
+	"item_aghanims_shard",
 	"item_butterfly",
-	"item_hydras_breath",
+	"item_ultimate_scepter",
 	"item_greater_crit",
 	"item_travel_boots",
-	"item_aghanims_shard",
-	"item_disperser",
+	"item_monkey_king_bar",
 	"item_moon_shard",
+	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = {

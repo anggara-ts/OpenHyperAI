@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+-- Rebound maxed first, Dispose second, Bodyguard last (Dotabuff most picked order).
+local j = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local k
 local l
 if h == "pos_1" then
@@ -31,15 +32,15 @@ m["pos_1"] = {
 	"item_phase_boots",
 	"item_magic_wand",
 	"item_armlet",
-	"item_bfury",
+	"item_blink",
 	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_basher",
 	"item_greater_crit",
-	"item_satanic",
+	"item_ultimate_scepter",
 	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
 m["pos_3"] = {
@@ -50,7 +51,7 @@ m["pos_3"] = {
 	"item_quelling_blade",
 	"item_phase_boots",
 	"item_magic_wand",
-	"item_bfury",
+	"item_blink",
 	"item_heavens_halberd",
 	"item_black_king_bar",
 	"item_assault",

@@ -11,9 +11,10 @@ local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
 -- 1 Stroke of Fate, 2 Phantom's Embrace, 3 Ink Swell, 6 Soulbind.
--- Support (pos 4/5): Ink Swell first, then Phantom's Embrace, Stroke of Fate last.
+-- Support (pos 4/5): Stroke of Fate first, then Phantom's Embrace, Ink Swell last (Dotabuff most
+-- picked order; it was Ink Swell first).
 -- Core: Stroke of Fate first, then Ink Swell, Phantom's Embrace last.
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 if h ~= "pos_4" and h ~= "pos_5" then
 	j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 end
@@ -62,11 +63,11 @@ m["pos_3"] = {
 m["pos_4"] = {
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_mekansm",
+	"item_blink",
 	"item_glimmer_cape",
-	"item_guardian_greaves",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_spirit_vessel",
+	"item_aether_lens",
 	"item_shivas_guard",
 	"item_sheepstick",
 	"item_moon_shard",
@@ -77,17 +78,17 @@ m["pos_5"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_boots_of_bearing",
-	"item_pipe",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_spirit_vessel",
 	"item_shivas_guard",
 	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+a["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_aether_lens", "item_urn_of_shadows" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
 end

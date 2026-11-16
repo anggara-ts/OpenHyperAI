@@ -11,8 +11,9 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
--- j[1]: Pulse Nova moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
-local j = { { 3, 1, 3, 1, 3, 6, 3, 2, 2, 2, 6, 2, 1, 1, 6 }, { 3, 2, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+-- Diabolic Edict maxed first, Lightning Storm second, Split Earth last (Dotabuff most picked order).
+-- Pulse Nova at entries 6/11/15 (levels 6/12/18).
+local j = { { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -36,12 +37,12 @@ o["pos_2"] = {
 	"item_arcane_boots",
 	"item_cyclone",
 	"item_kaya_and_sange",
+	"item_blink",
 	"item_bloodstone",
 	"item_shivas_guard",
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_travel_boots",
-	"item_wind_waker",
 	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
@@ -55,11 +56,11 @@ o["pos_3"] = {
 	"item_arcane_boots",
 	"item_kaya",
 	"item_bloodstone",
+	"item_blink",
 	"item_black_king_bar",
 	n,
 	"item_kaya_and_sange",
 	"item_aghanims_shard",
-	"item_travel_boots",
 	"item_shivas_guard",
 	"item_moon_shard",
 	"item_travel_boots_2",

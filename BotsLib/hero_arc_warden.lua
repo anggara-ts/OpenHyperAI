@@ -14,7 +14,7 @@ local k = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local l = { { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, { 3, 1, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, {
+local l = { { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, {
 	3,
 	1,
 	3,
@@ -95,7 +95,7 @@ if j == "Magical" then
 		"item_mjollnir",
 		"item_travel_boots",
 		"item_blink",
-		"item_octarine_core",
+		"item_manta",
 		"item_ultimate_scepter",
 		"item_orchid",
 		"item_sheepstick",
@@ -120,10 +120,10 @@ else
 		"item_travel_boots",
 		"item_orchid",
 		"item_manta",
-		"item_greater_crit",
+		"item_skadi",
 		"item_bloodthorn",
 		"item_moon_shard",
-		"item_skadi",
+		"item_sheepstick",
 		"item_travel_boots_2",
 		"item_aghanims_shard",
 		"item_ultimate_scepter_2",

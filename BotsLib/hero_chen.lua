@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 2, 1, 2, 1, 2, 6, 2, 3, 3, 3, 6, 3, 1, 1, 6 }, { 1, 2, 2, 3, 2, 6, 3, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local j = { { 2, 1, 2, 1, 2, 6, 2, 3, 3, 3, 6, 3, 1, 1, 6 }, { 1, 2, 2, 3, 2, 6, 2, 1, 1, 3, 6, 3, 3, 1, 6 } }
 local k
 local l
 if h == "pos_4" then
@@ -72,15 +72,15 @@ m["pos_4"] = {
 	"item_moon_shard",
 }
 m["pos_5"] = {
-	"item_mage_outfit",
-	"item_shadow_amulet",
+	"item_crystal_maiden_outfit",
+	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_shivas_guard",
+	"item_guardian_greaves",
 	"item_aghanims_shard",
-	"item_mystic_staff",
+	"item_vladmir",
 	"item_sheepstick",
-	"item_octarine_core",
+	"item_solar_crest",
 	"item_ultimate_scepter_2",
 }
 a["sBuyList"] = m[h]

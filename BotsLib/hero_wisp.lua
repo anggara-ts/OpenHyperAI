@@ -25,7 +25,7 @@ local w = dofile(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local x = m(
 	v,
 	{
-		skills = { default = { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } },
+		skills = { default = { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } },
 		talents = { default = { t25 = { 10, 0 }, t20 = { 10, 0 }, t15 = { 0, 10 }, t10 = { 0, 10 } } },
 		items = {
 			pos_1 = {
@@ -51,21 +51,21 @@ local x = m(
 			pos_4 = {
 				"item_priest_outfit",
 				"item_mekansm",
+				"item_holy_locket",
 				"item_glimmer_cape",
 				"item_guardian_greaves",
 				"item_spirit_vessel",
 				"item_shivas_guard",
-				"item_sheepstick",
 				"item_moon_shard",
 				"item_ultimate_scepter_2",
 			},
 			pos_5 = {
 				"item_blood_grenade",
 				"item_mage_outfit",
-				"item_ancient_janggo",
+				"item_holy_locket",
 				"item_glimmer_cape",
-				"item_pipe",
-				"item_boots_of_bearing",
+				"item_mekansm",
+				"item_ultimate_scepter",
 				"item_shivas_guard",
 				"item_cyclone",
 				"item_sheepstick",

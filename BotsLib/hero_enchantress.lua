@@ -11,8 +11,9 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 2, 3, 2, 3, 2, 6, 2, 1, 1, 1, 6, 1, 3, 3, 6 } }
--- j[2]: Untouchable moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
+-- j[2] (pos 4/5): Impetus first, then Nature's Attendants, Enchant last, as Dotabuff's most picked
+-- order (the support Enchantress there is a right-click Impetus build: Treads, Pike, Scepter).
+local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local k = j[1]
 if h == "pos_3" then
 	k = j[1]
@@ -66,7 +67,7 @@ o["pos_4"] = {
 	"item_guardian_greaves",
 	"item_hurricane_pike",
 	"item_aghanims_shard",
-	"item_mage_slayer",
+	"item_ultimate_scepter",
 	"item_moon_shard",
 	"item_bloodthorn",
 	"item_sheepstick",
@@ -86,7 +87,7 @@ o["pos_5"] = {
 	"item_hurricane_pike",
 	"item_aghanims_shard",
 	"item_boots_of_bearing",
-	"item_moon_shard",
+	"item_ultimate_scepter",
 	"item_bloodthorn",
 	"item_sheepstick",
 	"item_ultimate_scepter_2",

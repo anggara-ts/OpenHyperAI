@@ -10,7 +10,7 @@ local h = c.Skill.GetTalentList(b)
 local i = c.Skill.GetAbilityList(b)
 local j = c.Item.GetRoleItemsBuyList(b)
 local k = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local l = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 } }
+local l = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local m = c.Skill.GetRandomBuild(l)
 local n = c.Skill.GetTalentBuild(k)
 local o = {}

@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 1, 3, 3, 6, 3, 3, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,17 +21,17 @@ m["pos_2"] = {
 	"item_bracer",
 	"item_boots",
 	"item_magic_wand",
-	"item_maelstrom",
-	"item_dragon_lance",
-	"item_mjollnir",
+	"item_blink",
+	"item_kaya",
+	"item_yasha_and_kaya",
 	"item_travel_boots",
-	"item_greater_crit",
 	"item_aghanims_shard",
 	"item_black_king_bar",
-	"item_force_staff",
-	"item_hurricane_pike",
-	"item_moon_shard",
+	"item_shivas_guard",
+	"item_greater_crit",
+	"item_ultimate_scepter",
 	"item_sheepstick",
+	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
@@ -63,7 +63,7 @@ m["pos_3"] = m["pos_1"]
 -- Gobble Up / Spit Out, and the Shard makes Firesnap Cookie heal and launch a Mortimer Kiss (datafeed).
 m["pos_4"] = {
 	"item_priest_outfit",
-	"item_mekansm",
+	"item_blink",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
 	"item_force_staff",
@@ -79,7 +79,7 @@ m["pos_5"] = {
 	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_boots_of_bearing",
-	"item_pipe",
+	"item_blink",
 	"item_force_staff",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",

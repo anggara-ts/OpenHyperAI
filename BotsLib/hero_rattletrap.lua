@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k
 local l
 if h == "pos_4" then
@@ -33,7 +33,7 @@ m["pos_4"] = {
 	"item_force_staff",
 	"item_blade_mail",
 	"item_ancient_janggo",
-	"item_solar_crest",
+	"item_spirit_vessel",
 	"item_boots_of_bearing",
 	"item_aghanims_shard",
 	"item_shivas_guard",
@@ -48,12 +48,12 @@ m["pos_5"] = {
 	"item_wind_lace",
 	"item_boots",
 	"item_magic_wand",
-	"item_arcane_boots",
+	"item_tranquil_boots",
 	"item_force_staff",
 	"item_blade_mail",
-	"item_mekansm",
+	"item_spirit_vessel",
 	"item_solar_crest",
-	"item_guardian_greaves",
+	"item_lotus_orb",
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_heavens_halberd",

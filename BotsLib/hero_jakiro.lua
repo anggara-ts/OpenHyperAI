@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+-- Liquid Fire first (Dotabuff most picked order), Ice Path at 4 and 8, Dual Breath from 9.
+local j = { { 3, 1, 3, 2, 3, 6, 3, 2, 1, 1, 6, 1, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -35,7 +36,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_cyclone",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_moon_shard",
@@ -48,8 +49,8 @@ m["pos_5"] = {
 	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_boots_of_bearing",
-	"item_pipe",
-	"item_shivas_guard",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_sheepstick",
 	"item_wind_waker",
@@ -85,6 +86,8 @@ a["sSellList"] = {
 	"item_magic_wand",
 	"item_skadi",
 	"item_witch_blade",
+	"item_ultimate_scepter",
+	"item_urn_of_shadows",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mage" }, {}

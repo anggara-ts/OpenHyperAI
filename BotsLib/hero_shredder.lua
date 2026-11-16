@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 2, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local n = "item_team_aura"
@@ -45,10 +45,10 @@ o["pos_3"] = {
 	"item_helm_of_iron_will",
 	"item_ring_of_basilius",
 	"item_arcane_boots",
-	"item_veil_of_discord",
+	"item_kaya_and_sange",
 	"item_blink",
 	"item_pipe",
-	"item_kaya_and_sange",
+	"item_ultimate_scepter",
 	"item_shivas_guard",
 	n,
 	"item_travel_boots",

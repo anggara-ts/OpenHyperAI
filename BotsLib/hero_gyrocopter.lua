@@ -9,6 +9,11 @@ local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
 local j = { { 2, 3, 3, 2, 3, 6, 3, 2, 2, 1, 6, 1, 1, 1, 6 } }
+-- Support (pos 4/5): Rocket Barrage first, then Homing Missile, Flak Cannon last (Dotabuff most
+-- picked order, where Gyrocopter is mostly a support). Core keeps Flak Cannon first.
+if h == "pos_4" or h == "pos_5" then
+	j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
+end
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -23,6 +28,7 @@ m["pos_1"] = {
 	"item_lesser_crit",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_satanic",
 	"item_greater_crit",
 	"item_skadi",
@@ -30,7 +36,6 @@ m["pos_1"] = {
 	"item_monkey_king_bar",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
-	"item_aghanims_shard",
 }
 m["pos_2"] = m["pos_1"]
 -- Support builds: Dotabuff 7-day meta has Gyrocopter mostly at support-off (pos 4).

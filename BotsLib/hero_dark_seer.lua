@@ -23,10 +23,11 @@ m["pos_3"] = {
 	"item_enchanted_mango",
 	"item_magic_wand",
 	"item_arcane_boots",
-	"item_veil_of_discord",
+	"item_helm_of_the_dominator",
 	"item_crimson_guard",
 	"item_blink",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_shivas_guard",
 	"item_sheepstick",
@@ -35,7 +36,6 @@ m["pos_3"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
-	"item_aghanims_shard",
 }
 m["pos_1"] = m["pos_3"]
 m["pos_2"] = m["pos_3"]

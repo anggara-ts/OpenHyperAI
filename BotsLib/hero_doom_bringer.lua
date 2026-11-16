@@ -64,7 +64,7 @@ o["pos_3"] = {
 	n,
 	"item_aghanims_shard",
 	"item_overwhelming_blink",
-	"item_refresher",
+	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }

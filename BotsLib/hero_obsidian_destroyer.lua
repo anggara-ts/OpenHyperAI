@@ -28,7 +28,8 @@ l["pos_1"] = {
 	"item_kaya",
 	"item_meteor_hammer",
 	"item_witch_blade",
-	"item_force_staff",
+	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
+	"item_blink",
 	"item_hurricane_pike",
 	"item_black_king_bar",
 	"item_aghanims_shard",
@@ -51,7 +52,8 @@ l["pos_2"] = {
 	"item_kaya",
 	"item_meteor_hammer",
 	"item_witch_blade",
-	"item_force_staff",
+	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
+	"item_blink",
 	"item_hurricane_pike",
 	"item_black_king_bar",
 	"item_aghanims_shard",

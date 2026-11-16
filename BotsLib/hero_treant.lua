@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local j = { { 2, 1, 3, 1, 3, 6, 3, 1, 1, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,7 +21,7 @@ m["pos_4"] = {
 	"item_guardian_greaves",
 	"item_blink",
 	"item_aghanims_shard",
-	"item_black_king_bar",
+	"item_meteor_hammer",
 	"item_lotus_orb",
 	"item_gungir",
 	"item_wind_waker",
@@ -44,8 +44,8 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_blink",
 	"item_glimmer_cape",
-	"item_maelstrom",
-	"item_gungir",
+	"item_meteor_hammer",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
@@ -64,8 +64,8 @@ m["pos_3"] = {
 	"item_blink",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_maelstrom",
-	"item_gungir",
+	"item_meteor_hammer",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",

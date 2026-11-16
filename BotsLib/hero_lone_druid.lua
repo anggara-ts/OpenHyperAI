@@ -12,10 +12,10 @@ if c.GetLoneDruid(b).hero == nil then
 	c.GetLoneDruid(b).hero = b
 end
 local j = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
--- fix: the ultimate (6) was at entry 3 (level 3, unlearnable) and missing from entry 6; moved it to
--- entries 6/11/15 and kept the old Spirit Link, Savage Roar, Entangle order.
-local k = { { 2, 2, 3, 2, 2, 6, 3, 3, 3, 1, 6, 1, 1, 1, 6 } }
-local l = { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }
+-- Spirit Link maxed first, Entangle second, Savage Roar last (Dotabuff most picked order).
+-- True Form at entries 6/11/15 (levels 6/12/18).
+local k = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local l = { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }
 local m = d.Skill.GetRandomBuild(k)
 local n = d.Skill.GetTalentBuild(j)
 local o = {}
@@ -58,8 +58,8 @@ if r then
 		"item_butterfly",
 		"item_moon_shard",
 		"item_satanic",
-		"item_ultimate_scepter_2",
 		"item_travel_boots",
+		"item_travel_boots_2",
 	}
 else
 	a["sBuyList"] = o[i]

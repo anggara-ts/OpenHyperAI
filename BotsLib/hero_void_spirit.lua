@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 2, 6, 2, 2, 6 } }
+local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -22,8 +22,9 @@ m["pos_2"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_echo_sabre",
+	"item_spirit_vessel",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
 	"item_manta",
 	"item_black_king_bar",
 	"item_travel_boots",
@@ -34,7 +35,6 @@ m["pos_2"] = {
 	"item_travel_boots_2",
 	"item_orchid",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 }
 m["pos_1"] = {
 	"item_tango",
@@ -45,8 +45,9 @@ m["pos_1"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_echo_sabre",
+	"item_spirit_vessel",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
 	"item_manta",
 	"item_black_king_bar",
 	"item_travel_boots",
@@ -57,7 +58,6 @@ m["pos_1"] = {
 	"item_travel_boots_2",
 	"item_orchid",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 }
 m["pos_4"] = m["pos_1"]
 m["pos_5"] = m["pos_1"]

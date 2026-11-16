@@ -8,11 +8,11 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 3, 2, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = RandomInt(1, 9) > 5 and "item_monkey_king_bar" or "item_abyssal_blade"
-local n = RandomInt(1, 9) > 4 and "item_bloodthorn" or "item_butterfly"
+local n = "item_butterfly"
 local o = {}
 o["pos_1"] = {
 	"item_tango",
@@ -23,12 +23,11 @@ o["pos_1"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_manta",
-	"item_heart",
-	"item_skadi",
 	"item_ultimate_scepter",
-	"item_disperser",
+	"item_skadi",
+	"item_bloodthorn",
+	"item_heart",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	m,

@@ -55,7 +55,7 @@ m["pos_3"] = {
 	"item_helm_of_the_overlord",
 	"item_ultimate_scepter",
 	"item_blink",
-	"item_heavens_halberd",
+	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_travel_boots",
 	"item_assault",

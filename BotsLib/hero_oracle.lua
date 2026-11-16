@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local j = { { 1, 3, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -37,7 +37,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_blink",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_moon_shard",
@@ -45,13 +45,17 @@ m["pos_4"] = {
 	"item_sheepstick",
 }
 m["pos_5"] = {
+	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves, Aether Lens, Blink Dagger and
+	-- Aghanim's Shard instead of Tranquil -> Boots of Bearing (Drum), Pipe and an early Scepter: Arcane
+	-- 99% (#1), Blink 70%, Shard 65%, Aether 58%, Greaves 30% of his matches (Dotabuff, last patch);
+	-- Scepter, Pipe, Bearing and Drum are not in his top 25.
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_crystal_maiden_outfit",
+	"item_aether_lens",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
-	"item_pipe",
-	"item_ultimate_scepter",
+	"item_blink",
+	"item_guardian_greaves",
+	"item_aghanims_shard",
 	"item_cyclone",
 	"item_shivas_guard",
 	"item_sheepstick",

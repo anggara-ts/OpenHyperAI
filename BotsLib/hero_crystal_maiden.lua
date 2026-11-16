@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -17,9 +17,9 @@ m["pos_4"] = {
 	"item_urn_of_shadows",
 	"item_mekansm",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_guardian_greaves",
 	"item_spirit_vessel",
-	"item_shivas_guard",
 	"item_aghanims_shard",
 	"item_sheepstick",
 	"item_moon_shard",
@@ -28,14 +28,14 @@ m["pos_4"] = {
 m["pos_5"] = {
 	"item_blood_grenade",
 	"item_mage_outfit",
-	"item_ancient_janggo",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_blink",
 	"item_pipe",
-	"item_shivas_guard",
-	"item_cyclone",
-	"item_sheepstick",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_force_staff",
+	"item_sheepstick",
 	"item_wind_waker",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -58,7 +58,7 @@ m["pos_3"] = {
 m["pos_1"] = m["pos_3"]
 m["pos_2"] = m["pos_3"]
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_cyclone", "item_magic_wand", "item_shivas_guard", "item_magic_wand" }
+a["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_shivas_guard", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mage" }, {}
 end

@@ -23,6 +23,7 @@ m["pos_1"] = {
 	"item_armlet",
 	"item_radiance",
 	"item_blink",
+	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_assault",
 	"item_ultimate_scepter",
@@ -31,7 +32,6 @@ m["pos_1"] = {
 	"item_abyssal_blade",
 	"item_travel_boots",
 	"item_moon_shard",
-	"item_refresher",
 	"item_travel_boots_2",
 }
 m["pos_3"] = {
@@ -45,11 +45,11 @@ m["pos_3"] = {
 	"item_phase_boots",
 	"item_radiance",
 	"item_blink",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
 	"item_assault",
 	"item_aghanims_shard",
 	"item_overwhelming_blink",
-	"item_refresher",
 	"item_ultimate_scepter_2",
 	"item_nullifier",
 	"item_travel_boots_2",

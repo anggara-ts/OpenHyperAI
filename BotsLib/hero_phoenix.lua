@@ -19,11 +19,11 @@ m["pos_4"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_tranquil_boots",
+	"item_spirit_vessel",
 	-- Rod of Atos instead of Veil of Discord: roots the Sun Ray target so it cannot walk out.
 	"item_rod_of_atos",
 	"item_aghanims_shard",
 	"item_shivas_guard",
-	"item_force_staff",
 	"item_boots_of_bearing",
 	"item_cyclone",
 	"item_refresher",
@@ -36,9 +36,9 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_mage_outfit",
 	"item_ancient_janggo",
-	"item_glimmer_cape",
+	"item_spirit_vessel",
 	"item_boots_of_bearing",
-	"item_pipe",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_shivas_guard",
@@ -48,10 +48,14 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = {
-	"item_bristleback_outfit",
-	"item_hand_of_midas",
+	"item_tango",
+	"item_double_branches",
+	"item_bracer",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_spirit_vessel",
 	"item_radiance",
-	"item_kaya_and_sange",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_heart",
@@ -63,7 +67,7 @@ m["pos_2"] = {
 m["pos_1"] = m["pos_2"]
 m["pos_3"] = m["pos_2"]
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_heart", "item_hand_of_midas" }
+a["sSellList"] = { "item_heart", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
 end

@@ -389,10 +389,17 @@ function a.ConsiderAstralImprisonment()
 	local J = o:GetManaCost()
 	local K = c.GetManaAfter(J)
 	local L = c.GetManaThreshold(b, J, { r })
-	if #C >= #D then
-		if c.GetAttackProjectileDamageByRange(b, 800) > b:GetHealth() then
-			return BOT_ACTION_DESIRE_HIGH, b
+	-- Lethal attack projectiles on the way: prison himself whatever the hero count (the prisoner is
+	-- invulnerable, datafeed). This sat behind "allies >= enemies", so he died to them when outnumbered,
+	-- the case where he needs it most.
+	if c.GetAttackProjectileDamageByRange(b, 800) > b:GetHealth() then
+		if #C < #D and DotaTime() >= (b._odSelfLogAt or -999) then
+			b._odSelfLogAt = DotaTime() + 3
+			pcall(print, string.format("[OHA-OD] t=%.0f self-prison outnumbered allies=%d enemies=%d", DotaTime(), #C, #D))
 		end
+		return BOT_ACTION_DESIRE_HIGH, b
+	end
+	if #C >= #D then
 		if not b:IsMagicImmune() then
 			if c.IsStunProjectileIncoming(b, 600) and B < 0.2 then
 				return BOT_ACTION_DESIRE_HIGH, b
@@ -603,6 +610,34 @@ function a.ConsiderSanitysEclipse()
 			local G = a4 * a2
 			if c.WillKillTarget(N, a3 + G, DAMAGE_TYPE_MAGICAL, O) then
 				return BOT_ACTION_DESIRE_HIGH, N:GetLocation()
+			end
+		end
+	end
+	-- Team fight: it was cast only for a kill, so a 3-hero Eclipse never went out. A spot in cast range
+	-- (700) where 3+ enemy heroes in the radius (500/525/550, game data) each take at least 40% of their
+	-- current HP: base_damage + 0.4 x (OD max mana - their max mana), magical (datafeed).
+	if c.IsInTeamFight(b, 1200) then
+		local rad = r:GetSpecialValueInt("radius")
+		if rad <= 0 then
+			rad = 500
+		end
+		local aoe = b:FindAoELocation(true, true, b:GetLocation(), R, rad - 50, a1, 0)
+		if aoe ~= nil and aoe.count ~= nil and aoe.count >= 3 and aoe.targetloc ~= nil then
+			local hit = 0
+			for M, N in pairs(c.GetEnemiesNearLoc(aoe.targetloc, rad - 50) or {}) do
+				if c.IsValidHero(N) and c.CanCastOnNonMagicImmune(N) and not c.IsSuspiciousIllusion(N) then
+					local dmg = a3 + math.max(0, b:GetMaxMana() - N:GetMaxMana()) * a2
+					if N:GetActualIncomingDamage(dmg, DAMAGE_TYPE_MAGICAL) >= N:GetHealth() * 0.4 then
+						hit = hit + 1
+					end
+				end
+			end
+			if hit >= 3 then
+				if DotaTime() >= (b._odEclipseLogAt or -999) then
+					b._odEclipseLogAt = DotaTime() + 3
+					pcall(print, string.format("[OHA-OD] t=%.0f eclipse-teamfight heroes=%d", DotaTime(), hit))
+				end
+				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
 		end
 	end

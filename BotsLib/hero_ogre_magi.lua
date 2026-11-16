@@ -631,7 +631,9 @@ function a.ConsiderD()
 	end
 	local R = r:GetCastPoint()
 	local S = r:GetManaCost()
-	local T = r:GetSpecialValueInt("fireblast_damage")
+	-- Unrefined Fireblast has no "fireblast_damage" key (it read 0, so every kill check here was false):
+	-- its damage is base_damage + str_multiplier x Ogre's Strength (game data and datafeed).
+	local T = r:GetSpecialValueInt("base_damage") + r:GetSpecialValueFloat("str_multiplier") * b:GetAttributeValue(ATTRIBUTE_STRENGTH)
 	local U = DAMAGE_TYPE_MAGICAL
 	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
 	local V = c.GetNearbyHeroes(b, Q + 50, true, BOT_MODE_NONE)

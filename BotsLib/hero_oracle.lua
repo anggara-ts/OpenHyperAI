@@ -265,11 +265,18 @@ function a.ConsiderW()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
+		-- Fate's Edict gives its target 100% magic resistance (datafeed), which blocks Oracle's own
+		-- Fortune's End and Purifying Flames and the team's magic burst on the hero being killed. Only on
+		-- that target while it is hitting one of our heroes and still above 50% HP; "attacking anything"
+		-- used to be enough.
+		local hitting = c.IsValidHero(botTarget) and botTarget:GetAttackTarget() or nil
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(b, botTarget, N)
 			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsAttacking(botTarget)
+			and c.IsValidHero(hitting)
+			and hitting:GetTeam() == GetTeam()
+			and c.GetHP(botTarget) > 0.5
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Attack" .. c.Chat.GetNormName(botTarget)
 		end

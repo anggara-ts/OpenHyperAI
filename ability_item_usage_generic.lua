@@ -7901,6 +7901,75 @@ end
 -- dispenser with 1 observer). take: the stash items when the courier is sent for them; deliver:
 -- the order with the courier's value; arrived: an item that appears in the inventory away from
 -- the shop (or a dispenser whose charges change), checked once a second.
+-- [OHA-API] one-time dump of the bot API this game build actually exposes (user ask: the online
+-- docs are old and list no vector-target action). Radiant's first bot, once, at the first item
+-- think: every global callable by name, every global table with callables (classes such as
+-- CDOTA_Bot_Script) with its own and its metatable's callables, 25 names a line, sorted.
+local function ApiNames(t)
+	local names = {}
+	local seen = {}
+	local function add(tbl)
+		if type(tbl) ~= "table" then
+			return
+		end
+		for k, v in pairs(tbl) do
+			if type(k) == "string" and type(v) == "function" and not seen[k] then
+				seen[k] = true
+				names[#names + 1] = k
+			end
+		end
+	end
+	add(t)
+	local okM, mt = pcall(getmetatable, t)
+	if okM and type(mt) == "table" then
+		add(mt)
+		if type(mt.__index) == "table" then
+			add(mt.__index)
+		end
+	end
+	table.sort(names)
+	return names
+end
+local function ApiPrint(label, names)
+	for i = 1, #names, 25 do
+		local part = {}
+		for j = i, math.min(i + 24, #names) do
+			part[#part + 1] = names[j]
+		end
+		pcall(print, string.format("[OHA-API] %s n=%d %d-%d: %s", label, #names, i, i + #part - 1, table.concat(part, ",")))
+	end
+end
+function a.DumpBotApi()
+	if _G.OHA_API_DUMPED or GetTeam() ~= TEAM_RADIANT then
+		return
+	end
+	local first = GetTeamMember(1)
+	if first == nil or first:GetPlayerID() ~= b:GetPlayerID() then
+		return
+	end
+	_G.OHA_API_DUMPED = true
+	local globals, classes = {}, {}
+	for k, v in pairs(_G) do
+		if type(k) == "string" then
+			if type(v) == "function" then
+				globals[#globals + 1] = k
+			elseif type(v) == "table" and k ~= "_G" and string.sub(k, 1, 1) == "C" then
+				classes[#classes + 1] = k
+			end
+		end
+	end
+	table.sort(globals)
+	table.sort(classes)
+	ApiPrint("globals", globals)
+	for _, cls in ipairs(classes) do
+		local names = ApiNames(_G[cls])
+		if #names > 0 then
+			ApiPrint(cls, names)
+		end
+	end
+	-- The bot's own handle, in case its class table is not a global.
+	ApiPrint("bot-handle", ApiNames(b))
+end
 function a.LogCourier(kind)
 	local now = DotaTime()
 	b._courierLogAt = b._courierLogAt or {}
@@ -8002,6 +8071,7 @@ function ItemUsageThink()
 	pcall(a.TrackTeleportJump)
 	pcall(a.WatchStillUnderHit)
 	pcall(a.WatchArrivals)
+	pcall(a.DumpBotApi)
 	pcall(a.LogHomeWalk)
 	local okQ, cleared = pcall(a.WatchStuckQueue)
 	if okQ and cleared then

@@ -231,7 +231,18 @@ local function a(b)
 		if L then
 			b.SetQueueUseSoulRing(e)
 		end
+		-- Game 031, 66:30: OD kept switching his Power Treads. Every spell switched them to
+		-- Intelligence and the Treads rule switched them back (to Strength while retreating, or to
+		-- his main attribute 0.2s later). No switch for a spell while the Treads rule wants Strength.
+		local okR, wantStr = pcall(function()
+			return b.IsRetreating(e) and e:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE
+				or e:GetHealth() < 0.3 * e:GetMaxHealth()
+		end)
+		if okR and wantStr then
+			return
+		end
 		if not b.IsPTReady(e, ATTRIBUTE_INTELLECT) then
+			e._ptSpellSwitchAt = DotaTime()
 			b.SetQueueSwitchPtToINT(e)
 		end
 	end

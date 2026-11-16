@@ -752,6 +752,9 @@ function CDOTA_Bot_Script:GetAttackRange()
 	return aL(self)
 end
 local aM = CDOTA_Bot_Script.ActionImmediate_SwapItems
+-- Gap between two swaps of the same pair of items: the game puts an item moved out of the
+-- backpack on a 6s cooldown, plus 5s, so two routines that want opposite slots for the same
+-- items cannot ping-pong them and keep both on cooldown.
 local aN = 6 + 5
 local function SwapMovesBranchToBackpack(self, fromSlot, toSlot)
 	if toSlot < 6 or toSlot > 8 then
@@ -848,8 +851,7 @@ end
 function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	local forced = self._swapDespiteEnemies
 	self._swapDespiteEnemies = nil
-	-- A swap that must not wait for the 11s gap after the last swap (the banner at the enemy base:
-	-- every other routine's swaps keep that gap running).
+	-- A swap that must not wait for the 11s gap (the banner at the enemy base).
 	local urgent = self._swapDespiteCooldown
 	self._swapDespiteCooldown = nil
 	-- A branch parked for any other item gets pulled straight back, and that round trip
@@ -858,16 +860,17 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 		LogGrenadeSwap(self, aO, aP, "blocked-branch-rule")
 		return nil
 	end
-	if self.itemSwapTime == nil then
-		-- Start in the past. At 0 every swap was refused until 0:11, including the
-		-- pregame swap that moves a grenade bought into a full bag.
-		self.itemSwapTime = -1000
-	end
+	-- The gap is per pair of items. It used to be one timer for every swap, so a routine that kept
+	-- retrying one pair held up all the others (game 033: a Clarity/Dust swap that never took
+	-- effect restarted it every 6-13s for 26 minutes). A pair that has not swapped yet starts in
+	-- the past, so the pregame swap of a grenade bought into a full bag goes through at once.
+	local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
+	local pairKey = nameA < nameB and (nameA .. "|" .. nameB) or (nameB .. "|" .. nameA)
+	self._swapPairTime = self._swapPairTime or {}
 	local enemies = #(self:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {})
-	local cooldown = aN - (DotaTime() - self.itemSwapTime)
+	local cooldown = aN - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
 	if (forced or enemies == 0) and (cooldown < 0 or urgent) then
-		self.itemSwapTime = DotaTime()
-		local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
+		self._swapPairTime[pairKey] = DotaTime()
 		-- After a swap the engine ignored, try the slots the other way round once.
 		local reversed = self._swapTryReverse == true
 		self._swapTryReverse = nil

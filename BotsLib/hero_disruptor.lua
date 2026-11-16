@@ -248,10 +248,12 @@ function a.SkillsComplement()
 	end
 	E, F = a.ConsiderKineticStorm()
 	if E > 0 then
+		-- Kinetic Field first, then Static Storm inside it (user call): the field holds them in the
+		-- storm. It used to be storm first, field second.
 		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnLocation(s, F)
-		b:ActionQueue_Delay(0.05)
 		b:ActionQueue_UseAbilityOnLocation(q, F)
+		b:ActionQueue_Delay(0.05)
+		b:ActionQueue_UseAbilityOnLocation(s, F)
 		b:ActionQueue_Delay(0.05)
 		return
 	end

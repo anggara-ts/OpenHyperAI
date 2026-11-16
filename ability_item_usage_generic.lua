@@ -970,6 +970,10 @@ local function bg()
 	if a.TryConsumeGrisGris and a.TryConsumeGrisGris() then
 		return BOT_ACTION_DESIRE_HIGH
 	end
+	-- Shadow Amulet during a teleport channel (item use below is off while channelling).
+	if b:IsAlive() and b:HasModifier("modifier_teleporting") and a.AmuletDuringTeleport() then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	if
 		not b:IsAlive()
 		or b:IsMuted()
@@ -3950,65 +3954,97 @@ a.ConsiderItemDesire["item_satanic"] = function(bm)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Shadow Amulet (game files: allied hero target, range 600, cooldown 18s, fade 1.25s).
+-- Self: while running away from an enemy hero, or when a stun projectile is coming (invisible
+-- while stunned, nothing can target it). Ally in range: stunned, about to be stunned, or running
+-- away hurt. Never on a rooted hero or one already revealed (Dust, Amplify Damage), never near an
+-- enemy tower. During a teleport it is cast from the top of the item think (AmuletDuringTeleport),
+-- since item use is off while channelling.
+local function AmuletHidden(u)
+	return u:IsInvisible()
+		or u:HasModifier("modifier_invisible")
+		or u:HasModifier("modifier_item_glimmer_cape")
+		or u:HasModifier("modifier_item_shadow_amulet_fade")
+end
+local function AmuletRevealed(u)
+	return u:IsRooted() or u:HasModifier("modifier_slardar_amplify_damage") or u:HasModifier("modifier_item_dustofappearance")
+end
+local function AmuletLog(target, why)
+	if DotaTime() < (b._amuletLogAt or -999) then
+		return
+	end
+	b._amuletLogAt = DotaTime() + 2
+	pcall(print, string.format(
+		"[OHA-ITEM] t=%.0f %s shadow-amulet target=%s why=%s",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		why
+	))
+end
 a.ConsiderItemDesire["item_shadow_amulet"] = function(bm)
-	local bv = 600 + b8
 	local bq = "unit"
-	local hEffectTarget = nil
-	local bw = nil
-	local bx = f.GetNearbyHeroes(b, bv, true, BOT_MODE_NONE)
-	if
-		not b:HasModifier("modifier_invisible")
-		and not b:HasModifier("modifier_item_glimmer_cape")
-		and not b:HasModifier("modifier_item_shadow_amulet_fade")
-		and not b:HasModifier("modifier_slardar_amplify_damage")
-		and not b:HasModifier("modifier_item_dustofappearance")
-	then
-		local d7 = f.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-		for aX, aY in pairs(d7) do
-			if aY:IsAlive() and (aY:GetAttackTarget() == b or aY:IsFacingLocation(b:GetLocation(), 16)) then
-				local bY = b:GetNearbyTowers(888, true)
-				if #bY == 0 and b9 < DotaTime() - 1.28 and not f.IsGoingOnSomeone(b) then
-					b9 = DotaTime()
-					hEffectTarget = b
-					bw = "自己用"
-					return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
-				end
-			end
+	local range = 600 + b8
+	if not AmuletHidden(b) and not AmuletRevealed(b) and #(b:GetNearbyTowers(888, true) or {}) == 0 then
+		local foes = f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+		if f.IsStunProjectileIncoming(b, 1000) then
+			AmuletLog(b, "stun-incoming")
+			return BOT_ACTION_DESIRE_HIGH, b, bq, "stun-incoming"
 		end
-		if b:IsRooted() or f.IsStunProjectileIncoming(b, 1000) then
-			local bY = b:GetNearbyTowers(888, true)
-			if #bY == 0 and b9 < DotaTime() - 1.28 then
-				b9 = DotaTime()
-				hEffectTarget = b
-				bw = "撤退了"
-				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
-			end
+		if #foes > 0 and (bf == BOT_MODE_RETREAT or f.IsRetreating(b)) and not f.IsGoingOnSomeone(b) then
+			AmuletLog(b, "running-away")
+			return BOT_ACTION_DESIRE_HIGH, b, bq, "running-away"
 		end
 	end
-	local cz = f.GetNearbyHeroes(b, 849, false, BOT_MODE_NONE)
-	for aX, bA in pairs(cz) do
+	for _, ally in pairs(f.GetNearbyHeroes(b, range, false, BOT_MODE_NONE) or {}) do
 		if
-			f.IsValid(bA)
-			and bA ~= b
-			and not bA:IsIllusion()
-			and not bA:IsMagicImmune()
-			and not bA:IsInvisible()
-			and not bA:HasModifier("modifier_invisible")
-			and not bA:HasModifier("modifier_item_glimmer_cape")
-			and not bA:HasModifier("modifier_item_shadow_amulet_fade")
-			and not bA:HasModifier("modifier_slardar_amplify_damage")
-			and not bA:HasModifier("modifier_item_dustofappearance")
-			and (bA:IsStunned() or bA:IsRooted() or f.IsStunProjectileIncoming(bA, 1000))
+			f.IsValid(ally)
+			and ally ~= b
+			and not ally:IsIllusion()
+			and not ally:IsMagicImmune()
+			and not AmuletHidden(ally)
+			and not AmuletRevealed(ally)
+			and #(ally:GetNearbyTowers(888, true) or {}) == 0
 		then
-			local cl = bA:GetNearbyTowers(888, true)
-			if #cl == 0 then
-				hEffectTarget = bA
-				bw = "帮助队友隐身"
-				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+			local why = nil
+			if ally:IsStunned() then
+				why = "ally-stunned"
+			elseif f.IsStunProjectileIncoming(ally, 1000) then
+				why = "ally-stun-incoming"
+			elseif
+				f.IsRetreating(ally)
+				and ally:GetHealth() / math.max(1, ally:GetMaxHealth()) < 0.5
+				and #(ally:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}) > 0
+			then
+				why = "ally-running-away"
+			end
+			if why ~= nil then
+				AmuletLog(ally, why)
+				return BOT_ACTION_DESIRE_HIGH, ally, bq, why
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Teleporting with an enemy hero near: cast it on self during the channel. The amulet does not
+-- cancel channels (DOTA_ABILITY_BEHAVIOR_IGNORE_CHANNEL in the game files), so the 1.25s fade
+-- runs inside the TP. Casting it before the TP would not work: the TP is an item cast, which
+-- breaks the invisibility, and item use is held while the amulet fade is on. True when cast.
+function a.AmuletDuringTeleport()
+	local slot = b:FindItemSlot("item_shadow_amulet")
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local amulet = b:GetItemInSlot(slot)
+	if amulet == nil or not f.CanCastAbility(amulet) or AmuletHidden(b) or AmuletRevealed(b) then
+		return false
+	end
+	if #(f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) == 0 then
+		return false
+	end
+	AmuletLog(b, "during-teleport")
+	b:Action_UseAbilityOnEntity(amulet, b)
+	return true
 end
 a.ConsiderItemDesire["item_sheepstick"] = function(bm)
 	local bv = 800 + b8

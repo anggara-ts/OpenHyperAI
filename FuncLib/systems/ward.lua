@@ -196,6 +196,21 @@ end
 -- lane is kept and moved only when the front has moved 900+, so a planted or given-up mark stays.
 local LANE_AHEAD = 900
 local laneSpots = {}
+-- Within 1200 of a living enemy tower (tower attack range 700, plus the walk in to plant).
+local ENEMY_TOWER_GAP = 1200
+local function NearEnemyTower(loc)
+	local enemy = GetOpposingTeam()
+	for _, id in ipairs({
+		TOWER_TOP_1, TOWER_TOP_2, TOWER_TOP_3, TOWER_MID_1, TOWER_MID_2, TOWER_MID_3,
+		TOWER_BOT_1, TOWER_BOT_2, TOWER_BOT_3, TOWER_BASE_1, TOWER_BASE_2,
+	}) do
+		local t = GetTower(enemy, id)
+		if t ~= nil and GetUnitToLocationDistance(t, loc) <= ENEMY_TOWER_GAP then
+			return true
+		end
+	end
+	return false
+end
 local function LaneTier1Down(lane)
 	local t1 = lane == LANE_TOP and TOWER_TOP_1 or lane == LANE_MID and TOWER_MID_1 or TOWER_BOT_1
 	return GetTower(TEAM_RADIANT, t1) == nil or GetTower(TEAM_DIRE, t1) == nil
@@ -210,6 +225,15 @@ local function LaneSpots()
 	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
 		if LaneTier1Down(lane) then
 			local loc = GetLaneFrontLocation(GetTeam(), lane, LANE_AHEAD)
+			-- Not under an enemy tower (user question: a wave pushing their T2 put the spot in its
+			-- range; the deep filter only covers towers that still have an outer tower in front).
+			-- Pull back to 300 ahead of the wave, else no lane spot for now.
+			if loc ~= nil and NearEnemyTower(loc) then
+				loc = GetLaneFrontLocation(GetTeam(), lane, 300)
+				if loc ~= nil and NearEnemyTower(loc) then
+					loc = nil
+				end
+			end
 			-- Not inside either base: a front pushed to a barracks is a siege, not a ward spot.
 			local inBase = fountain ~= nil and enemyFountain ~= nil and loc ~= nil
 				and (b.GetDistance(loc, fountain) < 4000 or b.GetDistance(loc, enemyFountain) < 4000)

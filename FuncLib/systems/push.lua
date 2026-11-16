@@ -1340,6 +1340,14 @@ function l.PushThink(ao, ap)
 					dM = true
 					break
 				end
+				-- Game 032, 13:25: Techies, Pudge and OD, pushing mid, paced by a neutral camp next to
+				-- the Dire outpost (moved 98-215 in 10s): the nearby-creep list includes neutrals, so
+				-- they hit the camp, then walked back toward the lane. Pushing leaves neutrals alone
+				-- unless one is hitting this hero.
+				if ci:GetTeam() == TEAM_NEUTRAL and ci:GetAttackTarget() ~= ao then
+					dM = true
+					break
+				end
 				if dI and GetUnitToLocationDistance(ci, dH) >= dJ + 500 then
 					dM = true
 					break

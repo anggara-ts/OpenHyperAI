@@ -506,6 +506,9 @@ local function a(b)
 			or T:HasModifier("modifier_item_invisibility_edge_windwalk")
 			or T:HasModifier("modifier_item_silver_edge")
 			or T:HasModifier("modifier_item_silver_edge_windwalk")
+			-- Moonlight Shadow (game files: modifier_mirana_moonlight_shadow; datafeed: 2.5/2/1.5s fade,
+			-- on Mirana and every allied hero). Game 032, 11:00: not listed, so no Dust came.
+			or T:HasModifier("modifier_mirana_moonlight_shadow")
 			or T:HasModifier("modifier_item_glimmer_cape_fade")
 			or T:HasModifier("modifier_item_glimmer_cape")
 			or T:HasModifier("modifier_item_shadow_amulet")

@@ -6294,29 +6294,6 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 				end
 			end
 		end
-		-- Vanished in our vision: an enemy hero last seen 0.1-2s ago, within 1200, whose last spot is
-		-- still visible to us, went invisible (game 032, 11:00: Mirana's Moonlight Shadow, which the
-		-- fade check above does not list). Covers any invisibility without its buff name.
-		for _, pid in ipairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
-			if b._invisSeen[pid] == nil and IsHeroAlive(pid) then
-				local info0 = GetHeroLastSeenInfo(pid)
-				local ls0 = info0 ~= nil and info0[1] or nil
-				if
-					ls0 ~= nil
-					and ls0.time_since_seen >= 0.1
-					and ls0.time_since_seen <= 2
-					and GetUnitToLocationDistance(b, ls0.location) <= 1200
-					and IsLocationVisible(ls0.location)
-				then
-					b._invisSeen[pid] = {
-						t = now - ls0.time_since_seen,
-						loc = ls0.location,
-						name = GetSelectedHeroName(pid) or "?",
-						logged = false,
-					}
-				end
-			end
-		end
 		for pid, v in pairs(b._invisSeen) do
 			if now - v.t > 4 or not IsHeroAlive(pid) then
 				b._invisSeen[pid] = nil
@@ -6339,7 +6316,9 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 						tostring(closest)
 					))
 				end
-				if gone and dist <= 900 and closest then
+				-- Only with his last spot still in our vision: a fader who walked into fog, blinked or
+				-- teleported is not worth a Dust (user call).
+				if gone and dist <= 900 and closest and IsLocationVisible(loc) then
 					b._invisSeen[pid] = nil
 					pcall(print, string.format(
 						"[OHA-DUST] t=%.0f %s dust on %s dist=%.0f",

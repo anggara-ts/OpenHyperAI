@@ -838,30 +838,37 @@ function Think()
 				end
 				d._runePickTry = nil
 				d._runePickupAt = now0
-				-- River spot: alternate the pickup between the tracked id and any other rune id at
-				-- this spot (see AltRuneIds), switching every 0.5s.
-				local pickId = D.location
-				if IsRiverRune(D.location) and liveDist < 200 then
-					local alts = AltRuneIds(D.location)
-					if #alts > 0 then
-						local k = math.floor(now0 * 2) % (#alts + 1)
-						if k > 0 then
-							pickId = alts[k]
-						end
-						if pickId ~= d._runeAltLogged then
-							d._runeAltLogged = pickId
-							pcall(print, string.format(
-								"[OHA-RUNE] %s t=%.1f pickup-alt spot=%s id=%s alts=%s",
-								(string.gsub(d:GetUnitName(), "npc_dota_hero_", "")),
-								now0,
-								tostring(D.location),
-								tostring(pickId),
-								table.concat(alts, ",")
-							))
-						end
-					end
+				-- Standing right on the spawn point, the pick-up does nothing (games 015-021: Medusa
+				-- and Pudge at distance 0 on the river spots, 13s of orders, no gold; game 014: the
+				-- one taken was walked onto from ~390 away). After 1.5s of orders within 80 of the
+				-- spot, step back 160 toward our side and order the pick-up from there, so the
+				-- order walks onto the rune. One step-back per second at most.
+				local ft = d._freshTry
+				if ft == nil or ft.id ~= D.location or now0 - ft.last > 3 then
+					ft = { id = D.location, first = now0, last = now0, backAt = -99 }
+					d._freshTry = ft
 				end
-				d:Action_PickUpRune(pickId)
+				ft.last = now0
+				if liveDist < 80 and now0 - ft.first >= 1.5 and now0 - ft.backAt >= 1 then
+					ft.backAt = now0
+					local back = b.AdjustLocationWithOffsetTowardsFountain(E, 160)
+					if not ft.logged then
+						ft.logged = true
+						pcall(print, string.format(
+							"[OHA-RUNE] %s t=%.1f pickup-stepback rune=%s dist=%.0f type=%s",
+							HeroTag(),
+							now0,
+							tostring(D.location),
+							liveDist,
+							tostring(rType)
+						))
+					end
+					d:Action_MoveToLocation(back)
+					d:ActionQueue_PickUpRune(D.location)
+					doing("pickup-stepback")
+					return
+				end
+				d:Action_PickUpRune(D.location)
 				doing("pickup-fresh")
 				return
 			end

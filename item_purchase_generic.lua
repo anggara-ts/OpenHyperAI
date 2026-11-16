@@ -2304,6 +2304,19 @@ function SellMarkedItems()
 	-- lines), so "<= 200" passed everywhere and sells were tried far from any shop. Only a real,
 	-- non-negative distance counts.
 	local atShop = (dF >= 0 and dF <= 500) or (dS >= 0 and dS <= 200) or (dD >= 0 and dD <= 200)
+	-- Something waits to be sold: the fountain TP-out rule holds while this is set (game 031,
+	-- 66:48: Medusa walked home to 1942 from the fountain and teleported out at once, and kept her
+	-- Power Treads next to Boots of Travel; the sale needs the fountain within 500).
+	local okM, marks = pcall(MarkedForSale)
+	a._sellPending = false
+	if okM and marks ~= nil then
+		for name in pairs(marks) do
+			if a:FindItemSlot(name) >= 0 and now >= (a._sellBlock ~= nil and a._sellBlock[name] or -999) then
+				a._sellPending = true
+				break
+			end
+		end
+	end
 	if not atShop then
 		return
 	end

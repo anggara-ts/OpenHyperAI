@@ -4671,6 +4671,8 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		and not b:HasModifier("modifier_teleporting")
 		and DotaTime() > 15
 		and not baseUnderCreeps
+		-- An item waits to be sold (item_purchase_generic SellMarkedItems): reach the fountain first.
+		and not (b._sellPending and b:DistanceFromFountain() > 500)
 	then
 		local dO = a.GetLaneByPosition(b)
 		if not f.IsInLaningPhase() and DotaTime() > 10 * 60 then

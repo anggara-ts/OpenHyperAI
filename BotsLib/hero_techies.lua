@@ -372,6 +372,23 @@ function a.SkillsComplement()
 		b._madDetonateAt = nil
 		return
 	end
+	-- An escape Blast Off that never went on cooldown (game 031, 6:56: ordered, then not cast;
+	-- 1s cast point while being hit): log what stopped it.
+	if b._escapeBlastAt ~= nil and DotaTime() - b._escapeBlastAt >= 1.6 then
+		if s:IsTrained() and s:GetCooldownTimeRemaining() <= 0 then
+			pcall(print, string.format(
+				"[OHA-TECHIES] t=%.0f escape-not-cast stun=%s hex=%s silence=%s mode=%d act=%d hp=%.2f",
+				DotaTime(),
+				tostring(b:IsStunned()),
+				tostring(b:IsHexed()),
+				tostring(b:IsSilenced()),
+				b:GetActiveMode(),
+				b:GetCurrentActionType(),
+				c.GetHP(b)
+			))
+		end
+		b._escapeBlastAt = nil
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -501,6 +518,9 @@ function a.SkillsComplement()
 			end
 		end
 		a.LogTechies(string.format("blast why=%s tazer=%s", yWhy or "?", tostring(tazer)), planted, z)
+		if yWhy == "escape" then
+			b._escapeBlastAt = DotaTime()
+		end
 		if yWhy ~= "escape" then
 			-- With Sticky in front, Blast Off starts one Sticky cast later; the landing steps
 			-- (mines, M.A.D., ...) are timed from here.
@@ -548,6 +568,59 @@ function a.SkillsComplement()
 		return
 	end
 end
+-- Sticky Bomb (datafeed): 0.1s cast point, flies at 500 with 2000 acceleration, sticks to an enemy
+-- hero within 300 of the landing, explodes 2s later in a 350 radius.
+-- A hero: aimed where he will be when the bomb lands (cast point + flight), kept in cast range.
+local function StickyHeroSpot(hero, range, speed, accel)
+	local loc = hero:GetLocation()
+	if not c.IsDisabled(hero) then
+		local eta = p:GetCastPoint() + c.GetETAWithAcceleration(GetUnitToUnitDistance(b, hero), speed, accel)
+		loc = hero:GetExtrapolatedLocation(eta)
+	end
+	if GetUnitToLocationDistance(b, loc) > range then
+		loc = c.Site.GetXUnitsTowardsLocation(b, loc, range)
+	end
+	return loc
+end
+-- Creeps: the spot in cast range that has the most of them within 300 (the 350 blast, less the
+-- creeps' drift over the fuse). Candidates: each creep, each pair's midpoint and the center.
+local STICKY_AOE = 300
+local function StickyCreepSpot(units, range)
+	local list = {}
+	for _, u in pairs(units or {}) do
+		if c.IsValid(u) then
+			table.insert(list, u)
+		end
+	end
+	if #list == 0 then
+		return nil, 0
+	end
+	local cands = { c.GetCenterOfUnits(list) }
+	for i = 1, #list do
+		local li = list[i]:GetLocation()
+		table.insert(cands, li)
+		for k = i + 1, #list do
+			table.insert(cands, (li + list[k]:GetLocation()) / 2)
+		end
+	end
+	local best, bestN, bestSum = nil, 0, math.huge
+	for _, loc in ipairs(cands) do
+		if GetUnitToLocationDistance(b, loc) <= range then
+			local n, sum = 0, 0
+			for _, u in ipairs(list) do
+				local d0 = GetUnitToLocationDistance(u, loc)
+				if d0 <= STICKY_AOE then
+					n = n + 1
+					sum = sum + d0
+				end
+			end
+			if n > bestN or n == bestN and sum < bestSum then
+				best, bestN, bestSum = loc, n, sum
+			end
+		end
+	end
+	return best, bestN
+end
 function a.ConsiderStickyBomb()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
@@ -570,12 +643,7 @@ function a.ConsiderStickyBomb()
 			and not _:HasModifier("modifier_oracle_false_promise_timer")
 			and not _:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local a0 = c.GetETAWithAcceleration(GetUnitToUnitDistance(b, _), V, W)
-			if c.IsChasingTarget(b, _) then
-				return BOT_ACTION_DESIRE_HIGH, _:GetExtrapolatedLocation(a0)
-			else
-				return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
-			end
+			return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(_, T, V, W)
 		end
 	end
 	local a1 = c.GetNearbyHeroes(b, T, false, BOT_MODE_NONE)
@@ -598,12 +666,7 @@ function a.ConsiderStickyBomb()
 					and not c.IsSuspiciousIllusion(_)
 					and not _:HasModifier("modifier_necrolyte_reapers_scythe")
 				then
-					local a0 = c.GetETAWithAcceleration(GetUnitToUnitDistance(b, _), V, W)
-					if c.IsChasingTarget(_, a2) then
-						return BOT_ACTION_DESIRE_HIGH, _:GetExtrapolatedLocation(a0)
-					else
-						return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
-					end
+					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(_, T, V, W)
 				end
 			end
 		end
@@ -619,12 +682,7 @@ function a.ConsiderStickyBomb()
 			local a4 = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
 			local a5 = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
 			if a4 ~= nil and a5 ~= nil and #a4 >= #a5 then
-				local a0 = c.GetETAWithAcceleration(GetUnitToUnitDistance(b, H), V, W)
-				if c.IsChasingTarget(b, H) then
-					return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(a0)
-				else
-					return BOT_ACTION_DESIRE_HIGH, H:GetLocation()
-				end
+				return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(H, T, V, W)
 			end
 		end
 	end
@@ -641,29 +699,26 @@ function a.ConsiderStickyBomb()
 				local a4 = c.GetNearbyHeroes(_, 1200, true, BOT_MODE_NONE)
 				local a6 = c.GetNearbyHeroes(_, 1200, false, BOT_MODE_NONE)
 				if a4 ~= nil and a6 ~= nil and (#a6 > #a4 or b:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH, (b:GetLocation() + _:GetLocation()) / 2
+					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(_, T, V, W)
 				end
 			end
 		end
 	end
 	if (c.IsPushing(b) or c.IsDefending(b)) and X >= 3 and not c.IsThereNonSelfCoreNearby(1000) then
-		local a7 = b:GetNearbyLaneCreeps(1600, true)
-		if a7 ~= nil and #a7 >= 4 and c.GetMP(b) > 0.5 then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a7)
+		local spot, n = StickyCreepSpot(b:GetNearbyLaneCreeps(T + STICKY_AOE, true), T)
+		if spot ~= nil and n >= 4 and c.GetMP(b) > 0.5 then
+			return BOT_ACTION_DESIRE_HIGH, spot
 		end
 	end
 	if c.IsFarming(b) and c.GetManaAfter(p:GetManaCost()) > 0.3 then
-		local a8 = b:GetNearbyNeutralCreeps(T)
-		if a8 ~= nil then
-			if #a8 >= 2 or #a8 >= 1 and c.IsValid(a8[1]) and a8[1]:IsAncientCreep() then
-				return BOT_ACTION_DESIRE_HIGH, a8[1]:GetLocation()
-			end
+		local a8 = b:GetNearbyNeutralCreeps(T + STICKY_AOE)
+		local spot, n = StickyCreepSpot(a8, T)
+		if spot ~= nil and (n >= 2 or n >= 1 and c.IsValid(a8[1]) and a8[1]:IsAncientCreep()) then
+			return BOT_ACTION_DESIRE_HIGH, spot
 		end
-		local a7 = b:GetNearbyLaneCreeps(T, true)
-		if a7 ~= nil then
-			if #a7 >= 3 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a7)
-			end
+		spot, n = StickyCreepSpot(b:GetNearbyLaneCreeps(T + STICKY_AOE, true), T)
+		if spot ~= nil and n >= 3 then
+			return BOT_ACTION_DESIRE_HIGH, spot
 		end
 	end
 	if c.IsLaning(b) then
@@ -674,7 +729,7 @@ function a.ConsiderStickyBomb()
 			if c.IsValidHero(_) and c.CanCastOnNonMagicImmune(_) and not c.IsSuspiciousIllusion(_) then
 				local aa = _:GetNearbyTowers(600, true)
 				if aa ~= nil and #aa >= 1 and c.IsValidBuilding(aa[1]) and aa[1]:GetAttackTarget() == _ then
-					return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
+					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(_, T, V, W)
 				end
 			end
 		end
@@ -690,17 +745,18 @@ function a.ConsiderStickyBomb()
 					and not _:HasModifier("modifier_dazzle_shallow_grave")
 					and not _:HasModifier("modifier_oracle_false_promise_timer")
 				then
-					return BOT_ACTION_DESIRE_HIGH, _:GetExtrapolatedLocation(1.2)
+					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(_, T, V, W)
 				end
 			end
 		end
-		for Z, ab in pairs(a7) do
+		for Z, ab in pairs(b:GetNearbyLaneCreeps(T + STICKY_AOE, true) or {}) do
 			if c.IsValid(ab) and ab:GetHealth() <= U then
 				table.insert(a9, ab)
 			end
 		end
-		if #a9 >= 2 and c.GetMP(b) > 0.35 and c.CanBeAttacked(a9[1]) and not c.IsThereNonSelfCoreNearby(1200) then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a9)
+		local spot, n = StickyCreepSpot(a9, T)
+		if spot ~= nil and n >= 2 and c.GetMP(b) > 0.35 and c.CanBeAttacked(a9[1]) and not c.IsThereNonSelfCoreNearby(1200) then
+			return BOT_ACTION_DESIRE_HIGH, spot
 		end
 	end
 	if c.IsDoingRoshan(b) then
@@ -714,14 +770,15 @@ function a.ConsiderStickyBomb()
 		end
 	end
 	local a9 = {}
-	local ac = b:GetNearbyLaneCreeps(T, true)
-	for Z, ab in pairs(ac) do
+	local ac = b:GetNearbyLaneCreeps(T + STICKY_AOE, true)
+	for Z, ab in pairs(ac or {}) do
 		if c.IsValid(ab) and ab:GetHealth() <= U then
 			table.insert(a9, ab)
 		end
 	end
-	if #a9 >= 3 and c.CanBeAttacked(a9[1]) and not c.IsThereNonSelfCoreNearby(1200) then
-		return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a9)
+	local spot, n = StickyCreepSpot(a9, T)
+	if spot ~= nil and n >= 3 and c.CanBeAttacked(a9[1]) and not c.IsThereNonSelfCoreNearby(1200) then
+		return BOT_ACTION_DESIRE_HIGH, spot
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -1186,10 +1243,11 @@ function a.ConsiderBlastOff(ignoreMana)
 				local a4 = c.GetNearbyHeroes(_, 1200, true, BOT_MODE_NONE)
 				local a6 = c.GetNearbyHeroes(_, 1200, false, BOT_MODE_NONE)
 				if a4 ~= nil and a6 ~= nil and (#a6 > #a4 or b:WasRecentlyDamagedByAnyHero(2)) then
+					-- Game 031, 6:59: low and chased, he blasted onto the chaser (last-stand) and stayed
+					-- in the fight. Run away (user call); onto the chaser only when the blast kills him.
 					if
-						P < 0.5
-						and c.CanCastOnNonMagicImmune(_)
-						and b:GetHealth() < c.GetTotalEstimatedDamageToTarget(a5, b)
+						c.CanCastOnNonMagicImmune(_)
+						and c.CanKillTarget(_, s:GetSpecialValueInt("damage"), DAMAGE_TYPE_MAGICAL)
 					then
 						return BOT_ACTION_DESIRE_HIGH, _:GetLocation(), "last-stand"
 					else

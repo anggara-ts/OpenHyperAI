@@ -183,9 +183,51 @@ end
 local function TeamSide()
 	return GetTeam() == TEAM_RADIANT and "radiant" or "dire"
 end
--- Cliffs, hunt spots and gates on the enemy side sit in their jungle. River banks do not.
+-- Cliffs, hunt spots and gates on the enemy side sit in their jungle. River banks do not. A lane
+-- spot past the middle of the map is toward their towers.
 local function NeedsCover(spot)
-	return spot.role == "uber" or spot.role == "hunt" or spot.deep == true
+	return spot.role == "uber" or spot.role == "hunt" or spot.role == "lane" or spot.deep == true
+end
+-- Lane spots (user call: after towers fall, bots never warded along the lane paths, only the fixed
+-- spots). For a lane where a tier-1 tower (either team's) is down, after 10:00: a point on the lane
+-- path a little ahead of our wave, toward the enemy, so the vision follows the front both ways.
+-- Positions come from the game's lane data (GetLaneFrontLocation with a forward offset, as push.lua
+-- uses it backward with -500), so they are on walkable ground on the lane path. One spot table per
+-- lane is kept and moved only when the front has moved 900+, so a planted or given-up mark stays.
+local LANE_AHEAD = 900
+local laneSpots = {}
+local function LaneTier1Down(lane)
+	local t1 = lane == LANE_TOP and TOWER_TOP_1 or lane == LANE_MID and TOWER_MID_1 or TOWER_BOT_1
+	return GetTower(TEAM_RADIANT, t1) == nil or GetTower(TEAM_DIRE, t1) == nil
+end
+local function LaneSpots()
+	local out = {}
+	if DotaTime() < 10 * 60 then
+		return out
+	end
+	local fountain = b.GetTeamFountain and b.GetTeamFountain() or nil
+	local enemyFountain = b.GetEnemyFountain and b.GetEnemyFountain() or nil
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		if LaneTier1Down(lane) then
+			local loc = GetLaneFrontLocation(GetTeam(), lane, LANE_AHEAD)
+			-- Not inside either base: a front pushed to a barracks is a siege, not a ward spot.
+			local inBase = fountain ~= nil and enemyFountain ~= nil and loc ~= nil
+				and (b.GetDistance(loc, fountain) < 4000 or b.GetDistance(loc, enemyFountain) < 4000)
+			if loc ~= nil and not inBase then
+				local cur = laneSpots[lane]
+				if cur == nil or b.GetDistance(cur.location, loc) >= 900 then
+					local ours = fountain ~= nil and enemyFountain ~= nil
+						and b.GetDistance(loc, fountain) < b.GetDistance(loc, enemyFountain)
+					local ourSide = TeamSide()
+					local side = ours and ourSide or (ourSide == "radiant" and "dire" or "radiant")
+					cur = { location = loc, plant_time_obs = 0, plant_time_sentry = 0, role = "lane", side = side }
+					laneSpots[lane] = cur
+				end
+				out[#out + 1] = cur
+			end
+		end
+	end
+	return out
 end
 -- Walk into enemy jungle only behind our wave or with teammates, never into a visible bigger group.
 local function EnemySideCovered(bot, loc)
@@ -288,10 +330,18 @@ function a.GetAvailabeObserverWardSpots(K)
 			elseif defending or (b.IsEarlyGame() and not pushing) then
 				return
 			end
+		elseif spot.role == "lane" then
+			-- Defending our high ground: no lane ward on their half.
+			if defending and not onOurs then
+				return
+			end
 		else
 			return
 		end
 		table.insert(L, spot)
+	end
+	for _, spot in ipairs(LaneSpots()) do
+		consider(spot)
 	end
 	for i = 1, #UberWardSpots do
 		consider(UberWardSpots[i])

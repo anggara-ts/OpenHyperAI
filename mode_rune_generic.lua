@@ -1106,9 +1106,30 @@ function a.SkipRune(id, seconds)
 	d._earlyRuneCommit = nil
 	d._runeReach = nil
 end
+-- Team memory (user call): the rune status the bot API gives is per team and stays at its last
+-- reading when the spot is fogged, with the time since it was seen. A spot whose last reading is
+-- "missing" and was seen after its latest spawn (bounty every 180s, river every 120s) has been
+-- checked or picked this cycle by someone on the team: nobody goes there until it spawns again.
+-- A spot last seen before its latest spawn is treated as holding a rune; "available" is trusted.
+function a.CheckedEmpty(id)
+	local now = DotaTime()
+	if now < 0 or GetRuneStatus(id) ~= RUNE_STATUS_MISSING then
+		return false
+	end
+	local okS, seen = pcall(GetRuneTimeSinceSeen, id)
+	if not okS or type(seen) ~= "number" or seen < 0 then
+		return false
+	end
+	local cycle = RuneCycle(id)
+	local lastSpawn = math.floor(now / cycle) * cycle
+	return now - seen >= lastSpawn + 1
+end
 function a.RuneSkipped(id)
 	local untilAt = d._runeSkip and d._runeSkip[id]
-	return untilAt ~= nil and DotaTime() < untilAt
+	if untilAt ~= nil and DotaTime() < untilAt then
+		return true
+	end
+	return a.CheckedEmpty(id)
 end
 function a.RuneReachFailed(id, dist)
 	local now = DotaTime()

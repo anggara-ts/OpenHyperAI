@@ -4222,30 +4222,117 @@ end
 -- the first enemy within 450 and gives True Sight and shared vision on it; cast range 1000). Used
 -- on an enemy hero seen turning invisible in the last 4s whose last spot is within cast range and
 -- still in our vision, when the bot has no Dust ready to do it. [OHA-ITEM] distiller-ground.
-local function DistillerGroundSpot()
+-- Enemy heroes seen turning invisible, kept 4s (Dust keeps its own copy with its own logs). The
+-- reveal order is Dust, then a Sentry (plain or from a dispenser), then the Distiller: each one
+-- holds back while one earlier in the order is ready.
+local function TrackFaders()
 	local now = DotaTime()
-	b._distillerFaders = b._distillerFaders or {}
+	b._faders = b._faders or {}
 	for _, eq in pairs(f.GetEnemiesNearLoc(b:GetLocation(), 1600) or {}) do
 		if f.IsValidHero(eq) and f.IsUnitWillGoInvisible(eq) and not f.HasInvisCounterBuff(eq) and not f.IsSuspiciousIllusion(eq) then
-			b._distillerFaders[eq:GetPlayerID()] = { t = now, loc = eq:GetLocation(), name = eq:GetUnitName() }
+			b._faders[eq:GetPlayerID()] = { t = now, loc = eq:GetLocation(), name = eq:GetUnitName() }
 		end
 	end
-	local dustSlot = b:FindItemSlot("item_dust")
-	local dust = dustSlot >= 0 and dustSlot <= 5 and b:GetItemInSlot(dustSlot) or nil
-	local dustReady = dust ~= nil and f.CanCastAbility(dust)
-	for pid, v in pairs(b._distillerFaders) do
+	for pid, v in pairs(b._faders) do
 		if now - v.t > 4 or not IsHeroAlive(pid) then
-			b._distillerFaders[pid] = nil
-		elseif not dustReady then
-			local info = GetHeroLastSeenInfo(pid)
-			local ls = info ~= nil and info[1] or nil
-			local loc = ls ~= nil and ls.location or v.loc
-			local gone = ls == nil or ls.time_since_seen > 0.1
-			if gone and GetUnitToLocationDistance(b, loc) <= 1000 + b8 and IsLocationVisible(loc) then
-				b._distillerFaders[pid] = nil
-				return loc, v.name
-			end
+			b._faders[pid] = nil
 		end
+	end
+end
+local function ReadyMainItem(name)
+	local s = b:FindItemSlot(name)
+	if s < 0 or s > 5 then
+		return nil
+	end
+	local it = b:GetItemInSlot(s)
+	if it ~= nil and f.CanCastAbility(it) then
+		return it
+	end
+	return nil
+end
+local function SentryReady()
+	if ReadyMainItem("item_ward_sentry") ~= nil then
+		return true
+	end
+	local d = ReadyMainItem("item_ward_dispenser")
+	return d ~= nil and (d:GetSecondaryCharges() or 0) > 0
+end
+-- A fader out of sight whose last spot is within maxDist and still in our vision.
+local function FaderSpot(maxDist)
+	TrackFaders()
+	for pid, v in pairs(b._faders) do
+		local info = GetHeroLastSeenInfo(pid)
+		local ls = info ~= nil and info[1] or nil
+		local loc = ls ~= nil and ls.location or v.loc
+		local gone = ls == nil or ls.time_since_seen > 0.1
+		if gone and GetUnitToLocationDistance(b, loc) <= maxDist and IsLocationVisible(loc) then
+			return pid, loc, v.name
+		end
+	end
+	return nil
+end
+local function RevealLog(item, who, dist)
+	pcall(print, string.format(
+		"[OHA-ITEM] t=%.0f %s %s-reveal on %s dist=%d",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		item,
+		(string.gsub(tostring(who), "npc_dota_hero_", "")),
+		math.floor(dist)
+	))
+end
+-- Sentry spot for a fader: cast range 500, True Sight 1050 (game files). The ward goes on his
+-- last spot when that is within 500, else 480 toward it.
+local function SentrySpotFor(loc)
+	local me = b:GetLocation()
+	local dx, dy = loc.x - me.x, loc.y - me.y
+	local len = math.sqrt(dx * dx + dy * dy)
+	if len <= 500 then
+		return loc
+	end
+	return Vector(me.x + dx / len * 480, me.y + dy / len * 480, loc.z)
+end
+function a.ConsiderSentryReveal(item, isDispenser)
+	if ReadyMainItem("item_dust") ~= nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local pid, loc, who = FaderSpot(500 + 1000)
+	if pid == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if isDispenser then
+		if (item:GetSecondaryCharges() or 0) <= 0 then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		-- Toggle state true = observer (game 032). Switch to sentry first and cast on a later think;
+		-- not with no observers in it (a sentry-only dispenser plants sentries, c428dc4), and at most
+		-- one switch a second.
+		local okT, tog = pcall(function()
+			return item:GetToggleState()
+		end)
+		if okT and tog == true and (item:GetCurrentCharges() or 0) > 0 then
+			if DotaTime() < (b._revealToggleAt or -99) + 1 then
+				return BOT_ACTION_DESIRE_NONE
+			end
+			b._revealToggleAt = DotaTime()
+			return BOT_ACTION_DESIRE_HIGH, b, "unit", "dispenser-to-sentry"
+		end
+	end
+	b._faders[pid] = nil
+	RevealLog(isDispenser and "dispenser-sentry" or "sentry", who, GetUnitToLocationDistance(b, loc))
+	return BOT_ACTION_DESIRE_HIGH, SentrySpotFor(loc), "ground", "sentry-reveal"
+end
+a.ConsiderItemDesire["item_ward_dispenser"] = function(bm)
+	return a.ConsiderSentryReveal(bm, true)
+end
+local function DistillerGroundSpot()
+	if ReadyMainItem("item_dust") ~= nil or SentryReady() then
+		return nil
+	end
+	local pid, loc, who = FaderSpot(1000 + b8)
+	if pid ~= nil then
+		b._faders[pid] = nil
+		return loc, who
 	end
 	return nil
 end
@@ -5477,6 +5564,12 @@ a.ConsiderItemDesire["item_veil_of_discord"] = function(bm)
 end
 local ei = 0
 a.ConsiderItemDesire["item_ward_sentry"] = function(bm)
+	do
+		local d, spot, kind, why = a.ConsiderSentryReveal(bm, false)
+		if d ~= nil and d > 0 then
+			return d, spot, kind, why
+		end
+	end
 	local bv = 500 + b8
 	local bq = "ground"
 	local hEffectTarget = nil

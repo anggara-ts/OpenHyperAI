@@ -337,6 +337,8 @@ b["tEarlyConsumableItem"] = {
 b["tEarlyBoots"] = { "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
 b["sCanNotSwitchItems"] = {
 	"item_aegis",
+	-- Swapped in from the backpack for a push; other swaps must not send it back.
+	"item_roshans_banner",
 	"item_refresher_shard",
 	"item_cheese",
 	"item_bloodstone",

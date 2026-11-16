@@ -5667,6 +5667,11 @@ a.ConsiderItemDesire["item_ash_legion_shield"] = function(bm)
 	return BOT_ACTION_DESIRE_NONE
 end
 a.ConsiderItemDesire["item_flayers_bota"] = function(bm)
+	-- These three were undefined globals: the item was never used, and at Roshan the range check
+	-- errored (game 034, 45:40 Death Prophet and 46:00 Dragon Knight, ItemUsageThink).
+	local bAttacking = f.IsAttacking(b)
+	local botAttackRange = b:GetAttackRange()
+	local nEnemyHeroes = f.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
 	if f.IsGoingOnSomeone(b) then
 		if f.IsValidHero(be) and f.CanBeAttacked(be) and not f.IsSuspiciousIllusion(be) and bAttacking then
 			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE

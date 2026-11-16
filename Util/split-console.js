@@ -179,8 +179,9 @@ function summarize(g) {
 				tags[tag[1]] = (tags[tag[1]] || 0) + 1;
 			}
 		}
-		if (/Script Runtime|\[WARN\]|expected hscript|parameter \d+:/.test(line)) {
-			const key = (body || line.replace(/^\S+ \S+ /, "")).slice(0, 160);
+		// [OHA-ERROR]: errors caught by the OHA_Guard wrappers (game 034: six were missed here).
+		if (/Script Runtime|\[WARN\]|\[OHA-ERROR\]|expected hscript|parameter \d+:/.test(line)) {
+			const key = (body || line.replace(/^\S+ \S+ /, "")).replace(/t=[-\d.]+ /, "").slice(0, 160);
 			errors.set(key, (errors.get(key) || 0) + 1);
 		}
 	}

@@ -214,6 +214,37 @@ function a.SkillsComplement()
 	end
 	u, v = a.ConsiderStrokeOfFate()
 	if u > 0 then
+		-- EXPERIMENT: Stroke of Fate is ALT_CASTABLE (game files): the plain cast curves from where
+		-- Grimstroke faces, the alt-cast goes straight. The bot API has no alt-cast order; try
+		-- whether the alt state is the autocast toggle. Toggled once; every cast logs the state.
+		if not b._grimAltTried then
+			b._grimAltTried = true
+			local okB, before = pcall(function()
+				return o:GetAutoCastState()
+			end)
+			local okT = pcall(function()
+				o:ToggleAutoCast()
+			end)
+			local okA, after = pcall(function()
+				return o:GetAutoCastState()
+			end)
+			pcall(print, string.format(
+				"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
+				DotaTime(),
+				tostring(okT),
+				okB and tostring(before) or "error",
+				okA and tostring(after) or "error"
+			))
+		end
+		local okS, state = pcall(function()
+			return o:GetAutoCastState()
+		end)
+		pcall(print, string.format(
+			"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
+			DotaTime(),
+			okS and tostring(state) or "error",
+			math.floor(GetUnitToLocationDistance(b, v))
+		))
 		b:Action_UseAbilityOnLocation(o, v)
 		return
 	end

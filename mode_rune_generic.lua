@@ -388,10 +388,24 @@ function GetDesireRaw()
 	if d:IsInvulnerable() and i > 0.9 and d:DistanceFromFountain() < 500 then
 		return give(BOT_MODE_DESIRE_ABSOLUTE, "fountain")
 	end
+	-- Laning first (user call): while the bot's lane needs it, runes, lotus pools and wisdom
+	-- shrines wait unless one is within 500. Re-checked every think, so a deferred spot is taken
+	-- once the lane is pushed or empty and the spot is near.
+	local laneBusy = a.LaneBusy()
+	if laneBusy and DotaTime() >= 15 then
+		local nr = a.ClosestAvailableRune(500)
+		if nr == nil then
+			a.NoteLaneDefer()
+			return give(BOT_MODE_DESIRE_NONE, "lane-busy")
+		end
+	end
 	-- Before the fight bailouts. An enemy near the pool was returning NONE and lotus never started.
 	do
 		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(d)
+		if laneBusy and loc ~= nil and GetUnitToLocationDistance(d, loc) > 500 then
+			desire = 0
+		end
 		-- A rune within 1000 that reads available (its spot in vision) beats a lotus or wisdom
 		-- walk; standing beside the pool as it spawns (absolute desire) still wins. Game 021,
 		-- 8:24-8:43: Disruptor was heading for the bottom jungle bounty and turned off to walk
@@ -1154,6 +1168,37 @@ function a.RuneReachFailed(id, dist)
 		end
 	end
 	return now - s.since >= limit
+end
+-- The bot's lane needs it: laning phase, the bot within 1500 of its lane's creep front, an enemy
+-- lane creep within 1000 of it, and the lane not pushed (its front farther than 1000 from the
+-- enemy T1 of that lane).
+local LANE_T1 = { [LANE_TOP] = TOWER_TOP_1, [LANE_MID] = TOWER_MID_1, [LANE_BOT] = TOWER_BOT_1 }
+function a.LaneBusy()
+	if not b.IsInLaningPhase() or not d:IsAlive() then
+		return false
+	end
+	local lane = n or d:GetAssignedLane()
+	local front = GetLaneFrontLocation(GetTeam(), lane, 0)
+	if front == nil or GetUnitToLocationDistance(d, front) > 1500 then
+		return false
+	end
+	if #(d:GetNearbyLaneCreeps(1000, true) or {}) == 0 then
+		return false
+	end
+	local t1 = LANE_T1[lane] and GetTower(GetOpposingTeam(), LANE_T1[lane]) or nil
+	if t1 ~= nil and GetUnitToLocationDistance(t1, front) <= 1000 then
+		return false
+	end
+	return true
+end
+-- Once per 10s per bot: a rune or objective was set aside for the lane.
+function a.NoteLaneDefer()
+	local t = DotaTime()
+	if t < (d._laneDeferLogAt or -999) then
+		return
+	end
+	d._laneDeferLogAt = t + 10
+	pcall(print, string.format("[OHA-RUNE] %s t=%.0f lane-busy defer", HeroTag(), t))
 end
 function a.ClosestAvailableRune(maxDist)
 	local best, bestDist = nil, maxDist or 700

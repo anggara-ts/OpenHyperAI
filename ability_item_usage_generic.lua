@@ -1011,6 +1011,27 @@ local function bg()
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
 	for forageSlot = 0, 5 do
 		local forage = b:GetItemInSlot(forageSlot)
+		if forage ~= nil and not forage:IsNull() and not f.CanCastAbility(forage) then
+			local fn = forage:GetName()
+			if
+				(fn == "item_foragers_stats" or fn == "item_foragers_health" or fn == "item_foragers_mana")
+				and DotaTime() >= (b._forageStuckLogAt or -999)
+			then
+				b._forageStuckLogAt = DotaTime() + 20
+				pcall(print, string.format(
+					"[OHA-FORAGE] t=%.0f %s cannot-eat %s slot%d fully=%s cd=%.1f hidden=%s passive=%s mana=%.0f",
+					DotaTime(),
+					(string.gsub(c, "npc_dota_hero_", "")),
+					fn,
+					forageSlot,
+					tostring(forage:IsFullyCastable()),
+					forage:GetCooldownTimeRemaining(),
+					tostring(forage:IsHidden()),
+					tostring(forage:IsPassive()),
+					b:GetMana()
+				))
+			end
+		end
 		if forage ~= nil and not forage:IsNull() and f.CanCastAbility(forage) then
 			local forageName = forage:GetName()
 			if forageName == "item_foragers_stats" then

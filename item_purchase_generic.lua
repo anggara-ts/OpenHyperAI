@@ -1896,6 +1896,20 @@ function ItemPurchaseThink()
 			if dest ~= nil then
 				ForceSwap(forageSlot, dest)
 				local moved = a:GetItemInSlot(dest)
+				-- Game 031: Dazzle kept a Forager mushroom in the backpack for the rest of the game,
+				-- and this step never logged a use. Log each try (once per 15s).
+				if w >= (a._forageLogAt or -999) then
+					a._forageLogAt = w + 15
+					pcall(print, string.format(
+						"[OHA-FORAGE] t=%.0f %s swap %s slot%d->%d moved=%s",
+						w,
+						(string.gsub(b, "npc_dota_hero_", "")),
+						forageName,
+						forageSlot,
+						dest,
+						moved ~= nil and not moved:IsNull() and moved:GetName() or "-"
+					))
+				end
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == forageName then
 					MatchTrace.Buy(a, forageName, "backpack forage swap and use")
 					if forageName == "item_foragers_stats" then

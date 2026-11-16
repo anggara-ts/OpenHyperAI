@@ -6,6 +6,10 @@
 -- of that value. A higher mode still wins at once, and a dip that lasts longer than 2s goes through.
 local M = {}
 local HOLD_SECONDS = 2.0
+-- Game 030 (build 061): of 324 bridges, 167 kept a bot retreating after the danger was gone and 55
+-- held an override desire (1.0+, e.g. team roam 1.42 after its target was gone), which blocks every
+-- other mode. Only ordinary desires (0.05-0.9) are held.
+local HOLD_MAX = 0.9
 function M.Hold(bot, key, mode, desire)
 	if bot == nil or type(desire) ~= "number" then
 		return desire
@@ -18,7 +22,7 @@ function M.Hold(bot, key, mode, desire)
 		return desire
 	end
 	if h == nil or desire >= h.d * 0.95 then
-		if desire > 0.05 then
+		if desire > 0.05 and desire <= HOLD_MAX then
 			bot._modeHold[key] = { d = desire, t = now }
 		end
 		return desire

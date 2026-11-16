@@ -433,14 +433,26 @@ function a.ConsiderAdaptiveStrikeAGI()
 			and c.CanCastOnTargetAdvanced(au)
 		then
 			local aF = GetUnitToUnitDistance(b, au) / ag + af
-			if aD > aC * 1.5 then
-				if au:HasModifier("modifier_teleporting") then
-					if c.GetModifierTime(au, "modifier_teleporting") > aF then
-						return BOT_ACTION_DESIRE_HIGH, au
-					end
-				elseif au:IsChanneling() and ak > am and not c.IsRealInvisible(b) and not _ then
-					return BOT_ACTION_DESIRE_HIGH, au
+			-- Interrupt a TP or channel at any attribute split: the stun is 0.5s even at minimum (stun_min,
+			-- game data). It needed Strength 50% above Agility, which a carry Morphling almost never has.
+			local interrupt = false
+			if au:HasModifier("modifier_teleporting") then
+				interrupt = c.GetModifierTime(au, "modifier_teleporting") > aF
+			elseif au:IsChanneling() and ak > am and not c.IsRealInvisible(b) and not _ then
+				interrupt = true
+			end
+			if interrupt then
+				if DotaTime() >= (b._morphIntLogAt or -999) then
+					b._morphIntLogAt = DotaTime() + 3
+					pcall(print, string.format(
+						"[OHA-MORPH] t=%.0f strike-interrupt target=%s agi=%d str=%d",
+						DotaTime(),
+						(string.gsub(au:GetUnitName(), "npc_dota_hero_", "")),
+						math.floor(aC),
+						math.floor(aD)
+					))
 				end
+				return BOT_ACTION_DESIRE_HIGH, au
 			end
 			if
 				c.WillKillTarget(au, ah, DAMAGE_TYPE_MAGICAL, aF)
@@ -574,7 +586,8 @@ function a.ConsiderAdaptiveStrikeAGI()
 	end
 	if c.IsDoingTormentor(b) and aE then
 		if c.IsTormentor(G) and c.IsInRange(b, G, ae) and a0 and ak > al then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Return the Tormentor: the caller casts on the second value, which was nil here.
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

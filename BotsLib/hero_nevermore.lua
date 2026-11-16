@@ -153,6 +153,9 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbility(t)
 		return
 	end
+	if a.ConsiderBlinkRequiem() then
+		return
+	end
 	if t:IsFullyCastable() and c.Utils.IsTruelyInvisible(b) then
 		return
 	end
@@ -206,6 +209,11 @@ function a.ConsiderR()
 	local L = c.GetEnemyList(b, 1200)
 	local M = c.GetEnemyList(b, 750)
 	local N = c.GetEnemyList(b, 350)
+	-- Follow-through of ConsiderBlinkRequiem: just blinked in, 2+ enemies within 750.
+	if DotaTime() - (b._sfBlinkAt or -999) <= 1.5 and #M >= 2 then
+		b._sfBlinkAt = nil
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	for O, P in pairs(N) do
 		local Q = c.GetModifierTime(P, "modifier_brewmaster_storm_cyclone")
 		if c.IsValidHero(P) and (Q > 0 and Q <= 1.66 or c.Utils.IsTruelyInvisible(b)) and P:GetHealth() > 700 then
@@ -232,6 +240,54 @@ function a.ConsiderR()
 		end
 	end
 	return 0
+end
+-- Blink -> Requiem (review): his build buys a Blink Dagger, but Requiem was only cast where he
+-- already stood. In a team fight (2+ of our heroes attacking within 1600, so he never blinks in
+-- alone), with Requiem and its mana ready, 10+ souls and 40%+ HP, blink (1200, Arcane 1400, item
+-- data) onto a spot 500+ away with 3+ enemy heroes within 450. ConsiderR casts Requiem for 1.5s
+-- after the blink (b._sfBlinkAt) whatever its own fight gates say.
+function a.ConsiderBlinkRequiem()
+	if not t:IsFullyCastable() or b:GetMana() < t:GetManaCost() or b:IsRooted() then
+		return false
+	end
+	if c.IsRetreating(b) or c.GetHP(b) < 0.4 or not c.IsInTeamFight(b, 1600) then
+		return false
+	end
+	if b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery")) < 10 then
+		return false
+	end
+	if not c.CanBlinkDagger(b) or b.Blink == nil then
+		return false
+	end
+	local range = b.Blink:GetName() == "item_arcane_blink" and 1400 or 1200
+	local aoe = b:FindAoELocation(true, true, b:GetLocation(), range - 100, 450, 0, 0)
+	if aoe == nil or aoe.count == nil or aoe.count < 3 or aoe.targetloc == nil then
+		return false
+	end
+	if GetUnitToLocationDistance(b, aoe.targetloc) < 500 or not IsLocationPassable(aoe.targetloc) then
+		return false
+	end
+	local foes = 0
+	for _, e0 in pairs(c.GetEnemiesNearLoc(aoe.targetloc, 450) or {}) do
+		if c.IsValidHero(e0) and c.CanCastOnNonMagicImmune(e0) and not c.IsSuspiciousIllusion(e0) then
+			foes = foes + 1
+		end
+	end
+	if foes < 3 then
+		return false
+	end
+	if DotaTime() >= (b._sfBlinkLogAt or -999) then
+		b._sfBlinkLogAt = DotaTime() + 3
+		pcall(print, string.format(
+			"[OHA-SF] t=%.0f blink-requiem foes=%d dist=%d",
+			DotaTime(),
+			foes,
+			math.floor(GetUnitToLocationDistance(b, aoe.targetloc))
+		))
+	end
+	b._sfBlinkAt = DotaTime()
+	b:Action_UseAbilityOnLocation(b.Blink, aoe.targetloc)
+	return true
 end
 function a.Consider(T, U)
 	if not T:IsFullyCastable() then

@@ -453,6 +453,16 @@ function a.ConsiderW()
 	return 0
 end
 function a.ConsiderE()
+	-- Dodge: Blur disjoints incoming projectiles (datafeed), so a stun projectile on its way is cast
+	-- out of the air, near a tower too. It was only used to hide, never to dodge. 1000 range: Blur has
+	-- a 0.3s cast point (game data), and any projectile already in flight is dodged.
+	if q:IsFullyCastable() and not b:IsInvisible() and c.IsStunProjectileIncoming(b, 1000) then
+		if DotaTime() >= (b._paBlurLogAt or -999) then
+			b._paBlurLogAt = DotaTime() + 3
+			pcall(print, string.format("[OHA-PA] t=%.0f blur-disjoint hp=%.2f", DotaTime(), c.GetHP(b)))
+		end
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	local an = b:GetNearbyTowers(878, true)
 	if not q:IsFullyCastable() or b:IsInvisible() or #an >= 1 or b:DistanceFromFountain() < 600 then
 		return BOT_ACTION_DESIRE_NONE, 0

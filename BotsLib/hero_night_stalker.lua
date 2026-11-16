@@ -115,6 +115,8 @@ function a.SkillsComplement()
 	H = c.IsInTeamFight(b, 1200)
 	C = a.ConsiderDarkAscension()
 	if C > 0 then
+		-- Noted for Void: Dark Ascension makes night (datafeed), which the clock check cannot see.
+		b._nsDarkAt = DotaTime()
 		b:Action_UseAbility(u)
 		return
 	end
@@ -159,7 +161,12 @@ function a.ConsiderVoid()
 	for P, Q in pairs(O) do
 		if c.IsValidHero(Q) and c.CanCastOnNonMagicImmune(Q) and not c.IsSuspiciousIllusion(Q) then
 			-- Void returns a unit everywhere below (unit-target per datafeed; no Scepter point-cast)
-			if Q:IsChanneling() or c.IsCastingUltimateAbility(Q) and N == "night" then
+			-- Interrupt only at night: Void mini-stuns only then (datafeed, "At night, Void also
+			-- mini-stuns, interrupting channeling abilities"). "a or b and night" let any channel through
+			-- by day, where Void does not stop it. Night here also counts the 30s after Dark Ascension.
+			local darkUntil = (b._nsDarkAt or -999) + math.max(u:GetSpecialValueFloat("duration"), 0) + 0.5
+			local isNight = N == "night" or DotaTime() < darkUntil
+			if (Q:IsChanneling() or c.IsCastingUltimateAbility(Q)) and isNight then
 				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 			if
@@ -268,7 +275,9 @@ function a.ConsiderCripplingFear()
 	local K = r:GetSpecialValueInt("radius")
 	D = c.GetProperTarget(b)
 	if H then
-		local T = c.GetEnemiesNearLoc(b:GetLocation(), K * 2)
+		-- Enemies near enough to be silenced: Crippling Fear only works on enemies near him (datafeed,
+		-- radius 350, game data). K * 2 started the timed effect with both enemies 700 away.
+		local T = c.GetEnemiesNearLoc(b:GetLocation(), K + 150)
 		if T ~= nil and #T >= 2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end

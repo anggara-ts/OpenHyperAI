@@ -618,6 +618,21 @@ function a.ConsiderR()
 				if #as >= 2 or #as >= 1 and #at >= 2 then
 					return BOT_ACTION_DESIRE_HIGH
 				end
+				-- One ally running alone: the counts above are of his own team, so a lone retreating
+				-- hero was never saved. Under 30% HP with 2+ enemy heroes within 900 of him, Guardian
+				-- Angel (immunity from physical damage, datafeed) covers his escape.
+				if c.GetHP(a6) < 0.3 and #(c.GetEnemiesNearLoc(a6:GetLocation(), 900) or {}) >= 2 then
+					if DotaTime() >= (b._omniGaLogAt or -999) then
+						b._omniGaLogAt = DotaTime() + 3
+						pcall(print, string.format(
+							"[OHA-OMNI] t=%.0f angel-save ally=%s hp=%.2f",
+							DotaTime(),
+							(string.gsub(a6:GetUnitName(), "npc_dota_hero_", "")),
+							c.GetHP(a6)
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH
+				end
 			end
 		end
 	end

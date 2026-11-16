@@ -382,8 +382,11 @@ function a.ConsiderAS()
 	local a5 = c.GetAroundEnemyHeroList(K + 200)
 	if c.IsRetreating(b) and (b:WasRecentlyDamagedByAnyHero(3.0) or b:GetActiveModeDesire() > 0.7) then
 		for N, P in pairs(a5) do
+			-- Only an enemy already in Spectral Slug's cast range (500, game data): the list reaches 900, so
+			-- she used to walk up to 400 toward the enemy while retreating to cast it.
 			if
 				c.IsValid(P)
+				and c.IsInRange(b, P, s:GetCastRange())
 				and c.CanCastOnNonMagicImmune(P)
 				and c.CanCastOnTargetAdvanced(P)
 				and not c.IsDisabled(P)

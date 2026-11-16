@@ -20,6 +20,8 @@ local function IsRiverRune(id)
 end
 -- Sweep length: one 160 lap (2.4s) for every rune; a river rune next to an unpicked one lies as
 -- close as bounty gold does.
+-- Bounty circle walk off (user call); see a.NoteBountyGrab.
+local BOUNTY_SWEEP_ON = false
 local function SweepTime(id)
 	return 2.4
 end
@@ -1134,7 +1136,8 @@ function Think()
 			-- have spawned (it was a flat 20s, only there to stop back-to-back sweeps).
 			local cycle = RuneCycle(D.location)
 			local lastSweep = d._bountySwept[D.location]
-			local canSweep = isBounty
+			local canSweep = BOUNTY_SWEEP_ON
+				and isBounty
 				and d._bountySweep == nil
 				and (lastSweep == nil or math.floor(lastSweep / cycle) < math.floor(now0 / cycle))
 			local function StartSweep(why)
@@ -1266,7 +1269,13 @@ local BOUNTY_SWEEP = {
 	Vector(0, -160, 0),
 	Vector(113, -113, 0),
 }
+-- The circle walk around a jungle bounty spot after a pickup is off (user call): in the logged
+-- games it ran 66 times and found 1 extra rune, held the bot 2.4s after every bounty, and since build
+-- 045 bounties no longer stack; a leftover rune is picked up by Valve's item mode (BOUNTY_SWEEP_ON, top of file).
 function a.NoteBountyGrab(runeId)
+	if not BOUNTY_SWEEP_ON then
+		return
+	end
 	local now = DotaTime()
 	local s = d._bountySweep
 	if s == nil or s.id ~= runeId or (s.sweepUntil ~= nil and now > s.sweepUntil) then
@@ -1278,6 +1287,10 @@ function a.NoteBountyGrab(runeId)
 	end
 end
 function a.BountySweepState()
+	if not BOUNTY_SWEEP_ON then
+		d._bountySweep = nil
+		return nil
+	end
 	local s = d._bountySweep
 	if s == nil then
 		return nil

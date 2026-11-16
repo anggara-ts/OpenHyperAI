@@ -2432,11 +2432,17 @@ function IsOurSideOutpost(loc)
 	end
 	return a.GetDistance(loc, ours) < a.GetDistance(loc, theirs)
 end
--- Kills by team, from the scoreboard counters (no vision needed).
-local function TeamKills(team)
+-- Living enemy heroes not seen for over 3s (GetHeroLastSeenInfo works without vision).
+local function MissingEnemies()
 	local n = 0
-	for _, pid in pairs(GetTeamPlayers(team) or {}) do
-		n = n + (GetHeroKills(pid) or 0)
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local ls = info ~= nil and info[1] or nil
+			if ls == nil or ls.time_since_seen == nil or ls.time_since_seen > 3 then
+				n = n + 1
+			end
+		end
 	end
 	return n
 end
@@ -2461,19 +2467,20 @@ end
 -- The enemy-side outpost sits in their jungle. User call (game 035, 34:04: Leshrac walked alone
 -- to the Dire outpost while Radiant was well behind on kills and no wave pushed toward Dire, and
 -- Necrophos, Dragon Knight and Winter Wyvern killed him there): besides an enemy lane with T1 and
--- T2 down, our wave must be past the middle of the outpost's lane and the team must not be
--- 8+ kills behind.
-local ENEMY_OUTPOST_KILL_DEFICIT = 8
+-- T2 down, our wave must be past the middle of the outpost's lane, and no more than 2 living enemy
+-- heroes may be out of sight (the three who killed him were in the fog). This replaced a kill-deficit
+-- check (user call: kills say little about who is waiting nearby).
+local ENEMY_OUTPOST_MAX_MISSING = 2
 local enemyOutpostLogAt = -999
 local function EnemyOutpostSafe(loc)
 	local why = nil
 	if not EnemyTier2Down() then
 		why = "no-tier2-down"
 	else
-		local deficit = TeamKills(GetOpposingTeam()) - TeamKills(GetTeam())
+		local missing = MissingEnemies()
 		local lane, amount = OutpostLaneFront(loc)
-		if deficit >= ENEMY_OUTPOST_KILL_DEFICIT then
-			why = string.format("behind-on-kills(%d)", deficit)
+		if missing > ENEMY_OUTPOST_MAX_MISSING then
+			why = string.format("enemies-unseen(%d)", missing)
 		elseif amount <= 0.5 then
 			why = string.format("wave-not-pushed(lane=%s front=%.2f)", tostring(lane), amount)
 		end

@@ -57,7 +57,9 @@ function b.GetDesire()
 		c.isInLanePhase = true
 		return 0.369
 	end
-	if o <= 15 and a.GetCoresAverageNetworth() < 12000 then
+	-- Not after 15:00 (game 032, 22:00: Muerta, level 15 or lower with the cores' average net worth
+	-- under 12000, was still laning and followed her wave deep toward the enemy towers alone).
+	if n <= 15 * 60 and o <= 15 and a.GetCoresAverageNetworth() < 12000 then
 		c.isInLanePhase = true
 		return 0.228
 	end

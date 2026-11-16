@@ -6236,25 +6236,10 @@ a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 	local bE = f.GetAllyList(b, ek)
 	local nInRangeEnemy = f.GetNearbyHeroes(b, ek, true, BOT_MODE_NONE)
 	local eP = b:GetNearbyTowers(ek, true)
-	-- Pre-horn smoke only with teammates nearby (was solo-popping as soon as bought).
-	if DotaTime() < 0 and DotaTime() > -60 then
-		if bE ~= nil and #bE >= 2 and (nInRangeEnemy == nil or #nInRangeEnemy == 0) then
-			hEffectTarget = b
-			MatchTrace.Item(b, "item_smoke_of_deceit", "prehorn_team", string.format("allies=%d", #bE))
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
-		end
-		MatchTrace.Decide(
-			b,
-			"smoke_skip",
-			"prehorn_alone",
-			string.format("allies=%d (need>=2)", bE and #bE or 0),
-			5
-		)
-		return BOT_ACTION_DESIRE_NONE
-	end
-	-- Not in the laning phase by the clock, and never in a lane fight or under our own tower:
-	-- at 7:00 Techies popped one in team roam beside Medusa at our T1, in a creep wave.
-	if DotaTime() > 0 and DotaTime() < 10 * 60 then
+	-- Not before 10:00 (no build buys Smoke before the horn since 29becd3; pos 5 buys one from
+	-- 12:00), and never in a lane fight or under our own tower: at 7:00 Techies popped one in
+	-- team roam beside Medusa at our T1, in a creep wave.
+	if DotaTime() < 10 * 60 then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if #(b:GetNearbyLaneCreeps(1000, true) or {}) >= 3 or #(b:GetNearbyTowers(1000, false) or {}) >= 1 then

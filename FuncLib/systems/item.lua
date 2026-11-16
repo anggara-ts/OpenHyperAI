@@ -339,6 +339,11 @@ b["sCanNotSwitchItems"] = {
 	"item_aegis",
 	-- Swapped in from the backpack for a push; other swaps must not send it back.
 	"item_roshans_banner",
+	-- Game 032: every swap that would move a Ward Dispenser into the backpack was sent and had no
+	-- effect (110 for Dust, 2 for the banner); wards are never the item moved out to make room.
+	"item_ward_dispenser",
+	"item_ward_observer",
+	"item_ward_sentry",
 	-- Swapped in to be eaten (game 032: Medusa's Vital Toadstool went back to the backpack).
 	"item_foragers_health",
 	"item_foragers_stats",

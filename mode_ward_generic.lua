@@ -77,6 +77,18 @@ local function DispenserPlant(item, loc, wantObs)
 		t = nil
 	end
 	if t == nil then
+		-- Game 032: all 3 observer plants went in with GetToggleState() true and the first charge count
+		-- (observers) dropping, so true = observer active. Switch first when the state is the other one,
+		-- then cast 0.4s later; the old cast / watch / switch flow stays as the fallback.
+		local okT, tog = pcall(function()
+			return item:GetToggleState()
+		end)
+		if okT and type(tog) == "boolean" and tog ~= wantObs then
+			b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = true, recast = true, castAt = now + 0.4 }
+			DispLog("pre-toggle", item, loc, wantObs, obs, sen)
+			b:Action_UseAbilityOnEntity(item, b)
+			return true
+		end
 		b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = false, castAt = now }
 		DispLog("cast", item, loc, wantObs, obs, sen)
 		b:Action_UseAbilityOnLocation(item, loc)

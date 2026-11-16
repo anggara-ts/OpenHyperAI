@@ -529,7 +529,17 @@ local function PromoteBackpackCounters()
 	promoteNextCheck = DotaTime() + 2
 	for nBpSlot = 6, 8 do
 		local hBpItem = a:GetItemInSlot(nBpSlot)
-		if hBpItem ~= nil and tPromoteFromBackpack[hBpItem:GetName()] then
+		-- Game 032: Dust (promoted since build 055) picked the Ward Dispenser as the cheapest main item;
+		-- the engine ignored every swap and it was tried every 12s all game (Oracle 325 tries, 708 for
+		-- four supports), keeping the 11s swap gap running for every other swap. Wards are never moved
+		-- out for it, and an item that two swaps did not move is left for 120s.
+		a._promoteTries = a._promoteTries or {}
+		local tries = hBpItem ~= nil and a._promoteTries[hBpItem:GetName()] or nil
+		if tries ~= nil and DotaTime() > tries.untilAt then
+			a._promoteTries[hBpItem:GetName()] = nil
+			tries = nil
+		end
+		if hBpItem ~= nil and tPromoteFromBackpack[hBpItem:GetName()] and not (tries ~= nil and tries.n >= 2) then
 			local nBpCost = GetItemCost(hBpItem:GetName())
 			local nBestSlot, nBestCost = -1, nBpCost
 			for nSlot = 0, 5 do
@@ -545,6 +555,7 @@ local function PromoteBackpackCounters()
 					and not tPromoteFromBackpack[sName]
 					and not c.IsCanNotSwitchItem(sName)
 					and not string.find(sName, "boots")
+					and not string.find(sName, "item_ward", 1, true)
 					and sName ~= "item_power_treads"
 					and sName ~= "item_guardian_greaves"
 				then
@@ -553,6 +564,10 @@ local function PromoteBackpackCounters()
 			end
 			if nBestSlot ~= -1 then
 				log("[Item] %s backpack -> main: %s", b, hBpItem:GetName())
+				local tr = a._promoteTries[hBpItem:GetName()] or { n = 0, untilAt = 0 }
+				tr.n = tr.n + 1
+				tr.untilAt = DotaTime() + 120
+				a._promoteTries[hBpItem:GetName()] = tr
 				a:ActionImmediate_SwapItems(nBpSlot, nBestSlot)
 				return
 			end

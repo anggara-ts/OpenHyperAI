@@ -24,6 +24,12 @@ function M.Hold(bot, key, mode, desire)
 		return desire
 	end
 	if now - h.t <= HOLD_SECONDS then
+		-- Game 029 (build 053): flips went on at the same rate and no hold was visible. Log each bridge
+		-- (once per 15s per bot) to see whether this branch runs at all.
+		if now >= (bot._modeHoldLogAt or -999) then
+			bot._modeHoldLogAt = now + 15
+			pcall(print, string.format("[OHA-HOLD] t=%.1f %s %s raw=%.2f held=%.2f age=%.1f", now, (string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")), key, desire, h.d * 0.95, now - h.t))
+		end
 		return h.d * 0.95
 	end
 	bot._modeHold[key] = nil

@@ -439,10 +439,11 @@ function a.ConsiderR()
 	local S = 1600
 	local T = t:GetCastPoint()
 	local U = t:GetManaCost()
+	-- The +damage talent was read from sTalentList[5], which in the current talent order
+	-- (Ability10..17) is special_bonus_unique_zeus_2 (+60 Arc Lightning), not the Wrath talent
+	-- (special_bonus_unique_zeus_4, +75). Not added any more. The +75 is linked inside Wrath's
+	-- "damage" value, so GetSpecialValueInt("damage") may already include it (not verified).
 	local W = t:GetSpecialValueInt("damage")
-	if u:IsTrained() then
-		W = W + u:GetSpecialValueInt("value")
-	end
 	local ag = DAMAGE_TYPE_MAGICAL
 	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(2.0) then
 		if b:GetRespawnTime() > t:GetCooldown() and nHealthPercentage <= 0.28 then
@@ -452,7 +453,13 @@ function a.ConsiderR()
 	if c.IsInTeamFight(b, 1400) then
 		local af = c.GetNearbyHeroes(b, 1400, true, BOT_MODE_NONE)
 		local ah = c.GetInvUnitCount(false, af)
-		if ah >= 5 then
+		-- Was 5 visible enemies within 1400: in real fights (3v3, 4v4) Wrath stayed unused unless
+		-- it killed someone outright. Now 3.
+		if ah >= 3 then
+			if DotaTime() >= (b._zeusWrathLogAt or -999) then
+				b._zeusWrathLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-ZEUS] t=%.0f wrath-fight enemies=%d", DotaTime(), ah))
+			end
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end

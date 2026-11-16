@@ -241,7 +241,10 @@ function a.ConsiderE()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if q:IsFullyCastable() or n:IsFullyCastable() or o:IsFullyCastable() then
+	-- Only the ult holds Upheaval now (the channel blocks every cast until it ends). Bonds and Shadow
+	-- Word are considered first in SkillsComplement and return when they cast, so a ready-but-unused
+	-- Bonds or Word (no target for them) only kept Upheaval from ever going out.
+	if q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local M = p:GetCastRange() + 30 + I
@@ -251,7 +254,27 @@ function a.ConsiderE()
 	if c.IsInTeamFight(b, 1200) then
 		local R = b:FindAoELocation(true, true, b:GetLocation(), M, P / 2, 0, 0)
 		if R.count >= 2 then
-			return BOT_ACTION_DESIRE_LOW, R.targetloc
+			-- Upheaval does not pierce spell immunity (npc data: SPELL_IMMUNITY_ENEMIES_NO): with the
+			-- Bonds/Word gate gone, do not start a 10-16s channel unless 2+ of those heroes can be hit.
+			local hittable = 0
+			for _, foe in pairs(c.GetEnemiesNearLoc(R.targetloc, P / 2)) do
+				if c.IsValidHero(foe) and c.CanCastOnNonMagicImmune(foe) then
+					hittable = hittable + 1
+				end
+			end
+			if hittable >= 2 then
+				if DotaTime() >= (b._upheavalLogAt or -999) then
+					b._upheavalLogAt = DotaTime() + 15
+					pcall(print, string.format(
+						"[OHA-WARLOCK] t=%.0f upheaval heroes=%d bondsReady=%s wordReady=%s",
+						DotaTime(),
+						hittable,
+						tostring(n:IsFullyCastable()),
+						tostring(o:IsFullyCastable())
+					))
+				end
+				return BOT_ACTION_DESIRE_LOW, R.targetloc
+			end
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
@@ -394,7 +417,9 @@ function a.ConsiderQ()
 	end
 	if c.IsRetreating(b) then
 		local a4 = c.GetVulnerableWeakestUnit(b, true, true, M - 100)
-		if a4 ~= nil and c.GetUnitAllyCountAroundEnemyTarget(a4, P) >= 3 then
+		-- Bonds links enemy units, so count enemies around him (GetUnitAllyCountAroundEnemyTarget
+		-- counted our own units), as the engage branch below does.
+		if a4 ~= nil and c.GetAroundTargetEnemyUnitCount(a4, P) >= 3 then
 			return BOT_ACTION_DESIRE_HIGH, a4
 		end
 	end

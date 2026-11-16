@@ -109,6 +109,15 @@ local C, D
 local E = 0
 local F = 0
 local G, H, I, J, K, L
+-- [OHA-WD] lines: throttled per reason, at most once per 5s.
+function a.LogWD(why, fmt, ...)
+	b._wdLogAt = b._wdLogAt or {}
+	if DotaTime() < (b._wdLogAt[why] or -999) then
+		return
+	end
+	b._wdLogAt[why] = DotaTime() + 5
+	pcall(print, string.format("[OHA-WD] t=%.0f " .. why .. " " .. fmt, DotaTime(), ...))
+end
 function a.SkillsComplement()
 	a.ConsiderCombo()
 	if c.CanNotUseAbility(b) or b:IsInvisible() then
@@ -277,7 +286,14 @@ function a.ConsiderQ()
 		then
 			local a4 = botTarget:GetNearbyCreeps(_ * 1.9, false)
 			local a5 = c.GetNearbyHeroes(botTarget, _ * 1.9, false, BOT_MODE_NONE)
-			if #a4 >= 2 or #a5 >= 2 or J < 0.28 then
+			-- Gank on a lone hero (no creeps, no second enemy): Cask was never cast, and Death Ward
+			-- waits while Cask is ready (ConsiderR), so neither came out. Now also when another
+			-- allied hero is near the target (allies list counts WD, who is within cast range).
+			local aAlly = c.GetAlliesNearLoc(botTarget:GetLocation(), 900)
+			if #a4 >= 2 or #a5 >= 2 or J < 0.28 or #aAlly >= 2 then
+				if #a4 < 2 and #a5 < 2 and J >= 0.28 then
+					a.LogWD("cask-gank", "target=%s allies=%d", botTarget:GetUnitName(), #aAlly)
+				end
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack:" .. c.Chat.GetNormName(botTarget)
 			end
 		end
@@ -422,13 +438,16 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Heal only ran with no enemy within 1600 or in attack modes, so in a team fight while WD was
+	-- defending/pushing the heal stayed off (or was toggled off). Now team fights count too.
+	local inFight = c.IsInTeamFight(b, 1200)
 	local ac = c.GetAlliesNearLoc(b:GetLocation(), _)
 	for a0, ae in pairs(ac) do
 		if
 			c.IsValidHero(ae)
 			and c.GetHP(ae) < 0.5
 			and ab ~= nil
-			and #ab == 0
+			and (#ab == 0 or inFight)
 			and not c.IsSuspiciousIllusion(ae)
 			and not ae:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
 			and not ae:HasModifier("modifier_oracle_false_promise_timer")

@@ -338,6 +338,37 @@ function a.ConsiderLivingArmor()
 	end
 	local Z = nil
 	local _ = 0
+	-- In a fight an ally being focused comes first: the pick below takes the ally with the most
+	-- offensive power, at any HP, so a dying support never got the block. Under 50% HP and hit by a
+	-- hero in the last 2s, lowest HP first. Logged: [OHA-TREANT] armor-save.
+	if H or c.IsInTeamFight(b, 1600) then
+		local save, saveHP = nil, 0.5
+		for W, a0 in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a0)
+				and not c.IsMeepoClone(a0)
+				and not a0:IsIllusion()
+				and not a0:HasModifier("modifier_arc_warden_tempest_double")
+				and not a0:HasModifier("modifier_treant_living_armor")
+				and c.GetHP(a0) < saveHP
+				and a0:WasRecentlyDamagedByAnyHero(2)
+			then
+				save, saveHP = a0, c.GetHP(a0)
+			end
+		end
+		if save ~= nil then
+			if DotaTime() >= (b._treantArmorLogAt or -999) then
+				b._treantArmorLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-TREANT] t=%.0f armor-save ally=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
+					saveHP
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, save
+		end
+	end
 	if H or c.IsInTeamFight(b, 1600) then
 		local Q = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
 		for W, a0 in pairs(Q) do
@@ -406,16 +437,27 @@ function a.ConsiderOvergrowth()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local N = t:GetSpecialValueInt("radius")
-	if K then
-		local P = c.GetEnemiesNearLoc(b:GetLocation(), N)
-		if
-			P ~= nil
-			and #P >= 2
-			and not c.IsLocationInChrono(b:GetLocation())
-			and not c.IsLocationInBlackHole(b:GetLocation())
-		then
-			return BOT_ACTION_DESIRE_HIGH
+	-- K (2+ allies in attack mode) used to be required, so Overgrowth stayed unused when Treant
+	-- was going in on someone with fewer allies in attack mode, or caught by 3 enemies while
+	-- defending. Now: 2+ enemies in radius (datafeed 800) in a fight or while engaging, or 3+ anytime.
+	-- Logged: [OHA-TREANT] overgrowth.
+	local P = c.GetEnemiesNearLoc(b:GetLocation(), N)
+	if
+		P ~= nil
+		and (#P >= 3 or #P >= 2 and (K or H))
+		and not c.IsLocationInChrono(b:GetLocation())
+		and not c.IsLocationInBlackHole(b:GetLocation())
+	then
+		if not K and DotaTime() >= (b._treantOvergrowthLogAt or -999) then
+			b._treantOvergrowthLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-TREANT] t=%.0f overgrowth enemies=%d engaging=%s (not a team fight)",
+				DotaTime(),
+				#P,
+				tostring(H)
+			))
 		end
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -463,7 +505,9 @@ function a.ConsiderBlinkOvergrowth()
 	return BOT_ACTION_DESIRE_NONE
 end
 function CanDoBlinkOvergrowth()
-	if t:IsFullyCastable() and HasBlink() then
+	-- datafeed item_blink: blink_damage_cooldown 3, so Blink cannot be used within 3s of hero damage;
+	-- the queued Overgrowth would then go off where Treant stood (not verified in a game).
+	if t:IsFullyCastable() and HasBlink() and not b:WasRecentlyDamagedByAnyHero(3.0) then
 		local a7 = t:GetManaCost()
 		if b:GetMana() >= a7 then
 			b.shouldBlink = true

@@ -270,6 +270,12 @@ function a.ConsiderToss()
 	local N = p:GetSpecialValueInt("toss_damage") * (1 + b:GetSpellAmp())
 	local M = p:GetSpecialValueInt("grab_radius")
 	H = c.GetProperTarget(b)
+	-- datafeed: Toss throws the nearest unit within grab_radius (300) of Tiny. With none there it
+	-- has nothing to throw, yet the kill and interrupt branches below cast it anyway.
+	local grab = a.TossGrabUnit(M)
+	if grab == nil then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
 	local P = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
 	for Q, R in pairs(P) do
 		if c.IsValidHero(R) and c.CanCastOnNonMagicImmune(R) and not c.IsSuspiciousIllusion(R) then
@@ -288,7 +294,10 @@ function a.ConsiderToss()
 			end
 		end
 	end
-	if I and not CanDoBlinkToss() then
+	-- "and not CanDoBlinkToss()" removed: Blink + Toss is considered first in SkillsComplement, so
+	-- once that combo works the guard would only stop this Toss whenever a Blink was ready and the
+	-- combo declined. (Today CanDoBlinkToss is always false: F is never set.)
+	if I then
 		local S = c.GetNearbyHeroes(b, L + 200, false, BOT_MODE_NONE)
 		local T = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
 		if
@@ -354,7 +363,8 @@ function a.ConsiderToss()
 		if
 			S ~= nil
 			and T ~= nil
-			and (#T > #S or K and b:WasRecentlyDamagedByAnyHero(2))
+			-- "K and" was always true (K is the HP fraction); 0.58 as in Avalanche's escape branch.
+			and (#T > #S or K < 0.58 and b:WasRecentlyDamagedByAnyHero(2))
 			and c.IsValidHero(T[1])
 			and c.CanCastOnNonMagicImmune(T[1])
 			and not c.IsSuspiciousIllusion(T[1])
@@ -496,7 +506,7 @@ function a.ConsiderTreeVolley()
 		local T = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
 		if
 			c.IsValidTarget(H)
-			and c.IsValidTarget(H)
+			and c.IsInRange(b, H, L) -- was a duplicated IsValidTarget(H), with no range check
 			and not c.IsSuspiciousIllusion(H)
 			and not H:HasModifier("modifier_abaddon_aphotic_shield")
 			and not H:HasModifier("modifier_dazzle_shallow_grave")
@@ -542,6 +552,28 @@ function a.ConsiderBlinkToss()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- The unit Toss would grab: the nearest hero or creep (either team) within `radius` of Tiny,
+-- not Tiny, not debuff/magic immune (datafeed: "Debuff Immune units ... cannot be tossed").
+function a.TossGrabUnit(radius)
+	local best, bestDist = nil, radius + 1
+	local lists = {
+		c.GetNearbyHeroes(b, radius, false, BOT_MODE_NONE) or {},
+		c.GetNearbyHeroes(b, radius, true, BOT_MODE_NONE) or {},
+		b:GetNearbyCreeps(radius, true) or {},
+		b:GetNearbyCreeps(radius, false) or {},
+	}
+	for _, list in ipairs(lists) do
+		for _, u in pairs(list) do
+			if u ~= b and c.IsValid(u) and u:IsAlive() and not u:IsMagicImmune() then
+				local d0 = GetUnitToUnitDistance(b, u)
+				if d0 < bestDist then
+					best, bestDist = u, d0
+				end
+			end
+		end
+	end
+	return best
 end
 function CanDoBlinkToss()
 	if p:IsFullyCastable() and F ~= nil and F:IsFullyCastable() then

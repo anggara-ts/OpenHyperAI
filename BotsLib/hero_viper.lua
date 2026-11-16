@@ -410,9 +410,12 @@ local PASSIVE_HEROES = {
 	npc_dota_hero_centaur = true,
 	npc_dota_hero_necrolyte = true,
 }
+-- Viper Strike pierces spell immunity (npc data: SPELL_IMMUNITY_ENEMIES_YES and the
+-- MAGIC_IMMUNE_ENEMIES target flag), so a BKB'd carry is a valid target; the old
+-- CanCastOnNonMagicImmune check skipped exactly the cores the ult is best on.
 local function StrikeOk(N)
 	return c.IsValidHero(N)
-		and c.CanCastOnNonMagicImmune(N)
+		and c.CanCastOnMagicImmune(N)
 		and c.CanCastOnTargetAdvanced(N)
 		and not c.IsSuspiciousIllusion(N)
 		and not N:HasModifier("modifier_abaddon_borrowed_time")
@@ -449,7 +452,7 @@ function a.ConsiderViperStrike()
 		end
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	-- 1. A kill.
+	-- 1. A kill (GetActualIncomingDamage already applies the target's magic resistance / immunity).
 	for _, N in ipairs(inRange) do
 		if N:GetHealth() < N:GetActualIncomingDamage(total, DAMAGE_TYPE_MAGICAL) then
 			LogStrike("kill", N)

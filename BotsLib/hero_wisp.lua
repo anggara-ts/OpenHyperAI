@@ -110,7 +110,9 @@ local function L()
 		do
 			local P
 			repeat
-				if H == v or not H:IsAlive() or H:IsMagicImmune() then
+				-- Tether is SPELL_IMMUNITY_ALLIES_YES: a BKB carry can be tethered (the magic-immune
+				-- skip dropped Io's main fight target). Illusions of allies are skipped instead.
+				if H == v or not H:IsAlive() or H:IsIllusion() then
 					P = true
 					break
 				end
@@ -146,8 +148,12 @@ local function R()
 	if not z:IsFullyCastable() then
 		return c.None
 	end
-	if #D >= 1 then
-		return c.High
+	-- Was "#D >= 1" (any enemy hero within 1600): spirits circle Io at 200-650 range, so they
+	-- were cast (90-120 mana) at heroes they could not reach. Now: an enemy hero within 800.
+	for O, H in ipairs(D) do
+		if k(H) and GetUnitToUnitDistance(v, H) <= 800 then
+			return c.High
+		end
 	end
 	if #v:GetNearbyNeutralCreeps(500, true) >= t and a.GetMP(v) > u then
 		return c.Moderate
@@ -209,6 +215,22 @@ local function Y()
 	local a2, a3 = S()
 	if a2 > 0 and a3 ~= nil then
 		v:Action_UseAbilityOnLocation(B, a3)
+		return
+	end
+	-- Follow the tethered ally: the tether breaks past 1000 range (MAX TETHER DISTANCE in the
+	-- datafeed) and nothing kept Io near the ally, so modes walked Io away and broke it.
+	local th = v.stateTetheredHero
+	if K() and k(th) and not a.IsRetreating(v) and GetUnitToUnitDistance(v, th) > 650 then
+		if DotaTime() >= (v._wispFollowLogAt or -999) then
+			v._wispFollowLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-WISP] t=%.0f follow-tether ally=%s dist=%d",
+				DotaTime(),
+				th:GetUnitName(),
+				GetUnitToUnitDistance(v, th)
+			))
+		end
+		v:Action_MoveToLocation(th:GetLocation())
 	end
 end
 local function a4(a5)

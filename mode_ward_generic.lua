@@ -196,10 +196,10 @@ function GetDesireHelper()
 	if not a.IsSuitableToWard() then
 		return BOT_MODE_DESIRE_NONE
 	end
-	-- One early ward, then lane (user call). Game 030, -0:17: right after Techies planted the Dire
-	-- mid ward and stepped back behind the mid T1, ward mode started a second early trip across the
-	-- top river and he ended up fighting at the top rune. No more ward trips before 1:00.
-	if b._earlyWardPlantedAt ~= nil and DotaTime() < 60 then
+	-- One early ward (user call). Game 030, -0:17: right after Techies planted the Dire mid ward,
+	-- ward mode started a second early trip across the top river and he ended up fighting at the
+	-- top rune. No more ward trips until 0:20.
+	if b._earlyWardPlantedAt ~= nil and DotaTime() < 20 then
 		return BOT_MODE_DESIRE_NONE
 	end
 	if c.Utils.IsTeamPushingSecondTierOrHighGround(b) then
@@ -456,20 +456,18 @@ local function MarkEarlyWard(spot)
 	if p ~= nil and DotaTime() - p.at < 4 then
 		return
 	end
-	local obs = WardCharges()
-	local to = c.AdjustLocationWithOffsetTowardsFountain(t1:GetLocation(), 350)
-	local window = 25
-	-- Pos 5 before the horn: on to our own jungle's bounty spot (user call), through our jungle.
-	-- Radiant's jungle holds the bottom bounty, Dire's the top one.
-	if DotaTime() < 0 and c.GetPosition(b) == 5 then
-		to = GetRuneSpawnLocation(GetTeam() == TEAM_RADIANT and RUNE_BOUNTY_2 or RUNE_BOUNTY_1)
-		window = 40
+	-- Pos 5 only (user call): after the mid observer he walks to our own jungle's bounty spot
+	-- (Radiant's jungle holds the bottom bounty, Dire's the top one), up to 40s. No walk back
+	-- behind the mid T1 any more, for anyone.
+	if c.GetPosition(b) ~= 5 then
+		return
 	end
+	local obs = WardCharges()
 	b._earlyWardPending = {
 		at = DotaTime(),
 		obs = obs,
-		to = to,
-		window = window,
+		to = GetRuneSpawnLocation(GetTeam() == TEAM_RADIANT and RUNE_BOUNTY_2 or RUNE_BOUNTY_1),
+		window = 40,
 	}
 end
 -- Plant the observer from where he stands, as far toward the spot as the cast range allows.

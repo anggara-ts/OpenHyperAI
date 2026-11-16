@@ -100,8 +100,8 @@ end
 -- at -7250,-6845) and four of them died. The Radiant Ancient is ~1860 from its fountain, so
 -- fights at the Ancient (even its fountain side, ~1550+) stay outside this radius.
 local leaveFountain = nil
--- After an early mid ward is down (ward mode set c._earlyWardPending with the observer count):
--- back behind our mid T1 (350 toward the fountain) before going to lane, up to 25s.
+-- After pos 5's early mid ward is down (ward mode set c._earlyWardPending with the observer
+-- count): walk to our own jungle's bounty spot, up to 40s.
 local wardReturnTo = nil
 local function ObserverCount()
 	local n = 0

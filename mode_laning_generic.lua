@@ -731,6 +731,9 @@ function AnnounceMessages()
 		end
 	end
 end
+-- Hold the desire through short dips while laning (FuncLib/systems/mode_hold.lua). Game 030: the
+-- flips left were mostly laning against rune or attack (OD, 4:00: laning 0.56 / rune 0.35, 9 times).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "laning", BOT_MODE_LANING)
 if SafeCall then
 	local au = GetDesire
 	local av = Think

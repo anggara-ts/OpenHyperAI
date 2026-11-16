@@ -452,18 +452,35 @@ function a.ConsiderHookshot()
 				end
 			end
 		end
-		local a4 = GetNeutralSpawners()
+		-- Hookshot latches onto a unit, not a spot. The old loop aimed at any neutral SPAWNER nearer the
+		-- escape point with no range check, so it hooked empty camps or walked Clockwerk toward a camp
+		-- far beyond cast range. Now: a visible neutral creep inside hook range, nearer safety, path clear.
 		local a5 = c.GetEscapeLoc()
 		local a3 = GetUnitToLocationDistance(b, a5)
-		for L, a6 in pairs(a4) do
-			local a7 = c.GetDistance(a6.location, a5)
-			if a7 < a3 and GetUnitToLocationDistance(b, a6.location) > 700 then
+		for L, a6 in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS) or {}) do
+			if
+				c.IsValid(a6)
+				and a6:CanBeSeen()
+				and GetUnitToUnitDistance(b, a6) > 700
+				and GetUnitToUnitDistance(b, a6) <= W
+				and c.GetDistance(a6:GetLocation(), a5) < a3 - 500
+			then
+				local a7 = a6:GetLocation()
 				if
-					not c.IsUnitBetweenMeAndLocation(b, b, a6.location, J)
-					and not c.IsLocationInChrono(a6.location)
-					and not c.IsLocationInArena(a6.location, 800)
+					not c.IsUnitBetweenMeAndLocation(b, a6, a7, J)
+					and not c.IsLocationInChrono(a7)
+					and not c.IsLocationInArena(a7, 800)
 				then
-					return BOT_ACTION_DESIRE_HIGH, a6.location
+					if DotaTime() >= (b._hookCampLogAt or -999) then
+						b._hookCampLogAt = DotaTime() + 10
+						pcall(print, string.format(
+							"[OHA-RATTLETRAP] t=%.0f hookshot escape onto %s dist=%d",
+							DotaTime(),
+							a6:GetUnitName(),
+							math.floor(GetUnitToUnitDistance(b, a6))
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH, a7
 				end
 			end
 		end

@@ -531,8 +531,12 @@ function a.ConsiderE()
 			and not as:HasModifier("modifier_troll_warlord_battle_trance")
 			and not as:HasModifier("modifier_ursa_enrage")
 		then
+			-- datafeed: extra damage = int_multiplier (1/1.5/2/2.5) x the INT difference. The old math.abs()
+			-- also counted a target with MORE INT as bonus, and the multiplier was left out. Negative
+			-- difference counted as 0 (the feed does not say how it is handled).
 			local M = ao
-				+ math.abs(b:GetAttributeValue(ATTRIBUTE_INTELLECT) - as:GetAttributeValue(ATTRIBUTE_INTELLECT))
+				+ q:GetSpecialValueFloat("int_multiplier")
+					* math.max(0, b:GetAttributeValue(ATTRIBUTE_INTELLECT) - as:GetAttributeValue(ATTRIBUTE_INTELLECT))
 			if c.CanKillTarget(as, M, DAMAGE_TYPE_MAGICAL) then
 				if ap then
 					local at = b:FindAoELocation(true, true, as:GetLocation(), 0, I, 0, 0)
@@ -657,6 +661,7 @@ function a.ConsiderR()
 			and c.CanCastOnNonMagicImmune(a7)
 			and not a7:HasModifier("modifier_teleporting")
 			and a7:GetHealth() > 500
+			and a.IsChannelingUltimate(a7)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -693,6 +698,23 @@ function a.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Global Silence (120s) only to stop an ULTIMATE channel (Black Hole, Freezing Field, Death Ward...): any
+-- channel over 500 HP set it off before, e.g. a Life Drain, Shackles or a Tricks of the Trade.
+function a.IsChannelingUltimate(unit)
+	local ab = unit:GetCurrentActiveAbility()
+	if ab == nil or not ab:IsUltimate() then
+		return false
+	end
+	if DotaTime() >= (b._globalLogAt or -999) then
+		b._globalLogAt = DotaTime() + 10
+		pcall(print, string.format(
+			"[OHA-SILENCER] t=%.0f global-silence vs channel %s",
+			DotaTime(),
+			ab:GetName()
+		))
+	end
+	return true
 end
 function a.sil_GetWeakestUnit(aD)
 	local aE = nil

@@ -88,9 +88,8 @@ function a.SkillsComplement()
 	if s:IsTrained() then
 		D = s:GetSpecialValueInt("max_distance")
 	end
-	if v:IsTrained() then
-		D = D + v:GetSpecialValueInt("value")
-	end
+	-- sTalentList[5] is now special_bonus_unique_phantom_lancer_lance_damage (+100 lance damage, game files),
+	-- not a Phantom Rush range talent, so it no longer stretches the rush distance D.
 	w, x = a.ConsiderQ()
 	if w > 0 then
 		c.SetQueuePtToINT(b, true)

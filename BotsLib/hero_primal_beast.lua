@@ -148,6 +148,22 @@ function a.SkillsComplement()
 	if not b:HasModifier("modifier_primal_beast_trample") then
 		b.trample_status = { "", 0, nil }
 	end
+	-- Uproar (no target, IMMEDIATE, ignores channel) does not break Trample's walk, but the busy check
+	-- below blocked it for Trample's whole 5.5s; let it through during Trample only.
+	if
+		b:HasModifier("modifier_primal_beast_trample")
+		and not c.CanNotUseAbility(b)
+		and not b:HasModifier("modifier_primal_beast_pulverize_self")
+	then
+		if a.ConsiderUproar() > 0 then
+			if DotaTime() >= (b._uproarTrampleLogAt or -999) then
+				b._uproarTrampleLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f uproar during trample hp=%.2f", DotaTime(), L))
+			end
+			b:Action_UseAbility(q)
+			return
+		end
+	end
 	if
 		c.CanNotUseAbility(b)
 		or b:HasModifier("modifier_prevent_taunts")
@@ -237,8 +253,11 @@ function a.ConsiderOnslaught()
 	end
 	if J and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(4) and b:GetActiveModeDesire() > 0.7 then
 		if c.IsValidHero(v[1]) and (not c.WeAreStronger(b, 1200) and L < 0.75 or c.IsChasingTarget(v[1], b)) then
+			-- T is already a charge TIME (0.6-1.0 x chargeup_time); remapping it again as a distance
+			-- (100..max_distance) always gave the 0.3s floor, so the escape charge went only a few hundred units.
 			local T = RemapValClamped(GetUnitToUnitDistance(b, v[1]), 600, 1200, O * 0.6, O)
-			H = RemapValClamped(T, 100, M, 0.3, O)
+			H = T
+			a.LogOnslaughtRetreat(H)
 			b.onslaught_status = { "retreat", c.GetTeamFountain() }
 			return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 		end
@@ -267,6 +286,14 @@ function a.ConsiderOnslaught()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-PRIMAL_BEAST] retreat onslaught charge time, at most once per 5s.
+function a.LogOnslaughtRetreat(chargeTime)
+	if DotaTime() < (b._onslaughtLogAt or -999) then
+		return
+	end
+	b._onslaughtLogAt = DotaTime() + 5
+	pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f onslaught retreat charge=%.2fs hp=%.2f", DotaTime(), chargeTime, L))
 end
 function a.ConsiderBeginOnslaughtDesire()
 	if not c.CanCastAbility(t) then

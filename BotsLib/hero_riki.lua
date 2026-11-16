@@ -137,10 +137,9 @@ function a.ConsiderQ()
 	local S = o:GetAbilityDamage()
 	local T = DAMAGE_TYPE_MAGICAL
 	local U = c.GetAroundEnemyHeroList(P)
+	-- sTalentList[8] is special_bonus_unique_riki_9 (+500 Blink Strike range, game files), not a Smoke Screen
+	-- radius talent, so adding it here made the smoke AoE search 925 wide for a 425 cloud. Radius as read.
 	local V = o:GetSpecialValueInt("radius")
-	if v:IsTrained() then
-		V = V + v:GetSpecialValueInt("value")
-	end
 	local W = nil
 	for X, Y in pairs(L) do
 		if
@@ -203,10 +202,9 @@ function a.ConsiderW()
 		return 0
 	end
 	local O = p:GetLevel()
+	-- sTalentList[6] is special_bonus_unique_riki_5 (Blink Strike cooldown -1, game files), not a range talent;
+	-- the range talent (riki_9) is an AbilityCastRange bonus, left to GetCastRange().
 	local P = p:GetCastRange() + E
-	if u:IsTrained() then
-		P = P + u:GetSpecialValueInt("value")
-	end
 	local Q = p:GetCastPoint()
 	local R = p:GetManaCost()
 	local _ = b:GetAttackDamage()

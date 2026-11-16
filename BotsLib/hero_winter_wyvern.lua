@@ -107,6 +107,24 @@ local r =
 	SafeAbility(b:GetAbilityByName("winter_wyvern_splinter_blast"), "winter_wyvern_splinter_blast", "winter_wyvern")
 local s = SafeAbility(b:GetAbilityByName("winter_wyvern_cold_embrace"), "winter_wyvern_cold_embrace", "winter_wyvern")
 local t = SafeAbility(b:GetAbilityByName("winter_wyvern_winters_curse"), "winter_wyvern_winters_curse", "winter_wyvern")
+-- [OHA-WYVERN] lines: throttled per reason, at most once per 5s.
+function a.LogWyvern(why, fmt, ...)
+	b._wwLogAt = b._wwLogAt or {}
+	if DotaTime() < (b._wwLogAt[why] or -999) then
+		return
+	end
+	b._wwLogAt[why] = DotaTime() + 5
+	pcall(print, string.format("[OHA-WYVERN] t=%.0f " .. why .. " " .. fmt, DotaTime(), ...))
+end
+-- True when a visible real enemy hero within 1600 of the ally has it as its attack target.
+function a.IsAttackedByEnemyHero(ally)
+	for _, foe in pairs(c.GetNearbyHeroes(ally, 1600, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and foe:GetAttackTarget() == ally then
+			return true
+		end
+	end
+	return false
+end
 local u
 local v, w
 local x, y
@@ -196,7 +214,8 @@ function a.ConsiderArcticBurn()
 			end
 		end
 	else
-		if c.IsStuck(b) and not q:GetToggleState() == false then
+		-- Was "not toggle == false" (= toggle on), which turned the scepter toggle OFF when stuck.
+		if c.IsStuck(b) and q:GetToggleState() == false then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if C then
@@ -268,13 +287,15 @@ function a.ConsiderSplinterBlast()
 	local Q = r:GetSpecialValueInt("damage")
 	local R = r:GetSpecialValueInt("split_radius")
 	local S = r:GetManaCost()
-	local T = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
+	-- Kill secure: heroes were listed within cast range P and then required NOT in range P, so
+	-- this never fired. The primary target takes no damage (splinters hit units around it), so
+	-- list heroes out to P + split radius and cast on a unit near them that is in cast range.
+	local T = c.GetNearbyHeroes(b, math.min(1600, P + R), true, BOT_MODE_NONE)
 	for L, M in pairs(T) do
 		if
 			c.IsValidHero(M)
 			and c.CanCastOnNonMagicImmune(M)
 			and c.CanKillTarget(M, Q, DAMAGE_TYPE_MAGICAL)
-			and not c.IsInRange(b, M, P)
 			and not c.IsSuspiciousIllusion(M)
 			and not M:HasModifier("modifier_abaddon_borrowed_time")
 			and not M:HasModifier("modifier_dazzle_shallow_grave")
@@ -284,13 +305,15 @@ function a.ConsiderSplinterBlast()
 		then
 			local U = M:GetNearbyCreeps(R, true)
 			for L, V in pairs(U) do
-				if c.IsValid(V) and c.CanCastOnNonMagicImmune(V) then
+				if c.IsValid(V) and c.CanCastOnNonMagicImmune(V) and c.IsInRange(b, V, P) then
+					a.LogWyvern("splinter-kill", "target=%s via=%s", M:GetUnitName(), V:GetUnitName())
 					return BOT_ACTION_DESIRE_HIGH, V
 				end
 			end
 			local N = c.GetNearbyHeroes(M, R, false, BOT_MODE_NONE)
 			for L, W in pairs(N) do
-				if c.IsValidHero(W) and c.CanCastOnNonMagicImmune(W) and c.IsNotSelf(M, W) then
+				if c.IsValidHero(W) and c.CanCastOnNonMagicImmune(W) and c.IsNotSelf(M, W) and c.IsInRange(b, W, P) then
+					a.LogWyvern("splinter-kill", "target=%s via=%s", M:GetUnitName(), W:GetUnitName())
 					return BOT_ACTION_DESIRE_HIGH, W
 				end
 			end
@@ -513,7 +536,9 @@ function a.ConsiderColdEmbrace()
 				and E < 0.25
 				and not c.IsSuspiciousIllusion(M)
 				and not c.IsDisabled(M)
-				and not not M:HasModifier("modifier_fountain_aura_buff")
+				-- Was "not not M:HasModifier(fountain)": only fired while the chasing enemy stood in
+				-- the fountain, so the retreat self-embrace never happened. Meant: Wyvern not at base.
+				and not b:HasModifier("modifier_fountain_aura_buff")
 			then
 				local J = c.GetNearbyHeroes(M, 1200, true, BOT_MODE_NONE)
 				local N = c.GetNearbyHeroes(M, 1200, false, BOT_MODE_NONE)
@@ -530,8 +555,14 @@ function a.ConsiderColdEmbrace()
 			and not c.IsSuspiciousIllusion(a0)
 			and not c.IsInEtherealForm(a0)
 			and not a0:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not not a0:HasModifier("modifier_fountain_aura_buff")
+			-- Was "not not": the low-HP ally save fired only on allies standing in the fountain.
+			-- Now: ally not at base, hit by a hero in the last 2.5s and an enemy hero is attacking it
+			-- right now (the cocoon freezes the ally, so not on one who is getting away).
+			and not a0:HasModifier("modifier_fountain_aura_buff")
+			and a0:WasRecentlyDamagedByAnyHero(2.5)
+			and a.IsAttackedByEnemyHero(a0)
 		then
+			a.LogWyvern("embrace-save", "ally=%s hp=%.2f", a0:GetUnitName(), c.GetHP(a0))
 			return BOT_ACTION_DESIRE_HIGH, a0
 		end
 	end
@@ -640,9 +671,15 @@ function a.ConsiderWintersCurse()
 			then
 				local J = c.GetAlliesNearLoc(M:GetLocation(), 1200)
 				local N = c.GetEnemiesNearLoc(M:GetLocation(), 1200)
-				if J ~= nil and N ~= nil and (#N > #J or b:WasRecentlyDamagedByAnyHero(2.5)) and #J >= 2 then
+				-- Was "#J >= 2" (an ally besides Wyvern) and "#N >= 1" in radius, which M alone met:
+				-- a Wyvern fleeing alone never cursed two chasers. Now: an ally there, or a second
+				-- enemy in the curse radius to be cursed into attacking M.
+				if J ~= nil and N ~= nil and (#N > #J or b:WasRecentlyDamagedByAnyHero(2.5)) then
 					N = c.GetEnemiesNearLoc(M:GetLocation(), R)
-					if N ~= nil and #N >= 1 then
+					if N ~= nil and (#J >= 2 and #N >= 1 or #N >= 2) then
+						if #J < 2 then
+							a.LogWyvern("curse-escape", "target=%s cursed=%d", M:GetUnitName(), #N - 1)
+						end
 						return BOT_ACTION_DESIRE_HIGH, M
 					end
 				end

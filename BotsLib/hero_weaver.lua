@@ -53,6 +53,36 @@ end
 local p = SafeAbility(b:GetAbilityByName("weaver_the_swarm"), "weaver_the_swarm", "weaver")
 local q = SafeAbility(b:GetAbilityByName("weaver_shukuchi"), "weaver_shukuchi", "weaver")
 local r = SafeAbility(b:GetAbilityByName("weaver_time_lapse"), "weaver_time_lapse", "weaver")
+-- Geminate Attack is an autocast attack ability in the current game files (AUTOCAST | ATTACK);
+-- nothing in this script turned it on, so the second attack depended on the default state.
+local geminate = b:GetAbilityByName("weaver_geminate_attack")
+-- [OHA-WEAVER] lines: throttled per reason, at most once per 5s.
+function a.LogWeaver(why, fmt, ...)
+	b._weaverLogAt = b._weaverLogAt or {}
+	if DotaTime() < (b._weaverLogAt[why] or -999) then
+		return
+	end
+	b._weaverLogAt[why] = DotaTime() + 5
+	pcall(print, string.format("[OHA-WEAVER] t=%.0f " .. why .. " " .. fmt, DotaTime(), ...))
+end
+-- HP fraction about 5s ago (what Time Lapse gives back), sampled every 0.5s.
+function a.HpFiveSecondsAgo()
+	local now = DotaTime()
+	b._weaverHp = b._weaverHp or {}
+	local hist = b._weaverHp
+	if #hist == 0 or now - hist[#hist][1] >= 0.5 then
+		table.insert(hist, { now, c.GetHP(b) })
+		while #hist > 0 and now - hist[1][1] > 6 do
+			table.remove(hist, 1)
+		end
+	end
+	for _, s5 in ipairs(hist) do
+		if now - s5[1] <= 5.2 then
+			return s5[2]
+		end
+	end
+	return c.GetHP(b)
+end
 local s, t
 local u
 local v
@@ -68,6 +98,12 @@ local y
 local z
 local A
 function a.SkillsComplement()
+	-- Sample HP before the early return so the 5s history has no gaps while stunned.
+	local hp5 = a.HpFiveSecondsAgo()
+	if geminate ~= nil and not geminate:IsNull() and geminate:IsTrained() and not geminate:GetAutoCastState() then
+		geminate:ToggleAutoCast()
+		a.LogWeaver("geminate-autocast-on", "")
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -76,8 +112,16 @@ function a.SkillsComplement()
 	z = c.GetHP(b)
 	A = c.GetMP(b)
 	w = c.GetProperTarget(b)
-	if not b:HasModifier("modifier_weaver_shukuchi") then
+	-- Grace of 0.5s after the cast so the flag is not cleared before the buff shows up.
+	if not b:HasModifier("modifier_weaver_shukuchi") and DotaTime() - (b.ShukuchiKillAt or -99) > 0.5 then
 		b.tryShukuchiKill = false
+	end
+	-- Time Lapse in a fight: it was only considered in retreat mode, so a Weaver burst down while
+	-- attacking (mode not yet retreat) died with it ready. Cast when HP fell hard in the last 5s.
+	if r:IsFullyCastable() and not x and z < 0.3 and hp5 - z >= 0.25 and b:WasRecentlyDamagedByAnyHero(1.5) then
+		a.LogWeaver("lapse-fight", "hp=%.2f hp5=%.2f", z, hp5)
+		b:Action_UseAbility(r)
+		return
 	end
 	v, Target = a.ConsiderTimeLapse()
 	if v > 0 then
@@ -89,6 +133,19 @@ function a.SkillsComplement()
 			end
 		end
 		return
+	end
+	-- Shukuchi kill: the cast set tryShukuchiKill but nothing read it, so the bot cast Shukuchi
+	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
+	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
+	-- once inside that radius (the hit has landed).
+	if b.tryShukuchiKill and not x then
+		local kt = b.ShukuchiKillTarget
+		if c.IsValidHero(kt) and GetUnitToUnitDistance(b, kt) > 150 and GetUnitToUnitDistance(b, kt) < 1800 then
+			a.LogWeaver("shukuchi-kill-path", "target=%s dist=%d", kt:GetUnitName(), GetUnitToUnitDistance(b, kt))
+			b:Action_MoveToLocation(kt:GetExtrapolatedLocation(0.3))
+			return
+		end
+		b.tryShukuchiKill = false
 	end
 	u = a.ConsiderShukuchi()
 	if u > 0 then
@@ -112,7 +169,8 @@ function a.ConsiderTheSwarm()
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidTarget(w)
-			and c.CanCastOnMagicImmune(w)
+			-- The Swarm is SPELL_IMMUNITY_ENEMIES_NO: beetles do not latch a magic-immune hero.
+			and c.CanCastOnNonMagicImmune(w)
 			and c.IsInRange(b, w, B * 0.8)
 			and not c.IsSuspiciousIllusion(w)
 			and not w:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -151,14 +209,17 @@ function a.ConsiderTheSwarm()
 		end
 	end
 	if c.IsPushing(b) or c.IsDefending(b) then
-		local I = b:GetNearbyLaneCreeps(1600, true)
-		if I ~= nil and #I >= 5 then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(I)
-		end
+		-- Heroes first: the creep case returned before it, so with 5 creeps in range the swarm
+		-- went on the wave even with enemy heroes standing there.
 		local J = b:FindAoELocation(true, true, b:GetLocation(), 1600, C, 0, 0)
 		local E = c.GetEnemiesNearLoc(J.targetloc, C)
 		if E ~= nil and #E >= 1 then
 			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(E)
+		end
+		-- Creeps only with spare mana: the swarm is Weaver's fight spell (20-44s cooldown).
+		local I = b:GetNearbyLaneCreeps(1600, true)
+		if I ~= nil and #I >= 5 and A > 0.5 then
+			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(I)
 		end
 	end
 	if c.IsDoingRoshan(b) then
@@ -204,11 +265,13 @@ function a.ConsiderShukuchi()
 					if S ~= nil and #S == 0 then
 						b.tryShukuchiKill = true
 						b.ShukuchiKillTarget = G
+						b.ShukuchiKillAt = DotaTime()
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				else
 					b.tryShukuchiKill = true
 					b.ShukuchiKillTarget = G
+					b.ShukuchiKillAt = DotaTime()
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -254,7 +317,9 @@ function a.ConsiderShukuchi()
 	end
 	if c.IsFarming(b) and z > 0.25 and A > 0.25 then
 		local U = b:GetAttackTarget()
-		if U ~= nil then
+		-- Only as a gap closer to a farther target: cast while standing and attacking, Shukuchi
+		-- passed through nothing and its invisibility broke on the next attack (65 mana wasted).
+		if U ~= nil and GetUnitToUnitDistance(b, U) > K + 200 then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end

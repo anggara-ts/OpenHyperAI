@@ -127,9 +127,14 @@ function a.ConsiderEarthshock()
 	if v then
 		local G = c.GetNearbyHeroes(b, x + 200, false, BOT_MODE_NONE)
 		local I = c.GetNearbyHeroes(b, x, true, BOT_MODE_NONE)
+		-- datafeed: Earthshock "leaps forward hop_distance (250) units and slams the earth",
+		-- shock_radius 385. That the slam is centred on the landing spot is not verified; if it is,
+		-- requiring the target within 385 of Ursa skipped a fleeing target 400-535 ahead.
+		-- Reach = radius + hop - 100 (margin for his run during the hop); facing check kept.
+		local reach = x + o:GetSpecialValueInt("hop_distance") - 100
 		if
 			c.IsValidTarget(u)
-			and c.IsInRange(b, u, x)
+			and c.IsInRange(b, u, math.max(x, reach))
 			and not c.IsSuspiciousIllusion(u)
 			and not u:HasModifier("modifier_enigma_black_hole_pull")
 			and not u:HasModifier("modifier_faceless_void_chronosphere_freeze")
@@ -139,6 +144,16 @@ function a.ConsiderEarthshock()
 			and #G >= #I
 		then
 			if b:IsFacingLocation(u:GetExtrapolatedLocation(y), 15) then
+				-- [OHA-URSA] the new long-reach hop only, at most once per 5s.
+				if not c.IsInRange(b, u, x) and DotaTime() >= (b._ursaReachLogAt or -999) then
+					b._ursaReachLogAt = DotaTime() + 5
+					pcall(print, string.format(
+						"[OHA-URSA] t=%.0f earthshock-reach target=%s dist=%d",
+						DotaTime(),
+						(string.gsub(u:GetUnitName(), "npc_dota_hero_", "")),
+						math.floor(GetUnitToUnitDistance(b, u))
+					))
+				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -261,9 +276,9 @@ function a.ConsiderEnrage()
 	local Q = b:GetAttackRange()
 	u = c.GetProperTarget(b)
 	local I = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-	if I == nil or #I == 0 then
-		return BOT_ACTION_DESIRE_NONE
-	end
+	-- No enemy hero within 800 used to return here, so the farming, Roshan and Tormentor branches
+	-- below could never fire. The hero branches check I themselves.
+	I = I or {}
 	if I ~= nil and #I >= 2 and b:WasRecentlyDamagedByAnyHero(1.5) and w < 0.6 then
 		return BOT_ACTION_DESIRE_HIGH
 	end

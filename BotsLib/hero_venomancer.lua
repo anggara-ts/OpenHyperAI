@@ -346,6 +346,34 @@ function a.ConsiderPlagueWard()
 			end
 		end
 	end
+	-- Push / defend / farm: wards were only placed when engaging or retreating, so the 5s ward
+	-- (24-30 mana) never helped clear a wave or a camp. Keeps mana for Gale, Snakebite and the ult
+	-- (same reserve idiom as Snakebite), and only with no enemy hero within 1600.
+	if
+		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
+		and c.GetManaAfter(s:GetManaCost()) > c.GetManaThreshold(b, s:GetManaCost(), { q, r, t })
+		and #M == 0
+	then
+		local spot = nil
+		local X = b:GetNearbyLaneCreeps(I, true)
+		if X ~= nil and #X >= 3 then
+			spot = c.GetCenterOfUnits(X)
+		elseif c.IsFarming(b) and c.IsValid(D) and D:GetTeam() == TEAM_NEUTRAL and c.IsInRange(b, D, I) then
+			spot = D:GetLocation()
+		end
+		if spot ~= nil then
+			if DotaTime() >= (b._wardLogAt or -999) then
+				b._wardLogAt = DotaTime() + 15
+				pcall(print, string.format(
+					"[OHA-VENOMANCER] t=%.0f plague-ward clear creeps=%d farm=%s",
+					DotaTime(),
+					X ~= nil and #X or 0,
+					tostring(c.IsFarming(b))
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, spot, false
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, 0, false
 end
 function a.ConsiderNoxiousPlague()
@@ -359,10 +387,12 @@ function a.ConsiderNoxiousPlague()
 		local Q = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
 		for N, O in pairs(Q) do
 			if
+				-- Noxious Plague is damage and a slow, not a disable: a stunned target is a good target, so
+				-- "not disabled" is dropped. Linken's check added: an 80-100s ult must not pop a sphere.
 				c.IsValidHero(O)
 				and c.CanCastOnNonMagicImmune(O)
+				and c.CanCastOnTargetAdvanced(O)
 				and not c.IsSuspiciousIllusion(O)
-				and not c.IsDisabled(O)
 				and not O:HasModifier("modifier_enigma_black_hole_pull")
 				and not O:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not O:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -389,7 +419,9 @@ function a.ConsiderSnakebite()
 	end
 	-- A queued bite clears his move order, and lane, farm, and retreat then wait
 	-- on that queue. Cast only when the target is already in range.
-	local I = c.GetProperCastRange(false, b, r:GetCastRange())
+	-- Real cast range (600), not GetProperCastRange's +200: the comment above wants the target
+	-- already in range, and the +200 made him walk forward to bite.
+	local I = r:GetCastRange()
 	local a5 = r:GetManaCost()
 	local a6 = c.GetManaAfter(a5)
 	local a7 = c.GetManaThreshold(b, a5, { q, s, t })
@@ -402,8 +434,8 @@ function a.ConsiderSnakebite()
 			and c.IsInRange(b, D, I)
 			and c.CanCastOnNonMagicImmune(D)
 			and c.CanCastOnTargetAdvanced(D)
-			and not c.IsDisabled(D)
-			and not D:IsDisarmed()
+			-- Snakebite is only damage over time (npc data: base_damage + tick_damage, no disable), so
+			-- the old "not disabled / not disarmed" checks only skipped stunned targets.
 			and not D:HasModifier("modifier_abaddon_borrowed_time")
 			and not D:HasModifier("modifier_dazzle_shallow_grave")
 			and not D:HasModifier("modifier_oracle_false_promise_timer")

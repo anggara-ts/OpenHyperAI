@@ -345,11 +345,11 @@ function a.ConsiderSilentAsTheGrave()
 	end
 	if c.IsRetreating(b) then
 		local J = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
+		-- Silent as the Grave is a no-target self cast, so the chaser's BKB or Linken's does not
+		-- matter; those checks only stopped the escape when the chaser had one.
 		for K, L in pairs(J) do
 			if
 				c.IsValidHero(L)
-				and c.CanCastOnNonMagicImmune(L)
-				and c.CanCastOnTargetAdvanced(L)
 				and c.IsChasingTarget(L, b)
 				and not c.IsSuspiciousIllusion(L)
 				and not c.IsDisabled(L)

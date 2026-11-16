@@ -1625,22 +1625,23 @@ function ItemPurchaseThink()
 			end
 		end
 	end
+	-- Pos 4 and 5 both carry one now (was pos 5 under 10000 net worth with 3 free slots, which
+	-- rarely held, so Smoke was seldom bought). One free main-inventory slot is required: bot
+	-- swaps do not take effect, so a Smoke bought into the backpack may never get used.
 	if
-		e.GetPosition(a) == 5
-		and z < 10000
-		and f.CountBackpackEmptySpace(a) >= 2
+		e.GetPosition(a) >= 4
 		and GetItemStockCount("item_smoke_of_deceit") > 1
 		and y >= GetItemCost("item_smoke_of_deceit")
-		and c.GetEmptyInventoryAmount(a) >= 3
+		and c.GetEmptyNonBackpackInventoryAmount(a) >= 1
 		and c.GetItemCharges(a, "item_smoke_of_deceit") == 0
 		and C == 0
 	then
 		-- No Smoke before the horn or in the laning phase: it is wasted gold and a slot that
-		-- early. Pos 5 buys one once laning is over.
+		-- early. Supports buy one once laning is over.
 		-- By the clock: the laning-phase flag drops out mid-lane (GetDesireRaw clears it and
 		-- several early returns never set it back), so Techies bought one at 7:00 in lane.
 		if DotaTime() >= 12 * 60 and not e.IsInLaningPhase() then
-			MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning pos5")
+			MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning support")
 			a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
 		end
 	end

@@ -6227,6 +6227,33 @@ a.ConsiderItemDesire["item_blood_grenade"] = function(aT)
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 local eN = 0
+-- [OHA-ITEM] smoke: every Smoke of Deceit use with its reason.
+local function SmokeLog(why, allies)
+	if DotaTime() < (b._smokeLogAt or -999) then
+		return
+	end
+	b._smokeLogAt = DotaTime() + 3
+	pcall(print, string.format(
+		"[OHA-ITEM] t=%.0f %s smoke why=%s allies=%d",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		why,
+		allies or 0
+	))
+end
+-- The first enemy tower still standing in a lane, outer to inner.
+local function SmokeNextEnemyTower(lane)
+	local ids = lane == LANE_TOP and { TOWER_TOP_1, TOWER_TOP_2, TOWER_TOP_3 }
+		or lane == LANE_MID and { TOWER_MID_1, TOWER_MID_2, TOWER_MID_3 }
+		or { TOWER_BOT_1, TOWER_BOT_2, TOWER_BOT_3 }
+	for _, id in ipairs(ids) do
+		local t = GetTower(GetOpposingTeam(), id)
+		if t ~= nil and t:IsAlive() then
+			return t
+		end
+	end
+	return nil
+end
 a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 	local ek = 1200
 	local bq = "none"
@@ -6273,8 +6300,24 @@ a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 		local eS = f.CheckTimeOfDay()
 		hEffectTarget = b
 		if bf == BOT_MODE_ROAM or bf == BOT_MODE_GANK or bf == BOT_MODE_TEAM_ROAM then
+			SmokeLog("team-roam", #bE)
 			MatchTrace.Item(b, "item_smoke_of_deceit", "team_roam", string.format("allies=%d", #bE))
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+		end
+		-- A group walking to push a lane, still far from the tower (game 034, 16:30-17:15: four Dire
+		-- heroes walked together from Radiant's mid tower to its top tower and killed Grimstroke
+		-- and Riki on the way). Smoke hides the group until it reaches the wave.
+		local pushLane = bf == BOT_MODE_PUSH_TOWER_TOP and LANE_TOP
+			or bf == BOT_MODE_PUSH_TOWER_MID and LANE_MID
+			or bf == BOT_MODE_PUSH_TOWER_BOT and LANE_BOT
+			or nil
+		if pushLane ~= nil and #bE >= 3 then
+			local tower = SmokeNextEnemyTower(pushLane)
+			local dist = tower ~= nil and GetUnitToUnitDistance(b, tower) or 0
+			if dist > 2500 then
+				SmokeLog(string.format("push-group lane=%d tower-dist=%d", pushLane, math.floor(dist)), #bE)
+				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
+			end
 		end
 		if
 			eS == "day" and GetUnitToLocationDistance(b, f.Utils.RadiantRoshanLoc) < 600
@@ -6282,16 +6325,19 @@ a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 		then
 			if GetRoshanKillTime() > eN then
 				eN = GetRoshanKillTime()
+				SmokeLog("post-roshan", #bE)
 				MatchTrace.Item(b, "item_smoke_of_deceit", "post_roshan", string.format("allies=%d", #bE))
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
 			end
 		end
 		if bf == BOT_MODE_ROSHAN then
 			if eS == "day" and GetUnitToLocationDistance(b, f.Utils.RadiantRoshanLoc) > 3000 then
+				SmokeLog("to-roshan", #bE)
 				MatchTrace.Item(b, "item_smoke_of_deceit", "to_roshan", string.format("allies=%d", #bE))
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
 			end
 			if eS == "night" and GetUnitToLocationDistance(b, f.Utils.DireRoshanLoc) > 3000 then
+				SmokeLog("to-roshan", #bE)
 				MatchTrace.Item(b, "item_smoke_of_deceit", "to_roshan", string.format("allies=%d", #bE))
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
 			end

@@ -201,6 +201,16 @@ function a.SkillsComplement()
 	end
 	local E, F = a.ConsiderTeleportation()
 	if E > 0 then
+		pcall(print, string.format(
+			"[OHA-FURION] t=%.0f teleport to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
+			DotaTime(),
+			F.x,
+			F.y,
+			GetUnitToLocationDistance(b, F),
+			c.GetHP(b),
+			b:GetActiveMode(),
+			#(c.GetEnemiesNearLoc(F, 1200) or {})
+		))
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(p, F)
 		b.useProphetTP = false
@@ -309,8 +319,11 @@ function a.ConsiderTeleportation()
 	if c.IsStuck(b) then
 		return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 	end
+	-- Game 031, 12:01: at 21% HP he teleported to a fight and fed OD. Joining a fight, a gank, a
+	-- push, a defense, Roshan or a Tormentor needs half HP; below it only the fountain is a target.
+	local fitToJoin = c.GetHP(b) >= 0.5
 	local _ = c.GetTeamFightLocation(b)
-	if _ ~= nil and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500) then
+	if fitToJoin and _ ~= nil and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500) then
 		local a0 = GetUnitToLocationDistance(b, _)
 		local a1 = a0 / Z
 		if a1 > Y + 2 then
@@ -323,7 +336,8 @@ function a.ConsiderTeleportation()
 	for a3 = 1, #GetTeamPlayers(GetTeam()) do
 		local W = GetTeamMember(a3)
 		if
-			c.IsValidHero(W)
+			fitToJoin
+			and c.IsValidHero(W)
 			and c.IsGoingOnSomeone(W)
 			and not W:IsIllusion()
 			and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500)
@@ -360,6 +374,9 @@ function a.ConsiderTeleportation()
 				return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 			end
 		end
+	end
+	if not fitToJoin then
+		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if c.IsPushing(b) and not y and #x == 0 then
 		local a8 = b:GetAssignedLane()

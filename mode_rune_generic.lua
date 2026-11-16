@@ -875,6 +875,30 @@ function Think()
 					d._freshTry = ft
 				end
 				ft.last = now0
+				-- River gold lies off the reported spawn point (user pings, game 022): top (-1677, 1188)
+				-- vs the API's (-1640, 1112), bottom (1137, -1124) vs (1180, -1216), the same offset
+				-- of about (-40, +85) both times. The bots stood on the reported point, ~90 from it.
+				-- Walk onto the gold, then order the pick-up there.
+				if IsRiverRune(D.location) and rType == RUNE_BOUNTY then
+					local gold = E + Vector(-40, 85, 0)
+					if not ft.goldLogged then
+						ft.goldLogged = true
+						pcall(print, string.format(
+							"[OHA-RUNE] %s t=%.1f river-gold spot=%s gold=%.0f,%.0f dist=%.0f",
+							HeroTag(),
+							now0,
+							tostring(D.location),
+							gold.x,
+							gold.y,
+							GetUnitToLocationDistance(d, gold)
+						))
+					end
+					if GetUnitToLocationDistance(d, gold) > 40 and now0 - ft.first < 4 then
+						d:Action_MoveToLocation(gold)
+						doing("river-gold-walk")
+						return
+					end
+				end
 				if ft.backTo ~= nil then
 					if now0 < ft.backUntil and GetUnitToLocationDistance(d, ft.backTo) > 40 then
 						d:Action_MoveToLocation(ft.backTo)

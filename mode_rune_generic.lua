@@ -898,6 +898,61 @@ function Think()
 						doing("river-gold-walk")
 						return
 					end
+					-- On the gold: try every rune id 0-7 with both pick-up orders, 0.4s each, and log
+					-- the one after which his gold jumps by 30+ (user call: is the river gold under
+					-- another id?). Game 023: Medusa stood on it 6s ordering id 0, nothing.
+					if GetUnitToLocationDistance(d, gold) <= 60 then
+						local cy = ft.cycle
+						if cy == nil then
+							cy = { k = 0, at = now0 - 1, gold = d:GetGold() }
+							ft.cycle = cy
+						end
+						local gained = d:GetGold() - cy.gold
+						if gained >= 30 and cy.last ~= nil then
+							pcall(print, string.format(
+								"[OHA-RUNE] %s t=%.1f river-gold PICKED spot=%s id=%d order=%s gold+%d",
+								HeroTag(),
+								now0,
+								tostring(D.location),
+								cy.last.id,
+								cy.last.push and "ActionPush_PickUpRune" or "Action_PickUpRune",
+								gained
+							))
+							cy.last = nil
+							cy.gold = d:GetGold()
+						end
+						if now0 - cy.at >= 0.4 and cy.k < 16 then
+							local id = cy.k % 8
+							local push = cy.k >= 8
+							cy.k = cy.k + 1
+							cy.at = now0
+							cy.gold = d:GetGold()
+							cy.last = { id = id, push = push }
+							if push then
+								pcall(function()
+									d:ActionPush_PickUpRune(id)
+								end)
+							else
+								pcall(function()
+									d:Action_PickUpRune(id)
+								end)
+							end
+							if cy.k == 16 then
+								pcall(print, string.format(
+									"[OHA-RUNE] %s t=%.1f river-gold tried ids 0-7 x2 at spot=%s, no gold",
+									HeroTag(),
+									now0,
+									tostring(D.location)
+								))
+							end
+							doing("river-gold-ids")
+							return
+						end
+						if cy.k < 16 or now0 - cy.at < 0.4 then
+							doing("river-gold-ids")
+							return
+						end
+					end
 				end
 				if ft.backTo ~= nil then
 					if now0 < ft.backUntil and GetUnitToLocationDistance(d, ft.backTo) > 40 then

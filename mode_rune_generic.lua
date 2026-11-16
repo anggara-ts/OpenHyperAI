@@ -1293,10 +1293,7 @@ local function UnpickableRiverRune(id)
 	if not IsRiverRune(id) or DotaTime() < 0 then
 		return false
 	end
-	-- One more attempt by the single picker in the first 15s (user call), the others backing up.
-	if DotaTime() < 15 and a.IsTheClosestAlly(d, GetRuneSpawnLocation(id)) then
-		return false
-	end
+	-- The single-picker attempt (build 037) failed too (game 027): no exception any more.
 	local ty = GetRuneType and GetRuneType(id) or nil
 	return ty == RUNE_BOUNTY or (RUNE_WATER ~= nil and ty == RUNE_WATER)
 end

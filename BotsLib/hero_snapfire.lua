@@ -115,6 +115,10 @@ local F
 local G
 local H
 local I
+-- Review fix: what Mortimer has in his belly ("creep" or "hero"). Gobble Up used to store this in
+-- the ability handle r itself (r = "hero"), which broke every later Gobble Up call, and the creep
+-- case wrote a global that Spit Out never read, so a gobbled creep was never spat.
+local gobbled = nil
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
@@ -209,7 +213,9 @@ function a.ConsiderScatterBlast()
 				and c.CanCastOnNonMagicImmune(Q)
 				and c.IsInRange(b, Q, K)
 				and c.IsChasingTarget(Q, b)
-				and c.CanKillTarget(Q, N, DAMAGE_TYPE_MAGICAL)
+				-- Review fix: the slow is the escape value, so also blast a chaser that is hurting us,
+				-- not only one it kills.
+				and (c.CanKillTarget(Q, N, DAMAGE_TYPE_MAGICAL) or b:WasRecentlyDamagedByHero(Q, 2.0))
 				and not c.IsSuspiciousIllusion(Q)
 				and not Q:HasModifier("modifier_abaddon_borrowed_time")
 				and not Q:HasModifier("modifier_dazzle_shallow_grave")
@@ -217,7 +223,13 @@ function a.ConsiderScatterBlast()
 				and not Q:HasModifier("modifier_oracle_false_promise_timer")
 				and not Q:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
-				return BOT_ACTION_DESIRE_HIGH, b:GetExtrapolatedLocation(L)
+				-- Review fix: the cone was aimed at Snapfire's own position, so its direction was
+				-- undefined/forward (away from the chaser while running). Aim at the chaser.
+				if DotaTime() - (a.lastBlastLog or -99) > 10 then
+					a.lastBlastLog = DotaTime()
+					pcall(print, string.format("[OHA-SNAPFIRE] t=%.0f scatter-retreat chaser=%s", DotaTime(), Q:GetUnitName()))
+				end
+				return BOT_ACTION_DESIRE_HIGH, Q:GetExtrapolatedLocation(L)
 			end
 		end
 	end
@@ -288,14 +300,16 @@ function a.ConsiderScatterBlast()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderFiresnapCookie()
-	if not p:IsFullyCastable() then
+	-- Review fix: casting another ability cancels Mortimer Kisses (datafeed note), and Cookie is
+	-- considered right after it; skip Cookie while Kisses is running, as the other spells do.
+	if not p:IsFullyCastable() or b:HasModifier("modifier_snapfire_mortimer_kisses") then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local K = c.GetProperCastRange(false, b, p:GetCastRange())
 	local L = p:GetCastPoint()
 	local M = p:GetSpecialValueInt("impact_radius")
 	local _ = p:GetSpecialValueInt("jump_horizontal_distance")
-	local a0 = p:GetSpecialValueInt("jump_duration")
+	local a0 = p:GetSpecialValueFloat("jump_duration") -- Review fix: 0.484 read as Int gave 0
 	F = c.GetProperTarget(b)
 	local O = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 	for P, Q in pairs(O) do
@@ -536,7 +550,7 @@ function a.ConsiderGobbleUp()
 		then
 			local ac = b:GetNearbyCreeps(K + 100, true)
 			if ac ~= nil and #ac >= 1 then
-				GobledUnit = "creep"
+				gobbled = "creep" -- Review fix: was a global Spit Out never read
 				return BOT_ACTION_DESIRE_HIGH, ac[1]
 			end
 		end
@@ -559,7 +573,11 @@ function a.ConsiderGobbleUp()
 				and not a7[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not a7[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				r = "hero"
+				gobbled = "hero" -- Review fix: was r = "hero", overwriting the Gobble Up ability handle
+				if DotaTime() - (a.lastGobbleLog or -99) > 10 then
+					a.lastGobbleLog = DotaTime()
+					pcall(print, string.format("[OHA-SNAPFIRE] t=%.0f gobble-save ally=%s", DotaTime(), a2:GetUnitName()))
+				end
 				return BOT_ACTION_DESIRE_HIGH, a2
 			end
 		end
@@ -572,12 +590,13 @@ function a.ConsiderSpitOut()
 	end
 	local ab = c.GetProperCastRange(false, b, t:GetCastRange())
 	F = c.GetProperTarget(b)
-	if G and r == "creep" then
+	-- Review fix: read the belly kind from gobbled, not from the ability handle r.
+	if G and gobbled == "creep" then
 		if c.IsValidTarget(F) then
 			return BOT_ACTION_DESIRE_HIGH, F:GetLocation()
 		end
 	end
-	if r == "hero" then
+	if gobbled == "hero" then
 		return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEscapeLoc(), ab)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

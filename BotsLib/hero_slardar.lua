@@ -161,7 +161,9 @@ function a.ConsiderW()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, M - 99)
-			and c.CanCastOnMagicImmune(botTarget)
+			-- Review fix: Crush does not pierce spell immunity (game data SPELL_IMMUNITY_ENEMIES_NO),
+			-- so do not waste it on a BKB'd target.
+			and c.CanCastOnNonMagicImmune(botTarget)
 			and not c.IsDisabled(botTarget)
 		then
 			T = botTarget
@@ -247,7 +249,9 @@ function a.ConsiderR()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, L)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			-- Review fix: Corrosive Haze pierces spell immunity (game data SPELL_IMMUNITY_ENEMIES_YES,
+			-- MAGIC_IMMUNE_ENEMIES flag); it was skipped on BKB carries, the targets it matters most on.
+			and c.CanCastOnMagicImmune(botTarget)
 			and c.CanCastOnTargetAdvanced(botTarget)
 			and not botTarget:HasModifier("modifier_slardar_amplify_damage")
 		then
@@ -263,7 +267,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(W)
 				and not W:HasModifier("modifier_slardar_amplify_damage")
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W) -- Review fix: Haze pierces spell immunity (see above)
 				and c.CanCastOnTargetAdvanced(W)
 			then
 				local a2 = W:GetArmor()
@@ -313,7 +317,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(W)
 				and not W:HasModifier("modifier_slardar_amplify_damage")
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W) -- Review fix: Haze pierces spell immunity (see above)
 				and c.CanCastOnTargetAdvanced(W)
 			then
 				T = W

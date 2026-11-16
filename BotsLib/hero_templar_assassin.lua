@@ -504,12 +504,21 @@ function a.TAConsiderTarget()
 	end
 	local az = c.GetNearbyHeroes(b, ay, true, BOT_MODE_NONE)
 	local aA = az[1]
+	-- Review fix: this read nInAttackRangeWeakestEnemyHero, a global that is never set (always nil),
+	-- so TA kept running after an out-of-range or untouchable target. Use the weakest attackable
+	-- hero in range (same helper as Sniper's ConsiderTarget), else the nearest one.
+	aA = c.GetAttackableWeakestUnit(b, ay, true, true) or aA
 	if
-		c.IsValidHero(nInAttackRangeWeakestEnemyHero)
-		and c.CanBeAttacked(nInAttackRangeWeakestEnemyHero)
+		c.IsValidHero(aA)
+		and aA ~= ab
+		and c.CanBeAttacked(aA)
 		and (GetUnitToUnitDistance(ab, b) > ay or c.HasForbiddenModifier(ab))
 	then
-		b:SetTarget(nInAttackRangeWeakestEnemyHero)
+		if DotaTime() - (a.lastRetargetLog or -99) > 10 then
+			a.lastRetargetLog = DotaTime()
+			pcall(print, string.format("[OHA-TA] t=%.0f retarget from=%s to=%s", DotaTime(), ab:GetUnitName(), aA:GetUnitName()))
+		end
+		b:SetTarget(aA)
 		return
 	end
 end

@@ -170,7 +170,9 @@ function a.ConsiderQ()
 	local W = o:GetCastPoint()
 	local X = o:GetManaCost()
 	local Y = 0
-	local Z = o:GetSpecialValueInt("delay")
+	-- Review fix: "delay" is 1.5 in the game data; the Int read cut it to 1, so the pulse position
+	-- was predicted half a second early.
+	local Z = o:GetSpecialValueFloat("delay")
 	local _ = DAMAGE_TYPE_MAGICAL
 	local a0 = c.GetAroundEnemyHeroList(V)
 	local a1 = c.GetAroundEnemyHeroList(800)

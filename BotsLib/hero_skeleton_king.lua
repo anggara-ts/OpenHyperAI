@@ -290,6 +290,21 @@ function a.ConsiderW()
 	if c.IsValidHero(T) and #L == 1 and c.IsInRange(T, b, 650) and (W / Y >= 0.6 or t:IsTrained()) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
+	-- Review fix: the fight case above needs exactly one enemy hero within 1600, so in a real
+	-- teamfight (2+ enemies) Bone Guard was never cast and the stored skeletons were wasted.
+	-- Spend them when fighting a hero target in range, whatever the enemy count.
+	if
+		(c.IsGoingOnSomeone(b) or c.IsInTeamFight(b, 1200))
+		and c.IsValidHero(T)
+		and c.IsInRange(T, b, 700)
+		and (W >= 2 or t:IsTrained())
+	then
+		if DotaTime() - (a.lastBoneGuardLog or -99) > 10 then
+			a.lastBoneGuardLog = DotaTime()
+			pcall(print, string.format("[OHA-WK] t=%.0f bone-guard fight charges=%d enemies=%d", DotaTime(), W, #L))
+		end
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	if (W == Y or t:IsTrained()) and B >= 4 and (a.IsNearLaneFront(b) or c.IsFarming(b)) then
 		return BOT_ACTION_DESIRE_HIGH
 	end

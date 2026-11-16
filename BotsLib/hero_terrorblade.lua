@@ -262,8 +262,10 @@ function a.ConsiderSunder()
 	end
 	local H = t:GetCastRange()
 	local T = c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE)
+	-- Review fix: Sunder went out even when the target's HP% was no higher than TB's (no gain).
+	-- Only swap when it actually gains TB health.
 	local U = c.GetMostHPPercent(T, true)
-	if E < 0.35 and U ~= nil and not c.IsSuspiciousIllusion(U) then
+	if E < 0.35 and U ~= nil and not c.IsSuspiciousIllusion(U) and c.GetHP(U) > E + 0.15 then
 		return BOT_ACTION_DESIRE_HIGH, U
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

@@ -38,8 +38,40 @@ m["pos_3"] = {
 }
 m["pos_1"] = m["pos_3"]
 m["pos_2"] = m["pos_3"]
-m["pos_4"] = m["pos_3"]
-m["pos_5"] = m["pos_3"]
+-- Support builds: Dotabuff 7-day meta has Spirit Breaker mostly at support-off (pos 4, S tier).
+m["pos_4"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_wind_lace",
+	"item_boots",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_aghanims_shard",
+	"item_black_king_bar",
+	"item_lotus_orb",
+	"item_heavens_halberd",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+m["pos_5"] = {
+	"item_priest_outfit",
+	"item_urn_of_shadows",
+	"item_phase_boots",
+	"item_spirit_vessel",
+	"item_glimmer_cape",
+	"item_aghanims_shard",
+	"item_force_staff",
+	"item_lotus_orb",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 a["sBuyList"] = m[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then

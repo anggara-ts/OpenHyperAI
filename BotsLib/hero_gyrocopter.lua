@@ -33,8 +33,34 @@ m["pos_1"] = {
 	"item_aghanims_shard",
 }
 m["pos_2"] = m["pos_1"]
-m["pos_4"] = m["pos_1"]
-m["pos_5"] = m["pos_1"]
+-- Support builds: Dotabuff 7-day meta has Gyrocopter mostly at support-off (pos 4).
+m["pos_4"] = {
+	"item_priest_outfit",
+	"item_arcane_boots",
+	"item_glimmer_cape",
+	"item_rod_of_atos",
+	"item_aghanims_shard",
+	"item_force_staff",
+	"item_ultimate_scepter",
+	"item_gungir",
+	"item_black_king_bar",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+m["pos_5"] = {
+	"item_mage_outfit",
+	"item_arcane_boots",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_guardian_greaves",
+	"item_rod_of_atos",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 m["pos_3"] = m["pos_1"]
 a["sBuyList"] = m[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }

@@ -111,8 +111,33 @@ o["pos_3"] = {
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
-o["pos_4"] = o["pos_3"]
-o["pos_5"] = o["pos_3"]
+-- Support builds: Dotabuff 7-day meta has Windranger most often at support-off (pos 4).
+o["pos_4"] = {
+	"item_priest_outfit",
+	"item_arcane_boots",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_maelstrom",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_gungir",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+o["pos_5"] = {
+	"item_mage_outfit",
+	"item_arcane_boots",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_guardian_greaves",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 a["sBuyList"] = o[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then

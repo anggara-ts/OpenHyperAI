@@ -48,6 +48,7 @@ m["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_sheepstick",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_5"] = {
 	"item_blood_grenade",
 	"item_crystal_maiden_outfit",
@@ -55,7 +56,7 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_ancient_janggo",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_glimmer_cape",
 	"item_cyclone",

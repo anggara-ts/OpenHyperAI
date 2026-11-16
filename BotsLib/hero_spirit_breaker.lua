@@ -57,10 +57,10 @@ m["pos_4"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_5"] = {
 	"item_priest_outfit",
 	"item_urn_of_shadows",
-	"item_phase_boots",
 	"item_spirit_vessel",
 	"item_glimmer_cape",
 	"item_aghanims_shard",

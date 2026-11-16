@@ -1129,10 +1129,24 @@ function k.CanNotUseAttack(bD)
 		or bD:IsStunned()
 		or bD:IsDisarmed()
 		or bD:IsHexed()
-		or bD:IsRooted()
+		-- Not IsRooted: a rooted hero still attacks what is in range.
 		or k.WillBreakInvisible(bD)
 end
 function k.WillBreakInvisible(bD)
+	-- Game 031, 46:50: under Moonlight Shadow Doom hit OD with Infernal Blade, faded again and then
+	-- stood still: an invisible bot was treated as unable to attack. Moonlight Shadow is an engage,
+	-- and going on someone or in a team fight any invisibility is fine to attack out of.
+	if bD:IsInvisible() then
+		if bD:HasModifier("modifier_mirana_moonlight_shadow") then
+			return false
+		end
+		local okF, fighting = pcall(function()
+			return g.IsGoingOnSomeone(bD) or g.IsInTeamFight(bD, 1200)
+		end)
+		if okF and fighting then
+			return false
+		end
+	end
 	local bE = {
 		["npc_dota_hero_riki"] = true,
 		["npc_dota_hero_phantom_assassin"] = true,

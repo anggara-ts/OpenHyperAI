@@ -30,11 +30,15 @@ local GateSpots = {
 	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
 }
 local E = {
-	-- Dire bank of the top rune. The radiant bank (-1650, -83) looks into Radiant's jungle.
-	[1] = { location = Vector(-627, 850, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[2] = { location = Vector(-245, -996, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
-	[3] = { location = Vector(6113, -3427, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[4] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	-- Radiant mid: the user's safe spots, pinged in game 022 (2026-11-16), on Radiant's side of the
+	-- river so the support does not cross it. Replace the Dire bank of the top rune (-627, 850),
+	-- where Mirana was killed walking back (game 020 and 021), and (-245, -996). safe = true lets
+	-- them through the "early wards go on the enemy side" filter.
+	[1] = { location = Vector(-1386, -171, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[2] = { location = Vector(-303, -1001, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[3] = { location = Vector(-882, -1000, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[4] = { location = Vector(6113, -3427, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
+	[5] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 local F = {
 	-- Radiant bank of the bottom rune. The dire bank looks back into Dire's own jungle.
@@ -246,7 +250,7 @@ function a.GetAvailabeObserverWardSpots(K)
 		local ourSide = TeamSide()
 		for M, N in pairs(a.GetEarlyGameWardSpots()) do
 			-- Early observers go on the enemy side. Own-side cliffs look back into our jungle.
-			if ObsFree(N) and N.side ~= ourSide then
+			if ObsFree(N) and (N.side ~= ourSide or N.safe) then
 				table.insert(L, N)
 			end
 		end
@@ -336,7 +340,7 @@ function a.GetPossibleSentryWardSpots(K)
 	local pushing = not defending and EnemyOuterDown()
 	if DotaTime() < 0 or b.IsEarlyGame() then
 		for M, N in pairs(a.GetEarlyGameWardSpots()) do
-			if N.side ~= ourSide and SentryFree(N) then
+			if (N.side ~= ourSide or N.safe) and SentryFree(N) then
 				table.insert(W, N)
 			end
 		end

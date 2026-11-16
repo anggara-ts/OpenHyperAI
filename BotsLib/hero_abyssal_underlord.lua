@@ -144,6 +144,15 @@ function a.SkillsComplement()
 		return
 	end
 end
+-- fix: Firestorm and Pit were aimed with GetXUnitsTowardsLocation(b, loc, E), which always returns a
+-- point exactly E (cast range 675 + 200) from Underlord, so a close enemy group was missed by ~400+
+-- units (radius 425 / 400). Aim at the spot itself; clamp to E only when it is beyond E (far targets as before).
+function a.CastSpot(loc, castRange)
+	if GetUnitToLocationDistance(b, loc) <= castRange then
+		return loc
+	end
+	return c.Site.GetXUnitsTowardsLocation(b, loc, castRange)
+end
 function a.ConsiderFirestorm()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -155,7 +164,7 @@ function a.ConsiderFirestorm()
 		local H = b:FindAoELocation(true, true, b:GetLocation(), E + F, F, G, 0)
 		local I = c.GetEnemiesNearLoc(H.targetloc, F)
 		if I ~= nil and #I >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, H.targetloc, E)
+			return BOT_ACTION_DESIRE_HIGH, a.CastSpot(H.targetloc, E)
 		end
 	end
 	if A then
@@ -171,9 +180,9 @@ function a.ConsiderFirestorm()
 			if J ~= nil and I ~= nil and #J >= #I then
 				I = c.GetEnemiesNearLoc(z:GetLocation(), E + F)
 				if I ~= nil and #I >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetCenterOfUnits(I), E)
+					return BOT_ACTION_DESIRE_HIGH, a.CastSpot(c.GetCenterOfUnits(I), E)
 				end
-				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, z:GetLocation(), E)
+				return BOT_ACTION_DESIRE_HIGH, a.CastSpot(z:GetLocation(), E)
 			end
 		end
 	end
@@ -223,7 +232,7 @@ function a.ConsiderPitOfMalice()
 	local M = c.GetNearbyHeroes(b, E + F, true, BOT_MODE_NONE)
 	for N, O in pairs(M) do
 		if c.IsValidHero(O) and c.CanCastOnNonMagicImmune(O) and O:IsChanneling() and not c.IsSuspiciousIllusion(O) then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, O:GetLocation(), E)
+			return BOT_ACTION_DESIRE_HIGH, a.CastSpot(O:GetLocation(), E)
 		end
 	end
 	if A then
@@ -239,9 +248,9 @@ function a.ConsiderPitOfMalice()
 			if J ~= nil and I ~= nil and #J >= #I then
 				I = c.GetEnemiesNearLoc(z:GetLocation(), E + F)
 				if I ~= nil and #I >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetCenterOfUnits(I), E)
+					return BOT_ACTION_DESIRE_HIGH, a.CastSpot(c.GetCenterOfUnits(I), E)
 				end
-				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, z:GetLocation(), E)
+				return BOT_ACTION_DESIRE_HIGH, a.CastSpot(z:GetLocation(), E)
 			end
 		end
 	end

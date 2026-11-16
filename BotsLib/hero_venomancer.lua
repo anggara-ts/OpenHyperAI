@@ -171,12 +171,15 @@ function a.ConsiderVenomousGale()
 	local J = q:GetSpecialValueInt("radius")
 	local K = q:GetSpecialValueInt("strike_damage")
 	local L = q:GetSpecialValueInt("tick_damage")
+	-- datafeed: Venomous Gale deals strike_damage once plus tick_damage every tick_interval (3s) over duration (15s).
+	-- The old kill check used strike * tick (25 * 10 = 250 at level 1, real total 75).
+	local nGaleTicks = math.floor(q:GetSpecialValueInt("duration") / math.max(1, q:GetSpecialValueInt("tick_interval")))
 	local M = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
 	for N, O in pairs(M) do
 		if
 			c.IsValidHero(O)
 			and c.CanCastOnNonMagicImmune(O)
-			and (c.CanKillTarget(O, K, DAMAGE_TYPE_MAGICAL) or c.CanKillTarget(O, K * L, DAMAGE_TYPE_MAGICAL))
+			and (c.CanKillTarget(O, K, DAMAGE_TYPE_MAGICAL) or c.CanKillTarget(O, K + L * nGaleTicks, DAMAGE_TYPE_MAGICAL))
 			and not c.IsSuspiciousIllusion(O)
 			and not O:HasModifier("modifier_abaddon_borrowed_time")
 			and not O:HasModifier("modifier_dazzle_shallow_grave")

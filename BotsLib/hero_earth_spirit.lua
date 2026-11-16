@@ -471,7 +471,8 @@ function a.ConsiderGeomagneticGrip()
 			local aj = c.GetNearbyHeroes(K, O, true, BOT_MODE_NONE)
 			if ai ~= nil and aj ~= nil and #ai >= #aj then
 				local _ = c.GetCorrectLoc(K, ad)
-				local ah = IsStoneNearTarget(Z)
+				-- Check the stone near the engage target K; Z (kill-scan result) can be nil here and crash.
+				local ah = IsStoneNearTarget(K)
 				if ah then
 					return BOT_ACTION_DESIRE_HIGH, _, false
 				elseif J >= 1 then

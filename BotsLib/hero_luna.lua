@@ -331,7 +331,10 @@ function a.ConsiderLunarOrbit()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderMoonGlaives()
-	if not p:IsTrained() or not p:IsFullyCastable() then
+	-- datafeed: Moon Glaives is passive (behavior 2); never try to cast it (if a passive reads as
+	-- castable, the early return in SkillsComplement would skip Lucent Beam / Eclipse). The active is
+	-- Lunar Orbit (ConsiderLunarOrbit).
+	if not p:IsTrained() or not p:IsFullyCastable() or p:IsPassive() then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local W = 175

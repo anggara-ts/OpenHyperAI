@@ -380,9 +380,11 @@ function a.ConsiderSparkWraith()
 	end
 	local J = c.GetProperCastRange(false, b, s:GetCastRange())
 	local W = s:GetSpecialValueInt("radius")
-	local M = s:GetSpecialValueInt("spark_damage")
+	-- datafeed: the keys are now spark_damage_base and base_activation_delay (1.5s); the old
+	-- "spark_damage"/"activation_delay" read 0, so the kill check never fired and the lead was too short.
+	local M = s:GetSpecialValueInt("spark_damage_base")
 	local a5 = s:GetCastPoint()
-	local a6 = s:GetSpecialValueInt("activation_delay") + a5
+	local a6 = s:GetSpecialValueFloat("base_activation_delay") + a5
 	local N = c.GetNearbyHeroes(b, J, true, BOT_MODE_NONE)
 	for O, P in pairs(N) do
 		if

@@ -139,7 +139,8 @@ function a.SkillsComplement()
 	if w > 0 then
 		c.SetQueuePtToINT(b, true)
 		if E ~= nil and E ~= p:GetTargetType() then
-			b:ActionQueue_UseAbilityOnEntity(p, x:GetLocation())
+			-- A location needs the location order; UseAbilityOnEntity was given a vector here.
+			b:ActionQueue_UseAbilityOnLocation(p, x:GetLocation())
 		else
 			b:ActionQueue_UseAbilityOnEntity(p, x)
 		end
@@ -266,7 +267,8 @@ function a.ConsiderW()
 	local P = p:GetCastPoint()
 	local Q = p:GetManaCost()
 	local R = p:GetSpecialValueInt("brain_sap_damage") + D
-	local S = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Brain Sap deals pure damage (damage 4), not magical.
+	local S = DAMAGE_TYPE_PURE
 	local T = c.GetAroundEnemyHeroList(N)
 	local U = c.GetAroundEnemyHeroList(N + 200)
 	local V = nil
@@ -274,7 +276,7 @@ function a.ConsiderW()
 	local a3 = b:GetMaxHealth() - b:GetHealth()
 	for X, Y in pairs(U) do
 		if c.IsValid(Y) and c.CanCastOnNonMagicImmune(Y) and c.CanCastOnTargetAdvanced(Y) then
-			if c.WillMagicKillTarget(b, Y, R, P) then
+			if c.CanKillTarget(Y, R, S) then
 				V = Y
 				W = "W-击杀敌人" .. c.Chat.GetNormName(V)
 				return BOT_ACTION_DESIRE_HIGH, V, W

@@ -446,7 +446,8 @@ function a.ConsiderColdEmbrace()
 	local P = c.GetProperCastRange(false, b, s:GetCastRange())
 	local a1 = s:GetSpecialValueFloat("duration")
 	local a2 = s:GetSpecialValueInt("heal_additive")
-	local a3 = s:GetSpecialValueInt("heal_percentage") / 100
+	-- datafeed: heal_percentage is fractional (1.5/2.5/3.5/4.5); GetSpecialValueInt truncated it
+	local a3 = s:GetSpecialValueFloat("heal_percentage") / 100
 	local a4 = c.GetNearbyHeroes(b, P, false, BOT_MODE_NONE)
 	for L, a0 in pairs(a4) do
 		if

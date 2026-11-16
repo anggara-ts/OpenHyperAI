@@ -493,7 +493,8 @@ function a.ConsiderFireSpiritsLaunch()
 	local a1 = q:GetCastRange()
 	local a2 = q:GetSpecialValueInt("radius")
 	local a3 = q:GetSpecialValueInt("spirit_speed")
-	local aa = q:GetSpecialValueFloat("burn_duration")
+	-- datafeed: Fire Spirits' burn length is "duration" (4); "burn_duration" is Icarus Dive's key and read 0 here
+	local aa = q:GetSpecialValueFloat("duration")
 	local X = q:GetSpecialValueInt("damage_per_second") * aa
 	M = c.GetProperTarget(b)
 	local Z = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
@@ -849,8 +850,8 @@ function a.ConsiderSupernova()
 		local ao = c.GetEnemiesNearLoc(b:GetLocation(), a2 / 2 + 250)
 		if #ao >= 2 then
 			if string.find(GetBot():GetUnitName(), "phoenix") and b:HasScepter() then
-				an = c.GetAlliesNearLoc(b:GetLocation(), a1)
-				for S, al in pairs(an) do
+				local near = c.GetAlliesNearLoc(b:GetLocation(), a1)
+				for S, al in pairs(near) do
 					if
 						c.IsValidHero(al)
 						and not c.IsAttacking(al)
@@ -860,10 +861,11 @@ function a.ConsiderSupernova()
 						return BOT_ACTION_DESIRE_HIGH, al, true
 					end
 				end
-			else
-				if not (#an >= #ao + 2) then
-					return BOT_ACTION_DESIRE_HIGH, nil, false
-				end
+			end
+			-- With Scepter and no ally to save, still self-cast: the old else-branch meant a
+			-- Scepter Phoenix never cast Supernova in a fight unless an ally was low.
+			if not (#an >= #ao + 2) then
+				return BOT_ACTION_DESIRE_HIGH, nil, false
 			end
 		end
 	end

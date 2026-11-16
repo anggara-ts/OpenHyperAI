@@ -124,11 +124,9 @@ function a.SkillsComplement()
 	end
 	v, w = a.ConsiderVoid()
 	if v > 0 then
-		if b:HasScepter() then
-			b:Action_UseAbilityOnLocation(q, w)
-		else
-			b:Action_UseAbilityOnEntity(q, w)
-		end
+		-- datafeed: Void is unit-target only (behavior 8); the Shard adds its AoE around the target and the
+		-- Scepter belongs to Hunter in the Night, so the old Scepter "cast on a point" path failed once he had one.
+		b:Action_UseAbilityOnEntity(q, w)
 		return
 	end
 	y, z = a.ConsiderHunterInTheNight()
@@ -159,12 +157,9 @@ function a.ConsiderVoid()
 	local O = c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE)
 	for P, Q in pairs(O) do
 		if c.IsValidHero(Q) and c.CanCastOnNonMagicImmune(Q) and not c.IsSuspiciousIllusion(Q) then
+			-- Void returns a unit everywhere below (unit-target per datafeed; no Scepter point-cast)
 			if Q:IsChanneling() or c.IsCastingUltimateAbility(Q) and N == "night" then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation()
-				else
-					return BOT_ACTION_DESIRE_HIGH, Q
-				end
+				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 			if
 				c.CanKillTarget(Q, L, DAMAGE_TYPE_MAGICAL)
@@ -173,36 +168,24 @@ function a.ConsiderVoid()
 				and not Q:HasModifier("modifier_oracle_false_promise_timer")
 				and not Q:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, Q
-				end
+				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 		end
 	end
 	if H then
 		local R = c.GetStrongestUnit(I, b, true, false, M)
-		if b:HasScepter() then
-			local S = b:FindAoELocation(true, true, b:GetLocation(), I, K, J, 0)
-			local T = c.GetEnemiesNearLoc(S.targetloc, K)
-			if T ~= nil and #T >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, S.targetloc
-			end
-		else
-			if R == nil then
-				R = c.GetStrongestUnit(I, b, true, true, M)
-			end
-			if
-				c.IsValidTarget(R)
-				and c.CanCastOnNonMagicImmune(R)
-				and not c.IsSuspiciousIllusion(R)
-				and not c.IsDisabled(R)
-				and not c.IsTaunted(R)
-				and not R:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				return BOT_ACTION_DESIRE_HIGH, R
-			end
+		if R == nil then
+			R = c.GetStrongestUnit(I, b, true, true, M)
+		end
+		if
+			c.IsValidTarget(R)
+			and c.CanCastOnNonMagicImmune(R)
+			and not c.IsSuspiciousIllusion(R)
+			and not c.IsDisabled(R)
+			and not c.IsTaunted(R)
+			and not R:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			return BOT_ACTION_DESIRE_HIGH, R
 		end
 	end
 	if E then
@@ -219,17 +202,7 @@ function a.ConsiderVoid()
 		then
 			local V = c.GetNearbyHeroes(D, 800, false, BOT_MODE_NONE)
 			if U ~= nil and V ~= nil and #U >= #V then
-				if
-					b:HasScepter()
-					and not D:HasModifier("modifier_enigma_black_hole_pull")
-					and not D:HasModifier("modifier_faceless_void_chronosphere_freeze")
-					and not D:HasModifier("modifier_legion_commander_duel")
-					and not D:HasModifier("modifier_necrolyte_reapers_scythe")
-				then
-					return BOT_ACTION_DESIRE_HIGH, D:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, D
-				end
+				return BOT_ACTION_DESIRE_HIGH, D
 			end
 		end
 	end
@@ -247,30 +220,18 @@ function a.ConsiderVoid()
 		then
 			local V = c.GetNearbyHeroes(W[1], 800, false, BOT_MODE_NONE)
 			if V ~= nil and (#V > #U or c.GetHP(b) < 0.52 and b:WasRecentlyDamagedByAnyHero(2)) then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, W[1]:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, W[1]
-				end
+				return BOT_ACTION_DESIRE_HIGH, W[1]
 			end
 		end
 	end
 	if c.IsDoingRoshan(b) then
 		if c.IsRoshan(D) and c.CanCastOnNonMagicImmune(D) and c.IsInRange(b, D, 500) and F then
-			if b:HasScepter() then
-				return BOT_ACTION_DESIRE_HIGH, D:GetLocation()
-			else
-				return BOT_ACTION_DESIRE_HIGH, D
-			end
+			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(D) and c.IsInRange(b, D, 400) and F then
-			if b:HasScepter() then
-				return BOT_ACTION_DESIRE_HIGH, D:GetLocation()
-			else
-				return BOT_ACTION_DESIRE_HIGH, D
-			end
+			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
 	local X = c.GetNearbyHeroes(b, I, false, BOT_MODE_NONE)
@@ -292,11 +253,8 @@ function a.ConsiderVoid()
 				and not Z[1]:HasModifier("modifier_enigma_black_hole_pull")
 				and not Z[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Z[1]:GetLocation()
-				else
-					return BOT_ACTION_DESIRE_HIGH, D
-				end
+				-- the non-Scepter path returned D (own target) here instead of Z[1], the enemy chasing that ally
+				return BOT_ACTION_DESIRE_HIGH, Z[1]
 			end
 		end
 	end
@@ -364,7 +322,9 @@ function a.ConsiderHunterInTheNight()
 	if s:IsPassive() or not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local I = s:GetSpecialValueInt("shard_cast_range")
+	-- datafeed has no "shard_cast_range" on Hunter in the Night (it read 0, so no creep was ever found);
+	-- fall back to the engine cast range for the Shard cast
+	local I = math.max(s:GetSpecialValueInt("shard_cast_range"), s:GetCastRange())
 	local N = c.CheckTimeOfDay()
 	if c.IsFarming(b) then
 		local a1 = b:GetNearbyCreeps(I, true)

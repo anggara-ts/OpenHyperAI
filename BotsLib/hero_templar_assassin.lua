@@ -53,7 +53,9 @@ function a.MinionThink(o)
 			e.IllusionThink(o)
 			return
 		else
-			local p = o:GetAbilityByName("templar_assassin_self_trap")
+			-- Safe proxy: the datafeed does not list templar_assassin_self_trap (a trap-unit ability), so if
+			-- it is gone a nil here would error on p:IsFullyCastable() every MinionThink.
+			local p = SafeAbility(o:GetAbilityByName("templar_assassin_self_trap"), "templar_assassin_self_trap", "templar_assassin")
 			local q =
 				SafeAbility(b:GetAbilityByName("templar_assassin_trap"), "templar_assassin_trap", "templar_assassin")
 			local r = 400

@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 }, { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 1, 6, 1, 3, 6 } }
+-- j[2]: Skeleton Walk (ultimate) moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
+local j = { { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 }, { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 } }
 local k
 local l
 if h == "pos_1" then
@@ -48,7 +49,7 @@ m["pos_2"] = {
 	"item_dragon_lance",
 	"item_desolator",
 	"item_orchid",
-	"item_dragon_lance",
+	-- removed a second item_dragon_lance here: one lance already listed above, and Hurricane Pike takes only one
 	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_bloodthorn",
@@ -559,8 +560,9 @@ function a.ConsiderBurningBarrage()
 	if not r:IsTrained() or not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local S = c.GetProperCastRange(false, b, r:GetCastRange())
-	local U = r:GetSpecialValueInt("radius")
+	-- datafeed: Burning Barrage has no cast range and no "radius"; its arrows fly "range" (850), "projectile_width" (200) wide
+	local S = c.GetProperCastRange(false, b, math.max(r:GetCastRange(), r:GetSpecialValueInt("range")))
+	local U = r:GetSpecialValueInt("projectile_width")
 	if I then
 		if
 			c.IsValidTarget(H)
@@ -612,7 +614,8 @@ function a.ConsiderBurningBarrage()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderBurningArmy()
-	if not r:IsTrained() or not r:IsFullyCastable() then
+	-- checked r (Burning Barrage) by mistake; Burning Army is s
+	if not s:IsTrained() or not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local M = b:GetAttackRange()

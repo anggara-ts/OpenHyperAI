@@ -270,7 +270,8 @@ function a.ConsiderW()
 			return BOT_ACTION_DESIRE_MODERATE, X.targetloc
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b)) and c.IsAllowedToSpam(b, U) and N == nil or #N == 0 and #V <= 2 then
+	-- Parenthesised: without them "or" let this fire with no push/defend at all whenever no enemy hero was near.
+	if (c.IsPushing(b) or c.IsDefending(b)) and c.IsAllowedToSpam(b, U) and (N == nil or #N == 0) and #V <= 2 then
 		local Y = b:GetNearbyLaneCreeps(1000, true)
 		local X = b:FindAoELocation(true, false, b:GetLocation(), 1000, K / 2, S, M)
 		if X.count >= 4 and #Y >= 4 then

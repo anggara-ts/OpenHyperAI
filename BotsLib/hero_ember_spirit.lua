@@ -12,7 +12,8 @@ local j = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local k = { { 3, 2, 2, 3, 2, 6, 2, 1, 1, 1, 1, 3, 3, 6, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+-- Build 1 took Fire Remnant rank 2 at level 16 (entry 14) instead of 12; now entries 6/11/15 like build 2.
+local k = { { 3, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 1, 3, 3, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local l = k[i]
 local m = c.Skill.GetTalentBuild(j[i])
 local n = {}

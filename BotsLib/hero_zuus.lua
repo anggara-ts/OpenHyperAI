@@ -128,7 +128,8 @@ end
 local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "zuus")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "zuus")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "zuus")
-local r = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "zuus")
+-- Nimbus by name: datafeed lists zuus_cloud as Scepter-granted (hidden until then), so slot index 4 isn't reliable.
+local r = SafeAbility(b:GetAbilityByName("zuus_cloud"), "zuus_cloud", "zuus")
 local s = SafeAbility(b:GetAbilityByName(g[5]), "sAbilityList[5]", "zuus")
 local t = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "zuus")
 local u = SafeAbility(b:GetAbilityByName(f[5]), "sTalentList[5]", "zuus")
@@ -160,8 +161,11 @@ function a.SkillsComplement()
 	nManaPercentage = R.mp
 	nHealthPercentage = R.hp
 	M = R.enemies
-	if s:IsTrained() then
-		P = 0.09
+	-- datafeed: Static Field is now an innate (always on), damage_health_pct 3.45% of current health; it was
+	-- 0.09 and only when sAbilityList[5] was trained.
+	local aSF = b:GetAbilityByName("zuus_static_field")
+	if aSF ~= nil then
+		P = aSF:GetSpecialValueFloat("damage_health_pct") / 100
 	end
 	if w:IsTrained() then
 		O = O + w:GetSpecialValueInt("value")
@@ -313,7 +317,8 @@ function a.ConsiderW()
 	local S = p:GetCastRange()
 	local T = p:GetCastPoint()
 	local U = p:GetManaCost()
-	local W = p:GetAbilityDamage() * (1 + b:GetSpellAmp())
+	-- datafeed: Lightning Bolt damage is the "damage" value (140/220/300/380); it has no AbilityDamage (read 0).
+	local W = p:GetSpecialValueInt("damage") * (1 + b:GetSpellAmp())
 	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(2.0) then
 		local a2 = c.GetVulnerableWeakestUnit(b, true, true, S)
 		if a2 ~= nil and c.CanCastOnTargetAdvanced(a2) then
@@ -344,7 +349,7 @@ function a.ConsiderW2()
 	local S = p:GetCastRange()
 	local T = p:GetCastPoint()
 	local U = p:GetManaCost()
-	local W = p:GetAbilityDamage()
+	local W = p:GetSpecialValueInt("damage") -- datafeed: Lightning Bolt "damage"; no AbilityDamage (read 0)
 	local V = 325
 	local a7 = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
 	local X = c.GetNearbyHeroes(b, S + V, true, BOT_MODE_NONE)

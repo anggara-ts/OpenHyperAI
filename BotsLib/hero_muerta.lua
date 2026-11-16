@@ -236,9 +236,10 @@ function a.ConsiderW()
 		end
 	end
 	local V = b:FindAoELocation(true, true, T, K, R - 30, 0.8, 0)
+	-- FindAoELocation's field is "count"; the old ".cout" typo was always nil, so this never fired.
 	if
 		#U >= 2
-		and (V.cout ~= nil and V.cout >= 2)
+		and (V.count ~= nil and V.count >= 2)
 		and b:GetActiveMode() ~= BOT_MODE_LANING
 		and (
 			b:GetActiveMode() ~= BOT_MODE_RETREAT

@@ -281,7 +281,8 @@ function a.ConsiderW()
 	local M = p:GetCastPoint()
 	local N = p:GetManaCost()
 	local O = p:GetAbilityDamage()
-	local Z = q:GetAbilityDamage()
+	-- datafeed: Scream of Pain has no AbilityDamage; its damage is the special value "damage" (90/175/260/345).
+	local Z = q:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = c.GetAroundEnemyHeroList(L)
 	local S = nil
@@ -340,7 +341,8 @@ function a.ConsiderW()
 					T = "W-对线赶路"
 					if c.IsValidHero(b:GetTarget()) then
 						if c.CanKillTarget(b:GetTarget(), Z, DAMAGE_TYPE_MAGICAL) and q:IsFullyCastable() then
-							return BOT_ACTION_DESIRE_VERYHIGH
+							-- Return the blink location too: the caller casts Blink on w, and nil there broke the cast.
+							return BOT_ACTION_DESIRE_VERYHIGH, S, T
 						end
 					end
 					return BOT_ACTION_DESIRE_MODERATE, S, T
@@ -397,7 +399,9 @@ function a.ConsiderE()
 	local M = q:GetCastPoint()
 	local ac = q:GetSpecialValueInt("area_of_effect")
 	local N = q:GetManaCost()
-	local O = q:GetAbilityDamage()
+	-- datafeed: Scream of Pain has no AbilityDamage; its damage is the special value "damage" (90/175/260/345).
+	-- GetAbilityDamage() gave 0, so the kill and lane last-hit checks never fired.
+	local O = q:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = c.GetAroundEnemyHeroList(ac - 30)
 	local R = c.GetAroundEnemyHeroList(ac + 200)
@@ -509,9 +513,8 @@ function a.ConsiderR()
 	local N = r:GetManaCost()
 	local O = r:GetSpecialValueInt("damage")
 	local ac = r:GetSpecialValueInt("final_aoe") * 0.88
-	if b:HasScepter() then
-		O = r:GetSpecialValueInt("damage_scepter")
-	end
+	-- datafeed: Sonic Wave has no "damage_scepter" (the Scepter now upgrades Shadow Strike), so the old
+	-- Scepter override set the damage to 0 and broke the kill check; it is removed.
 	local P = DAMAGE_TYPE_PURE
 	local Q = c.GetAroundEnemyHeroList(L)
 	local S = nil

@@ -398,7 +398,9 @@ local function a(b)
 				and b.GetDistance(aJ, aH) < 880
 			then
 				aq = GetUnitToLocationDistance(m, aJ)
-				aI = loc
+				-- Was `aI = loc` (an undefined global), so this never returned a tree and Timber Chain's
+				-- retreat branch never fired (hero review, Timbersaw).
+				aI = aJ
 			end
 		end
 		if aI ~= nil and aq > m:GetAttackRange() then

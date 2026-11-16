@@ -67,35 +67,33 @@ m["pos_3"] = {
 	"item_moon_shard",
 }
 m["pos_1"] = m["pos_3"]
+-- Support builds: Hand of Midas, Basher, MKB, Assault Cuirass and Abyssal Blade were carry items on a pos 4/5
+-- support; swapped for save/utility items (Force Staff, Lotus Orb, Scythe of Vyse).
 m["pos_4"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
-	"item_basher",
-	"item_monkey_king_bar",
-	"item_assault",
-	"item_heavens_halberd",
+	"item_force_staff",
 	"item_aghanims_shard",
-	"item_abyssal_blade",
 	"item_ultimate_scepter",
+	"item_heavens_halberd",
+	"item_lotus_orb",
+	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 m["pos_5"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_basher",
-	"item_monkey_king_bar",
-	"item_assault",
-	"item_heavens_halberd",
+	"item_force_staff",
 	"item_aghanims_shard",
-	"item_abyssal_blade",
 	"item_ultimate_scepter",
+	"item_heavens_halberd",
+	"item_lotus_orb",
+	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
@@ -165,7 +163,7 @@ function a.SkillsComplement()
 		V = 0
 		W = 0
 	end
-	if U ~= 0 or V ~= 0 or V ~= 0 then
+	if U ~= 0 or V ~= 0 or W ~= 0 then -- was "V ~= 0" twice; W is the X + Torrent combo timer
 		return
 	end
 	G, H, I = a.ConsiderCombo1()

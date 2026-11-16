@@ -467,7 +467,8 @@ function a.ConsiderE()
 		local ao = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local R = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local an = b:GetNearbyTowers(1600, true)
-		if #ao == 0 and #R <= 2 and an == 0 then
+		-- "an" is the tower list: compare its length. The old "an == 0" compared a table with 0 and was always false.
+		if #ao == 0 and #R <= 2 and #an == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

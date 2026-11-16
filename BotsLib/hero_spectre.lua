@@ -127,7 +127,8 @@ function a.ConsiderSpectralDagger()
 		if
 			c.IsValidHero(T)
 			and c.CanCastOnNonMagicImmune(T)
-			and c.CanKillTarget(T, P, DAMAGE_TYPE_PURE)
+			-- datafeed: Spectral Dagger deals magical damage (damage 2), not pure
+			and c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL)
 			and not c.IsSuspiciousIllusion(T)
 			and not T:HasModifier("modifier_abaddon_borrowed_time")
 			and not T:HasModifier("modifier_dazzle_shallow_grave")
@@ -136,7 +137,8 @@ function a.ConsiderSpectralDagger()
 			and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			if c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL) then
-				local U = GetUnitToUnitDistance(b, T) / Q + N
+				-- fix: U was a travel time, not a location; aim at the predicted position
+				local U = c.GetCorrectLoc(T, GetUnitToUnitDistance(b, T) / Q + N)
 				if c.IsInRange(b, T, M / 2 - 150) then
 					U = T:GetLocation()
 				end
@@ -200,7 +202,8 @@ function a.ConsiderSpectralDagger()
 				and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
 				if c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL) then
-					local U = GetUnitToUnitDistance(b, T) / Q + N
+					-- fix: U was a travel time, not a location; aim at the predicted position
+					local U = c.GetCorrectLoc(T, GetUnitToUnitDistance(b, T) / Q + N)
 					if c.IsInRange(b, T, M / 2 - 150) then
 						U = T:GetLocation()
 					end

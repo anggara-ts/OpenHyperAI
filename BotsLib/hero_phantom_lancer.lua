@@ -112,7 +112,9 @@ function a.SkillsComplement()
 	end
 end
 function a.ConsiderR()
-	if not t:IsFullyCastable() or not b:HasScepter() or true then
+	-- datafeed: the Juxtapose active (invisibility) comes from the Shard, not the Scepter. The branch was also
+	-- switched off with "or true"; CanCastAbility keeps it off while Juxtapose is still passive.
+	if not c.CanCastAbility(t) then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if c.IsRetreating(b) and c.GetHP(b) < 0.4 then

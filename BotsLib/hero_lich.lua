@@ -116,7 +116,9 @@ end
 local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "lich")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "lich")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "lich")
-local r = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "lich")
+-- Ice Spire by name: datafeed lists it as Shard-granted (hidden until then), and the innate Sacrifice
+-- (lich_death_charge) can take slot index 4, so sAbilityList[4] isn't reliable.
+local r = SafeAbility(b:GetAbilityByName("lich_ice_spire"), "lich_ice_spire", "lich")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "lich")
 local t = SafeAbility(b:GetAbilityByName("lich_death_charge"), "lich_death_charge", "lich")
 local u = SafeAbility(b:GetAbilityByName(f[1]), "sTalentList[1]", "lich")
@@ -232,7 +234,7 @@ function a.ConsiderQ()
 	end
 	local V = o:GetCastPoint()
 	local W = o:GetManaCost()
-	local X = S * 50
+	local X = o:GetSpecialValueInt("damage") -- datafeed: primary-target damage 40/80/120/160 (was S * 50)
 	local Y = o:GetSpecialValueInt("aoe_damage")
 	if v:IsTrained() then
 		Y = Y + v:GetSpecialValueInt("value")

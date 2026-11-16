@@ -260,14 +260,16 @@ function a.ConsiderSoulRip()
 		then
 			local O = c.GetEnemiesNearLoc(b:GetLocation(), I)
 			local T = b:GetNearbyCreeps(I, true)
-			if O ~= nil and #O >= 1 then
-				J = J * #O
+			-- datafeed: damage_per_unit for each unit, up to max_units. It multiplied heroes by
+			-- creeps (and kept growing J across the loop), and then returned Undying himself, so
+			-- the "kill" cast healed him. Aim it at the enemy, within cast range.
+			local units = (O ~= nil and #O or 0) + (T ~= nil and #T or 0)
+			local maxUnits = r:GetSpecialValueInt("max_units")
+			if maxUnits ~= nil and maxUnits > 0 then
+				units = math.min(units, maxUnits)
 			end
-			if T ~= nil and #T >= 1 then
-				J = J * #T
-			end
-			if c.CanKillTarget(N, J, DAMAGE_TYPE_MAGICAL) then
-				return BOT_ACTION_DESIRE_HIGH, b
+			if c.IsInRange(b, N, H) and c.CanKillTarget(N, J * units, DAMAGE_TYPE_MAGICAL) then
+				return BOT_ACTION_DESIRE_HIGH, N
 			end
 		end
 	end

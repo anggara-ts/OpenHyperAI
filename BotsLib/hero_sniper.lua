@@ -156,9 +156,10 @@ function a.ConsiderQ()
 		V = 0
 	end
 	local W = b:FindAoELocation(true, true, R, M, P - 30, 0.8, 0)
+	-- Typo fix: the field is .count (FindAoELocation); .cout was always nil, so this 2+ hero Shrapnel never fired.
 	if
 		#T >= 2
-		and (W.cout ~= nil and W.cout >= 2)
+		and (W.count ~= nil and W.count >= 2)
 		and b:GetActiveMode() ~= BOT_MODE_LANING
 		and (b:GetActiveMode() ~= BOT_MODE_RETREAT or b:GetActiveMode() == BOT_MODE_RETREAT and b:GetActiveModeDesire() < 0.6)
 		and not a.IsAbiltyQCastedHere(W.targetloc, P)

@@ -392,7 +392,8 @@ function a.ConsiderW()
 	if b:GetActiveMode() ~= BOT_MODE_RETREAT or b:GetActiveModeDesire() < 0.6 then
 		if c.IsValidHero(ad) then
 			if ad:GetHealth() <= a.sil_RealDamage(aa, ab, ad) then
-				return BOT_ACTION_DESIRE_HIGH, WeakestEnemy
+				-- fix: returned an undefined global (WeakestEnemy = nil); the checked target is ad
+				return BOT_ACTION_DESIRE_HIGH, ad
 			end
 		end
 	end
@@ -707,7 +708,8 @@ function a.sil_GetWeakestUnit(aD)
 	return aE, aF
 end
 function a.sil_RealDamage(aa, ab, aG)
-	local aH = aG:GetActualIncomingDamage(aa, DAMAGE_TYPE_PHYSICAL) + aG:GetActualIncomingDamage(ab, DAMAGE_TYPE_PURE)
+	-- datafeed: Glaives of Wisdom bonus damage is magical (damage 2), not pure
+	local aH = aG:GetActualIncomingDamage(aa, DAMAGE_TYPE_PHYSICAL) + aG:GetActualIncomingDamage(ab, DAMAGE_TYPE_MAGICAL)
 	return aH
 end
 return a

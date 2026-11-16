@@ -136,7 +136,8 @@ function a.SkillsComplement()
 	end
 	B = a.ConsiderZealot()
 	if B > 0 then
-		b:Action_UseAbility(s)
+		-- datafeed: Zealot is unit-target (behavior 8); targeting Chen teleports all controlled units to him
+		b:Action_UseAbilityOnEntity(s, b)
 		return
 	end
 	w, x = a.ConsiderHolyPersuasion()
@@ -315,7 +316,8 @@ function a.ConsiderDivineFavor()
 					and not c.IsSuspiciousIllusion(M[1])
 					and not M[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 				then
-					return BOT_ACTION_DESIRE_HIGH, M[1]
+					-- datafeed: Divine Favor targets allies only (target_team 1); buff the retreating ally, not the chaser
+					return BOT_ACTION_DESIRE_HIGH, L
 				end
 			end
 		end
@@ -340,7 +342,8 @@ function a.ConsiderDivineFavor()
 				local N = c.GetNearbyHeroes(P, 1200, true, BOT_MODE_NONE)
 				local Q = c.GetNearbyHeroes(P, 1200, false, BOT_MODE_NONE)
 				if N ~= nil and Q ~= nil and (#Q > #N and #N <= 1 or b:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH, P
+					-- datafeed: Divine Favor targets allies only; self-cast also buffs all units Chen controls
+					return BOT_ACTION_DESIRE_HIGH, b
 				end
 			end
 		end

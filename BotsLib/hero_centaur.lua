@@ -100,7 +100,8 @@ function a.SkillsComplement()
 		return
 	end
 	w, x = a.ConsiderDoubleEdge()
-	if w > 0 then
+	-- Guard: never send the unit-target cast without a live target.
+	if w > 0 and c.IsValid(x) then
 		b:Action_UseAbilityOnEntity(r, x)
 		return
 	end
@@ -311,7 +312,9 @@ function a.ConsiderDoubleEdge()
 			and F
 			and b:GetHealth() > K * 1.5
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Return the target: this returned only the desire, so the caller cast Double Edge on
+			-- nil ("nil-target" refusals). Double Edge is unit-target (datafeed behavior 40).
+			return BOT_ACTION_DESIRE_HIGH, C
 		end
 	end
 	if c.IsDoingTormentor(b) then
@@ -322,7 +325,8 @@ function a.ConsiderDoubleEdge()
 			and b:GetHealth() > K * 1.5
 			and (b:GetHealth() - K) / b:GetMaxHealth() > 0.45
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Same nil-target fix as the Roshan branch above.
+			return BOT_ACTION_DESIRE_HIGH, C
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

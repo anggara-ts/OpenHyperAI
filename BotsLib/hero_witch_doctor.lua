@@ -194,10 +194,13 @@ function a.ConsiderQ()
 	local U = o:GetCastRange() + E
 	local V = o:GetCastPoint()
 	local W = o:GetManaCost()
-	local X = 50 + T * 25
+	-- datafeed: Cask base_damage is 55/70/85/100 (+20 per bounce); the old 50 + T * 25 overrated it.
+	local X = o:GetSpecialValueInt("base_damage")
 	local Y = DAMAGE_TYPE_MAGICAL
 	local Z = c.GetNearbyHeroes(b, U + 50, true, BOT_MODE_NONE)
-	local _ = s:GetSpecialValueInt("bounce_range") / 2
+	-- datafeed: bounce_range (575) is a Cask value; it was read from Death Ward (s), which has none, so this was 0
+	-- and the Q-Aoe / Q-Attack / Q-Retreat group checks never saw anyone.
+	local _ = o:GetSpecialValueInt("bounce_range") / 2
 	for a0, a1 in pairs(Z) do
 		if c.IsValidHero(a1) and c.CanCastOnNonMagicImmune(a1) and c.CanCastOnTargetAdvanced(a1) then
 			local a2 = V + GetUnitToUnitDistance(b, a1) / 1000
@@ -206,6 +209,47 @@ function a.ConsiderQ()
 			end
 			if a1:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, a1, "Q-Check:" .. c.Chat.GetNormName(a1)
+			end
+		end
+	end
+	-- Ally save: game report (1:00, Anti-Mage harassing Pudge next to WD with Cask ready, WD did nothing).
+	-- Cask on an enemy hero that is attacking or chasing an ally who is hurt (< 75% HP) or was just hit by it.
+	-- datafeed: Cask cast range 600, mana 80/100/120/140, 0.8s hero stun per bounce, bounce_range 575.
+	if b:GetMana() >= W then
+		local aS = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
+		for a0, a1 in pairs(Z) do
+			if
+				c.IsValidHero(a1)
+				and c.IsInRange(b, a1, U)
+				and c.CanCastOnNonMagicImmune(a1)
+				and c.CanCastOnTargetAdvanced(a1)
+				and not c.IsSuspiciousIllusion(a1)
+			then
+				local aT = a1:GetAttackTarget()
+				for a0b, aU in pairs(aS) do
+					if
+						c.IsValidHero(aU)
+						and aU ~= b
+						and not aU:IsIllusion()
+						and aU:GetTeam() == b:GetTeam()
+						and (
+							(c.IsValid(aT) and aT:IsHero() and aT == aU)
+							or (GetUnitToUnitDistance(a1, aU) <= 900 and c.IsChasingTarget(a1, aU))
+						)
+						and (c.GetHP(aU) < 0.75 or aU:WasRecentlyDamagedByHero(a1, 2.0))
+					then
+						pcall(
+							print,
+							string.format(
+								"[OHA-WD] t=%.0f cask-save enemy=%s ally=%s",
+								DotaTime(),
+								a1:GetUnitName(),
+								aU:GetUnitName()
+							)
+						)
+						return BOT_ACTION_DESIRE_HIGH, a1, "Q-Save:" .. c.Chat.GetNormName(a1)
+					end
+				end
 			end
 		end
 	end
@@ -463,7 +507,7 @@ function a.ConsiderR()
 	local V = s:GetCastPoint()
 	local W = s:GetManaCost()
 	local X = s:GetAbilityDamage()
-	local Y = DAMAGE_TYPE_PHYSICAL
+	local Y = DAMAGE_TYPE_PURE -- datafeed: Death Ward damage type is pure (4), not physical
 	local _ = 700 - 120
 	local Z = c.GetNearbyHeroes(b, U + _, true, BOT_MODE_NONE)
 	if c.IsInTeamFight(b, 900) then

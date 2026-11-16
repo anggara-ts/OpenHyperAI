@@ -169,7 +169,8 @@ function a.SkillsComplement()
 	D, E = a.ConsiderLiquidCourage()
 	if D > 0 then
 		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(v, E)
+		-- datafeed (Shard): the drink is tossed to a teammate or self; E is a hero, so cast on the unit
+		b:ActionQueue_UseAbilityOnEntity(v, E)
 		return
 	end
 	B = a.ConsiderPrimalCompanion()
@@ -403,6 +404,8 @@ function a.ConsiderLiquidCourage()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local Y = v:GetCastRange()
+	-- fix: nAllyHeroes was an undefined global here (pairs(nil) errors once the Shard is owned)
+	local nAllyHeroes = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}
 	for R, a1 in pairs(nAllyHeroes) do
 		if
 			c.IsValidHero(a1)

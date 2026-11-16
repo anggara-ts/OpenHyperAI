@@ -144,14 +144,11 @@ function a.SkillsComplement()
 		return
 	end
 	w, x = a.ConsiderLeechSeed()
-	if w > 0 then
-		if o then
-			b:Action_UseAbilityOnLocation(q, x)
-			o = false
-			return
-		else
-			b:Action_UseAbilityOnEntity(q, x)
-		end
+	-- datafeed: Leech Seed is now unit-target only (behavior 135176 = unit target + autocast +
+	-- attack, range 150); the old point-cast path (o) could never be used, so it always casts on a unit.
+	if w > 0 and c.IsValid(x) then
+		o = false
+		b:Action_UseAbilityOnEntity(q, x)
 		return
 	end
 	A, B = a.ConsiderEyesInTheForest()
@@ -270,9 +267,9 @@ function a.ConsiderLeechSeed()
 		o = false
 		if c.IsValidHero(G) and c.CanCastOnNonMagicImmune(G) and not c.IsChasingTarget(b, G) then
 			local O = b:FindAoELocation(true, true, G:GetLocation(), 0, N, 0, 0)
-			if O.count >= 2 and GetUnitToLocationDistance(b, O.targetloc) <= M then
-				o = true
-				return BOT_ACTION_DESIRE_HIGH, O.targetloc
+			-- datafeed: unit-target now, so seed the hero itself (it was a point cast on the group).
+			if O.count >= 2 and c.IsInRange(b, G, M) then
+				return BOT_ACTION_DESIRE_HIGH, G
 			end
 		end
 		local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
@@ -324,14 +321,13 @@ function a.ConsiderLeechSeed()
 	end
 	if c.IsDoingRoshan(b) then
 		if c.IsRoshan(G) and c.CanCastOnNonMagicImmune(G) and c.IsInRange(b, G, 500) and I then
-			o = true
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			-- datafeed: unit-target now; seed Roshan instead of a point at Treant's feet.
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(G) and c.IsInRange(b, G, 500) and I then
-			o = true
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

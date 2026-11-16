@@ -191,7 +191,8 @@ function a.ConsiderQ()
 	local T = o:GetSpecialValueInt("width")
 	local U = o:GetCastPoint()
 	local V = o:GetManaCost()
-	local W = o:GetAbilityDamage()
+	-- datafeed: Earth Spike damage is the "damage" value (105/170/235/300); it has no AbilityDamage (read 0).
+	local W = o:GetSpecialValueInt("damage")
 	local X = DAMAGE_TYPE_MAGICAL
 	local Y = c.GetNearbyHeroes(b, S, true, BOT_MODE_NONE)
 	local Z = c.GetNearbyHeroes(b, S + 200, true, BOT_MODE_NONE)
@@ -541,10 +542,11 @@ function a.ConsiderR()
 	local U = r:GetCastPoint()
 	local V = r:GetManaCost()
 	local ai = a.GetAbilityRDamageBonus()
-	local aj = 475 + 125 * R
+	local aj = r:GetSpecialValueInt("damage") -- datafeed: 600/725/850 (same as the old 475 + 125 * R)
 	if b:HasScepter() then
-		T = r:GetSpecialValueInt("splash_radius_scepter")
-		aj = 575 + 125 * R
+		-- datafeed: the Scepter adds AoE damage on the initial cast ("splash_radius"), not +100 damage, and
+		-- there is no "splash_radius_scepter" value.
+		T = r:GetSpecialValueInt("splash_radius")
 	end
 	local W = aj + ai
 	local X = DAMAGE_TYPE_MAGICAL

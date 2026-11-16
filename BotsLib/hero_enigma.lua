@@ -211,7 +211,8 @@ function a.ConsiderMalefice()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local S = c.GetProperCastRange(false, b, q:GetCastRange())
-	local T = q:GetSpecialValueInt("value")
+	-- datafeed: Malefice's instance count is "stun_instances" (3); it has no "value", so T (and the kill damage) was 0.
+	local T = q:GetSpecialValueInt("stun_instances")
 	if u:IsTrained() then
 		T = T + q:GetSpecialValueInt("value")
 	end

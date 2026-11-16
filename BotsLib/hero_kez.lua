@@ -552,7 +552,9 @@ function a.ConsiderKazuraiKatana()
 	if not c.CanCastAbility(r) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local ac = r:GetSpecialValueInt("katana_attack_range")
+	-- katana_attack_range lives on Switch Discipline (o), not on Kazurai Katana (game KV), so the old
+	-- lookup read 0 and the impale was never cast.
+	local ac = o:GetSpecialValueInt("katana_attack_range")
 	local as = r:GetSpecialValueInt("katana_bonus_damage") / 100
 	for a5, a6 in pairs(U) do
 		if c.IsValidHero(a6) and c.IsInRange(b, a6, ac) and c.CanCastOnTargetAdvanced(a6) then
@@ -667,7 +669,8 @@ function a.ConsiderTalonToss()
 			and c.CanCastOnNonMagicImmune(a6)
 			and c.CanCastOnTargetAdvanced(a6)
 			and c.IsInRange(b, a6, ac)
-			and c.CanKillTarget(a6, a2, DAMAGE_TYPE_MAGICAL)
+			-- datafeed: Talon Toss is a fixed-damage attack, physical damage.
+			and c.CanKillTarget(a6, a2, DAMAGE_TYPE_PHYSICAL)
 			and not a6:HasModifier("modifier_abaddon_borrowed_time")
 			and not a6:HasModifier("modifier_dazzle_shallow_grave")
 			and not a6:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -717,7 +720,8 @@ function a.ConsiderTalonToss()
 				and c.CanBeAttacked(au)
 				and not c.IsInRange(b, au, b:GetAttackRange() * 2.5)
 				and c.IsKeyWordUnit("ranged", au)
-				and c.CanKillTarget(au, a2, DAMAGE_TYPE_MAGICAL)
+				-- datafeed: Talon Toss deals physical damage.
+				and c.CanKillTarget(au, a2, DAMAGE_TYPE_PHYSICAL)
 			then
 				if c.IsValidHero(U[1]) and not c.IsSuspiciousIllusion(U[1]) and c.IsInRange(au, U[1], 550) then
 					return BOT_ACTION_DESIRE_HIGH, au

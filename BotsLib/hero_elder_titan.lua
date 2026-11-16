@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 3, 2, 3, 2, 3, 6, 1, 1, 1, 1, 6, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+-- Build 1 took Earth Splitter only at level 9 and rank 2 at 16; ultimate now at levels 6/12 (entries 6/11).
+local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k
 local l = c.Skill.GetTalentBuild(i[1])
 if h == "pos_1" then

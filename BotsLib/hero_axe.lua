@@ -196,7 +196,8 @@ function a.ConsiderW()
 	local P = p:GetManaCost()
 	local Z = p:GetSpecialValueInt("duration")
 	local Q = p:GetSpecialValueInt("damage_per_second") * Z
-	local R = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Battle Hunger deals pure damage (damage 4), not magical.
+	local R = DAMAGE_TYPE_PURE
 	local S = c.GetAroundEnemyHeroList(N)
 	local _ = c.GetAroundEnemyHeroList(N + 200)
 	local T = nil
@@ -206,7 +207,7 @@ function a.ConsiderW()
 			c.IsValid(W)
 			and c.CanCastOnNonMagicImmune(W)
 			and c.CanCastOnTargetAdvanced(W)
-			and c.WillMagicKillTarget(b, W, Q, Z)
+			and c.WillKillTarget(W, Q, R, Z)
 			and not W:HasModifier("modifier_axe_battle_hunger_self")
 		then
 			T = W
@@ -326,9 +327,11 @@ function a.ConsiderR()
 	local M = 600
 	local O = r:GetCastPoint()
 	local P = r:GetManaCost()
-	local a5 = 150 + 100 * L
-	if t:IsTrained() then
-		a5 = a5 + t:GetSpecialValueInt("value")
+	-- datafeed: Culling Blade damage is 275/375/475 pure (the old hard-coded 250/350/450 was low). The talent
+	-- is no longer added: f[5] is now +15 Strength, not Culling Blade damage.
+	local a5 = r:GetSpecialValueInt("damage")
+	if a5 <= 0 then
+		a5 = 175 + 100 * L
 	end
 	local R = DAMAGE_TYPE_PURE
 	local S = c.GetAroundEnemyHeroList(N)
@@ -342,7 +345,7 @@ function a.ConsiderR()
 			and W:GetHealth() + W:GetHealthRegen() * 0.8 < a5
 			and not c.IsHaveAegis(W)
 			and not W:IsInvulnerable()
-			and not W:IsMagicImmune()
+			-- datafeed: Culling Blade pierces debuff immunity (immunity 3), so magic-immune heroes are valid targets.
 			and not a.HasSpecialModifier(W)
 			and not a.IsKillBotAntiMage(W)
 		then

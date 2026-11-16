@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 } }
+-- Wall of Replica moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
+local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -481,7 +482,8 @@ function CanDoVacuumWall()
 			return true
 		end
 	end
-	b.shouldBlink = true
+	-- was true here too, which left shouldBlink stuck on and blocked the generic engage blink for Dark Seer
+	b.shouldBlink = false
 	return false
 end
 function HasBlink()

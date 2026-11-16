@@ -129,6 +129,10 @@ k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
 a["bDeafaultItem"] = true
+-- Declared before MinionThink: it was declared below it, so MinionThink set a global and the
+-- Decrepify-the-ward check in ConsiderW read a local that was always nil (datafeed notes:
+-- Decrepify "Can be used on your Nether Ward").
+local hNetherWard = nil
 function a.MinionThink(n)
 	if e.IsValidUnit(n) then
 		if c.IsKeyWordUnit("pugna_nether_ward", n) then
@@ -149,7 +153,6 @@ local x, y
 local z, A
 local B = 0
 local C = 0
-local hNetherWard = nil
 local D, E, F, G, H, I
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) or b:IsInvisible() then
@@ -200,7 +203,8 @@ function a.ConsiderQ()
 	local K = o:GetLevel()
 	local L = o:GetCastRange() + B
 	local M = o:GetSpecialValueInt("radius")
-	local N = o:GetCastPoint() + o:GetSpecialValueInt("delay")
+	-- datafeed: Nether Blast delay is 0.8s; GetSpecialValueInt truncated it to 0.
+	local N = o:GetCastPoint() + o:GetSpecialValueFloat("delay")
 	local O = o:GetManaCost()
 	local P = o:GetSpecialValueInt("blast_damage") + C
 	local Q = DAMAGE_TYPE_MAGICAL

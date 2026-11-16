@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 1, 3, 3, 6, 3, 2, 2, 2, 1, 6, 1, 1, 6 } }
+-- Infest moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
+local j = { { 2, 3, 1, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = RandomInt(1, 2) == 1 and "item_radiance" or "item_desolator"
@@ -185,6 +186,12 @@ function a.SkillsComplement()
 	if G > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbility(B)
+		return
+	end
+	-- ConsiderInfest was written but never called, so Infest (datafeed: unit target) was never cast.
+	J, K = a.ConsiderInfest()
+	if J > 0 and K ~= nil then
+		b:Action_UseAbilityOnEntity(D, K)
 		return
 	end
 	H, I = a.ConsiderOpenWounds()

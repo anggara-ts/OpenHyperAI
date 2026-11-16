@@ -164,7 +164,8 @@ function a.ConsiderAvalanche()
 	end
 	local L = c.GetProperCastRange(false, b, o:GetCastRange())
 	local M = o:GetSpecialValueInt("radius")
-	local N = o:GetSpecialValueInt("value") * (1 + b:GetSpellAmp())
+	-- datafeed: Avalanche's damage value is "avalanche_damage" (90/180/270/360); "value" read 0, so the kill checks never fired.
+	local N = o:GetSpecialValueInt("avalanche_damage") * (1 + b:GetSpellAmp())
 	local O = o:GetManaCost()
 	H = c.GetProperTarget(b)
 	local P = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
@@ -472,7 +473,8 @@ function a.ConsiderTreeThrow()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderTreeVolley()
-	if b:HasScepter() or not s:IsFullyCastable() then
+	-- datafeed: Tree Volley (tiny_tree_channel) is granted by Aghanim's Scepter, so it needs the Scepter (was inverted).
+	if not b:HasScepter() or not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local L = c.GetProperCastRange(false, b, s:GetCastRange())

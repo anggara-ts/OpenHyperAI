@@ -272,11 +272,16 @@ function a.ConsiderDemonZeal()
 	if not r:IsTrained() or not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local V = b:GetHealth() * r:GetSpecialValueFloat("value")
+	-- datafeed: the HP cost is health_cost_pct (20%) of current HP; "value" no longer exists (read 0).
+	local V = b:GetHealth() * r:GetSpecialValueFloat("health_cost_pct") / 100
 	local G = b:GetAttackRange() + q:GetSpecialValueInt("bonus_range")
 	C = c.GetProperTarget(b)
+	-- datafeed: Demon Zeal can't be cast while in Metamorphosis (and Metamorphosis removes it), so
+	-- cast it outside Metamorphosis; it used to require the Metamorphosis modifier and never went out.
 	if
-		(b:GetHealth() - V) / b:GetMaxHealth() > 0.5 and b:HasModifier("modifier_terrorblade_metamorphosis_transform")
+		(b:GetHealth() - V) / b:GetMaxHealth() > 0.5
+		and not b:HasModifier("modifier_terrorblade_metamorphosis")
+		and not b:HasModifier("modifier_terrorblade_metamorphosis_transform")
 	then
 		if F then
 			local L = c.GetNearbyHeroes(b, G, true, BOT_MODE_NONE)

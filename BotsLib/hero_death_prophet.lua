@@ -22,11 +22,11 @@ else
 	l = c.Skill.GetTalentBuild(i[2])
 end
 local m = {}
+-- No starting Circlet (user report, game 033 20:00: still in her bag): nothing in these builds uses it.
 m["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_bottle",
 	"item_magic_wand",
 	"item_boots",
@@ -64,7 +64,6 @@ m["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_magic_wand",
 	"item_boots",
 	"item_ring_of_basilius",
@@ -85,7 +84,6 @@ m["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_boots",
 	"item_ring_of_basilius",
 	"item_magic_wand",
@@ -177,7 +175,9 @@ function a.ConsiderQ()
 	local L = p:GetCastRange() + B + 100
 	local M = p:GetCastPoint()
 	local N = p:GetManaCost()
-	local O = p:GetAbilityDamage()
+	-- datafeed: Crypt Swarm has no AbilityDamage, its damage is the special value "damage" (100/175/250/325);
+	-- GetAbilityDamage() gave 0, so the kill check never fired and the last-hit AoE had no HP cap.
+	local O = p:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = p:GetSpecialValueInt("end_radius")
 	local R = c.GetNearbyHeroes(b, L - 50, true, BOT_MODE_NONE)

@@ -28,7 +28,7 @@ m["pos_4"] = {
 	"item_aghanims_shard",
 	"item_force_staff",
 	"item_lotus_orb",
-	"item_aghanims_shard",
+	-- removed a second "item_aghanims_shard": the Shard is already bought a few lines up and only applies once
 	"item_hurricane_pike",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -245,7 +245,8 @@ function a.ConsiderWaveOfTerror()
 	end
 	local B = c.GetProperCastRange(false, b, p:GetCastRange())
 	local Q = p:GetSpecialValueInt("wave_width")
-	local C = p:GetAbilityDamage()
+	-- datafeed: Wave of Terror's damage is the "damage" value (60/80/100/120); it has no AbilityDamage, so this was 0.
+	local C = p:GetSpecialValueInt("damage")
 	local D = c.GetNearbyHeroes(b, B, true, BOT_MODE_NONE)
 	for E, F in pairs(D) do
 		if

@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 2, 3, 2, 3, 2, 6, 2, 1, 1, 1, 1, 6, 3, 3, 6 } }
+local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 2, 3, 2, 3, 2, 6, 2, 1, 1, 1, 6, 1, 3, 3, 6 } }
+-- j[2]: Untouchable moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
 local k = j[1]
 if h == "pos_3" then
 	k = j[1]
@@ -318,7 +319,8 @@ function a.ConsiderSproink()
 	local H = b:GetAttackRange()
 	local O = c.GetNearbyHeroes(b, H + 100, false, BOT_MODE_NONE)
 	local V = c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE)
-	local W = q:GetSpecialValueFloat("value") / 100
+	-- datafeed: Impetus damage per distance is "distance_damage_pct"; "value" read 0, so the kill check never passed
+	local W = q:GetSpecialValueFloat("distance_damage_pct") / 100
 	C = c.GetProperTarget(b)
 	for P, X in pairs(V) do
 		if

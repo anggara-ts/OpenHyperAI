@@ -360,7 +360,8 @@ function a.ConsiderPhaseShift()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local a1 = r:GetSpecialValueInt("duration")
+	-- datafeed: Phase Shift duration is fractional (1/1.75/2.5/3.25s).
+	local a1 = r:GetSpecialValueFloat("duration")
 	if c.IsStunProjectileIncoming(b, 600) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
@@ -533,7 +534,8 @@ end
 function a.ConsiderPhaseOrb()
 	if CanDoPhaseOrb() then
 		local K = c.GetProperCastRange(false, b, p:GetCastRange())
-		local a1 = r:GetSpecialValueInt("duration")
+		-- datafeed: Phase Shift duration is 1/1.75/2.5/3.25s; read as a float so the Jaunt delay is not cut short.
+		local a1 = r:GetSpecialValueFloat("duration")
 		local a0 = c.GetEnemiesNearLoc(b:GetLocation(), 800)
 		local S = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
 		if a0 ~= nil and #a0 >= 2 and S ~= nil and #a0 >= #S then

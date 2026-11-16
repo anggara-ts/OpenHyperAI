@@ -397,7 +397,7 @@ function a.ConsiderShadowPoison()
 			c.IsValidTarget(G)
 			and c.CanCastOnNonMagicImmune(G)
 			and not c.IsSuspiciousIllusion(G)
-			and not G:HasModifier("modifier_dazzle_shallow_graves")
+			and not G:HasModifier("modifier_dazzle_shallow_grave") -- fix: modifier name typo ("graves")
 			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			if c.IsInRange(b, G, K / 2 - 150) then
@@ -530,13 +530,14 @@ function a.ConsiderDemonicCleanse()
 	end
 	local K = c.GetProperCastRange(false, b, t:GetCastRange())
 	if I then
-		local R = c.GetEnemiesNearLoc(b:GetLocation(), K + 200)
+		-- datafeed: Demonic Cleanse targets allies (target_team 1). It scanned enemies, required
+		-- disabled AND taunted, and returned an undefined global; cleanse a disabled ally instead.
+		local R = c.GetAlliesNearLoc(b:GetLocation(), K)
 		for N, P in pairs(R) do
 			if
 				c.IsValidHero(P)
-				and c.IsDisabled(P)
-				and c.IsTaunted(P)
-				and not c.IsSuspiciousIllusion(P)
+				and (c.IsDisabled(P) or c.IsTaunted(P))
+				and not P:IsIllusion()
 				and not P:HasModifier("modifier_abaddon_borrowed_time")
 				and not P:HasModifier("modifier_dazzle_shallow_grave")
 				and not P:HasModifier("modifier_doom_bringer_doom")
@@ -545,7 +546,7 @@ function a.ConsiderDemonicCleanse()
 				and not P:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not P:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				return BOT_ACTION_DESIRE_HIGH, enemyHero
+				return BOT_ACTION_DESIRE_HIGH, P
 			end
 		end
 	end

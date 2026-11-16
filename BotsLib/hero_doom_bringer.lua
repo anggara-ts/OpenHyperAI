@@ -89,7 +89,7 @@ local s = SafeAbility(b:GetAbilityByName("doom_bringer_infernal_blade"), "doom_b
 local t = SafeAbility(b:GetAbilityByName("doom_bringer_doom"), "doom_bringer_doom", "doom_bringer")
 local u = SafeAbility(b:GetAbilityByName("doom_bringer_empty1"), "doom_bringer_empty1", "doom_bringer")
 local v = SafeAbility(b:GetAbilityByName("doom_bringer_empty2"), "doom_bringer_empty2", "doom_bringer")
-local w = SafeAbility(b:GetAbilityByName("special_bonus_unique_doom_2"), "special_bonus_unique_doom_2", "doom_bringer")
+-- datafeed: special_bonus_unique_doom_2 is no longer a Doom talent (Ancient Devour moved to the Shard)
 local x, y
 local z
 local A, B
@@ -200,7 +200,12 @@ function a.ConsiderDevour()
 					Q = c.GetMostHpUnit(O)
 				end
 				if Q ~= nil then
-					if Q:IsAncientCreep() and w:IsTrained() then
+					-- datafeed: Devouring Ancients now comes from Aghanim's Shard (can_target_ancient), not
+					-- special_bonus_unique_doom_2, which is no longer one of Doom's talents
+					if
+						Q:IsAncientCreep()
+						and (q:GetSpecialValueInt("can_target_ancient") > 0 or c.HasAghanimsShard(b))
+					then
 						return BOT_ACTION_DESIRE_HIGH, Q
 					end
 					if not Q:IsAncientCreep() then
@@ -268,7 +273,8 @@ function a.ConsiderScorchedEarth()
 	if c.IsFarming(b) then
 		local O = b:GetNearbyCreeps(T, true)
 		if
-			nEnemyLaneCreeps ~= nil
+			-- fix: tested an undefined global (nEnemyLaneCreeps), so farming never used Scorched Earth
+			O ~= nil
 			and (#O >= 3 or #O >= 2 and O[1]:IsAncientCreep())
 			and c.CanBeAttacked(O[1])
 			and L
@@ -306,7 +312,8 @@ function a.ConsiderInfernalBlade()
 	end
 	local Y = s:GetCastRange()
 	local Z = s:GetSpecialValueInt("burn_damage")
-	local _ = s:GetSpecialValueInt("burn_damage_pct") / 100
+	-- datafeed: burn_damage_pct is fractional (0.5/1.75/3/4.25), GetSpecialValueInt truncated it
+	local _ = s:GetSpecialValueFloat("burn_damage_pct") / 100
 	local a0 = s:GetSpecialValueInt("burn_duration")
 	local a1 = c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE)
 	for R, W in pairs(a1) do

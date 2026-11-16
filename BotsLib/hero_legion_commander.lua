@@ -77,18 +77,19 @@ function a.SkillsComplement()
 	K = L.allies
 	C, D = a.ConsiderR()
 	if C > 0 then
+		-- Clear once, then queue all three: the old Action_UseAbilityOnEntity for Duel cleared the
+		-- queue, so the Press the Attack and Blade Mail queued before it never went out.
+		b:Action_ClearActions(false)
 		if r:IsTrained() and r:IsFullyCastable() and b:GetMana() > r:GetManaCost() + t:GetManaCost() then
-			if v:IsTrained() then
-				b:ActionQueue_UseAbilityOnLocation(r, b:GetLocation())
-			else
-				b:ActionQueue_UseAbilityOnEntity(r, b)
-			end
+			-- datafeed: Press the Attack is unit-target (behavior 8); f[5] is now the Duel duration
+			-- talent, not an AoE talent, so the old point-cast branch could never cast.
+			b:ActionQueue_UseAbilityOnEntity(r, b)
 		end
 		local M = c.IsItemAvailable("item_blade_mail")
 		if M ~= nil and M:IsFullyCastable() and b:GetMana() > M:GetManaCost() + t:GetManaCost() then
 			b:ActionQueue_UseAbility(M)
 		end
-		b:Action_UseAbilityOnEntity(t, D)
+		b:ActionQueue_UseAbilityOnEntity(t, D)
 		return
 	end
 	w, x = a.ConsiderQ()
@@ -100,11 +101,8 @@ function a.SkillsComplement()
 	y, z = a.ConsiderW()
 	if y > 0 then
 		c.SetQueuePtToINT(b, true)
-		if v:IsTrained() then
-			b:ActionQueue_UseAbilityOnLocation(r, z:GetLocation())
-		else
-			b:ActionQueue_UseAbilityOnEntity(r, z)
-		end
+		-- datafeed: Press the Attack is unit-target (behavior 8); no talent makes it point-cast.
+		b:ActionQueue_UseAbilityOnEntity(r, z)
 		return
 	end
 end

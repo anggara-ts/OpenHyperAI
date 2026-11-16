@@ -169,8 +169,9 @@ function a.ConsiderBoundlessStrike()
 			if V:IsChanneling() or c.IsCastingUltimateAbility(V) then
 				return BOT_ACTION_DESIRE_HIGH, V:GetLocation()
 			end
+			-- datafeed: Boundless Strike deals physical damage (a crit on his attack), not magical.
 			if
-				c.CanKillTarget(V, S, DAMAGE_TYPE_MAGICAL)
+				c.CanKillTarget(V, S, DAMAGE_TYPE_PHYSICAL)
 				and not V:HasModifier("modifier_abaddon_borrowed_time")
 				and not V:HasModifier("modifier_dazzle_shallow_grave")
 				and not V:HasModifier("modifier_oracle_false_promise_timer")
@@ -392,7 +393,9 @@ function a.ConsiderPrimalSpring()
 	if q:IsHidden() or not q:IsFullyCastable() or not q:IsActivated() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local aa = q:GetSpecialValueInt("max_distance")
+	-- Primal Spring has no "max_distance" value (game KV: only impact_damage/slow/radius; the leap
+	-- range is its AbilityCastRange, 800), so the old lookup read 0 and the spring never aimed anywhere.
+	local aa = q:GetCastRange()
 	local ab = q:GetChannelTime()
 	local R = q:GetSpecialValueInt("impact_radius")
 	if O then

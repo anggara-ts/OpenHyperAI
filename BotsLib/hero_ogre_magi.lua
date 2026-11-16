@@ -122,8 +122,10 @@ end
 local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "ogre_magi")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "ogre_magi")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "ogre_magi")
-local r = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "ogre_magi")
-local s = SafeAbility(b:GetAbilityByName(g[5]), "sAbilityList[5]", "ogre_magi")
+-- datafeed: by name, not by ability-list slot. The Scepter Unrefined Fireblast and the Shard Fire
+-- Shield (ogre_magi_smash) are hidden granted abilities, so g[4]/g[5] need not be them.
+local r = SafeAbility(b:GetAbilityByName("ogre_magi_unrefined_fireblast"), "ogre_magi_unrefined_fireblast", "ogre_magi")
+local s = SafeAbility(b:GetAbilityByName("ogre_magi_smash"), "ogre_magi_smash", "ogre_magi")
 local t = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "ogre_magi")
 local u = SafeAbility(b:GetAbilityByName(f[8]), "sTalentList[8]", "ogre_magi")
 local v, w

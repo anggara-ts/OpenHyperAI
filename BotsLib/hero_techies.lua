@@ -1188,6 +1188,42 @@ function a.ConsiderSoulRingForBlast()
 	return true
 end
 -- ignoreMana: judge the situation as if the mana were there (used to decide on Soul Ring).
+-- What the Blast Off combo deals to one hero (all magical, game files): Blast Off, plus Sticky Bomb
+-- when it is ready and there is mana for it after the blast, plus up to 2 Land Mines (the landing
+-- triangle; charges and mana permitting). User call: Techies only blasts in to start a fight when
+-- this kills someone; otherwise he keeps throwing Sticky Bombs (late game he blasted onto full-HP
+-- tanks and died).
+function a.ComboDamage()
+	local dmg = s:GetSpecialValueInt("damage")
+	local mana = b:GetMana() - s:GetManaCost()
+	if p:IsTrained() and p:IsFullyCastable() and mana >= p:GetManaCost() then
+		dmg = dmg + p:GetSpecialValueInt("damage")
+		mana = mana - p:GetManaCost()
+	end
+	if u:IsTrained() and not u:IsHidden() then
+		local cost = u:GetManaCost()
+		local mines = math.min(a.MineCharges(), 2, cost > 0 and math.floor(mana / cost) or 2)
+		dmg = dmg + math.max(0, mines) * u:GetSpecialValueInt("damage")
+	end
+	return dmg
+end
+function a.ComboKills(target)
+	return c.IsValidHero(target) and c.CanKillTarget(target, a.ComboDamage(), DAMAGE_TYPE_MAGICAL)
+end
+function a.LogBlastSkip(target, why)
+	if DotaTime() < (b._blastSkipLogAt or -99) + 10 or target == nil then
+		return
+	end
+	b._blastSkipLogAt = DotaTime()
+	pcall(print, string.format(
+		"[OHA-TECHIES] t=%.0f blast-skip why=%s target=%s combo=%d hp=%d",
+		DotaTime(),
+		why,
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		a.ComboDamage(),
+		target:GetHealth()
+	))
+end
 function a.ConsiderBlastOff(ignoreMana)
 	local ready = ignoreMana and s:IsTrained() and s:GetCooldownTimeRemaining() <= 0 or s:IsFullyCastable()
 	if not ready or s:IsHidden() then
@@ -1225,8 +1261,21 @@ function a.ConsiderBlastOff(ignoreMana)
 		local ae = b:FindAoELocation(true, true, b:GetLocation(), T, ad, 0, 0)
 		local a5 = c.GetEnemiesNearLoc(ae.targetloc, ad * 0.8)
 		if a5 ~= nil and #a5 >= 2 and not c.IsLocationInChrono(c.GetCenterOfUnits(a5)) then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), "fight"
+			local kills = false
+			for _, e in pairs(a5) do
+				if a.ComboKills(e) then
+					kills = true
+					break
+				end
+			end
+			if kills then
+				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(a5), "fight"
+			end
+			a.LogBlastSkip(a5[1], "fight-no-kill")
 		end
+	end
+	if M and c.IsValidHero(H) and c.IsInRange(b, H, T) and not a.ComboKills(H) then
+		a.LogBlastSkip(H, "no-kill")
 	end
 	if M then
 		if
@@ -1236,6 +1285,7 @@ function a.ConsiderBlastOff(ignoreMana)
 			and not c.IsSuspiciousIllusion(H)
 			and not H:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
+			and a.ComboKills(H)
 		then
 			local a4 = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
 			local a5 = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
@@ -1789,6 +1839,7 @@ function a.ComboReady()
 		return false
 	end
 	local range = c.GetProperCastRange(false, b, s:GetCastRange()) + 300
-	return c.IsValidTarget(H) and GetUnitToUnitDistance(b, H) <= range
+	-- No combo without a kill: the Tazer is not held back for one that will not happen.
+	return c.IsValidTarget(H) and GetUnitToUnitDistance(b, H) <= range and a.ComboKills(H)
 end
 return a

@@ -159,7 +159,9 @@ function a.ConsiderQ()
 	local N = o:GetSpecialValueInt("starfall_secondary_radius")
 	local O = o:GetCastPoint()
 	local P = o:GetManaCost()
-	local Q = o:GetAbilityDamage()
+	-- Starstorm has no AbilityDamage in the game data; its damage is the special value "damage"
+	-- (75/150/225/300). GetAbilityDamage() gave 0, so the kill and lane last-hit casts never fired.
+	local Q = o:GetSpecialValueInt("damage")
 	local R = DAMAGE_TYPE_MAGICAL
 	local S = c.GetAroundEnemyHeroList(N)
 	local T = c.GetAroundEnemyHeroList(M)
@@ -213,6 +215,11 @@ function a.ConsiderQ()
 					end
 				end
 			end
+		end
+		if (Y + Z >= 3 or Z >= 1 and Y >= 1) and DotaTime() >= (b._starLaneLogAt or -999) then
+			-- [OHA-MIRANA]: lane last-hit Starstorm (dead before the "damage" key fix), every 10s at most.
+			b._starLaneLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-MIRANA] t=%.0f starstorm-lane melee=%d ranged=%d dmg=%d", DotaTime(), Y, Z, Q))
 		end
 		if Y + Z >= 3 then
 			U = b

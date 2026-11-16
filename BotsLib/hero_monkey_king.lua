@@ -191,13 +191,40 @@ function a.ConsiderBoundlessStrike()
 			end
 		end
 	end
+	-- Was: two heroes inside a 150 circle AND two enemies within 150 of Monkey King himself, which
+	-- almost never holds. The staff stuns along a line (datafeed): strike_radius is the line's
+	-- half-width and the cast range its length. Aim at the enemy whose line catches the most heroes.
 	if O then
-		local W = b:FindAoELocation(true, true, b:GetLocation(), P, R, Q, 0)
-		if W.count >= 2 then
-			local X = c.GetEnemiesNearLoc(b:GetLocation(), R)
-			if X ~= nil and #X >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, W.targetloc
+		local me = b:GetLocation()
+		local len = o:GetSpecialValueInt("strike_cast_range")
+		if len == nil or len <= 0 then
+			len = P
+		end
+		local bestLoc, bestN = nil, 0
+		for U, V in pairs(T) do
+			if c.IsValidHero(V) and c.CanCastOnNonMagicImmune(V) and not c.IsSuspiciousIllusion(V) then
+				local aim = V:GetExtrapolatedLocation(Q)
+				local tip = me + (aim - me):Normalized() * len
+				local n = 0
+				for _, X in pairs(T) do
+					if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) then
+						local hit = PointToLineDistance(me, tip, X:GetExtrapolatedLocation(Q))
+						if hit ~= nil and hit.within and hit.distance <= R + 25 then
+							n = n + 1
+						end
+					end
+				end
+				if n > bestN then
+					bestLoc, bestN = aim, n
+				end
 			end
+		end
+		if bestLoc ~= nil and bestN >= 2 then
+			if DotaTime() >= (b._strikeLineLogAt or -999) then
+				b._strikeLineLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-MONKEY_KING] t=%.0f boundless-strike line heroes=%d", DotaTime(), bestN))
+			end
+			return BOT_ACTION_DESIRE_HIGH, bestLoc
 		end
 	end
 	if J then
@@ -320,7 +347,13 @@ function a.ConsiderTreeDance()
 	if T == nil then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if J and q:IsFullyCastable() then
+	-- Was "J and q:IsFullyCastable()": Primal Spring is only gained while perched (datafeed), so
+	-- from the ground this either never held, or (perched) it held again and Tree Dance (cooldown
+	-- 0.9 to 0, checked before Spring) hopped to the next tree instead of springing. Now: Spring
+	-- trained, off cooldown and affordable; no new hop for 3s after one, so Spring gets its turn;
+	-- and the tree must be within Spring's range of the target (it was just the first tree found).
+	local springReady = q:IsTrained() and q:GetCooldownTimeRemaining() <= 0 and b:GetMana() >= q:GetManaCost()
+	if J and springReady and DotaTime() - (b._mkTreeDanceAt or -999) > 3 then
 		local Y = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
 		if
 			c.IsValidTarget(I)
@@ -332,15 +365,27 @@ function a.ConsiderTreeDance()
 		then
 			local a8 = b:GetNearbyTrees(P)
 			local Z = c.GetNearbyHeroes(I, 1000, false, BOT_MODE_NONE)
-			if
-				Y ~= nil
-				and Z ~= nil
-				and #Y >= #Z
-				and a8 ~= nil
-				and #a8 >= 1
-				and (IsLocationVisible(GetTreeLocation(a8[1])) or IsLocationPassable(GetTreeLocation(a8[1])))
-			then
-				return BOT_ACTION_DESIRE_HIGH, a8[1]
+			local springRange = q:GetCastRange()
+			if springRange == nil or springRange <= 0 then
+				springRange = 800
+			end
+			local tree, treeDist = nil, math.huge
+			for U, an in pairs(a8 or {}) do
+				local tl = GetTreeLocation(an)
+				local d0 = GetUnitToLocationDistance(I, tl)
+				if d0 <= springRange - 100 and d0 < treeDist and (IsLocationVisible(tl) or IsLocationPassable(tl)) then
+					tree, treeDist = an, d0
+				end
+			end
+			if Y ~= nil and Z ~= nil and #Y >= #Z and tree ~= nil then
+				b._mkTreeDanceAt = DotaTime()
+				pcall(print, string.format(
+					"[OHA-MONKEY_KING] t=%.0f tree-dance engage target=%s tree-to-target=%d",
+					DotaTime(),
+					(string.gsub(I:GetUnitName(), "npc_dota_hero_", "")),
+					math.floor(treeDist)
+				))
+				return BOT_ACTION_DESIRE_HIGH, tree
 			end
 		end
 	end
@@ -411,7 +456,9 @@ function a.ConsiderPrimalSpring()
 	if O then
 		local W = b:FindAoELocation(true, true, b:GetLocation(), aa, R, ab, 0)
 		if W.count >= 2 then
-			local X = c.GetEnemiesNearLoc(b:GetLocation(), R)
+			-- Was enemies within impact_radius of Monkey King himself, not of the landing spot (up to
+			-- 800 away), so a group out there never counted.
+			local X = c.GetEnemiesNearLoc(W.targetloc, R)
 			if X ~= nil and #X >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, W.targetloc
 			end

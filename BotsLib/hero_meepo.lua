@@ -289,7 +289,9 @@ function a.ConsiderPoof()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local Z = B:GetSpecialValueInt("radius")
-	local ab = B:GetAbilityDamage()
+	-- Poof has no AbilityDamage in the game data; its damage is the special value "poof_damage"
+	-- (50/80/110/140). GetAbilityDamage() gave 0, so the lane last-hit Poofs never fired.
+	local ab = B:GetSpecialValueInt("poof_damage")
 	if P < 0.5 and U then
 		for t, ac in pairs(N) do
 			if ac ~= b and ac:DistanceFromFountain() < 800 and not c.IsStunProjectileIncoming(b, 400) then
@@ -384,7 +386,10 @@ function a.ConsiderPoof()
 			local ah = nil
 			local v = 0
 			for t, ac in pairs(N) do
-				if GetUnitToUnitDistance(b, ac) > v then
+				-- Was the farthest Meepo whatever its state: a Meepo fighting elsewhere is no escape.
+				-- Only a Meepo with no enemy hero within 1200 counts.
+				local near = c.GetNearbyHeroes(ac, 1200, true, BOT_MODE_NONE)
+				if (near == nil or #near == 0) and GetUnitToUnitDistance(b, ac) > v then
 					ah = ac
 					v = GetUnitToUnitDistance(b, ac)
 				end
@@ -415,6 +420,11 @@ function a.ConsiderPoof()
 			end
 		end
 		if al >= 2 then
+			-- [OHA-MEEPO]: lane last-hit Poof (dead before the poof_damage fix), every 10s at most.
+			if DotaTime() >= (b._poofLaneLogAt or -999) then
+				b._poofLaneLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-MEEPO] t=%.0f poof-lane-lasthit creeps=%d dmg=%d", DotaTime(), al, ab))
+			end
 			return BOT_ACTION_DESIRE_HIGH, b
 		end
 		local a6 = c.GetNearbyHeroes(b, Z / 2.1, true, BOT_MODE_NONE)

@@ -155,7 +155,26 @@ local N
 local O
 local P
 local Q
+-- [OHA-KOTL] one line per new behaviour, at most once per 3s per kind.
+function a.LogKotl(what)
+	b._kotlLogAt = b._kotlLogAt or {}
+	if DotaTime() < (b._kotlLogAt[what] or -999) then
+		return
+	end
+	b._kotlLogAt[what] = DotaTime() + 3
+	pcall(print, string.format("[OHA-KOTL] t=%.0f %s", DotaTime(), what))
+end
 function a.SkillsComplement()
+	-- Illuminate is channelled, and CanNotUseAbility() is true for the whole channel (IsChanneling), so
+	-- the early release (Illuminate End) further down was never reached outside Spirit Form. Check it
+	-- here, before that early return, while Keeper is channelling.
+	if b:IsChanneling() and b.illuminate_status ~= nil and c.CanCastAbility(p) then
+		if a.ConsiderIlluminateEnd() > 0 then
+			a.LogKotl("illuminate-end why=" .. tostring(b.illuminate_status[1]))
+			b:Action_UseAbility(p)
+			return
+		end
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -246,6 +265,9 @@ function a.ConsiderIlluminate()
 	local T = o:GetSpecialValueInt("radius")
 	local U = o:GetSpecialValueInt("total_damage")
 	local V = c.GetManaAfter(o:GetManaCost())
+	-- Illuminate is ready, so any earlier wave is over: drop its status, or a stale "kill"/"laning"
+	-- target could release this new cast early (only the kill and laning branches set a new status).
+	b.illuminate_status = nil
 	for W, X in pairs(M) do
 		if c.IsValidHero(X) and c.IsInRange(b, X, S) and c.CanCastOnNonMagicImmune(X) then
 			if
@@ -374,7 +396,8 @@ function a.ConsiderBlindingLight()
 	local T = q:GetSpecialValueInt("radius")
 	local a6 = q:GetLevel()
 	for W, X in pairs(M) do
-		if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) then
+		-- Range check added: M reaches 1600, so a killable enemy 1600 away made Keeper walk up to it.
+		if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) and c.IsInRange(b, X, R) then
 			if
 				c.CanKillTarget(X, a4, DAMAGE_TYPE_MAGICAL)
 				and not X:HasModifier("modifier_abaddon_borrowed_time")
@@ -440,7 +463,11 @@ function a.ConsiderBlindingLight()
 				and not aa[1]:HasModifier("modifier_legion_commander_duel")
 				and not aa[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local a7 = c.VectorAway(aa[1]:GetLocation(), a9:GetLocation(), T * 0.4)
+				-- Blinding Light knocks units to the edge of the area (datafeed), i.e. away from its centre.
+				-- The centre used to be past the enemy (VectorAway), which knocked the chaser onto the
+				-- retreating ally. Put the centre between them so the chaser is knocked away from the ally.
+				local a7 = c.VectorTowards(aa[1]:GetLocation(), a9:GetLocation(), T * 0.4)
+				a.LogKotl("blind-save ally=" .. a9:GetUnitName() .. " enemy=" .. aa[1]:GetUnitName())
 				return BOT_ACTION_DESIRE_HIGH, a7
 			end
 		end
@@ -558,7 +585,9 @@ function a.ConsiderWillOWisp()
 	local R = c.GetProperCastRange(false, b, u:GetCastRange())
 	local T = u:GetSpecialValueInt("radius")
 	local a5 = u:GetCastPoint()
-	local ad = u:GetSpecialValueInt("duration")
+	-- Will-O-Wisp has no "duration" key (game KV), so the old "duration > 0.5" test read 0 and the
+	-- TP-cancel branch never fired. Its first pull comes after off_duration_initial (1.0s).
+	local ad = u:GetSpecialValueFloat("off_duration_initial")
 	for W, X in pairs(M) do
 		if
 			c.IsValidHero(X)
@@ -567,7 +596,8 @@ function a.ConsiderWillOWisp()
 			and X:HasModifier("modifier_teleporting")
 		then
 			local ae = c.GetModifierTime(X, "modifier_teleporting")
-			if ae > a5 and ad > 0.5 then
+			if ae > a5 + ad then
+				a.LogKotl("wisp-tp target=" .. X:GetUnitName())
 				return BOT_ACTION_DESIRE_HIGH, X:GetLocation()
 			end
 		end

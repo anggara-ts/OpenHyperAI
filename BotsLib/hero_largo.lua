@@ -264,7 +264,10 @@ function a.ConsiderCatchLick()
 				or c.GetModifierTime(S, "modifier_warlock_fatal_bonds") > 2
 				or c.GetModifierTime(S, "modifier_arc_warden_flux") > 2 and X
 				or c.GetModifierTime(S, "modifier_venomancer_venomous_gale") > 2 and X
-				or c.GetModifierTime(S, "modifier_stunned") > 2
+				-- Stun only when the lick is a strong dispel: it is a basic dispel (strong_dispel 0 in the
+				-- game KV, no talent changes it) and a stun needs a strong dispel, so licking a stunned
+				-- ally only moved it and wasted the cast.
+				or o:GetSpecialValueInt("strong_dispel") > 0 and c.GetModifierTime(S, "modifier_stunned") > 2
 			then
 				return BOT_ACTION_DESIRE_HIGH, S
 			end

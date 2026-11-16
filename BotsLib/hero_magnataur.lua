@@ -136,6 +136,33 @@ local J
 local K
 local L
 local M
+-- Where a Skewer started at fromLoc should end: toward the nearest allied hero (not Magnus) at least
+-- 300 away from fromLoc, else toward the escape location. If the ally list includes Magnus himself
+-- (the file's own `ally ~= b` guards assume it can), the old "last ally in the list" could be Magnus,
+-- giving a zero-length Skewer onto his own spot, and the escape fallback (#X == 0) could never run.
+local function SkewerDestination(fromLoc, skewerRange)
+	local towardLoc = nil
+	local nearest = math.huge
+	for _, ally in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(ally) and ally ~= b and not ally:IsIllusion() then
+			local dist = GetUnitToLocationDistance(ally, fromLoc)
+			if dist >= 300 and dist < nearest then
+				nearest = dist
+				towardLoc = ally:GetLocation()
+			end
+		end
+	end
+	if towardLoc == nil then
+		towardLoc = c.GetEscapeLoc()
+	end
+	return c.Utils.GetOffsetLocationTowardsTargetLocation(fromLoc, towardLoc, skewerRange)
+end
+local function LogCombo(what)
+	if DotaTime() >= (b._ohaMagnusComboLogAt or -999) then
+		b._ohaMagnusComboLogAt = DotaTime() + 5
+		pcall(print, string.format("[OHA-MAGNUS] t=%.0f %s", DotaTime(), what))
+	end
+end
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
@@ -154,10 +181,10 @@ function a.SkillsComplement()
 		b:ActionQueue_Delay(0.1)
 		b:ActionQueue_UseAbility(u)
 		b:ActionQueue_Delay(0.3)
-		z, A = a.ConsiderSkewer2()
-		if z > 0 then
-			b:ActionQueue_UseAbilityOnLocation(s, A)
-		end
+		-- Was ConsiderSkewer2(), evaluated now at the pre-blink spot (no enemy within 145 there), so the
+		-- Skewer after Blink + RP was never queued. Aim it from the blink spot E toward allies instead.
+		b:ActionQueue_UseAbilityOnLocation(s, SkewerDestination(E, s:GetSpecialValueInt("range")))
+		LogCombo("blink + RP + skewer")
 		return
 	end
 	G = a.ConsiderBlinkForSkewer()
@@ -168,10 +195,9 @@ function a.SkillsComplement()
 		end
 		b:ActionQueue_UseAbilityOnLocation(D, E)
 		b:ActionQueue_Delay(0.1)
-		z, A = a.ConsiderSkewer2()
-		if z > 0 then
-			b:ActionQueue_UseAbilityOnLocation(s, A)
-		end
+		-- Same pre-blink evaluation bug as above: Skewer from the blink spot (on the target) to allies.
+		b:ActionQueue_UseAbilityOnLocation(s, SkewerDestination(E, s:GetSpecialValueInt("range")))
+		LogCombo("blink + skewer")
 		return
 	end
 	F = a.ConsiderBlinkRP()
@@ -416,11 +442,9 @@ function a.ConsiderSkewer()
 			and #X >= #Y
 		then
 			if c.IsEnemyBetweenMeAndLocation(b, c.GetEscapeLoc(), aa) and c.IsInRange(b, I, P) then
-				if #X >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, X[#X]:GetLocation(), aa)
-				else
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEscapeLoc(), aa)
-				end
+				-- X[#X] could be Magnus himself (see SkewerDestination). Skewer toward a real ally, else
+				-- toward safety.
+				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(b:GetLocation(), aa)
 			end
 			if
 				c.IsRunning(b)
@@ -618,11 +642,8 @@ function a.ConsiderSkewer2()
 			and #X >= #Y
 		then
 			if c.IsEnemyBetweenMeAndLocation(b, c.GetEscapeLoc(), aa) and c.IsInRange(b, V, P) then
-				if #X >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, X[#X]:GetLocation(), aa)
-				else
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEscapeLoc(), aa)
-				end
+				-- Same Magnus-in-his-own-ally-list bug as in ConsiderSkewer.
+				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(b:GetLocation(), aa)
 			end
 		end
 	end

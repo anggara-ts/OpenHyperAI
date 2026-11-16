@@ -189,9 +189,12 @@ function a.ConsiderSplitEarth()
 		end
 	end
 	if D then
+		-- Range cap added: the target can be far beyond reach, and the stun went to a spot I units
+		-- toward it with nobody there.
 		if
 			c.IsValidTarget(C)
 			and c.CanCastOnNonMagicImmune(C)
+			and c.IsInRange(b, C, I + K)
 			and not c.IsDisabled(C)
 			and not C:HasModifier("modifier_faceless_void_chronosphere_freeze")
 		then
@@ -255,7 +258,8 @@ function a.ConsiderSplitEarth()
 			end
 			local Y = b:GetNearbyLaneCreeps(I, true)
 			if Y ~= nil and #Y >= 4 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(P)
+				-- Was GetCenterOfUnits(P), the enemy HEROES list: with no hero near it aimed at (0,0).
+				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(Y)
 			end
 		end
 	end
@@ -329,9 +333,11 @@ function a.ConsiderDiabolicEdict()
 	local K = r:GetSpecialValueInt("radius")
 	local N = r:GetManaCost()
 	if D then
+		-- No magic-immunity check: Edict pierces it (Valve data: SPELL_IMMUNITY_ENEMIES_YES, pure
+		-- damage), so a BKB'd target no longer stops it.
 		if
 			c.IsValidTarget(C)
-			and c.CanCastOnNonMagicImmune(C)
+			and c.CanCastOnMagicImmune(C)
 			and c.IsInRange(b, C, K + 100)
 			and not c.IsSuspiciousIllusion(C)
 			and not C:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -424,13 +430,13 @@ function a.ConsiderLightningStorm()
 		end
 	end
 	if D then
+		-- Chase and not-disabled requirements dropped: a target stunned by Split Earth or standing to
+		-- fight never got Lightning Storm (4s cooldown, damage spell) outside the kill/team-fight cases.
 		if
 			c.IsValidTarget(C)
 			and c.CanCastOnNonMagicImmune(C)
 			and c.IsInRange(b, C, I)
-			and c.IsChasingTarget(b, C)
 			and not c.IsSuspiciousIllusion(C)
-			and not c.IsDisabled(C)
 			and not C:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not C:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
@@ -656,6 +662,46 @@ function a.ConsiderNihilism()
 		local T = c.GetEnemiesNearLoc(b:GetLocation(), K)
 		if b:WasRecentlyDamagedByAnyHero(2) and T ~= nil and #T >= 1 then
 			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
+	-- Fights: Nihilism makes Leshrac and enemies within the radius ethereal (no attacks), slows them
+	-- and they take 30% more magic damage (Valve datafeed). It was only an escape. Now (1) in a
+	-- fight while heroes hit him below 60% HP, and (2) going on a target with no allied hero within
+	-- 1200, so no ally's right-clicks are lost to the ethereal enemies.
+	if D or H then
+		local T = c.GetEnemiesNearLoc(b:GetLocation(), K)
+		local hit = 0
+		for Q, R in pairs(T) do
+			if c.IsValidHero(R) and not R:IsMagicImmune() and not c.IsSuspiciousIllusion(R) then
+				hit = hit + 1
+			end
+		end
+		if hit >= 1 then
+			local mates = 0
+			for Q, R in pairs(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}) do
+				if R ~= b and not c.IsSuspiciousIllusion(R) then
+					mates = mates + 1
+				end
+			end
+			local why = nil
+			if b:WasRecentlyDamagedByAnyHero(1.5) and c.GetHP(b) < 0.6 then
+				why = "defend"
+			elseif
+				D
+				and c.IsValidHero(C)
+				and c.IsInRange(b, C, K)
+				and not C:IsMagicImmune()
+				and mates == 0
+			then
+				why = "solo"
+			end
+			if why ~= nil then
+				if DotaTime() >= (b._nihilLogAt or -999) then
+					b._nihilLogAt = DotaTime() + 5
+					pcall(print, string.format("[OHA-LESHRAC] t=%.0f nihilism %s enemies=%d", DotaTime(), why, hit))
+				end
+				return BOT_ACTION_DESIRE_HIGH
+			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE

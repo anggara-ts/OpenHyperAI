@@ -132,7 +132,8 @@ function a.ConsiderGorgonGrasp()
 	local K = s:GetSpecialValueInt("delay")
 	local L = s:GetSpecialValueInt("damage")
 	local M = s:GetSpecialValueInt("damage_pers")
-	local N = s:GetSpecialValueInt("duration")
+	-- Float: duration is 0.8/1.2/1.6/2.0 (game data); the Int read gave 0/1/1/2 and undercounted the kill damage.
+	local N = s:GetSpecialValueFloat("duration")
 	G = c.GetProperTarget(b)
 	local O = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local P = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
@@ -419,7 +420,9 @@ function a.ConsiderR()
 		if
 			c.IsValidHero(a8)
 			and not c.IsSuspiciousIllusion(a8)
-			and c.CanCastOnNonMagicImmune(a8)
+			-- Was CanCastOnNonMagicImmune: Stone Gaze is SPELL_IMMUNITY_ENEMIES_YES in the game data
+			-- (it pierces debuff immunity), so a BKB carry hitting her counts as looking too.
+			and not a8:IsInvulnerable()
 			and (
 				a8:GetAttackTarget() == b
 				or c.IsChasingTarget(a8, b)

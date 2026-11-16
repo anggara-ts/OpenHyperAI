@@ -170,6 +170,31 @@ function a.ConsiderBodyguard()
 	end
 	local K = c.GetProperCastRange(false, b, t:GetCastRange())
 	local L = b:GetNearbyLaneCreeps(1200, true)
+	-- Save: Bodyguard puts a shared all-damage barrier on the partner (datafeed: shared_barrier
+	-- 90/160/230/300), but it was only cast from Marci's own state, never for an ally under fire.
+	for _, ally in pairs(I) do
+		if
+			c.IsValidHero(ally)
+			and b ~= ally
+			and not ally:IsIllusion()
+			and not c.IsMeepoClone(ally)
+			and c.IsInRange(b, ally, K)
+			and c.GetHP(ally) < 0.5
+			and ally:WasRecentlyDamagedByAnyHero(1.5)
+			and not ally:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			if DotaTime() >= (b._ohaMarciGuardLogAt or -999) then
+				b._ohaMarciGuardLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-MARCI] t=%.0f bodyguard save on %s hp=%.2f",
+					DotaTime(),
+					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+					c.GetHP(ally)
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, ally
+		end
+	end
 	if
 		c.IsGoingOnSomeone(b) and b:WasRecentlyDamagedByAnyHero(5.0)
 		or c.IsPushing(b) and #J > 0
@@ -330,8 +355,20 @@ function a.ConsiderRebound()
 							and not c.IsSuspiciousIllusion(U)
 							and not c.IsDisabled(U)
 						then
+							-- Was returning the enemy U: Rebound targets allied units only (enemies only
+							-- with Shard), so the escape cast failed or jumped Marci onto the chaser.
+							-- Jump to the ally P that is on the way to the fountain.
 							if #J > #I or b:WasRecentlyDamagedByHero(U, 3.0) then
-								return BOT_ACTION_DESIRE_HIGH, U
+								-- Landing direction can't be set (no vector-target order); log to check it.
+								if DotaTime() >= (b._ohaMarciReboundLogAt or -999) then
+									b._ohaMarciReboundLogAt = DotaTime() + 5
+									pcall(print, string.format(
+										"[OHA-MARCI] t=%.0f rebound escape via %s",
+										DotaTime(),
+										P:GetUnitName()
+									))
+								end
+								return BOT_ACTION_DESIRE_HIGH, P
 							end
 						end
 					end
@@ -406,7 +443,16 @@ function a.ConsiderUnleash()
 	end
 	local aa = s:GetSpecialValueInt("pulse_damage")
 	local ab = s:GetSpecialValueInt("charges_per_flurry")
-	if c.IsInTeamFight(b, 800) then
+	-- Was: any team fight with an enemy core within 1600, so the 16 s Unleash could start while Marci
+	-- was still walking in and lose seconds of it. Now an enemy hero must be within 500.
+	local enemyClose = false
+	for O, a6 in pairs(J) do
+		if c.IsValidHero(a6) and not c.IsSuspiciousIllusion(a6) and c.IsInRange(b, a6, 500) then
+			enemyClose = true
+			break
+		end
+	end
+	if c.IsInTeamFight(b, 800) and enemyClose then
 		local ac = 0
 		for O, a6 in pairs(J) do
 			if c.IsValidHero(a6) and c.IsCore(a6) then

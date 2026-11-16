@@ -1164,7 +1164,9 @@ function l.PushThink(ao, ap)
 	then
 		local dm = df[1]:GetAttackRange() + 200
 		local dn = false
-		if dd < 0.6 then
+		-- Also step out when an attack order on an allied creep failed to move the tower's aggro
+		-- in the last 6s (ability_item_usage_generic DeflectTowerAggro).
+		if dd < 0.6 or DotaTime() < (ao._deaggroFailedAt or -99) + 6 then
 			dn = true
 		else
 			local dp = df[1]:GetAttackDamage() * df[1]:GetAttackSpeed() * 5 - ao:GetHealthRegen() * 5

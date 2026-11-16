@@ -7706,6 +7706,9 @@ function a.DeflectTowerAggro()
 		b._deaggroChecked = true
 		local tw = b._deaggroTower
 		local switched = f.IsValidBuilding(tw) and tw:GetAttackTarget() ~= b
+		if not switched then
+			b._deaggroFailedAt = now
+		end
 		pcall(print, string.format(
 			"[OHA-AGGRO] t=%.0f %s tower-deflect result=%s",
 			now,
@@ -7714,6 +7717,13 @@ function a.DeflectTowerAggro()
 		))
 	end
 	if not b:IsAlive() or b:IsInvulnerable() or now < (b._deaggroAt or -99) + 2 then
+		return false
+	end
+	-- Walk out instead (game 034, 26:47-26:59: Phoenix kept getting a deflect order every 2s after
+	-- it failed, each one cancelling the push mode's step out of range; he went from 85% to 9% HP
+	-- under the tower, logged idle). No deflect below 60% HP or while retreating (the modes walk
+	-- the bot out from there), and none for 6s after one that did not move the tower's aggro.
+	if f.GetHP(b) < 0.6 or b:GetActiveMode() == BOT_MODE_RETREAT or now < (b._deaggroFailedAt or -99) + 6 then
 		return false
 	end
 	for _, tw in pairs(b:GetNearbyTowers(1000, true) or {}) do

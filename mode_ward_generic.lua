@@ -366,6 +366,24 @@ function Think()
 	else
 		b._wardAtSpotSince = nil
 	end
+	-- No progress toward the spot for 4s (the path keeps turning back): game 031, -0:16 to -0:03,
+	-- Techies paced 650-700 from the Dire mid spot in sight of the enemy and drew an attack. Within
+	-- 700: plant from here toward it. Farther: give the spot up.
+	if j and j.location then
+		local now = DotaTime()
+		local dist = GetUnitToLocationDistance(b, j.location)
+		local pr = b._wardProgress
+		if pr == nil or pr.spot ~= j or dist < pr.best - 40 then
+			b._wardProgress = { spot = j, best = dist, at = now }
+		elseif now - pr.at >= 4 and dist > math.max(f, g) then
+			b._wardProgress = nil
+			if dist <= 700 and a.PlantShort() then
+				return
+			end
+			GiveUpWardSpot("no-progress")
+			return
+		end
+	end
 	a.WardThinkActed = false
 	a.WardThink()
 	if a.WardThinkActed then
@@ -431,6 +449,34 @@ local function MarkEarlyWard(spot)
 		obs = obs,
 		to = c.AdjustLocationWithOffsetTowardsFountain(t1:GetLocation(), 350),
 	}
+end
+-- Plant the observer from where he stands, as far toward the spot as the cast range allows.
+function a.PlantShort()
+	if j == nil or h == nil or not c.CanCastAbility(h) then
+		return false
+	end
+	if h:GetName() == "item_ward_dispenser" and not DispenserHasObservers(h) then
+		return false
+	end
+	local loc = c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), j.location, f - 30)
+	pcall(print, string.format(
+		"[OHA-WARD] t=%.0f %s plant-short spot=%.0f,%.0f at=%.0f,%.0f dist=%d",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		j.location.x,
+		j.location.y,
+		loc.x,
+		loc.y,
+		GetUnitToLocationDistance(b, j.location)
+	))
+	pcall(MarkEarlyWard, j)
+	if h:GetName() == "item_ward_observer" then
+		b:Action_UseAbilityOnLocation(h, loc)
+	else
+		DispenserPlant(h, loc, true)
+	end
+	j.plant_time_obs = DotaTime()
+	return true
 end
 function a.WardThink()
 	pcall(ValidateSpot, j)

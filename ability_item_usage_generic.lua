@@ -708,11 +708,13 @@ local function aD()
 				end
 			end
 			if wardInStash then
+				pcall(a.LogCourier, "take")
 				b:ActionImmediate_Courier(aF, COURIER_ACTION_TAKE_STASH_ITEMS)
 				az = aH
 				return
 			end
 			if b:GetCourierValue() > 0 and aH > az + aK then
+				pcall(a.LogCourier, "deliver")
 				b:ActionImmediate_Courier(aF, COURIER_ACTION_TRANSFER_ITEMS)
 				az = aH
 				return
@@ -733,7 +735,8 @@ local function aD()
 						))
 				then
 					f.SetReportMotive(aE, "信使取出物品并开始运输")
-					b:ActionImmediate_Courier(aF, COURIER_ACTION_TAKE_STASH_ITEMS)
+					pcall(a.LogCourier, "take")
+				b:ActionImmediate_Courier(aF, COURIER_ACTION_TAKE_STASH_ITEMS)
 					az = aH
 					if aH > aC + aL then
 						aC = aH
@@ -770,7 +773,8 @@ local function aD()
 			and aH > az + aK
 		then
 			f.SetReportMotive(aE, "信使运输背包中的东西")
-			b:ActionImmediate_Courier(aF, COURIER_ACTION_TRANSFER_ITEMS)
+			pcall(a.LogCourier, "deliver")
+				b:ActionImmediate_Courier(aF, COURIER_ACTION_TRANSFER_ITEMS)
 			az = aH
 			return
 		end
@@ -7888,6 +7892,91 @@ function a.UseDustNow()
 	end
 	return false
 end
+-- [OHA-COURIER] what the courier takes and delivers, and what shows up in the inventory (user ask,
+-- game 031: Earthshaker's sentry was in the stash / on the courier while he kept switching a
+-- dispenser with 1 observer). take: the stash items when the courier is sent for them; deliver:
+-- the order with the courier's value; arrived: an item that appears in the inventory away from
+-- the shop (or a dispenser whose charges change), checked once a second.
+function a.LogCourier(kind)
+	local now = DotaTime()
+	b._courierLogAt = b._courierLogAt or {}
+	if now < (b._courierLogAt[kind] or -999) then
+		return
+	end
+	b._courierLogAt[kind] = now + 3
+	local names = {}
+	for slot = 9, 14 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and not it:IsNull() then
+			names[#names + 1] = (string.gsub(it:GetName(), "^item_", ""))
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-COURIER] t=%.0f %s %s stash=%s stashValue=%d courierValue=%d",
+		now,
+		(string.gsub(c, "npc_dota_hero_", "")),
+		kind,
+		#names > 0 and table.concat(names, ",") or "-",
+		b:GetStashValue(),
+		b:GetCourierValue()
+	))
+end
+local function DispenserCounts(it)
+	local obs = it:GetCurrentCharges() or 0
+	local okS, sen = pcall(function()
+		return it:GetSecondaryCharges()
+	end)
+	return obs, okS and type(sen) == "number" and sen or -1
+end
+function a.WatchArrivals()
+	local now = DotaTime()
+	if now < (b._arrivalAt or -999) or not b:IsAlive() then
+		return
+	end
+	b._arrivalAt = now + 1
+	local count, disp = {}, nil
+	for slot = 0, 8 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and not it:IsNull() then
+			local nm = it:GetName()
+			count[nm] = (count[nm] or 0) + 1
+			if nm == "item_ward_dispenser" then
+				local o, s0 = DispenserCounts(it)
+				disp = { obs = o, sen = s0, slot = slot }
+			end
+		end
+	end
+	local prev = b._arrivalPrev
+	b._arrivalPrev = { count = count, disp = disp }
+	if prev == nil then
+		return
+	end
+	local atShop = b:DistanceFromFountain() <= 1000
+	for nm, n in pairs(count) do
+		if n > (prev.count[nm] or 0) and not atShop then
+			pcall(print, string.format(
+				"[OHA-COURIER] t=%.0f %s arrived %s slot=%d",
+				now,
+				(string.gsub(c, "npc_dota_hero_", "")),
+				(string.gsub(nm, "^item_", "")),
+				b:FindItemSlot(nm)
+			))
+		end
+	end
+	local pd = prev.disp
+	if disp ~= nil and (pd == nil or pd.obs ~= disp.obs or pd.sen ~= disp.sen) then
+		pcall(print, string.format(
+			"[OHA-COURIER] t=%.0f %s dispenser obs=%s->%d sen=%s->%d slot=%d",
+			now,
+			(string.gsub(c, "npc_dota_hero_", "")),
+			pd ~= nil and tostring(pd.obs) or "-",
+			disp.obs,
+			pd ~= nil and tostring(pd.sen) or "-",
+			disp.sen,
+			disp.slot
+		))
+	end
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7908,6 +7997,7 @@ function ItemUsageThink()
 	pcall(ChargeTracker.Tick, b)
 	pcall(a.TrackTeleportJump)
 	pcall(a.WatchStillUnderHit)
+	pcall(a.WatchArrivals)
 	pcall(a.LogHomeWalk)
 	local okQ, cleared = pcall(a.WatchStuckQueue)
 	if okQ and cleared then

@@ -60,6 +60,7 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 m["pos_3"] = {
 	"item_mage_outfit",
 	"item_glimmer_cape",
@@ -74,7 +75,6 @@ m["pos_3"] = {
 	"item_sheepstick",
 	"item_wind_waker",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 m["pos_2"] = {
 	"item_crystal_maiden_outfit",

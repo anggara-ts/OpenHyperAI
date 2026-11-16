@@ -79,6 +79,7 @@ n["pos_2"] = {
 	"item_satanic",
 	"item_travel_boots_2",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 n["pos_4"] = {
 	"item_double_tango",
 	"item_faerie_fire",
@@ -96,7 +97,6 @@ n["pos_4"] = {
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 n["pos_5"] = {
 	"item_double_tango",

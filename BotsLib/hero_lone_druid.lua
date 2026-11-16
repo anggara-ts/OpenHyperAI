@@ -41,7 +41,7 @@ o["pos_2"] = o["pos_1"]
 o["pos_3"] = o["pos_1"]
 o["pos_4"] = o["pos_1"]
 o["pos_5"] = o["pos_1"]
-local r = SafeAbility(b:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid") ~= nil
+local r = b:GetAbilityByName("lone_druid_spirit_bear") ~= nil
 if r then
 	a["sBuyList"] = {
 		"item_tango",

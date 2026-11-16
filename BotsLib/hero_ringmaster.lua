@@ -107,8 +107,6 @@ local u = SafeAbility(b:GetAbilityByName("ringmaster_empty_souvenir"), "ringmast
 local v = SafeAbility(b:GetAbilityByName("ringmaster_funhouse_mirror"), "ringmaster_funhouse_mirror", "ringmaster")
 local w = SafeAbility(b:GetAbilityByName("ringmaster_strongman_tonic"), "ringmaster_strongman_tonic", "ringmaster")
 local x = SafeAbility(b:GetAbilityByName("ringmaster_whoopee_cushion"), "ringmaster_whoopee_cushion", "ringmaster")
-local y = SafeAbility(b:GetAbilityByName("ringmaster_crystal_ball"), "ringmaster_crystal_ball", "ringmaster")
-local z = SafeAbility(b:GetAbilityByName("ringmaster_weighted_pie"), "ringmaster_weighted_pie", "ringmaster")
 local A = SafeAbility(b:GetAbilityByName("ringmaster_summon_unicycle"), "ringmaster_summon_unicycle", "ringmaster")
 local B, C
 local D
@@ -119,8 +117,6 @@ local K, L
 local M
 local N, O
 local P
-local Q, R
-local S, T
 local U
 local V
 local W, X
@@ -196,16 +192,6 @@ function a.SkillsComplement()
 	M = a.ConsiderFunhouseMirror()
 	if M > 0 then
 		b:Action_UseAbility(v)
-		return
-	end
-	Q, R = a.ConsiderCrystalBall()
-	if Q > 0 then
-		b:ActionQueue_UseAbilityOnLocation(y, R)
-		return
-	end
-	S, T = a.ConsiderWeightedPie()
-	if S > 0 then
-		b:Action_UseAbilityOnEntity(z, T)
 		return
 	end
 	U = a.ConsiderUnicycle()
@@ -806,59 +792,6 @@ function a.ConsiderWhoopeeCushion()
 				and b:IsFacingLocation(c.GetTeamFountain(), 45)
 			then
 				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderCrystalBall()
-	if not c.CanCastAbility(y) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	for aA, aB in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		if IsHeroAlive(aB) then
-			local aC = GetHeroLastSeenInfo(aB)
-			if aC ~= nil then
-				local aD = aC[1]
-				if
-					aD ~= nil
-					and c.GetLocationToLocationDistance(b:GetLocation(), aD.location) <= 100000
-					and aD.time_since_seen > 3
-				then
-					return BOT_ACTION_DESIRE_HIGH, aD.location
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderWeightedPie()
-	if not c.CanCastAbility(z) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local a2 = c.GetProperCastRange(false, b, z:GetCastRange())
-	local aa = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	if Y then
-		if
-			c.IsValidHero(W)
-			and c.IsInRange(b, W, a2 / 3)
-			and c.CanCastOnNonMagicImmune(W)
-			and not W:IsInvulnerable()
-			and not W:HasModifier("modifier_ringmaster_weightedpie_blind")
-		then
-			return BOT_ACTION_DESIRE_HIGH, W
-		end
-	end
-	if Z and not c.IsRealInvisible(b) then
-		for ab, ac in pairs(aa) do
-			if
-				c.IsValidHero(ac)
-				and c.IsInRange(b, ac, a2)
-				and c.CanCastOnNonMagicImmune(ac)
-				and (a0 < 0.5 or c.IsChasingTarget(ac, b))
-				and not ac:HasModifier("modifier_ringmaster_weightedpie_blind")
-			then
-				return BOT_ACTION_DESIRE_HIGH, ac
 			end
 		end
 	end

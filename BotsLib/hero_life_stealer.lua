@@ -83,11 +83,6 @@ local o, p, q
 local r, s
 function a.MinionThink(t)
 	local u = c.GetHP(b)
-	local v = t:GetAbilityByName("life_stealer_control")
-	if v and not v:IsHidden() and v:IsFullyCastable() then
-		t:Action_UseAbility(v)
-		return
-	end
 	local w = t:GetAbilityByName("life_stealer_consume")
 	if w and w:IsFullyCastable() then
 		local x = t:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
@@ -149,7 +144,6 @@ local B = SafeAbility(b:GetAbilityByName("life_stealer_rage"), "life_stealer_rag
 local C = SafeAbility(b:GetAbilityByName("life_stealer_open_wounds"), "life_stealer_open_wounds", "life_stealer")
 local D = SafeAbility(b:GetAbilityByName("life_stealer_infest"), "life_stealer_infest", "life_stealer")
 local E = SafeAbility(b:GetAbilityByName("life_stealer_consume"), "life_stealer_consume", "life_stealer")
-local F = SafeAbility(b:GetAbilityByName("life_stealer_control"), "life_stealer_control", "life_stealer")
 local G
 local H, I
 local J, K

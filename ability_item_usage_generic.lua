@@ -248,12 +248,6 @@ local function K()
 		b.stuckTime = nil
 		b.stuckLoc = nil
 	end
-	if b.needRefreshAbilitiesFor737 ~= nil and h ~= nil then
-		o = h["sSkillList"]
-		if not b.needRefreshAbilitiesFor737 then
-			b.needRefreshAbilitiesFor737 = nil
-		end
-	end
 	local A = b:GetLevel()
 	if GetGameMode() == GAMEMODE_ARDM and b:GetAbilityPoints() > 0 then
 		if #o > 0 then

@@ -132,8 +132,6 @@ local s = SafeAbility(
 	"keeper_of_the_light_radiant_bind",
 	"keeper_of_the_light"
 )
-local t =
-	SafeAbility(b:GetAbilityByName("keeper_of_the_light_recall"), "keeper_of_the_light_recall", "keeper_of_the_light")
 local u = SafeAbility(
 	b:GetAbilityByName("keeper_of_the_light_will_o_wisp"),
 	"keeper_of_the_light_will_o_wisp",
@@ -149,7 +147,6 @@ local y
 local z, A
 local B, C
 local D, E
-local F, G
 local H, I
 local J
 local K = -100
@@ -187,11 +184,6 @@ function a.SkillsComplement()
 	s = SafeAbility(
 		b:GetAbilityByName("keeper_of_the_light_radiant_bind"),
 		"keeper_of_the_light_radiant_bind",
-		"keeper_of_the_light"
-	)
-	t = SafeAbility(
-		b:GetAbilityByName("keeper_of_the_light_recall"),
-		"keeper_of_the_light_recall",
 		"keeper_of_the_light"
 	)
 	u = SafeAbility(
@@ -242,11 +234,6 @@ function a.SkillsComplement()
 	B, C = a.ConsiderChakraMagic()
 	if B > 0 then
 		b:Action_UseAbilityOnEntity(r, C)
-		return
-	end
-	F, G = a.ConsiderRecall()
-	if F > 0 then
-		b:Action_UseAbilityOnEntity(t, G)
 		return
 	end
 end
@@ -617,47 +604,5 @@ function a.ConsiderSpiritForm()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderRecall()
-	if not c.CanCastAbility(t) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local ag = t:GetSpecialValueInt("teleport_delay")
-	if ag == nil or ag == 0 then
-		ag = 3
-	end
-	for W, a9 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-		if c.IsValidHero(a9) and not a9:IsIllusion() and not c.IsMeepoClone(a9) then
-			local ah = c.IsEnemyHeroAroundLocation(a9:GetLocation(), 1600)
-			local aa = c.GetEnemiesNearLoc(a9:GetLocation(), 1600)
-			if not ah then
-				if
-					c.IsRetreating(a9)
-					and c.GetHP(a9) < 0.25
-					and #aa == 0
-					and a9:DistanceFromFountain() > 4500
-					and b:DistanceFromFountain() < 1600
-					and not a9:WasRecentlyDamagedByAnyHero(ag)
-				then
-					return BOT_ACTION_DESIRE_HIGH, a9
-				end
-				if
-					c.IsPushing(b)
-					and GetUnitToUnitDistance(b, a9) > 4000
-					and not c.IsFarming(a9)
-					and not c.IsLaning(a9)
-					and not c.IsDoingRoshan(a9)
-					and not c.IsDoingTormentor(a9)
-					and not c.IsDefending(a9)
-				then
-					local ac = c.GetAlliesNearLoc(b:GetLocation(), 1600)
-					if #ac >= 2 then
-						return BOT_ACTION_DESIRE_HIGH, a9
-					end
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
 end
 return a

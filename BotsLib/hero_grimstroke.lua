@@ -101,16 +101,13 @@ end
 local o = SafeAbility(b:GetAbilityByName("grimstroke_dark_artistry"), "grimstroke_dark_artistry", "grimstroke")
 local p = SafeAbility(b:GetAbilityByName("grimstroke_ink_creature"), "grimstroke_ink_creature", "grimstroke")
 local q = SafeAbility(b:GetAbilityByName("grimstroke_spirit_walk"), "grimstroke_spirit_walk", "grimstroke")
-local r = SafeAbility(b:GetAbilityByName("grimstroke_return"), "grimstroke_return", "grimstroke")
 local s = SafeAbility(b:GetAbilityByName("grimstroke_dark_portrait"), "grimstroke_dark_portrait", "grimstroke")
 local t = SafeAbility(b:GetAbilityByName("grimstroke_soul_chain"), "grimstroke_soul_chain", "grimstroke")
 local u, v
 local w, x
 local y, z
-local A
 local B, C
 local D, E
-local F = -1
 local G
 local H
 local I
@@ -183,12 +180,6 @@ function a.SkillsComplement()
 	y, z = a.ConsiderInkSwell()
 	if y > 0 then
 		b:Action_UseAbilityOnEntity(q, z)
-		F = DotaTime()
-		return
-	end
-	A = a.ConsiderInkExplosion()
-	if A > 0 then
-		b:Action_UseAbility(r)
 		return
 	end
 	D, E = a.ConsiderSoulBind()
@@ -564,46 +555,6 @@ function a.ConsiderInkSwell()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderInkExplosion()
-	if r:IsHidden() or not r:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local N = q:GetSpecialValueInt("radius")
-	local a2 = q:GetSpecialValueInt("buff_duration")
-	if DotaTime() < F + a2 then
-		local R = b:GetNearbyHeroes(N, true, BOT_MODE_NONE)
-		for S, T in pairs(R) do
-			if
-				c.IsValidHero(T)
-				and c.CanCastOnNonMagicImmune(T)
-				and T:IsChanneling()
-				and not c.IsSuspiciousIllusion(T)
-				and not c.IsDisabled(T)
-				and b:HasModifier("modifier_grimstroke_spirit_walk_buff")
-			then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-		for S, a0 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			local a6 = a0:GetNearbyHeroes(N, true, BOT_MODE_NONE)
-			if c.IsValidHero(a0) then
-				for S, a7 in pairs(a6) do
-					if
-						c.IsValidHero(a7)
-						and c.CanCastOnNonMagicImmune(a7)
-						and a7:IsChanneling()
-						and not c.IsSuspiciousIllusion(a7)
-						and not c.IsDisabled(a7)
-						and a0:HasModifier("modifier_grimstroke_spirit_walk_buff")
-					then
-						return BOT_ACTION_DESIRE_HIGH
-					end
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderSoulBind()
 	if not t:IsFullyCastable() then

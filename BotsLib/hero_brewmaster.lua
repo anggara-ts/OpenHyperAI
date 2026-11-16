@@ -116,13 +116,11 @@ end
 local q = SafeAbility(b:GetAbilityByName("brewmaster_thunder_clap"), "brewmaster_thunder_clap", "brewmaster")
 local r = SafeAbility(b:GetAbilityByName("brewmaster_cinder_brew"), "brewmaster_cinder_brew", "brewmaster")
 local s = SafeAbility(b:GetAbilityByName("brewmaster_drunken_brawler"), "brewmaster_drunken_brawler", "brewmaster")
-local t = SafeAbility(b:GetAbilityByName("brewmaster_primal_companion"), "brewmaster_primal_companion", "brewmaster")
 local u = SafeAbility(b:GetAbilityByName("brewmaster_primal_split"), "brewmaster_primal_split", "brewmaster")
 local v = SafeAbility(b:GetAbilityByName("brewmaster_liquid_courage"), "brewmaster_liquid_courage", "brewmaster")
 local w
 local x, y
 local z, A
-local B
 local C
 local D, E
 local F = 1
@@ -171,11 +169,6 @@ function a.SkillsComplement()
 		c.SetQueuePtToINT(b, false)
 		-- datafeed (Shard): the drink is tossed to a teammate or self; E is a hero, so cast on the unit
 		b:ActionQueue_UseAbilityOnEntity(v, E)
-		return
-	end
-	B = a.ConsiderPrimalCompanion()
-	if B > 0 then
-		b:Action_UseAbility(u)
 		return
 	end
 end
@@ -423,38 +416,6 @@ function a.ConsiderLiquidCourage()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderPrimalCompanion()
-	if not b:HasScepter() or not c.CanCastAbility(t) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local R, u = c.HasAbility(b, "brewmaster_primal_split")
-	local nAllyHeroes = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local P = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	G = c.GetProperTarget(b)
-	if u ~= nil and (u:IsFullyCastable() or u:GetCooldownTimeRemaining() < 5) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	if L then
-		if P ~= nil and #P >= 2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if H then
-		if
-			c.IsValidTarget(G)
-			and not G:IsAttackImmune()
-			and c.IsInRange(b, G, 600)
-			and not c.IsSuspiciousIllusion(G)
-			and not c.IsDisabled(G)
-			and not c.IsMeepoClone(G)
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not c.IsLocationInChrono(G:GetLocation())
-		then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderPrimalSplit()
 	if not c.CanCastAbility(u) then

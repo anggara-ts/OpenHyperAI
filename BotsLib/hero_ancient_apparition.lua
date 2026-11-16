@@ -457,7 +457,7 @@ function a.ConsiderIceBlastRelease()
 	end
 	local a2 = GetLinearProjectiles()
 	for N, a3 in pairs(a2) do
-		if a3 ~= nil and a3.ability:GetName() == "ancient_apparition_ice_blast" then
+		if a3 ~= nil and a3.ability ~= nil and a3.ability:GetName() == "ancient_apparition_ice_blast" then
 			if D ~= nil and c.GetLocationToLocationDistance(D, a3.location) < 100 then
 				return BOT_ACTION_DESIRE_HIGH
 			end

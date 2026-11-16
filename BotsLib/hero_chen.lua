@@ -100,13 +100,11 @@ end
 local o = SafeAbility(b:GetAbilityByName("chen_penitence"), "chen_penitence", "chen")
 local p = SafeAbility(b:GetAbilityByName("chen_holy_persuasion"), "chen_holy_persuasion", "chen")
 local q = SafeAbility(b:GetAbilityByName("chen_divine_favor"), "chen_divine_favor", "chen")
-local r = SafeAbility(b:GetAbilityByName("chen_summon_convert"), "chen_summon_convert", "chen")
 local s = SafeAbility(b:GetAbilityByName("chen_zealot"), "chen_zealot", "chen")
 local t = SafeAbility(b:GetAbilityByName("chen_hand_of_god"), "chen_hand_of_god", "chen")
 local u, v
 local w, x
 local y, z
-local A
 local B
 local C
 local D = {}
@@ -127,11 +125,6 @@ function a.SkillsComplement()
 	u, v = a.ConsiderPenitence()
 	if u > 0 then
 		b:Action_UseAbilityOnEntity(o, v)
-		return
-	end
-	A = a.ConsiderSummonConvert()
-	if A > 0 then
-		b:Action_UseAbility(r)
 		return
 	end
 	B = a.ConsiderZealot()
@@ -350,34 +343,6 @@ function a.ConsiderDivineFavor()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderSummonConvert()
-	if not r:IsFullyCastable() or a.IsThereChenCreepAlive() then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	if c.IsGoingOnSomeone(b) then
-		if
-			c.IsValidTarget(E)
-			and c.IsInRange(b, E, 900)
-			and not c.IsSuspiciousIllusion(E)
-			and not E:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			local N = c.GetNearbyHeroes(E, 1200, true, BOT_MODE_NONE)
-			local O = c.GetNearbyHeroes(E, 1200, false, BOT_MODE_NONE)
-			if N ~= nil and O ~= nil and #N >= #O then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-	end
-	if (c.IsFarming(b) or c.IsPushing(b) or c.IsDefending(b) or c.IsLaning(b)) and F then
-		return BOT_ACTION_DESIRE_HIGH
-	end
-	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(E) or c.IsTormentor(E)) and c.IsInRange(b, E, b:GetAttackRange()) and F then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 function a.ConsiderZealot()
 	if not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
@@ -446,13 +411,5 @@ function a.ConsiderHandOfGod()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function a.IsThereChenCreepAlive()
-	for K, V in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if string.find(V:GetUnitName(), "neutral") and V:HasModifier("modifier_chen_holy_persuasion") then
-			return true
-		end
-	end
-	return false
 end
 return a

@@ -119,13 +119,11 @@ function a.MinionThink(o)
 end
 local p = SafeAbility(b:GetAbilityByName("marci_grapple"), "marci_grapple", "marci")
 local q = SafeAbility(b:GetAbilityByName("marci_companion_run"), "marci_companion_run", "marci")
-local r = SafeAbility(b:GetAbilityByName("marci_guardian"), "marci_guardian", "marci")
 local s = SafeAbility(b:GetAbilityByName("marci_unleash"), "marci_unleash", "marci")
 local t = SafeAbility(b:GetAbilityByName("marci_bodyguard"), "marci_bodyguard", "marci")
 local u = SafeAbility(b:GetAbilityByName("marci_special_delivery"), "marci_special_delivery", "marci")
 local v, w
 local x, y
-local z, A
 local B
 local C, D
 local E
@@ -156,12 +154,6 @@ function a.SkillsComplement()
 	if x > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnEntity(q, y)
-		return
-	end
-	z, A = a.ConsiderSidekick()
-	if z > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(r, A)
 		return
 	end
 	C, D = a.ConsiderBodyguard()
@@ -403,51 +395,6 @@ function a.ConsiderRebound()
 					end
 				end
 			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderSidekick()
-	if not c.CanCastAbility(r) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local K = c.GetProperCastRange(false, b, r:GetCastRange())
-	local a7 = b:GetNearbyLaneCreeps(1200, true)
-	if
-		c.IsGoingOnSomeone(b)
-		or c.IsPushing(b)
-		or c.IsDefending(b)
-		or c.IsLaning(b) and #a7 >= 3
-		or c.IsDoingRoshan(b) and c.IsRoshan(G) and c.IsInRange(b, G, 800) and c.IsAttacking(b) and c.CanBeAttacked(G)
-		or c.IsDoingTormentor(b)
-			and c.IsTormentor(G)
-			and c.IsInRange(b, G, 800)
-			and c.IsAttacking(b)
-			and c.CanBeAttacked(G)
-	then
-		local I = b:GetNearbyHeroes(K, false, BOT_MODE_NONE)
-		local M = nil
-		local a8 = 0
-		for O, P in pairs(I) do
-			if
-				c.IsValidHero(P)
-				and b ~= P
-				and c.IsInRange(b, P, K)
-				and not P:IsIllusion()
-				and not c.IsMeepoClone(P)
-				and not P:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not P:HasModifier("modifier_marci_guardian_buff")
-				and not P:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local a9 = P:GetAttackDamage() * P:GetAttackSpeed()
-				if a9 > a8 then
-					a8 = a9
-					M = P
-				end
-			end
-		end
-		if M ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, M
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

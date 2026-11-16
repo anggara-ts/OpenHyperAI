@@ -81,14 +81,12 @@ local s = SafeAbility(b:GetAbilityByName("shredder_reactive_armor"), "shredder_r
 local t = SafeAbility(b:GetAbilityByName("shredder_chakram"), "shredder_chakram", "shredder")
 local u = SafeAbility(b:GetAbilityByName("shredder_return_chakram"), "shredder_return_chakram", "shredder")
 local v = SafeAbility(b:GetAbilityByName("shredder_flamethrower"), "shredder_flamethrower", "shredder")
-local w = SafeAbility(b:GetAbilityByName("shredder_twisted_chakram"), "shredder_twisted_chakram", "shredder")
 local x
 local y, z
 local A
 local B, C
 local D
 local E
-local F, G
 local H = 0
 local I
 local J = 0
@@ -116,11 +114,6 @@ function a.SkillsComplement()
 		I = C
 		K = DotaTime()
 		J = H
-		return
-	end
-	F, G = a.ConsiderTwistedChakram()
-	if F > 0 then
-		b:Action_UseAbilityOnLocation(w, G)
 		return
 	end
 	y, z = a.ConsiderTimberChain()
@@ -420,103 +413,6 @@ function a.ConsiderChakram()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0, 0
-end
-function a.ConsiderTwistedChakram()
-	if not c.CanCastAbility(w) then
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	local a2 = c.GetProperCastRange(false, b, w:GetCastRange())
-	local a0 = w:GetCastPoint()
-	local Q = w:GetSpecialValueInt("damage")
-	local P = w:GetSpecialValueInt("radius")
-	local a1 = w:GetSpecialValueFloat("speed")
-	local S = b:GetMana() / b:GetMaxMana()
-	local a9 = c.GetManaAfter(w:GetManaCost())
-	L = c.GetProperTarget(b)
-	local aa = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	for U, V in pairs(aa) do
-		if
-			c.IsValidHero(V)
-			and c.CanCastOnNonMagicImmune(V)
-			and c.IsInRange(b, V, a2)
-			and c.CanKillTarget(V, Q, DAMAGE_TYPE_PURE)
-			and not V:HasModifier("modifier_abaddon_borrowed_time")
-			and not V:HasModifier("modifier_dazzle_shallow_grave")
-			and not V:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not V:HasModifier("modifier_oracle_false_promise_timer")
-			and not V:HasModifier("modifier_troll_warlord_battle_trance")
-			and not V:HasModifier("modifier_ursa_enrage")
-		then
-			local ab = GetUnitToUnitDistance(b, V) / a1 + a0
-			return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(V, ab)
-		end
-	end
-	if M then
-		if
-			c.IsValidTarget(L)
-			and c.CanBeAttacked(L)
-			and c.CanCastOnNonMagicImmune(L)
-			and c.IsInRange(b, L, a2)
-			and not L:HasModifier("modifier_dazzle_shallow_grave")
-			and not L:HasModifier("modifier_troll_warlord_battle_trance")
-			and not L:HasModifier("modifier_ursa_enrage")
-		then
-			local ab = GetUnitToUnitDistance(b, L) / a1 + a0
-			return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(L, ab)
-		end
-	end
-	if N and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(3.0) and not c.CanCastAbility(r) then
-		for U, ac in pairs(aa) do
-			if
-				c.IsValidHero(ac)
-				and c.CanCastOnNonMagicImmune(ac)
-				and c.IsInRange(b, ac, 500)
-				and c.IsChasingTarget(ac, b)
-				and not c.IsDisabled(ac)
-			then
-				return BOT_ACTION_DESIRE_HIGH, ac:GetLocation()
-			end
-		end
-	end
-	local ad = b:GetNearbyLaneCreeps(a2, true)
-	if (c.IsDefending(b) or c.IsPushing(b)) and a9 > 0.3 then
-		if c.IsValid(ad[1]) and c.CanBeAttacked(ad[1]) and not c.IsRunning(ad[1]) then
-			local a7 = b:FindAoELocation(true, false, ad[1]:GetLocation(), 0, P, 0, 0)
-			if a7.count >= 4 then
-				return BOT_ACTION_DESIRE_HIGH, a7.targetloc
-			end
-		end
-	end
-	if c.IsFarming(b) and a9 > 0.3 then
-		local ae = b:GetNearbyCreeps(a2, true)
-		if c.IsValid(ae[1]) and c.CanBeAttacked(ae[1]) and not c.IsRunning(ae[1]) then
-			local a7 = b:FindAoELocation(true, false, ae[1]:GetLocation(), 0, P, 0, 0)
-			if a7.count >= 3 or a7.count >= 1 and ae[1]:IsAncientCreep() then
-				return BOT_ACTION_DESIRE_HIGH, a7.targetloc
-			end
-		end
-	end
-	if c.IsLaning(b) and S > 0.35 then
-		for U, _ in pairs(ad) do
-			if
-				c.IsValid(_)
-				and c.CanBeAttacked(_)
-				and not c.IsRunning(_)
-				and c.IsKeyWordUnit("ranged", _)
-				and c.CanKillTarget(_, Q, DAMAGE_TYPE_PURE)
-				and b:GetAttackTarget() ~= _
-			then
-				if
-					c.IsValidHero(aa[1])
-					and not c.IsSuspiciousIllusion(aa[1])
-					and GetUnitToUnitDistance(_, aa[1]) <= 600
-				then
-					return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderChakramReturn()
 	if I == 0 or I == nil or not u:IsFullyCastable() or u:IsHidden() then

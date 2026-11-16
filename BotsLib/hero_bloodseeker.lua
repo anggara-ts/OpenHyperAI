@@ -118,12 +118,11 @@ end
 local q = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "bloodseeker")
 local r = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "bloodseeker")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "bloodseeker")
-local t = SafeAbility(b:GetAbilityByName("bloodseeker_blood_mist"), "bloodseeker_blood_mist", "bloodseeker")
 local u = SafeAbility(b:GetAbilityByName("bloodseeker_thirst"), "bloodseeker_thirst", "bloodseeker")
 local v = 0
 local w, x = 0
 local y, z = 0
-local A, B
+local B
 local C
 local D, E, F, G, H
 local I
@@ -139,12 +138,6 @@ function a.SkillsComplement()
 	G = J.level
 	H = J.enemies
 	C = J.target
-	A = a.ConsiderBloodMist()
-	if A > 0 then
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbility(t)
-		return
-	end
 	B = a.ConsiderThirst()
 	if B > 0 then
 		c.SetQueuePtToINT(b, false)
@@ -182,27 +175,6 @@ function a.ConsiderThirst()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
-end
-function a.ConsiderBloodMist()
-	if not b:HasScepter() or not c.CanCastAbility(t) then
-		return BOT_MODE_NONE
-	end
-	local K = 450
-	local L = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
-	if t:GetToggleState() == true then
-		if F < 0.2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-		if #L == 0 then
-			return BOT_ACTION_DESIRE_ABSOLUTE
-		end
-	end
-	if not t:GetToggleState() == false and F > 0.5 then
-		if c.IsValidHero(C) and c.IsInRange(b, C, K * 0.8) and c.CanCastOnNonMagicImmune(C) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_MODE_NONE
 end
 function a.ConsiderQ()
 	if not q:IsFullyCastable() then

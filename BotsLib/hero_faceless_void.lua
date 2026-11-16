@@ -57,14 +57,11 @@ local r = SafeAbility(
 	"faceless_void_time_walk_reverse",
 	"faceless_void"
 )
-local s = SafeAbility(b:GetAbilityByName("faceless_void_time_zone"), "faceless_void_time_zone", "faceless_void")
 local t, u
 local v
 local w, x
 local y
-local z, A
 local B
-local C, D = 0, GameTime()
 local E
 local F
 local G
@@ -74,9 +71,6 @@ function a.SkillsComplement()
 	end
 	F = c.IsGoingOnSomeone(b)
 	G = c.IsRetreating(b)
-	if not q or q:IsHidden() then
-		q = SafeAbility(b:GetAbilityByName("faceless_void_time_zone"), "faceless_void_time_zone", "faceless_void")
-	end
 	E = c.GetProperTarget(b)
 	y = a.ConsiderTimeWalkReverse()
 	if y > 0 then
@@ -96,38 +90,9 @@ function a.SkillsComplement()
 		b:Action_UseAbility(p)
 		return
 	end
-	if q and not q:IsNull() and not q:IsHidden() then
-		if b.needRefreshAbilitiesFor737 then
-			q = SafeAbility(
-				b:GetAbilityByName("faceless_void_chronosphere"),
-				"faceless_void_chronosphere",
-				"faceless_void"
-			)
-			g = c.Skill.GetAbilityList(b)
-			a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-			b:ActionImmediate_Chat("I now have my Chronosphere back. Thanks!", true)
-			b.needRefreshAbilitiesFor737 = false
-		end
-		w, x = a.ConsiderChronosphere()
-		if w > 0 then
-			b:Action_UseAbilityOnLocation(q, x)
-			return
-		end
-	else
-		b.needRefreshAbilitiesFor737 = true
-		if C <= 2 and GameTime() - D > 15 + b:GetPlayerID() then
-			D = GameTime()
-			C = C + 1
-			b:ActionImmediate_Chat(
-				"Due to Valve bug in 7.37. I lost Chronosphere. Please enable Fretbots mode in this script to fix this problem. Check Workshop page if you need help.",
-				true
-			)
-		end
-	end
-	z, A = a.ConsiderTimezone()
-	if z > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(s, A)
+	w, x = a.ConsiderChronosphere()
+	if w > 0 then
+		b:Action_UseAbilityOnLocation(q, x)
 		return
 	end
 end
@@ -442,49 +407,6 @@ function a.ConsiderTimeWalkReverse()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderTimezone()
-	if not s or s:IsNull() or not s:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	local H = c.GetProperCastRange(false, b, s:GetCastRange())
-	local aa = s:GetSpecialValueInt("radius")
-	if c.IsInTeamFight(b, 1600) then
-		local ag = b:FindAoELocation(true, true, b:GetLocation(), H, aa, 0, 0)
-		local Q = c.GetAlliesNearLoc(ag.targetloc, aa)
-		local R = c.GetEnemiesNearLoc(ag.targetloc, aa)
-		if Q ~= nil and R ~= nil and #Q >= 2 and #R >= 2 then
-			local ak = 0
-			for _, a0 in pairs(R) do
-				if
-					c.IsValidHero(a0)
-					and not c.IsSuspiciousIllusion(a0)
-					and c.GetHP(a0) > 0.25
-					and c.CanBeAttacked(a0)
-					and not a0:HasModifier("modifier_abaddon_borrowed_time")
-					and not a0:HasModifier("modifier_necrolyte_reapers_scythe")
-				then
-					ak = ak + 1
-				end
-			end
-			if ak >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, ag.targetloc
-			end
-		end
-	end
-	if F then
-		if
-			c.IsValidTarget(E)
-			and c.CanBeAttacked(E)
-			and c.IsInRange(b, E, H)
-			and not c.IsSuspiciousIllusion(E)
-			and not E:HasModifier("modifier_abaddon_borrowed_time")
-			and not E:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			return BOT_ACTION_DESIRE_HIGH, E:GetLocation()
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 function IsAllowedToCast(al)
 	if q ~= nil and not q:IsNull() and q:IsTrained() and q:IsFullyCastable() then

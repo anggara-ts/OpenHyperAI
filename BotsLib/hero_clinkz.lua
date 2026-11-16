@@ -88,14 +88,12 @@ function a.MinionThink(n)
 	e.MinionThink(n)
 end
 local o = SafeAbility(b:GetAbilityByName("clinkz_strafe"), "clinkz_strafe", "clinkz")
-local p = SafeAbility(b:GetAbilityByName("clinkz_tar_bomb"), "clinkz_tar_bomb", "clinkz")
 local q = SafeAbility(b:GetAbilityByName("clinkz_death_pact"), "clinkz_death_pact", "clinkz")
 local r = SafeAbility(b:GetAbilityByName("clinkz_burning_barrage"), "clinkz_burning_barrage", "clinkz")
 local s = SafeAbility(b:GetAbilityByName("clinkz_burning_army"), "clinkz_burning_army", "clinkz")
 local t = SafeAbility(b:GetAbilityByName("clinkz_wind_walk"), "clinkz_wind_walk", "clinkz")
 local u = SafeAbility(b:GetAbilityByName("clinkz_searing_arrows"), "clinkz_searing_arrows", "clinkz")
 local v
-local w, x
 local y, z
 local A, B
 local C, D
@@ -117,11 +115,6 @@ function a.SkillsComplement()
 	E = a.ConsiderSkeletonWalk()
 	if E > 0 then
 		b:Action_UseAbility(t)
-		return
-	end
-	w, x = a.ConsiderTarBomb()
-	if w > 0 and p ~= nil and x ~= nil then
-		b:Action_UseAbilityOnEntity(p, x)
 		return
 	end
 	F, G = a.ConsiderSearingArrows()
@@ -219,159 +212,6 @@ function a.ConsiderStrafe()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderTarBomb()
-	if p == nil or not p:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local R = p:GetLevel()
-	local S = p:GetCastRange()
-	local T = 40 + 20 * R - 1
-	local U = 325
-	local V = c.GetNearbyHeroes(b, S, true, BOT_MODE_NONE)
-	local W = c.GetNearbyHeroes(b, S, false, BOT_MODE_NONE)
-	for X, Y in pairs(V) do
-		if
-			c.IsValidTarget(Y)
-			and c.CanCastOnNonMagicImmune(Y)
-			and c.CanKillTarget(Y, T, DAMAGE_TYPE_MAGICAL)
-			and not c.IsSuspiciousIllusion(Y)
-			and not Y:HasModifier("modifier_abaddon_borrowed_time")
-			and not Y:HasModifier("modifier_dazzle_shallow_grave")
-			and not Y:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not Y:HasModifier("modifier_oracle_false_promise_timer")
-			and not Y:HasModifier("modifier_templar_assassin_refraction_absorb")
-		then
-			return BOT_ACTION_DESIRE_HIGH, Y
-		end
-	end
-	if I then
-		if
-			c.IsValidTarget(H)
-			and c.CanCastOnNonMagicImmune(H)
-			and c.IsInRange(b, H, S + U)
-			and not c.IsSuspiciousIllusion(H)
-			and not c.IsDisabled(H)
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			local N = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-			local O = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if N ~= nil and O ~= nil and #N >= #O then
-				if J or c.IsChasingTarget(b, H) and b:GetCurrentMovementSpeed() < H:GetCurrentMovementSpeed() then
-					return BOT_ACTION_DESIRE_HIGH, H
-				end
-			end
-		end
-	end
-	if c.IsRetreating(b) and b:GetActiveModeDesire() > 0.5 then
-		local O = c.GetNearbyHeroes(b, S, true, BOT_MODE_NONE)
-		for X, Y in pairs(O) do
-			if
-				c.IsValidHero(Y)
-				and c.IsChasingTarget(Y, b)
-				and not c.IsSuspiciousIllusion(Y)
-				and not c.IsDisabled(Y)
-			then
-				local N = c.GetNearbyHeroes(Y, 1200, true, BOT_MODE_NONE)
-				local Z = c.GetNearbyHeroes(Y, 1200, false, BOT_MODE_NONE)
-				if
-					N ~= nil
-					and Z ~= nil
-					and (#Z > #N or b:WasRecentlyDamagedByAnyHero(1.5))
-					and b:GetCurrentMovementSpeed() < Y:GetCurrentMovementSpeed()
-				then
-					return BOT_ACTION_DESIRE_HIGH, Y
-				end
-			end
-		end
-	end
-	if c.IsPushing(b) then
-		if c.IsValidBuilding(H) and c.CanBeAttacked(H) and c.IsInRange(b, H, S) and c.IsAttacking(H) then
-			return BOT_ACTION_DESIRE_HIGH, H
-		end
-	end
-	if c.IsFarming(b) then
-		if J then
-			local P = b:GetNearbyNeutralCreeps(1000)
-			if P ~= nil and #P >= 1 and P[1]:GetHealth() >= 600 then
-				if t:IsTrained() then
-					if c.GetManaAfter(p:GetManaCost()) * b:GetMana() > t:GetManaCost() then
-						return BOT_ACTION_DESIRE_HIGH, P[1]
-					end
-				else
-					if K > 0.4 then
-						return BOT_ACTION_DESIRE_HIGH, P[1]
-					end
-				end
-			end
-			local Q = b:GetNearbyLaneCreeps(1000, true)
-			if Q ~= nil and #Q >= 1 and Q[1]:GetHealth() >= 550 then
-				if t:IsTrained() then
-					if c.GetManaAfter(p:GetManaCost()) * b:GetMana() > t:GetManaCost() then
-						return BOT_ACTION_DESIRE_HIGH, Q[1]
-					end
-				else
-					if K > 0.4 then
-						return BOT_ACTION_DESIRE_HIGH, Q[1]
-					end
-				end
-			end
-		end
-	end
-	if c.IsLaning(b) then
-		local Q = b:GetNearbyLaneCreeps(S, true)
-		for X, _ in pairs(Q) do
-			if
-				c.IsValid(_)
-				and (c.IsKeyWordUnit("ranged", _) or c.IsKeyWordUnit("siege", _) or c.IsKeyWordUnit("flagbearer", _))
-				and _:GetHealth() <= T
-			then
-				local a0 = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
-				if
-					a0 ~= nil
-					and #a0 >= 1
-					and GetUnitToUnitDistance(_, a0[1]) < 600
-					and H ~= _
-					and K > 0.3
-					and c.CanBeAttacked(_)
-					and c.IsInLaningPhase()
-				then
-					return BOT_ACTION_DESIRE_HIGH, _
-				end
-			end
-		end
-	end
-	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(H) or c.IsTormentor(H)) and c.IsInRange(b, H, b:GetAttackRange()) and J then
-			if t:IsTrained() then
-				if c.GetManaAfter(p:GetManaCost()) * b:GetMana() > t:GetManaCost() then
-					return BOT_ACTION_DESIRE_HIGH, H
-				end
-			else
-				return BOT_ACTION_DESIRE_HIGH, H
-			end
-		end
-	end
-	for X, a1 in pairs(W) do
-		local a2 = c.GetNearbyHeroes(a1, 1200, true, BOT_MODE_NONE)
-		if c.IsValidHero(a1) and c.IsRetreating(a1) and a1:WasRecentlyDamagedByAnyHero(2) and not a1:IsIllusion() then
-			if
-				a2 ~= nil
-				and #a2 >= 1
-				and c.IsValidHero(a2[1])
-				and c.IsInRange(b, a2[1], S)
-				and c.IsChasingTarget(a2[1], a1)
-				and a1:GetCurrentMovementSpeed() < a2[1]:GetCurrentMovementSpeed()
-				and not c.IsDisabled(a2[1])
-				and not c.IsTaunted(a2[1])
-				and not c.IsSuspiciousIllusion(a2[1])
-				and not a2[1]:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				return BOT_ACTION_DESIRE_HIGH, a2[1]
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
 function a.ConsiderDeathPact()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
@@ -384,8 +224,9 @@ function a.ConsiderDeathPact()
 			local Q = b:GetNearbyLaneCreeps(S, true)
 			for X, _ in pairs(Q) do
 				if
-					c.IsValid(_) and c.CanBeAttacked(_) and c.IsKeyWordUnit("ranged", _)
-					or c.IsKeyWordUnit("siege", _) and _:GetLevel() <= a3
+					c.IsValid(_)
+					and c.CanBeAttacked(_)
+					and (c.IsKeyWordUnit("ranged", _) or c.IsKeyWordUnit("siege", _) and _:GetLevel() <= a3)
 				then
 					local a0 = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
 					if

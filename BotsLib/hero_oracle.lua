@@ -142,6 +142,24 @@ function a.ConsiderD()
 	local Q = t:GetAbilityDamage()
 	local R = DAMAGE_TYPE_MAGICAL
 	local S = 650
+	-- Heal (datafeed: allies in the rain heal and take more healing): in a fight, 2+ allied heroes under
+	-- 70% HP within 300 of a spot in range.
+	if c.IsInTeamFight(b, 1200) then
+		for _, ally in pairs(K or {}) do
+			if c.IsValidHero(ally) and c.GetHP(ally) < 0.7 and c.IsInRange(b, ally, N) then
+				local hurt = 0
+				for _, other in pairs(c.GetAlliesNearLoc(ally:GetLocation(), 300) or {}) do
+					if c.IsValidHero(other) and c.GetHP(other) < 0.7 then
+						hurt = hurt + 1
+					end
+				end
+				if hurt >= 2 then
+					pcall(print, string.format("[OHA-ORACLE] t=%.0f rain-heal allies=%d", DotaTime(), hurt))
+					return BOT_ACTION_DESIRE_HIGH, ally:GetLocation(), "D-Heal"
+				end
+			end
+		end
+	end
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
@@ -166,6 +184,21 @@ function a.ConsiderQ()
 	local R = DAMAGE_TYPE_MAGICAL
 	local S = 300
 	local T = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	-- Save (datafeed: on an ally it only dispels debuffs): an ally in range who is rooted or silenced
+	-- with an enemy hero within 900 of him.
+	for _, ally in pairs(K or {}) do
+		if
+			c.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and (ally:IsRooted() or ally:IsSilenced())
+			and not ally:IsMagicImmune()
+			and #(c.GetEnemiesNearLoc(ally:GetLocation(), 900) or {}) >= 1
+		then
+			pcall(print, string.format("[OHA-ORACLE] t=%.0f fortunes_end-dispel ally=%s", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))))
+			return BOT_ACTION_DESIRE_HIGH, ally, "Q-Dispel" .. c.Chat.GetNormName(ally)
+		end
+	end
 	if c.IsGoingOnSomeone(b) then
 		if c.IsValidHero(botTarget) and c.IsInRange(b, botTarget, N) and c.CanCastOnNonMagicImmune(botTarget) then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack" .. c.Chat.GetNormName(botTarget)
@@ -184,6 +217,24 @@ function a.ConsiderW()
 	local Q = p:GetAbilityDamage()
 	local R = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	-- Save: a hurt ally (under 60% HP, hit by a hero in the last 2s) with an enemy spell projectile
+	-- on its way gets Fate's Edict (100% magic resistance, datafeed); Purifying Flames then heals him
+	-- (ConsiderE's Edict rule).
+	for _, ally in pairs(K or {}) do
+		if
+			c.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and c.GetHP(ally) < 0.6
+			and ally:WasRecentlyDamagedByAnyHero(2.0)
+			and c.IsNotAttackProjectileIncoming(ally, 900)
+			and not ally:IsMagicImmune()
+			and not ally:HasModifier("modifier_oracle_fates_edict")
+		then
+			pcall(print, string.format("[OHA-ORACLE] t=%.0f edict-save ally=%s hp=%.2f", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")), c.GetHP(ally)))
+			return BOT_ACTION_DESIRE_HIGH, ally, "W-Save" .. c.Chat.GetNormName(ally)
+		end
+	end
 	if c.IsInTeamFight(b, 900) and #J >= 3 then
 		local U = nil
 		local V = 0

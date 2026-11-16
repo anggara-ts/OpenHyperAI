@@ -1623,6 +1623,10 @@ function b.GetItemWardSolt()
 end
 -- Aegis: a nearby human, then a core, then anyone else.
 -- Roshan's Banner: a nearby support, then anyone else.
+-- Cheese / Refresher Shard: a core with a free main slot, then a support with one, then anyone.
+-- Game 034, 63:38: Roshan died, Phoenix took the Aegis and the Cheese (into his backpack, full
+-- bag) and nobody took the Refresher Shard: these two were never claimed by anyone. A free main
+-- slot matters: bot swaps do not take effect, so an item that lands in the backpack stays there.
 function b.RoshanClaimKind(name)
 	if name == "item_aegis" then
 		return "aegis"
@@ -1630,11 +1634,20 @@ function b.RoshanClaimKind(name)
 	if name == "item_roshans_banner" then
 		return "banner"
 	end
+	if name == "item_cheese" or name == "item_refresher_shard" then
+		return "consumable"
+	end
 	return nil
 end
 local function RoshanDropTier(hero, kind)
 	local human = hero.IsBot ~= nil and not hero:IsBot()
 	local pos = a.GetPosition(hero) or 3
+	if kind == "consumable" then
+		if b.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
+			return 3
+		end
+		return pos <= 3 and 1 or 2
+	end
 	if kind == "aegis" then
 		if human then
 			return 1
@@ -1663,7 +1676,7 @@ function b.ShouldClaimRoshanDrop(bot, loc, itemName)
 	if kind == nil or loc == nil or not RoshanDropCandidate(bot, itemName) then
 		return false
 	end
-	local tiers = kind == "aegis" and { 1, 2, 3 } or { 1, 2 }
+	local tiers = (kind == "aegis" or kind == "consumable") and { 1, 2, 3 } or { 1, 2 }
 	local function closest(tier, maxDist)
 		local best, bestDist, bestId = nil, maxDist, math.huge
 		local players = GetTeamPlayers(GetTeam())
@@ -1727,17 +1740,38 @@ function b.TryPickupRoshanDrop(bot)
 		end
 	end
 	if best == nil or bestDist > 4500 then
+		-- Nothing left to claim: pick back up the item dropped to make room (20s, within 1500).
+		local ret = bot._roshReturn
+		if ret ~= nil then
+			if DotaTime() - ret.at > 20 then
+				bot._roshReturn = nil
+				return false
+			end
+			for _, drop in pairs(GetDroppedItemList() or {}) do
+				if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() and drop.item:GetName() == ret.name then
+					local d = GetUnitToLocationDistance(bot, drop.location)
+					if d <= 1500 then
+						if d > 120 then
+							bot:Action_MoveToLocation(drop.location)
+						else
+							bot:Action_PickUpItem(drop.item)
+							bot._roshReturn = nil
+						end
+						return true
+					end
+				end
+			end
+			bot._roshReturn = nil
+		end
 		return false
 	end
 	if b.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
 		local cheap = b.GetMainInvLessValItemSlot(bot)
-		local pack = b.GetEmptyBackpackSlot(bot)
-		if cheap ~= nil and cheap >= 0 and pack ~= nil and pack >= 0 then
-			bot:ActionImmediate_SwapItems(cheap, pack)
-		elseif cheap ~= nil and cheap >= 0 and bestDist <= 600 then
-			-- Backpack full too: drop the cheapest main-slot item at his feet to make room. Game
-			-- 021, 32:48: Roshan died and nobody took the Aegis; the claimant's bag was full (OD
-			-- with a Null Talisman) and the swap needs an empty backpack slot.
+		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the
+		-- cheapest item to the backpack never made room. Drop it at his feet instead, pick up the
+		-- Roshan item into the freed main slot, then pick the dropped item back up (it goes to the
+		-- backpack). Game 021, 32:48: nobody took the Aegis, the claimant's bag was full.
+		if cheap ~= nil and cheap >= 0 and bestDist <= 600 then
 			local it = bot:GetItemInSlot(cheap)
 			if it ~= nil then
 				pcall(print, string.format(
@@ -1747,6 +1781,7 @@ function b.TryPickupRoshanDrop(bot)
 					b.RoshanClaimKind(best.item:GetName()) or "drop",
 					(string.gsub(it:GetName(), "^item_", ""))
 				))
+				bot._roshReturn = { name = it:GetName(), at = DotaTime() }
 				bot:Action_DropItem(it, bot:GetLocation())
 				return true
 			end

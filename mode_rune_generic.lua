@@ -325,19 +325,22 @@ end
 -- Water runes (2:00, 4:00): the bot API never reports them at the river spot (game 031, 4:02: the
 -- top spot read "missing" though seen 2s before, the rune lying there), and only Valve's default
 -- item mode picks them up, for a bot close by. So the ally closest to a river spot (within 2200,
--- not outnumbered there) walks to it from 8s before the spawn; within 200, rune mode stands down
--- so the item mode can take the rune, until 6s after the spawn.
-local WATER_AT = { 120, 240 }
+-- not outnumbered there) walks to it from 8s before the spawn and holds it until 8s after.
+-- The river gold at the horn too (game 031: OD stood on the bottom spot, laning pulled him to mid
+-- 0.3s after the horn, the gold stayed; Valve's item mode took the top one only at 0:06, at 0.90).
+-- After the spawn the hold desire is 0.35: above laning (0.27-0.30), below the item mode's 0.90,
+-- so the item mode takes over as soon as it wants the rune.
+local WATER_AT = { 0, 120, 240 }
+local RIVER_HOLD_DESIRE = 0.35
 function a.WaterWalk()
 	local now = DotaTime()
 	local w = d._waterWalk
 	if w ~= nil then
-		if not d:IsAlive() or now > w.t0 + 6 then
+		if not d:IsAlive() or now > w.t0 + 8 then
 			d._waterWalk = nil
 			return nil
 		end
 		if GetUnitToLocationDistance(d, w.loc) <= 200 then
-			-- Before the spawn: hold the spot (laning would pull him back). From the spawn: stand down.
 			return now < w.t0 and "hold" or "near"
 		end
 		return "walk"
@@ -497,10 +500,11 @@ function GetDesireRaw()
 	end
 	do
 		local okW, ww = pcall(a.WaterWalk)
-		if okW and (ww == "walk" or ww == "hold") then
-			return give(BOT_MODE_DESIRE_HIGH, "water-" .. ww)
-		elseif okW and ww == "near" then
-			return give(BOT_MODE_DESIRE_NONE, "water-item-mode")
+		if okW and ww ~= nil and d._waterWalk ~= nil then
+			if DotaTime() < d._waterWalk.t0 then
+				return give(BOT_MODE_DESIRE_HIGH, "water-" .. ww)
+			end
+			return give(RIVER_HOLD_DESIRE, "river-item-" .. ww)
 		end
 	end
 	-- Laning first (user call): while the bot's lane needs it, runes, lotus pools and wisdom
@@ -778,10 +782,9 @@ function Think()
 			doing("water-walk")
 			return
 		end
-		if DotaTime() < d._waterWalk.t0 then
-			doing("water-hold")
-			return
-		end
+		-- On the spot: stand still, for Valve's item mode to take over and pick the rune up.
+		doing("water-hold")
+		return
 	end
 	if d._goldCycle ~= nil then
 		local okG, held = pcall(a.GoldCycleStep)

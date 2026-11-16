@@ -362,7 +362,6 @@ function a.RuneWatch()
 	pcall(print, string.format("[OHA-RUNE] t=%.0f watch %s %s", now, GetTeam() == TEAM_RADIANT and "radiant" or "dire", table.concat(parts, " ")))
 end
 function GetDesire()
-	pcall(a.RuneProbe)
 	pcall(a.RuneWatch)
 	if ShouldSkipBotThink(GetBot()) then
 		runeWhy = "skip"

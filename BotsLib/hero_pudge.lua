@@ -347,7 +347,11 @@ function a.TryBlink(rot, shield, dismember)
 	return false
 end
 -- [OHA-PUDGE] one line per cast decision, with HP, mode and the heroes around him.
+-- The combo, hooks, Rot and Dismember work as intended: no longer printed (call sites kept).
 function a.LogPudge(what, hp)
+	if true then
+		return
+	end
 	pcall(function()
 		local foes = #(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {})
 		local friends = #(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {})

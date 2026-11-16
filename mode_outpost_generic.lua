@@ -114,17 +114,6 @@ local function EnemyFountainEscape()
 		away = a.GetTeamFountain() - fountain
 	end
 	local dest = fountain + away:Normalized() * 1800
-	if DotaTime() >= (c._fountainLogAt or -999) + 3 then
-		c._fountainLogAt = DotaTime()
-		pcall(print, string.format(
-			"[OHA-FOUNTAIN] t=%.0f %s leave dist=%d mode=%d hp=%.2f",
-			DotaTime(),
-			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
-			math.floor(d0),
-			c:GetActiveMode(),
-			a.GetHP(c)
-		))
-	end
 	return dest
 end
 function GetDesire()
@@ -289,24 +278,6 @@ function Think()
 			-- outpost with no capture for 10s, from within 600. Log each order (what the bot sees
 			-- of ability_capture), and after 3s with no capture, walk to the outpost's edge on
 			-- the bot's side (150 from the centre) before ordering again.
-			if c._outpostOrderLogAt == nil or DotaTime() - c._outpostOrderLogAt >= 3 then
-				c._outpostOrderLogAt = DotaTime()
-				local okR, range = pcall(function()
-					return capture ~= nil and capture:GetCastRange() or -1
-				end)
-				pcall(print, string.format(
-					"[OHA-OUTPOST] t=%.0f %s capture-order outpost=%s dist=%d ability=%s castable=%s range=%s hidden=%s near=%.1f",
-					DotaTime(),
-					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
-					Z:GetUnitName(),
-					math.floor(dist),
-					capture ~= nil and "yes" or "no",
-					tostring(castable),
-					okR and tostring(range) or "?",
-					capture ~= nil and tostring(capture:IsHidden()) or "-",
-					nearFor
-				))
-			end
 			if nearFor >= 3 and dist > 200 then
 				local edge = c:GetLocation()
 				local zl = Z:GetLocation()

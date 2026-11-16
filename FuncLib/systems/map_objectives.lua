@@ -762,7 +762,8 @@ local function ProbeObjectives(bot)
 	end
 end
 function MapObjectives.ConsiderObjectiveDesire(bot)
-	pcall(ProbeObjectives, bot)
+	-- The pool / shrine probe answered it (game 020): pools show no modifiers with lotuses in
+	-- them, shrines only modifier_invulnerable, so neither can be read when passing by. Removed.
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
 		if bot ~= nil then
 			bot._lotusWhy = "dead"

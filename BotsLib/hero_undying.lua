@@ -13,9 +13,12 @@ local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local n = "item_team_aura"
 local o = {}
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 o["pos_4"] = {
 	"item_blood_grenade",
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_magic_wand",
 	"item_arcane_boots",
 	"item_essence_distiller",
 	"item_crimson_guard",

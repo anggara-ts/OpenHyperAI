@@ -49,6 +49,7 @@ m["pos_2"] = {
 	"item_ultimate_scepter_2",
 }
 m["pos_3"] = m["pos_1"]
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
@@ -58,7 +59,7 @@ m["pos_4"] = {
 	"item_boots",
 	"item_tranquil_boots",
 	"item_ancient_janggo",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_solar_crest",
 	"item_heavens_halberd",
 	"item_sheepstick",
@@ -68,6 +69,7 @@ m["pos_4"] = {
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
@@ -79,7 +81,7 @@ m["pos_5"] = {
 	"item_ancient_janggo",
 	"item_pipe",
 	"item_solar_crest",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_heavens_halberd",
 	"item_sheepstick",
 	"item_lotus_orb",

@@ -124,6 +124,7 @@ m["pos_4"] = {
 	"item_sheepstick",
 	"item_moon_shard",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
@@ -136,7 +137,7 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_mekansm",
 	"item_spirit_vessel",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_ultimate_scepter",
 	"item_orchid",
 	"item_heavens_halberd",

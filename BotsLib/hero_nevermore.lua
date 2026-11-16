@@ -63,6 +63,7 @@ m["pos_2"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_4"] = {
 	"item_tango",
 	"item_tango",
@@ -72,7 +73,6 @@ m["pos_4"] = {
 	"item_tranquil_boots",
 	"item_null_talisman",
 	"item_glimmer_cape",
-	"item_guardian_greaves",
 	"item_force_staff",
 	"item_cyclone",
 	"item_boots_of_bearing",

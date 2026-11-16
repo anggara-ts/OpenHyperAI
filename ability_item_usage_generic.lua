@@ -3756,6 +3756,9 @@ a.ConsiderItemDesire["item_power_treads"] = function(bm)
 			bb = DotaTime()
 			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
+	elseif DotaTime() - (b._ptSpellSwitchAt or -999) < 3 then
+		-- Switched to Intelligence for a spell: leave it for 3s instead of switching straight back.
+		return BOT_ACTION_DESIRE_NONE
 	elseif f.IsGoingOnSomeone(b) then
 		if f.ShouldSwitchPTStat(b, bm) and bb < DotaTime() - 0.2 then
 			return BOT_ACTION_DESIRE_HIGH, nil, "none"

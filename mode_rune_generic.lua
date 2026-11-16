@@ -392,6 +392,14 @@ function GetDesireRaw()
 	do
 		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(d)
+		-- A rune within 1000 that reads available (its spot in vision) beats a lotus or wisdom
+		-- walk; standing beside the pool as it spawns (absolute desire) still wins. Game 021,
+		-- 8:24-8:43: Disruptor was heading for the bottom jungle bounty and turned off to walk
+		-- to the bottom lotus pool 17-28s before its spawn.
+		local nearRune = a.ClosestAvailableRune(1000)
+		if nearRune ~= nil and GetRuneStatus(nearRune) == RUNE_STATUS_AVAILABLE and desire < BOT_MODE_DESIRE_ABSOLUTE then
+			desire = 0
+		end
 		if desire > 0 and loc ~= nil and kind ~= nil then
 			d._mapObjKind = kind
 			d._mapObjLoc = loc

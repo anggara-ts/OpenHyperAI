@@ -339,6 +339,10 @@ b["sCanNotSwitchItems"] = {
 	"item_aegis",
 	-- Swapped in from the backpack for a push; other swaps must not send it back.
 	"item_roshans_banner",
+	-- Swapped in to be eaten (game 032: Medusa's Vital Toadstool went back to the backpack).
+	"item_foragers_health",
+	"item_foragers_stats",
+	"item_foragers_mana",
 	"item_refresher_shard",
 	"item_cheese",
 	"item_bloodstone",

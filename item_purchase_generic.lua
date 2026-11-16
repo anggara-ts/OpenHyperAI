@@ -1914,7 +1914,7 @@ function ItemPurchaseThink()
 				end
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == forageName then
 					MatchTrace.Buy(a, forageName, "backpack forage swap and use")
-					if forageName == "item_foragers_stats" then
+					if forageName == "item_foragers_stats" or forageName == "item_foragers_mana" then
 						a:Action_UseAbility(moved)
 					else
 						a:Action_UseAbilityOnEntity(moved, a)

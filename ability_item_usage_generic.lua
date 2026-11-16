@@ -1035,10 +1035,10 @@ local function bg()
 		end
 		if forage ~= nil and not forage:IsNull() and f.CanCastAbility(forage) then
 			local forageName = forage:GetName()
-			if forageName == "item_foragers_stats" then
+			if forageName == "item_foragers_stats" or forageName == "item_foragers_mana" then
 				b:Action_UseAbility(forage)
 				return BOT_ACTION_DESIRE_NONE
-			elseif forageName == "item_foragers_health" or forageName == "item_foragers_mana" then
+			elseif forageName == "item_foragers_health" then
 				b:Action_UseAbilityOnEntity(forage, b)
 				return BOT_ACTION_DESIRE_NONE
 			end
@@ -7788,6 +7788,43 @@ function a.WatchStillUnderHit()
 		#mods > 0 and table.concat(mods, ",") or "-"
 	))
 end
+-- Forager mushrooms in a main slot, eaten ahead of the item think's busy gate (queued orders,
+-- casting ...). Game 032, 13:14-19:07: Medusa swapped a Vital Toadstool into a main slot every
+-- 16s and never ate it; it went back to the backpack each time. Targeting from the datafeed:
+-- Vital Toadstool is unit-target (cast on self), Ironwood Nut and Tomo'kan Ringcap are no-target
+-- (the Ringcap was being cast on a unit). Once per 0.5s.
+local FORAGE_NO_TARGET = { item_foragers_stats = true, item_foragers_mana = true }
+function a.EatForage()
+	if not b:IsAlive() or DotaTime() < (b._forageEatAt or -999) then
+		return false
+	end
+	if b:IsStunned() or b:IsHexed() or b:IsChanneling() or b:IsCastingAbility() or b:IsInvulnerable() then
+		return false
+	end
+	local okM, muted = pcall(function()
+		return b:IsMuted()
+	end)
+	if okM and muted then
+		return false
+	end
+	for slot = 0, 5 do
+		local it = b:GetItemInSlot(slot)
+		if it ~= nil and not it:IsNull() then
+			local name = it:GetName()
+			if (FORAGE_NO_TARGET[name] or name == "item_foragers_health") and f.CanCastAbility(it) then
+				b._forageEatAt = DotaTime() + 0.5
+				pcall(print, string.format("[OHA-FORAGE] t=%.0f %s eat %s slot%d", DotaTime(), (string.gsub(c, "npc_dota_hero_", "")), name, slot))
+				if FORAGE_NO_TARGET[name] then
+					b:Action_UseAbility(it)
+				else
+					b:Action_UseAbilityOnEntity(it, b)
+				end
+				return true
+			end
+		end
+	end
+	return false
+end
 function a.RunePickupLock()
 	return b:IsAlive()
 		and b:GetActiveMode() == BOT_MODE_RUNE
@@ -7819,6 +7856,13 @@ function ItemUsageThink()
 	-- same Dota build (6975) and no rune-mode change in between.
 	if a.RunePickupLock() then
 		return
+	end
+	do
+		local okF, ate = pcall(a.EatForage)
+		if okF and ate then
+			_perfDone()
+			return
+		end
 	end
 	-- A hero script holding for a cast it just ordered (Techies' M.A.D. plant): no item order
 	-- that would replace it.

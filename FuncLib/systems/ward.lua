@@ -332,6 +332,66 @@ function a.GetClosestObserverWardSpot(K, S)
 	end
 	return uberBest or U
 end
+-- Objective ward (user call): when a teammate heads for Roshan, or for the enemy-side outpost, a
+-- support with an observer wards the enemy-side spot nearest that objective first: the side the
+-- enemies come from. For Radiant at the bottom pit that is the Dire contest spot by the river and
+-- the Dire outpost (2588, -1248); for Dire at the top pit, the Radiant contest spot (-3379, 743).
+-- Contest and hunt spots only, never an eye cliff (uber): those mean walking deep into enemy
+-- territory. A spot already covered by one of our observers (any, also a human's) or with an ally
+-- already walking to it is skipped (ObsFree). Game 035, 34:04: Leshrac died at the Dire outpost to
+-- three heroes nobody could see.
+local OBJECTIVE_OUTPOSTS = { Vector(-4096, -448, 128), Vector(3392, -448, 128) }
+local OBJECTIVE_WARD_RANGE = 2600
+local function ObjectiveTarget()
+	local ourSide = TeamSide()
+	local rosh = b.GetCurrentRoshanLocation and b.GetCurrentRoshanLocation() or nil
+	-- The enemy-side outpost: the one farther from our fountain.
+	local fountain = b.GetTeamFountain and b.GetTeamFountain() or nil
+	local enemyOutpost = OBJECTIVE_OUTPOSTS[2]
+	if fountain ~= nil and b.GetDistance(OBJECTIVE_OUTPOSTS[1], fountain) > b.GetDistance(OBJECTIVE_OUTPOSTS[2], fountain) then
+		enemyOutpost = OBJECTIVE_OUTPOSTS[1]
+	end
+	for i = 1, 5 do
+		local ally = GetTeamMember(i)
+		if b.IsValidHero(ally) then
+			local m = ally:GetActiveMode()
+			if m == BOT_MODE_ROSHAN and rosh ~= nil then
+				return rosh, "roshan"
+			end
+			if BOT_MODE_OUTPOST ~= nil and m == BOT_MODE_OUTPOST and GetUnitToLocationDistance(ally, enemyOutpost) <= 4000 then
+				return enemyOutpost, "enemy-outpost"
+			end
+		end
+	end
+	return nil
+end
+function a.GetObjectiveWardSpot(K)
+	local target, kind = ObjectiveTarget()
+	if target == nil then
+		return nil
+	end
+	local ourSide = TeamSide()
+	local best, bestDist = nil, OBJECTIVE_WARD_RANGE
+	local function consider(spot)
+		if spot.side == ourSide then
+			return
+		end
+		local d = b.GetDistance(spot.location, target)
+		if d < bestDist then
+			best, bestDist = spot, d
+		end
+	end
+	for i = 1, #RoshSpots do
+		consider(RoshSpots[i])
+	end
+	for i = 1, #HuntSpots do
+		consider(HuntSpots[i])
+	end
+	if best == nil or not ObsFree(best) then
+		return nil
+	end
+	return best, kind
+end
 function a.GetPossibleSentryWardSpots(K)
 	local W = {}
 	local ourSide = TeamSide()

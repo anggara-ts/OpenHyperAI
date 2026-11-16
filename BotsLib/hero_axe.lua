@@ -92,6 +92,16 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnEntity(r, B)
 		return
 	end
+	-- fix (missing combo): Blink + Berserker's Call, the Axe initiation. Before this only the generic
+	-- item code blinked him (to a random spot near one target) and Call waited for the next think.
+	local blinkCallDesire, blinkCallLoc = a.ConsiderBlinkCall()
+	if blinkCallDesire > 0 then
+		b:Action_ClearActions(false)
+		b:ActionQueue_UseAbilityOnLocation(b.Blink, blinkCallLoc)
+		b:ActionQueue_Delay(0.1)
+		b:ActionQueue_UseAbility(o)
+		return
+	end
 	u, v = a.ConsiderQ()
 	if u > 0 then
 		c.SetQueuePtToINT(b, true)
@@ -122,8 +132,10 @@ function a.ConsiderQ()
 	local S = c.GetAroundEnemyHeroList(M - 50)
 	local T = nil
 	local U = nil
+	-- fix: Berserker's Call is SPELL_IMMUNITY_ENEMIES_YES (game data): it taunts magic-immune heroes,
+	-- so a BKB no longer blocks the channel interrupt or the engage Call.
 	for V, W in pairs(S) do
-		if W:IsChanneling() and not W:IsMagicImmune() then
+		if W:IsChanneling() and c.CanCastOnMagicImmune(W) then
 			T = W
 			U = "Q-打断" .. c.Chat.GetNormName(T)
 			return BOT_ACTION_DESIRE_HIGH, U
@@ -133,12 +145,25 @@ function a.ConsiderQ()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, M - 90)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.CanCastOnMagicImmune(botTarget)
 			and not c.IsDisabled(botTarget)
 		then
 			T = botTarget
 			U = "Q-先手" .. c.Chat.GetNormName(T)
 			return BOT_ACTION_DESIRE_HIGH, U
+		end
+	end
+	-- fix: in a fight Call only ever went on the chosen target. Call whenever 2+ enemy heroes are inside it.
+	if c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) then
+		local heroesInCall = 0
+		for V, W in pairs(S) do
+			if c.IsValidHero(W) and c.CanCastOnMagicImmune(W) and not c.IsSuspiciousIllusion(W) and not c.IsDisabled(W) then
+				heroesInCall = heroesInCall + 1
+			end
+		end
+		if heroesInCall >= 2 then
+			a.LogAxe("call-multi heroes=" .. heroesInCall)
+			return BOT_ACTION_DESIRE_HIGH, "Q-multi"
 		end
 	end
 	if
@@ -355,6 +380,55 @@ function a.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-AXE]: new casts (multi-hero Call, Blink-Call), at most once per 10s per reason.
+function a.LogAxe(why)
+	b._axeLogAt = b._axeLogAt or {}
+	local key = string.match(why, "^%S+") or why
+	if DotaTime() < (b._axeLogAt[key] or -999) then
+		return
+	end
+	b._axeLogAt[key] = DotaTime() + 10
+	pcall(print, string.format("[OHA-AXE] t=%.0f %s hp=%.2f", DotaTime(), why, c.GetHP(b)))
+end
+-- Blink (item, range 1200) into 2+ enemy heroes, or onto the engage target, then Call at once.
+function a.ConsiderBlinkCall()
+	if not o:IsFullyCastable() or b:GetMana() < o:GetManaCost() or b:IsRooted() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not (c.IsGoingOnSomeone(b) or c.IsInTeamFight(b, 1200)) or c.GetHP(b) < 0.4 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not c.CanBlinkDagger(b) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local callRadius = o:GetSpecialValueInt("radius")
+	local blinkRange = 1150
+	local spot = nil
+	local aoe = b:FindAoELocation(true, true, b:GetLocation(), blinkRange, callRadius - 50, 0, 0)
+	if aoe.count >= 2 and GetUnitToLocationDistance(b, aoe.targetloc) > callRadius then
+		spot = aoe.targetloc
+	elseif
+		c.IsGoingOnSomeone(b)
+		and c.IsValidHero(botTarget)
+		and c.CanCastOnMagicImmune(botTarget)
+		and not c.IsSuspiciousIllusion(botTarget)
+		and not c.IsDisabled(botTarget)
+		and c.IsInRange(b, botTarget, blinkRange)
+		and not c.IsInRange(b, botTarget, callRadius + 100)
+	then
+		spot = botTarget:GetLocation()
+	end
+	if spot == nil or not IsLocationPassable(spot) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local alliesThere = c.GetAlliesNearLoc(spot, 1600)
+	local enemiesThere = c.GetEnemiesNearLoc(spot, 1200)
+	if alliesThere == nil or enemiesThere == nil or #alliesThere + 1 < #enemiesThere then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	a.LogAxe("blink-call enemies=" .. #enemiesThere .. " allies=" .. #alliesThere)
+	return BOT_ACTION_DESIRE_HIGH, spot
 end
 function a.HasSpecialModifier(W)
 	if

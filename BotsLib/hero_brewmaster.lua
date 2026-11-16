@@ -296,6 +296,9 @@ function a.ConsiderCinderBrew()
 		if
 			c.IsValidTarget(G)
 			and c.CanCastOnNonMagicImmune(G)
+			-- fix: no range check here, so a target 2000+ away got a brew thrown at a point Y (cast
+			-- range + 200) toward it, landing on nothing. Only when the target is within Y + radius.
+			and c.IsInRange(b, G, Y + N)
 			and not c.IsDisabled(G)
 			and not G:HasModifier("modifier_brewmaster_cinder_brew")
 			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -427,7 +430,13 @@ function a.ConsiderPrimalSplit()
 	if nAllyHeroes ~= nil and #nAllyHeroes == 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if c.GetHP(b) < 0.33 and P ~= nil and #P >= 2 and nAllyHeroes ~= nil and #nAllyHeroes == 0 then
+	-- fix: GetNearbyHeroes(allies) includes Brewmaster himself, so "#nAllyHeroes == 0" never held
+	-- and this low-HP split (save) never fired. "<= 1" = no ally but himself.
+	if c.GetHP(b) < 0.33 and P ~= nil and #P >= 2 and nAllyHeroes ~= nil and #nAllyHeroes <= 1 then
+		if DotaTime() >= (b._brewSplitLogAt or -999) then
+			b._brewSplitLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-BREWMASTER] t=%.0f primal split save hp=%.2f enemies=%d", DotaTime(), c.GetHP(b), #P))
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if L then

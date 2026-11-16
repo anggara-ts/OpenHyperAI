@@ -69,6 +69,12 @@ function a.SkillsComplement()
 	C, D, E = a.ConsiderBlinkVoid()
 	if C > 0 then
 		c.SetQueuePtToINT(b, false)
+		-- fix: the kill target was blinked to even when already inside Mana Void range (600),
+		-- spending Blink (his escape) for nothing. Void directly then.
+		if c.IsInRange(b, E, s:GetCastRange()) then
+			b:ActionQueue_UseAbilityOnEntity(s, E)
+			return
+		end
 		b:ActionQueue_UseAbilityOnLocation(o, D)
 		b:ActionQueue_Delay(0.1)
 		b:ActionQueue_UseAbilityOnEntity(s, E)

@@ -239,6 +239,8 @@ function a.ConsiderViscousNasalGoo()
 	if K then
 		if
 			c.IsValidHero(G[1])
+			-- fix: no range check, so in a fight he walked up to 1600 toward G[1] to goo it
+			and c.IsInRange(b, G[1], O)
 			and c.CanBeAttacked(G[1])
 			and c.CanCastOnNonMagicImmune(G[1])
 			and not G[1]:HasModifier("modifier_necrolyte_reapers_scythe")

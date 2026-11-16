@@ -294,11 +294,13 @@ function a.ConsiderR()
 	local S = s:GetCastPoint()
 	local U = s:GetManaCost()
 	local N = c.GetNearbyHeroes(b, R + 200, true, BOT_MODE_NONE)
+	-- fix: Rupture has DOTA_UNIT_TARGET_FLAG_MAGIC_IMMUNE_ENEMIES / SPELL_IMMUNITY_ENEMIES_YES (game data),
+	-- so the three target checks below now accept BKB heroes (was CanCastOnNonMagicImmune).
 	if c.IsRetreating(b) then
 		for P, W in pairs(N) do
 			if
 				b:WasRecentlyDamagedByHero(W, 1.0)
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W)
 				and c.CanCastOnTargetAdvanced(W)
 				and not W:HasModifier("modifier_bloodseeker_bloodrage")
 				and not W:HasModifier("modifier_bloodseeker_rupture")
@@ -310,7 +312,7 @@ function a.ConsiderR()
 	if c.IsInTeamFight(b, 1200) then
 		for P, W in pairs(N) do
 			if
-				c.CanCastOnNonMagicImmune(W)
+				c.CanCastOnMagicImmune(W)
 				and c.CanCastOnTargetAdvanced(W)
 				and c.Role.IsCarry(W:GetUnitName())
 				and not W:HasModifier("modifier_bloodseeker_bloodrage")
@@ -324,7 +326,7 @@ function a.ConsiderR()
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(C)
-			and c.CanCastOnNonMagicImmune(C)
+			and c.CanCastOnMagicImmune(C)
 			and c.CanCastOnTargetAdvanced(C)
 			and c.IsInRange(C, b, R + 100)
 			and not C:HasModifier("modifier_bloodseeker_bloodrage")
@@ -333,6 +335,20 @@ function a.ConsiderR()
 		then
 			local a0 = c.GetNearbyHeroes(C, 1200, true, BOT_MODE_NONE)
 			if a0 ~= nil and #a0 >= 2 then
+				return BOT_ACTION_DESIRE_HIGH, C
+			end
+			-- fix: a0 counts Bloodseeker himself, so ">= 2" meant a solo gank never ruptured. Alone,
+			-- rupture a target already below half HP (it cannot run without bleeding).
+			if c.GetHP(C) < 0.5 and not c.IsSuspiciousIllusion(C) then
+				if DotaTime() >= (b._bsRuptureLogAt or -999) then
+					b._bsRuptureLogAt = DotaTime() + 10
+					pcall(print, string.format(
+						"[OHA-BLOODSEEKER] t=%.0f rupture solo %s hp=%.2f",
+						DotaTime(),
+						(string.gsub(C:GetUnitName(), "npc_dota_hero_", "")),
+						c.GetHP(C)
+					))
+				end
 				return BOT_ACTION_DESIRE_HIGH, C
 			end
 		end

@@ -392,10 +392,17 @@ function a.ConsiderE()
 	then
 		return BOT_ACTION_DESIRE_HIGH, "E-隐身逃跑"
 	end
-	if c.IsInEnemyArea(b) and E >= 7 and G >= 280 then
+	-- fix: G is the mana fraction (0-1), so "G >= 280" was never true, and "a7 == 0" compared the tower
+	-- table with a number (never true either): he never went invisible to move in the enemy half.
+	-- Now: 280 mana kept, no enemy hero or tower within 1600.
+	if c.IsInEnemyArea(b) and E >= 7 and b:GetMana() >= 280 and not c.IsRealInvisible(b) then
 		local a6 = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local a7 = b:GetNearbyTowers(1600, true)
-		if #a6 == 0 and a7 == 0 then
+		if a6 ~= nil and #a6 == 0 and a7 ~= nil and #a7 == 0 then
+			if DotaTime() >= (b._bhSneakLogAt or -999) then
+				b._bhSneakLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-BOUNTY] t=%.0f shadow walk in enemy area mana=%d", DotaTime(), b:GetMana()))
+			end
 			return BOT_ACTION_DESIRE_HIGH, "E-潜行"
 		end
 	end

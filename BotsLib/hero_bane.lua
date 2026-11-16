@@ -493,8 +493,10 @@ function a.ConsiderR()
 	local U = c.GetAroundEnemyHeroList(N + 200)
 	local V = nil
 	local W = nil
+	-- fix: Fiend's Grip has DOTA_UNIT_TARGET_FLAG_MAGIC_IMMUNE_ENEMIES / SPELL_IMMUNITY_ENEMIES_YES (game
+	-- data), so the three target checks in this function now accept magic-immune heroes.
 	for X, Y in pairs(U) do
-		if c.IsValid(Y) and c.CanCastOnNonMagicImmune(Y) and c.CanCastOnTargetAdvanced(Y) then
+		if c.IsValid(Y) and c.CanCastOnMagicImmune(Y) and c.CanCastOnTargetAdvanced(Y) then
 			if Y:IsChanneling() then
 				V = Y
 				W = "R-打断" .. c.Chat.GetNormName(V)
@@ -507,16 +509,16 @@ function a.ConsiderR()
 			end
 		end
 	end
-	if p:IsFullyCastable() and b:GetMana() > r:GetManaCost() + p:GetManaCost() then
-		return 0
-	end
+	-- fix: removed "Brain Sap castable and mana for both -> no Grip". Brain Sap is considered first
+	-- anyway; when it declined (e.g. its level <= 7 / mana < 72% early exit), this block also
+	-- blocked Grip, so a level-6/7 gank never used the ultimate.
 	if c.IsInTeamFight(b, 1200) then
 		local Z = nil
 		local _ = 0
 		for X, Y in pairs(J) do
 			if
 				c.IsValid(Y)
-				and c.CanCastOnNonMagicImmune(Y)
+				and c.CanCastOnMagicImmune(Y)
 				and c.CanCastOnTargetAdvanced(Y)
 				and not c.IsDisabled(Y)
 			then
@@ -537,7 +539,7 @@ function a.ConsiderR()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, N + 50)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.CanCastOnMagicImmune(botTarget)
 			and c.CanCastOnTargetAdvanced(botTarget)
 		then
 			V = botTarget

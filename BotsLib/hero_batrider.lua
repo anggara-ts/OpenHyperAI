@@ -144,6 +144,10 @@ local E
 local F
 local G
 local H
+-- fix: these helpers were globals; Beastmaster defines globals with the same names (HasBlink,
+-- CanBKB), so if both bots share globals one hero's checks read the other's items. Forward-declared
+-- locals: the "function X()" definitions at the bottom now assign these.
+local CanDoBlinkLasso, HasBlink, CanBKB
 function a.SkillsComplement()
 	local I = d.Build(b)
 	F = I.isEngaging
@@ -437,6 +441,15 @@ function a.ConsiderFirefly()
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
+		-- fix: Firefly (bonus move speed, flies over trees) was an escape only vs a chaser within 350
+		-- that faced him. Also use it when a hero hurt him recently and one is still within 900.
+		if b:WasRecentlyDamagedByAnyHero(2.0) and P ~= nil and c.IsValidHero(P[1]) and c.IsInRange(b, P[1], 900) then
+			if DotaTime() >= (b._batFireflyLogAt or -999) then
+				b._batFireflyLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-BATRIDER] t=%.0f firefly escape hp=%.2f", DotaTime(), H))
+			end
+			return BOT_ACTION_DESIRE_HIGH
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -445,7 +458,9 @@ function a.ConsiderFlamingLasso()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local J = r:GetCastRange() + b:GetAttackRange()
-	if F and not CanDoBlinkLasso() then
+	-- fix: was "F and not CanDoBlinkLasso()". Blink-Lasso is considered first; when it declined
+	-- (target conditions failed) a plain Lasso was still blocked just because a Blink was ready.
+	if F then
 		local N = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
 		local P = c.GetNearbyHeroes(b, J, true, BOT_MODE_NONE)
 		for X, Y in pairs(P) do
@@ -485,6 +500,8 @@ function a.ConsiderBlinkLasso()
 				and c.CanCastOnMagicImmune(a6)
 				and c.CanCastOnTargetAdvanced(a6)
 				and c.IsInRange(b, a6, 1199)
+				-- fix: no Blink when the target is already in Lasso range (200); plain Lasso does it.
+				and not c.IsInRange(b, a6, r:GetCastRange() + 50)
 				and not c.IsSuspiciousIllusion(a6)
 				and not c.IsTaunted(a6)
 				and not a6:HasModifier("modifier_abaddon_borrowed_time")

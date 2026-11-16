@@ -1,6 +1,6 @@
 # Hero review brief (OpenHyperAI Dota 2 bots)
 
-Repo: C:\Users\ANGGARA\Documents\OpenHyperAI (Lua bot scripts for Dota 2). Each hero has one file:
+Repo: the repo root (Lua bot scripts for Dota 2). Each hero has one file:
 BotsLib/hero_<short_name>.lua (e.g. BotsLib/hero_antimage.lua). You review ONLY the heroes in your batch file
 and edit ONLY their BotsLib/hero_<name>.lua files.
 
@@ -15,7 +15,7 @@ HARD RULES
       shard_loc / scepter_loc (Aghanim texts). talents[] are also there.
     - items: https://www.dota2.com/datafeed/itemdata?language=english&item_id=<id>
     - the list of every valid item name is already saved at
-      C:\Users\ANGGARA\AppData\Local\Temp\claude\dd83bb95a98a6874\78631228-580b-4093-8e8e-7286c4feda37\scratchpad\review\items.txt
+      items.txt (every item name from the datafeed itemlist; not kept)
   Fetch with curl from Bash (e.g. curl -s "<url>" | node -e '...'). If something can't be verified, don't change it;
   flag it instead.
 - Edits must keep Lua valid: tabs for indentation, balanced function/if/for/do ... end. Keep the existing code style
@@ -60,7 +60,7 @@ WHAT TO DO PER HERO (your checklist)
    about obvious gaps, not personal taste.
 5. Ability-use logic: fix obvious bugs from the list above. Don't redesign.
 6. Sanity check the Lua after editing. A rough block-balance checker is at
-   C:\Users\ANGGARA\AppData\Local\Temp\claude\dd83bb95a98a6874\78631228-580b-4093-8e8e-7286c4feda37\scratchpad\luabal.js
+   Util/luabal.js
    (node luabal.js <file>). Compare against the original with
    `git show HEAD:BotsLib/hero_<name>.lua > <tmp>` and the same checker; the "gap" must not change. It is rough:
    the words function/end inside strings containing the letter n, or in comments, can skew the counts, so judge

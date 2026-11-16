@@ -195,6 +195,7 @@ function a.SkillsComplement()
 	end
 	local B, C, D = a.ConsiderSproutCall()
 	if B > 0 and C ~= nil then
+		pcall(print, string.format("[OHA-FURION] t=%.0f sprout-call dist=%.0f", DotaTime(), GetUnitToLocationDistance(b, D)))
 		b:Action_ClearActions(true)
 		b:ActionQueue_UseAbilityOnEntity(o, C)
 		b:ActionQueue_Delay(0.35 + 0.44)
@@ -553,18 +554,20 @@ function a.ConsiderSproutCall()
 	end
 	local N = c.GetProperCastRange(false, b, o:GetCastRange())
 	local ae = b:GetNearbyLaneCreeps(N, true)
+	-- Sprout is cast on Furion, so its trees ring him; Nature's Call only converts trees within its
+	-- area (150-375) of the point. Calling at the creep centre (up to 850 away) found none of the
+	-- sprouted trees. Call on Furion, as the farming case already does.
 	if (c.IsPushing(b) or c.IsDefending(b)) and ae and #ae >= 4 and c.CanBeAttacked(ae[1]) then
-		local ac = c.GetCenterOfUnits(ae)
-		return BOT_ACTION_DESIRE_HIGH, b, ac
+		return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 	end
 	if c.IsFarming(b) and y then
 		local af = b:GetNearbyNeutralCreeps(N)
 		if af and c.IsValid(af[1]) and (#af >= 3 or #af >= 2 and af[1]:IsAncientCreep()) then
 			return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 		end
+		-- Same as the push case: call where the sprouted trees are (around Furion).
 		if ae and #ae >= 3 and c.CanBeAttacked(ae[1]) then
-			local ac = c.GetCenterOfUnits(ae)
-			return BOT_ACTION_DESIRE_HIGH, b, ac
+			return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 		end
 	end
 	if c.IsLaning(b) and y then

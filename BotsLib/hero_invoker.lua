@@ -1011,8 +1011,10 @@ function a.ConsiderCmToTarget(b4, bg, bm, b9)
 			and not c.IsSuspiciousIllusion(b4)
 			and (not aG or aG and c.GetManaAfter(A:GetManaCost()) > 0.5 or c.GetHP(b4) < 0.5)
 			and not b4:HasModifier("modifier_abaddon_borrowed_time")
-			and (c.GetHP(b4) <= 0.9 and c.GetHP(b4) > 0.15)
-		or b4:GetMovementDirectionStability() >= 0.75
+			-- Steady movement is an alternative to the HP window only. It used to be OR'ed with the
+			-- whole condition, so any enemy walking straight got a Meteor, magic immune, an
+			-- illusion or with laning mana under half included.
+			and (c.GetHP(b4) <= 0.9 and c.GetHP(b4) > 0.15 or b4:GetMovementDirectionStability() >= 0.75)
 	then
 		if b4:HasModifier(O) then
 			if DotaTime() >= ah["Tornado"] + aB - bg then

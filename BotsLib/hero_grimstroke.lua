@@ -502,7 +502,10 @@ function a.ConsiderInkSwell()
 			and not c.IsSuspiciousIllusion(a0)
 			and GetUnitToUnitDistance(a0, G) < a8
 		then
+			-- Keep the ally nearest the target: a8 was never lowered, so the last ally in the list
+			-- won (often one far from the target, and then no enemy was in the swell radius).
 			a9 = a0
+			a8 = GetUnitToUnitDistance(a0, G)
 		end
 	end
 	if H then
@@ -519,6 +522,7 @@ function a.ConsiderInkSwell()
 			if V ~= nil and W ~= nil and (#V >= #W or c.WeAreStronger(b, 1600)) and a9 ~= nil then
 				W = c.GetEnemiesNearLoc(a9:GetLocation(), N)
 				if W ~= nil and #W >= 1 then
+					pcall(print, string.format("[OHA-GRIM] t=%.0f ink-swell engage ally=%s dist=%d", DotaTime(), a9:GetUnitName(), math.floor(a8)))
 					return BOT_ACTION_DESIRE_HIGH, a9
 				end
 			end

@@ -382,7 +382,9 @@ function a.ConsiderR()
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			-- Life Break pierces spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES and
+			-- FLAG_MAGIC_IMMUNE_ENEMIES); it was held whenever the target popped BKB.
+			and c.CanCastOnMagicImmune(botTarget)
 			and (c.IsInRange(b, botTarget, K + 88) or c.IsInRange(b, botTarget, b:GetAttackRange() + 99))
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "R进攻" .. c.Chat.GetNormName(botTarget)

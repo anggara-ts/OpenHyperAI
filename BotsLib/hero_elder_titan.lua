@@ -245,12 +245,20 @@ function ConsiderEarthSplitter()
 	if b:IsCastingAbility() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local X = s:GetSpecialValueInt("AbilityCastRange")
+	-- Earth Splitter's cast range (2400) is a top-level AbilityCastRange, not an AbilityValues key,
+	-- so GetSpecialValueInt("AbilityCastRange") read 0: no enemy was ever "in range" and the AoE
+	-- search ran around Elder Titan's own feet. Read the real cast range.
+	local X = s:GetCastRange()
+	if X == nil or X <= 0 then
+		X = 2400
+	end
 	local a3 = 300
 	local a4 = 3.14
 	if c.IsInTeamFight(b, 1600) or K or c.IsPushing(b) then
 		for E, a5 in pairs(u) do
-			if c.IsValidHero(a5) and c.CanCastOnNonMagicImmune(a5) and c.IsInRange(b, a5, X) and B(a5, 1.8) then
+			-- The crack lands crack_time (2.72s) after the cast, so the hold must outlast that (was 1.8).
+			if c.IsValidHero(a5) and c.CanCastOnNonMagicImmune(a5) and c.IsInRange(b, a5, X) and B(a5, 2.8) then
+				pcall(print, string.format("[OHA-ELDERTITAN] t=%.0f splitter on held %s", DotaTime(), a5:GetUnitName()))
 				return BOT_ACTION_DESIRE_VERYHIGH, a5:GetLocation()
 			end
 		end
@@ -319,13 +327,34 @@ function ConsiderEchoStomp(a9)
 		end
 	end
 	if L or K or c.IsPushing(b) or c.IsDefending(b) then
+		-- No IsChasingTarget here: it needs the target to be running, so a stunned target (the
+		-- best moment to stomp) never passed.
 		if
 			c.IsValidHero(t)
-			and c.IsChasingTarget(b, t)
+			and c.CanCastOnNonMagicImmune(t)
 			and c.IsInRange(a9, t, aa)
 			and (c.IsDisabled(t) or t:GetCurrentMovementSpeed() <= 250 or z(t))
 		then
 			return BOT_ACTION_DESIRE_HIGH
+		end
+		-- Two or more heroes well inside the radius in a fight: the stomp (0.4s + 1.3s channel)
+		-- sleeps them even if they are not disabled first. It used to need 3 already-disabled heroes.
+		if L or K then
+			local deep = 0
+			for E, a5 in pairs(ac) do
+				if
+					c.IsValidHero(a5)
+					and c.CanCastOnNonMagicImmune(a5)
+					and not c.IsSuspiciousIllusion(a5)
+					and c.IsInRange(a9, a5, aa - 150)
+				then
+					deep = deep + 1
+				end
+			end
+			if deep >= 2 then
+				pcall(print, string.format("[OHA-ELDERTITAN] t=%.0f stomp heroes=%d", DotaTime(), deep))
+				return BOT_ACTION_DESIRE_HIGH
+			end
 		end
 		local ae = 0
 		for E, a5 in pairs(ac) do

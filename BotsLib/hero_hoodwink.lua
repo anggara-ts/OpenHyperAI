@@ -156,7 +156,11 @@ function a.ConsiderAcornShot()
 	local J = c.GetProperCastRange(false, b, o:GetCastRange())
 	local K = o:GetCastPoint()
 	local L = o:GetSpecialValueInt("bounce_range")
-	local M = o:GetSpecialValueInt("acorn_shot_damage") * b:GetAttackDamage() * 0.75
+	-- datafeed: an acorn hit is base_damage_pct (80%) of the attack plus acorn_shot_damage
+	-- (45-180). It was bonus x attack x 0.75 (thousands), so the "kill" check passed on every
+	-- hero in range and Acorn Shot was fired on cooldown at anyone, at any mana.
+	local M = b:GetAttackDamage() * o:GetSpecialValueInt("base_damage_pct") / 100
+		+ o:GetSpecialValueInt("acorn_shot_damage")
 	local N = o:GetSpecialValueInt("projectile_speed")
 	local O = o:GetLevel()
 	E = c.GetProperTarget(b)

@@ -1007,6 +1007,7 @@ local function bg()
 	else
 		b8 = 0
 	end
+	pcall(a.BannerFromBackpack)
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
 	for forageSlot = 0, 5 do
@@ -6396,8 +6397,57 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 end
 -- Roshan's Banner (datafeed: placed within 1200, 120s, buffs our lane creeps in a 600/900/1200
 -- radius by level; can be destroyed, melee heroes hit it twice as hard). Bots had no rule for it.
+-- Bots carry it in the backpack: a.BannerFromBackpack swaps it into a main slot first.
 -- Pushing (user call): planted behind our wave once the wave is at an enemy tower, barracks or
 -- the ancient, so the creeps fighting the building get the buff. One banner per push.
+-- Pushing, with an enemy tower, barracks or the ancient within 2500: a banner in the backpack goes
+-- into a main slot (an empty one, else the cheapest), early enough for any backpack cooldown to run
+-- out before the wave reaches the building. Once per 5s.
+function a.BannerFromBackpack()
+	local slot = b:FindItemSlot("item_roshans_banner")
+	if slot < 6 or slot > 8 or not f.IsPushing(b) or DotaTime() < (b._bannerSwapAt or -999) then
+		return
+	end
+	local near = nil
+	for _, t in pairs(b:GetNearbyTowers(2500, true) or {}) do
+		if f.IsValidBuilding(t) then
+			near = t
+			break
+		end
+	end
+	if near == nil then
+		for _, r in pairs(b:GetNearbyBarracks(2500, true) or {}) do
+			if f.IsValidBuilding(r) then
+				near = r
+				break
+			end
+		end
+	end
+	local anc = GetAncient(GetOpposingTeam())
+	if near == nil and anc ~= nil and GetUnitToUnitDistance(b, anc) <= 2500 then
+		near = anc
+	end
+	if near == nil then
+		return
+	end
+	local dest = require(GetScriptDirectory() .. "/FuncLib/systems/item").GetMainInvLessValItemSlot(b)
+	if dest == nil or dest < 0 then
+		return
+	end
+	b._bannerSwapAt = DotaTime() + 5
+	local out = b:GetItemInSlot(dest)
+	pcall(print, string.format(
+		"[OHA-BANNER] t=%.0f %s swap slot%d->%d out=%s building=%s dist=%.0f",
+		DotaTime(),
+		(string.gsub(c, "npc_dota_hero_", "")),
+		slot,
+		dest,
+		out ~= nil and out:GetName() or "-",
+		(string.gsub(near:GetUnitName(), "npc_dota_", "")),
+		GetUnitToUnitDistance(b, near)
+	))
+	b:ActionImmediate_SwapItems(slot, dest)
+end
 a.ConsiderItemDesire["item_roshans_banner"] = function(bm)
 	if not f.IsPushing(b) or b:WasRecentlyDamagedByAnyHero(1.5) and f.GetHP(b) < 0.4 then
 		return BOT_ACTION_DESIRE_NONE
@@ -6433,7 +6483,8 @@ a.ConsiderItemDesire["item_roshans_banner"] = function(bm)
 			table.insert(wave, cr)
 		end
 	end
-	if #wave < 3 then
+	-- 5+ creeps (user call: 3 is too few to be worth it).
+	if #wave < 5 then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	-- Not on top of another of our banners.

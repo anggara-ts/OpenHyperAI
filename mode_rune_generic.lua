@@ -23,10 +23,12 @@ end
 local function SweepTime(id)
 	return 2.4
 end
--- Spawn cycle: bounty runes every 180s (the bountyDue check below uses the same), river runes
--- every 120s (water at 2:00 and 4:00, power runes from 6:00, as the rest of this file assumes).
+-- Spawn cycle: jungle bounties every 240s (8 logged games: first seen up at 4:00, 8:00, 12:00,
+-- 16:00, 20:00 ..., never at 3-minute marks; the bountyDue check below uses the same), river
+-- runes every 120s (water at 2:00 and 4:00, power runes from 6:00).
+local BOUNTY_CYCLE = 240
 local function RuneCycle(id)
-	return IsRiverRune(id) and 120 or 180
+	return IsRiverRune(id) and 120 or BOUNTY_CYCLE
 end
 -- What is at a river rune spot the API cannot pick up (game 017: river gold seen in game, type -1
 -- or type 5 with pick-ups failing at distance 0). Prints units and dropped items within 350 of
@@ -68,7 +70,9 @@ local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local st = RawGetRuneStatus(id)
 	-- Not in the first 10s of a spawn: a new rune can read as not there for a moment.
-	if st == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and DotaTime() % RuneCycle(id) >= 10 and GetRuneType ~= nil then
+	-- River runes only. Game 031, 20:09-20:49: the bottom jungle bounty read available with type -1
+	-- in our vision (Doom 160 away, Mirana 257), this turned it into missing, and nobody took it.
+	if IsRiverRune(id) and st == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and DotaTime() % RuneCycle(id) >= 10 and GetRuneType ~= nil then
 		local okT, rType = pcall(GetRuneType, id)
 		if okT and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
 			local okV, seen = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
@@ -1331,7 +1335,7 @@ function a.SkipRune(id, seconds)
 end
 -- Team memory (user call): the rune status the bot API gives is per team and stays at its last
 -- reading when the spot is fogged, with the time since it was seen. A spot whose last reading is
--- "missing" and was seen after its latest spawn (bounty every 180s, river every 120s) has been
+-- "missing" and was seen after its latest spawn (bounty every 240s, river every 120s) has been
 -- checked or picked this cycle by someone on the team: nobody goes there until it spawns again.
 -- A spot last seen before its latest spawn is treated as holding a rune; "available" is trusted.
 function a.CheckedEmpty(id)
@@ -1436,8 +1440,8 @@ function a.ClosestAvailableRune(maxDist)
 	local best, bestDist = nil, maxDist or 700
 	local t = DotaTime()
 	for _, rune in pairs(h) do
-		-- Bounty runes spawn every 3 minutes and report missing until the bot has vision.
-		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2) and t >= 170 and t % 180 <= 50
+		-- Jungle bounties spawn every 4 minutes and report missing until the bot has vision.
+		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2) and t >= BOUNTY_CYCLE - 10 and t % BOUNTY_CYCLE <= 50
 		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE or (bountyDue and GetRuneStatus(rune) ~= RUNE_STATUS_MISSING) then
 			if a.RuneSkipped(rune) then
 				goto continue_rune

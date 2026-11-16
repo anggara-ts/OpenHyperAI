@@ -357,6 +357,8 @@ function a.WaterWalk()
 				local loc = GetRuneSpawnLocation(id)
 				if
 					not d._waterDone[key]
+					-- Not the hero who just planted the early mid ward: he goes behind his T1 and to lane.
+					and not (t0 == 0 and d._earlyWardPlantedAt ~= nil)
 					and GetUnitToLocationDistance(d, loc) <= 2200
 					and a.IsTheClosestAlly(d, loc)
 					and #(b.GetEnemiesNearLoc(loc, 1000) or {}) <= #(b.GetAlliesNearLoc(loc, 1000) or {}) + 1

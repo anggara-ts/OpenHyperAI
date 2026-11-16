@@ -196,6 +196,12 @@ function GetDesireHelper()
 	if not a.IsSuitableToWard() then
 		return BOT_MODE_DESIRE_NONE
 	end
+	-- One early ward, then lane (user call). Game 030, -0:17: right after Techies planted the Dire
+	-- mid ward and stepped back behind the mid T1, ward mode started a second early trip across the
+	-- top river and he ended up fighting at the top rune. No more ward trips before 1:00.
+	if b._earlyWardPlantedAt ~= nil and DotaTime() < 60 then
+		return BOT_MODE_DESIRE_NONE
+	end
 	if c.Utils.IsTeamPushingSecondTierOrHighGround(b) then
 		return BOT_MODE_DESIRE_NONE
 	end

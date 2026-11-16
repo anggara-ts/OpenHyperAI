@@ -122,7 +122,18 @@ local function WardReturnTarget()
 	if p ~= nil then
 		if ObserverCount() < (p.obs or 0) then
 			c._wardReturn = { to = p.to, untilAt = now + 25 }
+			-- Ward mode and the horn river hold leave him alone after this (one early ward, then
+			-- behind T1 and to lane).
+			c._earlyWardPlantedAt = now
 			c._earlyWardPending = nil
+			pcall(print, string.format(
+				"[OHA-WARD] t=%.0f %s return-start to=%.0f,%.0f dist=%.0f",
+				now,
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				p.to.x,
+				p.to.y,
+				GetUnitToLocationDistance(c, p.to)
+			))
 		elseif now - p.at > 6 then
 			c._earlyWardPending = nil
 		end
@@ -132,6 +143,13 @@ local function WardReturnTarget()
 		return nil
 	end
 	if now > r.untilAt or GetUnitToLocationDistance(c, r.to) <= 350 or not c:IsAlive() then
+		pcall(print, string.format(
+			"[OHA-WARD] t=%.0f %s return-done why=%s dist=%.0f",
+			now,
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			not c:IsAlive() and "dead" or (now > r.untilAt and "timeout" or "reached"),
+			GetUnitToLocationDistance(c, r.to)
+		))
 		c._wardReturn = nil
 		return nil
 	end

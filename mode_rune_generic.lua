@@ -515,7 +515,16 @@ function GetDesireRaw()
 	-- shrines wait unless one is within 500. Re-checked every think, so a deferred spot is taken
 	-- once the lane is pushed or empty and the spot is near.
 	local laneBusy = a.LaneBusy()
-	if laneBusy and DotaTime() >= 15 then
+	-- The lane support contests his side's lotus pool while laning (map_objectives
+	-- IsLotusContester): the lane-busy hold does not stop his lotus trip.
+	local lotusContest = false
+	if laneBusy then
+		local okC, cC = pcall(function()
+			return require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives").IsLotusContester(d)
+		end)
+		lotusContest = okC and cC == true
+	end
+	if laneBusy and DotaTime() >= 15 and not lotusContest then
 		local nr = a.ClosestAvailableRune(500)
 		if nr == nil then
 			a.NoteLaneDefer()
@@ -526,7 +535,7 @@ function GetDesireRaw()
 	do
 		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(d)
-		if laneBusy and loc ~= nil and GetUnitToLocationDistance(d, loc) > 500 then
+		if laneBusy and loc ~= nil and GetUnitToLocationDistance(d, loc) > 500 and not (lotusContest and kind == "lotus") then
 			desire = 0
 		end
 		-- A rune within 1000 that reads available (its spot in vision) beats a lotus or wisdom
@@ -541,6 +550,11 @@ function GetDesireRaw()
 			d._mapObjKind = kind
 			d._mapObjLoc = loc
 			return give(desire, "mapobj-" .. tostring(kind))
+		end
+		-- The contester with no lotus trip now: the lane hold applies as usual.
+		if lotusContest and DotaTime() >= 15 and a.ClosestAvailableRune(500) == nil then
+			a.NoteLaneDefer()
+			return give(BOT_MODE_DESIRE_NONE, "lane-busy")
 		end
 	end
 	if DotaTime() > 0 and #p > 0 then

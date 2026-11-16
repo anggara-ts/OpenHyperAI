@@ -368,6 +368,35 @@ local function UtilsPos(bot)
 	return 3
 end
 
+-- Lane support contests his side's lotus pool in the laning phase (user call). Game 032, 3:00:
+-- the top lotus spawned with Doom and Mirana ~2000 away in the top lane; lane-push, pool-foes and
+-- not-best kept both in lane, and Dire took it later. A pos 4/5 bot assigned to top or bottom is the
+-- contester for that side's pool (top pool: y > 0). Once the laning phase ends this is off; the
+-- later pickup (passing by, pushing with the wave) is still to be designed.
+function MapObjectives.IsLotusContester(bot, loc)
+	local okL, laning = pcall(function()
+		return require(GetScriptDirectory() .. "/FuncLib/func_utils").IsInLaningPhase()
+	end)
+	if not (okL and laning) or bot == nil or not bot:IsAlive() then
+		return false
+	end
+	local pos = UtilsPos(bot)
+	if pos ~= 4 and pos ~= 5 then
+		return false
+	end
+	local lane = bot:GetAssignedLane()
+	if lane ~= LANE_TOP and lane ~= LANE_BOT then
+		return false
+	end
+	if loc == nil then
+		loc = MapObjectives.PickLotusForBot(bot, MapObjectives.GetLotusPoolLocations())
+	end
+	if loc == nil then
+		return false
+	end
+	return (lane == LANE_TOP) == (loc.y > 0)
+end
+
 function MapObjectives.LotusScore(hero, loc)
 	if hero == nil or not hero:IsAlive() then
 		return -99999
@@ -886,6 +915,19 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
 			local danger = loc ~= nil and MapObjectives.DangerousObjective(bot, loc, 1500)
 			local tripBlock = LotusTripBlock(bot, loc, dist, foes, friends)
+			local contester = loc ~= nil and MapObjectives.IsLotusContester(bot, loc)
+			if contester then
+				-- A pushed lane does not hold the contester back; enemies at the pool only do when
+				-- they outnumber him and the allies with him (his lane partner).
+				if tripBlock == "lane-push" or tripBlock == "tower-push" then
+					tripBlock = nil
+				elseif tripBlock == "pool-foes" then
+					local withHim = #(bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {})
+					if HeroesNearLoc(loc, 1600) <= math.max(1, withHim) then
+						tripBlock = nil
+					end
+				end
+			end
 			if tripBlock ~= nil then
 				beside = false
 				inLotus = false
@@ -970,9 +1012,9 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and dist <= maxWalk
 				and hp >= 0.28
 				and not (danger and dist > 700)
-				and (beside or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
+				and (beside or contester or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
 			then
-				note(beside and "beside" or "walk")
+				note(beside and "beside" or (contester and "contest" or "walk"))
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
 				if beside then
 					-- Has to beat laning and a nearby fight, or Think never runs and they never say it.

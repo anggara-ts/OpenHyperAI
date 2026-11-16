@@ -77,14 +77,12 @@ function a.MinionThink(o)
 end
 local p = SafeAbility(b:GetAbilityByName("morphling_waveform"), "morphling_waveform", "morphling")
 local q = SafeAbility(b:GetAbilityByName("morphling_adaptive_strike_agi"), "morphling_adaptive_strike_agi", "morphling")
-local r = SafeAbility(b:GetAbilityByName("morphling_adaptive_strike_str"), "morphling_adaptive_strike_str", "morphling")
 local s = SafeAbility(b:GetAbilityByName("morphling_morph_agi"), "morphling_morph_agi", "morphling")
 local t = SafeAbility(b:GetAbilityByName("morphling_morph_str"), "morphling_morph_str", "morphling")
 local u = SafeAbility(b:GetAbilityByName("morphling_replicate"), "morphling_replicate", "morphling")
 local v = SafeAbility(b:GetAbilityByName("morphling_morph_replicate"), "morphling_morph_replicate", "morphling")
 local w, x
 local y, z
-local A, B
 local C
 local D, E
 local F = ""
@@ -254,11 +252,6 @@ function a.SkillsComplement()
 		if w > 0 then
 			c.SetQueuePtToINT(b, false)
 			b:ActionQueue_UseAbilityOnLocation(p, x)
-			return
-		end
-		A, B = a.ConsiderAdaptiveStrikeSTR()
-		if A > 0 then
-			b:Action_UseAbilityOnEntity(r, B)
 			return
 		end
 		y, z = a.ConsiderAdaptiveStrikeAGI()
@@ -580,31 +573,6 @@ function a.ConsiderAdaptiveStrikeAGI()
 	if c.IsDoingTormentor(b) and aE then
 		if c.IsTormentor(G) and c.IsInRange(b, G, ae) and a0 and ak > al then
 			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderAdaptiveStrikeSTR()
-	if not c.CanCastAbility(r) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local ae = c.GetProperCastRange(false, b, r:GetCastRange())
-	local K = b:GetNearbyHeroes(ae, true, BOT_MODE_NONE)
-	for at, au in pairs(K) do
-		if c.IsValidHero(au) and c.CanCastOnNonMagicImmune(au) and au:IsChanneling() then
-			return BOT_ACTION_DESIRE_HIGH, au
-		end
-	end
-	if _ and not c.IsRealInvisible(b) and b:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE then
-		local a2 = b:GetNearbyHeroes(ae, true, BOT_MODE_NONE)
-		for at, au in pairs(a2) do
-			if c.IsValidHero(au) and c.CanCastOnNonMagicImmune(au) and not c.IsDisabled(au) then
-				local aN = au:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
-				local aO = au:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if aN ~= nil and aO ~= nil and (#aO > #aN or b:WasRecentlyDamagedByAnyHero(1.5)) then
-					return BOT_ACTION_DESIRE_HIGH, au
-				end
-			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

@@ -52,13 +52,9 @@ function a.MinionThink(n)
 end
 local o = SafeAbility(b:GetAbilityByName("antimage_blink"), "antimage_blink", "antimage")
 local p = SafeAbility(b:GetAbilityByName("antimage_counterspell"), "antimage_counterspell", "antimage")
-local q = SafeAbility(b:GetAbilityByName("antimage_counterspell_ally"), "antimage_counterspell_ally", "antimage")
-local r = SafeAbility(b:GetAbilityByName("antimage_mana_overload"), "antimage_mana_overload", "antimage")
 local s = SafeAbility(b:GetAbilityByName("antimage_mana_void"), "antimage_mana_void", "antimage")
 local t, u
 local v
-local w, x
-local y, z
 local A, B
 local C, D, E
 local F
@@ -84,11 +80,6 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbility(p)
 		return
 	end
-	y, z = a.ConsiderBlinkFragment()
-	if y > 0 then
-		b:Action_UseAbilityOnLocation(r, z)
-		return
-	end
 	t, u = a.ConsiderBlink()
 	if t > 0 then
 		c.SetQueuePtToINT(b, false)
@@ -99,12 +90,6 @@ function a.SkillsComplement()
 	if A > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnEntity(s, B)
-		return
-	end
-	w, x = a.ConsiderCounterSpellAlly()
-	if w > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(q, x)
 		return
 	end
 end
@@ -319,81 +304,6 @@ function a.ConsiderManaVoid()
 		end
 	end
 	return 0
-end
-function a.ConsiderCounterSpellAlly()
-	if not q:IsTrained() or not q:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local I = q:GetCastRange()
-	local M = c.GetNearbyHeroes(b, I, false, BOT_MODE_NONE)
-	for Q, a6 in pairs(M) do
-		if
-			c.IsValidHero(a6)
-			and not c.IsSuspiciousIllusion(a6)
-			and not a6:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			if c.IsUnitTargetProjectileIncoming(a6, 400) and not a6:IsMagicImmune() then
-				return BOT_ACTION_DESIRE_HIGH, a6
-			end
-			if not a6:HasModifier("modifier_sniper_assassinate") and not a6:IsMagicImmune() then
-				if c.IsWillBeCastUnitTargetSpell(a6, I) then
-					return BOT_ACTION_DESIRE_HIGH, a6
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderBlinkFragment()
-	if not b:HasScepter() or not r or not r:IsTrained() or not r:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	local I = r:GetCastRange()
-	if G then
-		local a7 = nil
-		local a8 = 99999
-		local N = c.GetEnemiesNearLoc(b:GetLocation(), I)
-		for Q, R in pairs(N) do
-			if
-				c.IsValidTarget(R)
-				and c.CanCastOnMagicImmune(R)
-				and not c.IsInRange(b, R, I / 2)
-				and not R:IsAttackImmune()
-				and not R:HasModifier("modifier_abaddon_borrowed_time")
-				and not R:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not R:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local M = c.GetNearbyHeroes(R, 1200, true, BOT_MODE_NONE)
-				local S = c.GetNearbyHeroes(R, 1200, false, BOT_MODE_NONE)
-				if M ~= nil and S ~= nil and #M >= #S and a8 < R:GetHealth() then
-					a8 = R:GetHealth()
-					a7 = R
-				end
-			end
-		end
-		if a7 ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, a7:GetLocation()
-		end
-	end
-	if c.IsRetreating(b) then
-		local N = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		for Q, R in pairs(N) do
-			if
-				c.IsValidHero(R)
-				and c.IsChasingTarget(R, b)
-				and not c.IsSuspiciousIllusion(R)
-				and not c.IsDisabled(R)
-				and not c.IsRealInvisible(b)
-			then
-				local M = c.GetNearbyHeroes(R, 1200, true, BOT_MODE_NONE)
-				local S = c.GetNearbyHeroes(R, 1200, false, BOT_MODE_NONE)
-				if M ~= nil and S ~= nil and (#S > #M or b:WasRecentlyDamagedByAnyHero(1.2)) then
-					return BOT_ACTION_DESIRE_HIGH, R:GetLocation()
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderBlinkVoid()
 	if not o:IsFullyCastable() or not s:IsFullyCastable() then

@@ -24,7 +24,6 @@ a["spells"] = {
 	["npc_dota_hero_antimage"] = {
 		["antimage_blink"] = { weight = 0.5 },
 		["antimage_counterspell"] = { weight = 0.8 },
-		["antimage_counterspell_ally"] = { weight = 0.9 },
 		["antimage_mana_void"] = { weight = 0.5 },
 	},
 	["npc_dota_hero_arc_warden"] = {
@@ -58,7 +57,6 @@ a["spells"] = {
 	["npc_dota_hero_bloodseeker"] = {
 		["bloodseeker_bloodrage"] = { weight = 1 },
 		["bloodseeker_blood_bath"] = { weight = 0.9 },
-		["bloodseeker_blood_mist"] = { weight = 1 },
 		["bloodseeker_thirst"] = { weight = 0.9 },
 		["bloodseeker_rupture"] = { weight = 0.3 },
 	},
@@ -73,7 +71,6 @@ a["spells"] = {
 		["brewmaster_thunder_clap"] = { weight = 0.7 },
 		["brewmaster_cinder_brew"] = { weight = 0.7 },
 		["brewmaster_drunken_brawler"] = { weight = 1 },
-		["brewmaster_primal_companion"] = { weight = 1 },
 		["brewmaster_primal_split"] = { weight = 1 },
 	},
 	["npc_dota_hero_bristleback"] = {
@@ -106,12 +103,10 @@ a["spells"] = {
 		["chen_penitence"] = { weight = 0.1 },
 		["chen_holy_persuasion"] = { weight = 1 },
 		["chen_divine_favor"] = { weight = 0.1 },
-		["chen_summon_convert"] = { weight = 1 },
 		["chen_hand_of_god"] = { weight = 0.2 },
 	},
 	["npc_dota_hero_clinkz"] = {
 		["clinkz_strafe"] = { weight = 0.9 },
-		["clinkz_tar_bomb"] = { weight = 0.8 },
 		["clinkz_death_pact"] = { weight = 0.9 },
 		["clinkz_burning_barrage"] = { weight = 0.9 },
 		["clinkz_burning_army"] = { weight = 0.9 },
@@ -227,7 +222,6 @@ a["spells"] = {
 		["faceless_void_time_dilation"] = { weight = 0.8 },
 		["faceless_void_time_walk_reverse"] = { weight = 1 },
 		["faceless_void_chronosphere"] = { weight = 0.1 },
-		["faceless_void_time_zone"] = { weight = 0.1 },
 	},
 	["npc_dota_hero_furion"] = {
 		["furion_sprout"] = { weight = 0.1 },
@@ -241,7 +235,6 @@ a["spells"] = {
 		["grimstroke_ink_creature"] = { weight = 0.3 },
 		["grimstroke_spirit_walk"] = { weight = 0.5 },
 		["grimstroke_dark_portrait"] = { weight = 0.2 },
-		["grimstroke_return"] = { weight = 1 },
 		["grimstroke_soul_chain"] = { weight = 0.2 },
 	},
 	["npc_dota_hero_gyrocopter"] = {
@@ -300,7 +293,6 @@ a["spells"] = {
 		["keeper_of_the_light_blinding_light"] = { weight = 0.7 },
 		["keeper_of_the_light_chakra_magic"] = { weight = 0.2 },
 		["keeper_of_the_light_radiant_bind"] = { weight = 0.2 },
-		["keeper_of_the_light_recall"] = { weight = 1 },
 		["keeper_of_the_light_will_o_wisp"] = { weight = 0.1 },
 		["keeper_of_the_light_spirit_form"] = { weight = 1 },
 	},
@@ -388,7 +380,6 @@ a["spells"] = {
 	["npc_dota_hero_marci"] = {
 		["marci_grapple"] = { weight = 0.2 },
 		["marci_companion_run"] = { weight = 0.7 },
-		["marci_guardian"] = { weight = 0.5 },
 		["marci_bodyguard"] = { weight = 0.5 },
 		["marci_unleash"] = { weight = 0.8 },
 	},
@@ -603,8 +594,6 @@ a["spells"] = {
 		["ringmaster_funhouse_mirror"] = { weight = 0.8 },
 		["ringmaster_strongman_tonic"] = { weight = 0.2 },
 		["ringmaster_whoopee_cushion"] = { weight = 0.2 },
-		["ringmaster_crystal_ball"] = { weight = 1 },
-		["ringmaster_weighted_pie"] = { weight = 0.2 },
 		["ringmaster_summon_unicycle"] = { weight = 0.5 },
 	},
 	["npc_dota_hero_sand_king"] = {
@@ -636,7 +625,6 @@ a["spells"] = {
 		["shredder_chakram_2"] = { weight = 0.5 },
 		["shredder_return_chakram_2"] = { weight = 1 },
 		["shredder_flamethrower"] = { weight = 0.5 },
-		["shredder_twisted_chakram"] = { weight = 0.5 },
 	},
 	["npc_dota_hero_silencer"] = {
 		["silencer_curse_of_the_silent"] = { weight = 0.5 },

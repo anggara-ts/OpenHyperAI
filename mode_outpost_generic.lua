@@ -121,7 +121,7 @@ local function WardReturnTarget()
 	local p = c._earlyWardPending
 	if p ~= nil then
 		if ObserverCount() < (p.obs or 0) then
-			c._wardReturn = { to = p.to, untilAt = now + 25 }
+			c._wardReturn = { to = p.to, untilAt = now + (p.window or 25) }
 			-- Ward mode and the horn river hold leave him alone after this (one early ward, then
 			-- behind T1 and to lane).
 			c._earlyWardPlantedAt = now

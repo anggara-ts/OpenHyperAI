@@ -1521,7 +1521,11 @@ function ItemPurchaseThink()
 					end
 				end
 			end
-			tryBuyWard("item_ward_observer", 2, "support obs")
+			-- Before the horn only pos 5 buys observers (user call: pos 5 always plants the early
+			-- one); the stock is shared, so pos 4 buying first left pos 5 without one.
+			if w >= 0 or e.GetPosition(a) == 5 then
+				tryBuyWard("item_ward_observer", 2, "support obs")
+			end
 			if sentryCap > 0 and w > (a._sentryBuyAt or -100) + 15 then
 				if tryBuyWard("item_ward_sentry", sentryCap, "support sentry") then
 					a._sentryBuyAt = w

@@ -1,3 +1,11 @@
+-- [OHA-CHARGES] lines off (charges work, 1123 lines in game 029); [OHA-ERROR] still prints.
+local rawPrint = print
+local print = function(msg, ...)
+	if type(msg) == "string" and string.find(msg, "[OHA-CHARGES]", 1, true) then
+		return
+	end
+	return rawPrint(msg, ...)
+end
 -- Charge count for charge-based hero abilities, for every bot.
 -- The bot API documents GetCurrentCharges for items only, and GetCurrentAbilityCharges does not
 -- exist (every Techies log showed the fallback value). So the count is kept here: from the

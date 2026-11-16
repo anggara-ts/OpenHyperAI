@@ -353,6 +353,9 @@ local function GiveUpWardSpot(why)
 	))
 end
 function Think()
+	if OhaCastGuard ~= nil and OhaCastGuard(GetBot()) then
+		return
+	end
 	DumpWards()
 	if c.CanNotUseAction(b) then
 		return

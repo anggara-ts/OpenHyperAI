@@ -11,7 +11,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+-- Starstorm maxed first, Sacred Arrow second, Leap last (Dotabuff most picked order).
+local j = { { 2, 3, 1, 1, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -38,11 +39,11 @@ m["pos_4"] = {
 	"item_rod_of_atos",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
+	"item_cyclone",
 	"item_mekansm",
 	"item_guardian_greaves",
 	"item_glimmer_cape",
 	"item_spirit_vessel",
-	"item_shivas_guard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_sheepstick",

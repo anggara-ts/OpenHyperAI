@@ -12,8 +12,8 @@ local j = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
--- Build 1 took Fire Remnant rank 2 at level 16 (entry 14) instead of 12; now entries 6/11/15 like build 2.
-local k = { { 3, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 1, 3, 3, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+-- Flame Guard first, then Searing Chains, Sleight of Fist last (Dotabuff most picked order).
+local k = { { 3, 2, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 }, { 3, 2, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local l = k[i]
 local m = c.Skill.GetTalentBuild(j[i])
 local n = {}
@@ -62,14 +62,14 @@ n["pos_1"] = {
 }
 o["pos_1"] = {
 	[1] = {
-		"item_quelling_blade",
 		"item_black_king_bar",
-		"item_wraith_band",
+		"item_quelling_blade",
 		"item_shivas_guard",
-		"item_magic_wand",
+		"item_wraith_band",
 		"item_ultimate_scepter",
+		"item_magic_wand",
 	},
-	[2] = { "item_wraith_band", "item_greater_crit", "item_magic_wand", "item_skadi" },
+	[2] = { "item_greater_crit", "item_wraith_band", "item_skadi", "item_magic_wand" },
 }
 n["pos_2"] = {
 	[1] = {
@@ -80,16 +80,16 @@ n["pos_2"] = {
 		"item_bottle",
 		"item_magic_wand",
 		"item_phase_boots",
-		"item_maelstrom",
+		"item_spirit_vessel",
 		"item_mage_slayer",
 		"item_kaya",
 		"item_black_king_bar",
-		"item_mjollnir",
+		"item_ultimate_scepter",
+		"item_aghanims_shard",
 		"item_kaya_and_sange",
 		"item_shivas_guard",
 		"item_ultimate_scepter_2",
 		"item_octarine_core",
-		"item_aghanims_shard",
 		"item_moon_shard",
 		"item_travel_boots_2",
 	},
@@ -101,14 +101,14 @@ n["pos_2"] = {
 		"item_bottle",
 		"item_magic_wand",
 		"item_boots",
-		"item_blight_stone",
 		"item_phase_boots",
-		"item_bfury",
-		"item_desolator",
+		"item_spirit_vessel",
+		"item_kaya_and_sange",
 		"item_black_king_bar",
-		"item_greater_crit",
 		"item_aghanims_shard",
-		"item_skadi",
+		"item_ultimate_scepter",
+		"item_shivas_guard",
+		"item_sphere",
 		"item_ultimate_scepter_2",
 		"item_moon_shard",
 		"item_travel_boots_2",
@@ -116,16 +116,23 @@ n["pos_2"] = {
 }
 o["pos_2"] = {
 	[1] = {
-		"item_quelling_blade",
 		"item_kaya",
-		"item_magic_wand",
+		"item_quelling_blade",
 		"item_black_king_bar",
-		"item_bottle",
+		"item_magic_wand",
 		"item_shivas_guard",
-		"item_mage_slayer",
+		"item_bottle",
 		"item_octarine_core",
+		"item_mage_slayer",
 	},
-	[2] = { "item_magic_wand", "item_greater_crit", "item_bottle", "item_skadi" },
+	[2] = {
+		"item_kaya_and_sange",
+		"item_quelling_blade",
+		"item_black_king_bar",
+		"item_magic_wand",
+		"item_shivas_guard",
+		"item_bottle",
+	},
 }
 a["sBuyList"] = n[h] and n[h][i] or nil
 a["sSellList"] = o[h] and o[h][i] or {}

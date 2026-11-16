@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 3, 2, 3, 1, 3, 6, 1, 1, 1, 3, 6, 2, 2, 2, 6 }, { 2, 3, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = j[2]
 if h == "pos_1" then
 	k = j[1]
@@ -51,7 +51,7 @@ o["pos_1"] = {
 	"item_basher",
 	"item_aghanims_shard",
 	"item_abyssal_blade",
-	"item_skadi",
+	"item_butterfly",
 	"item_monkey_king_bar",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -73,7 +73,7 @@ o["pos_2"] = {
 	"item_mjollnir",
 	"item_basher",
 	"item_aghanims_shard",
-	"item_sheepstick",
+	"item_butterfly",
 	"item_travel_boots",
 	"item_abyssal_blade",
 	"item_travel_boots_2",
@@ -91,7 +91,7 @@ o["pos_3"] = {
 	"item_maelstrom",
 	"item_black_king_bar",
 	"item_mjollnir",
-	"item_heavens_halberd",
+	"item_blade_mail",
 	n,
 	"item_basher",
 	"item_travel_boots",

@@ -11,7 +11,7 @@ local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10
 local j = { { 2, 3, 1, 2, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = RandomInt(1, 2) == 1 and "item_butterfly" or "item_black_king_bar"
+local m = RandomInt(1, 2) == 1 and "item_butterfly" or "item_monkey_king_bar"
 local n = {}
 n["pos_1"] = {
 	"item_tango",
@@ -21,9 +21,9 @@ n["pos_1"] = {
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_magic_wand",
-	"item_maelstrom",
+	"item_desolator",
 	"item_dragon_lance",
-	"item_mjollnir",
+	"item_sphere",
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_greater_crit",

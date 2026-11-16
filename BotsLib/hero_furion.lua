@@ -12,7 +12,8 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, {
+-- j[1] (pos 1/2): Nature's Call first, then Teleportation, Sprout last (Dotabuff most picked order).
+local j = { { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, {
 	2,
 	1,
 	1,
@@ -148,10 +149,10 @@ a["sBuyList"] = m[h]
 a["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
-	"item_null_talisman",
 	"item_ultimate_scepter",
-	"item_magic_wand",
+	"item_null_talisman",
 	"item_cyclone",
+	"item_magic_wand",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}

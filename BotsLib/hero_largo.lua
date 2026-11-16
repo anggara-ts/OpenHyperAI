@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+-- Catchy Lick maxed first, Frogstomp second, Croak of Genius last (Dotabuff most picked order).
+local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
 local k
 local l
 if h == "pos_5" then
@@ -26,12 +27,12 @@ m["pos_4"] = {
 	"item_enchanted_mango",
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_force_staff",
+	"item_soul_ring",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_hurricane_pike",
+	"item_lotus_orb",
 	"item_shivas_guard",
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
@@ -46,13 +47,13 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_boots",
 	"item_urn_of_shadows",
-	"item_tranquil_boots",
-	"item_pipe",
+	"item_arcane_boots",
+	"item_soul_ring",
 	"item_spirit_vessel",
 	"item_glimmer_cape",
-	"item_pavise",
+	"item_holy_locket",
 	"item_solar_crest",
-	"item_boots_of_bearing",
+	"item_ultimate_scepter",
 	"item_octarine_core",
 	"item_sheepstick",
 	"item_aghanims_shard",
@@ -65,7 +66,7 @@ m["pos_3"] = {
 	"item_boots_of_bearing",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_veil_of_discord",
+	"item_kaya_and_sange",
 	"item_cyclone",
 	"item_shivas_guard",
 	"item_refresher",

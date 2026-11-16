@@ -21,16 +21,17 @@ m["pos_1"] = {
 	"item_wraith_band",
 	"item_wraith_band",
 	"item_power_treads",
-	"item_mask_of_madness",
+	-- Maelstrom, then Mjollnir: her most bought item after Power Treads (Dotabuff, last patch).
+	"item_maelstrom",
 	"item_dragon_lance",
 	"item_lesser_crit",
 	"item_hurricane_pike",
 	-- Black King Bar instead of Shadow Blade / Silver Edge (user call: improve her build). Pierce the
 	-- Veil turns her damage magical and she stands in fights; she needs the spell immunity.
 	"item_black_king_bar",
+	"item_mjollnir",
 	"item_aghanims_shard",
 	"item_greater_crit",
-	"item_butterfly",
 	"item_travel_boots",
 	"item_moon_shard",
 	"item_satanic",

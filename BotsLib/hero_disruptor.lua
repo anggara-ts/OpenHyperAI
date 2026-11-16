@@ -11,9 +11,9 @@ local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
 -- 1 Thunder Strike, 2 Glimpse, 3 Kinetic Field, 6 Static Storm (ultimate at 6, 12, 18).
--- Support: one point in each, then Glimpse, then Kinetic Field, Thunder Strike last.
+-- Support: Glimpse first, then Thunder Strike, Kinetic Field last (Dotabuff most picked order).
 -- Core: Thunder Strike first, then Glimpse, Kinetic Field last.
-local j = { { 1, 2, 3, 2, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 1, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 if h ~= "pos_4" and h ~= "pos_5" then
 	j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 end
@@ -29,10 +29,10 @@ m["pos_4"] = {
 	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_force_staff",
+	"item_blink",
 	"item_guardian_greaves",
 	"item_ultimate_scepter",
 	"item_sheepstick",
-	"item_shivas_guard",
 	"item_wind_waker",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -44,12 +44,12 @@ m["pos_5"] = {
 	"item_faerie_fire",
 	"item_blood_grenade",
 	"item_magic_wand",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_force_staff",
 	"item_pipe",
 	"item_aether_lens",
-	"item_boots_of_bearing",
+	"item_blink",
 	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_aghanims_shard",

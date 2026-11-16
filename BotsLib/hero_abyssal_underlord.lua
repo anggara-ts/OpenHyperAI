@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 1, 3, 1, 2, 1, 6, 2, 2, 2, 6, 3, 3, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -30,14 +30,14 @@ m["pos_1"] = {
 m["pos_2"] = m["pos_1"]
 m["pos_3"] = {
 	"item_tank_outfit",
-	"item_crimson_guard",
-	"item_heavens_halberd",
+	"item_soul_ring",
+	"item_ultimate_scepter",
 	"item_lotus_orb",
 	"item_aghanims_shard",
 	"item_gungir",
 	"item_travel_boots",
 	"item_assault",
-	"item_heart",
+	"item_shivas_guard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
@@ -87,6 +87,8 @@ a["sSellList"] = {
 	"item_magic_wand",
 	"item_shivas_guard",
 	"item_bracer",
+	"item_assault",
+	"item_soul_ring",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}

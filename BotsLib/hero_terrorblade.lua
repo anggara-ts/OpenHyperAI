@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 2, 2, 2, 2, 6, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,16 +21,16 @@ m["pos_1"] = {
 	"item_wraith_band",
 	"item_magic_wand",
 	"item_power_treads",
+	"item_falcon_blade",
 	"item_dragon_lance",
 	"item_manta",
 	"item_skadi",
+	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_greater_crit",
 	"item_butterfly",
-	"item_force_staff",
 	"item_hurricane_pike",
 	"item_moon_shard",
-	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = m["pos_1"]

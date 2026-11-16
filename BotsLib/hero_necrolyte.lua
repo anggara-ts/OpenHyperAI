@@ -49,7 +49,8 @@ n["pos_2"] = {
 n["pos_3"] = {
 	"item_mage_outfit",
 	"item_shadow_amulet",
-	"item_veil_of_discord",
+	-- Radiance: bought in nearly every Necrophos game (Dotabuff, last patch); Veil was not.
+	"item_radiance",
 	m,
 	"item_glimmer_cape",
 	"item_crellas_crozier",

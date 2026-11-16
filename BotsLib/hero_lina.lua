@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 3, 1, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, {
+local j = { { 2, 3, 3, 1, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, {
 	2,
 	1,
 	1,
@@ -65,19 +65,19 @@ m["pos_2"] = {
 	"item_null_talisman",
 	"item_magic_wand",
 	"item_boots",
-	"item_arcane_boots",
-	"item_orchid",
+	"item_travel_boots",
+	"item_yasha_and_kaya",
 	"item_maelstrom",
-	"item_mjollnir",
 	"item_black_king_bar",
-	"item_bloodthorn",
+	"item_ultimate_scepter",
+	"item_mjollnir",
+	"item_aghanims_shard",
+	"item_blink",
 	"item_invis_sword",
 	"item_silver_edge",
-	"item_sheepstick",
+	"item_sphere",
 	"item_moon_shard",
-	"item_travel_boots",
 	"item_travel_boots_2",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 }
 m["pos_3"] = {

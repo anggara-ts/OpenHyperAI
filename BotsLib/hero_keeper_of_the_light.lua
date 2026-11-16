@@ -45,7 +45,7 @@ m["pos_2"] = {
 	"item_spirit_vessel",
 	"item_dagon_2",
 	"item_travel_boots",
-	"item_black_king_bar",
+	"item_ethereal_blade",
 	"item_octarine_core",
 	"item_dagon_5",
 	"item_kaya_and_sange",
@@ -94,7 +94,7 @@ m["pos_5"] = {
 	"item_moon_shard",
 }
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+a["sSellList"] = { "item_ethereal_blade", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
 end

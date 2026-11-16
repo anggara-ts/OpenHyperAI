@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 2, 1, 3, 3, 6, 3, 3, 1, 1, 6, 2, 2, 2, 6 }, { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -33,7 +33,7 @@ m["pos_2"] = {
 	"item_bracer",
 	"item_power_treads",
 	"item_maelstrom",
-	"item_dragon_lance",
+	"item_blink",
 	"item_black_king_bar",
 	"item_mjollnir",
 	"item_aghanims_shard",
@@ -76,8 +76,8 @@ m["pos_3"] = {
 	"item_magic_wand",
 	"item_bracer",
 	"item_power_treads",
-	"item_orchid",
-	"item_crimson_guard",
+	"item_soul_ring",
+	"item_blink",
 	"item_black_king_bar",
 	"item_heavens_halberd",
 	"item_aghanims_shard",
@@ -91,7 +91,7 @@ a["sBuyList"] = m[h]
 a["sSellList"] = {
 	"item_power_treads",
 	"item_quelling_blade",
-	"item_crimson_guard",
+	"item_blink",
 	"item_quelling_blade",
 	"item_black_king_bar",
 	"item_magic_wand",

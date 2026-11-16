@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -28,15 +28,33 @@ m["pos_1"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-m["pos_2"] = m["pos_1"]
+-- Mid: Dotabuff has Blink, Shard, Yasha and Kaya, Arcane Boots, Scepter, BKB, Octarine and
+-- Refresher on top; the carry list (Midas, Satanic, Daedalus, Abyssal) is outside its top 25.
+m["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_bottle",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_blink",
+	"item_aghanims_shard",
+	"item_yasha_and_kaya",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_octarine_core",
+	"item_refresher",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
 m["pos_3"] = {
 	"item_tank_outfit",
-	"item_crimson_guard",
-	"item_aghanims_shard",
-	"item_heavens_halberd",
 	"item_blink",
-	"item_lotus_orb",
+	"item_aghanims_shard",
+	"item_crimson_guard",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
+	"item_lotus_orb",
 	"item_travel_boots",
 	"item_assault",
 	"item_ultimate_scepter_2",

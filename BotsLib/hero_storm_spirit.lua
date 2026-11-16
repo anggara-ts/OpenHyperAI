@@ -13,8 +13,13 @@ local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_2"] = {
-	"item_crystal_maiden_outfit",
-	"item_falcon_blade",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_bottle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads_int",
 	"item_witch_blade",
 	"item_kaya_and_sange",
 	"item_devastator",

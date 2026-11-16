@@ -12,7 +12,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }, {
+local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, {
 	2,
 	3,
 	2,
@@ -57,7 +57,7 @@ o["pos_1"] = {
 	"item_black_king_bar",
 	"item_mjollnir",
 	"item_greater_crit",
-	"item_ultimate_scepter",
+	"item_blink",
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_travel_boots",
@@ -81,7 +81,7 @@ o["pos_2"] = {
 	"item_black_king_bar",
 	"item_mjollnir",
 	"item_greater_crit",
-	"item_ultimate_scepter",
+	"item_blink",
 	"item_sheepstick",
 	"item_travel_boots",
 	"item_monkey_king_bar",

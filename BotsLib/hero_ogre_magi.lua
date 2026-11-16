@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 3, 2, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 3, 1, 1, 1, 6, 3, 3, 2, 6 } }
+local j = { { 3, 2, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -28,7 +28,7 @@ m["pos_3"] = {
 	"item_crimson_guard",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_heavens_halberd",
+	"item_blink",
 	"item_travel_boots",
 	"item_assault",
 	"item_sheepstick",
@@ -80,7 +80,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_blink",
 	"item_lotus_orb",
 	"item_gungir",
 	"item_ultimate_scepter",
@@ -91,15 +91,17 @@ m["pos_4"] = {
 	"item_moon_shard",
 }
 m["pos_5"] = {
-	"item_mage_outfit",
+	-- Arcane Boots (crystal_maiden_outfit) instead of Tranquil Boots, and Blink Dagger instead of
+	-- Spirit Vessel: Arcane 71% (#2), Blink 64% (#3) of his matches (Dotabuff, last patch).
+	"item_crystal_maiden_outfit",
 	"item_hand_of_midas",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_pavise",
 	"item_pipe",
 	"item_solar_crest",
 	"item_lotus_orb",
 	"item_aghanims_shard",
-	"item_spirit_vessel",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_mystic_staff",

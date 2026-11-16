@@ -43,16 +43,16 @@ n["pos_2"] = {
 n["pos_2_qe"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_bracer",
+	"item_null_talisman",
 	"item_magic_wand",
 	"item_boots",
 	"item_hand_of_midas",
 	"item_power_treads",
-	"item_orchid",
+	"item_meteor_hammer",
 	"item_sphere",
 	"item_black_king_bar",
 	"item_travel_boots",
-	"item_bloodthorn",
+	"item_octarine_core",
 	"item_sheepstick",
 	"item_refresher",
 	"item_moon_shard",
@@ -81,6 +81,8 @@ a["sSellList"] = {
 	"item_quelling_blade",
 	"item_sheepstick",
 	"item_hand_of_midas",
+	"item_octarine_core",
+	"item_null_talisman",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}

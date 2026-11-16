@@ -25,11 +25,12 @@ o["pos_3"] = {
 	"item_blink",
 	"item_aghanims_shard",
 	"item_black_king_bar",
+	-- Harpoon (Echo Sabre upgrade): 41% of his matches, #6 (Dotabuff, last patch).
+	"item_harpoon",
 	n,
 	"item_basher",
 	"item_assault",
 	"item_abyssal_blade",
-	"item_travel_boots",
 	"item_overwhelming_blink",
 	"item_travel_boots_2",
 	"item_moon_shard",

@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 3, 1, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -16,10 +16,10 @@ m["pos_4"] = {
 	"item_enchanted_mango",
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_mekansm",
+	"item_blink",
 	"item_glimmer_cape",
 	"item_rod_of_atos",
-	"item_guardian_greaves",
+	"item_aether_lens",
 	"item_gungir",
 	"item_shivas_guard",
 	"item_aghanims_shard",
@@ -31,10 +31,10 @@ m["pos_4"] = {
 }
 m["pos_5"] = {
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_crystal_maiden_outfit",
+	"item_blink",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_aether_lens",
 	"item_pipe",
 	"item_rod_of_atos",
 	"item_gungir",

@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 5, 1, 5, 1, 5, 1, 5, 6, 4, 6, 4, 4, 4, 6 } }
+local j = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 4, 6, 4, 4, 6 } }
 local k = j[1]
 local l
 if h == "pos_1" or h == "pos_3" then
@@ -27,9 +27,10 @@ m["pos_1"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_dragon_lance",
-	"item_lesser_crit",
+	-- Yasha and Kaya and Blink Dagger: #5 and #3 by matches played (Dotabuff, last patch).
+	"item_yasha_and_kaya",
 	"item_black_king_bar",
-	"item_butterfly",
+	"item_blink",
 	"item_greater_crit",
 	"item_hurricane_pike",
 	"item_aghanims_shard",
@@ -48,10 +49,12 @@ m["pos_2"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_dragon_lance",
-	"item_lesser_crit",
+	-- Yasha and Kaya, Blink Dagger and Aghanim's Scepter: #5, #3 and #6 by matches played (Dotabuff,
+	-- last patch); Orchid / Bloodthorn are not in his top 25.
+	"item_yasha_and_kaya",
 	"item_black_king_bar",
-	"item_orchid",
-	"item_bloodthorn",
+	"item_blink",
+	"item_ultimate_scepter",
 	"item_greater_crit",
 	"item_hurricane_pike",
 	"item_aghanims_shard",

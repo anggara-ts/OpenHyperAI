@@ -8,11 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
--- Infest moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
-local j = { { 2, 3, 1, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+-- Feast maxed first, Rage second, Open Wounds last (Dotabuff most picked order). Infest at 6/12/18.
+local j = { { 3, 2, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = RandomInt(1, 2) == 1 and "item_radiance" or "item_desolator"
 local n = {}
 n["pos_1"] = {
 	"item_tango",
@@ -24,14 +23,14 @@ n["pos_1"] = {
 	"item_double_gauntlets",
 	"item_phase_boots",
 	"item_armlet",
-	m,
-	"item_aghanims_shard",
-	"item_assault",
+	"item_radiance",
+	"item_ultimate_scepter",
+	"item_sange_and_yasha",
 	"item_basher",
-	"item_nullifier",
+	"item_assault",
 	"item_monkey_king_bar",
-	"item_travel_boots",
 	"item_abyssal_blade",
+	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",

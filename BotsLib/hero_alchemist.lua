@@ -14,10 +14,10 @@ local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_1"] = {
 	"item_bristleback_outfit",
+	"item_soul_ring",
 	"item_radiance",
 	"item_travel_boots",
-	"item_blade_mail",
-	"item_heavens_halberd",
+	"item_assault",
 	"item_blink",
 	"item_black_king_bar",
 	"item_aghanims_shard",

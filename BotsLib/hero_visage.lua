@@ -24,6 +24,7 @@ m["pos_2"] = {
 	"item_double_bracer",
 	"item_boots",
 	"item_vladmir",
+	"item_aghanims_shard",
 	"item_orchid",
 	"item_ancient_janggo",
 	"item_ultimate_scepter",
@@ -33,7 +34,6 @@ m["pos_2"] = {
 	"item_black_king_bar",
 	"item_sheepstick",
 	"item_ultimate_scepter_2",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 m["pos_3"] = {
@@ -45,6 +45,7 @@ m["pos_3"] = {
 	"item_double_bracer",
 	"item_boots",
 	"item_vladmir",
+	"item_aghanims_shard",
 	"item_orchid",
 	"item_ancient_janggo",
 	"item_ultimate_scepter",
@@ -54,7 +55,6 @@ m["pos_3"] = {
 	"item_black_king_bar",
 	"item_ultimate_scepter_2",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 m["pos_1"] = m["pos_3"]

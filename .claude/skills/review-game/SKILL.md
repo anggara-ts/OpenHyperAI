@@ -15,6 +15,8 @@ Rules: `AGENTS.md` ("Reviewing a game", workflow steps 7-8). Checklist:
    already fixed).
 3. **Tracker:** for every item `verify.js check` left pending or flagged, read the sample lines and set
    `node Util/verify.js set <pr> <item> pass|fail|skip [note]`. Items whose situation didn't happen stay pending.
+   `set` and `check` also update the PR: its "How to verify in game" checkboxes and, once every item is done,
+   "Tested in a local game", the **Ready to merge** label and a "Ready to merge (blocked by #N)" line.
 4. **Maintainer comments:** each observation becomes either a fix in the PR it is about, or part of a grouped
    issue card (skill `start-issue`).
 5. **Findings:** write them as time + log line / why it matters / code location / suggested fix / confidence.

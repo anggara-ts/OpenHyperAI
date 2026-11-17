@@ -10,6 +10,8 @@ Rules: `AGENTS.md` (workflow step 9). The agent decides and merges without askin
 
 1. **Ready?** `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and the PR's CI is
    green (`gh pr checks <pr>`), and no PR it contains (stacked base) is still unready. Otherwise stop and say why.
+   A ready but blocked PR keeps the **Ready to merge** label and the "blocked by #N" line that
+   `node Util/verify.js sync <pr>` writes; run it after any status change.
 2. **Mute proven noise:** `node Util/verify.js mute-suggest <pr>` lists the passed `[OHA-*]` tags; add the
    noisy ones to `OHA_MUTED` in `FuncLib/systems/global_overrides.lua` in this PR (keep logs that report
    errors or rare decisions). Commit, push, wait for CI.

@@ -27,9 +27,10 @@ or object still gets its own sub-bullet with its own Before/Now.
 -
 
 ## How to verify in game
-<!-- The [OHA-*] log lines to look for in the next game, and what a good result looks like. When a machine can
-check a bullet, end it with an HTML comment holding "expect: seen>=1; key<=X" and/or "heroes: a,b" (Util/verify.js). -->
--
+<!-- One checkbox per [OHA-*] log line to look for in the next game, and what a good result looks like. When a
+machine can check an item, end it with an HTML comment holding "expect: seen>=1; key<=X" and/or "heroes: a,b".
+Util/verify.js ticks a box when its item passes (or is skipped) in a game; do not tick them by hand. -->
+- [ ] 
 
 ## Checks
 - [ ] CI green: LuaJIT syntax, luacheck, StyLua, Tests

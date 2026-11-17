@@ -7,7 +7,9 @@
 //   node Util/verify.js check <game.log> [--game NNN] [--prs 4,5]   (--prs: only the PRs in that game's build;
 //                                              Util/after-game.js passes it from git ancestry)
 //                                              count each item's log tags in a game log, apply `expect` rules
-//   node Util/verify.js set <pr> <item|all> <pass|fail|pending|skip> [note...]
+//   node Util/verify.js set <pr> <item|all> <pass|fail|pending|skip> [note...]   (also ticks the PR checkbox)
+//   node Util/verify.js sync [pr...]              tick the "How to verify in game" checkboxes from the tracker
+//                                              (set and check do this by themselves)
 //   node Util/verify.js expect <pr> <item> "<rules>"   set an item's rules ("none" clears), see below
 //   node Util/verify.js heroes <pr> <item> lion,mirana   heroes the item needs on the field ("none" clears)
 //   node Util/verify.js show [pr]             status table; a PR is ready when every item is pass/skip
@@ -219,7 +221,7 @@ function parseVerify(body) {
 	for (let i = start + 1; i < lines.length; i++) {
 		const l = lines[i];
 		if (/^##\s/.test(l)) break;
-		const m = l.match(/^\s*[-*]\s+(.*)$/);
+		const m = l.match(/^\s*[-*]\s+(?:\[[ xX]\]\s+)?(.*)$/);
 		if (!m) continue;
 		let expect = "";
 		let heroList = null;
@@ -344,6 +346,7 @@ function cmdCheck(log, game, only) {
 		});
 	}
 	save(db);
+	for (const num of Object.keys(db.prs)) if (!only || only.includes(num)) syncPrBody(num);
 }
 
 // ---------- set / expect / heroes / show / done ----------
@@ -354,6 +357,106 @@ function getItem(db, pr, which) {
 	const it = p.items[Number(which) - 1];
 	if (!it) throw new Error(`no item ${which} in #${pr}`);
 	return it;
+}
+
+// The PR description mirrors the tracker: in "How to verify in game", an item that passed or was skipped
+// gets [x], the others [ ] (plain bullets become checkboxes). The tracker stays the source of truth;
+// GitHub shows the ticked count on the PR. Offline or without gh it only warns.
+function syncPrBody(pr) {
+	const p = load().prs[pr];
+	if (!p) return;
+	let body;
+	try {
+		body = JSON.parse(gh(["pr", "view", String(pr), "--json", "body"])).body || "";
+	} catch (e) {
+		console.log(`sync #${pr}: could not read the PR (${String(e.message).split("\n")[0]})`);
+		return;
+	}
+	const lines = body.split(/\r?\n/);
+	const start = lines.findIndex((l) => /^##\s+How to verify in game/i.test(l));
+	if (start < 0) return;
+	const parsed = parseVerify(body);
+	let k = 0;
+	let changed = 0;
+	for (let i = start + 1; i < lines.length && k < parsed.length; i++) {
+		if (/^##\s/.test(lines[i])) break;
+		const m = lines[i].match(/^(\s*[-*]\s+)(?:\[[ xX]\]\s+)?(.*)$/);
+		if (!m) continue;
+		const item = p.items.find((x) => x.text === parsed[k].text);
+		k++;
+		const done = !!item && (item.status === "pass" || item.status === "skip");
+		const next = `${m[1]}[${done ? "x" : " "}] ${m[2]}`;
+		if (next !== lines[i]) {
+			lines[i] = next;
+			changed++;
+		}
+	}
+	// Ready (every item pass or skip): tick "Tested in a local game (game NNN)", say at the top whether it can
+	// merge now or what blocks it, and set the "Ready to merge" label. A PR is blocked by a tracked PR that is
+	// not ready and whose own commits are all in this branch (stacked); it must merge first.
+	const ready = isReady(p);
+	const games = [...new Set(p.items.flatMap((x) => [...String(x.note || "").matchAll(/game (\d{3})/g)].map((m) => m[1])))];
+	const gameText = games.length ? `game ${games.join(", ")}` : "game ?";
+	for (let i = 0; i < lines.length; i++) {
+		const m = lines[i].match(/^(\s*[-*]\s+)\[([ xX])\]\s+Tested in a local game\b.*$/);
+		if (!m) continue;
+		const next = ready ? `${m[1]}[x] Tested in a local game (${gameText})` : lines[i];
+		if (next !== lines[i]) {
+			lines[i] = next;
+			changed++;
+		}
+	}
+	const MARK = "<!-- oha-merge-status -->";
+	let statusLine = "";
+	if (ready) {
+		const blockers = blockingPrs(pr);
+		statusLine = blockers.length
+			? `> **Ready to merge, blocked by ${blockers.map((n) => "#" + n).join(", ")}**: every in-game item passed or was skipped (${gameText}), but this branch contains ${blockers.length > 1 ? "their" : "its"} commits and ${blockers.length > 1 ? "they are" : "it is"} not ready yet. It merges right after. ${MARK}`
+			: `> **Ready to merge**: every in-game item passed or was skipped (${gameText}). ${MARK}`;
+	}
+	const at = lines.findIndex((l) => l.includes(MARK));
+	if (at >= 0 && lines[at] !== statusLine) {
+		if (statusLine) lines[at] = statusLine;
+		else lines.splice(at, lines[at + 1] === "" ? 2 : 1);
+		changed++;
+	} else if (at < 0 && statusLine) {
+		lines.unshift(statusLine, "");
+		changed++;
+	}
+	setReadyLabel(pr, ready);
+	if (!changed) return;
+	try {
+		cp.execFileSync(GH, ["pr", "edit", String(pr), "--body-file", "-"], { encoding: "utf8", input: lines.join("\n") });
+		console.log(`sync #${pr}: ${changed} checkbox line(s) updated in the PR description`);
+	} catch (e) {
+		console.log(`sync #${pr}: could not edit the PR (${String(e.message).split("\n")[0]})`);
+	}
+}
+
+// Tracked PRs that are not ready and whose own (non-merge) commits are all in this PR's branch.
+function blockingPrs(pr) {
+	const db = load();
+	const me = db.prs[pr];
+	if (!me || !me.branch) return [];
+	const git = (args) => cp.spawnSync("git", args, { cwd: ROOT, encoding: "utf8" });
+	const out = [];
+	for (const [n, q] of Object.entries(db.prs)) {
+		if (n === String(pr) || !q.branch || isReady(q)) continue;
+		const own = (git(["rev-list", "--no-merges", `origin/main..origin/${q.branch}`]).stdout || "").split(/\r?\n/).filter(Boolean);
+		if (own.length && own.every((c) => git(["merge-base", "--is-ancestor", c, `origin/${me.branch}`]).status === 0)) out.push(n);
+	}
+	return out;
+}
+
+const READY_LABEL = "Ready to merge";
+function setReadyLabel(pr, ready) {
+	const run = (args) => cp.spawnSync(GH, args, { encoding: "utf8" });
+	if (ready) {
+		run(["label", "create", READY_LABEL, "--color", "0E8A16", "--description", "Every in-game check passed; merges when nothing blocks it"]);
+		run(["pr", "edit", String(pr), "--add-label", READY_LABEL]);
+	} else {
+		run(["pr", "edit", String(pr), "--remove-label", READY_LABEL]);
+	}
 }
 
 function cmdSet(pr, which, status, note) {
@@ -369,6 +472,7 @@ function cmdSet(pr, which, status, note) {
 		if (note) p.items[i].note = note;
 	}
 	save(db);
+	syncPrBody(pr);
 	cmdShow(pr);
 }
 
@@ -729,6 +833,7 @@ function main(argv) {
 	else if (cmd === "expect") cmdExpect(a[0], a[1], a.slice(2).join(" "));
 	else if (cmd === "heroes") cmdHeroes(a[0], a[1], a.slice(2).join(","));
 	else if (cmd === "show") cmdShow(a[0]);
+	else if (cmd === "sync") for (const n of a.length ? a : Object.keys(load().prs)) syncPrBody(n);
 	else if (cmd === "mute-suggest") cmdMuteSuggest(a[0]);
 	else if (cmd === "done") cmdDone(a[0]);
 	else if (cmd === "lineup") {

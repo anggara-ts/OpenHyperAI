@@ -209,7 +209,12 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
 9. **Merge.** The agent decides which PRs are ready and squash-merges them itself, without asking (standing
    approval from the maintainer, 2026-11-17); it reports what it merged and why. A PR is ready when
    `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip), CI is green, and every PR it is
-   stacked on is merged or merges first in the same go (a PR that contains an unready PR waits). Then:
+   stacked on is merged or merges first in the same go (a PR that contains an unready PR waits).
+   The PR shows its state by itself: "How to verify in game" is a checkbox list, and `verify.js set`, `check` and
+   `sync` tick an item's box when it passes or is skipped. When every item is done they also tick
+   "Tested in a local game (game NNN)", add the **Ready to merge** label and put a status line at the top of
+   the description: "Ready to merge", or "Ready to merge, blocked by #N" when it is stacked on a PR that is not
+   ready. Don't tick those by hand. Then:
    - `node Util/verify.js mute-suggest <pr>` prints `OHA_MUTED` entries for the proven log lines
      (`FuncLib/systems/global_overrides.lua`); add the noisy ones in the PR (avoid whole-tag mutes; keep error and
      rare-decision logs).

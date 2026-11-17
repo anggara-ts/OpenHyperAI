@@ -382,24 +382,76 @@ function a.ConsiderDarkAscension()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Midnight Feast (datafeed): heals on attacks; "At night, the ability can be activated to instantly destroy a
+-- non-ancient creep and restore a percentage of Night Stalker's maximum health and mana" (10/15/20/25% HP,
+-- 10/12/14/16% mana, cooldown 39/36/33/30, range 125, no mana cost). The game file lists it as PASSIVE, so the
+-- old c.CanCastAbility (rejects IsPassive) may never have let it through. We now try it only at night, at most
+-- once per 3s, and log whether the previous try started the cooldown (an order refused by the engine would not).
+local feastTryAt, feastTryCd, feastGold = -999, nil, nil
+local function FeastIsNight()
+	local darkUntil = (b._nsDarkAt or -999) + math.max(u:GetSpecialValueFloat("duration"), 0)
+	return c.CheckTimeOfDay() == "night" or DotaTime() < darkUntil
+end
+-- Lane, siege and neutral creeps only (not summons, couriers or ancients: "non-ancient creep").
+local function IsFeastCreep(cr)
+	if not c.IsValid(cr) or not c.CanBeAttacked(cr) or cr:IsAncientCreep() or cr:IsDominated() then
+		return false
+	end
+	local nm = cr:GetUnitName() or ""
+	return string.find(nm, "creep", 1, true) ~= nil
+		or string.find(nm, "neutral", 1, true) ~= nil
+		or string.find(nm, "siege", 1, true) ~= nil
+end
+-- Fullest creep in range: eating it saves the most attacks (like Devour / Midas on the biggest creep).
+local function BestFeastCreep(range)
+	local best, bestHp = nil, -1
+	for _, cr in pairs(b:GetNearbyCreeps(range, true) or {}) do
+		if IsFeastCreep(cr) and cr:GetHealth() > bestHp then
+			best, bestHp = cr, cr:GetHealth()
+		end
+	end
+	return best
+end
 function a.ConsiderMidnightFeast()
+	local now = DotaTime()
+	-- Did the last try start the cooldown? Logs the gold change once so we learn if eating gives bounty.
+	if feastTryCd ~= nil and now - feastTryAt > 1 then
+		local cdNow = t:GetCooldownTimeRemaining()
+		print(string.format("[OHA-NS] feast result started=%s goldDelta=%d", tostring(cdNow > 0), b:GetGold() - (feastGold or b:GetGold())))
+		feastTryCd, feastGold = nil, nil
+	end
 	if
-		not c.CanCastAbility(t)
+		t == nil
+		or t:IsNull()
+		or not t:IsTrained()
+		or t:IsHidden()
+		or not t:IsActivated()
+		or t:GetCooldownTimeRemaining() > 0
+		or now - feastTryAt < 3
+		or not FeastIsNight()
 		or c.IsRetreating(b) and c.IsRealInvisible(b) and #c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) > 0
 	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a2 = b:GetNearbyCreeps(650, true)
-	if
-		c.IsValid(a2[1])
-		and c.CanBeAttacked(a2[1])
-		and c.CanCastOnTargetAdvanced(a2[1])
-		and not a2[1]:IsAncientCreep()
-		and not a2[1]:IsDominated()
-	then
-		if c.GetHP(b) < 0.5 or G < 0.5 and c.GetHP(b) < 0.75 then
-			return BOT_ACTION_DESIRE_HIGH, a2[1]
-		end
+	local hp = c.GetHP(b)
+	local enemies = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	local nEnemies = enemies ~= nil and #enemies or 0
+	local why, cr = nil, nil
+	-- Heal: low HP, or low mana and hurt. Only a creep next to him while heroes are around.
+	if hp < 0.5 or G < 0.5 and hp < 0.75 then
+		cr = BestFeastCreep(nEnemies > 0 and 300 or 600)
+		why = "heal"
+	end
+	-- Farm: no enemy hero near, use it on cooldown like Devour / Midas (it also tops up HP and mana).
+	if cr == nil and nEnemies == 0 and (c.IsFarming(b) or c.IsLaning(b) or c.IsPushing(b) or hp < 0.9 or G < 0.9) then
+		cr = BestFeastCreep(450)
+		why = "farm"
+	end
+	if cr ~= nil and c.CanCastOnTargetAdvanced(cr) then
+		feastTryAt, feastTryCd, feastGold = now, t:GetCooldownTimeRemaining(), b:GetGold()
+		print(string.format("[OHA-NS] feast try why=%s creep=%s passive=%s castable=%s hp=%.2f mp=%.2f",
+			why, cr:GetUnitName(), tostring(t:IsPassive()), tostring(t:IsFullyCastable()), hp, G))
+		return BOT_ACTION_DESIRE_HIGH, cr
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

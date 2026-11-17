@@ -388,6 +388,58 @@ local function CoreCanTakeLastHit(creep)
 	end
 	return nil, nil
 end
+-- Enemy heroes harassing us: aiming at us now, or hit us in the last 1.5s.
+local function Harassers()
+	local list = {}
+	for _, h in pairs(k or {}) do
+		if
+			b.IsValidHero(h)
+			and not b.IsSuspiciousIllusion(h)
+			and (h:GetAttackTarget() == e or e:WasRecentlyDamagedByHero(h, 1.5))
+		then
+			list[#list + 1] = h
+		end
+	end
+	return list
+end
+local function LaneLog(fmt, ...)
+	if DotaTime() >= (e._laneRiskLogAt or -999) then
+		e._laneRiskLogAt = DotaTime() + 2
+		pcall(print, string.format(fmt, ...))
+	end
+end
+-- Walking in for a last hit with a harasser on us (user rule 2026-11-17). The spot we attack from
+-- is inside a harasser's attack range + 100: skip below 40% HP, skip a melee creep below 60% HP
+-- (ranged / siege / flagbearer still worth it), and a ranged bot below 60% only last-hits from
+-- where it stands. Returns why it skips, or nil.
+local function LastHitRisk(creep, spot, needsWalk)
+	local hp = b.GetHP(e)
+	if hp >= 0.6 then
+		return nil
+	end
+	local danger = nil
+	for _, h in pairs(Harassers()) do
+		if GetUnitToLocationDistance(h, spot) <= h:GetAttackRange() + 100 then
+			danger = h
+			break
+		end
+	end
+	if danger == nil then
+		return nil
+	end
+	local name = creep:GetUnitName() or ""
+	local valuable = N(creep) >= 2 or string.find(name, "siege", 1, true) ~= nil
+	if hp < 0.4 then
+		return "low-hp", danger
+	end
+	if not valuable then
+		return "melee-creep", danger
+	end
+	if m > 326 and needsWalk then
+		return "ranged-walk", danger
+	end
+	return nil
+end
 -- [OHA-LANE]: every 20s per bot in the laning phase. Last hits, denies, where it
 -- stands relative to the wave, and how often a support took or left a last hit.
 local function LogLaning()
@@ -529,6 +581,26 @@ do
 			end
 			if bCanLastHit then
 				local a7 = GetUnitToUnitDistance(e, C)
+				do
+					local spot = e:GetLocation()
+					if a7 > m then
+						spot = b.GetXUnitsTowardsLocation2(C:GetLocation(), e:GetLocation(), m - C:GetBoundingRadius())
+					end
+					local why, by = LastHitRisk(C, spot, a7 > m)
+					if why ~= nil then
+						LaneLog(
+							"[OHA-LANE] t=%.0f %s lasthit-skip why=%s creep=%s by=%s hp=%.2f walk=%d",
+							DotaTime(),
+							(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+							why,
+							(string.gsub(C:GetUnitName(), "npc_dota_", "")),
+							(string.gsub(by:GetUnitName(), "npc_dota_hero_", "")),
+							b.GetHP(e),
+							math.max(0, math.floor(a7 - m))
+						)
+						goto a5
+					end
+				end
 				if a7 > m then
 					local a8 = m - C:GetBoundingRadius()
 					local a9 = b.GetXUnitsTowardsLocation2(C:GetLocation(), e:GetLocation(), a8)
@@ -605,6 +677,33 @@ do
 			for D, L in pairs(k) do
 				if SafeToHarassHero(L) and b.IsInRange(e, L, m) then
 					e:Action_AttackUnit(L, true)
+					return
+				end
+			end
+		end
+		-- Harassed with no last hit to take and no trade above: step out of the harasser's attack
+		-- range + 100 toward our fountain for 1s, then the wait spot below brings us back.
+		if e._harassStepUntil ~= nil and DotaTime() < e._harassStepUntil then
+			e:Action_MoveToLocation(e._harassStepTo)
+			return
+		end
+		do
+			for _, h in pairs(Harassers()) do
+				local dist = GetUnitToUnitDistance(e, h)
+				if e:WasRecentlyDamagedByHero(h, 1.5) and dist <= h:GetAttackRange() + 100 then
+					local need = math.max(150, h:GetAttackRange() + 150 - dist)
+					e._harassStepUntil = DotaTime() + 1.0
+					e._harassStepTo = b.AdjustLocationWithOffsetTowardsFountain(e:GetLocation(), need)
+					LaneLog(
+						"[OHA-LANE] t=%.0f %s harass-step by=%s dist=%d step=%d hp=%.2f",
+						DotaTime(),
+						(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(h:GetUnitName(), "npc_dota_hero_", "")),
+						dist,
+						need,
+						b.GetHP(e)
+					)
+					e:Action_MoveToLocation(e._harassStepTo)
 					return
 				end
 			end

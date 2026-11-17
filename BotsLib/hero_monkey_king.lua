@@ -115,7 +115,26 @@ local L
 local M
 local N
 local O
+-- In-game check: is the Jingu buff seen, and do the counter stacks build on the hero he hits?
+local jinguOn, jinguLogTarget, jinguLogStacks = false, nil, 0
+local function LogJingu()
+	local on = b:HasModifier("modifier_monkey_king_quadruple_tap_bonuses")
+	if on ~= jinguOn then
+		jinguOn = on
+		print(string.format("[OHA-MONKEY_KING] jingu %s charges=%d hp=%.2f", on and "active" or "ended",
+			c.GetModifierCount(b, "modifier_monkey_king_quadruple_tap_bonuses"), c.GetHP(b)))
+	end
+	local tgt = b:GetAttackTarget()
+	if c.IsValidHero(tgt) then
+		local st = c.GetModifierCount(tgt, "modifier_monkey_king_quadruple_tap_counter")
+		if st > 0 and (tgt ~= jinguLogTarget or st ~= jinguLogStacks) then
+			jinguLogTarget, jinguLogStacks = tgt, st
+			print(string.format("[OHA-MONKEY_KING] jingu counter target=%s stacks=%d", tgt:GetUnitName(), st))
+		end
+	end
+end
 function a.SkillsComplement()
+	LogJingu()
 	if c.CanNotUseAbility(b) then
 		return
 	end

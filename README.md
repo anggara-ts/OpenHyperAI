@@ -65,10 +65,20 @@ Edit picks, bans, language, and related options in `Customize/general.lua`.
 
 ### 4. Play
 
+You can not use the "Play vs Bots" menu, but instead we have to play in a Custom Lobby.
+
 1. Open Dota 2  
-2. **Play** → **Custom Lobby** → create lobby  
-3. Server location: **Local Host**  
-4. Fill empty slots with bots and start  
+2. **Play** → **Custom Lobbies** → **+ Create**  
+3. Edit Lobby Settings:
+- Server location: **Local Host**
+- Bot Settings → Select  **Local Dev Script** for both Radiant and Dire Bots
+4. Human can join the Radiant or Dire team, with the slot number assign your role:
+- 1. Carry (Safe lane)
+- 2. Mid-laner
+- 3. Off-laner
+- 4. Soft Support (Off lane Support)
+- 5. Hard Support (Safe lane Support)
+5. Start the game
 
 ---
 

@@ -25,7 +25,11 @@ local function Record(name, seconds)
 	if span < WINDOW then
 		return
 	end
-	if perf.total / span > BUDGET then
+	-- The first window of each bot always prints (why=baseline), so a quiet log means "under budget" and not "the
+	-- clock did not advance".
+	local baseline = not bot._perfBaselineDone
+	bot._perfBaselineDone = true
+	if baseline or perf.total / span > BUDGET then
 		local names = {}
 		for key, value in pairs(perf.sum) do
 			names[#names + 1] = { key, value }
@@ -40,9 +44,10 @@ local function Record(name, seconds)
 		pcall(
 			print,
 			string.format(
-				"[OHA-PERF] t=%.0f %s ms/s=%.1f calls=%d window=%.0fs top=%s",
+				"[OHA-PERF] t=%.0f %s why=%s ms/s=%.1f calls=%d window=%.0fs top=%s",
 				now,
 				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				baseline and "baseline" or "over-budget",
 				perf.total / span * 1000,
 				perf.calls,
 				span,

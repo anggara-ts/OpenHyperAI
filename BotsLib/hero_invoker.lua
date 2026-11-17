@@ -1,4 +1,6 @@
 -- Invoker: skill build, item build, and ability use for this hero.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local botTarget, CataclysmDesire, ConsiderFirstSpell, CheckAbilityUsage
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

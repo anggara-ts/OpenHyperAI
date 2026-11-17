@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Alchemist.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local ChemicalRageDesire, UnstableConcoctionThrowDesire, UnstableConcoctionThrowTarget, UnstableConcoctionDesire, AcidSprayDesire, AcidSprayLocation, BerserkPotionDesire, BerserkPotionTarget
 local bot
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

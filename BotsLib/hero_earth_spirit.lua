@@ -1,4 +1,6 @@
 -- Earth Spirit: skill build, item build, and ability use for this hero.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local EnchantTarget, IsStoneNearby, IsStoneInPath, IsStoneNearTarget
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

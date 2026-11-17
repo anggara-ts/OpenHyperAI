@@ -1,4 +1,7 @@
 -- How Rubick plays after stealing a spell from Batrider.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local BlinkLassoTarget, FireflyDesire, FlamingLassoDesire, FlamingLassoTarget, FlamebreakDesire, FlamebreakLocation, StickyNapalmDesire, StickyNapalmLocation
+local BlinkLocation
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

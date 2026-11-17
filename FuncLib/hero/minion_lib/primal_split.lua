@@ -1,4 +1,7 @@
 -- Thinking for summoned units: primal split.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local DispelMagic, WindWalk, DispelMagicTarget, CycloneTarget, WindWalkTarget, HurlBoulder, HurlBoulderTarget, AstralPull
+local AstralPullDesire, AstralPullTarget, AttackUnits, UseDispelMagic, UseCyclone, UseWindWalk, UseHurlBoulder, UseAstralPull
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
 local X = {}

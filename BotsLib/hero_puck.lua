@@ -2,6 +2,7 @@
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AltCast = require(GetScriptDirectory() .. "/FuncLib/systems/alt_cast")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
@@ -93,6 +94,9 @@ local isRetreating
 local isAttacking
 local mpRatio
 function X.SkillsComplement()
+	-- Illusory Orb curves on a normal cast and flies straight on alt-cast (#36). Try the autocast switch as the alt
+	-- state (as Grimstroke does) and log it at each cast, to confirm in a game that the orb then flies straight.
+	AltCast.Ensure(bot, illusoryOrbAbility, true)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -114,6 +118,18 @@ function X.SkillsComplement()
 	illusoryOrbDesire, illusoryOrbLocation = X.ConsiderIllusoryOrb()
 	if illusoryOrbDesire > 0 then
 		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, illusoryOrbLocation)
+		if DotaTime() >= (bot._orbCastLogAt or -999) then
+			bot._orbCastLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-PUCK] t=%.0f orb cast alt=%s dist=%d",
+					DotaTime(),
+					tostring(AltCast.State(illusoryOrbAbility)),
+					GetUnitToLocationDistance(bot, illusoryOrbLocation)
+				)
+			)
+		end
 		return
 	end
 	phaseShiftDesire = X.ConsiderPhaseShift()

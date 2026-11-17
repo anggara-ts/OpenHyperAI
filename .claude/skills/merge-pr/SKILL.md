@@ -5,10 +5,11 @@ description: Merge an OpenHyperAI PR whose in-game checks all passed - tick the 
 
 # Merge a verified PR
 
-Rules: `AGENTS.md` (workflow step 8). Checklist:
+Rules: `AGENTS.md` (workflow step 9). The agent decides and merges without asking (maintainer approval,
+2026-11-17), then reports what it merged. Checklist:
 
 1. **Ready?** `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and the PR's CI is
-   green (`gh pr checks <pr>`). Otherwise stop.
+   green (`gh pr checks <pr>`), and no PR it contains (stacked base) is still unready. Otherwise stop and say why.
 2. **Mute proven noise:** `node Util/verify.js mute-suggest <pr>` lists the passed `[OHA-*]` tags; add the
    noisy ones to `OHA_MUTED` in `FuncLib/systems/global_overrides.lua` in this PR (keep logs that report
    errors or rare decisions). Commit, push, wait for CI.

@@ -206,7 +206,10 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
      either fixed in the PR it is about or added to a grouped issue card (step 1).
    - An item that failed: fix it in the same PR and keep it tracked; an item whose situation didn't happen stays
      pending for the next game.
-9. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
+9. **Merge.** The agent decides which PRs are ready and squash-merges them itself, without asking (standing
+   approval from the maintainer, 2026-11-17); it reports what it merged and why. A PR is ready when
+   `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip), CI is green, and every PR it is
+   stacked on is merged or merges first in the same go (a PR that contains an unready PR waits). Then:
    - `node Util/verify.js mute-suggest <pr>` prints `OHA_MUTED` entries for the proven log lines
      (`FuncLib/systems/global_overrides.lua`); add the noisy ones in the PR (avoid whole-tag mutes; keep error and
      rare-decision logs).

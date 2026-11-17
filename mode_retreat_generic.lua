@@ -5,7 +5,6 @@ local bot = GetBot()
 local hpRatio, mpRatio, botName, botHealth, healthRegen, manaRegen, botLocation, botTarget
 local botLevel, activeMode
 local allyHeroes, enemyHeroes
-local unusedValue = 0
 local loneDruidAegisAt = 0
 local runStartTime = 0
 local runDuration = 0
@@ -44,7 +43,7 @@ local function RefreshNearby()
 			Fu.IsValid(unit)
 			and unit:GetTeam() ~= TEAM_NEUTRAL
 			and unit:GetTeam() ~= TEAM_NONE
-			and not string.find(botName, "lone_druid_bear")
+			and not string.find(unit:GetUnitName(), "lone_druid_bear")
 			and not unit:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not unit:HasModifier("modifier_dazzle_nothl_projection_physical_body_debuff")
 			and not unit:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")

@@ -109,6 +109,9 @@ local botTarget
 local isGoingOnSomeone
 local isRetreating
 local hpRatio
+-- fix: these helpers were globals (Magnus had a global CanBKB too, reading his own bot).
+-- Forward-declared locals: the "function X()" definitions at the bottom now assign these.
+local IsTargetLocInBigUlt, CanBKB
 local function IsSolarGuardianInFlight()
 	return bot:IsChanneling()
 		or bot:HasModifier("modifier_dawnbreaker_solar_guardian_air_time")
@@ -423,7 +426,7 @@ function X.ConsiderConverge()
 		if
 			alliesAround ~= nil
 			and enemiesAround ~= nil
-			and (#enemiesAround > #alliesAround or hpRatio and bot:WasRecentlyDamagedByAnyHero(2))
+			and (#enemiesAround > #alliesAround or hpRatio < 0.7 and bot:WasRecentlyDamagedByAnyHero(2))
 			and Fu.IsValidHero(enemiesAround[1])
 			and not Fu.IsSuspiciousIllusion(enemiesAround[1])
 			and not Fu.IsDisabled(enemiesAround[1])
@@ -510,9 +513,9 @@ function X.ConsiderSolarGuardian()
 			then
 				local nearbyAllies = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
 				local farthestAlly = nil
+				local farthestDistance = 0
 				for i = 1, #GetTeamPlayers(GetTeam()) do
 					local member = GetTeamMember(i)
-					local farthestDistance = 0
 					if member ~= nil and member:IsAlive() and GetUnitToUnitDistance(bot, member) > farthestDistance then
 						farthestDistance = GetUnitToUnitDistance(bot, member)
 						farthestAlly = member

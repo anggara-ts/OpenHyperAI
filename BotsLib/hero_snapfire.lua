@@ -292,7 +292,7 @@ function X.ConsiderScatterBlast()
 		end
 		if
 			enemiesInRange ~= nil
-			and #enemiesInRange ~= nil
+			and #enemiesInRange >= 1
 			and Fu.IsValidHero(enemiesInRange[1])
 			and Fu.IsAttacking(enemiesInRange[1])
 			and mpRatio > 0.55
@@ -567,9 +567,7 @@ function X.ConsiderMortimerKisses()
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1600, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1600, false, BOT_MODE_NONE)
 				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
-					if #enemiesNearTarget >= 1 and #enemiesNearTarget >= 1 or #enemiesNearTarget == 0 then
-						return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
-					end
+					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
 		end

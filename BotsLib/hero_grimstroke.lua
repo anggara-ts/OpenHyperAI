@@ -693,7 +693,7 @@ function X.ConsiderDarkPortrait()
 			if
 				nearbyEnemies ~= nil
 				and nearbyAllies ~= nil
-				and (#nearbyEnemies >= #nearbyAllies or Fu.WeAreStronger(bot, 1600))
+				and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600))
 			then
 				return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 			end

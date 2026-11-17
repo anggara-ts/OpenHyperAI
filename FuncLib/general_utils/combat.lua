@@ -712,34 +712,15 @@ local function installCombat(Fu)
 	end
 	function Fu.GetArmorReducers(hero)
 		local armorReduction = 0
-		if
-			Fu.HasItem(hero, "item_desolator")
-			and (
-				hero:GetItemInSlot(6) ~= "item_desolator"
-				or hero:GetItemInSlot(7) ~= "item_desolator"
-				or hero:GetItemInSlot(8) ~= "item_desolator"
-			)
-		then
+		-- Fu.HasItem only looks at the main slots 0-5, so backpack items are already left out. (The
+		-- removed extra test compared an item handle with a name string and was always true.)
+		if Fu.HasItem(hero, "item_desolator") then
 			armorReduction = armorReduction + 6
 		end
-		if
-			Fu.HasItem(hero, "item_assault")
-			and (
-				hero:GetItemInSlot(6) ~= "item_assault"
-				or hero:GetItemInSlot(7) ~= "item_assault"
-				or hero:GetItemInSlot(8) ~= "item_assault"
-			)
-		then
+		if Fu.HasItem(hero, "item_assault") then
 			armorReduction = armorReduction + 5
 		end
-		if
-			Fu.HasItem(hero, "item_blight_stone")
-			and (
-				hero:GetItemInSlot(6) ~= "item_blight_stone"
-				or hero:GetItemInSlot(7) ~= "item_blight_stone"
-				or hero:GetItemInSlot(8) ~= "item_blight_stone"
-			)
-		then
+		if Fu.HasItem(hero, "item_blight_stone") then
 			armorReduction = armorReduction + 2
 		end
 		local darkLordAbility = hero:GetAbilityByName("nevermore_dark_lord")

@@ -123,7 +123,8 @@ local function buildTeamNames(customNames, customTeamName)
 	local teamIndex = 0
 	repeat
 		teamIndex = RandomInt(1, #teamList)
-	until teamIndex % 2 == GetTeam() - 2 and (teamList[teamIndex].name ~= "ADD" or teamList[teamIndex].name ~= "上古")
+	until teamIndex % 2 == GetTeam() - 2
+		and (teamList[teamIndex].name ~= "ADD" and teamList[teamIndex].name ~= "上古")
 	names = Utils.MergeLists(teamList[teamIndex].players, teamList[#teamList].players)
 	if customNames and #customNames > 0 then
 		for slot = 1, #customNames do

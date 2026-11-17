@@ -19,7 +19,7 @@ function X.ConsiderStolenSpell(ability)
 	local abilityName = ability:GetName()
 	if abilityName == "axe_culling_blade" then
 		cullingBladeAbility = ability
-		CullingBladeDesire, CullingBladeTarget = X.ConsiderCullingBlade()
+		local CullingBladeDesire, CullingBladeTarget = X.ConsiderCullingBlade()
 		if CullingBladeDesire > 0 then
 			bot:Action_UseAbilityOnEntity(cullingBladeAbility, CullingBladeTarget)
 			return
@@ -27,7 +27,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "axe_berserkers_call" then
 		berserkersCallAbility = ability
-		BerserkersCallDesire = X.ConsiderBerserkersCall()
+		local BerserkersCallDesire = X.ConsiderBerserkersCall()
 		if BerserkersCallDesire > 0 then
 			bot:Action_UseAbility(berserkersCallAbility)
 			return
@@ -35,7 +35,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "axe_battle_hunger" then
 		battleHungerAbility = ability
-		BattleHungerDesire, BattleHungerTarget = X.ConsiderBattleHunger()
+		local BattleHungerDesire, BattleHungerTarget = X.ConsiderBattleHunger()
 		if BattleHungerDesire > 0 then
 			bot:Action_UseAbilityOnEntity(battleHungerAbility, BattleHungerTarget)
 			return

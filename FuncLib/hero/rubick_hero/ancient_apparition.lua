@@ -165,7 +165,7 @@ function X.ConsiderIceVortex()
 	if Fu.IsInTeamFight(bot, 1200) then
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
-		if enemiesInRadius ~= nil and #enemiesInRadius then
+		if enemiesInRadius ~= nil and #enemiesInRadius >= 1 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end

@@ -163,9 +163,9 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(primalSplitAbility)
 		return
 	end
-	drunkenBrawlerDesire, State = X.ConsiderDrunkenBrawler()
+	drunkenBrawlerDesire, drunkenBrawlerStance = X.ConsiderDrunkenBrawler()
 	if drunkenBrawlerDesire > 0 then
-		if currentBrawlerStance ~= State then
+		if currentBrawlerStance ~= drunkenBrawlerStance then
 			bot:Action_UseAbility(drunkenBrawlerAbility)
 			currentBrawlerStance = currentBrawlerStance % 3 + 1
 		end

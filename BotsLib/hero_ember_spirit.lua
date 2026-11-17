@@ -730,7 +730,8 @@ function X.ConsiderActivateFireRemnant()
 				local distanceToRemnant = GetUnitToUnitDistance(bot, remnant)
 				if remnantFountainDistance < botFountainDistance and bestDistance < distanceToRemnant then
 					bestRemnant = remnant
-					bestDistance = remnantFountainDistance
+					-- fix: store the distance that is compared (was the remnant's fountain distance)
+					bestDistance = distanceToRemnant
 				end
 			end
 		end
@@ -743,6 +744,17 @@ function X.ConsiderActivateFireRemnant()
 					and not enemyHero:IsDisarmed()
 				then
 					if Fu.IsChasingTarget(enemyHero, bot) or #nearbyEnemies > #nearbyAllies or hpRatio < 0.5 then
+						if DotaTime() >= (bot._ohaRemnantRetreatLogAt or -999) then
+							bot._ohaRemnantRetreatLogAt = DotaTime() + 5
+							pcall(
+								print,
+								string.format(
+									"[OHA-EMBER_SPIRIT] t=%.0f retreat to remnant %.0f away (farthest toward fountain)",
+									DotaTime(),
+									bestDistance
+								)
+							)
+						end
 						return BOT_ACTION_DESIRE_HIGH, bestRemnant:GetLocation()
 					end
 				end

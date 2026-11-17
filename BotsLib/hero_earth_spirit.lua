@@ -125,20 +125,13 @@ local stoneRemnantAbility =
 	SafeAbility(bot:GetAbilityByName("earth_spirit_stone_caller"), "earth_spirit_stone_caller", "earth_spirit")
 local magnetizeAbility =
 	SafeAbility(bot:GetAbilityByName("earth_spirit_magnetize"), "earth_spirit_magnetize", "earth_spirit")
-local talentUnique2 = SafeAbility(
-	bot:GetAbilityByName("special_bonus_unique_earth_spirit_2"),
-	"special_bonus_unique_earth_spirit_2",
-	"earth_spirit"
-)
 local enchantRemnantAbility =
 	SafeAbility(bot:GetAbilityByName("earth_spirit_petrify"), "earth_spirit_petrify", "earth_spirit")
 local boulderSmashDesire, boulderSmashLocation, boulderSmashNeedsStone, boulderSmashReady
 local rollingBoulderDesire, rollingBoulderLocation, rollingBoulderNeedsStone
 local geomagneticGripDesire, geomagneticGripTarget, geomagneticGripNeedsStone
-local unusedDesire
 local enchantRemnantDesire
 local magnetizeDesire
-local unusedState
 local stoneCharges = 0
 local botTarget
 local isGoingOnSomeone

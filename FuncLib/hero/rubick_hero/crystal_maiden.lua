@@ -9,6 +9,10 @@ local freezingFieldAbility
 local manaThreshold, mpRatio, hpRatio, botLevel
 local lastShadowAmuletTime = 0
 local botTarget
+-- Handles of the other Crystal Maiden spells are nil unless Rubick stole that spell too.
+local function IsStolenSpellReady(spell)
+	return spell ~= nil and not spell:IsNull() and spell:IsFullyCastable()
+end
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -535,8 +539,9 @@ function X.ConsiderFreezingField()
 		if
 			Fu.IsValidHero(chaser)
 			and Fu.CanCastOnNonMagicImmune(chaser)
-			and not abilityQ:IsFullyCastable()
-			and not abilityW:IsFullyCastable()
+			-- fix: abilityQ/abilityW were undefined globals (Crystal Nova / Frostbite in hero_crystal_maiden.lua)
+			and not IsStolenSpellReady(crystalNovaAbility)
+			and not IsStolenSpellReady(frostbiteAbility)
 			and hpRatio > 0.38 * #nearbyEnemies
 		then
 			return BOT_ACTION_DESIRE_HIGH

@@ -370,8 +370,9 @@ local function installMapInfo(Fu)
 		end
 		local closestMember = nil
 		local closestDistance = 100000
-		for _, playerId in pairs(teamPlayerIds) do
-			local member = GetTeamMember(playerId)
+		-- GetTeamMember takes a team slot (1-5), not a player ID; this loop used to pass the player ID.
+		for i = 1, #teamPlayerIds do
+			local member = GetTeamMember(i)
 			if
 				Fu.IsValidHero(member)
 				and member:GetItemSlotType(member:FindItemSlot("item_dust")) == ITEM_SLOT_TYPE_MAIN

@@ -11,6 +11,7 @@ local berserkPotionAbility
 local minThrowDelay = 2
 local fullBrewDelay = 4.25
 local concoctionStartTime = 0
+local lastEngageLogTime = -999
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -79,6 +80,8 @@ function X.ConsiderAcidSpray()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 900, false, BOT_MODE_NONE)
+		-- fix: nInRangeEnemy was an undefined global here, so engaging never used Acid Spray
+		local nInRangeEnemy = Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE)
 		if
 			Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
@@ -94,6 +97,17 @@ function X.ConsiderAcidSpray()
 		then
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 900, false, BOT_MODE_NONE)
 			if nearbyAllies ~= nil and enemiesNearTarget ~= nil and #nearbyAllies >= #enemiesNearTarget then
+				if DotaTime() >= lastEngageLogTime + 5 then
+					lastEngageLogTime = DotaTime()
+					pcall(
+						print,
+						string.format(
+							"[OHA-RUBICK] t=%.0f stolen acid spray engage target=%s",
+							DotaTime(),
+							botTarget:GetUnitName()
+						)
+					)
+				end
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
@@ -265,7 +279,11 @@ function X.ConsiderUnstableConcoctionThrow()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, unstableConcoctionThrowAbility:GetCastRange())
-	local maxDamage = unstableConcoctionAbility:GetSpecialValueInt("max_damage")
+	-- The concoction handle is set only after its own branch ran; without it, 0 skips the kill check.
+	local maxDamage = 0
+	if unstableConcoctionAbility ~= nil and not unstableConcoctionAbility:IsNull() then
+		maxDamage = unstableConcoctionAbility:GetSpecialValueInt("max_damage")
+	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if

@@ -130,6 +130,12 @@ local blinkLocation
 local blinkRPDesire
 local blinkSkewerDesire
 local blinkRPSkewerDesire
+local blinkHornTossSkewerDesire
+local bkbItem
+-- fix: these helpers were globals; Dark Seer, Treant and Tiny also define a global HasBlink, so one
+-- hero could run another's copy (reading that hero's bot). Forward-declared locals: the
+-- "function X()" definitions at the bottom now assign these.
+local CanDoBlinkRP, CanDoBlinkSkewer, CanDoBlinkRPSkewer, CanDoBlinkHornTossSkewer, HasBlink, CanBKB
 if bot.shouldBlink == nil then
 	bot.shouldBlink = false
 end
@@ -177,7 +183,7 @@ function X.SkillsComplement()
 	if blinkRPSkewerDesire > 0 then
 		bot:Action_ClearActions(false)
 		if CanBKB() then
-			bot:ActionQueue_UseAbility(BlackKingBar)
+			bot:ActionQueue_UseAbility(bkbItem)
 		end
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkLocation)
 		bot:ActionQueue_Delay(0.1)
@@ -196,7 +202,7 @@ function X.SkillsComplement()
 	if blinkSkewerDesire > 0 then
 		bot:Action_ClearActions(false)
 		if CanBKB() then
-			bot:ActionQueue_UseAbility(BlackKingBar)
+			bot:ActionQueue_UseAbility(bkbItem)
 		end
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkLocation)
 		bot:ActionQueue_Delay(0.1)
@@ -212,18 +218,18 @@ function X.SkillsComplement()
 	if blinkRPDesire > 0 then
 		bot:Action_ClearActions(false)
 		if CanBKB() then
-			bot:ActionQueue_UseAbility(BlackKingBar)
+			bot:ActionQueue_UseAbility(bkbItem)
 		end
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkLocation)
 		bot:ActionQueue_Delay(0.1)
 		bot:ActionQueue_UseAbility(reversePolarityAbility)
 		return
 	end
-	BlinkHornTossSkewerDesire = X.ConsiderBlinkForHornTossSkewer()
-	if BlinkHornTossSkewerDesire > 0 then
+	blinkHornTossSkewerDesire = X.ConsiderBlinkForHornTossSkewer()
+	if blinkHornTossSkewerDesire > 0 then
 		bot:Action_ClearActions(false)
 		if CanBKB() then
-			bot:ActionQueue_UseAbility(BlackKingBar)
+			bot:ActionQueue_UseAbility(bkbItem)
 		end
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkLocation)
 		hornTossDesire = X.ConsiderHornToss()
@@ -809,7 +815,7 @@ function CanBKB()
 		end
 	end
 	if foundBlackKingBar ~= nil and foundBlackKingBar:IsFullyCastable() and bot:GetMana() >= 75 then
-		BlackKingBar = foundBlackKingBar
+		bkbItem = foundBlackKingBar
 		return true
 	end
 	return false

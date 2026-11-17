@@ -8,7 +8,6 @@ then
 	return
 end
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local Version = require(GetScriptDirectory() .. "/FuncLib/systems/version")
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomizeGeneral = require(GetScriptDirectory() .. "/Customize/general")
 local FarmDefend = require(GetScriptDirectory() .. "/FuncLib/systems/farm_defend")
@@ -42,13 +41,8 @@ local isOfflaner = false
 local isMidlaner = false
 local isCarry = false
 local team = GetTeam()
-local unusedFlag = false
 local enemyHumanCount, enemyBotCount = Fu.Utils.NumHumanBotPlayersInTeam(GetOpposingTeam())
 local allyHumanCount, allyBotCount = Fu.Utils.NumHumanBotPlayersInTeam(team)
-local unusedCounter = 0
-local unusedMin = 1
-local unusedMax = 6
-local unusedFlag2 = false
 local lastCacheCleanupTime = -100
 local modeLocaleKeys = {
 	[BOT_MODE_LANING] = "mode_laning",

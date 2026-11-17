@@ -135,13 +135,14 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(timeLapseAbility)
 		return
 	end
-	timeLapseDesire, Target = X.ConsiderTimeLapse()
+	local timeLapseTarget
+	timeLapseDesire, timeLapseTarget = X.ConsiderTimeLapse()
 	if timeLapseDesire > 0 then
-		if Target == "self" then
+		if timeLapseTarget == "self" then
 			bot:Action_UseAbility(timeLapseAbility)
 		else
 			if bot:HasScepter() then
-				bot:Action_UseAbilityOnEntity(timeLapseAbility, Target)
+				bot:Action_UseAbilityOnEntity(timeLapseAbility, timeLapseTarget)
 			end
 		end
 		return

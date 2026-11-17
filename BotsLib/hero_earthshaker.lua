@@ -307,11 +307,13 @@ function X.ConsiderFissure()
 			and not Fu.IsSuspiciousIllusion(enemiesAround[1])
 			and not Fu.IsDisabled(enemiesAround[1])
 		then
-			enemiesAround = Fu.GetEnemiesNearLoc(enemiesAround[1]:GetLocation(), radius)
-			if enemiesAround ~= nil and #enemiesAround >= 1 then
-				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesAround)
+			-- fix: keep the chaser; the else branch indexed the (empty) re-fetched list
+			local chaser = enemiesAround[1]
+			local enemiesNearChaser = Fu.GetEnemiesNearLoc(chaser:GetLocation(), radius)
+			if enemiesNearChaser ~= nil and #enemiesNearChaser >= 1 then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearChaser)
 			else
-				return BOT_ACTION_DESIRE_HIGH, enemiesAround[1]:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, chaser:GetLocation()
 			end
 		end
 	end

@@ -222,12 +222,8 @@ function X.ConsiderSplitEarth()
 				end
 				if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 then
 					if not Fu.IsInRange(bot, botTarget, castRange) then
-						if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 then
-							return BOT_ACTION_DESIRE_HIGH,
-								Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemyHeroes), castRange)
-						else
-							return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyEnemyHeroes)
-						end
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemyHeroes), castRange)
 					end
 				end
 				if not Fu.IsInRange(bot, botTarget, castRange) then

@@ -3,8 +3,8 @@ local a = require("bots.FuncLib.systems.version")
 if Sounds == nil then
 	Sounds = require("bots.FretBots.Soundboard")
 end
--- Hero names live in the core bot script since the plugin split (FuncLib/data/hero_names.lua).
-local b = require("bots.FuncLib.data.hero_names")
+-- Hero names live in the core bot script since the plugin split (FuncLib/data/hero_display_names.lua).
+local b = require("bots.FuncLib.data.hero_display_names")
 local c = require("bots.FretBots.Inspect")
 local d = require("bots/FuncLib/systems/localization")
 local e

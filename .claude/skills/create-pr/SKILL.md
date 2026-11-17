@@ -19,7 +19,7 @@ Rules: `AGENTS.md` (Branches and pull requests, Commits, Checks, Logging). Check
 4. **Commit** with a conventional message (what was wrong, what changed, which log shows it). Commits are
    signed automatically. Never stage `Customize/general.lua` (test lineup). The build number is generated
    (`Customize/build_info.lua`); don't bump versions by hand.
-5. **Push** and confirm the CI run for the commit is green (Syntax, Lint, Format, Tests).
+5. **Push**, then start a background CI wait (`gh pr checks <pr> --watch` with run_in_background, or the GitHub API in a background loop) and continue with the next steps; never block the session polling CI. Fix a red check when the background task reports it; CI must be green before merging.
 6. **Description** from `.github/pull_request_template.md`, change-log format: one entry per change with
    type (crash/mechanic/behaviour/cleanup), **Before:** and **Now:** in one or two sentences; group same-issue
    objects but give each hero/object its own sub-bullet. "How to verify in game" lists the `[OHA-*]` lines; add

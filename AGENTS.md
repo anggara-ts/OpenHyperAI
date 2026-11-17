@@ -101,7 +101,7 @@ Prefix a file with `--` only for a short local test, never as a long-term "disab
    `Tests/stub_api.lua`. A real bug that isn't fixed in the same PR stays as `T.xfail(name, reason, fn)` plus an
    issue; an XPASS means it got fixed, so remove the xfail.
 
-Run them locally before pushing, then confirm the CI run for your commit is green.
+Run them locally before pushing. After pushing, don't block on CI: start a background wait (e.g. `gh pr checks <pr> --watch` run in the background) and keep working; look at the result before merging or when it reports a failure.
 
 **pre-commit hooks.** Once per clone: `pip install pre-commit` then `pre-commit install --install-hooks`
 (`.pre-commit-config.yaml`; installs the commit hooks and the post-checkout/commit/merge/rewrite hooks that

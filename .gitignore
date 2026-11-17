@@ -9,3 +9,5 @@ FretBots/
 FretBots.lua
 Buff/
 Customize/fretbots.lua
+# In-game verification tracker (Util/verify.js): local test state, quotes match-log lines
+Util/verify/

@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+// Opens a draft PR for every open issue that has none yet.
+//
+//   node Util/issue-prs.js [--dry-run]
+//
+// For each open issue without a PR (matched by "Closes #N" in a PR body or "issue-N" in the branch name):
+//   - branch  <prefix>/issue-<N>-<slug>  from origin/main  (prefix: feat for "enhancement", docs for
+//     "documentation", chore for "chore", otherwise fix)
+//   - one signed empty commit (git commit-tree -S, so no checkout and no working-tree change),
+//   - a draft PR titled "<prefix>: <issue title> (#N)" with the PR template and "Closes #N".
+// Issues labelled "no-pr" are skipped. Runs locally (not as a GitHub Action) because the branch rules require
+// commits signed with the maintainer's key.
+"use strict";
+const cp = require("child_process");
+const path = require("path");
+const fs = require("fs");
+
+const DRY = process.argv.includes("--dry-run");
+const GH = process.env.GH || (process.platform === "win32" ? "C:\\Program Files\\GitHub CLI\\gh.exe" : "gh");
+const ROOT = path.join(__dirname, "..");
+
+const gh = (args) => cp.execFileSync(GH, args, { encoding: "utf8", cwd: ROOT });
+const git = (args) => cp.execFileSync("git", args, { encoding: "utf8", cwd: ROOT }).trim();
+
+function prefixFor(labels) {
+	if (labels.includes("enhancement")) return "feat";
+	if (labels.includes("documentation")) return "docs";
+	if (labels.includes("chore")) return "chore";
+	return "fix";
+}
+function slug(title) {
+	return title
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 40)
+		.replace(/-+$/, "");
+}
+
+const issues = JSON.parse(gh(["issue", "list", "--state", "open", "--limit", "200", "--json", "number,title,labels,url"]));
+const prs = JSON.parse(gh(["pr", "list", "--state", "all", "--limit", "300", "--json", "number,headRefName,body"]));
+const covered = new Set();
+for (const pr of prs) {
+	for (const m of (pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi)) covered.add(Number(m[1]));
+	const b = pr.headRefName.match(/issue-(\d+)/);
+	if (b) covered.add(Number(b[1]));
+}
+
+const template = fs.readFileSync(path.join(ROOT, ".github", "pull_request_template.md"), "utf8");
+git(["fetch", "-q", "origin", "main"]);
+const baseSha = git(["rev-parse", "origin/main"]);
+const baseTree = git(["rev-parse", "origin/main^{tree}"]);
+
+let made = 0;
+for (const issue of issues) {
+	const labels = issue.labels.map((l) => l.name);
+	if (covered.has(issue.number) || labels.includes("no-pr")) continue;
+	const prefix = prefixFor(labels);
+	const branch = `${prefix}/issue-${issue.number}-${slug(issue.title)}`;
+	const title = `${prefix}: ${issue.title} (#${issue.number})`;
+	console.log(`#${issue.number} -> ${branch}`);
+	if (DRY) continue;
+	const sha = git(["commit-tree", "-S", baseTree, "-p", baseSha, "-m", `chore: start work on #${issue.number}\n\n${issue.title}`]);
+	git(["push", "-q", "origin", `${sha}:refs/heads/${branch}`]);
+	const body = `Closes #${issue.number}\n\n` + template;
+	const out = gh(["pr", "create", "--draft", "--base", "main", "--head", branch, "--title", title, "--body", body]);
+	console.log("   " + out.trim());
+	made++;
+}
+console.log(DRY ? "dry run, nothing created" : `${made} draft PR(s) created`);

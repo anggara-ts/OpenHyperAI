@@ -126,6 +126,11 @@ local funhouseMirrorDesire
 local strongmanTonicDesire, strongmanTonicTarget
 local whoopeeCushionDesire
 local unicycleDesire
+-- Weighted Pie and Crystal Ball souvenirs (#49): never cast before.
+local weightedPieAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_weighted_pie"), "ringmaster_weighted_pie", "ringmaster")
+local crystalBallAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_crystal_ball"), "ringmaster_crystal_ball", "ringmaster")
 local whipCastTime
 local botTarget, botLevel
 local isEngaging
@@ -211,6 +216,88 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(unicycleAbility)
 		return
 	end
+	local pieTarget = X.ConsiderWeightedPie()
+	if pieTarget ~= nil then
+		bot:Action_UseAbilityOnEntity(weightedPieAbility, pieTarget)
+		return
+	end
+	local ballLocation = X.ConsiderCrystalBall()
+	if ballLocation ~= nil then
+		bot:Action_UseAbilityOnLocation(crystalBallAbility, ballLocation)
+		return
+	end
+end
+function X.LogSouvenir(name, why)
+	if DotaTime() >= (bot._souvenirLogAt or -999) then
+		bot._souvenirLogAt = DotaTime() + 3
+		pcall(print, string.format("[OHA-RINGMASTER] t=%.0f souvenir=%s why=%s", DotaTime(), name, why))
+	end
+end
+-- Weighted Pie (game data: hero/creep target, 750 range, pushes 400 over 0.3s, blinds 3s, slows up to 45%):
+-- on the closest chaser while retreating, or on a target escaping while engaging.
+function X.ConsiderWeightedPie()
+	if not Fu.CanCastAbility(weightedPieAbility) then
+		return nil
+	end
+	local castRange = 750
+	if isRetreating then
+		local closest, closestDistance = nil, castRange + 1
+		for _, enemyHero in pairs(bot:GetNearbyHeroes(castRange, true, BOT_MODE_NONE) or {}) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
+				and GetUnitToUnitDistance(bot, enemyHero) < closestDistance
+			then
+				closest, closestDistance = enemyHero, GetUnitToUnitDistance(bot, enemyHero)
+			end
+		end
+		if closest ~= nil then
+			X.LogSouvenir("weighted_pie", "chaser")
+			return closest
+		end
+	end
+	if
+		isEngaging
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.IsRunning(botTarget)
+		and not botTarget:IsFacingLocation(bot:GetLocation(), 90)
+	then
+		X.LogSouvenir("weighted_pie", "escaping-target")
+		return botTarget
+	end
+	return nil
+end
+-- Crystal Ball (game data: point AoE, radius 450, 5s true sight): on an invisible enemy hero within 1600, or on
+-- an enemy hero last seen in the fog near a fight.
+function X.ConsiderCrystalBall()
+	if not Fu.CanCastAbility(crystalBallAbility) then
+		return nil
+	end
+	for _, enemyHero in pairs(bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and enemyHero:IsInvisible() then
+			X.LogSouvenir("crystal_ball", "invisible")
+			return enemyHero:GetLocation()
+		end
+	end
+	if Fu.IsInTeamFight(bot, 1200) then
+		for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			local info = IsHeroAlive(playerId) and GetHeroLastSeenInfo(playerId) or nil
+			local lastSeen = info ~= nil and info[1] or nil
+			if
+				lastSeen ~= nil
+				and lastSeen.time_since_seen > 0.5
+				and lastSeen.time_since_seen < 3
+				and GetUnitToLocationDistance(bot, lastSeen.location) < 1200
+			then
+				X.LogSouvenir("crystal_ball", "fog")
+				return lastSeen.location
+			end
+		end
+	end
+	return nil
 end
 function X.ConsiderTameTheBeasts()
 	if not Fu.CanCastAbility(tameTheBeastsAbility) then

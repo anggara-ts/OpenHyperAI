@@ -2109,6 +2109,30 @@ Usage.ConsiderItemDesire["item_crimson_guard"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- A silence only matters when it blocks a spell the hero could use now: a learned, non-passive ability that is
+-- off cooldown and affordable. The self-dispel rules (Eul's, Stormcrafter) used to require an intelligence hero,
+-- so universal, strength and agility heroes never dispelled a silence (#15). Eul's self-cast is a basic dispel
+-- (datafeed, item 100).
+function Usage.SilenceBlocksASpell(unit)
+	if not unit:IsSilenced() then
+		return false
+	end
+	for slot = 0, 5 do
+		local ability = unit:GetAbilityInSlot(slot)
+		if
+			ability ~= nil
+			and not ability:IsNull()
+			and ability:GetLevel() > 0
+			and not ability:IsPassive()
+			and not ability:IsHidden()
+			and ability:GetCooldownTimeRemaining() <= 0
+			and ability:GetManaCost() <= unit:GetMana()
+		then
+			return true
+		end
+	end
+	return false
+end
 Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 	local castRange = 650 + castRangeBonus
 	local castType = "unit"
@@ -2180,10 +2204,7 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			castReason = "撤退:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
-		if
-			bot:IsRooted()
-			or bot:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and bot:IsSilenced() and not Usage.IsDoomed(bot)
-		then
+		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
 			hEffectTarget = bot
 			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -6364,10 +6385,7 @@ Usage.ConsiderItemDesire["item_stormcrafter"] = function(item)
 	local castReason = nil
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	if Fu.CanCastOnNonMagicImmune(bot) and #enemyHeroes > 0 then
-		if
-			bot:IsRooted()
-			or bot:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and bot:IsSilenced() and not Usage.IsDoomed(bot)
-		then
+		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
 			hEffectTarget = bot
 			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -8684,22 +8702,66 @@ function Usage.EatForage()
 	if okM and muted then
 		return false
 	end
+	-- Did the last eat order consume anything? Game 039: Keeper ordered 306 eats of a Forager mushroom that was
+	-- never used up (most likely another hero's: items owned by another player can't be used). After two
+	-- orders that changed nothing, leave that item alone for 60s.
+	bot._forageFail = bot._forageFail or {}
+	local pending = bot._foragePending
+	if pending ~= nil and DotaTime() >= pending.at + 1.0 then
+		bot._foragePending = nil
+		local item = bot:GetItemInSlot(pending.slot)
+		local stillThere = item ~= nil
+			and not item:IsNull()
+			and item:GetName() == pending.name
+			and (item:GetCurrentCharges() or 0) >= pending.charges
+		if stillThere then
+			local fail = bot._forageFail[pending.name] or { n = 0, untilAt = 0 }
+			fail.n = fail.n + 1
+			if fail.n >= 2 then
+				fail.untilAt = DotaTime() + 60
+				fail.n = 0
+				pcall(
+					print,
+					string.format(
+						"[OHA-FORAGE] t=%.0f %s cannot-eat %s why=not-consumed backoff=60s",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						pending.name
+					)
+				)
+			end
+			bot._forageFail[pending.name] = fail
+		else
+			bot._forageFail[pending.name] = nil
+		end
+	end
 	for slot = 0, 5 do
 		local item = bot:GetItemInSlot(slot)
 		if item ~= nil and not item:IsNull() then
 			local name = item:GetName()
-			if (FORAGE_NO_TARGET[name] or name == "item_foragers_health") and Fu.CanCastAbility(item) then
+			local backedOff = bot._forageFail[name] ~= nil and DotaTime() < bot._forageFail[name].untilAt
+			if
+				(FORAGE_NO_TARGET[name] or name == "item_foragers_health")
+				and Fu.CanCastAbility(item)
+				and not backedOff
+				and bot._foragePending == nil
+			then
+				bot._foragePending =
+					{ name = name, slot = slot, charges = item:GetCurrentCharges() or 0, at = DotaTime() }
 				bot._forageEatAt = DotaTime() + 0.5
-				pcall(
-					print,
-					string.format(
-						"[OHA-FORAGE] t=%.0f %s eat %s slot%d",
-						DotaTime(),
-						(string.gsub(botName, "npc_dota_hero_", "")),
-						name,
-						slot
+				if DotaTime() >= (bot._forageLogAt or -999) then
+					bot._forageLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-FORAGE] t=%.0f %s eat %s slot%d",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							name,
+							slot
+						)
 					)
-				)
+				end
 				if FORAGE_NO_TARGET[name] then
 					bot:Action_UseAbility(item)
 				else

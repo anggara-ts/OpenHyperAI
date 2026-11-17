@@ -643,6 +643,22 @@ local function CheckPulls()
 end
 local function PromoteBackpackCounters()
 	CheckPulls()
+	-- [OHA-NEUTRAL]: which neutral item the bot carries (slot 16), printed when it changes. Game 039: the
+	-- maintainer saw no neutral item on Keeper of the Light and nothing in the log could say (#15).
+	local neutralItem = bot:GetItemInSlot(16)
+	local neutralName = neutralItem ~= nil and not neutralItem:IsNull() and neutralItem:GetName() or "none"
+	if neutralName ~= bot._neutralLogged and DotaTime() > 0 then
+		bot._neutralLogged = neutralName
+		pcall(
+			print,
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s slot16=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				neutralName
+			)
+		)
+	end
 	if DotaTime() < promoteNextCheck then
 		return
 	end
@@ -683,6 +699,10 @@ local function PromoteBackpackCounters()
 					and not string.find(sName, "item_ward", 1, true)
 					and sName ~= "item_power_treads"
 					and sName ~= "item_guardian_greaves"
+					-- Never give up an item with an active on a cooldown (Mekansm, Magic Wand, Urn, Glimmer...):
+					-- moving it through the backpack puts it on cooldown, and the engine often reverts the swap,
+					-- so it went back and forth. Game 039, ~40:00: Rubick's Mekansm, swapped out for Dust twice.
+					and not (not hItem:IsPassive() and (hItem:GetCooldown() or 0) > 0)
 				then
 					nBestSlot, nBestCost = nSlot, nCost
 				end

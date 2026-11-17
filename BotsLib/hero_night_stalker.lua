@@ -417,7 +417,15 @@ end
 -- 10/12/14/16% mana, cooldown 39/36/33/30, range 125, no mana cost). The game file lists it as PASSIVE, so the
 -- old Fu.CanCastAbility (rejects IsPassive) may never have let it through. We now try it only at night, at most
 -- once per 3s, and log whether the previous try started the cooldown (an order refused by the engine would not).
+-- Game 037: 13 of 34 tries failed. The order was a one-tick Action_UseAbilityOnEntity on a creep up to 600
+-- away (cast range 125), so the walk was overridden by the next tick's order, mostly in fights. Now: a
+-- creep within 250 while enemy heroes are near (450 otherwise), and the same order is re-issued each tick
+-- for up to 1.5s until the cooldown starts or the creep dies. Siege creeps stay allowed: the game data
+-- gives Feast DOTA_UNIT_TARGET_BASIC with no flags and the siege unit (npc_units.txt, creep_siege) has
+-- nothing that excludes it. Why both siege tries in 037 failed is unknown (no distance was logged then).
+local FEAST_HOLD = 1.5
 local feastTryAt, feastTryCd, feastGold = -999, nil, nil
+local feastCreep, feastDist, feastReissues, feastCdAt = nil, 0, 0, nil
 local function FeastIsNight()
 	local darkUntil = (bot._nsDarkAt or -999) + math.max(darknessAbility:GetSpecialValueFloat("duration"), 0)
 	return Fu.CheckTimeOfDay() == "night" or DotaTime() < darkUntil
@@ -444,17 +452,39 @@ local function BestFeastCreep(range)
 end
 function X.ConsiderMidnightFeast()
 	local now = DotaTime()
+	-- Keep the order on the same creep until the cooldown starts, the creep dies or FEAST_HOLD runs out.
+	if
+		feastTryCd ~= nil
+		and now - feastTryAt <= FEAST_HOLD
+		and midnightFeastAbility ~= nil
+		and not midnightFeastAbility:IsNull()
+		and midnightFeastAbility:GetCooldownTimeRemaining() <= 0
+		and Fu.IsValid(feastCreep)
+		and feastCreep:IsAlive()
+		and not Fu.IsRetreating(bot)
+	then
+		feastReissues = feastReissues + 1
+		return BOT_ACTION_DESIRE_HIGH, feastCreep
+	end
+	if feastTryCd ~= nil and feastCdAt == nil and midnightFeastAbility:GetCooldownTimeRemaining() > 0 then
+		feastCdAt = now - feastTryAt
+	end
 	-- Did the last try start the cooldown? Logs the gold change once so we learn if eating gives bounty.
-	if feastTryCd ~= nil and now - feastTryAt > 1 then
+	if feastTryCd ~= nil and now - feastTryAt > FEAST_HOLD then
 		local cdNow = midnightFeastAbility:GetCooldownTimeRemaining()
 		print(
 			string.format(
-				"[OHA-NS] feast result started=%s goldDelta=%d",
+				"[OHA-NS] t=%.0f feast result started=%s goldDelta=%d cdAt=%.1f reissues=%d dist=%d creepAlive=%s",
+				now,
 				tostring(cdNow > 0),
-				bot:GetGold() - (feastGold or bot:GetGold())
+				bot:GetGold() - (feastGold or bot:GetGold()),
+				feastCdAt or -1,
+				feastReissues,
+				feastDist,
+				tostring(Fu.IsValid(feastCreep) and feastCreep:IsAlive())
 			)
 		)
-		feastTryCd, feastGold = nil, nil
+		feastTryCd, feastGold, feastCreep, feastReissues, feastCdAt = nil, nil, nil, 0, nil
 	end
 	if
 		midnightFeastAbility == nil
@@ -476,9 +506,9 @@ function X.ConsiderMidnightFeast()
 	local nEnemies = enemies ~= nil and #enemies or 0
 	local why, creep = nil, nil
 	-- Heal: HP under 75% or mana under 50% (no mana cost, 30-39s cooldown, so no need to wait for 50% HP).
-	-- Only a creep next to him while heroes are around.
+	-- Only a creep next to him while heroes are around (250: cast range 125 plus a step).
 	if hp < 0.75 or mpRatio < 0.5 then
-		creep = BestFeastCreep(nEnemies > 0 and 300 or 600)
+		creep = BestFeastCreep(nEnemies > 0 and 250 or 450)
 		why = "heal"
 	end
 	-- Farm: no enemy hero near, use it on cooldown like Devour / Midas (it also tops up HP and mana).
@@ -492,11 +522,15 @@ function X.ConsiderMidnightFeast()
 	end
 	if creep ~= nil and Fu.CanCastOnTargetAdvanced(creep) then
 		feastTryAt, feastTryCd, feastGold = now, midnightFeastAbility:GetCooldownTimeRemaining(), bot:GetGold()
+		feastCreep, feastDist = creep, GetUnitToUnitDistance(bot, creep)
 		print(
 			string.format(
-				"[OHA-NS] feast try why=%s creep=%s passive=%s castable=%s hp=%.2f mp=%.2f",
+				"[OHA-NS] t=%.0f feast try why=%s creep=%s dist=%d enemies=%d passive=%s castable=%s hp=%.2f mp=%.2f",
+				now,
 				why,
 				creep:GetUnitName(),
+				feastDist,
+				nEnemies,
 				tostring(midnightFeastAbility:IsPassive()),
 				tostring(midnightFeastAbility:IsFullyCastable()),
 				hp,

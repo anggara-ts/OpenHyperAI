@@ -253,7 +253,26 @@ function GetDesireHelper()
 	if hpRatio > 0.3 then
 		lastHitCreep = TeamRoam.GetLastHitCreep()
 		if Fu.IsValid(lastHitCreep) and Fu.CanBeAttacked(lastHitCreep) then
-			return BOT_DESIRE_OVERRIDE * 1.5
+			local why = TeamRoam.LastHitWithdrawWhy(lastHitCreep)
+			if why == nil then
+				return BOT_DESIRE_OVERRIDE * 1.5
+			end
+			if DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
+				bot._roamLastHitSkipLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-ROAM] t=%.0f %s last-hit-skip why=%s creep=%.0f,%.0f",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						why,
+						lastHitCreep:GetLocation().x,
+						lastHitCreep:GetLocation().y
+					)
+				)
+			end
+			-- Think attacks lastHitCreep whenever it is set, under any desire.
+			lastHitCreep = nil
 		end
 	end
 	if not bot:IsAlive() or bot:GetCurrentActionType() == BOT_ACTION_TYPE_DELAY then
@@ -434,6 +453,26 @@ function GetDesireHelper()
 		end
 	end
 	return 0.0
+end
+-- No last-hit snipe on a creep in the enemy half while the team is pulling out of it: push.lua
+-- found us behind on a lane (GameStates.enemyHalfOff[lane], 20s) or farm is walking this bot home
+-- (bot._farmWithdrawUntil). Returns the reason, or nil.
+function TeamRoam.LastHitWithdrawWhy(creep)
+	if not Fu.IsInEnemyArea(creep) then
+		return nil
+	end
+	if (bot._farmWithdrawUntil or -1) > DotaTime() then
+		return "withdraw"
+	end
+	local states = Fu.Utils.GameStates
+	if states ~= nil and states.enemyHalfOff ~= nil then
+		for _, untilAt in pairs(states.enemyHalfOff) do
+			if untilAt > DotaTime() then
+				return "behind"
+			end
+		end
+	end
+	return nil
 end
 function TeamRoam.GetLastHitCreep()
 	if Fu.IsRetreating(bot) or not Fu.IsCore(bot) and Fu.IsThereCoreNearby(800) or Fu.IsInTeamFight(bot, 1200) then
@@ -1897,8 +1936,34 @@ function GoPickUpItem(droppedItem)
 		return
 	end
 end
+-- item_purchase_generic.lua sets bot._pullBackoff[name] when a backpack-to-inventory pull of that
+-- item was reverted; the swaps below wait it out too instead of pulling the item again.
+local function SwapBackedOff(itemName)
+	if bot._pullBackoff == nil or (bot._pullBackoff[itemName] or -1) <= DotaTime() then
+		return false
+	end
+	local slot = bot:FindItemSlot(itemName)
+	if slot >= 6 and slot <= 8 and DotaTime() >= (bot._roamSwapSkipLogAt or -999) then
+		bot._roamSwapSkipLogAt = DotaTime() + 10
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s roam-swap-skip %s backoff=%.0fs",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				itemName,
+				bot._pullBackoff[itemName] - DotaTime()
+			)
+		)
+	end
+	return true
+end
 function TrySwapInvItemForClarity()
-	if DotaTime() >= lastClaritySwapTime + 6.3 and bot:GetActiveMode() ~= BOT_MODE_WARD then
+	if
+		DotaTime() >= lastClaritySwapTime + 6.3
+		and bot:GetActiveMode() ~= BOT_MODE_WARD
+		and not SwapBackedOff("item_clarity")
+	then
 		local slot = bot:FindItemSlot("item_clarity")
 		if slot and bot:GetItemSlotType(slot) == ITEM_SLOT_TYPE_BACKPACK then
 			local targetSlot = Fu.Item.GetMainInvLessValItemSlot(bot)
@@ -1910,7 +1975,11 @@ function TrySwapInvItemForClarity()
 	end
 end
 function TrySwapInvItemForFlask()
-	if DotaTime() >= lastFlaskSwapTime + 6.2 and bot:GetActiveMode() ~= BOT_MODE_WARD then
+	if
+		DotaTime() >= lastFlaskSwapTime + 6.2
+		and bot:GetActiveMode() ~= BOT_MODE_WARD
+		and not SwapBackedOff("item_flask")
+	then
 		local slot = bot:FindItemSlot("item_flask")
 		if slot and bot:GetItemSlotType(slot) == ITEM_SLOT_TYPE_BACKPACK then
 			local targetSlot = Fu.Item.GetMainInvLessValItemSlot(bot)
@@ -1922,7 +1991,11 @@ function TrySwapInvItemForFlask()
 	end
 end
 function TrySwapInvItemForMoonshard()
-	if DotaTime() >= lastMoonShardSwapTime + 10.0 and bot:GetActiveMode() ~= BOT_MODE_WARD then
+	if
+		DotaTime() >= lastMoonShardSwapTime + 10.0
+		and bot:GetActiveMode() ~= BOT_MODE_WARD
+		and not SwapBackedOff("item_moon_shard")
+	then
 		local slot = bot:FindItemSlot("item_moon_shard")
 		if slot and bot:GetItemSlotType(slot) == ITEM_SLOT_TYPE_BACKPACK then
 			local targetSlot = Fu.Item.GetMainInvLessValItemSlot(bot)
@@ -1934,7 +2007,11 @@ function TrySwapInvItemForMoonshard()
 	end
 end
 function TrySwapInvItemForCheese()
-	if DotaTime() >= lastCheeseSwapTime + 2.3 and bot:GetActiveMode() ~= BOT_MODE_WARD then
+	if
+		DotaTime() >= lastCheeseSwapTime + 2.3
+		and bot:GetActiveMode() ~= BOT_MODE_WARD
+		and not SwapBackedOff("item_cheese")
+	then
 		local slot = bot:FindItemSlot("item_cheese")
 		if bot:GetItemSlotType(slot) == ITEM_SLOT_TYPE_BACKPACK then
 			local targetSlot = Fu.Item.GetMainInvLessValItemSlot(bot)
@@ -1946,7 +2023,11 @@ function TrySwapInvItemForCheese()
 	end
 end
 function TrySwapInvItemForRefresherShard()
-	if DotaTime() >= lastRefresherShardSwapTime + 2.2 and bot:GetActiveMode() ~= BOT_MODE_WARD then
+	if
+		DotaTime() >= lastRefresherShardSwapTime + 2.2
+		and bot:GetActiveMode() ~= BOT_MODE_WARD
+		and not SwapBackedOff("item_refresher_shard")
+	then
 		local slot = bot:FindItemSlot("item_refresher_shard")
 		if bot:GetItemSlotType(slot) == ITEM_SLOT_TYPE_BACKPACK then
 			local targetSlot = Fu.Item.GetMainInvLessValItemSlot(bot)

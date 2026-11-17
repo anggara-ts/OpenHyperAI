@@ -3,11 +3,12 @@ local X = {}
 local bot
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 function X.GetDesire(thinkingBot)
+	-- bot was set after these four reads, so they described the previous caller (nil at first).
+	bot = thinkingBot
 	local hpRatio = Fu.GetHP(bot)
 	local isRetreating = Fu.IsRetreating(bot)
 	local isRealInvisible = Fu.IsRealInvisible(bot)
 	local isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
-	bot = thinkingBot
 	if Fu.CanNotUseAction(bot) or bot:IsDisarmed() then
 		return 0
 	end
@@ -712,16 +713,120 @@ function X.GetDewardDesire(bot, attackRange, nearbyEnemies)
 		DewardLog("skip-low-hp", 0)
 		return 0, nil
 	end
+	-- Game 037, t=1834: Lion hit a ward at the 0.90 cap with 92% HP and 4 enemy heroes near and
+	-- died; 0.90 beat retreat (0.70 at that HP). 3+ enemy heroes within 1200, or more of them
+	-- than us (this bot counted): leave the ward. A cap just under retreat would not do it,
+	-- since the hard retreat only applies while attack/roam is the active mode.
+	if #foes >= 1 then
+		local alliesNear = #(Fu.GetAlliesNearLoc(bot:GetLocation(), 1200) or {})
+		if #foes >= 3 or #foes > alliesNear then
+			DewardLog("skip-outnumbered allies=" .. alliesNear, 0)
+			return 0, nil
+		end
+	end
 	local desire = 0.95
 	if bestDist <= attackRange + 50 then
 		desire = 1.25
 	elseif bestDist <= attackRange + 350 then
 		desire = 1.1
 	end
-	if #foes >= 1 and desire > 0.9 then
-		desire = 0.9
+	-- Any other enemy hero near: 0.6, under retreat's 0.70 even with the engine's ~10% bonus for
+	-- the active mode (an active 0.65 reads 0.71 in the log).
+	if #foes >= 1 and desire > 0.6 then
+		desire = 0.6
 		DewardLog("capped-enemies-near", desire)
 	end
 	return desire, best
+end
+-- Kiting (test, user request 2026-11-17; revert if it costs damage): a ranged bot fighting a melee
+-- hero steps away between attacks instead of standing still. Only inside a window that cannot
+-- cancel an attack: it is not known whether GetLastAttackTime is the start of the attack or the
+-- moment it is released, so the window assumes the worst of both:
+--   from  last + point + BUF        (wind-up surely over even if "last" is the start)
+--   until last + spa - point - BUF  (next wind-up can start even if "last" is the release)
+-- point = GetAttackPoint / GetAttackSpeed as in combat.lua GetAttackProDelayTime, at least 0.25s.
+-- Shared: the override attack mode calls it, and X.TryKiteInAttack is the hook for heroes on
+-- Valve's attack mode (game 037: it lived only in the override, so only Hoodwink ever kited).
+local KITE_BUF = 0.1
+function X.TryKite(unit, meleeEnemy)
+	local range = unit:GetAttackRange()
+	if range <= 320 or not Fu.IsValidHero(meleeEnemy) or meleeEnemy:GetAttackRange() > 320 then
+		return false
+	end
+	if Fu.IsDisabled(meleeEnemy) or meleeEnemy:IsRooted() or unit:IsRooted() or Fu.IsSuspiciousIllusion(meleeEnemy) then
+		return false
+	end
+	local dist = GetUnitToUnitDistance(unit, meleeEnemy)
+	-- The melee hero has to be a threat: on us, chasing us, or close.
+	if
+		meleeEnemy:GetAttackTarget() ~= unit
+		and not Fu.IsChasingTarget(meleeEnemy, unit)
+		and dist >= meleeEnemy:GetAttackRange() + 150
+	then
+		return false
+	end
+	-- Step back but stay in our attack range, so the next attack needs no walk back.
+	local step = math.min(250, range - dist - 30)
+	if step < 60 then
+		return false
+	end
+	-- Never cut a wind-up that is playing now (attack activity 1503, as in combat.lua).
+	if unit:GetAnimActivity() == 1503 and unit:GetAnimCycle() < unit:GetAttackPoint() + 0.05 then
+		return false
+	end
+	local spa = unit:GetSecondsPerAttack()
+	local point = math.max(unit:GetAttackPoint() / math.max(unit:GetAttackSpeed(), 0.1), 0.25)
+	local since = GameTime() - unit:GetLastAttackTime()
+	local from, to = point + KITE_BUF, spa - point - KITE_BUF
+	if to - from < 0.15 or since < from or since > to then
+		return false
+	end
+	local away = Fu.VectorAway(unit:GetLocation(), meleeEnemy:GetLocation(), step)
+	if not IsLocationPassable(away) then
+		return false
+	end
+	unit:Action_MoveToLocation(away)
+	if DotaTime() >= (unit._kiteLogAt or -99) + 2 then
+		unit._kiteLogAt = DotaTime()
+		pcall(
+			print,
+			string.format(
+				"[OHA-KITE] t=%.0f %s from %s dist=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
+				DotaTime(),
+				(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+				(string.gsub(meleeEnemy:GetUnitName(), "npc_dota_hero_", "")),
+				dist,
+				step,
+				since,
+				from,
+				to,
+				spa
+			)
+		)
+	end
+	return true
+end
+-- Per-think hook for heroes on Valve's own attack mode: attack mode active, ranged, hitting a
+-- hero. Heroes on the override attack mode (unit._ohaAttackOverride, set by
+-- mode_attack_generic.lua) already kite from its Think. Returns true when it issued the step.
+function X.TryKiteInAttack(unit)
+	if
+		unit == nil
+		or unit._ohaAttackOverride
+		or not unit:IsAlive()
+		or unit:GetActiveMode() ~= BOT_MODE_ATTACK
+		or unit:GetAttackRange() <= 320
+		or Fu.CanNotUseAction(unit)
+	then
+		return false
+	end
+	local target = unit:GetAttackTarget()
+	if not Fu.IsValidHero(target) then
+		target = unit:GetTarget()
+	end
+	if not Fu.IsValidHero(target) then
+		return false
+	end
+	return X.TryKite(unit, target)
 end
 return X

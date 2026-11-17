@@ -174,6 +174,11 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnEntity(megaMeepoFlingAbility, flingTarget)
 		return
 	end
+	local regroupBody = X.ConsiderRegroup()
+	if regroupBody ~= nil then
+		bot:Action_MoveToLocation(regroupBody:GetLocation())
+		return
+	end
 end
 function X.ConsiderEarthBind()
 	if not earthbindAbility:IsFullyCastable() then
@@ -287,7 +292,107 @@ function X.ConsiderEarthBind()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Game 037: 14 Meepo deaths. Bodies Poofed into fights already lost (25:28, 27:25, 38:17) and were
+-- split across the map (24:09: one body in rune mode while another died). The old checks counted every
+-- Meepo body as an ally (#meepos, GetNearbyHeroes), so three bodies looked like three heroes.
+local FIGHT_RADIUS = 1200
+local function MeepoTag()
+	return Fu.IsMeepoClone(bot) and "clone" or "main"
+end
+-- Allied heroes near a location with all Meepo bodies counted as one (they die together), and the real
+-- enemy heroes there.
+local function FightCountAt(location)
+	local allies, meepoSeen = 0, false
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if Fu.IsValidHero(ally) and GetUnitToLocationDistance(ally, location) <= FIGHT_RADIUS then
+			if ally:GetUnitName() == "npc_dota_hero_meepo" then
+				if not meepoSeen and not Fu.IsSuspiciousIllusion(ally) then
+					meepoSeen = true
+					allies = allies + 1
+				end
+			elseif not ally:IsIllusion() then
+				allies = allies + 1
+			end
+		end
+	end
+	-- The arriving body is a Meepo too.
+	if not meepoSeen then
+		allies = allies + 1
+	end
+	return allies, #Fu.GetEnemiesNearLoc(location, FIGHT_RADIUS)
+end
+-- Clearly lost: two or more enemy heroes and more of them than us (Meepo bodies count once). Game 037
+-- t=2297: a lone body vs Dawnbreaker and MK took the Poofs, Mirana joined and all three bodies died.
+local function IsFightLost(allies, enemies)
+	return enemies >= 2 and enemies > allies
+end
+-- A Poof onto another body, unless it is an escape (that body near the fountain), only into a fight
+-- that is not clearly lost.
 function X.ConsiderPoof()
+	local desire, target = X.ConsiderPoofRaw()
+	if desire > 0 and target ~= nil and target ~= bot and target:DistanceFromFountain() >= 800 then
+		local allies, enemies = FightCountAt(target:GetLocation())
+		if IsFightLost(allies, enemies) then
+			if DotaTime() >= (bot._poofLostLogAt or -999) then
+				bot._poofLostLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f %s poof-skip lost-fight allies=%d enemies=%d dist=%d targetHp=%.2f",
+						DotaTime(),
+						MeepoTag(),
+						allies,
+						enemies,
+						GetUnitToUnitDistance(bot, target),
+						Fu.GetHP(target)
+					)
+				)
+			end
+			return BOT_ACTION_DESIRE_NONE, nil
+		end
+	end
+	return desire, target
+end
+-- Pull a body toward another body that is fighting (enemy hero within 1200, hero damage in the last 2s)
+-- when the fight is not clearly lost, this body is 1600-3000 away, out of a fight, not retreating and not
+-- at Roshan / a Tormentor. Poof (above) runs first; this is the walk when Poof is down or none of its
+-- branches fire. SkillsComplement does not run while channeling or with queued actions (CanNotUseAbility).
+function X.ConsiderRegroup()
+	if Fu.IsLaning(bot) or isRetreating or hpRatio < 0.5 or Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
+		return nil
+	end
+	if #(Fu.GetNearbyHeroes(bot, FIGHT_RADIUS, true, BOT_MODE_NONE) or {}) > 0 then
+		return nil
+	end
+	for _, meepo in pairs(meepos) do
+		if meepo ~= bot and Fu.IsValidHero(meepo) and meepo:WasRecentlyDamagedByAnyHero(2.0) then
+			local distance = GetUnitToUnitDistance(bot, meepo)
+			if distance > 1600 and distance <= 3000 then
+				local allies, enemies = FightCountAt(meepo:GetLocation())
+				if enemies >= 1 and not IsFightLost(allies, enemies) then
+					if DotaTime() >= (bot._meepoRegroupLogAt or -999) then
+						bot._meepoRegroupLogAt = DotaTime() + 5
+						pcall(
+							print,
+							string.format(
+								"[OHA-MEEPO] t=%.0f %s regroup dist=%d allies=%d enemies=%d poofCd=%.0f",
+								DotaTime(),
+								MeepoTag(),
+								distance,
+								allies,
+								enemies,
+								poofAbility:GetCooldownTimeRemaining()
+							)
+						)
+					end
+					return meepo
+				end
+			end
+		end
+	end
+	return nil
+end
+function X.ConsiderPoofRaw()
 	if not poofAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end

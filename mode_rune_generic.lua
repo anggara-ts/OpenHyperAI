@@ -97,14 +97,15 @@ end
 local hpRatio, mpRatio, botPosition, activeMode, activeModeDesire, assignedLane
 local nearbyAllies, nearbyEnemies
 local humanClaimTime = {}
--- Early-game console trace. Grep [OHA-RUNE]. One line a second while a bot is
--- within 1600 of a rune before 6:10 (covers the 2:00 and 4:00 water runes and the 6:00 power
--- rune; it stopped at 1:40), plus a line whenever the reason changes.
+-- Early-game console trace. Grep [OHA-RUNE]. While a bot is within 1600 of a rune before 6:10
+-- (covers the 2:00 and 4:00 water runes and the 6:00 power rune): a line whenever the reason
+-- changes, and a stuck line at most every 10s (was one a second per bot until game 037).
 local RUNE_DBG_UNTIL = 370
 local runeWhy = "none"
 local dbgAt = -100
 local dbgWhy = ""
 local dbgLoc = nil
+local dbgStuckLogAt = -100
 local function give(desire, why)
 	if why ~= nil then
 		runeWhy = why
@@ -228,13 +229,25 @@ function RuneMode.RuneDbg(desire)
 		local loc = bot:GetLocation()
 		local moved = dbgLoc and Fu.GetDistance(dbgLoc, loc) or -1
 		local elapsed = now - dbgAt
-		if elapsed < 0.25 or (why == dbgWhy and elapsed < 1) then
+		local changed = why ~= dbgWhy
+		if elapsed < 0.25 or (not changed and elapsed < 1) then
 			return
 		end
 		local stuck = (elapsed >= 0.8 and nearDist <= 900 and moved >= 0 and moved < 40) and 1 or 0
 		dbgAt = now
 		dbgWhy = why
 		dbgLoc = loc
+		-- Game 037: 1,318 trace lines in 0:00-2:00 (one a second per bot). Print one line per
+		-- decision (why changes), plus a stuck line at most every 10s. Meepo clones stay quiet.
+		if Fu.IsMeepoClone(bot) then
+			return
+		end
+		if not changed then
+			if stuck == 0 or now < dbgStuckLogAt then
+				return
+			end
+			dbgStuckLogAt = now + 10
+		end
 		local runeInfo = bot.rune and bot.rune.normal
 		local best = "none"
 		if runeInfo ~= nil and runeInfo.location ~= nil then
@@ -280,7 +293,7 @@ function RuneMode.RuneDbg(desire)
 end
 local function doing(name)
 	bot._runeDo = name
-	if DotaTime() > RUNE_DBG_UNTIL or name == bot._runeDoPrev then
+	if DotaTime() > RUNE_DBG_UNTIL or name == bot._runeDoPrev or Fu.IsMeepoClone(bot) then
 		return
 	end
 	local nearDist = select(2, NearRune())
@@ -605,6 +618,21 @@ function GetDesire()
 	RuneMode.RuneDbg(desire)
 	return desire
 end
+-- Another Meepo body with an enemy hero within 1200 that took hero damage in the last 3s.
+function RuneMode.MeepoBodyInFight()
+	for _, meepo in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			meepo ~= bot
+			and Fu.IsValidHero(meepo)
+			and meepo:GetUnitName() == "npc_dota_hero_meepo"
+			and meepo:WasRecentlyDamagedByAnyHero(3.0)
+			and #(meepo:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) >= 1
+		then
+			return meepo
+		end
+	end
+	return nil
+end
 function GetDesireRaw()
 	RuneMode.InitRune()
 	bot._mapObjKind = nil
@@ -620,6 +648,26 @@ function GetDesireRaw()
 	nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}
 	if bot:IsInvulnerable() and hpRatio > 0.9 and bot:DistanceFromFountain() < 500 then
 		return give(BOT_MODE_DESIRE_ABSOLUTE, "fountain")
+	end
+	-- Meepo: no rune / lotus / wisdom trip while another body is fighting (losing one body kills
+	-- them all). Game 037, 24:09: one body was in rune mode at (-7802,642) while another died.
+	if bot:GetUnitName() == "npc_dota_hero_meepo" and RuneMode.ClosestAvailableRune(300) == nil then
+		local fightBody = RuneMode.MeepoBodyInFight()
+		if fightBody ~= nil then
+			if DotaTime() >= (bot._meepoRuneSkipLogAt or -999) then
+				bot._meepoRuneSkipLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f %s rune-skip body-in-fight dist=%d",
+						DotaTime(),
+						Fu.IsMeepoClone(bot) and "clone" or "main",
+						GetUnitToUnitDistance(bot, fightBody)
+					)
+				)
+			end
+			return give(BOT_MODE_DESIRE_NONE, "meepo-fight")
+		end
 	end
 	do
 		local okW, waterState = pcall(RuneMode.WaterWalk)

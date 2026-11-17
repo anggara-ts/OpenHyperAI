@@ -134,6 +134,20 @@ function a.SkillsComplement()
 			DotaTime(),
 			tostring(ChargeTracker.Count(b, q))
 		))
+		-- Game 036: Leap re-ordered 10-26 times per burst with "can't be used while rooted" although
+		-- IsRooted() was false. A second order within 1.5s means the first did not go off: list her
+		-- modifiers (once per 10s) to find the root-like state the check misses.
+		local now = DotaTime()
+		if now - (b._leapOrderAt or -99) < 1.5 and now >= (b._leapModLogAt or -99) then
+			b._leapModLogAt = now + 10
+			local mods = {}
+			for mi = 0, b:NumModifiers() - 1 do
+				mods[#mods + 1] = tostring(b:GetModifierName(mi))
+			end
+			pcall(_G.print, string.format("[OHA-MIRANA] t=%.0f leap-reorder rooted=%s mods=%s", now,
+				tostring(b:IsRooted()), table.concat(mods, ",")))
+		end
+		b._leapOrderAt = now
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbility(q)
 		return
@@ -219,7 +233,8 @@ function a.ConsiderQ()
 		if (Y + Z >= 3 or Z >= 1 and Y >= 1) and DotaTime() >= (b._starLaneLogAt or -999) then
 			-- [OHA-MIRANA]: lane last-hit Starstorm (dead before the "damage" key fix), every 10s at most.
 			b._starLaneLogAt = DotaTime() + 10
-			pcall(print, string.format("[OHA-MIRANA] t=%.0f starstorm-lane melee=%d ranged=%d dmg=%d", DotaTime(), Y, Z, Q))
+			-- _G.print: the file mutes print (line 2) and this log checks the build-122 fix (game 036 review).
+			pcall(_G.print, string.format("[OHA-MIRANA] t=%.0f starstorm-lane melee=%d ranged=%d dmg=%d", DotaTime(), Y, Z, Q))
 		end
 		if Y + Z >= 3 then
 			U = b

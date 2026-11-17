@@ -133,9 +133,20 @@ local function LogJingu()
 		end
 	end
 end
+-- Game 036: engage hops 3-5s apart (1476/1479/1482, 2643/2646, 2703/2708) with no Primal Spring in
+-- between (cooldown 18-12s, game data). For 4s after an engage hop, say why Spring was not cast.
+local function SpringSkip(why)
+	local now = DotaTime()
+	if now - (b._mkTreeDanceAt or -999) <= 4 and now >= (b._mkSpringSkipLogAt or -99) then
+		b._mkSpringSkipLogAt = now + 1
+		print(string.format("[OHA-MONKEY_KING] t=%.0f spring-skip why=%s hidden=%s cd=%.1f mana=%d/%d",
+			now, why, tostring(q:IsHidden()), q:GetCooldownTimeRemaining(), b:GetMana(), q:GetManaCost()))
+	end
+end
 function a.SkillsComplement()
 	LogJingu()
 	if c.CanNotUseAbility(b) then
+		SpringSkip("cannot-use-ability")
 		return
 	end
 	J = c.IsGoingOnSomeone(b)
@@ -467,6 +478,7 @@ function a.ConsiderTreeDance()
 end
 function a.ConsiderPrimalSpring()
 	if q:IsHidden() or not q:IsFullyCastable() or not q:IsActivated() then
+		SpringSkip(q:IsHidden() and "hidden" or not q:IsActivated() and "not-activated" or "not-castable")
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	-- Primal Spring has no "max_distance" value (game KV: only impact_damage/slow/radius; the leap
@@ -501,7 +513,12 @@ function a.ConsiderPrimalSpring()
 			if Y ~= nil and Z ~= nil and #Y >= #Z then
 				return BOT_ACTION_DESIRE_HIGH, ac:GetExtrapolatedLocation(ab)
 			end
+			SpringSkip(string.format("outnumbered(%d<%d)", Y ~= nil and #Y or -1, Z ~= nil and #Z or -1))
+		else
+			SpringSkip("no-target-in-" .. tostring(aa))
 		end
+	else
+		SpringSkip("not-going-on-someone")
 	end
 	if K then
 		local Y = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)

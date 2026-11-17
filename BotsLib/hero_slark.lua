@@ -155,9 +155,10 @@ function a.ConsiderSaltwaterShiv()
 			end
 		end
 	end
-	if (c.IsDoingRoshan(b) or c.IsDoingTormentor(b)) and c.IsValid(botTarget) and c.IsInRange(b, botTarget, Q) then
-		return BOT_ACTION_DESIRE_HIGH, botTarget
-	end
+	-- Removed the Roshan / Tormentor branch: Saltwater Shiv targets heroes only (game data
+	-- AbilityUnitTargetType DOTA_UNIT_TARGET_HERO). Game 036, t=1187-1266: 53 "cannot target creeps"
+	-- refusals, all while the Radiant Roshan call/gather/attempt ran (gather counts as doing Roshan,
+	-- which explains the 9 before Slark's mode showed roshan).
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderQ()

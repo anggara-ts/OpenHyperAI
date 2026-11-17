@@ -376,8 +376,18 @@ function a.ConsiderUnstableConcoctionThrow()
 			end
 		end
 	end
-	if W ~= nil and #W >= 1 and DotaTime() >= D + B then
-		return BOT_ACTION_DESIRE_HIGH, W[1]
+	-- Fallback: any hero in range. Game data (throw): brew_time 5.0 for the full stun/damage
+	-- (max_stun 1.75-3.25 vs min 0.25), brew_explosion 7.0. It used the 2s gate (B), so whenever an
+	-- enemy was in range it threw at ~2s, ahead of the 4.25s (C) kill/engage branches above. The 2s
+	-- throw stays only for the retreat case (G) above.
+	if W ~= nil and #W >= 1 and DotaTime() >= D + C then
+		for _, Y in pairs(W) do
+			if c.IsValidHero(Y) and c.CanCastOnNonMagicImmune(Y) and not c.IsSuspiciousIllusion(Y) then
+				print(string.format("[OHA-ALCHEMIST] concoction throw why=fallback target=%s brewed=%.1fs",
+					Y:GetUnitName(), DotaTime() - D))
+				return BOT_ACTION_DESIRE_HIGH, Y
+			end
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

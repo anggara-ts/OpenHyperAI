@@ -446,12 +446,25 @@ function a.ConsiderSolarGuardian()
 					end
 					if DotaTime() >= (b._sgLogAt or -999) then
 						b._sgLogAt = DotaTime() + 5
+						-- allyDist: closest allied hero other than her to the spot, at current positions (the
+						-- ally count uses predicted positions and may include her; game 036 review).
+						local allyDist, allyName = -1, "-"
+						for _, al in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+							if c.IsValidHero(al) and al ~= b and not al:IsIllusion() then
+								local ad = GetUnitToLocationDistance(al, a9.targetloc)
+								if allyDist < 0 or ad < allyDist then
+									allyDist, allyName = ad, (string.gsub(al:GetUnitName(), "npc_dota_hero_", ""))
+								end
+							end
+						end
 						pcall(print, string.format(
-							"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d",
+							"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s",
 							DotaTime(),
 							a9.count,
 							aa.count,
-							GetUnitToLocationDistance(b, a9.targetloc)
+							GetUnitToLocationDistance(b, a9.targetloc),
+							math.floor(allyDist),
+							allyName
 						))
 					end
 					return BOT_ACTION_DESIRE_HIGH, a9.targetloc

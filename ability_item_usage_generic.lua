@@ -6516,7 +6516,17 @@ a.ConsiderItemDesire["item_smoke_of_deceit"] = function(aT)
 	return BOT_ACTION_DESIRE_NONE
 end
 local eT = nil
+-- Dust only from a main slot (game 036: 308 "item can't be used from stash" refusals, bursts with the
+-- Dust loop on Ogre Magi). The rule below is unchanged otherwise.
+local DustDesire
 a.ConsiderItemDesire["item_dust"] = function(aT)
+	local s = b:FindItemSlot("item_dust")
+	if s < 0 or s > 5 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	return DustDesire(aT)
+end
+DustDesire = function(aT)
 	local ek = 1050
 	-- Game 031, 28:40: Dazzle used Glimmer Cape (datafeed: 0.5s fade, 5s invisible) and no Dust
 	-- came; the rules below only catch the half-second fade, or 0.2-0.5s after he vanished within
@@ -6589,15 +6599,22 @@ a.ConsiderItemDesire["item_dust"] = function(aT)
 				end
 				-- Only with his last spot still in our vision: a fader who walked into fog, blinked or
 				-- teleported is not worth a Dust (user call).
-				if gone and dist <= 900 and closest and IsLocationVisible(loc) then
-					b._invisSeen[pid] = nil
-					pcall(print, string.format(
-						"[OHA-DUST] t=%.0f %s dust on %s dist=%.0f",
-						now,
-						(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-						(string.gsub(v.name, "npc_dota_hero_", "")),
-						dist
-					))
+				-- Game 036, t=895-898: the entry was cleared on the decision, so when the Dust did not go
+				-- off the fader was found again next tick and both lines printed ~29 times a second. The
+				-- entry now stays (it expires after 4s as before); one try per 2s, one log per entry.
+				if gone and dist <= 900 and closest and IsLocationVisible(loc) and now >= (v.dustAt or -99) + 2 then
+					v.dustAt = now
+					v.why = nil
+					if not v.dustLogged then
+						v.dustLogged = true
+						pcall(print, string.format(
+							"[OHA-DUST] t=%.0f %s dust on %s dist=%.0f",
+							now,
+							(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+							(string.gsub(v.name, "npc_dota_hero_", "")),
+							dist
+						))
+					end
 					return BOT_ACTION_DESIRE_HIGH, b, "none", nil
 				end
 			end
@@ -6679,22 +6696,43 @@ end
 -- into a main slot (an empty one, else the cheapest), early enough for any backpack cooldown to run
 -- out before the wave reaches the building. Once per 5s.
 function a.BannerFromBackpack()
-	local slot = b:FindItemSlot("item_roshans_banner")
-	if slot < 6 or slot > 8 or not f.IsPushing(b) or DotaTime() < (b._bannerSwapAt or -999) then
+	-- Game 036: GetNearbyTowers/GetNearbyBarracks at 2500 ran every tick while pushing (the 5s gate was
+	-- set only when a building was found) and the engine warned "querying nearby units with a distance
+	-- greater than cached (2500)" 3185 times. Now at most once per 1s, and buildings are read from the
+	-- enemy building list by distance, which has no radius cache.
+	local now = DotaTime()
+	if now < (b._bannerCheckAt or -999) then
 		return
 	end
-	local near = nil
-	for _, t in pairs(b:GetNearbyTowers(2500, true) or {}) do
-		if f.IsValidBuilding(t) then
-			near = t
-			break
+	b._bannerCheckAt = now + 1
+	local slot = b:FindItemSlot("item_roshans_banner")
+	if slot >= 0 and slot <= 5 then
+		-- In a main slot: the last swap worked.
+		b._bannerSwapPending, b._bannerSwapFails = false, 0
+	end
+	if slot < 6 or slot > 8 or not f.IsPushing(b) or now < (b._bannerSwapAt or -999) or b._bannerSwapGaveUp then
+		return
+	end
+	-- A swap was ordered and the banner is still in the backpack: count it. Game 036: 6 swaps, none took.
+	if b._bannerSwapPending then
+		b._bannerSwapPending = false
+		b._bannerSwapFails = (b._bannerSwapFails or 0) + 1
+		if b._bannerSwapFails >= 3 then
+			b._bannerSwapGaveUp = true
+			pcall(print, string.format("[OHA-BANNER] t=%.0f %s swap-failed tries=%d slot=%d, giving up",
+				now, (string.gsub(c, "npc_dota_hero_", "")), b._bannerSwapFails, slot))
+			return
 		end
 	end
-	if near == nil then
-		for _, r in pairs(b:GetNearbyBarracks(2500, true) or {}) do
-			if f.IsValidBuilding(r) then
-				near = r
-				break
+	local near, nearD = nil, 2500
+	for _, u in pairs(GetUnitList(UNIT_LIST_ENEMY_BUILDINGS) or {}) do
+		if f.IsValidBuilding(u) then
+			local nm = u:GetUnitName() or ""
+			if u:IsTower() or string.find(nm, "rax", 1, true) ~= nil then
+				local dd = GetUnitToUnitDistance(b, u)
+				if dd <= nearD then
+					near, nearD = u, dd
+				end
 			end
 		end
 	end
@@ -6725,6 +6763,7 @@ function a.BannerFromBackpack()
 		(string.gsub(near:GetUnitName(), "npc_dota_", "")),
 		GetUnitToUnitDistance(b, near)
 	))
+	b._bannerSwapPending = true
 	b:ActionImmediate_SwapItems(slot, dest)
 end
 a.ConsiderItemDesire["item_roshans_banner"] = function(bm)

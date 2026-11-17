@@ -59,7 +59,10 @@ const prs = JSON.parse(
 );
 const PRIORITY = ["P1 critical", "P2 high", "P3 medium", "P4 low"];
 const covered = new Set();
+// Only an OPEN PR covers an issue. A closed draft or a merged batch must not stop new work on the card
+// (the goodnight run of 2026-11-18 found #34 "covered" by its closed empty draft #35).
 for (const pr of prs) {
+	if (pr.state !== "OPEN") continue;
 	for (const m of (pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|related to|part of)\s+#(\d+)/gi)) covered.add(Number(m[1]));
 	const b = pr.headRefName.match(/issue-(\d+)/);
 	if (b) covered.add(Number(b[1]));
@@ -76,7 +79,11 @@ for (const issue of issues) {
 	if (covered.has(issue.number) || labels.includes("no-pr")) continue;
 	if (!START.has(issue.number) && !labels.includes("wip")) continue;
 	const prefix = prefixFor(labels);
-	const branch = `${prefix}/issue-${issue.number}-${slug(issue.title)}`;
+	// A merged or closed earlier PR may have used the name: add -2, -3, ... until the branch is free.
+	const baseBranch = `${prefix}/issue-${issue.number}-${slug(issue.title)}`;
+	const taken = (name) => git(["ls-remote", "--heads", "origin", name]) !== "";
+	let branch = baseBranch;
+	for (let n = 2; taken(branch) && n < 20; n++) branch = `${baseBranch}-${n}`;
 	const title = `${prefix}: ${issue.title} (#${issue.number})`;
 	console.log(`#${issue.number} -> ${branch}`);
 	if (DRY) continue;

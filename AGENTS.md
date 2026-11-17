@@ -135,19 +135,55 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
    buildings, pushes, Roshan, lotus, script errors). `Util/match-logs/` is git-ignored: the logs contain the
    host's Steam account ID and server IPs, never commit or publish them.
 
+## Issue -> PR -> game test -> merge (the regular workflow)
+
+Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`.
+
+1. **Issues.** Every bug, finding or request is a GitHub issue. Group findings that share a cause or an area into
+   one card (e.g. "Meepo: Poof and retreat", "Rubick stolen spells: leftover globals"), so a card is one focused
+   fix. Labels: `bug`, `enhancement`, `needs-confirmation` (seen once, verify next game), `design` (needs a
+   decision), `game-review` (came from watching a game). `no-pr` skips step 2.
+2. **Draft PR per issue, automatically.** `node Util/issue-prs.js` opens a draft PR for every open issue without
+   one: branch `<fix|feat|docs|chore>/issue-<N>-<slug>` from `origin/main`, one signed empty commit, the PR
+   template and `Closes #N`. Run it after creating issues (agents run it right after they file issues). It runs
+   locally, not as a GitHub Action, because commits must be signed with the maintainer's key.
+3. **Work on the PR branch.** Before the first real commit, merge `origin/main` into it if `main` moved. Commit
+   (signed, pre-commit hooks), push, keep CI green, and fill the PR description in the change-log format
+   (see Branches and pull requests). Mark the PR ready for review when the code is done.
+4. **Track what is not tested in a game yet.** `node Util/verify.js add <pr>` imports the PR's
+   "How to verify in game" list into `Util/verify/tracker.json` (git-ignored). Every PR with game-visible
+   changes goes there until a game proves it.
+5. **Play a game** on a branch that contains the PRs under test (or `main` once merged). Note which build ran.
+6. **Review the game** (below). Then for the tracked PRs:
+   - `node Util/verify.js check Util/match-logs/game-NNN_*.log --game NNN` counts each item's log tags and shows
+     sample lines; read them and set each item: `node Util/verify.js set <pr> <item> pass|fail|skip [note]`.
+   - Read the maintainer's PR comments (`gh pr view <pr> --comments`): game-review PRs get comments written while
+     watching the game, e.g. "20:30 radiant team went yolo behind bottom t1". Each observation is either fixed
+     in that PR (if it is about that PR's change) or filed as an issue (grouped as in step 1).
+   - An item that failed or did not fire: fix it in the same PR and keep it in the tracker; an item that never
+     triggered (the situation didn't happen) stays pending for the next game.
+7. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
+   tick the PR's checks (including "Tested in a local game (game NNN)"), squash-merge with `gh pr merge <pr>
+   --squash`, delete the branch, and `node Util/verify.js done <pr>`. Stacked PRs merge in order (base first);
+   after each squash-merge, merge `origin/main` into the next branch so its PR shows only its own changes.
+
 ## Reviewing a game (regular task)
 
-- Note the build the game ran (`version` in the summary) and map log line numbers to that commit
-  (`git show <sha>:<file>`).
-- Check: script errors (`attempt to`, `stack traceback`), every `[OHA-*]` line added since the last game
-  (did the feature fire, with sane values?), log spam (lines per second per tag), death patterns, objectives
-  (towers, barracks, Roshan, Tormentor, buybacks), mode flip-flops (`[OHA-FLIP]`, `[OHA-STUCK]`).
+- Split the console (`Util/split-console.js`), note the build the game ran (`version` in the summary) and map
+  log line numbers to that commit (`git show <sha>:<file>`).
+- Check: script errors (`attempt to`, `stack traceback`), every tracked `[OHA-*]` item (`Util/verify.js check`)
+  and every other line added since the last game (did the feature fire, with sane values?), log spam (lines per
+  second per tag), death patterns, objectives (towers, barracks, Roshan, Tormentor, buybacks), mode flip-flops
+  (`[OHA-FLIP]`, `[OHA-STUCK]`), and the maintainer's comments on the PRs under test.
 - Write findings as: what happened (time + log line) / why it matters / code location / suggested fix /
-  confidence. Fix in a new `fix/<game>` branch with a log for every behaviour change.
+  confidence. File them as grouped issues (step 1) and let `Util/issue-prs.js` open their PRs; a single
+  `fix/game-NNN` PR is fine for many small fixes from one review.
 
 ## Things not to do
 
 - Do not commit `Customize/general.lua` test lineups, match logs, or anything with the Steam ID.
 - Do not force-push, rewrite published history, or skip signing.
 - Do not change a mechanic from memory; check the game data.
-- Do not stack branches on unmerged branches.
+- Do not stack branches on unmerged branches unless the work depends on them; then say so in the PR and merge
+  in order.
+- Do not merge a PR with game-visible changes before its tracker items pass in a game.

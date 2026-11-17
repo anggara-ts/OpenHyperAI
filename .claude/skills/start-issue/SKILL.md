@@ -21,3 +21,7 @@ Rules live in `AGENTS.md` ("Issue -> PR -> game test -> merge", step 1-2). This 
 5. **Open draft PRs:** `node Util/issue-prs.js --dry-run`, then `node Util/issue-prs.js`. They say `Refs #N`,
    never `Closes #N`: a merged PR must not close the issue.
 6. Tell the user the issue and PR numbers in a short table.
+
+**Priority:** give every new card exactly one of `P1 critical`, `P2 high`, `P3 medium`, `P4 low` (definitions
+in AGENTS.md step 1), with the reason in one line on the card. `node Util/issue-prs.js` copies it to the PR and
+lists untriaged issues.

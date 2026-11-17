@@ -2114,7 +2114,10 @@ end
 -- so universal, strength and agility heroes never dispelled a silence (#15). Eul's self-cast is a basic dispel
 -- (datafeed, item 100).
 function Usage.SilenceBlocksASpell(unit)
-	if not unit:IsSilenced() then
+	-- Only when a spell is needed now: retreating (escape) or engaging (disable / nuke). A silenced right-clicker
+	-- in a calm moment should not Eul himself out of a fight. The silence's remaining time is not checked: it
+	-- needs the silence modifier names (many), left for later (#15).
+	if not unit:IsSilenced() or not (Fu.IsRetreating(unit) or Fu.IsGoingOnSomeone(unit)) then
 		return false
 	end
 	for slot = 0, 5 do
@@ -2128,6 +2131,18 @@ function Usage.SilenceBlocksASpell(unit)
 			and ability:GetCooldownTimeRemaining() <= 0
 			and ability:GetManaCost() <= unit:GetMana()
 		then
+			if DotaTime() >= (unit._silenceDispelLogAt or -999) then
+				unit._silenceDispelLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-ITEM] t=%.0f %s silence-dispel-wanted spell=%s",
+						DotaTime(),
+						(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+						ability:GetName()
+					)
+				)
+			end
 			return true
 		end
 	end

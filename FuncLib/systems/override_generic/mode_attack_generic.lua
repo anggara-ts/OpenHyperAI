@@ -360,6 +360,57 @@ function r.GetDesire()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+-- Kiting (test, user request 2026-11-17; revert if it costs damage): a ranged bot fighting a melee
+-- hero steps away between attacks instead of standing still. Only inside a window that cannot
+-- cancel an attack: it is not known whether GetLastAttackTime is the start of the attack or the
+-- moment it is released, so the window assumes the worst of both:
+--   from  last + point + BUF        (wind-up surely over even if "last" is the start)
+--   until last + spa - point - BUF  (next wind-up can start even if "last" is the release)
+-- point = GetAttackPoint / GetAttackSpeed as in combat.lua GetAttackProDelayTime, at least 0.25s.
+local KITE_BUF = 0.1
+local kiteLogAt = -99
+local function TryKite(t)
+	local range = c:GetAttackRange()
+	if range <= 320 or not a.IsValidHero(t) or t:GetAttackRange() > 320 then
+		return false
+	end
+	if a.IsDisabled(t) or t:IsRooted() or c:IsRooted() or a.IsSuspiciousIllusion(t) then
+		return false
+	end
+	local dist = GetUnitToUnitDistance(c, t)
+	-- The melee hero has to be a threat: on us, chasing us, or close.
+	if not (t:GetAttackTarget() == c or a.IsChasingTarget(t, c) or dist < t:GetAttackRange() + 150) then
+		return false
+	end
+	-- Step back but stay in our attack range, so the next attack needs no walk back.
+	local step = math.min(250, range - dist - 30)
+	if step < 60 then
+		return false
+	end
+	-- Never cut a wind-up that is playing now (attack activity 1503, as in combat.lua).
+	if c:GetAnimActivity() == 1503 and c:GetAnimCycle() < c:GetAttackPoint() + 0.05 then
+		return false
+	end
+	local spa = c:GetSecondsPerAttack()
+	local point = math.max(c:GetAttackPoint() / math.max(c:GetAttackSpeed(), 0.1), 0.25)
+	local since = GameTime() - c:GetLastAttackTime()
+	local from, to = point + KITE_BUF, spa - point - KITE_BUF
+	if to - from < 0.15 or since < from or since > to then
+		return false
+	end
+	local away = a.VectorAway(c:GetLocation(), t:GetLocation(), step)
+	if not IsLocationPassable(away) then
+		return false
+	end
+	c:Action_MoveToLocation(away)
+	if DotaTime() >= kiteLogAt + 2 then
+		kiteLogAt = DotaTime()
+		print(string.format("[OHA-KITE] t=%.0f %s from %s dist=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
+			DotaTime(), (string.gsub(c:GetUnitName(), "npc_dota_hero_", "")), (string.gsub(t:GetUnitName(), "npc_dota_hero_", "")),
+			dist, step, since, from, to, spa))
+	end
+	return true
+end
 function r.Think()
 	if a.CanNotUseAction(c) then
 		return
@@ -417,6 +468,9 @@ function r.Think()
 		local ae = d.unit:IsAttackImmune() and (not ad or not ac)
 		if ae then
 			c:Action_MoveToLocation(a.VectorTowards(d.unit:GetLocation(), l, e / 2))
+			return
+		end
+		if TryKite(d.unit) then
 			return
 		end
 		c:Action_AttackUnit(d.unit, false)

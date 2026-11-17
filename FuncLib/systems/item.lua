@@ -1,8 +1,8 @@
 -- Shared bot system: item.
 require(GetScriptDirectory() .. "/FuncLib/systems/global_overrides")
-local a = require(GetScriptDirectory() .. "/FuncLib/systems/role")
-local b = {}
-local c = {
+local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local Item = {}
+local specifiedItemSet = {
 	["item_tpscroll"] = true,
 	["item_travel_boots"] = true,
 	["item_travel_boots_2"] = true,
@@ -11,7 +11,7 @@ local c = {
 	["item_manta"] = true,
 	["item_force_staff"] = true,
 }
-local d = {
+local sDebugItems = {
 	"item_mango_tree",
 	"item_arcane_ring",
 	"item_royal_jelly",
@@ -84,15 +84,15 @@ local d = {
 	"item_urn_of_shadows",
 	"item_veil_of_discord",
 }
-local function e(f)
-	local g = {}
-	for h, i in pairs(f) do
-		g[i] = true
+local function ToSet(list)
+	local set = {}
+	for _, value in pairs(list) do
+		set[value] = true
 	end
-	return g
+	return set
 end
-local j = e(d)
-b["sBasicItems"] = {
+local debugItemSet = ToSet(sDebugItems)
+Item["sBasicItems"] = {
 	"item_aegis",
 	"item_boots_of_elves",
 	"item_belt_of_strength",
@@ -169,7 +169,7 @@ b["sBasicItems"] = {
 	"item_splintmail",
 	"item_shawl",
 }
-b["sSeniorItems"] = {
+Item["sSeniorItems"] = {
 	"item_arcane_boots",
 	"item_buckler",
 	"item_basher",
@@ -200,7 +200,7 @@ b["sSeniorItems"] = {
 	"item_helm_of_the_dominator",
 	"item_rod_of_atos",
 }
-b["sTopItems"] = {
+Item["sTopItems"] = {
 	"item_clarity",
 	"item_tango",
 	"item_flask",
@@ -279,8 +279,8 @@ b["sTopItems"] = {
 	"item_consecrated_wraps",
 	"item_crellas_crozier",
 }
-local k = e(b["sTopItems"])
-b["tEarlyItem"] = {
+local topItemSet = ToSet(Item["sTopItems"])
+Item["tEarlyItem"] = {
 	"item_clarity",
 	"item_faerie_fire",
 	"item_tango",
@@ -300,7 +300,7 @@ b["tEarlyItem"] = {
 	"item_circlet",
 	"item_mantle",
 }
-b["tSupportSellWhenFull"] = {
+Item["tSupportSellWhenFull"] = {
 	"item_magic_wand",
 	"item_magic_stick",
 	"item_bracer",
@@ -314,7 +314,7 @@ b["tSupportSellWhenFull"] = {
 	"item_ring_of_basilius",
 	"item_urn_of_shadows",
 }
-b["tEarlyConsumableItem"] = {
+Item["tEarlyConsumableItem"] = {
 	"item_clarity",
 	"item_faerie_fire",
 	"item_tango",
@@ -334,8 +334,8 @@ b["tEarlyConsumableItem"] = {
 	"item_magic_stick",
 	"item_smoke_of_deceit",
 }
-b["tEarlyBoots"] = { "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
-b["sCanNotSwitchItems"] = {
+Item["tEarlyBoots"] = { "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
+Item["sCanNotSwitchItems"] = {
 	"item_aegis",
 	-- Swapped in from the backpack for a push; other swaps must not send it back.
 	"item_roshans_banner",
@@ -366,7 +366,7 @@ b["sCanNotSwitchItems"] = {
 	-- and each one restarted the 11s swap gap for every other swap.
 	"item_dust",
 }
-b["sSellList"] = {
+Item["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
 	"item_ultimate_scepter",
@@ -408,8 +408,8 @@ b["sSellList"] = {
 	"item_wizard_hat",
 	"item_circlet",
 }
-local l = e(b["sCanNotSwitchItems"])
-local m = {
+local canNotSwitchItemSet = ToSet(Item["sCanNotSwitchItems"])
+local sConsumableItems = {
 	"item_clarity",
 	"item_tango",
 	"item_flask",
@@ -425,8 +425,8 @@ local m = {
 	"item_refresher_shard",
 	"item_aegis",
 }
-local n = e(m)
-local o = {
+local consumableItemSet = ToSet(sConsumableItems)
+local sNotSellItems = {
 	"item_abyssal_blade",
 	"item_assault",
 	"item_black_king_bar",
@@ -464,22 +464,22 @@ local o = {
 	"item_travel_boots_2",
 	"item_ward_observer",
 }
-local p = e(o)
-local q = { ["item_tpscroll"] = 1, ["item_flask"] = 1, ["item_enchanted_mango"] = 1 }
-function b.GetComponentList(r)
-	local s = {}
-	local t = GetItemComponents(r)
-	if #t == 0 then
-		s = { r }
+local notSellItemSet = ToSet(sNotSellItems)
+local smallItemSet = { ["item_tpscroll"] = 1, ["item_flask"] = 1, ["item_enchanted_mango"] = 1 }
+function Item.GetComponentList(itemName)
+	local components = {}
+	local componentSets = GetItemComponents(itemName)
+	if #componentSets == 0 then
+		components = { itemName }
 	else
-		local u = t[1]
-		for h, i in pairs(u) do
-			s[#s + 1] = i
+		local firstComponentSet = componentSets[1]
+		for _, component in pairs(firstComponentSet) do
+			components[#components + 1] = component
 		end
 	end
-	return s
+	return components
 end
-local v = {
+local sCompositeItems = {
 	"item_abyssal_blade",
 	"item_aether_lens",
 	"item_arcane_boots",
@@ -619,26 +619,26 @@ local function RecipesLast(parts)
 	end
 	return ordered
 end
-for h, w in pairs(v) do
-	b[w] = RecipesLast(GetItemComponents(w)[1])
+for _, itemName in pairs(sCompositeItems) do
+	Item[itemName] = RecipesLast(GetItemComponents(itemName)[1])
 end
 -- Boots of Travel 2 is Boots of Travel plus the recipe again (the recipe name the game reported
 -- for it in game 020's purchases). Spelled out so the planner keeps level 1 as a step toward it.
-b["item_travel_boots_2"] = { "item_travel_boots", "item_recipe_travel_boots" }
-b["item_phase_boots"] = { "item_blades_of_attack", "item_boots", "item_chainmail" }
-b["item_power_treads_agi"] = { "item_boots", "item_boots_of_elves", "item_gloves" }
-b["item_power_treads_int"] = { "item_boots", "item_robe", "item_gloves" }
-b["item_power_treads_str"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
-b["item_power_treads"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
-b["item_ultimate_scepter"] =
+Item["item_travel_boots_2"] = { "item_travel_boots", "item_recipe_travel_boots" }
+Item["item_phase_boots"] = { "item_blades_of_attack", "item_boots", "item_chainmail" }
+Item["item_power_treads_agi"] = { "item_boots", "item_boots_of_elves", "item_gloves" }
+Item["item_power_treads_int"] = { "item_boots", "item_robe", "item_gloves" }
+Item["item_power_treads_str"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
+Item["item_power_treads"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
+Item["item_ultimate_scepter"] =
 	{ "item_point_booster", "item_ogre_axe", "item_blade_of_alacrity", "item_staff_of_wizardry" }
 -- Stick and two branches do not combine on their own. The recipe has to be bought
 -- with them, before the build moves on to boots.
-b["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches", "item_recipe_magic_wand" }
+Item["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches", "item_recipe_magic_wand" }
 -- Claymore and Blades of Attack do not combine on their own.
-b["item_lesser_crit"] = { "item_claymore", "item_blades_of_attack", "item_recipe_lesser_crit" }
-b["item_yasha"] = { "item_boots_of_elves", "item_blade_of_alacrity", "item_recipe_yasha" }
-local x = {
+Item["item_lesser_crit"] = { "item_claymore", "item_blades_of_attack", "item_recipe_lesser_crit" }
+Item["item_yasha"] = { "item_boots_of_elves", "item_blade_of_alacrity", "item_recipe_yasha" }
+local itemAliases = {
 	["item_double_tango"] = "item_tango",
 	["item_double_clarity"] = "item_clarity",
 	["item_double_flask"] = "item_flask",
@@ -663,31 +663,31 @@ local x = {
 	["item_crystal_maiden_outfit"] = "item_magic_wand",
 	["item_priest_outfit"] = "item_arcane_boots",
 }
-b["item_double_branches"] = { "item_branches", "item_branches" }
+Item["item_double_branches"] = { "item_branches", "item_branches" }
 -- Two Gauntlets as one build entry. Two separate "item_gauntlets" entries do not work: the
 -- second reads as done as soon as the first is owned.
-b["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
-b["item_double_tango"] = { "item_tango", "item_tango" }
-b["item_double_clarity"] = { "item_clarity", "item_clarity" }
-b["item_double_flask"] = { "item_flask", "item_flask" }
-b["item_double_enchanted_mango"] = { "item_enchanted_mango", "item_enchanted_mango" }
-b["item_double_circlet"] = { "item_circlet", "item_circlet" }
-b["item_double_slippers"] = { "item_slippers", "item_slippers" }
-b["item_double_mantle"] = { "item_mantle", "item_mantle" }
-b["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
-b["item_double_wraith_band"] = { "item_wraith_band", "item_wraith_band" }
-b["item_double_null_talisman"] = { "item_null_talisman", "item_null_talisman" }
-b["item_double_bracer"] = { "item_bracer", "item_bracer" }
-b["item_double_crown"] = { "item_crown", "item_crown" }
-b["item_broken_hurricane_pike"] = { "item_force_staff", "item_recipe_hurricane_pike" }
-b["item_broken_silver_edge"] = { "item_blitz_knuckles", "item_broadsword", "item_recipe_silver_edge" }
-b["item_broken_bfury"] = { "item_ring_of_health", "item_void_stone", "item_broadsword", "item_claymore" }
-b["item_broken_satanic"] = { "item_reaver", "item_claymore" }
-b["item_broken_soul_ring"] = { "item_ring_of_protection", "item_recipe_soul_ring" }
-b["item_four_branches"] = { "item_branches", "item_branches", "item_branches", "item_branches" }
-b["item_six_branches"] =
+Item["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
+Item["item_double_tango"] = { "item_tango", "item_tango" }
+Item["item_double_clarity"] = { "item_clarity", "item_clarity" }
+Item["item_double_flask"] = { "item_flask", "item_flask" }
+Item["item_double_enchanted_mango"] = { "item_enchanted_mango", "item_enchanted_mango" }
+Item["item_double_circlet"] = { "item_circlet", "item_circlet" }
+Item["item_double_slippers"] = { "item_slippers", "item_slippers" }
+Item["item_double_mantle"] = { "item_mantle", "item_mantle" }
+Item["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
+Item["item_double_wraith_band"] = { "item_wraith_band", "item_wraith_band" }
+Item["item_double_null_talisman"] = { "item_null_talisman", "item_null_talisman" }
+Item["item_double_bracer"] = { "item_bracer", "item_bracer" }
+Item["item_double_crown"] = { "item_crown", "item_crown" }
+Item["item_broken_hurricane_pike"] = { "item_force_staff", "item_recipe_hurricane_pike" }
+Item["item_broken_silver_edge"] = { "item_blitz_knuckles", "item_broadsword", "item_recipe_silver_edge" }
+Item["item_broken_bfury"] = { "item_ring_of_health", "item_void_stone", "item_broadsword", "item_claymore" }
+Item["item_broken_satanic"] = { "item_reaver", "item_claymore" }
+Item["item_broken_soul_ring"] = { "item_ring_of_protection", "item_recipe_soul_ring" }
+Item["item_four_branches"] = { "item_branches", "item_branches", "item_branches", "item_branches" }
+Item["item_six_branches"] =
 	{ "item_branches", "item_branches", "item_branches", "item_branches", "item_branches", "item_branches" }
-b["item_mid_outfit"] = {
+Item["item_mid_outfit"] = {
 	"item_tango",
 	"item_faerie_fire",
 	"item_double_branches",
@@ -697,7 +697,7 @@ b["item_mid_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_power_treads_agi",
 }
-b["item_medusa_outfit"] = {
+Item["item_medusa_outfit"] = {
 	"item_null_talisman",
 	"item_double_branches",
 	"item_null_talisman",
@@ -706,7 +706,7 @@ b["item_medusa_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_power_treads_int",
 }
-b["item_templar_assassin_outfit"] = {
+Item["item_templar_assassin_outfit"] = {
 	"item_tango",
 	"item_faerie_fire",
 	"item_double_branches",
@@ -717,7 +717,7 @@ b["item_templar_assassin_outfit"] = {
 	"item_power_treads_agi",
 	"item_blight_stone",
 }
-b["item_ranged_carry_outfit"] = {
+Item["item_ranged_carry_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_double_branches",
@@ -729,7 +729,7 @@ b["item_ranged_carry_outfit"] = {
 	"item_power_treads_agi",
 	"item_infused_raindrop",
 }
-b["item_melee_carry_outfit"] = {
+Item["item_melee_carry_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -741,7 +741,7 @@ b["item_melee_carry_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_power_treads_agi",
 }
-b["item_phantom_assassin_outfit"] = {
+Item["item_phantom_assassin_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -754,7 +754,7 @@ b["item_phantom_assassin_outfit"] = {
 	"item_power_treads_agi",
 	"item_blight_stone",
 }
-b["item_juggernaut_outfit"] = {
+Item["item_juggernaut_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -767,7 +767,7 @@ b["item_juggernaut_outfit"] = {
 	"item_phase_boots",
 	"item_wraith_band",
 }
-b["item_huskar_outfit"] = {
+Item["item_huskar_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_double_branches",
@@ -781,7 +781,7 @@ b["item_huskar_outfit"] = {
 	"item_blades_of_attack",
 	"item_chainmail",
 }
-b["item_sven_outfit"] = {
+Item["item_sven_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -793,7 +793,7 @@ b["item_sven_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_phase_boots",
 }
-b["item_bristleback_outfit"] = {
+Item["item_bristleback_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -805,7 +805,7 @@ b["item_bristleback_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_power_treads_str",
 }
-b["item_tank_outfit"] = {
+Item["item_tank_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -817,7 +817,7 @@ b["item_tank_outfit"] = {
 	"item_recipe_magic_wand",
 	"item_power_treads_str",
 }
-b["item_dragon_knight_outfit"] = {
+Item["item_dragon_knight_outfit"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -829,7 +829,7 @@ b["item_dragon_knight_outfit"] = {
 	"item_power_treads_str",
 	"item_broken_soul_ring",
 }
-b["item_priest_outfit"] = {
+Item["item_priest_outfit"] = {
 	"item_tango",
 	"item_tango",
 	"item_branches",
@@ -840,7 +840,7 @@ b["item_priest_outfit"] = {
 	"item_flask",
 	"item_urn_of_shadows",
 }
-b["item_mage_outfit"] = {
+Item["item_mage_outfit"] = {
 	"item_tango",
 	"item_tango",
 	"item_double_branches",
@@ -852,7 +852,7 @@ b["item_mage_outfit"] = {
 	"item_tranquil_boots",
 	"item_flask",
 }
-b["item_crystal_maiden_outfit"] = {
+Item["item_crystal_maiden_outfit"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_circlet",
@@ -863,7 +863,7 @@ b["item_crystal_maiden_outfit"] = {
 	"item_arcane_boots",
 	"item_flask",
 }
-b["PvN_priest"] = {
+Item["PvN_priest"] = {
 	"item_tango",
 	"item_flask",
 	"item_bracer",
@@ -877,7 +877,7 @@ b["PvN_priest"] = {
 	"item_sheepstick",
 	"item_moon_shard",
 }
-b["PvN_mage"] = {
+Item["PvN_mage"] = {
 	"item_tango",
 	"item_flask",
 	"item_bracer",
@@ -891,7 +891,7 @@ b["PvN_mage"] = {
 	"item_sheepstick",
 	"item_moon_shard",
 }
-b["PvN_melee_carry"] = {
+Item["PvN_melee_carry"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -905,7 +905,7 @@ b["PvN_melee_carry"] = {
 	"item_abyssal_blade",
 	"item_moon_shard",
 }
-b["PvN_str_carry"] = {
+Item["PvN_str_carry"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -918,7 +918,7 @@ b["PvN_str_carry"] = {
 	"item_abyssal_blade",
 	"item_moon_shard",
 }
-b["PvN_ranged_carry"] = {
+Item["PvN_ranged_carry"] = {
 	"item_tango",
 	"item_flask",
 	"item_wraith_band",
@@ -934,7 +934,7 @@ b["PvN_ranged_carry"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_tank"] = {
+Item["PvN_tank"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -949,7 +949,7 @@ b["PvN_tank"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_mid"] = {
+Item["PvN_mid"] = {
 	"item_tango",
 	"item_flask",
 	"item_wraith_band",
@@ -964,7 +964,7 @@ b["PvN_mid"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_antimage"] = {
+Item["PvN_antimage"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -981,7 +981,7 @@ b["PvN_antimage"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_huskar"] = {
+Item["PvN_huskar"] = {
 	"item_tango",
 	"item_flask",
 	"item_bracer",
@@ -997,7 +997,7 @@ b["PvN_huskar"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_clinkz"] = {
+Item["PvN_clinkz"] = {
 	"item_tango",
 	"item_flask",
 	"item_wraith_band",
@@ -1013,7 +1013,7 @@ b["PvN_clinkz"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_BH"] = {
+Item["PvN_BH"] = {
 	"item_tango",
 	"item_flask",
 	"item_wraith_band",
@@ -1028,7 +1028,7 @@ b["PvN_BH"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_TA"] = {
+Item["PvN_TA"] = {
 	"item_tango",
 	"item_flask",
 	"item_wraith_band",
@@ -1044,7 +1044,7 @@ b["PvN_TA"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_PA"] = {
+Item["PvN_PA"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -1060,7 +1060,7 @@ b["PvN_PA"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_PL"] = {
+Item["PvN_PL"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -1076,7 +1076,7 @@ b["PvN_PL"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-b["PvN_OM"] = {
+Item["PvN_OM"] = {
 	"item_tango",
 	"item_flask",
 	"item_quelling_blade",
@@ -1091,196 +1091,196 @@ b["PvN_OM"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-function b.IsConsumableItem(y)
-	return n[y] == true
+function Item.IsConsumableItem(itemName)
+	return consumableItemSet[itemName] == true
 end
-function b.IsSmallItem(y)
-	return q[y] ~= nil
+function Item.IsSmallItem(itemName)
+	return smallItemSet[itemName] ~= nil
 end
-function b.IsNeutralItem(y)
-	return tNeutralItemLevelList[y] ~= nil
+function Item.IsNeutralItem(itemName)
+	return tNeutralItemLevelList[itemName] ~= nil
 end
-function b.GetNeutralItemLevel(y)
-	return tNeutralItemLevelList[y] or 0
+function Item.GetNeutralItemLevel(itemName)
+	return tNeutralItemLevelList[itemName] or 0
 end
-function b.GetMinTeamNeutralItemLevel()
-	local z = 999
-	for A = 1, #GetTeamPlayers(GetTeam()) do
-		local B = GetTeamMember(A)
-		if B ~= nil then
-			local C = B:GetItemInSlot(16)
-			if C ~= nil then
-				local D = C:GetName()
-				if b.GetNeutralItemLevel(D) < z then
-					z = b.GetNeutralItemLevel(D)
+function Item.GetMinTeamNeutralItemLevel()
+	local minLevel = 999
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(i)
+		if member ~= nil then
+			local neutralItem = member:GetItemInSlot(16)
+			if neutralItem ~= nil then
+				local neutralItemName = neutralItem:GetName()
+				if Item.GetNeutralItemLevel(neutralItemName) < minLevel then
+					minLevel = Item.GetNeutralItemLevel(neutralItemName)
 				end
 			else
-				z = 0
+				minLevel = 0
 				break
 			end
 		end
 	end
-	return z
+	return minLevel
 end
-function b.GetInUseNeutralItemLevel(E)
-	local C = E:GetItemInSlot(16)
-	if C ~= nil then
-		local D = C:GetName()
-		return b.GetNeutralItemLevel(D)
+function Item.GetInUseNeutralItemLevel(hero)
+	local neutralItem = hero:GetItemInSlot(16)
+	if neutralItem ~= nil then
+		local neutralItemName = neutralItem:GetName()
+		return Item.GetNeutralItemLevel(neutralItemName)
 	end
 	return 0
 end
-function b.IsNotSellItem(y)
-	return p[y] == true
+function Item.IsNotSellItem(itemName)
+	return notSellItemSet[itemName] == true
 end
-function b.IsCanNotSwitchItem(y)
-	return l[y] == true
+function Item.IsCanNotSwitchItem(itemName)
+	return canNotSwitchItemSet[itemName] == true
 end
-function b.IsDebugItem(y)
-	return j[y] == true
+function Item.IsDebugItem(itemName)
+	return debugItemSet[itemName] == true
 end
-function b.IsSpecifiedItem(y)
-	return c[y] == true
+function Item.IsSpecifiedItem(itemName)
+	return specifiedItemSet[itemName] == true
 end
-function b.IsTopItem(y)
-	return k[y] == true
+function Item.IsTopItem(itemName)
+	return topItemSet[itemName] == true
 end
-function b.HasItem(E, r)
-	return E:FindItemSlot(r) >= 0
+function Item.HasItem(hero, itemName)
+	return hero:FindItemSlot(itemName) >= 0
 end
-function b.HasItemWithName(E, F)
-	for A = 0, 8 do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil then
-			if string.find(G:GetName(), F) then
+function Item.HasItemWithName(hero, namePattern)
+	for slot = 0, 8 do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil then
+			if string.find(item:GetName(), namePattern) then
 				return true
 			end
 		end
 	end
 	return false
 end
-function b.IsItemInHero(y)
-	return b.IsItemInTargetHero(y, GetBot())
+function Item.IsItemInHero(itemName)
+	return Item.IsItemInTargetHero(itemName, GetBot())
 end
-function b.IsItemInTargetHero(y, E)
-	if y == "item_double_flask" then
-		return b.IsItemInHero("item_flask")
+function Item.IsItemInTargetHero(itemName, hero)
+	if itemName == "item_double_flask" then
+		return Item.IsItemInHero("item_flask")
 	end
-	if y == "item_flask" and GetItemStockCount("item_flask") == 0 then
+	if itemName == "item_flask" and GetItemStockCount("item_flask") == 0 then
 		return true
 	end
-	if x[y] ~= nil then
-		return b.IsItemInHero(x[y])
+	if itemAliases[itemName] ~= nil then
+		return Item.IsItemInHero(itemAliases[itemName])
 	end
-	if string.find(y, "item_double") ~= nil then
-		return b.GetItemCountInSolt(E, string.gsub(y, "_double", ""), 0, 8) >= 2
+	if string.find(itemName, "item_double") ~= nil then
+		return Item.GetItemCountInSolt(hero, string.gsub(itemName, "_double", ""), 0, 8) >= 2
 	end
-	if string.find(y, "PvN_") ~= nil then
-		return b.IsItemInHero("item_moon_shard")
+	if string.find(itemName, "PvN_") ~= nil then
+		return Item.IsItemInHero("item_moon_shard")
 	end
-	if y == "item_ultimate_scepter" and E:HasScepter() then
+	if itemName == "item_ultimate_scepter" and hero:HasScepter() then
 		return true
 	end
-	if y == "item_moon_shard" and E:HasModifier("modifier_item_moon_shard_consumed") then
+	if itemName == "item_moon_shard" and hero:HasModifier("modifier_item_moon_shard_consumed") then
 		return true
 	end
-	if y == "item_ultimate_scepter_2" then
-		return E:HasScepter() and E:FindItemSlot("item_ultimate_scepter") < 0
+	if itemName == "item_ultimate_scepter_2" then
+		return hero:HasScepter() and hero:FindItemSlot("item_ultimate_scepter") < 0
 	end
-	local H = E:FindItemSlot(y)
-	return H >= 0 and (H <= 8 or b.IsTopItem(y))
+	local slot = hero:FindItemSlot(itemName)
+	return slot >= 0 and (slot <= 8 or Item.IsTopItem(itemName))
 end
 -- Basic items still to buy for a list. Owned copies are counted, and each owned copy covers
 -- one entry only, so a recipe that needs two of a part (Soul Ring: two Gauntlets) buys the
 -- second one. The old single "last repeat item" flag was shared with every other call and
 -- often lost, so a Techies with one Gauntlets got only the Soul Ring recipe.
-function b.GetBasicItems(I, owned)
-	local E = GetBot()
+function Item.GetBasicItems(itemList, owned)
+	local bot = GetBot()
 	owned = owned or {}
-	local J = {}
-	for A, i in pairs(I) do
-		if owned[i] == nil then
-			if b.IsItemInHero(i) then
-				owned[i] = math.max(1, b.GetItemCountInSolt(E, i, 0, 8))
+	local basicItems = {}
+	for _, itemName in pairs(itemList) do
+		if owned[itemName] == nil then
+			if Item.IsItemInHero(itemName) then
+				owned[itemName] = math.max(1, Item.GetItemCountInSolt(bot, itemName, 0, 8))
 			else
-				owned[i] = 0
+				owned[itemName] = 0
 			end
 		end
-		if owned[i] > 0 then
-			owned[i] = owned[i] - 1
-		elseif b[i] ~= nil then
-			for h, L in pairs(b.GetBasicItems(b[i], owned)) do
-				J[#J + 1] = L
+		if owned[itemName] > 0 then
+			owned[itemName] = owned[itemName] - 1
+		elseif Item[itemName] ~= nil then
+			for _, basicItem in pairs(Item.GetBasicItems(Item[itemName], owned)) do
+				basicItems[#basicItems + 1] = basicItem
 			end
 		else
-			J[#J + 1] = i
+			basicItems[#basicItems + 1] = itemName
 		end
 	end
-	return J
+	return basicItems
 end
-function b.GetMainInvLessValItemSlot(E)
-	local M = 10000
-	local N = -1
-	for A = 0, 5 do
-		local G = E:GetItemInSlot(A)
-		if G == nil then
-			return A
+function Item.GetMainInvLessValItemSlot(hero)
+	local lowestCost = 10000
+	local lowestSlot = -1
+	for slot = 0, 5 do
+		local item = hero:GetItemInSlot(slot)
+		if item == nil then
+			return slot
 		end
-		if G ~= nil and not b.IsCanNotSwitchItem(G:GetName()) then
-			local O = GetItemCost(G:GetName())
-			if O < M then
-				M = O
-				N = A
+		if item ~= nil and not Item.IsCanNotSwitchItem(item:GetName()) then
+			local cost = GetItemCost(item:GetName())
+			if cost < lowestCost then
+				lowestCost = cost
+				lowestSlot = slot
 			end
 		end
 	end
-	return N
+	return lowestSlot
 end
-function b.GetBodyInvLessValItemSlot(E)
-	local M = 10000
-	local N = -1
-	for A = 0, 8 do
-		local G = E:GetItemInSlot(A)
-		if G == nil then
-			return A, -1
+function Item.GetBodyInvLessValItemSlot(hero)
+	local lowestCost = 10000
+	local lowestSlot = -1
+	for slot = 0, 8 do
+		local item = hero:GetItemInSlot(slot)
+		if item == nil then
+			return slot, -1
 		end
-		if G ~= nil and not b.IsCanNotSwitchItem(G:GetName()) then
-			local O = GetItemCost(G:GetName())
-			if O < M then
-				M = O
-				N = A
+		if item ~= nil and not Item.IsCanNotSwitchItem(item:GetName()) then
+			local cost = GetItemCost(item:GetName())
+			if cost < lowestCost then
+				lowestCost = cost
+				lowestSlot = slot
 			end
 		end
 	end
-	return N, M
+	return lowestSlot, lowestCost
 end
-function b.GetItemCharges(E, r)
-	local P = 0
-	for A = 0, 16 do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil and G:GetName() == r then
-			P = P + G:GetCurrentCharges()
+function Item.GetItemCharges(hero, itemName)
+	local charges = 0
+	for slot = 0, 16 do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil and item:GetName() == itemName then
+			charges = charges + item:GetCurrentCharges()
 		end
 	end
-	return P
+	return charges
 end
 -- Observer and sentry wards merge into item_ward_dispenser. An exact-name
 -- count then reads 0, so a support carrying both re-buys wards every tick.
 -- Dispenser current charges are observers. Secondary charges are sentries.
-function b.GetWardCharges(E, wardType)
+function Item.GetWardCharges(hero, wardType)
 	local charges = 0
-	for A = 0, 16 do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil and G:GetName() == wardType then
+	for slot = 0, 16 do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil and item:GetName() == wardType then
 			-- One ward often reports 0 charges, so a cap of 1 still bought a second.
-			local n = G:GetCurrentCharges()
-			charges = charges + ((n ~= nil and n > 0) and n or 1)
-		elseif G ~= nil and G:GetName() == "item_ward_dispenser" then
+			local currentCharges = item:GetCurrentCharges()
+			charges = charges + ((currentCharges ~= nil and currentCharges > 0) and currentCharges or 1)
+		elseif item ~= nil and item:GetName() == "item_ward_dispenser" then
 			if wardType == "item_ward_observer" then
-				charges = charges + G:GetCurrentCharges()
+				charges = charges + item:GetCurrentCharges()
 			else
 				local ok, nSentry = pcall(function()
-					return G:GetSecondaryCharges()
+					return item:GetSecondaryCharges()
 				end)
 				charges = charges + ((ok and type(nSentry) == "number") and nSentry or 1)
 			end
@@ -1288,39 +1288,39 @@ function b.GetWardCharges(E, wardType)
 	end
 	return charges
 end
-function b.GetNeutralItemCount(E)
-	local Q = 0
-	local R = { 6, 7, 8, 16 }
-	for h, A in pairs(R) do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil then
-			local r = G:GetName()
-			if b.IsNeutralItem(r) and not b.IsConsumableItem(r) then
-				Q = Q + 1
+function Item.GetNeutralItemCount(hero)
+	local count = 0
+	local slots = { 6, 7, 8, 16 }
+	for _, slot in pairs(slots) do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil then
+			local itemName = item:GetName()
+			if Item.IsNeutralItem(itemName) and not Item.IsConsumableItem(itemName) then
+				count = count + 1
 			end
 		end
 	end
-	return Q
+	return count
 end
-local function S(E, T, U)
-	local Q = 0
-	for A = T, U do
-		if E:GetItemInSlot(A) == nil then
-			Q = Q + 1
+local function CountEmptySlots(hero, firstSlot, lastSlot)
+	local count = 0
+	for slot = firstSlot, lastSlot do
+		if hero:GetItemInSlot(slot) == nil then
+			count = count + 1
 		end
 	end
-	return Q
+	return count
 end
-function b.GetEmptyInventoryAmount(E)
-	return S(E, 0, 8)
+function Item.GetEmptyInventoryAmount(hero)
+	return CountEmptySlots(hero, 0, 8)
 end
-function b.GetEmptyNonBackpackInventoryAmount(E)
-	return S(E, 0, 5)
+function Item.GetEmptyNonBackpackInventoryAmount(hero)
+	return CountEmptySlots(hero, 0, 5)
 end
 -- Greater Healing Lotus (item_greater_famango) stacks up to 3 per slot.
-b.GREATER_FAMANGO = "item_greater_famango"
-b.GREATER_FAMANGO_MAX_STACK = 3
-function b.GetLotusCharges(item)
+Item.GREATER_FAMANGO = "item_greater_famango"
+Item.GREATER_FAMANGO_MAX_STACK = 3
+function Item.GetLotusCharges(item)
 	if item == nil or item:IsNull() then
 		return 0
 	end
@@ -1330,31 +1330,31 @@ function b.GetLotusCharges(item)
 	end
 	return charges
 end
-function b.CollectGreaterFamangoStacks(bot)
+function Item.CollectGreaterFamangoStacks(bot)
 	local stacks = {}
 	if bot == nil then
 		return stacks
 	end
 	for slot = 0, 8 do
 		local item = bot:GetItemInSlot(slot)
-		if item ~= nil and not item:IsNull() and item:GetName() == b.GREATER_FAMANGO then
+		if item ~= nil and not item:IsNull() and item:GetName() == Item.GREATER_FAMANGO then
 			stacks[#stacks + 1] = {
 				slot = slot,
 				item = item,
-				charges = b.GetLotusCharges(item),
+				charges = Item.GetLotusCharges(item),
 			}
 		end
 	end
 	return stacks
 end
 -- True if inventory has 2+ greater-famango piles that can merge (frees a slot).
-function b.CanStackGreaterFamango(bot)
-	local stacks = b.CollectGreaterFamangoStacks(bot)
+function Item.CanStackGreaterFamango(bot)
+	local stacks = Item.CollectGreaterFamangoStacks(bot)
 	if #stacks < 2 then
 		return false
 	end
 	for i = 1, #stacks do
-		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+		if stacks[i].charges < Item.GREATER_FAMANGO_MAX_STACK then
 			return true
 		end
 	end
@@ -1362,17 +1362,17 @@ function b.CanStackGreaterFamango(bot)
 end
 -- Drop a spare greater-famango so the next pick-up merges into an incomplete stack (max 3).
 -- Returns true if a drop was issued (caller should pick up on a later think).
-function b.TryStackGreaterFamango(bot)
-	if bot == nil or not b.CanStackGreaterFamango(bot) then
+function Item.TryStackGreaterFamango(bot)
+	if bot == nil or not Item.CanStackGreaterFamango(bot) then
 		return false
 	end
-	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local stacks = Item.CollectGreaterFamangoStacks(bot)
 	local sink = nil
 	for i = 1, #stacks do
-		local s = stacks[i]
-		if s.charges < b.GREATER_FAMANGO_MAX_STACK then
-			if sink == nil or s.charges < sink.charges then
-				sink = s
+		local stack = stacks[i]
+		if stack.charges < Item.GREATER_FAMANGO_MAX_STACK then
+			if sink == nil or stack.charges < sink.charges then
+				sink = stack
 			end
 		end
 	end
@@ -1381,9 +1381,9 @@ function b.TryStackGreaterFamango(bot)
 	end
 	local donor = nil
 	for i = 1, #stacks do
-		local s = stacks[i]
-		if s.slot ~= sink.slot then
-			donor = s
+		local stack = stacks[i]
+		if stack.slot ~= sink.slot then
+			donor = stack
 			break
 		end
 	end
@@ -1395,7 +1395,7 @@ function b.TryStackGreaterFamango(bot)
 	return true
 end
 -- After TryStackGreaterFamango drop: pick the ground greater back up to merge stacks.
-function b.TryPickupStackedGreaterFamango(bot)
+function Item.TryPickupStackedGreaterFamango(bot)
 	if bot == nil or bot._lotusStackPickupUntil == nil then
 		return false
 	end
@@ -1403,20 +1403,20 @@ function b.TryPickupStackedGreaterFamango(bot)
 		bot._lotusStackPickupUntil = nil
 		return false
 	end
-	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local stacks = Item.CollectGreaterFamangoStacks(bot)
 	local hasRoom = false
 	for i = 1, #stacks do
-		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+		if stacks[i].charges < Item.GREATER_FAMANGO_MAX_STACK then
 			hasRoom = true
 			break
 		end
 	end
-	if not hasRoom and b.GetEmptyInventoryAmount(bot) <= 0 then
+	if not hasRoom and Item.GetEmptyInventoryAmount(bot) <= 0 then
 		bot._lotusStackPickupUntil = nil
 		return false
 	end
 	for _, drop in pairs(GetDroppedItemList() or {}) do
-		if drop ~= nil and drop.item ~= nil and drop.item:GetName() == b.GREATER_FAMANGO then
+		if drop ~= nil and drop.item ~= nil and drop.item:GetName() == Item.GREATER_FAMANGO then
 			local dist = GetUnitToLocationDistance(bot, drop.location)
 			if dist <= 400 then
 				if dist > 100 then
@@ -1432,7 +1432,7 @@ function b.TryPickupStackedGreaterFamango(bot)
 	return false
 end
 -- Prefer freeing a lotus that cannot stack further (full greater stack, or lower tiers).
-function b.FindLotusToFreeSlot(bot)
+function Item.FindLotusToFreeSlot(bot)
 	if bot == nil then
 		return nil, -1, nil
 	end
@@ -1447,9 +1447,9 @@ function b.FindLotusToFreeSlot(bot)
 			for slot = 0, 8 do
 				local item = bot:GetItemInSlot(slot)
 				if item ~= nil and not item:IsNull() and item:GetName() == name then
-					if name == b.GREATER_FAMANGO then
-						local charges = b.GetLotusCharges(item)
-						if pass == 1 and charges >= b.GREATER_FAMANGO_MAX_STACK then
+					if name == Item.GREATER_FAMANGO then
+						local charges = Item.GetLotusCharges(item)
+						if pass == 1 and charges >= Item.GREATER_FAMANGO_MAX_STACK then
 							return name, slot, item
 						end
 						if pass == 2 then
@@ -1464,159 +1464,159 @@ function b.FindLotusToFreeSlot(bot)
 	end
 	return nil, -1, nil
 end
-function b.GetEmptyNeutralBackpackAmount(E)
-	return S(E, 6, 8) + (E:GetItemInSlot(16) == nil and 1 or 0)
+function Item.GetEmptyNeutralBackpackAmount(hero)
+	return CountEmptySlots(hero, 6, 8) + (hero:GetItemInSlot(16) == nil and 1 or 0)
 end
-function b.GetEmptyBackpackSlot(E)
-	for A = 6, 8 do
-		if E:GetItemInSlot(A) == nil then
-			return A
+function Item.GetEmptyBackpackSlot(hero)
+	for slot = 6, 8 do
+		if hero:GetItemInSlot(slot) == nil then
+			return slot
 		end
 	end
 	return -1
 end
-function b.GetItemCount(V, r)
-	return b.GetItemCountInSolt(V, r, 0, 16)
+function Item.GetItemCount(unit, itemName)
+	return Item.GetItemCountInSolt(unit, itemName, 0, 16)
 end
-function b.GetItemCountInSolt(V, r, W, X)
-	local Y = 0
-	for A = W, X do
-		local G = V:GetItemInSlot(A)
-		if G ~= nil and G:GetName() == r then
-			Y = Y + 1
+function Item.GetItemCountInSolt(unit, itemName, firstSlot, lastSlot)
+	local count = 0
+	for slot = firstSlot, lastSlot do
+		local item = unit:GetItemInSlot(slot)
+		if item ~= nil and item:GetName() == itemName then
+			count = count + 1
 		end
 	end
-	return Y
+	return count
 end
-function b.HasBasicItem(E)
-	local Z = -1
-	for A = 1, #b["sBasicItems"] do
-		Z = E:FindItemSlot(b["sBasicItems"][A])
-		if Z >= 0 and Z <= 5 then
+function Item.HasBasicItem(hero)
+	local slot = -1
+	for i = 1, #Item["sBasicItems"] do
+		slot = hero:FindItemSlot(Item["sBasicItems"][i])
+		if slot >= 0 and slot <= 5 then
 			return true
 		end
 	end
 	return false
 end
-local function _(E, a0)
-	for h, a1 in pairs(b["tEarlyBoots"]) do
-		local a2 = E:FindItemSlot(a1)
-		if a2 >= 0 and a2 <= a0 then
+local function HasBootsInSlots(hero, lastSlot)
+	for _, bootsName in pairs(Item["tEarlyBoots"]) do
+		local slot = hero:FindItemSlot(bootsName)
+		if slot >= 0 and slot <= lastSlot then
 			return true
 		end
 	end
 	return false
 end
-function b.HasBuyBoots(E)
-	return _(E, 16)
+function Item.HasBuyBoots(hero)
+	return HasBootsInSlots(hero, 16)
 end
-function b.HasBootsInMainSolt(E)
-	return _(E, 8)
+function Item.HasBootsInMainSolt(hero)
+	return HasBootsInSlots(hero, 8)
 end
-function b.GetItemTotalWorthInSlots(V)
-	local a3 = 0
-	for A = 0, 16 do
-		local G = V:GetItemInSlot(A)
-		if G ~= nil then
-			a3 = a3 + GetItemCost(G:GetName())
+function Item.GetItemTotalWorthInSlots(unit)
+	local totalWorth = 0
+	for slot = 0, 16 do
+		local item = unit:GetItemInSlot(slot)
+		if item ~= nil then
+			totalWorth = totalWorth + GetItemCost(item:GetName())
 		end
 	end
-	return a3
+	return totalWorth
 end
-function b.GetTheItemSolt(E, W, X, a4)
-	local a5 = a4 and -9999 or 99999
-	local a6 = -1
-	for A = W, X do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil then
-			local O = GetItemCost(G:GetName())
-			if a4 and O > a5 or not a4 and O < a5 then
-				a5 = O
-				a6 = A
+function Item.GetTheItemSolt(hero, firstSlot, lastSlot, findMostExpensive)
+	local bestCost = findMostExpensive and -9999 or 99999
+	local bestSlot = -1
+	for slot = firstSlot, lastSlot do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil then
+			local cost = GetItemCost(item:GetName())
+			if findMostExpensive and cost > bestCost or not findMostExpensive and cost < bestCost then
+				bestCost = cost
+				bestSlot = slot
 			end
 		end
 	end
-	return a6
+	return bestSlot
 end
-function b.GetOutfitType(E)
-	local a7 =
+function Item.GetOutfitType(hero)
+	local outfitByPosition =
 		{ [1] = "outfit_mid", [2] = "outfit_tank", [3] = "outfit_carry", [4] = "outfit_mage", [5] = "outfit_priest" }
-	local a8 = GetTeamPlayers(GetTeam())
-	for A = 1, #GetTeamPlayers(GetTeam()) do
-		local a9 = a8[A]
-		if E:GetPlayerID() == a9 then
-			return a7[A]
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local playerId = teamPlayers[i]
+		if hero:GetPlayerID() == playerId then
+			return outfitByPosition[i]
 		end
 	end
 	return "outfit_carry"
 end
-function b.GetRoleItemsBuyList(E)
-	return "pos_" .. tostring(a.GetPosition(E))
+function Item.GetRoleItemsBuyList(hero)
+	return "pos_" .. tostring(Role.GetPosition(hero))
 end
-function b.HasTargetItemCompositByItems(E, aa)
-	local ab = {}
-	for A = 0, 8 do
-		local G = E:GetItemInSlot(A)
-		if G ~= nil then
-			local ac = b.GetBasicItems({ G:GetName() })
-			local ad, ae = b.GetIntersection(aa, ac)
-			if ae then
-				ab = b.MergeLists(ab, ad)
+function Item.HasTargetItemCompositByItems(hero, purchaseList)
+	local ownedComponents = {}
+	for slot = 0, 8 do
+		local item = hero:GetItemInSlot(slot)
+		if item ~= nil then
+			local basicItems = Item.GetBasicItems({ item:GetName() })
+			local intersection, isSubset = Item.GetIntersection(purchaseList, basicItems)
+			if isSubset then
+				ownedComponents = Item.MergeLists(ownedComponents, intersection)
 			end
 		end
 	end
-	return ab
+	return ownedComponents
 end
-function b.GetReducedPurchaseList(E, aa)
-	local af = b.HasTargetItemCompositByItems(E, aa)
-	return b.RemoveIntersectedItems(aa, af)
+function Item.GetReducedPurchaseList(hero, purchaseList)
+	local ownedComponents = Item.HasTargetItemCompositByItems(hero, purchaseList)
+	return Item.RemoveIntersectedItems(purchaseList, ownedComponents)
 end
-function b.GetIntersection(ag, ah)
-	local ai = {}
-	for h, aj in ipairs(ag) do
-		ai[aj] = true
+function Item.GetIntersection(firstList, secondList)
+	local firstSet = {}
+	for _, itemName in ipairs(firstList) do
+		firstSet[itemName] = true
 	end
-	local ad = {}
-	local ak = true
-	for h, aj in ipairs(ah) do
-		if ai[aj] then
-			table.insert(ad, aj)
+	local intersection = {}
+	local isSubset = true
+	for _, itemName in ipairs(secondList) do
+		if firstSet[itemName] then
+			table.insert(intersection, itemName)
 		else
-			ak = false
+			isSubset = false
 		end
 	end
-	return ad, ak
+	return intersection, isSubset
 end
-function b.MergeLists(ag, ah)
-	local al = {}
-	for h, aj in ipairs(ag) do
-		table.insert(al, aj)
+function Item.MergeLists(firstList, secondList)
+	local merged = {}
+	for _, itemName in ipairs(firstList) do
+		table.insert(merged, itemName)
 	end
-	for h, aj in ipairs(ah) do
-		table.insert(al, aj)
+	for _, itemName in ipairs(secondList) do
+		table.insert(merged, itemName)
 	end
-	return al
+	return merged
 end
-function b.RemoveIntersectedItems(ag, ah)
-	local am = {}
-	for h, aj in ipairs(ah) do
-		am[aj] = true
+function Item.RemoveIntersectedItems(firstList, secondList)
+	local secondSet = {}
+	for _, itemName in ipairs(secondList) do
+		secondSet[itemName] = true
 	end
-	local an = {}
-	for h, aj in ipairs(ag) do
-		if not am[aj] then
-			table.insert(an, aj)
+	local remaining = {}
+	for _, itemName in ipairs(firstList) do
+		if not secondSet[itemName] then
+			table.insert(remaining, itemName)
 		end
 	end
-	return an
+	return remaining
 end
-function b.GetItemWardSolt()
-	local E = GetBot()
-	local ao = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
-	for h, ap in pairs(ao) do
-		local aq = E:FindItemSlot(ap)
-		if aq ~= -1 then
-			return aq
+function Item.GetItemWardSolt()
+	local bot = GetBot()
+	local wardNames = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
+	for _, wardName in pairs(wardNames) do
+		local slot = bot:FindItemSlot(wardName)
+		if slot ~= -1 then
+			return slot
 		end
 	end
 	return -1
@@ -1627,7 +1627,7 @@ end
 -- Game 034, 63:38: Roshan died, Phoenix took the Aegis and the Cheese (into his backpack, full
 -- bag) and nobody took the Refresher Shard: these two were never claimed by anyone. A free main
 -- slot matters: bot swaps do not take effect, so an item that lands in the backpack stays there.
-function b.RoshanClaimKind(name)
+function Item.RoshanClaimKind(name)
 	if name == "item_aegis" then
 		return "aegis"
 	end
@@ -1641,9 +1641,9 @@ function b.RoshanClaimKind(name)
 end
 local function RoshanDropTier(hero, kind)
 	local human = hero.IsBot ~= nil and not hero:IsBot()
-	local pos = a.GetPosition(hero) or 3
+	local pos = Role.GetPosition(hero) or 3
 	if kind == "consumable" then
-		if b.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
+		if Item.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
 			return 3
 		end
 		return pos <= 3 and 1 or 2
@@ -1666,13 +1666,13 @@ local function RoshanDropCandidate(hero, itemName)
 	if hero == nil or not hero:IsAlive() or not hero:IsHero() or hero:IsIllusion() then
 		return false
 	end
-	if b.HasItem(hero, itemName) then
+	if Item.HasItem(hero, itemName) then
 		return false
 	end
 	return true
 end
-function b.ShouldClaimRoshanDrop(bot, loc, itemName)
-	local kind = b.RoshanClaimKind(itemName)
+function Item.ShouldClaimRoshanDrop(bot, loc, itemName)
+	local kind = Item.RoshanClaimKind(itemName)
 	if kind == nil or loc == nil or not RoshanDropCandidate(bot, itemName) then
 		return false
 	end
@@ -1695,8 +1695,8 @@ function b.ShouldClaimRoshanDrop(bot, loc, itemName)
 		return best
 	end
 	local function winner(maxDist)
-		for n = 1, #tiers do
-			local ally = closest(tiers[n], maxDist)
+		for tierIndex = 1, #tiers do
+			local ally = closest(tiers[tierIndex], maxDist)
 			if ally ~= nil then
 				return ally
 			end
@@ -1707,13 +1707,13 @@ function b.ShouldClaimRoshanDrop(bot, loc, itemName)
 	local ally = winner(4000) or winner(math.huge)
 	return ally == bot
 end
-function b.RoshanDropDesire(bot)
+function Item.RoshanDropDesire(bot)
 	for _, drop in pairs(GetDroppedItemList() or {}) do
 		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
 			local name = drop.item:GetName()
 			if
-				b.RoshanClaimKind(name) ~= nil
-				and b.ShouldClaimRoshanDrop(bot, drop.location, name)
+				Item.RoshanClaimKind(name) ~= nil
+				and Item.ShouldClaimRoshanDrop(bot, drop.location, name)
 				and GetUnitToLocationDistance(bot, drop.location) <= 4500
 			then
 				return 0.97
@@ -1722,7 +1722,7 @@ function b.RoshanDropDesire(bot)
 	end
 	return 0
 end
-function b.TryPickupRoshanDrop(bot)
+function Item.TryPickupRoshanDrop(bot)
 	if bot == nil or not bot:IsAlive() then
 		return false
 	end
@@ -1730,7 +1730,7 @@ function b.TryPickupRoshanDrop(bot)
 	for _, drop in pairs(GetDroppedItemList() or {}) do
 		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
 			local name = drop.item:GetName()
-			if b.RoshanClaimKind(name) ~= nil and b.ShouldClaimRoshanDrop(bot, drop.location, name) then
+			if Item.RoshanClaimKind(name) ~= nil and Item.ShouldClaimRoshanDrop(bot, drop.location, name) then
 				local dist = GetUnitToLocationDistance(bot, drop.location)
 				if dist < bestDist then
 					best = drop
@@ -1749,9 +1749,9 @@ function b.TryPickupRoshanDrop(bot)
 			end
 			for _, drop in pairs(GetDroppedItemList() or {}) do
 				if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() and drop.item:GetName() == ret.name then
-					local d = GetUnitToLocationDistance(bot, drop.location)
-					if d <= 1500 then
-						if d > 120 then
+					local distance = GetUnitToLocationDistance(bot, drop.location)
+					if distance <= 1500 then
+						if distance > 120 then
 							bot:Action_MoveToLocation(drop.location)
 						else
 							bot:Action_PickUpItem(drop.item)
@@ -1765,24 +1765,24 @@ function b.TryPickupRoshanDrop(bot)
 		end
 		return false
 	end
-	if b.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
-		local cheap = b.GetMainInvLessValItemSlot(bot)
+	if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+		local cheap = Item.GetMainInvLessValItemSlot(bot)
 		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the
 		-- cheapest item to the backpack never made room. Drop it at his feet instead, pick up the
 		-- Roshan item into the freed main slot, then pick the dropped item back up (it goes to the
 		-- backpack). Game 021, 32:48: nobody took the Aegis, the claimant's bag was full.
 		if cheap ~= nil and cheap >= 0 and bestDist <= 600 then
-			local it = bot:GetItemInSlot(cheap)
-			if it ~= nil then
+			local item = bot:GetItemInSlot(cheap)
+			if item ~= nil then
 				pcall(print, string.format(
 					"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
 					DotaTime(),
 					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-					b.RoshanClaimKind(best.item:GetName()) or "drop",
-					(string.gsub(it:GetName(), "^item_", ""))
+					Item.RoshanClaimKind(best.item:GetName()) or "drop",
+					(string.gsub(item:GetName(), "^item_", ""))
 				))
-				bot._roshReturn = { name = it:GetName(), at = DotaTime() }
-				bot:Action_DropItem(it, bot:GetLocation())
+				bot._roshReturn = { name = item:GetName(), at = DotaTime() }
+				bot:Action_DropItem(item, bot:GetLocation())
 				return true
 			end
 		end
@@ -1794,4 +1794,4 @@ function b.TryPickupRoshanDrop(bot)
 	end
 	return true
 end
-return b
+return Item

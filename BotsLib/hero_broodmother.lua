@@ -1,28 +1,28 @@
 -- Broodmother: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
-local k = j[2]
-local l = c.Skill.GetTalentBuild(i[2])
-if h == "pos_2" then
-	k = j[1]
-	l = c.Skill.GetTalentBuild(i[1])
-elseif h == "pos_3" then
-	k = j[2]
-	l = c.Skill.GetTalentBuild(i[2])
+local tAllAbilityBuildList = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local nAbilityBuildList = tAllAbilityBuildList[2]
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
+if sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
+elseif sRole == "pos_3" then
+	nAbilityBuildList = tAllAbilityBuildList[2]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
-local m = {}
-m["pos_2"] = {
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_double_wraith_band",
@@ -41,7 +41,7 @@ m["pos_2"] = {
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 }
-m["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_double_wraith_band",
@@ -60,235 +60,235 @@ m["pos_3"] = {
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 }
-m["pos_1"] = m["pos_3"]
-m["pos_4"] = m["pos_3"]
-m["pos_5"] = m["pos_3"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_power_treads", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local o =
-	SafeAbility(b:GetAbilityByName("broodmother_insatiable_hunger"), "broodmother_insatiable_hunger", "broodmother")
-local p = SafeAbility(b:GetAbilityByName("broodmother_spin_web"), "broodmother_spin_web", "broodmother")
-local q =
-	SafeAbility(b:GetAbilityByName("broodmother_spawn_spiderlings"), "broodmother_spawn_spiderlings", "broodmother")
-local r
-local s, t
-local u, v
-local w = 1
-local x = 0
-local y
-local z
-local A
-local B
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local insatiableHungerAbility =
+	SafeAbility(bot:GetAbilityByName("broodmother_insatiable_hunger"), "broodmother_insatiable_hunger", "broodmother")
+local spinWebAbility = SafeAbility(bot:GetAbilityByName("broodmother_spin_web"), "broodmother_spin_web", "broodmother")
+local spawnSpiderlingsAbility =
+	SafeAbility(bot:GetAbilityByName("broodmother_spawn_spiderlings"), "broodmother_spawn_spiderlings", "broodmother")
+local insatiableHungerDesire
+local spinWebDesire, spinWebLocation
+local spawnSpiderlingsDesire, spawnSpiderlingsTarget
+local webCastInterval = 1
+local lastWebCastTime = 0
+local botTarget
+local isEngaging
+local isRetreating
+local isAttacking
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local C = d.Build(b)
-	z = C.isEngaging
-	A = C.isRetreating
-	B = c.IsAttacking(b)
-	u, v = a.ConsiderSpawnSpiderlings()
-	if u > 0 then
-		b:Action_UseAbilityOnEntity(q, v)
+	local context = AbilityContext.Build(bot)
+	isEngaging = context.isEngaging
+	isRetreating = context.isRetreating
+	isAttacking = Fu.IsAttacking(bot)
+	spawnSpiderlingsDesire, spawnSpiderlingsTarget = X.ConsiderSpawnSpiderlings()
+	if spawnSpiderlingsDesire > 0 then
+		bot:Action_UseAbilityOnEntity(spawnSpiderlingsAbility, spawnSpiderlingsTarget)
 		return
 	end
-	s, t = a.ConsiderSpinWeb()
-	if s > 0 then
-		if DotaTime() - x > w then
-			b:Action_UseAbilityOnLocation(p, t)
-			x = DotaTime()
+	spinWebDesire, spinWebLocation = X.ConsiderSpinWeb()
+	if spinWebDesire > 0 then
+		if DotaTime() - lastWebCastTime > webCastInterval then
+			bot:Action_UseAbilityOnLocation(spinWebAbility, spinWebLocation)
+			lastWebCastTime = DotaTime()
 		end
 		return
 	end
-	r = a.ConsiderInsatiableHunger()
-	if r > 0 then
-		b:Action_UseAbility(o)
+	insatiableHungerDesire = X.ConsiderInsatiableHunger()
+	if insatiableHungerDesire > 0 then
+		bot:Action_UseAbility(insatiableHungerAbility)
 		return
 	end
 end
-function a.ConsiderInsatiableHunger()
-	if not o:IsFullyCastable() then
+function X.ConsiderInsatiableHunger()
+	if not insatiableHungerAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local D = b:GetAttackRange()
-	y = c.GetProperTarget(b)
-	if c.IsInTeamFight(b, 1200) then
-		local E = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-		if E ~= nil and #E >= 2 and c.GetHP(b) < 0.75 and B then
+	local attackRange = bot:GetAttackRange()
+	botTarget = Fu.GetProperTarget(bot)
+	if Fu.IsInTeamFight(bot, 1200) then
+		local enemiesInFight = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+		if enemiesInFight ~= nil and #enemiesInFight >= 2 and Fu.GetHP(bot) < 0.75 and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if z then
+	if isEngaging then
 		if
-			c.IsValidTarget(y)
-			and c.IsInRange(b, y, D + 150)
-			and B
-			and not c.IsSuspiciousIllusion(y)
-			and not c.IsDisabled(y)
-			and not y:HasModifier("modifier_dazzle_shallow_grave")
-			and not y:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not y:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not y:HasModifier("modifier_templar_assassin_refraction_absorb")
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, attackRange + 150)
+			and isAttacking
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not botTarget:HasModifier("modifier_dazzle_shallow_grave")
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local F = c.GetNearbyHeroes(y, 1200, true, BOT_MODE_NONE)
-			local E = c.GetNearbyHeroes(y, 1200, false, BOT_MODE_NONE)
-			if F ~= nil and E ~= nil and #F >= #E then
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsFarming(b) then
-		local G = b:GetNearbyCreeps(700, true)
-		if G ~= nil and #G > 0 and c.GetHP(b) < 0.4 and B then
+	if Fu.IsFarming(bot) then
+		local nearbyCreeps = bot:GetNearbyCreeps(700, true)
+		if nearbyCreeps ~= nil and #nearbyCreeps > 0 and Fu.GetHP(bot) < 0.4 and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(y) and c.IsInRange(b, y, 500) and B then
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(y) and c.IsInRange(b, y, 500) and B then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderSpinWeb()
-	if not p:IsFullyCastable() then
+function X.ConsiderSpinWeb()
+	if not spinWebAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local H = c.GetProperCastRange(false, b, p:GetCastRange())
-	local I = p:GetSpecialValueInt("radius")
-	local J = b:GetNearbyLaneCreeps(H, true)
-	local K = b:GetNearbyTowers(H, true)
-	y = c.GetProperTarget(b)
-	if c.IsStuck(b) and not DoesLocationHaveWeb(b:GetLocation(), I) then
-		return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+	local castRange = Fu.GetProperCastRange(false, bot, spinWebAbility:GetCastRange())
+	local radius = spinWebAbility:GetSpecialValueInt("radius")
+	local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
+	local enemyTowers = bot:GetNearbyTowers(castRange, true)
+	botTarget = Fu.GetProperTarget(bot)
+	if Fu.IsStuck(bot) and not DoesLocationHaveWeb(bot:GetLocation(), radius) then
+		return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local L = b:FindAoELocation(true, true, b:GetLocation(), H, I, 0, 0)
-		local E = c.GetEnemiesNearLoc(L.targetloc, I / 1.7)
+	if Fu.IsInTeamFight(bot, 1200) then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
+		local enemiesInWeb = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius / 1.7)
 		if
-			E ~= nil
-			and #E >= 2
-			and not DoesLocationHaveWeb(L.targetloc, I)
-			and not c.IsLocationInChrono(L.targetloc)
-			and not c.IsLocationInBlackHole(L.targetloc)
+			enemiesInWeb ~= nil
+			and #enemiesInWeb >= 2
+			and not DoesLocationHaveWeb(aoeLocation.targetloc, radius)
+			and not Fu.IsLocationInChrono(aoeLocation.targetloc)
+			and not Fu.IsLocationInBlackHole(aoeLocation.targetloc)
 		then
-			return BOT_ACTION_DESIRE_HIGH, L.targetloc
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
-	if z then
+	if isEngaging then
 		if
-			c.IsValidTarget(y)
-			and c.IsInRange(b, y, H)
-			and not c.IsSuspiciousIllusion(y)
-			and not c.IsDisabled(y)
-			and not y:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not DoesLocationHaveWeb(y:GetLocation(), I)
-			and not c.IsLocationInChrono(y:GetLocation())
-			and not c.IsLocationInBlackHole(y:GetLocation())
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not DoesLocationHaveWeb(botTarget:GetLocation(), radius)
+			and not Fu.IsLocationInChrono(botTarget:GetLocation())
+			and not Fu.IsLocationInBlackHole(botTarget:GetLocation())
 		then
-			local F = c.GetNearbyHeroes(y, 1200, true, BOT_MODE_NONE)
-			local E = c.GetNearbyHeroes(y, 1200, false, BOT_MODE_NONE)
-			if F ~= nil and E ~= nil and #F >= #E then
-				return BOT_ACTION_DESIRE_HIGH, y:GetLocation()
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	if A then
-		local F = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local E = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if isRetreating then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			F ~= nil
-			and E ~= nil
-			and c.IsValidHero(E[1])
-			and c.IsInRange(b, E[1], 600)
-			and c.IsChasingTarget(E[1], b)
-			and not c.IsSuspiciousIllusion(E[1])
-			and not c.IsDisabled(E[1])
-			and not DoesLocationHaveWeb(b:GetLocation(), I)
+			nearbyAllies ~= nil
+			and nearbyEnemies ~= nil
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], 600)
+			and Fu.IsChasingTarget(nearbyEnemies[1], bot)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and not Fu.IsDisabled(nearbyEnemies[1])
+			and not DoesLocationHaveWeb(bot:GetLocation(), radius)
 		then
-			local M = c.GetNearbyHeroes(E[1], 1200, false, BOT_MODE_NONE)
-			if M ~= nil and (#M > #F or b:WasRecentlyDamagedByAnyHero(1.5)) then
-				return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
+			if chaserAllies ~= nil and (#chaserAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
-	if c.IsPushing(b) then
-		if J ~= nil and #J >= 4 and not DoesLocationHaveWeb(c.GetCenterOfUnits(J), I) then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(J)
+	if Fu.IsPushing(bot) then
+		if laneCreeps ~= nil and #laneCreeps >= 4 and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius) then
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
-		if K ~= nil and #K >= 1 and c.CanBeAttacked(K[1]) and not DoesLocationHaveWeb(K[1]:GetLocation(), I) then
-			return BOT_ACTION_DESIRE_HIGH, K[1]:GetLocation()
-		end
-	end
-	if c.IsLaning(b) then
-		if J ~= nil and #J >= 4 and not DoesLocationHaveWeb(c.GetCenterOfUnits(J), I) then
-			return BOT_MODE_DESIRE_HIGH, c.GetCenterOfUnits(J)
+		if enemyTowers ~= nil and #enemyTowers >= 1 and Fu.CanBeAttacked(enemyTowers[1]) and not DoesLocationHaveWeb(enemyTowers[1]:GetLocation(), radius) then
+			return BOT_ACTION_DESIRE_HIGH, enemyTowers[1]:GetLocation()
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(y) and c.IsInRange(b, y, 500) and B and not DoesLocationHaveWeb(y:GetLocation(), I) then
-			return BOT_ACTION_DESIRE_HIGH, y:GetLocation()
+	if Fu.IsLaning(bot) then
+		if laneCreeps ~= nil and #laneCreeps >= 4 and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius) then
+			return BOT_MODE_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(y) and c.IsInRange(b, y, 500) and B and not DoesLocationHaveWeb(y:GetLocation(), I) then
-			return BOT_ACTION_DESIRE_HIGH, y:GetLocation()
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not DoesLocationHaveWeb(botTarget:GetLocation(), radius) then
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+		end
+	end
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not DoesLocationHaveWeb(botTarget:GetLocation(), radius) then
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderSpawnSpiderlings()
-	if not q:IsFullyCastable() then
+function X.ConsiderSpawnSpiderlings()
+	if not spawnSpiderlingsAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local H = c.GetProperCastRange(false, b, q:GetCastRange())
-	local N = q:GetSpecialValueInt("damage")
-	local O = c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE)
-	for P, Q in pairs(O) do
+	local castRange = Fu.GetProperCastRange(false, bot, spawnSpiderlingsAbility:GetCastRange())
+	local damage = spawnSpiderlingsAbility:GetSpecialValueInt("damage")
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(enemiesInRange) do
 		if
-			c.IsValidHero(Q)
-			and c.CanCastOnNonMagicImmune(Q)
-			and c.CanKillTarget(Q, N, DAMAGE_TYPE_MAGICAL)
-			and not c.IsSuspiciousIllusion(Q)
-			and not Q:HasModifier("modifier_abaddon_borrowed_time")
-			and not Q:HasModifier("modifier_dazzle_shallow_grave")
-			and not Q:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not Q:HasModifier("modifier_oracle_false_promise_timer")
-			and not Q:HasModifier("modifier_templar_assassin_refraction_absorb")
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			return BOT_ACTION_DESIRE_HIGH, Q
+			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end
 	-- fix: on heroes Spawn Spiderlings was only a finisher. Engaging, throw it at the target for its
 	-- damage (220-420) and slow (25-45% for 4s, game data); cooldown is only 7-9s.
-	local spiderTarget = c.GetProperTarget(b)
+	local spiderTarget = Fu.GetProperTarget(bot)
 	if
-		z
-		and c.IsValidHero(spiderTarget)
-		and c.IsInRange(b, spiderTarget, H)
-		and c.CanCastOnNonMagicImmune(spiderTarget)
-		and c.CanCastOnTargetAdvanced(spiderTarget)
-		and not c.IsSuspiciousIllusion(spiderTarget)
+		isEngaging
+		and Fu.IsValidHero(spiderTarget)
+		and Fu.IsInRange(bot, spiderTarget, castRange)
+		and Fu.CanCastOnNonMagicImmune(spiderTarget)
+		and Fu.CanCastOnTargetAdvanced(spiderTarget)
+		and not Fu.IsSuspiciousIllusion(spiderTarget)
 		and not spiderTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
-		and c.GetManaAfter(q:GetManaCost()) > 0.2
+		and Fu.GetManaAfter(spawnSpiderlingsAbility:GetManaCost()) > 0.2
 	then
-		if DotaTime() >= (b._broodSpawnLogAt or -999) then
-			b._broodSpawnLogAt = DotaTime() + 10
+		if DotaTime() >= (bot._broodSpawnLogAt or -999) then
+			bot._broodSpawnLogAt = DotaTime() + 10
 			pcall(print, string.format(
 				"[OHA-BROODMOTHER] t=%.0f spiderlings engage %s",
 				DotaTime(),
@@ -297,20 +297,20 @@ function a.ConsiderSpawnSpiderlings()
 		end
 		return BOT_ACTION_DESIRE_HIGH, spiderTarget
 	end
-	local G = b:GetNearbyLaneCreeps(H, true)
-	for P, R in pairs(G) do
-		if c.IsValid(R) and c.CanBeAttacked(R) and c.CanKillTarget(R, N, DAMAGE_TYPE_MAGICAL) and not A then
-			return BOT_ACTION_DESIRE_HIGH, R
+	local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
+	for _, creep in pairs(laneCreeps) do
+		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL) and not isRetreating then
+			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function DoesLocationHaveWeb(S, I)
-	for P, T in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if c.IsValid(T) and T:GetUnitName() == "npc_dota_broodmother_web" and GetUnitToLocationDistance(T, S) < I then
+function DoesLocationHaveWeb(location, radius)
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+		if Fu.IsValid(unit) and unit:GetUnitName() == "npc_dota_broodmother_web" and GetUnitToLocationDistance(unit, location) < radius then
 			return true
 		end
 	end
 	return false
 end
-return a
+return X

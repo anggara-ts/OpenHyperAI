@@ -1,13 +1,13 @@
 -- Chat text in English, Chinese, Russian, and Japanese.
-local a = {}
-local b
+local Localization = {}
+local CustomLoader
 if GetScriptDirectory() == "bots" then
-	b = require("bots.FuncLib.systems.custom_loader")
+	CustomLoader = require("bots.FuncLib.systems.custom_loader")
 else
-	b = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+	CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 end
-local c = "en"
-local d = {
+local defaultLocale = "en"
+local strings = {
 	en = {
 		welcome_msgs = {
 			"Welcome to Open Hyper AI (OHA-DEV): ",
@@ -927,20 +927,20 @@ local d = {
 		say_debug_off = { "デバッグOFF。", "Verbose debug 無効。" },
 	},
 }
-if b and b.Enable and d[b.Localization] then
-	c = b.Localization
+if CustomLoader and CustomLoader.Enable and strings[CustomLoader.Localization] then
+	defaultLocale = CustomLoader.Localization
 else
-	b.Localization = c
+	CustomLoader.Localization = defaultLocale
 end
-function a.Supported(e)
-	return d[e] ~= nil
+function Localization.Supported(locale)
+	return strings[locale] ~= nil
 end
-function a.GetLocale()
-	return b.Localization or c
+function Localization.GetLocale()
+	return CustomLoader.Localization or defaultLocale
 end
-function a.Get(e)
-	local f = d[a.GetLocale()] or d["en"]
-	local g = f[e] or d["en"][e]
-	return g
+function Localization.Get(key)
+	local localeStrings = strings[Localization.GetLocale()] or strings["en"]
+	local text = localeStrings[key] or strings["en"][key]
+	return text
 end
-return a
+return Localization

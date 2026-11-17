@@ -1,50 +1,50 @@
 -- Support library: http_req.
-local function a(self)
-	local b = { prototype = {} }
-	b.prototype.__index = b.prototype
-	b.prototype.constructor = b
-	return b
+local function createClass(self)
+	local class = { prototype = {} }
+	class.prototype.__index = class.prototype
+	class.prototype.constructor = class
+	return class
 end
-local c = {}
-local d = require(GetScriptDirectory() .. "/ts_libs/utils/json")
-c.Request = a()
-local e = c.Request
-e.name = "Request"
-function e.prototype.____constructor(self) end
-function e.HttpPost(self, f, g, h)
+local Module = {}
+local Json = require(GetScriptDirectory() .. "/ts_libs/utils/json")
+Module.Request = createClass()
+local Request = Module.Request
+Request.name = "Request"
+function Request.prototype.____constructor(self) end
+function Request.HttpPost(self, body, endpoint, callback)
 	if self.UUID ~= nil then
-		return c.Request:RawPostRequest((c.Request.BASE_URL .. "/") .. g, h, f)
+		return Module.Request:RawPostRequest((Module.Request.BASE_URL .. "/") .. endpoint, callback, body)
 	else
-		return self:GetUUID(h)
+		return self:GetUUID(callback)
 	end
 end
-function e.GetUUID(self, h)
-	return c.Request:RawPostRequest(c.Request.BASE_URL .. "/uuid", h)
+function Request.GetUUID(self, callback)
+	return Module.Request:RawPostRequest(Module.Request.BASE_URL .. "/uuid", callback)
 end
-function e.RawPostRequest(self, i, h, f)
-	local j = d.encode(f)
-	local k = CreateRemoteHTTPRequest(i)
-	k:SetHTTPRequestRawPostBody("application/json", j)
-	k:Send(function(l)
-		log("Raw %s Result: %s", i, l)
-		local m = d.decode(l)
-		log("Jsonified result: %s", m)
-		if h then
-			h(l)
+function Request.RawPostRequest(self, url, callback, body)
+	local encodedBody = Json.encode(body)
+	local request = CreateRemoteHTTPRequest(url)
+	request:SetHTTPRequestRawPostBody("application/json", encodedBody)
+	request:Send(function(response)
+		log("Raw %s Result: %s", url, response)
+		local decoded = Json.decode(response)
+		log("Jsonified result: %s", decoded)
+		if callback then
+			callback(response)
 		end
 	end)
-	return k
+	return request
 end
-function e.RawGetRequest(self, i, h)
-	local k = CreateRemoteHTTPRequest(i)
-	k:Send(function(l)
-		log("Raw %s Result: %s", i, l)
-		if h then
-			h(l)
+function Request.RawGetRequest(self, url, callback)
+	local request = CreateRemoteHTTPRequest(url)
+	request:Send(function(response)
+		log("Raw %s Result: %s", url, response)
+		if callback then
+			callback(response)
 		end
 	end)
-	return k
+	return request
 end
-e.UUID = nil
-e.BASE_URL = "http://127.0.0.1:5000/"
-return c
+Request.UUID = nil
+Request.BASE_URL = "http://127.0.0.1:5000/"
+return Module

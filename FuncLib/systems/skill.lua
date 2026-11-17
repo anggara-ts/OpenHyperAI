@@ -1,11 +1,11 @@
 -- Shared bot system: skill.
-local a = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local b = {}
-local c = "generic_hidden"
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local Skill = {}
+local HIDDEN_ABILITY_NAME = "generic_hidden"
 if DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE == nil then
 	DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE = 64
 end
-b["sAllyUnitAbilityIndex"] = {
+Skill["sAllyUnitAbilityIndex"] = {
 	["bloodseeker_bloodrage"] = true,
 	["omniknight_purification"] = true,
 	["omniknight_repel"] = true,
@@ -16,7 +16,7 @@ b["sAllyUnitAbilityIndex"] = {
 	["ogre_magi_bloodlust"] = true,
 	["lich_frost_shield"] = true,
 }
-b["sProjectileAbilityIndex"] = {
+Skill["sProjectileAbilityIndex"] = {
 	["chaos_knight_chaos_bolt"] = true,
 	["grimstroke_ink_creature"] = true,
 	["lich_chain_frost"] = true,
@@ -30,7 +30,7 @@ b["sProjectileAbilityIndex"] = {
 	["viper_viper_strike"] = true,
 	["witch_doctor_paralyzing_cask"] = true,
 }
-b["sOnlyProjectileAbilityIndex"] = {
+Skill["sOnlyProjectileAbilityIndex"] = {
 	["necrolyte_death_pulse"] = true,
 	["arc_warden_spark_wraith"] = true,
 	["tinker_heat_seeking_missile"] = true,
@@ -38,7 +38,7 @@ b["sOnlyProjectileAbilityIndex"] = {
 	["rattletrap_battery_assault"] = true,
 	["queenofpain_scream_of_pain"] = true,
 }
-b["sStunProjectileAbilityIndex"] = {
+Skill["sStunProjectileAbilityIndex"] = {
 	["chaos_knight_chaos_bolt"] = true,
 	["skeleton_king_hellfire_blast"] = true,
 	["sven_storm_bolt"] = true,
@@ -46,152 +46,152 @@ b["sStunProjectileAbilityIndex"] = {
 	["witch_doctor_paralyzing_cask"] = true,
 	["dragon_knight_dragon_tail"] = true,
 }
-function b.GetTalentList(d)
-	local e = {}
-	for f = 0, 25 do
-		local g = d:GetAbilityInSlot(f)
-		if g ~= nil and g:IsTalent() then
-			table.insert(e, g:GetName())
+function Skill.GetTalentList(hero)
+	local talentList = {}
+	for slot = 0, 25 do
+		local ability = hero:GetAbilityInSlot(slot)
+		if ability ~= nil and ability:IsTalent() then
+			table.insert(talentList, ability:GetName())
 		end
 	end
-	return e
+	return talentList
 end
-function b.GetAbilityList(d)
-	local h = {}
-	local i = 10
-	local j = d:GetUnitName()
-	for k = 0, i do
-		local l = d:GetAbilityInSlot(k)
-		if l then
-			local m = l:GetName()
-			if m == c then
-				if k ~= 0 then
-					table.insert(h, c)
+function Skill.GetAbilityList(hero)
+	local abilityList = {}
+	local lastSlot = 10
+	local heroName = hero:GetUnitName()
+	for slot = 0, lastSlot do
+		local ability = hero:GetAbilityInSlot(slot)
+		if ability then
+			local abilityName = ability:GetName()
+			if abilityName == HIDDEN_ABILITY_NAME then
+				if slot ~= 0 then
+					table.insert(abilityList, HIDDEN_ABILITY_NAME)
 				else
 					log(
 						"[WARN] The ability %s on slot %s does not make sense. Check if there is anything wrong with this hero: %s",
-						m,
-						k,
-						j
+						abilityName,
+						slot,
+						heroName
 					)
 				end
-			elseif a.AbilityBehaviorHasFlag(l:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) and l:IsHidden() then
-			elseif l:IsUltimate() and k >= 4 then
-				if a.AbilityBehaviorHasFlag(l:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) or l:IsHidden() then
+			elseif Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) and ability:IsHidden() then
+			elseif ability:IsUltimate() and slot >= 4 then
+				if Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) or ability:IsHidden() then
 					log(
 						"[WARN] The ability %s on slot %s seems to be an ultimate for hero: %s. But it is not learnable OR hidden. Check if there is anything wrong with this hero.",
-						m,
-						k,
-						j
+						abilityName,
+						slot,
+						heroName
 					)
 				else
-					h[6] = m
+					abilityList[6] = abilityName
 				end
-			elseif not l:IsTalent() then
-				table.insert(h, m)
+			elseif not ability:IsTalent() then
+				table.insert(abilityList, abilityName)
 			else
-				log("%s failed to load ability with name= %s, at idx= %s", j, m, k)
+				log("%s failed to load ability with name= %s, at idx= %s", heroName, abilityName, slot)
 			end
 		else
-			log("[WARN] It seems there is no ability on slot %s for %s", k, j)
+			log("[WARN] It seems there is no ability on slot %s for %s", slot, heroName)
 		end
 	end
-	return h
+	return abilityList
 end
-function b.GetRandomBuild(n)
-	return n[RandomInt(1, #n)]
+function Skill.GetRandomBuild(buildList)
+	return buildList[RandomInt(1, #buildList)]
 end
-function b.GetTalentBuild(o)
-	local p = {
-		[1] = o["t10"][1] == 0 and 1 or 2,
-		[2] = o["t15"][1] == 0 and 3 or 4,
-		[3] = o["t20"][1] == 0 and 5 or 6,
-		[4] = o["t25"][1] == 0 and 7 or 8,
-		[5] = o["t10"][1] == 0 and 2 or 1,
-		[6] = o["t15"][1] == 0 and 4 or 3,
-		[7] = o["t20"][1] == 0 and 6 or 5,
-		[8] = o["t25"][1] == 0 and 8 or 7,
+function Skill.GetTalentBuild(talentTree)
+	local talentBuild = {
+		[1] = talentTree["t10"][1] == 0 and 1 or 2,
+		[2] = talentTree["t15"][1] == 0 and 3 or 4,
+		[3] = talentTree["t20"][1] == 0 and 5 or 6,
+		[4] = talentTree["t25"][1] == 0 and 7 or 8,
+		[5] = talentTree["t10"][1] == 0 and 2 or 1,
+		[6] = talentTree["t15"][1] == 0 and 4 or 3,
+		[7] = talentTree["t20"][1] == 0 and 6 or 5,
+		[8] = talentTree["t25"][1] == 0 and 8 or 7,
 	}
-	return p
+	return talentBuild
 end
-function b.GetSkillList(h, q, e, p)
-	local r = GetBot():GetUnitName()
-	local s = {}
-	local t = 1
-	local u = 1
-	local v = #q + #p
-	for f = 1, v do
-		if f >= 10 and (f % 5 == 0 or u > #q) then
-			s[f] = e[p[t]]
-			t = t + 1
+function Skill.GetSkillList(abilityList, abilityBuild, talentList, talentBuild)
+	local heroName = GetBot():GetUnitName()
+	local skillList = {}
+	local talentIndex = 1
+	local abilityIndex = 1
+	local totalPoints = #abilityBuild + #talentBuild
+	for point = 1, totalPoints do
+		if point >= 10 and (point % 5 == 0 or abilityIndex > #abilityBuild) then
+			skillList[point] = talentList[talentBuild[talentIndex]]
+			talentIndex = talentIndex + 1
 		else
-			if u <= #q then
-				s[f] = h[q[u]]
-				u = u + 1
+			if abilityIndex <= #abilityBuild then
+				skillList[point] = abilityList[abilityBuild[abilityIndex]]
+				abilityIndex = abilityIndex + 1
 			end
 		end
 	end
-	if r == "npc_dota_hero_meepo" then
-		s = {
-			[1] = h[q[1]],
-			[2] = h[q[2]],
-			[3] = h[q[3]],
-			[4] = h[q[4]],
-			[5] = h[q[5]],
-			[6] = h[q[6]],
-			[7] = h[q[7]],
-			[8] = h[q[8]],
-			[9] = h[q[9]],
-			[10] = h[q[10]],
-			[11] = e[p[1]],
-			[12] = h[q[11]],
-			[13] = h[q[12]],
-			[14] = h[q[13]],
-			[15] = e[p[2]],
-			[16] = h[q[14]],
-			[17] = h[q[15]],
-			[18] = e[p[3]],
-			[19] = e[p[4]],
-			[20] = e[p[5]],
-			[21] = e[p[6]],
-			[22] = e[p[7]],
-			[23] = e[p[8]],
-			[24] = h[q[16]],
-			[25] = e[p[3]],
-			[26] = e[p[4]],
-			[27] = e[p[5]],
-			[28] = e[p[6]],
-			[29] = e[p[7]],
-			[30] = e[p[8]],
+	if heroName == "npc_dota_hero_meepo" then
+		skillList = {
+			[1] = abilityList[abilityBuild[1]],
+			[2] = abilityList[abilityBuild[2]],
+			[3] = abilityList[abilityBuild[3]],
+			[4] = abilityList[abilityBuild[4]],
+			[5] = abilityList[abilityBuild[5]],
+			[6] = abilityList[abilityBuild[6]],
+			[7] = abilityList[abilityBuild[7]],
+			[8] = abilityList[abilityBuild[8]],
+			[9] = abilityList[abilityBuild[9]],
+			[10] = abilityList[abilityBuild[10]],
+			[11] = talentList[talentBuild[1]],
+			[12] = abilityList[abilityBuild[11]],
+			[13] = abilityList[abilityBuild[12]],
+			[14] = abilityList[abilityBuild[13]],
+			[15] = talentList[talentBuild[2]],
+			[16] = abilityList[abilityBuild[14]],
+			[17] = abilityList[abilityBuild[15]],
+			[18] = talentList[talentBuild[3]],
+			[19] = talentList[talentBuild[4]],
+			[20] = talentList[talentBuild[5]],
+			[21] = talentList[talentBuild[6]],
+			[22] = talentList[talentBuild[7]],
+			[23] = talentList[talentBuild[8]],
+			[24] = abilityList[abilityBuild[16]],
+			[25] = talentList[talentBuild[3]],
+			[26] = talentList[talentBuild[4]],
+			[27] = talentList[talentBuild[5]],
+			[28] = talentList[talentBuild[6]],
+			[29] = talentList[talentBuild[7]],
+			[30] = talentList[talentBuild[8]],
 		}
 	end
-	if r == "npc_dota_hero_invoker" then
+	if heroName == "npc_dota_hero_invoker" then
 		-- Indexed by ability point, not hero level. Since 7.41b Invoker gets an
 		-- extra point at levels 6, 12 and 18, so the level 10/15/20/25 talents
 		-- are his 11th, 17th, 23rd and 28th points.
 		local tTalentAtPoint = { [11] = 1, [17] = 2, [23] = 3, [28] = 4, [29] = 5, [30] = 6, [31] = 7, [32] = 8 }
-		s = {}
+		skillList = {}
 		local nAbility = 1
-		for nPoint = 1, #q + 8 do
+		for nPoint = 1, #abilityBuild + 8 do
 			if tTalentAtPoint[nPoint] then
-				s[nPoint] = e[p[tTalentAtPoint[nPoint]]]
+				skillList[nPoint] = talentList[talentBuild[tTalentAtPoint[nPoint]]]
 			else
-				s[nPoint] = h[q[nAbility]]
+				skillList[nPoint] = abilityList[abilityBuild[nAbility]]
 				nAbility = nAbility + 1
 			end
 		end
 	end
-	return s
+	return skillList
 end
-function b.IsHeroInEnemyTeam(w)
-	for x, y in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		if GetSelectedHeroName(y) == w then
+function Skill.IsHeroInEnemyTeam(heroName)
+	for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+		if GetSelectedHeroName(playerId) == heroName then
 			return true
 		end
 	end
 	return false
 end
-function b.GetOutfitName(d)
-	return "item_" .. string.gsub(d:GetUnitName(), "npc_dota_hero_", "") .. "_outfit"
+function Skill.GetOutfitName(hero)
+	return "item_" .. string.gsub(hero:GetUnitName(), "npc_dota_hero_", "") .. "_outfit"
 end
-return b
+return Skill

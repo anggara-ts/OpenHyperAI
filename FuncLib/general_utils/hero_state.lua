@@ -1,57 +1,57 @@
 -- Shared helper: hero state.
-local function a(b)
-	function b.HasQueuedAction(c)
-		if c ~= GetBot() then
+local function installHeroState(Fu)
+	function Fu.HasQueuedAction(bot)
+		if bot ~= GetBot() then
 			return false
 		end
-		return c:NumQueuedActions() > 0
+		return bot:NumQueuedActions() > 0
 	end
-	function b.IsTryingtoUseAbility(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsTryingtoUseAbility(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return c:IsCastingAbility() or c:IsUsingAbility() or c:IsChanneling()
+		return unit:IsCastingAbility() or unit:IsUsingAbility() or unit:IsChanneling()
 	end
-	function b.CanNotUseAction(c)
-		if not b.IsUnitValid(c) then
+	function Fu.CanNotUseAction(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return not c:IsAlive()
-			or b.HasQueuedAction(c)
-			or c:IsInvulnerable() and not c:HasModifier("modifier_fountain_invulnerability") and not c:HasModifier(
+		return not unit:IsAlive()
+			or Fu.HasQueuedAction(unit)
+			or unit:IsInvulnerable() and not unit:HasModifier("modifier_fountain_invulnerability") and not unit:HasModifier(
 				"modifier_dazzle_nothl_projection_soul_debuff"
 			)
-			or c:IsCastingAbility()
-			or c:IsUsingAbility()
-			or c:IsChanneling()
-			or c:IsStunned() and not c:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
-			or c:IsNightmared()
-			or c:HasModifier("modifier_ringmaster_the_box_buff")
-			or c:HasModifier("modifier_item_forcestaff_active")
-			or c:HasModifier("modifier_phantom_lancer_phantom_edge_boost")
-			or c:HasModifier("modifier_tinker_rearm")
+			or unit:IsCastingAbility()
+			or unit:IsUsingAbility()
+			or unit:IsChanneling()
+			or unit:IsStunned() and not unit:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
+			or unit:IsNightmared()
+			or unit:HasModifier("modifier_ringmaster_the_box_buff")
+			or unit:HasModifier("modifier_item_forcestaff_active")
+			or unit:HasModifier("modifier_phantom_lancer_phantom_edge_boost")
+			or unit:HasModifier("modifier_tinker_rearm")
 	end
-	function b.CanNotUseAbility(c)
-		if not b.IsUnitValid(c) then
+	function Fu.CanNotUseAbility(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return not c:IsAlive()
-			or b.HasQueuedAction(c)
-			or c:IsInvulnerable() and not c:HasModifier("modifier_fountain_invulnerability") and not c:HasModifier(
+		return not unit:IsAlive()
+			or Fu.HasQueuedAction(unit)
+			or unit:IsInvulnerable() and not unit:HasModifier("modifier_fountain_invulnerability") and not unit:HasModifier(
 				"modifier_dazzle_nothl_projection_soul_debuff"
 			)
-			or c:IsCastingAbility()
-			or c:IsUsingAbility()
-			or c:IsChanneling()
-			or c:IsSilenced()
-			or c:IsStunned() and not c:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
-			or c:IsHexed()
-			or c:IsNightmared()
-			or c:HasModifier("modifier_ringmaster_the_box_buff")
-			or c:HasModifier("modifier_doom_bringer_doom")
-			or c:HasModifier("modifier_item_forcestaff_active")
+			or unit:IsCastingAbility()
+			or unit:IsUsingAbility()
+			or unit:IsChanneling()
+			or unit:IsSilenced()
+			or unit:IsStunned() and not unit:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
+			or unit:IsHexed()
+			or unit:IsNightmared()
+			or unit:HasModifier("modifier_ringmaster_the_box_buff")
+			or unit:HasModifier("modifier_doom_bringer_doom")
+			or unit:HasModifier("modifier_item_forcestaff_active")
 	end
-	local d = {
+	local damageOverTimeModifiers = {
 		"modifier_viper_corrosive_skin_slow",
 		"modifier_viper_poison_attack_slow",
 		"modifier_venomancer_poison_sting_debuff",
@@ -68,118 +68,118 @@ local function a(b)
 		"modifier_ogre_magi_ignite",
 		"modifier_batrider_napalm",
 	}
-	function b.HasDamageOverTimeDebuff(c)
-		if not b.IsUnitValid(c) then
+	function Fu.HasDamageOverTimeDebuff(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		for e, f in pairs(d) do
-			if c:HasModifier(f) then
+		for _, modifierName in pairs(damageOverTimeModifiers) do
+			if unit:HasModifier(modifierName) then
 				return true
 			end
 		end
 		return false
 	end
-	local g = {}
-	local h = {}
-	local function i(j, c, k)
-		local l = c:GetPlayerID()
-		if j[l] and DotaTime() < j[l] then
+	local towerAggroCooldowns = {}
+	local denyCooldowns = {}
+	local function IsOnCooldown(cooldowns, bot, duration)
+		local playerId = bot:GetPlayerID()
+		if cooldowns[playerId] and DotaTime() < cooldowns[playerId] then
 			return true
 		end
 		return false
 	end
-	local function m(j, c, k)
-		j[c:GetPlayerID()] = DotaTime() + k
+	local function StartCooldown(cooldowns, bot, duration)
+		cooldowns[bot:GetPlayerID()] = DotaTime() + duration
 	end
-	function b.TryDropTowerAggro(c)
-		if i(g, c, 0) then
+	function Fu.TryDropTowerAggro(bot)
+		if IsOnCooldown(towerAggroCooldowns, bot, 0) then
 			return false
 		end
-		local n = c:GetNearbyTowers(900, true)
-		if n == nil or #n == 0 then
+		local nearbyTowers = bot:GetNearbyTowers(900, true)
+		if nearbyTowers == nil or #nearbyTowers == 0 then
 			return false
 		end
-		for e, o in pairs(n) do
-			if b.IsValidBuilding(o) and o:GetAttackTarget() == c then
+		for _, tower in pairs(nearbyTowers) do
+			if Fu.IsValidBuilding(tower) and tower:GetAttackTarget() == bot then
 				-- Only a creep already in attack range: walking up to one kept the hero under the
 				-- tower longer. (It also right-clicked allied heroes; gone.)
-				local p = c:GetNearbyLaneCreeps(c:GetAttackRange() + 250, false)
-				for e, q in pairs(p) do
+				local nearbyAllyCreeps = bot:GetNearbyLaneCreeps(bot:GetAttackRange() + 250, false)
+				for _, creep in pairs(nearbyAllyCreeps) do
 					if
-						b.IsValid(q)
-						and GetUnitToUnitDistance(q, o) <= (o:GetAttackRange() or 700)
-						and GetUnitToUnitDistance(c, q) <= c:GetAttackRange() + 50
+						Fu.IsValid(creep)
+						and GetUnitToUnitDistance(creep, tower) <= (tower:GetAttackRange() or 700)
+						and GetUnitToUnitDistance(bot, creep) <= bot:GetAttackRange() + 50
 					then
-						c:Action_AttackUnit(q, true)
-						m(g, c, 1.5)
+						bot:Action_AttackUnit(creep, true)
+						StartCooldown(towerAggroCooldowns, bot, 1.5)
 						return true
 					end
 				end
-				local t = b.AdjustLocationWithOffsetTowardsFountain(c:GetLocation(), 500)
-				c:Action_MoveToLocation(t)
-				m(g, c, 1.5)
+				local retreatLocation = Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 500)
+				bot:Action_MoveToLocation(retreatLocation)
+				StartCooldown(towerAggroCooldowns, bot, 1.5)
 				return true
 			end
 		end
 		return false
 	end
-	function b.TryDenyTower(c)
-		if i(h, c, 0) then
+	function Fu.TryDenyTower(bot)
+		if IsOnCooldown(denyCooldowns, bot, 0) then
 			return false
 		end
-		local n = c:GetNearbyTowers(700, false)
-		if n == nil then
+		local nearbyTowers = bot:GetNearbyTowers(700, false)
+		if nearbyTowers == nil then
 			return false
 		end
-		local u = GetTeam()
-		for e, o in pairs(n) do
+		local team = GetTeam()
+		for _, tower in pairs(nearbyTowers) do
 			if
-				b.IsValidBuilding(o)
-				and b.CanBeAttacked(o)
-				and o ~= GetTower(u, TOWER_TOP_3)
-				and o ~= GetTower(u, TOWER_MID_3)
-				and o ~= GetTower(u, TOWER_BOT_3)
-				and o ~= GetTower(u, TOWER_BASE_1)
-				and o ~= GetTower(u, TOWER_BASE_2)
-				and not o:HasModifier("modifier_backdoor_protection")
-				and not o:HasModifier("modifier_backdoor_protection_in_base")
-				and o:GetHealth() < o:GetMaxHealth() * 0.07
+				Fu.IsValidBuilding(tower)
+				and Fu.CanBeAttacked(tower)
+				and tower ~= GetTower(team, TOWER_TOP_3)
+				and tower ~= GetTower(team, TOWER_MID_3)
+				and tower ~= GetTower(team, TOWER_BOT_3)
+				and tower ~= GetTower(team, TOWER_BASE_1)
+				and tower ~= GetTower(team, TOWER_BASE_2)
+				and not tower:HasModifier("modifier_backdoor_protection")
+				and not tower:HasModifier("modifier_backdoor_protection_in_base")
+				and tower:GetHealth() < tower:GetMaxHealth() * 0.07
 			then
-				c:Action_AttackUnit(o, false)
+				bot:Action_AttackUnit(tower, false)
 				return true
 			end
 		end
 		return false
 	end
-	function b.TryDenyAllyHero(c)
-		if i(h, c, 0) then
+	function Fu.TryDenyAllyHero(bot)
+		if IsOnCooldown(denyCooldowns, bot, 0) then
 			return false
 		end
-		local v = c:GetNearbyHeroes(700, false, BOT_MODE_NONE)
-		if v == nil then
+		local nearbyAllies = bot:GetNearbyHeroes(700, false, BOT_MODE_NONE)
+		if nearbyAllies == nil then
 			return false
 		end
-		for e, s in pairs(v) do
+		for _, ally in pairs(nearbyAllies) do
 			if
-				b.IsValidHero(s)
-				and s ~= c
-				and b.CanBeAttacked(s)
-				and b.GetHP(s) < 0.05
+				Fu.IsValidHero(ally)
+				and ally ~= bot
+				and Fu.CanBeAttacked(ally)
+				and Fu.GetHP(ally) < 0.05
 				and (
-					s:HasModifier("modifier_doom_bringer_doom")
-					or s:HasModifier("modifier_queenofpain_shadow_strike")
-					or s:HasModifier("modifier_venomancer_venomous_gale")
-					or s:HasModifier("modifier_venomancer_poison_sting_debuff")
+					ally:HasModifier("modifier_doom_bringer_doom")
+					or ally:HasModifier("modifier_queenofpain_shadow_strike")
+					or ally:HasModifier("modifier_venomancer_venomous_gale")
+					or ally:HasModifier("modifier_venomancer_poison_sting_debuff")
 				)
 			then
-				c:Action_AttackUnit(s, false)
-				m(h, c, 2.0)
+				bot:Action_AttackUnit(ally, false)
+				StartCooldown(denyCooldowns, bot, 2.0)
 				return true
 			end
 		end
 		return false
 	end
-	local w = {
+	local undyingModifiers = {
 		"modifier_abaddon_borrowed_time",
 		"modifier_dazzle_shallow_grave",
 		"modifier_wind_waker",
@@ -187,16 +187,16 @@ local function a(b)
 		"modifier_oracle_false_promise_timer",
 		"modifier_item_aeon_disk_buff",
 	}
-	local x = 0
-	function b.HasMovableUndyingModifier(y, z)
-		if not b.IsUnitValid(y) then
+	local modifierTime = 0
+	function Fu.HasMovableUndyingModifier(unit, minDuration)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		for e, A in pairs(w) do
-			if y:HasModifier(A) then
-				x = b.GetModifierTime(y, A)
-				if x > 0 then
-					if x > z then
+		for _, modifierName in pairs(undyingModifiers) do
+			if unit:HasModifier(modifierName) then
+				modifierTime = Fu.GetModifierTime(unit, modifierName)
+				if modifierTime > 0 then
+					if modifierTime > minDuration then
 						return true
 					end
 					return false
@@ -205,331 +205,331 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsWithoutTarget(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsWithoutTarget(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return c:CanBeSeen()
-			and c:GetAttackTarget() == nil
-			and (c:GetTeam() == GetBot():GetTeam() and c:GetTarget() == nil)
+		return unit:CanBeSeen()
+			and unit:GetAttackTarget() == nil
+			and (unit:GetTeam() == GetBot():GetTeam() and unit:GetTarget() == nil)
 	end
-	function b.IsUnderLongDurationStun(B)
-		if not b.IsUnitValid(B) then
+	function Fu.IsUnderLongDurationStun(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return B:HasModifier("modifier_bane_fiends_grip")
-			or B:HasModifier("modifier_legion_commander_duel")
-			or B:HasModifier("modifier_enigma_black_hole_pull")
-			or B:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			or B:HasModifier("modifier_magnataur_reverse_polarity")
-			or B:HasModifier("modifier_tidehunter_ravage")
-			or B:HasModifier("modifier_winter_wyvern_winters_curse_aura")
+		return unit:HasModifier("modifier_bane_fiends_grip")
+			or unit:HasModifier("modifier_legion_commander_duel")
+			or unit:HasModifier("modifier_enigma_black_hole_pull")
+			or unit:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			or unit:HasModifier("modifier_magnataur_reverse_polarity")
+			or unit:HasModifier("modifier_tidehunter_ravage")
+			or unit:HasModifier("modifier_winter_wyvern_winters_curse_aura")
 	end
-	function b.IsInEtherealForm(C)
-		if not b.IsUnitValid(C) then
+	function Fu.IsInEtherealForm(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return C:HasModifier("modifier_ghost_state")
-			or C:HasModifier("modifier_item_ethereal_blade_ethereal")
-			or C:HasModifier("modifier_necrolyte_death_seeker")
-			or C:HasModifier("modifier_necrolyte_sadist_active")
-			or C:HasModifier("modifier_pugna_decrepify")
+		return unit:HasModifier("modifier_ghost_state")
+			or unit:HasModifier("modifier_item_ethereal_blade_ethereal")
+			or unit:HasModifier("modifier_necrolyte_death_seeker")
+			or unit:HasModifier("modifier_necrolyte_sadist_active")
+			or unit:HasModifier("modifier_pugna_decrepify")
 	end
-	function b.HasForbiddenModifier(C)
-		if not b.IsUnitValid(C) then
+	function Fu.HasForbiddenModifier(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		for e, f in pairs(b.Buff["enemy_is_immune"]) do
-			if C:HasModifier(f) then
+		for _, modifierName in pairs(Fu.Buff["enemy_is_immune"]) do
+			if unit:HasModifier(modifierName) then
 				return true
 			end
 		end
-		if C:IsHero() then
-			local D = b.GetNearbyHeroes(C, 800, false, BOT_MODE_NONE)
-			if D ~= nil and #D >= 2 then
-				for e, f in pairs(b.Buff["enemy_is_undead"]) do
-					if C:HasModifier(f) then
+		if unit:IsHero() then
+			local nearbyAllies = Fu.GetNearbyHeroes(unit, 800, false, BOT_MODE_NONE)
+			if nearbyAllies ~= nil and #nearbyAllies >= 2 then
+				for _, modifierName in pairs(Fu.Buff["enemy_is_undead"]) do
+					if unit:HasModifier(modifierName) then
 						return true
 					end
 				end
 			end
-			if not C:IsBot() then
-				local E = C:GetPlayerID()
-				local F = GetHeroKills(E)
-				local G = GetHeroDeaths(E)
-				if G >= 6 and F <= 6 and F / G <= 0.3 then
+			if not unit:IsBot() then
+				local playerId = unit:GetPlayerID()
+				local kills = GetHeroKills(playerId)
+				local deaths = GetHeroDeaths(playerId)
+				if deaths >= 6 and kills <= 6 and kills / deaths <= 0.3 then
 					return true
 				end
 			end
 		else
-			if C:HasModifier("modifier_crystal_maiden_frostbite") or C:HasModifier("modifier_fountain_glyph") then
+			if unit:HasModifier("modifier_crystal_maiden_frostbite") or unit:HasModifier("modifier_fountain_glyph") then
 				return true
 			end
 		end
 		return false
 	end
-	function b.ShouldEscape(c)
-		if not b.IsUnitValid(c) then
+	function Fu.ShouldEscape(bot)
+		if not Fu.IsUnitValid(bot) then
 			return false
 		end
-		local H = b.GetNearbyHeroes(c, 800, false, BOT_MODE_ATTACK)
-		if #H > 0 and b.GetHP(c) > 0.16 then
+		local attackingAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_ATTACK)
+		if #attackingAllies > 0 and Fu.GetHP(bot) > 0.16 then
 			return false
 		end
-		local I = b.GetNearbyHeroes(c, 1000, true, BOT_MODE_NONE)
-		if c:WasRecentlyDamagedByAnyHero(2.0) or c:WasRecentlyDamagedByTower(2.0) or #I >= 2 then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		if bot:WasRecentlyDamagedByAnyHero(2.0) or bot:WasRecentlyDamagedByTower(2.0) or #nearbyEnemies >= 2 then
 			return true
 		end
 	end
-	function b.IsDisabled(C)
-		if not b.IsUnitValid(C) then
+	function Fu.IsDisabled(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		if C:GetTeam() ~= GetTeam() and C:CanBeSeen() then
-			return C:IsRooted() or C:IsStunned() or C:IsHexed() or C:IsNightmared() or b.IsTaunted(C)
+		if unit:GetTeam() ~= GetTeam() and unit:CanBeSeen() then
+			return unit:IsRooted() or unit:IsStunned() or unit:IsHexed() or unit:IsNightmared() or Fu.IsTaunted(unit)
 		else
-			if C:IsStunned() and b.GetRemainStunTime(C) > 0.8 then
+			if unit:IsStunned() and Fu.GetRemainStunTime(unit) > 0.8 then
 				return true
 			end
 			if
-				C:IsSilenced()
-				and not C:HasModifier("modifier_item_mask_of_madness_berserk")
-				and b.IsWithoutTarget(C)
+				unit:IsSilenced()
+				and not unit:HasModifier("modifier_item_mask_of_madness_berserk")
+				and Fu.IsWithoutTarget(unit)
 			then
 				return true
 			end
-			return C:IsRooted() or C:IsHexed() or C:IsNightmared() or b.IsTaunted(C)
+			return unit:IsRooted() or unit:IsHexed() or unit:IsNightmared() or Fu.IsTaunted(unit)
 		end
 	end
-	function b.IsTaunted(C)
-		if not b.IsUnitValid(C) then
+	function Fu.IsTaunted(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		if not C:CanBeSeen() then
+		if not unit:CanBeSeen() then
 			return false
 		end
-		return C:HasModifier("modifier_axe_berserkers_call")
-			or C:HasModifier("modifier_legion_commander_duel")
-			or C:HasModifier("modifier_winter_wyvern_winters_curse")
-			or C:HasModifier("modifier_winter_wyvern_winters_curse_aura")
+		return unit:HasModifier("modifier_axe_berserkers_call")
+			or unit:HasModifier("modifier_legion_commander_duel")
+			or unit:HasModifier("modifier_winter_wyvern_winters_curse")
+			or unit:HasModifier("modifier_winter_wyvern_winters_curse_aura")
 	end
-	function b.IsMoving(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsMoving(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		if not c:IsAlive() then
+		if not unit:IsAlive() then
 			return false
 		end
-		local J = c:GetExtrapolatedLocation(0.6)
-		if GetUnitToLocationDistance(c, J) > c:GetCurrentMovementSpeed() * 0.45 then
+		local futureLocation = unit:GetExtrapolatedLocation(0.6)
+		if GetUnitToLocationDistance(unit, futureLocation) > unit:GetCurrentMovementSpeed() * 0.45 then
 			return true
 		end
 		return false
 	end
-	function b.IsRunning(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsRunning(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		if not c:IsAlive() then
+		if not unit:IsAlive() then
 			return false
 		end
-		return c:GetAnimActivity() == ACTIVITY_RUN
+		return unit:GetAnimActivity() == ACTIVITY_RUN
 	end
-	function b.IsAttacking(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsAttacking(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local K = c:GetAnimActivity()
-		if K ~= ACTIVITY_ATTACK and K ~= ACTIVITY_ATTACK2 then
+		local activity = unit:GetAnimActivity()
+		if activity ~= ACTIVITY_ATTACK and activity ~= ACTIVITY_ATTACK2 then
 			return false
 		end
-		if c:GetAttackPoint() > c:GetAnimCycle() * 0.99 then
+		if unit:GetAttackPoint() > unit:GetAnimCycle() * 0.99 then
 			return true
 		end
 		return false
 	end
-	function b.IsChasingTarget(c, L)
-		if not b.IsUnitValid(c) then
+	function Fu.IsChasingTarget(unit, target)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
 		if
-			b.IsRunning(c)
-			and b.IsRunning(L)
-			and c:IsFacingLocation(L:GetLocation(), 20)
-			and not L:IsFacingLocation(c:GetLocation(), 150)
+			Fu.IsRunning(unit)
+			and Fu.IsRunning(target)
+			and unit:IsFacingLocation(target:GetLocation(), 20)
+			and not target:IsFacingLocation(unit:GetLocation(), 150)
 		then
 			return true
 		end
 		return false
 	end
-	function b.IsRealInvisible(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsRealInvisible(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local M = c:GetNearbyTowers(880, true)
+		local nearbyEnemyTowers = unit:GetNearbyTowers(880, true)
 		if
-			c:IsInvisible()
-			and not c:HasModifier("modifier_item_dustofappearance")
-			and not c:HasModifier("modifier_bloodseeker_thirst_vision")
-			and not c:HasModifier("modifier_slardar_amplify_damage")
-			and not c:HasModifier("modifier_sniper_assassinate")
-			and not c:HasModifier("modifier_bounty_hunter_track")
-			and not c:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and #M == 0
+			unit:IsInvisible()
+			and not unit:HasModifier("modifier_item_dustofappearance")
+			and not unit:HasModifier("modifier_bloodseeker_thirst_vision")
+			and not unit:HasModifier("modifier_slardar_amplify_damage")
+			and not unit:HasModifier("modifier_sniper_assassinate")
+			and not unit:HasModifier("modifier_bounty_hunter_track")
+			and not unit:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and #nearbyEnemyTowers == 0
 		then
 			return true
 		end
 		return false
 	end
-	function b.GetModifierTime(c, N)
-		if not b.IsUnitValid(c) then
+	function Fu.GetModifierTime(unit, modifierName)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		if not c:HasModifier(N) then
+		if not unit:HasModifier(modifierName) then
 			return 0
 		end
-		local O = c:NumModifiers()
-		for P = 0, O do
-			if c:GetModifierName(P) == N then
-				return c:GetModifierRemainingDuration(P)
+		local modifierCount = unit:NumModifiers()
+		for i = 0, modifierCount do
+			if unit:GetModifierName(i) == modifierName then
+				return unit:GetModifierRemainingDuration(i)
 			end
 		end
 		return 0
 	end
-	function b.GetModifierCount(c, N)
-		if not b.IsUnitValid(c) then
+	function Fu.GetModifierCount(unit, modifierName)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		if not c:HasModifier(N) then
+		if not unit:HasModifier(modifierName) then
 			return 0
 		end
-		local O = c:NumModifiers()
-		for P = 0, O do
-			if c:GetModifierName(P) == N then
-				return c:GetModifierStackCount(P)
+		local modifierCount = unit:NumModifiers()
+		for i = 0, modifierCount do
+			if unit:GetModifierName(i) == modifierName then
+				return unit:GetModifierStackCount(i)
 			end
 		end
 		return 0
 	end
-	function b.GetUniqueModifierCount(c, N)
-		if not b.IsUnitValid(c) then
+	function Fu.GetUniqueModifierCount(unit, modifierName)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		if not c:HasModifier(N) then
+		if not unit:HasModifier(modifierName) then
 			return 0
 		end
-		local Q = 0
-		local O = c:NumModifiers()
-		for P = 0, O do
-			if c:GetModifierName(P) == N then
-				Q = Q + 1
+		local count = 0
+		local modifierCount = unit:NumModifiers()
+		for i = 0, modifierCount do
+			if unit:GetModifierName(i) == modifierName then
+				count = count + 1
 			end
 		end
-		return Q
+		return count
 	end
-	function b.GetRemainStunTime(c)
-		if not b.IsUnitValid(c) then
+	function Fu.GetRemainStunTime(unit)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		if not c:HasModifier("modifier_stunned") then
+		if not unit:HasModifier("modifier_stunned") then
 			return 0
 		end
-		local O = c:NumModifiers()
-		for P = 0, O do
-			if c:GetModifierName(P) == "modifier_stunned" then
-				return c:GetModifierRemainingDuration(P)
+		local modifierCount = unit:NumModifiers()
+		for i = 0, modifierCount do
+			if unit:GetModifierName(i) == "modifier_stunned" then
+				return unit:GetModifierRemainingDuration(i)
 			end
 		end
 		return 0
 	end
-	function b.CannotBeKilled(c, y)
-		if not b.IsUnitValid(c) then
+	function Fu.CannotBeKilled(attacker, target)
+		if not Fu.IsUnitValid(attacker) then
 			return false
 		end
-		return b.IsValidHero(y)
+		return Fu.IsValidHero(target)
 			and (
-				b.GetModifierTime(y, "modifier_dazzle_shallow_grave") > 0.6
-					and b.GetHP(y) < 0.15
-					and (c == nil or c:GetUnitName() ~= "npc_dota_hero_axe")
-				or b.GetModifierTime(y, "modifier_oracle_false_promise_timer") > 0.6
-				or y:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
-				or y:HasModifier("modifier_item_helm_of_the_undying_active")
-				or y:HasModifier("modifier_item_aeon_disk_buff")
-				or y:HasModifier("modifier_abaddon_borrowed_time")
+				Fu.GetModifierTime(target, "modifier_dazzle_shallow_grave") > 0.6
+					and Fu.GetHP(target) < 0.15
+					and (attacker == nil or attacker:GetUnitName() ~= "npc_dota_hero_axe")
+				or Fu.GetModifierTime(target, "modifier_oracle_false_promise_timer") > 0.6
+				or target:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
+				or target:HasModifier("modifier_item_helm_of_the_undying_active")
+				or target:HasModifier("modifier_item_aeon_disk_buff")
+				or target:HasModifier("modifier_abaddon_borrowed_time")
 			)
 	end
-	function b.CanIgnoreLowHp(c)
-		if not b.IsUnitValid(c) then
+	function Fu.CanIgnoreLowHp(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return b.GetModifierTime(c, "modifier_dazzle_shallow_grave") > 0.6
-			or b.GetModifierTime(c, "modifier_oracle_false_promise_timer") > 0.6
+		return Fu.GetModifierTime(unit, "modifier_dazzle_shallow_grave") > 0.6
+			or Fu.GetModifierTime(unit, "modifier_oracle_false_promise_timer") > 0.6
 	end
-	function b.DoesSomeoneHaveModifier(R, S)
-		if not b.IsUnitValid(R) then
+	function Fu.DoesSomeoneHaveModifier(units, modifierName)
+		if not Fu.IsUnitValid(units) then
 			return false
 		end
-		for e, T in pairs(R) do
-			if b.IsValid(T) and T:HasModifier(S) then
+		for _, unit in pairs(units) do
+			if Fu.IsValid(unit) and unit:HasModifier(modifierName) then
 				return true
 			end
 		end
 		return false
 	end
-	function b.DoesUnitHaveTemporaryBuff(U)
-		if not b.IsUnitValid(U) then
+	function Fu.DoesUnitHaveTemporaryBuff(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local V = U:GetUnitName()
-		if V == "npc_dota_hero_huskar" and b.GetHP(U) < 0.6 then
+		local unitName = unit:GetUnitName()
+		if unitName == "npc_dota_hero_huskar" and Fu.GetHP(unit) < 0.6 then
 			return true
 		end
-		for P = 0, U:NumModifiers() do
-			local W = U:GetModifierRemainingDuration(P)
-			if W > 0.5 or W > -1 and W < 0.5 then
+		for i = 0, unit:NumModifiers() do
+			local remainingDuration = unit:GetModifierRemainingDuration(i)
+			if remainingDuration > 0.5 or remainingDuration > -1 and remainingDuration < 0.5 then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsUnitWillGoInvisible(T)
-		if not b.IsUnitValid(T) then
+	function Fu.IsUnitWillGoInvisible(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return T:HasModifier("modifier_sandking_sand_storm")
-			or T:HasModifier("modifier_bounty_hunter_wind_walk")
-			or T:HasModifier("modifier_clinkz_wind_walk")
-			or T:HasModifier("modifier_weaver_shukuchi")
-			or T:HasModifier("modifier_oracle_false_promise") and T:HasModifier("modifier_oracle_false_promise_invis")
-			or T:HasModifier("modifier_windrunner_windrun") and T:HasModifier("modifier_windrunner_windrun_invis")
-			or T:HasModifier("modifier_item_invisibility_edge")
-			or T:HasModifier("modifier_item_invisibility_edge_windwalk")
-			or T:HasModifier("modifier_item_silver_edge")
-			or T:HasModifier("modifier_item_silver_edge_windwalk")
+		return unit:HasModifier("modifier_sandking_sand_storm")
+			or unit:HasModifier("modifier_bounty_hunter_wind_walk")
+			or unit:HasModifier("modifier_clinkz_wind_walk")
+			or unit:HasModifier("modifier_weaver_shukuchi")
+			or unit:HasModifier("modifier_oracle_false_promise") and unit:HasModifier("modifier_oracle_false_promise_invis")
+			or unit:HasModifier("modifier_windrunner_windrun") and unit:HasModifier("modifier_windrunner_windrun_invis")
+			or unit:HasModifier("modifier_item_invisibility_edge")
+			or unit:HasModifier("modifier_item_invisibility_edge_windwalk")
+			or unit:HasModifier("modifier_item_silver_edge")
+			or unit:HasModifier("modifier_item_silver_edge_windwalk")
 			-- Moonlight Shadow (game files: modifier_mirana_moonlight_shadow; datafeed: 2.5/2/1.5s fade,
 			-- on Mirana and every allied hero). Game 032, 11:00: not listed, so no Dust came.
-			or T:HasModifier("modifier_mirana_moonlight_shadow")
-			or T:HasModifier("modifier_item_glimmer_cape_fade")
-			or T:HasModifier("modifier_item_glimmer_cape")
-			or T:HasModifier("modifier_item_shadow_amulet")
-			or T:HasModifier("modifier_item_shadow_amulet_fade")
-			or T:HasModifier("modifier_item_trickster_cloak_invis")
+			or unit:HasModifier("modifier_mirana_moonlight_shadow")
+			or unit:HasModifier("modifier_item_glimmer_cape_fade")
+			or unit:HasModifier("modifier_item_glimmer_cape")
+			or unit:HasModifier("modifier_item_shadow_amulet")
+			or unit:HasModifier("modifier_item_shadow_amulet_fade")
+			or unit:HasModifier("modifier_item_trickster_cloak_invis")
 	end
-	function b.HasInvisCounterBuff(T)
-		if not b.IsUnitValid(T) then
+	function Fu.HasInvisCounterBuff(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
 		if
-			T:HasModifier("modifier_item_dustofappearance")
-			or T:HasModifier("modifier_bounty_hunter_track")
-			or T:HasModifier("modifier_bloodseeker_thirst_vision")
-			or T:HasModifier("modifier_slardar_amplify_damage")
-			or T:HasModifier("modifier_sniper_assassinate")
-			or T:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			unit:HasModifier("modifier_item_dustofappearance")
+			or unit:HasModifier("modifier_bounty_hunter_track")
+			or unit:HasModifier("modifier_bloodseeker_thirst_vision")
+			or unit:HasModifier("modifier_slardar_amplify_damage")
+			or unit:HasModifier("modifier_sniper_assassinate")
+			or unit:HasModifier("modifier_faceless_void_chronosphere_freeze")
 		then
 			return true
 		end
 		return false
 	end
 end
-return a
+return installHeroState

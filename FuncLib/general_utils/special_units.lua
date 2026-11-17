@@ -1,6 +1,6 @@
 -- Shared helper: special units.
-local function a(b)
-	local c = {
+local function installSpecialUnits(Fu)
+	local specialUnitWeights = {
 		["npc_dota_clinkz_skeleton_archer"] = 0.75,
 		["npc_dota_juggernaut_healing_ward"] = 0.9,
 		["npc_dota_invoker_forged_spirit"] = 0.9,
@@ -35,14 +35,14 @@ local function a(b)
 		["npc_dota_weaver_swarm"] = 0.9,
 		["npc_dota_zeus_cloud"] = 0.75,
 	}
-	function b.GetSpecialUnits()
-		return c
+	function Fu.GetSpecialUnits()
+		return specialUnitWeights
 	end
-	function b.IsUnitNearby(d, e, f, g, h)
-		for i, j in pairs(e) do
-			if b.IsValid(j) and b.IsInRange(d, j, f) and j:GetUnitName() == g then
-				if h then
-					if b.IsValidHero(j) and not b.IsSuspiciousIllusion(j) then
+	function Fu.IsUnitNearby(bot, units, range, unitName, requireRealHero)
+		for _, unit in pairs(units) do
+			if Fu.IsValid(unit) and Fu.IsInRange(bot, unit, range) and unit:GetUnitName() == unitName then
+				if requireRealHero then
+					if Fu.IsValidHero(unit) and not Fu.IsSuspiciousIllusion(unit) then
 						return true
 					end
 				else
@@ -52,66 +52,66 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsUnitTargetedByTower(k, l)
-		local m = l and UNIT_LIST_ALLIED_BUILDINGS or UNIT_LIST_ENEMY_BUILDINGS
-		local n = GetUnitList(m)
-		for i, o in pairs(n) do
-			if b.IsValidBuilding(o) and o:GetAttackTarget() == k then
+	function Fu.IsUnitTargetedByTower(unit, isAllied)
+		local buildingListType = isAllied and UNIT_LIST_ALLIED_BUILDINGS or UNIT_LIST_ENEMY_BUILDINGS
+		local buildings = GetUnitList(buildingListType)
+		for _, building in pairs(buildings) do
+			if Fu.IsValidBuilding(building) and building:GetAttackTarget() == unit then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsBigCamp(p)
-		for i, q in pairs(p) do
-			if b.IsValid(q) then
+	function Fu.IsBigCamp(neutralCreeps)
+		for _, creep in pairs(neutralCreeps) do
+			if Fu.IsValid(creep) then
 				if
-					q:GetUnitName() == "npc_dota_neutral_satyr_hellcaller"
-					or q:GetUnitName() == "npc_dota_neutral_polar_furbolg_ursa_warrior"
-					or q:GetUnitName() == "npc_dota_neutral_dark_troll_warlord"
-					or q:GetUnitName() == "npc_dota_neutral_centaur_khan"
-					or q:GetUnitName() == "npc_dota_neutral_enraged_wildkin"
-					or q:GetUnitName() == "npc_dota_neutral_warpine_raider"
+					creep:GetUnitName() == "npc_dota_neutral_satyr_hellcaller"
+					or creep:GetUnitName() == "npc_dota_neutral_polar_furbolg_ursa_warrior"
+					or creep:GetUnitName() == "npc_dota_neutral_dark_troll_warlord"
+					or creep:GetUnitName() == "npc_dota_neutral_centaur_khan"
+					or creep:GetUnitName() == "npc_dota_neutral_enraged_wildkin"
+					or creep:GetUnitName() == "npc_dota_neutral_warpine_raider"
 				then
 					return true
 				end
 			end
 		end
 	end
-	function b.GetTechiesMines()
-		local r = {}
-		for i, j in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-			if j ~= nil and j:GetUnitName() == "npc_dota_techies_land_mine" then
-				table.insert(r, j)
+	function Fu.GetTechiesMines()
+		local mines = {}
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+			if unit ~= nil and unit:GetUnitName() == "npc_dota_techies_land_mine" then
+				table.insert(mines, unit)
 			end
 		end
-		return r
+		return mines
 	end
-	function b.GetTechiesMinesInLoc(s, f)
-		local r = {}
-		for i, j in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+	function Fu.GetTechiesMinesInLoc(location, radius)
+		local mines = {}
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
 			if
-				j ~= nil
-				and j:GetUnitName() == "npc_dota_techies_land_mine"
-				and GetUnitToLocationDistance(j, s) <= f
+				unit ~= nil
+				and unit:GetUnitName() == "npc_dota_techies_land_mine"
+				and GetUnitToLocationDistance(unit, location) <= radius
 			then
-				table.insert(r, j)
+				table.insert(mines, unit)
 			end
 		end
-		return r
+		return mines
 	end
-	function b.GetPowerCogsCountInLoc(s, f)
-		local t = 0
-		for i, j in pairs(GetUnitList(UNIT_LIST_ALL)) do
+	function Fu.GetPowerCogsCountInLoc(location, radius)
+		local cogCount = 0
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALL)) do
 			if
-				b.IsValid(j)
-				and string.find(j:GetUnitName(), "rattletrap_cog")
-				and GetUnitToLocationDistance(j, s) <= f
+				Fu.IsValid(unit)
+				and string.find(unit:GetUnitName(), "rattletrap_cog")
+				and GetUnitToLocationDistance(unit, location) <= radius
 			then
-				t = t + 1
+				cogCount = cogCount + 1
 			end
 		end
-		return t
+		return cogCount
 	end
 end
-return a
+return installSpecialUnits

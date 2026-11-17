@@ -1,18 +1,18 @@
 -- Earth Spirit: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_2"] = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
+local tAllAbilityBuildList = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -34,7 +34,7 @@ m["pos_2"] = {
 	"item_sheepstick",
 	"item_travel_boots_2",
 }
-m["pos_1"] = {
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -55,7 +55,7 @@ m["pos_1"] = {
 	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
-m["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tank_outfit",
 	"item_aghanims_shard",
 	"item_crimson_guard",
@@ -68,7 +68,7 @@ m["pos_3"] = {
 	"item_heart",
 	"item_travel_boots_2",
 }
-m["pos_4"] = {
+sRoleItemsBuyList["pos_4"] = {
 	"item_priest_outfit",
 	"item_mekansm",
 	"item_glimmer_cape",
@@ -83,7 +83,7 @@ m["pos_4"] = {
 	"item_moon_shard",
 	"item_wind_waker",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
@@ -98,46 +98,46 @@ m["pos_5"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_travel_boots", "item_quelling_blade", "item_abyssal_blade", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_travel_boots", "item_quelling_blade", "item_abyssal_blade", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	if e.IsValidUnit(n) then
-		if c.IsValidHero(n) and n:IsIllusion() then
-			e.IllusionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	if Minion.IsValidUnit(hMinionUnit) then
+		if Fu.IsValidHero(hMinionUnit) and hMinionUnit:IsIllusion() then
+			Minion.IllusionThink(hMinionUnit)
 		end
 	end
 end
-local o = SafeAbility(b:GetAbilityByName("earth_spirit_boulder_smash"), "earth_spirit_boulder_smash", "earth_spirit")
-local p =
-	SafeAbility(b:GetAbilityByName("earth_spirit_rolling_boulder"), "earth_spirit_rolling_boulder", "earth_spirit")
-local q =
-	SafeAbility(b:GetAbilityByName("earth_spirit_geomagnetic_grip"), "earth_spirit_geomagnetic_grip", "earth_spirit")
-local r = SafeAbility(b:GetAbilityByName("earth_spirit_stone_caller"), "earth_spirit_stone_caller", "earth_spirit")
-local s = SafeAbility(b:GetAbilityByName("earth_spirit_magnetize"), "earth_spirit_magnetize", "earth_spirit")
-local t = SafeAbility(
-	b:GetAbilityByName("special_bonus_unique_earth_spirit_2"),
+local boulderSmashAbility = SafeAbility(bot:GetAbilityByName("earth_spirit_boulder_smash"), "earth_spirit_boulder_smash", "earth_spirit")
+local rollingBoulderAbility =
+	SafeAbility(bot:GetAbilityByName("earth_spirit_rolling_boulder"), "earth_spirit_rolling_boulder", "earth_spirit")
+local geomagneticGripAbility =
+	SafeAbility(bot:GetAbilityByName("earth_spirit_geomagnetic_grip"), "earth_spirit_geomagnetic_grip", "earth_spirit")
+local stoneRemnantAbility = SafeAbility(bot:GetAbilityByName("earth_spirit_stone_caller"), "earth_spirit_stone_caller", "earth_spirit")
+local magnetizeAbility = SafeAbility(bot:GetAbilityByName("earth_spirit_magnetize"), "earth_spirit_magnetize", "earth_spirit")
+local talentUnique2 = SafeAbility(
+	bot:GetAbilityByName("special_bonus_unique_earth_spirit_2"),
 	"special_bonus_unique_earth_spirit_2",
 	"earth_spirit"
 )
-local u = SafeAbility(b:GetAbilityByName("earth_spirit_petrify"), "earth_spirit_petrify", "earth_spirit")
-local v, w, x, y
-local z, A, B
-local C, D, E
-local F
-local G
-local H
-local I
-local J = 0
-local K
-local L
-local M
+local enchantRemnantAbility = SafeAbility(bot:GetAbilityByName("earth_spirit_petrify"), "earth_spirit_petrify", "earth_spirit")
+local boulderSmashDesire, boulderSmashLocation, boulderSmashNeedsStone, boulderSmashReady
+local rollingBoulderDesire, rollingBoulderLocation, rollingBoulderNeedsStone
+local geomagneticGripDesire, geomagneticGripTarget, geomagneticGripNeedsStone
+local unusedDesire
+local enchantRemnantDesire
+local magnetizeDesire
+local unusedState
+local stoneCharges = 0
+local botTarget
+local isGoingOnSomeone
+local isRetreating
 -- One throttled log line per kind, so the new casts below can be seen in a game.
 local esLogAt = {}
 local function LogES(kind, fmt, ...)
@@ -150,171 +150,171 @@ local function LogES(kind, fmt, ...)
 		pcall(print, msg)
 	end
 end
-function a.SkillsComplement()
-	local N = d.Build(b)
-	L = N.isEngaging
-	M = N.isRetreating
-	if b:IsUsingAbility() or b:IsChanneling() or b:IsSilenced() or b:NumQueuedActions() > 0 then
+function X.SkillsComplement()
+	local context = AbilityContext.Build(bot)
+	isGoingOnSomeone = context.isEngaging
+	isRetreating = context.isRetreating
+	if bot:IsUsingAbility() or bot:IsChanneling() or bot:IsSilenced() or bot:NumQueuedActions() > 0 then
 		return
 	end
-	if r:IsFullyCastable() then
-		J = 1
+	if stoneRemnantAbility:IsFullyCastable() then
+		stoneCharges = 1
 	else
-		J = 0
+		stoneCharges = 0
 	end
-	G, EnchantTarget = a.ConsiderEchantRemnant()
-	if G > 0 then
-		b:ActionQueue_UseAbilityOnEntity(u, EnchantTarget)
-		b:ActionQueue_UseAbilityOnLocation(o, b:GetLocation() + RandomVector(800))
+	enchantRemnantDesire, EnchantTarget = X.ConsiderEchantRemnant()
+	if enchantRemnantDesire > 0 then
+		bot:ActionQueue_UseAbilityOnEntity(enchantRemnantAbility, EnchantTarget)
+		bot:ActionQueue_UseAbilityOnLocation(boulderSmashAbility, bot:GetLocation() + RandomVector(800))
 		return
 	end
-	z, A, B = a.ConsiderRollingBoulder()
-	if z > 0 then
-		if B then
-			b:Action_ClearActions(false)
-			b:ActionQueue_UseAbilityOnLocation(r, b:GetLocation())
-			b:ActionQueue_UseAbilityOnLocation(p, A)
+	rollingBoulderDesire, rollingBoulderLocation, rollingBoulderNeedsStone = X.ConsiderRollingBoulder()
+	if rollingBoulderDesire > 0 then
+		if rollingBoulderNeedsStone then
+			bot:Action_ClearActions(false)
+			bot:ActionQueue_UseAbilityOnLocation(stoneRemnantAbility, bot:GetLocation())
+			bot:ActionQueue_UseAbilityOnLocation(rollingBoulderAbility, rollingBoulderLocation)
 			return
 		else
-			b:Action_UseAbilityOnLocation(p, A)
+			bot:Action_UseAbilityOnLocation(rollingBoulderAbility, rollingBoulderLocation)
 			return
 		end
 	end
-	H = a.ConsiderMagnetize()
-	if H > 0 then
-		b:Action_UseAbility(s)
+	magnetizeDesire = X.ConsiderMagnetize()
+	if magnetizeDesire > 0 then
+		bot:Action_UseAbility(magnetizeAbility)
 		return
 	end
-	v, w, x, y = a.ConsiderBoulderSmash()
-	if v > 0 then
-		if x then
-			b:Action_ClearActions(false)
-			b:ActionQueue_UseAbilityOnLocation(r, b:GetLocation())
-			b:ActionQueue_UseAbilityOnLocation(o, w)
+	boulderSmashDesire, boulderSmashLocation, boulderSmashNeedsStone, boulderSmashReady = X.ConsiderBoulderSmash()
+	if boulderSmashDesire > 0 then
+		if boulderSmashNeedsStone then
+			bot:Action_ClearActions(false)
+			bot:ActionQueue_UseAbilityOnLocation(stoneRemnantAbility, bot:GetLocation())
+			bot:ActionQueue_UseAbilityOnLocation(boulderSmashAbility, boulderSmashLocation)
 			return
 		else
-			if y then
-				b:Action_UseAbilityOnLocation(o, w)
+			if boulderSmashReady then
+				bot:Action_UseAbilityOnLocation(boulderSmashAbility, boulderSmashLocation)
 				return
 			end
 		end
 	end
 	local onAlly
-	C, D, E, onAlly = a.ConsiderGeomagneticGrip()
-	if C > 0 then
-		if E then
-			b:Action_ClearActions(false)
-			b:ActionQueue_UseAbilityOnLocation(r, D)
-			b:ActionQueue_UseAbilityOnLocation(q, D)
+	geomagneticGripDesire, geomagneticGripTarget, geomagneticGripNeedsStone, onAlly = X.ConsiderGeomagneticGrip()
+	if geomagneticGripDesire > 0 then
+		if geomagneticGripNeedsStone then
+			bot:Action_ClearActions(false)
+			bot:ActionQueue_UseAbilityOnLocation(stoneRemnantAbility, geomagneticGripTarget)
+			bot:ActionQueue_UseAbilityOnLocation(geomagneticGripAbility, geomagneticGripTarget)
 			return
 		else
 			-- Ally pull is a unit-target cast; it used to depend on Shard, but the base spell
 			-- already targets allies (shard only adds range/speed).
 			if onAlly == true then
-				b:Action_UseAbilityOnEntity(q, D)
+				bot:Action_UseAbilityOnEntity(geomagneticGripAbility, geomagneticGripTarget)
 			else
-				b:Action_UseAbilityOnLocation(q, D)
+				bot:Action_UseAbilityOnLocation(geomagneticGripAbility, geomagneticGripTarget)
 			end
 			return
 		end
 	end
 end
-function a.ConsiderBoulderSmash()
-	if not o:IsFullyCastable() then
+function X.ConsiderBoulderSmash()
+	if not boulderSmashAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0, false, false
 	end
-	local O = o:GetCastRange()
-	local P = b:GetAttackRange()
-	local Q = o:GetSpecialValueInt("speed")
-	local R = o:GetSpecialValueInt("rock_damage")
-	local S = IsStoneNearby(b:GetLocation(), P)
-	local T = b:GetMana() / b:GetMaxMana()
+	local castRange = boulderSmashAbility:GetCastRange()
+	local attackRange = bot:GetAttackRange()
+	local speed = boulderSmashAbility:GetSpecialValueInt("speed")
+	local rockDamage = boulderSmashAbility:GetSpecialValueInt("rock_damage")
+	local hasStoneNearby = IsStoneNearby(bot:GetLocation(), attackRange)
+	local mpRatio = bot:GetMana() / bot:GetMaxMana()
 	-- Rock reach: a smashed remnant travels rock_distance (2000). The kill and engage scans used
 	-- the smash cast range (150), so the remnant kick only ever fired at melee range.
-	local rockReach = math.min(o:GetSpecialValueInt("rock_distance"), 1600)
+	local rockReach = math.min(boulderSmashAbility:GetSpecialValueInt("rock_distance"), 1600)
 	if rockReach <= 0 then
 		rockReach = 1600
 	end
-	local U = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
+	local enemiesInAttackRange = Fu.GetNearbyHeroes(bot, attackRange, true, BOT_MODE_NONE)
 	-- Kick an enemy in melee range into a real ally. The ally list includes Earth Spirit himself,
-	-- so V[#V] could be his own spot (kick toward his feet). A ground cast also kicks a remnant
+	-- so its last entry could be his own spot (kick toward his feet). A ground cast also kicks a remnant
 	-- within 200 first (datafeed), so skip this when one is next to him.
 	local kickTo = nil
-	for _, ally in pairs(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}) do
-		if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() then
+	for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}) do
+		if ally ~= bot and Fu.IsValidHero(ally) and not ally:IsIllusion() then
 			kickTo = ally
 			break
 		end
 	end
-	for W, X in pairs(U) do
+	for _, enemyHero in pairs(enemiesInAttackRange) do
 		if
 			kickTo ~= nil
-			and not IsStoneNearby(b:GetLocation(), o:GetSpecialValueInt("rock_search_aoe"))
-			and c.IsValidHero(X)
-			and c.CanCastOnNonMagicImmune(X)
-			and c.IsInRange(b, X, P)
-			and not c.IsSuspiciousIllusion(X)
+			and not IsStoneNearby(bot:GetLocation(), boulderSmashAbility:GetSpecialValueInt("rock_search_aoe"))
+			and Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, attackRange)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
-			LogES("kick", "enemy=%s into ally=%s", X:GetUnitName(), kickTo:GetUnitName())
+			LogES("kick", "enemy=%s into ally=%s", enemyHero:GetUnitName(), kickTo:GetUnitName())
 			return BOT_ACTION_DESIRE_HIGH, kickTo:GetLocation(), false, true
 		end
 	end
-	if S then
-		local Y = c.GetNearbyHeroes(b, rockReach, true, BOT_MODE_NONE)
-		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
-		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
-			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q)
-			return BOT_ACTION_DESIRE_HIGH, _, false, true
+	if hasStoneNearby then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, rockReach, true, BOT_MODE_NONE)
+		local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, rockDamage, DAMAGE_TYPE_MAGICAL, false)
+		if killableEnemy ~= nil and not Fu.IsSuspiciousIllusion(killableEnemy) then
+			local castLocation = Fu.GetCorrectLoc(killableEnemy, GetUnitToUnitDistance(bot, killableEnemy) / speed)
+			return BOT_ACTION_DESIRE_HIGH, castLocation, false, true
 		end
-	elseif J >= 1 then
-		local Y = c.GetNearbyHeroes(b, rockReach, true, BOT_MODE_NONE)
-		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
-		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
-			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q)
-			LogES("smash", "kill target=%s dist=%d", Z:GetUnitName(), math.floor(GetUnitToUnitDistance(b, Z)))
-			return BOT_ACTION_DESIRE_HIGH, _, true, false
+	elseif stoneCharges >= 1 then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, rockReach, true, BOT_MODE_NONE)
+		local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, rockDamage, DAMAGE_TYPE_MAGICAL, false)
+		if killableEnemy ~= nil and not Fu.IsSuspiciousIllusion(killableEnemy) then
+			local castLocation = Fu.GetCorrectLoc(killableEnemy, GetUnitToUnitDistance(bot, killableEnemy) / speed)
+			LogES("smash", "kill target=%s dist=%d", killableEnemy:GetUnitName(), math.floor(GetUnitToUnitDistance(bot, killableEnemy)))
+			return BOT_ACTION_DESIRE_HIGH, castLocation, true, false
 		end
 	end
-	if L then
-		K = c.GetProperTarget(b)
+	if isGoingOnSomeone then
+		botTarget = Fu.GetProperTarget(bot)
 		-- Engage kick: remnant at the target from up to 1200 (was the 150 cast range).
 		if
-			c.IsValidTarget(K)
-			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, math.min(rockReach, 1200))
-			and not c.IsSuspiciousIllusion(K)
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, math.min(rockReach, 1200))
+			and not Fu.IsSuspiciousIllusion(botTarget)
 		then
-			local _ = c.GetCorrectLoc(K, GetUnitToUnitDistance(b, K) / Q)
-			LogES("smash", "engage target=%s dist=%d", K:GetUnitName(), math.floor(GetUnitToUnitDistance(b, K)))
-			if S then
-				return BOT_ACTION_DESIRE_HIGH, _, false, true
-			elseif J >= 1 then
-				return BOT_ACTION_DESIRE_HIGH, _, true, false
+			local castLocation = Fu.GetCorrectLoc(botTarget, GetUnitToUnitDistance(bot, botTarget) / speed)
+			LogES("smash", "engage target=%s dist=%d", botTarget:GetUnitName(), math.floor(GetUnitToUnitDistance(bot, botTarget)))
+			if hasStoneNearby then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, false, true
+			elseif stoneCharges >= 1 then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, true, false
 			end
 		end
 	end
-	if M and b:WasRecentlyDamagedByAnyHero(2) then
-		local a0 = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
-		local Y = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-		local Z = c.GetClosestUnit(Y)
-		if Z ~= nil and S then
-			if a0 ~= nil and Y ~= nil and #a0 <= 1 and #Y <= 1 then
-				return BOT_ACTION_DESIRE_HIGH, Z:GetLocation(), false, true
+	if isRetreating and bot:WasRecentlyDamagedByAnyHero(2) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
+		local closestEnemy = Fu.GetClosestUnit(nearbyEnemies)
+		if closestEnemy ~= nil and hasStoneNearby then
+			if nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyAllies <= 1 and #nearbyEnemies <= 1 then
+				return BOT_ACTION_DESIRE_HIGH, closestEnemy:GetLocation(), false, true
 			end
-		elseif Z ~= nil and J >= 1 then
-			if a0 ~= nil and Y ~= nil and #a0 <= 1 and #Y <= 1 and b:IsFacingLocation(c.GetEscapeLoc(), 30) then
-				return BOT_ACTION_DESIRE_HIGH, Z:GetLocation(), true, false
+		elseif closestEnemy ~= nil and stoneCharges >= 1 then
+			if nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyAllies <= 1 and #nearbyEnemies <= 1 and bot:IsFacingLocation(Fu.GetEscapeLoc(), 30) then
+				return BOT_ACTION_DESIRE_HIGH, closestEnemy:GetLocation(), true, false
 			end
 		end
 	end
-	if c.IsLaning(b) then
-		if J >= 1 and T > 0.33 then
-			local a1 = b:GetNearbyLaneCreeps(r:GetCastRange(), true)
-			for W, a2 in pairs(a1) do
-				if c.IsValid(a2) and c.IsKeyWordUnit("ranged", a2) and a2:GetHealth() <= R then
-					local Y = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-					if Y ~= nil and #Y >= 1 and GetUnitToUnitDistance(a2, Y[1]) <= 600 then
-						return BOT_ACTION_DESIRE_HIGH, a2:GetLocation(), true, false
+	if Fu.IsLaning(bot) then
+		if stoneCharges >= 1 and mpRatio > 0.33 then
+			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(stoneRemnantAbility:GetCastRange(), true)
+			for _, creep in pairs(nearbyLaneCreeps) do
+				if Fu.IsValid(creep) and Fu.IsKeyWordUnit("ranged", creep) and creep:GetHealth() <= rockDamage then
+					local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+					if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600 then
+						return BOT_ACTION_DESIRE_HIGH, creep:GetLocation(), true, false
 					end
 				end
 			end
@@ -322,217 +322,217 @@ function a.ConsiderBoulderSmash()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0, false, false
 end
-function a.ConsiderRollingBoulder()
-	if not p:IsFullyCastable() or b:IsRooted() then
+function X.ConsiderRollingBoulder()
+	if not rollingBoulderAbility:IsFullyCastable() or bot:IsRooted() then
 		return BOT_ACTION_DESIRE_NONE, 0, false
 	end
-	local a3 = p:GetSpecialValueInt("distance")
-	local a4 = p:GetSpecialValueFloat("delay")
-	local Q = p:GetSpecialValueInt("rock_speed")
-	local R = p:GetSpecialValueInt("damage")
-	-- Mana ratio (was raw mana, so the "T > 0.88" travel roll below passed at any mana).
-	local T = b:GetMana() / b:GetMaxMana()
-	local a5 = math.min(a3 * 2, 1600)
-	local a6 = a3
-	if J >= 1 then
-		a6 = a6 * 2
+	local distance = rollingBoulderAbility:GetSpecialValueInt("distance")
+	local delay = rollingBoulderAbility:GetSpecialValueFloat("delay")
+	local rockSpeed = rollingBoulderAbility:GetSpecialValueInt("rock_speed")
+	local damage = rollingBoulderAbility:GetSpecialValueInt("damage")
+	-- Mana ratio (was raw mana, so the "mpRatio > 0.88" travel roll below passed at any mana).
+	local mpRatio = bot:GetMana() / bot:GetMaxMana()
+	local stoneRange = math.min(distance * 2, 1600)
+	local searchRange = distance
+	if stoneCharges >= 1 then
+		searchRange = searchRange * 2
 	end
-	local Y = c.GetNearbyHeroes(b, math.min(a6, 1600), true, BOT_MODE_NONE)
-	for W, X in pairs(Y) do
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, math.min(searchRange, 1600), true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(nearbyEnemies) do
 		-- Parenthesised: the channel case used to skip the illusion and already-rolling checks.
 		if
-			(X:CanBeSeen() and X:IsChanneling() or c.IsCastingUltimateAbility(X))
-			and not c.IsSuspiciousIllusion(X)
-			and not b:HasModifier("modifier_earth_spirit_rolling_boulder_caster")
+			(enemyHero:CanBeSeen() and enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero))
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not bot:HasModifier("modifier_earth_spirit_rolling_boulder_caster")
 		then
-			local _ = c.GetCorrectLoc(X, GetUnitToUnitDistance(b, X) / Q + a4)
-			if IsStoneInPath(_, GetUnitToUnitDistance(b, X)) or J == 0 then
-				return BOT_ACTION_DESIRE_HIGH, _, false
-			elseif J >= 1 then
-				return BOT_ACTION_DESIRE_HIGH, _, true
+			local castLocation = Fu.GetCorrectLoc(enemyHero, GetUnitToUnitDistance(bot, enemyHero) / rockSpeed + delay)
+			if IsStoneInPath(castLocation, GetUnitToUnitDistance(bot, enemyHero)) or stoneCharges == 0 then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, false
+			elseif stoneCharges >= 1 then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, true
 			end
 		end
 	end
-	if c.IsStuck(b) then
-		local _ = c.GetEscapeLoc()
-		return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, _, a3), false
+	if Fu.IsStuck(bot) then
+		local escapeLocation = Fu.GetEscapeLoc()
+		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, distance), false
 	end
-	if J >= 1 then
-		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
-		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
-			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q + a4)
-			if IsStoneInPath(_, GetUnitToUnitDistance(b, Z)) then
-				return BOT_ACTION_DESIRE_HIGH, _, false
+	if stoneCharges >= 1 then
+		local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, damage, DAMAGE_TYPE_MAGICAL, false)
+		if killableEnemy ~= nil and not Fu.IsSuspiciousIllusion(killableEnemy) then
+			local castLocation = Fu.GetCorrectLoc(killableEnemy, GetUnitToUnitDistance(bot, killableEnemy) / rockSpeed + delay)
+			if IsStoneInPath(castLocation, GetUnitToUnitDistance(bot, killableEnemy)) then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, false
 			else
-				return BOT_ACTION_DESIRE_HIGH, _, true
+				return BOT_ACTION_DESIRE_HIGH, castLocation, true
 			end
 		end
-	elseif J == 0 then
-		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
-		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
-			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q + a4)
-			return BOT_ACTION_DESIRE_HIGH, _, false
+	elseif stoneCharges == 0 then
+		local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, damage, DAMAGE_TYPE_MAGICAL, false)
+		if killableEnemy ~= nil and not Fu.IsSuspiciousIllusion(killableEnemy) then
+			local castLocation = Fu.GetCorrectLoc(killableEnemy, GetUnitToUnitDistance(bot, killableEnemy) / rockSpeed + delay)
+			return BOT_ACTION_DESIRE_HIGH, castLocation, false
 		end
 	end
-	if L then
-		K = c.GetProperTarget(b)
+	if isGoingOnSomeone then
+		botTarget = Fu.GetProperTarget(bot)
 		if
-			J >= 1
-			and c.IsValidTarget(K)
-			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, a5)
-			and not c.IsSuspiciousIllusion(K)
-			and not K:HasModifier("modifier_faceless_void_chronosphere")
+			stoneCharges >= 1
+			and Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, stoneRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere")
 		then
-			local a0 = c.GetNearbyHeroes(b, a5, false, BOT_MODE_NONE)
-			if Y ~= nil and a0 ~= nil and (#a0 >= #Y or #Y > #a0 and c.WeAreStronger(b, a3)) then
-				local _ = c.GetCorrectLoc(K, GetUnitToUnitDistance(b, K) / Q)
-				if IsStoneInPath(_, GetUnitToUnitDistance(b, K)) then
-					return BOT_ACTION_DESIRE_HIGH, _, false
+			local nearbyAllies = Fu.GetNearbyHeroes(bot, stoneRange, false, BOT_MODE_NONE)
+			if nearbyEnemies ~= nil and nearbyAllies ~= nil and (#nearbyAllies >= #nearbyEnemies or #nearbyEnemies > #nearbyAllies and Fu.WeAreStronger(bot, distance)) then
+				local castLocation = Fu.GetCorrectLoc(botTarget, GetUnitToUnitDistance(bot, botTarget) / rockSpeed)
+				if IsStoneInPath(castLocation, GetUnitToUnitDistance(bot, botTarget)) then
+					return BOT_ACTION_DESIRE_HIGH, castLocation, false
 				else
-					return BOT_ACTION_DESIRE_HIGH, _, true
+					return BOT_ACTION_DESIRE_HIGH, castLocation, true
 				end
 			end
 		elseif
-			J == 0
-			and c.IsValidTarget(K)
-			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, a3)
-			and not c.IsSuspiciousIllusion(K)
-			and not K:HasModifier("modifier_faceless_void_chronosphere")
+			stoneCharges == 0
+			and Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, distance)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere")
 		then
-			local _ = c.GetCorrectLoc(K, a4)
-			return BOT_ACTION_DESIRE_HIGH, _, false
+			local castLocation = Fu.GetCorrectLoc(botTarget, delay)
+			return BOT_ACTION_DESIRE_HIGH, castLocation, false
 		end
 	end
-	local V = c.GetNearbyHeroes(b, a5, false, BOT_MODE_NONE)
-	if M or M and (V ~= nil and Y ~= nil and #Y > #V) then
-		local a0 = c.GetNearbyHeroes(b, a5, false, BOT_MODE_NONE)
-		local a7 = c.GetEscapeLoc()
-		local _ = c.Site.GetXUnitsTowardsLocation(b, a7, a3)
-		if a0 ~= nil and Y ~= nil and (#Y > #a0 or #a0 >= #Y and c.GetHP(b) < 0.45) then
-			if J >= 1 then
-				if c.IsInRange(b, Y[1], 600) then
-					return BOT_ACTION_DESIRE_HIGH, _, true
+	local alliesInRange = Fu.GetNearbyHeroes(bot, stoneRange, false, BOT_MODE_NONE)
+	if isRetreating or isRetreating and (alliesInRange ~= nil and nearbyEnemies ~= nil and #nearbyEnemies > #alliesInRange) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, stoneRange, false, BOT_MODE_NONE)
+		local escapeLocation = Fu.GetEscapeLoc()
+		local castLocation = Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, distance)
+		if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyEnemies > #nearbyAllies or #nearbyAllies >= #nearbyEnemies and Fu.GetHP(bot) < 0.45) then
+			if stoneCharges >= 1 then
+				if Fu.IsInRange(bot, nearbyEnemies[1], 600) then
+					return BOT_ACTION_DESIRE_HIGH, castLocation, true
 				else
-					return BOT_ACTION_DESIRE_HIGH, _, false
+					return BOT_ACTION_DESIRE_HIGH, castLocation, false
 				end
-			elseif J == 0 then
-				return BOT_ACTION_DESIRE_HIGH, _, false
+			elseif stoneCharges == 0 then
+				return BOT_ACTION_DESIRE_HIGH, castLocation, false
 			end
 		end
 	end
 	if
-		T > 0.88
-		and b:DistanceFromFountain() > 100
-		and b:DistanceFromFountain() < 6000
+		mpRatio > 0.88
+		and bot:DistanceFromFountain() > 100
+		and bot:DistanceFromFountain() < 6000
 		and DotaTime() > 0
-		and not c.IsDoingTormentor(b)
+		and not Fu.IsDoingTormentor(bot)
 	then
-		local a8 = GetLaneFrontLocation(GetTeam(), LANE_TOP, 0)
-		local a9 = GetLaneFrontLocation(GetTeam(), LANE_MID, 0)
-		local aa = GetLaneFrontLocation(GetTeam(), LANE_BOT, 0)
-		local ab = GetUnitToLocationDistance(b, b:GetLocation())
-		local ac = Vector(0, 0, 0)
-		if b:IsFacingLocation(a8, 45) then
-			ab = GetUnitToLocationDistance(b, a8)
-			ac = a8
-		elseif b:IsFacingLocation(a9, 45) then
-			ab = GetUnitToLocationDistance(b, a9)
-			ac = a9
-		elseif b:IsFacingLocation(aa, 45) then
-			ab = GetUnitToLocationDistance(b, aa)
-			ac = aa
+		local topFront = GetLaneFrontLocation(GetTeam(), LANE_TOP, 0)
+		local midFront = GetLaneFrontLocation(GetTeam(), LANE_MID, 0)
+		local botFront = GetLaneFrontLocation(GetTeam(), LANE_BOT, 0)
+		local frontDistance = GetUnitToLocationDistance(bot, bot:GetLocation())
+		local frontLocation = Vector(0, 0, 0)
+		if bot:IsFacingLocation(topFront, 45) then
+			frontDistance = GetUnitToLocationDistance(bot, topFront)
+			frontLocation = topFront
+		elseif bot:IsFacingLocation(midFront, 45) then
+			frontDistance = GetUnitToLocationDistance(bot, midFront)
+			frontLocation = midFront
+		elseif bot:IsFacingLocation(botFront, 45) then
+			frontDistance = GetUnitToLocationDistance(bot, botFront)
+			frontLocation = botFront
 		end
-		if ab > 1600 then
-			local a7 = c.Site.GetXUnitsTowardsLocation(b, ac, a3)
-			if IsLocationPassable(a7) then
-				return BOT_ACTION_DESIRE_HIGH, a7, false
+		if frontDistance > 1600 then
+			local travelLocation = Fu.Site.GetXUnitsTowardsLocation(bot, frontLocation, distance)
+			if IsLocationPassable(travelLocation) then
+				return BOT_ACTION_DESIRE_HIGH, travelLocation, false
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0, false
 end
-function a.ConsiderGeomagneticGrip()
-	if not q:IsFullyCastable() then
+function X.ConsiderGeomagneticGrip()
+	if not geomagneticGripAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0, false
 	end
-	local O = q:GetCastRange()
-	local ad = q:GetCastPoint()
-	local T = b:GetMana() / b:GetMaxMana()
-	local R = q:GetSpecialValueInt("rock_damage")
+	local castRange = geomagneticGripAbility:GetCastRange()
+	local castPoint = geomagneticGripAbility:GetCastPoint()
+	local mpRatio = bot:GetMana() / bot:GetMaxMana()
+	local rockDamage = geomagneticGripAbility:GetSpecialValueInt("rock_damage")
 	-- Ally save. Grip pulls allied heroes without Shard (datafeed: "cast range is reduced when
 	-- targeting an ally"; cast_range_heroes 550-700, Shard +50%). It used to be Shard-only, used
 	-- the remnant range (1000-1300) and required no ally within 300 of Earth Spirit, but that list
 	-- includes himself, so it never fired. Now: a hurt or fleeing ally being hit by heroes, an enemy
 	-- hero near him, between 300 and the hero cast range, while Earth Spirit is not running himself.
-	local heroRange = q:GetSpecialValueInt("cast_range_heroes")
+	local heroRange = geomagneticGripAbility:GetSpecialValueInt("cast_range_heroes")
 	if heroRange <= 0 then
 		heroRange = 550
 	end
-	if not M then
-		for W, ag in pairs(c.GetNearbyHeroes(b, heroRange, false, BOT_MODE_NONE) or {}) do
+	if not isRetreating then
+		for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, heroRange, false, BOT_MODE_NONE) or {}) do
 			if
-				ag ~= b
-				and c.IsValidHero(ag)
-				and not ag:IsIllusion()
-				and c.IsInRange(b, ag, heroRange)
-				and not c.IsInRange(b, ag, 300)
-				and ag:WasRecentlyDamagedByAnyHero(2.0)
-				and (c.GetHP(ag) < 0.4 or c.IsRetreating(ag))
-				and not ag:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not ag:HasModifier("modifier_enigma_black_hole_pull")
-				and not ag:HasModifier("modifier_legion_commander_duel")
-				and #(c.GetEnemiesNearLoc(ag:GetLocation(), 700) or {}) >= 1
+				allyHero ~= bot
+				and Fu.IsValidHero(allyHero)
+				and not allyHero:IsIllusion()
+				and Fu.IsInRange(bot, allyHero, heroRange)
+				and not Fu.IsInRange(bot, allyHero, 300)
+				and allyHero:WasRecentlyDamagedByAnyHero(2.0)
+				and (Fu.GetHP(allyHero) < 0.4 or Fu.IsRetreating(allyHero))
+				and not allyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				and not allyHero:HasModifier("modifier_enigma_black_hole_pull")
+				and not allyHero:HasModifier("modifier_legion_commander_duel")
+				and #(Fu.GetEnemiesNearLoc(allyHero:GetLocation(), 700) or {}) >= 1
 			then
-				LogES("grip", "save ally=%s hp=%.2f dist=%d", ag:GetUnitName(), c.GetHP(ag), math.floor(GetUnitToUnitDistance(b, ag)))
-				return BOT_ACTION_DESIRE_HIGH, ag, false, true
+				LogES("grip", "save ally=%s hp=%.2f dist=%d", allyHero:GetUnitName(), Fu.GetHP(allyHero), math.floor(GetUnitToUnitDistance(bot, allyHero)))
+				return BOT_ACTION_DESIRE_HIGH, allyHero, false, true
 			end
 		end
 	end
-	local Y = c.GetNearbyHeroes(b, O, true, BOT_MODE_NONE)
-	local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
-	if Z ~= nil and c.CanCastOnNonMagicImmune(Z) and c.IsInRange(b, Z, O) and not c.IsSuspiciousIllusion(Z) then
-		local _ = c.GetCorrectLoc(Z, ad)
-		local ah = IsStoneNearTarget(Z)
-		if ah then
-			return BOT_ACTION_DESIRE_HIGH, _, false
-		elseif J >= 1 then
-			return BOT_ACTION_DESIRE_HIGH, _, true
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, rockDamage, DAMAGE_TYPE_MAGICAL, false)
+	if killableEnemy ~= nil and Fu.CanCastOnNonMagicImmune(killableEnemy) and Fu.IsInRange(bot, killableEnemy, castRange) and not Fu.IsSuspiciousIllusion(killableEnemy) then
+		local castLocation = Fu.GetCorrectLoc(killableEnemy, castPoint)
+		local hasStoneNearTarget = IsStoneNearTarget(killableEnemy)
+		if hasStoneNearTarget then
+			return BOT_ACTION_DESIRE_HIGH, castLocation, false
+		elseif stoneCharges >= 1 then
+			return BOT_ACTION_DESIRE_HIGH, castLocation, true
 		end
 	end
-	if L then
-		K = c.GetProperTarget(b)
+	if isGoingOnSomeone then
+		botTarget = Fu.GetProperTarget(bot)
 		if
-			c.IsValidTarget(K)
-			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, O)
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
 			-- Also for the silence, not only when it kills (a pulled remnant silences whoever it hits).
-			and (c.CanKillTarget(K, R, DAMAGE_TYPE_MAGICAL) or not K:IsSilenced() and not c.IsDisabled(K))
-			and not c.IsSuspiciousIllusion(K)
+			and (Fu.CanKillTarget(botTarget, rockDamage, DAMAGE_TYPE_MAGICAL) or not botTarget:IsSilenced() and not Fu.IsDisabled(botTarget))
+			and not Fu.IsSuspiciousIllusion(botTarget)
 		then
-			local ai = c.GetNearbyHeroes(K, O, false, BOT_MODE_NONE)
-			local aj = c.GetNearbyHeroes(K, O, true, BOT_MODE_NONE)
-			if ai ~= nil and aj ~= nil and #ai >= #aj then
-				local _ = c.GetCorrectLoc(K, ad)
-				-- Check the stone near the engage target K; Z (kill-scan result) can be nil here and crash.
-				local ah = IsStoneNearTarget(K)
-				if ah then
-					return BOT_ACTION_DESIRE_HIGH, _, false
-				elseif J >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, _, true
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, castRange, false, BOT_MODE_NONE)
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, castRange, true, BOT_MODE_NONE)
+			if enemiesNearTarget ~= nil and alliesNearTarget ~= nil and #enemiesNearTarget >= #alliesNearTarget then
+				local castLocation = Fu.GetCorrectLoc(botTarget, castPoint)
+				-- Check the stone near the engage target (botTarget); killableEnemy (kill-scan result) can be nil here and crash.
+				local hasStoneNearTarget = IsStoneNearTarget(botTarget)
+				if hasStoneNearTarget then
+					return BOT_ACTION_DESIRE_HIGH, castLocation, false
+				elseif stoneCharges >= 1 then
+					return BOT_ACTION_DESIRE_HIGH, castLocation, true
 				end
 			end
 		end
 	end
-	if c.IsLaning(b) then
-		if J >= 1 and T > 0.33 then
-			local a1 = b:GetNearbyLaneCreeps(r:GetCastRange(), true)
-			for W, a2 in pairs(a1) do
-				if c.IsValid(a2) and c.IsKeyWordUnit("ranged", a2) and a2:GetHealth() <= R then
-					local ak = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-					if ak ~= nil and #ak >= 1 and GetUnitToUnitDistance(a2, ak[1]) <= 600 then
-						return BOT_ACTION_DESIRE_HIGH, a2:GetLocation(), true, false
+	if Fu.IsLaning(bot) then
+		if stoneCharges >= 1 and mpRatio > 0.33 then
+			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(stoneRemnantAbility:GetCastRange(), true)
+			for _, creep in pairs(nearbyLaneCreeps) do
+				if Fu.IsValid(creep) and Fu.IsKeyWordUnit("ranged", creep) and creep:GetHealth() <= rockDamage then
+					local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+					if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600 then
+						return BOT_ACTION_DESIRE_HIGH, creep:GetLocation(), true, false
 					end
 				end
 			end
@@ -540,80 +540,80 @@ function a.ConsiderGeomagneticGrip()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0, false, false
 end
-function a.ConsiderEchantRemnant()
-	if not u:IsTrained() or not u:IsFullyCastable() then
+function X.ConsiderEchantRemnant()
+	if not enchantRemnantAbility:IsTrained() or not enchantRemnantAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderMagnetize()
-	if not s:IsFullyCastable() then
+function X.ConsiderMagnetize()
+	if not magnetizeAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local al = s:GetSpecialValueInt("cast_radius")
-	K = c.GetProperTarget(b)
-	if c.IsInTeamFight(b, 1200) then
-		local Y = c.GetNearbyHeroes(b, al, true, BOT_MODE_NONE)
-		if Y ~= nil and #Y >= 2 then
+	local radius = magnetizeAbility:GetSpecialValueInt("cast_radius")
+	botTarget = Fu.GetProperTarget(bot)
+	if Fu.IsInTeamFight(bot, 1200) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+		if nearbyEnemies ~= nil and #nearbyEnemies >= 2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if L then
-		local a0 = c.GetNearbyHeroes(b, al + 200, false, BOT_MODE_NONE)
-		local Y = c.GetNearbyHeroes(b, al, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, radius + 200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 		if
-			c.IsValidTarget(K)
-			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, al)
-			and not c.IsSuspiciousIllusion(K)
-			and a0 ~= nil
-			and Y ~= nil
-			and #a0 <= 1
-			and #Y <= 1
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and nearbyAllies ~= nil
+			and nearbyEnemies ~= nil
+			and #nearbyAllies <= 1
+			and #nearbyEnemies <= 1
 		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
-	if M then
-		local a0 = c.GetNearbyHeroes(b, al + 200, false, BOT_MODE_NONE)
-		local Y = c.GetNearbyHeroes(b, al, true, BOT_MODE_NONE)
+	if isRetreating then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, radius + 200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 		if
-			Y ~= nil
-			and a0 ~= nil
-			and #Y >= 2
-			and b:WasRecentlyDamagedByAnyHero(2)
-			and c.CanCastOnNonMagicImmune(Y[1])
-			and c.IsInRange(b, Y[1], al)
-			and not c.IsSuspiciousIllusion(Y[1])
-			and #Y > #a0
+			nearbyEnemies ~= nil
+			and nearbyAllies ~= nil
+			and #nearbyEnemies >= 2
+			and bot:WasRecentlyDamagedByAnyHero(2)
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], radius)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and #nearbyEnemies > #nearbyAllies
 		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function IsStoneNearby(a7, am)
-	local an = GetUnitList(UNIT_LIST_ALLIED_OTHER)
-	for W, ao in pairs(an) do
+function IsStoneNearby(location, radius)
+	local otherUnits = GetUnitList(UNIT_LIST_ALLIED_OTHER)
+	for _, unit in pairs(otherUnits) do
 		if
-			ao ~= nil
-			and ao:GetUnitName() == "npc_dota_earth_spirit_stone"
-			and GetUnitToLocationDistance(ao, a7) < am
+			unit ~= nil
+			and unit:GetUnitName() == "npc_dota_earth_spirit_stone"
+			and GetUnitToLocationDistance(unit, location) < radius
 		then
 			return true
 		end
 	end
 	return false
 end
-function IsStoneInPath(a7, ap)
-	if b:IsFacingLocation(a7, 5) then
-		local an = GetUnitList(UNIT_LIST_ALLIED_OTHER)
-		for W, ao in pairs(an) do
+function IsStoneInPath(location, distance)
+	if bot:IsFacingLocation(location, 5) then
+		local otherUnits = GetUnitList(UNIT_LIST_ALLIED_OTHER)
+		for _, unit in pairs(otherUnits) do
 			if
-				ao ~= nil
-				and ao:GetUnitName() == "npc_dota_earth_spirit_stone"
-				and b:IsFacingLocation(ao:GetLocation(), 5)
-				and GetUnitToUnitDistance(ao, b) < ap
+				unit ~= nil
+				and unit:GetUnitName() == "npc_dota_earth_spirit_stone"
+				and bot:IsFacingLocation(unit:GetLocation(), 5)
+				and GetUnitToUnitDistance(unit, bot) < distance
 			then
 				return true
 			end
@@ -621,17 +621,17 @@ function IsStoneInPath(a7, ap)
 	end
 	return false
 end
-function IsStoneNearTarget(Z)
-	local an = GetUnitList(UNIT_LIST_ALLIED_OTHER)
-	for W, ao in pairs(an) do
+function IsStoneNearTarget(target)
+	local otherUnits = GetUnitList(UNIT_LIST_ALLIED_OTHER)
+	for _, unit in pairs(otherUnits) do
 		if
-			ao ~= nil
-			and ao:GetUnitName() == "npc_dota_earth_spirit_stone"
-			and GetUnitToLocationDistance(ao, Z:GetLocation()) < 100
+			unit ~= nil
+			and unit:GetUnitName() == "npc_dota_earth_spirit_stone"
+			and GetUnitToLocationDistance(unit, target:GetLocation()) < 100
 		then
 			return true
 		end
 	end
 	return false
 end
-return a
+return X

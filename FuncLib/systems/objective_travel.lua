@@ -10,14 +10,14 @@ local TP_CHANNEL = 3
 local MIN_SAVED = 8 -- seconds a TP or gate has to save over walking
 
 local function Speed(unit)
-	local ok, v = pcall(function()
+	local ok, speed = pcall(function()
 		return unit:GetCurrentMovementSpeed()
 	end)
-	return (ok and type(v) == "number" and v > 100) and v or 300
+	return (ok and type(speed) == "number" and speed > 100) and speed or 300
 end
 
-local function Dist(a, b)
-	local dx, dy = a.x - b.x, a.y - b.y
+local function Dist(locA, locB)
+	local dx, dy = locA.x - locB.x, locA.y - locB.y
 	return math.sqrt(dx * dx + dy * dy)
 end
 
@@ -25,11 +25,11 @@ end
 local function TpSpot(loc)
 	local best, bestD = nil, math.huge
 	for id = 0, 10 do
-		local t = GetTower(GetTeam(), id)
-		if t ~= nil and t:IsAlive() then
-			local d = GetUnitToLocationDistance(t, loc)
-			if d < bestD then
-				best, bestD = t:GetLocation(), d
+		local tower = GetTower(GetTeam(), id)
+		if tower ~= nil and tower:IsAlive() then
+			local distance = GetUnitToLocationDistance(tower, loc)
+			if distance < bestD then
+				best, bestD = tower:GetLocation(), distance
 			end
 		end
 	end
@@ -38,14 +38,14 @@ end
 
 local function TpItem(unit)
 	for _, slot in ipairs({ 15, 0, 1, 2, 3, 4, 5 }) do
-		local ok, it = pcall(function()
+		local ok, item = pcall(function()
 			return unit:GetItemInSlot(slot)
 		end)
-		if ok and it ~= nil then
-			local name = it:GetName()
+		if ok and item ~= nil then
+			local name = item:GetName()
 			if name == "item_tpscroll" or name == "item_travel_boots" or name == "item_travel_boots_2" then
-				if it:IsFullyCastable() then
-					return it
+				if item:IsFullyCastable() then
+					return item
 				end
 			end
 		end
@@ -57,9 +57,9 @@ local gates = nil
 local function Gates()
 	if gates == nil or #gates < 2 then
 		gates = {}
-		for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
-			if u ~= nil and u:GetUnitName() == "npc_dota_unit_twin_gate" then
-				gates[#gates + 1] = u
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+			if unit ~= nil and unit:GetUnitName() == "npc_dota_unit_twin_gate" then
+				gates[#gates + 1] = unit
 			end
 		end
 	end
@@ -67,11 +67,11 @@ local function Gates()
 end
 
 local function GateWarp(unit)
-	local ok, ab = pcall(function()
+	local ok, warpAbility = pcall(function()
 		return unit:GetAbilityByName("twin_gate_portal_warp")
 	end)
-	if ok and ab ~= nil and ab:IsFullyCastable() then
-		return ab
+	if ok and warpAbility ~= nil and warpAbility:IsFullyCastable() then
+		return warpAbility
 	end
 	return nil
 end
@@ -87,9 +87,9 @@ function ObjectiveTravel.Best(unit, loc)
 	if tp ~= nil then
 		local towerLoc, towerToTarget = TpSpot(loc)
 		if towerLoc ~= nil and Dist(here, towerLoc) > 2500 then
-			local t = TP_CHANNEL + 1 + towerToTarget / speed
-			if t + MIN_SAVED < best then
-				best, how, extra, spot = t, "tp", tp, towerLoc
+			local tpTime = TP_CHANNEL + 1 + towerToTarget / speed
+			if tpTime + MIN_SAVED < best then
+				best, how, extra, spot = tpTime, "tp", tp, towerLoc
 			end
 		end
 	end
@@ -104,9 +104,9 @@ function ObjectiveTravel.Best(unit, loc)
 		if channel == nil or channel <= 0 then
 			channel = 6
 		end
-		local t = GetUnitToUnitDistance(unit, near) / speed + channel + 1 + GetUnitToLocationDistance(far, loc) / speed
-		if t + MIN_SAVED < best then
-			best, how, extra, spot = t, "gate", warp, near
+		local gateTime = GetUnitToUnitDistance(unit, near) / speed + channel + 1 + GetUnitToLocationDistance(far, loc) / speed
+		if gateTime + MIN_SAVED < best then
+			best, how, extra, spot = gateTime, "gate", warp, near
 		end
 	end
 	return best, how, extra, spot
@@ -114,9 +114,9 @@ end
 
 -- Seconds for unit to reach loc the fastest way (for timing estimates).
 function ObjectiveTravel.Eta(unit, loc)
-	local ok, t = pcall(ObjectiveTravel.Best, unit, loc)
-	if ok and type(t) == "number" then
-		return t
+	local ok, seconds = pcall(ObjectiveTravel.Best, unit, loc)
+	if ok and type(seconds) == "number" then
+		return seconds
 	end
 	return GetUnitToLocationDistance(unit, loc) / Speed(unit)
 end
@@ -130,7 +130,7 @@ function ObjectiveTravel.Go(bot, loc, tag)
 	if bot:WasRecentlyDamagedByAnyHero(2) or bot:IsRooted() then
 		return false
 	end
-	local ok, t, how, extra, spot = pcall(ObjectiveTravel.Best, bot, loc)
+	local ok, seconds, how, extra, spot = pcall(ObjectiveTravel.Best, bot, loc)
 	if not ok or how == "walk" or extra == nil then
 		return false
 	end
@@ -143,7 +143,7 @@ function ObjectiveTravel.Go(bot, loc, tag)
 				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 				how,
 				tostring(tag),
-				t,
+				seconds,
 				GetUnitToLocationDistance(bot, loc) / Speed(bot)
 			))
 		end

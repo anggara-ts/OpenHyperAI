@@ -1,38 +1,38 @@
 -- Lycan: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
 -- fix: build 1 had the 2nd Shapeshift point at entry 12 (level 13); entry 11 is level 12
-local j = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
-local k = j[1]
-if h == "pos_1" then
-	k = j[1]
+local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local nAbilityBuildList = tAllAbilityBuildList[1]
+if sRole == "pos_1" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
 end
-if h == "pos_2" then
-	k = j[1]
+if sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
 end
-if h == "pos_3" then
-	k = j[2]
+if sRole == "pos_3" then
+	nAbilityBuildList = tAllAbilityBuildList[2]
 end
-local l = c.Skill.GetTalentBuild(i)
-if h == "pos_1" then
-	l = c.Skill.GetTalentBuild(i)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+if sRole == "pos_1" then
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 end
-if h == "pos_2" then
-	l = c.Skill.GetTalentBuild(i)
+if sRole == "pos_2" then
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 end
-if h == "pos_3" then
-	l = c.Skill.GetTalentBuild(i)
+if sRole == "pos_3" then
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 end
-local n = "item_team_aura"
-local o = {}
-o["pos_1"] = {
+local sUtility = "item_team_aura"
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_double_circlet",
@@ -52,7 +52,7 @@ o["pos_1"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-o["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_double_circlet",
@@ -74,7 +74,7 @@ o["pos_2"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-o["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -87,95 +87,95 @@ o["pos_3"] = {
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_assault",
-	n,
+	sUtility,
 	"item_travel_boots",
 	"item_sheepstick",
 	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-o["pos_4"] = o["pos_3"]
-o["pos_5"] = o["pos_3"]
-a["sBuyList"] = o[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(p)
-	e.MinionThink(p)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local q = SafeAbility(b:GetAbilityByName("lycan_summon_wolves"), "lycan_summon_wolves", "lycan")
-local r = SafeAbility(b:GetAbilityByName("lycan_howl"), "lycan_howl", "lycan")
-local s = SafeAbility(b:GetAbilityByName("lycan_feral_impulse"), "lycan_feral_impulse", "lycan")
-local t = SafeAbility(b:GetAbilityByName("lycan_wolf_bite"), "lycan_wolf_bite", "lycan")
-local u = SafeAbility(b:GetAbilityByName("lycan_shapeshift"), "lycan_shapeshift", "lycan")
-local v
-local w
-local x, y
-local z
-local A
-local B
-local C
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local summonWolvesAbility = SafeAbility(bot:GetAbilityByName("lycan_summon_wolves"), "lycan_summon_wolves", "lycan")
+local howlAbility = SafeAbility(bot:GetAbilityByName("lycan_howl"), "lycan_howl", "lycan")
+local feralImpulseAbility = SafeAbility(bot:GetAbilityByName("lycan_feral_impulse"), "lycan_feral_impulse", "lycan")
+local wolfBiteAbility = SafeAbility(bot:GetAbilityByName("lycan_wolf_bite"), "lycan_wolf_bite", "lycan")
+local shapeshiftAbility = SafeAbility(bot:GetAbilityByName("lycan_shapeshift"), "lycan_shapeshift", "lycan")
+local summonWolvesDesire
+local howlDesire
+local wolfBiteDesire, wolfBiteTarget
+local shapeshiftDesire
+local botTarget
+local isGoingOnSomeone
+local isAttacking
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	B = c.IsGoingOnSomeone(b)
-	C = c.IsAttacking(b)
-	z = a.ConsiderShapeShift()
-	if z > 0 then
-		b:Action_UseAbility(u)
+	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
+	isAttacking = Fu.IsAttacking(bot)
+	shapeshiftDesire = X.ConsiderShapeShift()
+	if shapeshiftDesire > 0 then
+		bot:Action_UseAbility(shapeshiftAbility)
 		return
 	end
-	w = a.ConsiderHowl()
-	if w > 0 then
-		b:Action_UseAbility(r)
+	howlDesire = X.ConsiderHowl()
+	if howlDesire > 0 then
+		bot:Action_UseAbility(howlAbility)
 		return
 	end
-	v = a.ConsiderSummonWolves()
-	if v > 0 then
-		b:Action_UseAbility(q)
+	summonWolvesDesire = X.ConsiderSummonWolves()
+	if summonWolvesDesire > 0 then
+		bot:Action_UseAbility(summonWolvesAbility)
 		return
 	end
 	-- Wolf Bite (Scepter) was loaded but never cast. Last in the order so it never blocks the rest.
-	local biteDesire, biteTarget = a.ConsiderWolfBite()
+	local biteDesire, biteTarget = X.ConsiderWolfBite()
 	if biteDesire > 0 then
-		b:Action_UseAbilityOnEntity(t, biteTarget)
+		bot:Action_UseAbilityOnEntity(wolfBiteAbility, biteTarget)
 		return
 	end
 end
 -- Data/datafeed: Wolf Bite is unit-target on an allied hero or creep-hero, cast range 300; the
 -- bitten ally gets Shapeshift's properties and shares lifesteal with Lycan. Cast it on the
 -- hardest-hitting allied hero in a fight.
-function a.ConsiderWolfBite()
-	if t:IsHidden() or not t:IsFullyCastable() then
+function X.ConsiderWolfBite()
+	if wolfBiteAbility:IsHidden() or not wolfBiteAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	-- After an attempt, wait 3 s: if the game ever rejects the order, it must not be re-issued every
 	-- think and keep replacing Lycan's attack order.
-	if DotaTime() < (b._ohaWolfBiteTryAt or -999) + 3 then
+	if DotaTime() < (bot._ohaWolfBiteTryAt or -999) + 3 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if not (B or c.IsInTeamFight(b, 1200)) then
+	if not (isGoingOnSomeone or Fu.IsInTeamFight(bot, 1200)) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local biteRange = t:GetCastRange() + 200
+	local biteRange = wolfBiteAbility:GetCastRange() + 200
 	local bestAlly, bestScore = nil, -1
-	for _, ally in pairs(c.GetNearbyHeroes(b, biteRange, false, BOT_MODE_NONE) or {}) do
+	for _, ally in pairs(Fu.GetNearbyHeroes(bot, biteRange, false, BOT_MODE_NONE) or {}) do
 		if
-			c.IsValidHero(ally)
-			and ally ~= b
+			Fu.IsValidHero(ally)
+			and ally ~= bot
 			and not ally:IsIllusion()
-			and not c.IsMeepoClone(ally)
-			and (c.IsGoingOnSomeone(ally) or c.IsInTeamFight(ally, 1200))
-			and c.IsValidHero(ally:GetAttackTarget())
+			and not Fu.IsMeepoClone(ally)
+			and (Fu.IsGoingOnSomeone(ally) or Fu.IsInTeamFight(ally, 1200))
+			and Fu.IsValidHero(ally:GetAttackTarget())
 		then
 			local score = ally:GetAttackDamage() * ally:GetAttackSpeed()
-			if c.IsCore(ally) then
+			if Fu.IsCore(ally) then
 				score = score + 10000
 			end
 			if score > bestScore then
@@ -184,9 +184,9 @@ function a.ConsiderWolfBite()
 		end
 	end
 	if bestAlly ~= nil then
-		b._ohaWolfBiteTryAt = DotaTime()
-		if DotaTime() >= (b._ohaWolfBiteLogAt or -999) then
-			b._ohaWolfBiteLogAt = DotaTime() + 5
+		bot._ohaWolfBiteTryAt = DotaTime()
+		if DotaTime() >= (bot._ohaWolfBiteLogAt or -999) then
+			bot._ohaWolfBiteLogAt = DotaTime() + 5
 			pcall(print, string.format(
 				"[OHA-LYCAN] t=%.0f wolf bite on %s",
 				DotaTime(),
@@ -197,204 +197,204 @@ function a.ConsiderWolfBite()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderSummonWolves()
-	if not q:IsFullyCastable() then
+function X.ConsiderSummonWolves()
+	if not summonWolvesAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	for D, E in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if c.IsValid(E) and string.find(E:GetUnitName(), "npc_dota_lycan_wolf") then
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+		if Fu.IsValid(unit) and string.find(unit:GetUnitName(), "npc_dota_lycan_wolf") then
 			return BOT_ACTION_DESIRE_NONE
 		end
 	end
-	A = c.GetProperTarget(b)
-	if B then
-		local F = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local G = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	botTarget = Fu.GetProperTarget(bot)
+	if isGoingOnSomeone then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			c.IsValidTarget(A)
-			and c.IsInRange(b, A, 800)
-			and not c.IsSuspiciousIllusion(A)
-			and F ~= nil
-			and G
-			and #F >= #G
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and nearbyAllies ~= nil
+			and nearbyEnemies
+			and #nearbyAllies >= #nearbyEnemies
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) or c.IsLaning(b) then
-		local H = b:GetNearbyLaneCreeps(800, true)
-		if C then
-			if H ~= nil and #H >= 1 then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsLaning(bot) then
+		local nearbyCreeps = bot:GetNearbyLaneCreeps(800, true)
+		if isAttacking then
+			if nearbyCreeps ~= nil and #nearbyCreeps >= 1 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			local I = b:GetNearbyTowers(600, true)
-			if I ~= nil and #I >= 1 and c.CanBeAttacked(I[1]) then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-	end
-	if c.IsFarming(b) then
-		local J = b:GetNearbyNeutralCreeps(600)
-		local H = b:GetNearbyLaneCreeps(600, true)
-		if C then
-			if J ~= nil and #J >= 2 or H ~= nil and #H >= 3 then
+			local nearbyTowers = bot:GetNearbyTowers(600, true)
+			if nearbyTowers ~= nil and #nearbyTowers >= 1 and Fu.CanBeAttacked(nearbyTowers[1]) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(A) and c.IsInRange(b, A, 400) and C then
+	if Fu.IsFarming(bot) then
+		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(600)
+		local nearbyCreeps = bot:GetNearbyLaneCreeps(600, true)
+		if isAttacking then
+			if nearbyNeutrals ~= nil and #nearbyNeutrals >= 2 or nearbyCreeps ~= nil and #nearbyCreeps >= 3 then
+				return BOT_ACTION_DESIRE_HIGH
+			end
+		end
+	end
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(A) and c.IsInRange(b, A, 400) and C then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderHowl()
-	if not r:IsFullyCastable() then
+function X.ConsiderHowl()
+	if not howlAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local K = c.CheckTimeOfDay()
-	A = c.GetProperTarget(b)
-	if K == "night" then
-		for D, L in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			if c.IsValidHero(L) and not L:IsIllusion() then
-				if c.IsCore(L) and c.IsGoingOnSomeone(L) then
-					local M = L:GetAttackTarget()
+	local timeOfDay = Fu.CheckTimeOfDay()
+	botTarget = Fu.GetProperTarget(bot)
+	if timeOfDay == "night" then
+		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+			if Fu.IsValidHero(allyHero) and not allyHero:IsIllusion() then
+				if Fu.IsCore(allyHero) and Fu.IsGoingOnSomeone(allyHero) then
+					local allyTarget = allyHero:GetAttackTarget()
 					if
-						c.IsValidTarget(M)
-						-- Was IsInRange(b, ...): measured from Lycan, so the global night Howl only
+						Fu.IsValidTarget(allyTarget)
+						-- Was IsInRange(bot, ...): measured from Lycan, so the global night Howl only
 						-- helped an ally core fighting next to Lycan. The ally must be in range.
-						and c.IsInRange(L, M, L:GetAttackRange() + 150)
-						and L:IsFacingLocation(M:GetLocation(), 30)
-						and c.IsAttacking(L)
-						and not c.IsSuspiciousIllusion(M)
+						and Fu.IsInRange(allyHero, allyTarget, allyHero:GetAttackRange() + 150)
+						and allyHero:IsFacingLocation(allyTarget:GetLocation(), 30)
+						and Fu.IsAttacking(allyHero)
+						and not Fu.IsSuspiciousIllusion(allyTarget)
 					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				end
 			end
 		end
-		local N = c.GetTeamFightLocation(b)
-		if N ~= nil then
-			if GetUnitToLocationDistance(b, N) > 1600 then
+		local teamFightLocation = Fu.GetTeamFightLocation(bot)
+		if teamFightLocation ~= nil then
+			if GetUnitToLocationDistance(bot, teamFightLocation) > 1600 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if B then
-		local F = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local G = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			c.IsValidTarget(A)
-			and c.IsInRange(b, A, 800)
-			and not c.IsSuspiciousIllusion(A)
-			and F ~= nil
-			and G
-			and #F >= #G
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and nearbyAllies ~= nil
+			and nearbyEnemies
+			and #nearbyAllies >= #nearbyEnemies
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsRetreating(b) then
-		local F = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		local G = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		if
-			F ~= nil
-			and G ~= nil
-			and (#G > #F or c.GetHP(b) < 0.75 and b:WasRecentlyDamagedByAnyHero(1.7))
-			and c.IsValidHero(G[1])
-			and c.IsInRange(b, G[1], 450)
-			and b:IsFacingLocation(c.GetEscapeLoc(), 30)
-			and G[1]:IsFacingLocation(b:GetLocation(), 30)
-			and not c.IsSuspiciousIllusion(G[1])
-			and not c.IsDisabled(G[1])
+			nearbyAllies ~= nil
+			and nearbyEnemies ~= nil
+			and (#nearbyEnemies > #nearbyAllies or Fu.GetHP(bot) < 0.75 and bot:WasRecentlyDamagedByAnyHero(1.7))
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], 450)
+			and bot:IsFacingLocation(Fu.GetEscapeLoc(), 30)
+			and nearbyEnemies[1]:IsFacingLocation(bot:GetLocation(), 30)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local H = b:GetNearbyCreeps(600, true)
-		if C then
-			if H ~= nil and #H >= 2 then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+		local nearbyCreeps = bot:GetNearbyCreeps(600, true)
+		if isAttacking then
+			if nearbyCreeps ~= nil and #nearbyCreeps >= 2 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			local I = b:GetNearbyTowers(600, true)
-			if I ~= nil and #I >= 1 and c.CanBeAttacked(I[1]) then
+			local nearbyTowers = bot:GetNearbyTowers(600, true)
+			if nearbyTowers ~= nil and #nearbyTowers >= 1 and Fu.CanBeAttacked(nearbyTowers[1]) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
-		local O = c.GetNearbyHeroes(b, 900, false, BOT_MODE_NONE)
-		if O ~= nil and #O >= 2 and H ~= nil and #H >= 1 then
+		local alliesNearby = Fu.GetNearbyHeroes(bot, 900, false, BOT_MODE_NONE)
+		if alliesNearby ~= nil and #alliesNearby >= 2 and nearbyCreeps ~= nil and #nearbyCreeps >= 1 then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
-	if c.IsFarming(b) then
-		local J = b:GetNearbyNeutralCreeps(300)
-		local H = b:GetNearbyLaneCreeps(600, true)
-		if C then
-			if J ~= nil and #J >= 2 or H ~= nil and #H >= 3 then
+	if Fu.IsFarming(bot) then
+		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(300)
+		local nearbyCreeps = bot:GetNearbyLaneCreeps(600, true)
+		if isAttacking then
+			if nearbyNeutrals ~= nil and #nearbyNeutrals >= 2 or nearbyCreeps ~= nil and #nearbyCreeps >= 3 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(A) and c.IsInRange(b, A, 400) and C then
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(A) and c.IsInRange(b, A, 400) and C then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderShapeShift()
-	if not u:IsFullyCastable() then
+function X.ConsiderShapeShift()
+	if not shapeshiftAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if c.IsInTeamFight(b, 1000) then
+	if Fu.IsInTeamFight(bot, 1000) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if B then
-		A = c.GetProperTarget(b)
-		local F = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local G = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		botTarget = Fu.GetProperTarget(bot)
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			c.IsValidTarget(A)
-			and c.IsInRange(b, A, 800)
-			and not c.IsSuspiciousIllusion(A)
-			and F ~= nil
-			and G
-			and #F >= #G
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and nearbyAllies ~= nil
+			and nearbyEnemies
+			and #nearbyAllies >= #nearbyEnemies
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	if P ~= nil and #P >= 1 then
-		for D, Q in pairs(P) do
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+	if enemiesInRange ~= nil and #enemiesInRange >= 1 then
+		for _, enemyHero in pairs(enemiesInRange) do
 			if
-				c.IsValidTarget(Q)
-				and not c.IsSuspiciousIllusion(Q)
-				and c.GetHP(Q) < 0.5
-				and not Q:IsFacingLocation(b:GetLocation(), 60)
+				Fu.IsValidTarget(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.GetHP(enemyHero) < 0.5
+				and not enemyHero:IsFacingLocation(bot:GetLocation(), 60)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsRetreating(b) then
-		local G = c.GetNearbyHeroes(b, 900, true, BOT_MODE_NONE)
-		if G ~= nil and #G >= 1 and c.GetHP(b) < 0.3 and b:WasRecentlyDamagedByAnyHero(2.0) then
+	if Fu.IsRetreating(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE)
+		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and Fu.GetHP(bot) < 0.3 and bot:WasRecentlyDamagedByAnyHero(2.0) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

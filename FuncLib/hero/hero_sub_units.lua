@@ -1,141 +1,141 @@
 -- Hero-specific helper: hero sub units.
-local a = {}
-local b
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d
-local e = false
-function a.FamiliarThink(f, g)
-	if c.CanNotUseAbility(g) then
+local X = {}
+local ownerHero
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local stoneFormAbility
+local isFamiliarBusy = false
+function X.FamiliarThink(hero, familiar)
+	if Fu.CanNotUseAbility(familiar) then
 		return
 	end
-	b = f
-	d = g:GetAbilityByName("visage_summon_familiars_stone_form")
-	Desire = ConsiderStoneForm(g, d)
+	ownerHero = hero
+	stoneFormAbility = familiar:GetAbilityByName("visage_summon_familiars_stone_form")
+	Desire = ConsiderStoneForm(familiar, stoneFormAbility)
 	if Desire > 0 then
-		g:Action_UseAbilityOnLocation(d, g:GetLocation())
+		familiar:Action_UseAbilityOnLocation(stoneFormAbility, familiar:GetLocation())
 		return
 	end
-	RetreatDesire, RetreatLocation = ConsiderFamiliarRetreat(g)
+	RetreatDesire, RetreatLocation = ConsiderFamiliarRetreat(familiar)
 	if RetreatDesire > 0 then
-		g:Action_MoveToLocation(RetreatLocation)
+		familiar:Action_MoveToLocation(RetreatLocation)
 		return
 	end
-	AttackDesire, AttackTarget = ConsiderFamiliarAttack(g)
+	AttackDesire, AttackTarget = ConsiderFamiliarAttack(familiar)
 	if AttackDesire > 0 then
-		g:Action_AttackUnit(AttackTarget, false)
+		familiar:Action_AttackUnit(AttackTarget, false)
 		return
 	end
-	MoveDesire, MoveLocation = ConsiderFamiliarMove(g)
+	MoveDesire, MoveLocation = ConsiderFamiliarMove(familiar)
 	if MoveDesire > 0 then
-		g:Action_MoveToLocation(MoveLocation)
+		familiar:Action_MoveToLocation(MoveLocation)
 		return
 	end
 end
-function ConsiderStoneForm(g, h)
-	if not h:IsFullyCastable() or g:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
+function ConsiderStoneForm(familiar, stoneFormAbility)
+	if not stoneFormAbility:IsFullyCastable() or familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local i = h:GetSpecialValueInt("stun_radius")
-	if c.IsRetreating(b) then
-		local j = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-		for k, l in pairs(j) do
+	local stunRadius = stoneFormAbility:GetSpecialValueInt("stun_radius")
+	if Fu.IsRetreating(ownerHero) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(ownerHero, 1600, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(l)
-				and c.CanCastOnNonMagicImmune(l)
-				and c.CanCastOnTargetAdvanced(l)
-				and c.IsChasingTarget(l, b)
-				and not c.IsSuspiciousIllusion(l)
-				and not c.IsDisabled(l)
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, ownerHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
 			then
-				local m = c.GetNearbyHeroes(l, 1200, true, BOT_MODE_NONE)
-				local n = c.GetNearbyHeroes(l, 1200, false, BOT_MODE_NONE)
-				if m ~= nil and n ~= nil and (#n > #m or b:WasRecentlyDamagedByAnyHero(2.5)) then
-					local o = g:GetNearbyHeroes(i, true, BOT_MODE_NONE)
-					if o ~= nil and #o >= 1 then
+				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or ownerHero:WasRecentlyDamagedByAnyHero(2.5)) then
+					local enemiesInStunRadius = familiar:GetNearbyHeroes(stunRadius, true, BOT_MODE_NONE)
+					if enemiesInStunRadius ~= nil and #enemiesInStunRadius >= 1 then
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				end
 			end
 		end
 	end
-	if c.GetHP(g) < 0.49 then
+	if Fu.GetHP(familiar) < 0.49 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	local p = g:GetNearbyHeroes(i, true, BOT_MODE_NONE)
-	for k, l in pairs(p) do
-		if c.IsValidHero(l) and c.CanCastOnNonMagicImmune(l) and l:IsChanneling() and not c.IsSuspiciousIllusion(l) then
+	local nearbyEnemies = familiar:GetNearbyHeroes(stunRadius, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() and not Fu.IsSuspiciousIllusion(enemyHero) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	local q = g:GetAttackTarget()
-	if c.IsValidHero(q) and not c.IsSuspiciousIllusion(q) and not c.IsDisabled(q) then
+	local attackTarget = familiar:GetAttackTarget()
+	if Fu.IsValidHero(attackTarget) and not Fu.IsSuspiciousIllusion(attackTarget) and not Fu.IsDisabled(attackTarget) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function ConsiderFamiliarRetreat(g)
-	if g:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
+function ConsiderFamiliarRetreat(familiar)
+	if familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if not b:IsAlive() then
-		return BOT_ACTION_DESIRE_HIGH, c.GetEscapeLoc()
+	if not ownerHero:IsAlive() then
+		return BOT_ACTION_DESIRE_HIGH, Fu.GetEscapeLoc()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function ConsiderFamiliarAttack(g)
-	if g:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
+function ConsiderFamiliarAttack(familiar)
+	if familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local r = c.GetProperTarget(b)
-	if c.IsValidHero(r) or c.IsValidBuilding(r) then
-		e = false
-		return BOT_ACTION_DESIRE_HIGH, r
+	local heroTarget = Fu.GetProperTarget(ownerHero)
+	if Fu.IsValidHero(heroTarget) or Fu.IsValidBuilding(heroTarget) then
+		isFamiliarBusy = false
+		return BOT_ACTION_DESIRE_HIGH, heroTarget
 	end
-	local s = b:GetNearbyCreeps(700, true)
-	for k, t in pairs(s) do
-		if c.IsValid(t) and c.CanBeAttacked(t) and GetUnitToUnitDistance(b, g) < 1600 then
-			e = true
-			return BOT_ACTION_DESIRE_HIGH, t
+	local nearbyUnits = ownerHero:GetNearbyCreeps(700, true)
+	for _, creep in pairs(nearbyUnits) do
+		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and GetUnitToUnitDistance(ownerHero, familiar) < 1600 then
+			isFamiliarBusy = true
+			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end
-	s = b:GetNearbyTowers(700, true)
-	for k, u in pairs(s) do
+	nearbyUnits = ownerHero:GetNearbyTowers(700, true)
+	for _, tower in pairs(nearbyUnits) do
 		if
-			c.IsValidBuilding(u)
-			and c.CanBeAttacked(u)
-			and u:GetAttackTarget() ~= g
-			and not g:WasRecentlyDamagedByTower(1)
+			Fu.IsValidBuilding(tower)
+			and Fu.CanBeAttacked(tower)
+			and tower:GetAttackTarget() ~= familiar
+			and not familiar:WasRecentlyDamagedByTower(1)
 		then
-			local j = c.GetEnemiesNearLoc(u:GetLocation(), 700)
-			if j ~= nil and #j == 0 and GetUnitToUnitDistance(b, g) < 1600 then
-				e = true
-				return BOT_ACTION_DESIRE_HIGH, u
+			local enemiesNearTower = Fu.GetEnemiesNearLoc(tower:GetLocation(), 700)
+			if enemiesNearTower ~= nil and #enemiesNearTower == 0 and GetUnitToUnitDistance(ownerHero, familiar) < 1600 then
+				isFamiliarBusy = true
+				return BOT_ACTION_DESIRE_HIGH, tower
 			end
 		end
 	end
-	e = false
+	isFamiliarBusy = false
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function ConsiderFamiliarMove(g)
-	if g:HasModifier("modifier_visage_summon_familiars_stone_form_buff") or not b:IsAlive() then
+function ConsiderFamiliarMove(familiar)
+	if familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff") or not ownerHero:IsAlive() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local p = g:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	for k, l in pairs(p) do
-		if c.IsValidHero(l) and c.CanCastOnNonMagicImmune(l) and l:IsChanneling() and not c.IsSuspiciousIllusion(l) then
-			local m = c.GetNearbyHeroes(l, 1200, true, BOT_MODE_NONE)
-			local j = c.GetNearbyHeroes(l, 1200, false, BOT_MODE_NONE)
-			if m ~= nil and j ~= nil and #m >= #j then
-				return BOT_ACTION_DESIRE_HIGH, l:GetLocation()
+	local nearbyEnemies = familiar:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() and not Fu.IsSuspiciousIllusion(enemyHero) then
+			local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+			if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
 		end
 	end
-	if GetUnitToUnitDistance(g, b) > g:GetAttackRange() and not e then
-		return BOT_ACTION_DESIRE_HIGH, b:GetLocation() + RandomVector(g:GetAttackRange())
+	if GetUnitToUnitDistance(familiar, ownerHero) > familiar:GetAttackRange() and not isFamiliarBusy then
+		return BOT_ACTION_DESIRE_HIGH, ownerHero:GetLocation() + RandomVector(familiar:GetAttackRange())
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-local v = {
+local bearItemList = {
 	"item_six_branches",
 	"item_phase_boots",
 	"item_diffusal_blade",
@@ -148,108 +148,108 @@ local v = {
 	"item_monkey_king_bar",
 	"item_bloodthorn",
 }
-local w
-local r
-function a.BearThink(f, g)
-	b = f
-	r = c.GetProperTarget(b)
-	w = g:GetAbilityByName("lone_druid_spirit_bear_return")
-	Desire = ConsiderReturn(g, w)
+local returnAbility
+local bearTarget
+function X.BearThink(hero, bear)
+	ownerHero = hero
+	bearTarget = Fu.GetProperTarget(ownerHero)
+	returnAbility = bear:GetAbilityByName("lone_druid_spirit_bear_return")
+	Desire = ConsiderReturn(bear, returnAbility)
 	if Desire > 0 then
-		g:Action_UseAbility(w)
+		bear:Action_UseAbility(returnAbility)
 		return
 	end
-	RetreatDesire, RetreatLocation = ConsiderBearRetreat(g)
+	RetreatDesire, RetreatLocation = ConsiderBearRetreat(bear)
 	if RetreatDesire > 0 then
-		g:Action_MoveToLocation(RetreatLocation)
+		bear:Action_MoveToLocation(RetreatLocation)
 		return
 	end
-	AttackDesire, AttackTarget = ConsiderBearAttack(g)
+	AttackDesire, AttackTarget = ConsiderBearAttack(bear)
 	if AttackDesire > 0 then
-		g:Action_AttackUnit(AttackTarget, false)
+		bear:Action_AttackUnit(AttackTarget, false)
 		return
 	end
-	MoveDesire, MoveLocation = ConsiderBearMove(g)
+	MoveDesire, MoveLocation = ConsiderBearMove(bear)
 	if MoveDesire > 0 then
-		g:Action_MoveToLocation(MoveLocation)
+		bear:Action_MoveToLocation(MoveLocation)
 		return
 	end
 end
-function ConsiderReturn(g, h)
-	if not h:IsFullyCastable() then
+function ConsiderReturn(bear, returnAbility)
+	if not returnAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if GetUnitToUnitDistance(b, g) > 1100 then
-		g:SetTarget(nil)
+	if GetUnitToUnitDistance(ownerHero, bear) > 1100 then
+		bear:SetTarget(nil)
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function ConsiderBearRetreat(g)
-	if c.IsRetreating(b) then
-		local m = g:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-		local j = g:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-		if m ~= nil and j ~= nil and #j > #m then
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+function ConsiderBearRetreat(bear)
+	if Fu.IsRetreating(ownerHero) then
+		local nearbyAllies = bear:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+		local nearbyEnemies = bear:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+		if nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyEnemies > #nearbyAllies then
+			return BOT_ACTION_DESIRE_HIGH, ownerHero:GetLocation()
 		end
 	end
-	if g:WasRecentlyDamagedByTower(1) and c.GetHP(g) < 0.5 then
-		local x = g:GetNearbyTowers(700, true)
-		if x ~= nil and #x >= 1 and GetUnitToUnitDistance(g, x[1]) < 700 then
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+	if bear:WasRecentlyDamagedByTower(1) and Fu.GetHP(bear) < 0.5 then
+		local nearbyTowers = bear:GetNearbyTowers(700, true)
+		if nearbyTowers ~= nil and #nearbyTowers >= 1 and GetUnitToUnitDistance(bear, nearbyTowers[1]) < 700 then
+			return BOT_ACTION_DESIRE_HIGH, ownerHero:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function ConsiderBearAttack(g)
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local x = g:GetNearbyTowers(1200, true)
-		if x ~= nil and #x >= 1 then
-			return BOT_ACTION_DESIRE_HIGH, x[1]
+function ConsiderBearAttack(bear)
+	if Fu.IsPushing(ownerHero) or Fu.IsDefending(ownerHero) then
+		local nearbyTowers = bear:GetNearbyTowers(1200, true)
+		if nearbyTowers ~= nil and #nearbyTowers >= 1 then
+			return BOT_ACTION_DESIRE_HIGH, nearbyTowers[1]
 		end
-		local y = g:GetNearbyLaneCreeps(1600, true)
-		if y ~= nil and #y >= 1 then
-			return BOT_ACTION_DESIRE_HIGH, y[1]
+		local nearbyLaneCreeps = bear:GetNearbyLaneCreeps(1600, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 1 then
+			return BOT_ACTION_DESIRE_HIGH, nearbyLaneCreeps[1]
 		end
 	end
-	if c.IsLaning(b) then
-		local y = g:GetNearbyLaneCreeps(b:GetAttackRange(), true)
-		if y ~= nil and #y >= 1 then
-			for k, t in pairs(y) do
-				if c.IsValid(t) and c.CanBeAttacked(t) and t:GetHealth() <= g:GetAttackDamage() then
-					return BOT_ACTION_DESIRE_HIGH, t
+	if Fu.IsLaning(ownerHero) then
+		local nearbyLaneCreeps = bear:GetNearbyLaneCreeps(ownerHero:GetAttackRange(), true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 1 then
+			for _, creep in pairs(nearbyLaneCreeps) do
+				if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and creep:GetHealth() <= bear:GetAttackDamage() then
+					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
 		end
 	end
-	if c.IsFarming(b) then
-		local z = g:GetNearbyCreeps(1600, true)
-		if z ~= nil and #z >= 1 and c.IsAttacking(b) then
-			local A = nil
-			local B = 0
-			for k, t in pairs(z) do
-				if c.IsValid(t) and c.CanBeAttacked(t) and B < t:GetHealth() then
-					B = t:GetHealth()
-					A = t
+	if Fu.IsFarming(ownerHero) then
+		local nearbyCreeps = bear:GetNearbyCreeps(1600, true)
+		if nearbyCreeps ~= nil and #nearbyCreeps >= 1 and Fu.IsAttacking(ownerHero) then
+			local strongestCreep = nil
+			local strongestHealth = 0
+			for _, creep in pairs(nearbyCreeps) do
+				if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and strongestHealth < creep:GetHealth() then
+					strongestHealth = creep:GetHealth()
+					strongestCreep = creep
 				end
 			end
-			if A ~= nil then
-				return BOT_ACTION_DESIRE_HIGH, A
+			if strongestCreep ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, strongestCreep
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(b) or c.IsDoingTormentor(b)) and c.IsInRange(b, r, 500) and c.IsAttacking(b) then
-			g:SetTarget(r)
-			return BOT_ACTION_DESIRE_HIGH, r
+	if Fu.IsDoingRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero) then
+		if (Fu.IsRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero)) and Fu.IsInRange(ownerHero, bearTarget, 500) and Fu.IsAttacking(ownerHero) then
+			bear:SetTarget(bearTarget)
+			return BOT_ACTION_DESIRE_HIGH, bearTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function ConsiderBearMove(g)
-	if not c.IsInRange(b, g, 700) then
-		return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+function ConsiderBearMove(bear)
+	if not Fu.IsInRange(ownerHero, bear, 700) then
+		return BOT_ACTION_DESIRE_HIGH, ownerHero:GetLocation()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-return a
+return X

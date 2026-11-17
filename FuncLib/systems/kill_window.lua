@@ -56,12 +56,12 @@ local function Fountain(team)
 	return Vector(6982, 6422, 392)
 end
 
-local function Dist(a, b)
-	if a == nil or b == nil or a.x == nil or b.x == nil then
+local function Dist(posA, posB)
+	if posA == nil or posB == nil or posA.x == nil or posB.x == nil then
 		return 99999
 	end
-	local dx = a.x - b.x
-	local dy = a.y - b.y
+	local dx = posA.x - posB.x
+	local dy = posA.y - posB.y
 	return math.sqrt(dx * dx + dy * dy)
 end
 
@@ -104,11 +104,11 @@ end
 local function RespawnOf(pid)
 	local hero = FindEnemy(pid)
 	if hero ~= nil and hero.GetRespawnTime ~= nil then
-		local ok, rt = pcall(function()
+		local ok, respawnTime = pcall(function()
 			return hero:GetRespawnTime()
 		end)
-		if ok and type(rt) == "number" and rt > 5 and rt < 140 then
-			return rt, true
+		if ok and type(respawnTime) == "number" and respawnTime > 5 and respawnTime < 140 then
+			return respawnTime, true
 		end
 	end
 	return 30, false
@@ -227,16 +227,16 @@ end
 -- Dead enemies that will be back within `seconds` (respawn timer only).
 function KillWindow.RespawningWithin(seconds)
 	local now = Now()
-	local n = 0
+	local count = 0
 	for _, slot in pairs(enemies) do
 		if not slot.alive and slot.deathAt ~= nil then
 			local rest = slot.deathAt + (slot.respawnFor or 30) - now
 			if rest <= seconds then
-				n = n + 1
+				count = count + 1
 			end
 		end
 	end
-	return n
+	return count
 end
 function KillWindow.WindowLeft()
 	local now = Now()
@@ -255,11 +255,11 @@ end
 -- Seconds a respawned enemy needs to reach `loc` from its fountain, counting a TP to a
 -- tower on the way. Kept between 8 and 20.
 function KillWindow.TransitGrace(loc)
-	local d = Dist(Fountain(GetOpposingTeam()), loc)
-	if d >= 99999 then
+	local distance = Dist(Fountain(GetOpposingTeam()), loc)
+	if distance >= 99999 then
 		return 10
 	end
-	return math.max(8, math.min(20, d / 450))
+	return math.max(8, math.min(20, distance / 450))
 end
 
 -- Enemies that respawned less than `grace` seconds ago and have not been seen away from
@@ -267,7 +267,7 @@ end
 function KillWindow.EnemiesInTransit(grace)
 	local now = Now()
 	local fountain = Fountain(GetOpposingTeam())
-	local n = 0
+	local count = 0
 	for pid, slot in pairs(enemies) do
 		if slot.alive and slot.backAt ~= nil and now - slot.backAt < (grace or 15) then
 			local seen = LastSeen(pid)
@@ -276,11 +276,11 @@ function KillWindow.EnemiesInTransit(grace)
 				and seen.time_since_seen < 3
 				and Dist(seen.location, fountain) > 3500
 			if not away then
-				n = n + 1
+				count = count + 1
 			end
 		end
 	end
-	return n
+	return count
 end
 
 function KillWindow.Tick()

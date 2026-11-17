@@ -1,38 +1,38 @@
 -- Attack mode. Picks a fight target and how badly the bot wants that fight.
-local a = GetBot()
-local b = a:GetUnitName()
-local c = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local d
-if not ShouldSkipBotThink(a) and c.BuggyHeroesDueToValveTooLazy[b] then
-	d = dofile(GetScriptDirectory() .. "/FuncLib/systems/override_generic/mode_attack_generic")
+local bot = GetBot()
+local botName = bot:GetUnitName()
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local AttackOverride
+if not ShouldSkipBotThink(bot) and Utils.BuggyHeroesDueToValveTooLazy[botName] then
+	AttackOverride = dofile(GetScriptDirectory() .. "/FuncLib/systems/override_generic/mode_attack_generic")
 end
-if d ~= nil then
+if AttackOverride ~= nil then
 	function GetDesire()
-		if ShouldSkipBotThink(a) then
+		if ShouldSkipBotThink(bot) then
 			return 0
 		end
-		return math.min(d.GetDesire(), BOT_MODE_DESIRE_ABSOLUTE)
+		return math.min(AttackOverride.GetDesire(), BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	function Think()
-		if ShouldSkipBotThink(a) then
+		if ShouldSkipBotThink(bot) then
 			return
 		end
-		return d.Think()
+		return AttackOverride.Think()
 	end
 	function OnStart()
-		return d.OnStart()
+		return AttackOverride.OnStart()
 	end
 	function OnEnd()
-		return d.OnEnd()
+		return AttackOverride.OnEnd()
 	end
 end
 if SafeCall then
-	local e = GetDesire
-	local f = Think
-	if e then
-		GetDesire = SafeCall(e, 0, "ATTACK_GetDesire")
+	local originalGetDesire = GetDesire
+	local originalThink = Think
+	if originalGetDesire then
+		GetDesire = SafeCall(originalGetDesire, 0, "ATTACK_GetDesire")
 	end
-	if f then
-		Think = SafeCall(f, nil, "ATTACK_Think")
+	if originalThink then
+		Think = SafeCall(originalThink, nil, "ATTACK_Think")
 	end
 end

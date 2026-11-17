@@ -1,472 +1,472 @@
 -- Shared helper: positioning.
-local function a(b)
-	function b.IsAllyHeroBetweenAllyAndEnemy(c, d, e, f)
-		local g = c:GetLocation()
-		local h = e
-		local i = b.GetNearbyHeroes(c, 1600, false, BOT_MODE_NONE)
-		for j, k in pairs(i) do
-			if k ~= c then
-				local l = PointToLineDistance(g, h, k:GetLocation())
-				if l ~= nil and l.within and l.distance <= f + 50 then
+local function installPositioning(Fu)
+	function Fu.IsAllyHeroBetweenAllyAndEnemy(allyHero, enemyHero, location, radius)
+		local startLocation = allyHero:GetLocation()
+		local endLocation = location
+		local heroes = Fu.GetNearbyHeroes(allyHero, 1600, false, BOT_MODE_NONE)
+		for _, hero in pairs(heroes) do
+			if hero ~= allyHero then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, hero:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius + 50 then
 					return true
 				end
 			end
 		end
-		i = b.GetNearbyHeroes(d, 1600, true, BOT_MODE_NONE)
-		for j, k in pairs(i) do
-			if k ~= c then
-				local l = PointToLineDistance(g, h, k:GetLocation())
-				if l ~= nil and l.within and l.distance <= f + 50 then
+		heroes = Fu.GetNearbyHeroes(enemyHero, 1600, true, BOT_MODE_NONE)
+		for _, hero in pairs(heroes) do
+			if hero ~= allyHero then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, hero:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius + 50 then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.IsInRange(m, n, f)
-		if n == nil or not n:CanBeSeen() then
+	function Fu.IsInRange(unit, target, range)
+		if target == nil or not target:CanBeSeen() then
 			return false
 		end
-		return GetUnitToUnitDistance(m, n) <= f
+		return GetUnitToUnitDistance(unit, target) <= range
 	end
-	function b.IsInLocRange(n, o, f)
-		if not n:CanBeSeen() then
+	function Fu.IsInLocRange(unit, location, range)
+		if not unit:CanBeSeen() then
 			return false
 		end
-		return GetUnitToLocationDistance(n, o) <= f
+		return GetUnitToLocationDistance(unit, location) <= range
 	end
-	function b.GetCorrectLoc(n, p)
-		local q = n:GetMovementDirectionStability()
-		local r = n:GetLocation()
-		local s = n:GetExtrapolatedLocation(p)
-		local t = (r + s) * 0.5
-		local u = (r + t) * 0.5
-		local v = (s + t) * 0.5
-		if q < 0.5 then
-			return u
-		elseif q < 0.7 then
-			return t
-		elseif q < 0.9 then
-			return v
+	function Fu.GetCorrectLoc(unit, delay)
+		local stability = unit:GetMovementDirectionStability()
+		local currentLocation = unit:GetLocation()
+		local predictedLocation = unit:GetExtrapolatedLocation(delay)
+		local midLocation = (currentLocation + predictedLocation) * 0.5
+		local nearMidLocation = (currentLocation + midLocation) * 0.5
+		local farMidLocation = (predictedLocation + midLocation) * 0.5
+		if stability < 0.5 then
+			return nearMidLocation
+		elseif stability < 0.7 then
+			return midLocation
+		elseif stability < 0.9 then
+			return farMidLocation
 		end
-		return s
+		return predictedLocation
 	end
-	function b.GetLocationToLocationDistance(w, x)
-		local y = w.x
-		local z = x.x
-		local A = w.y
-		local B = x.y
-		return math.sqrt(math.pow(B - A, 2) + math.pow(z - y, 2))
+	function Fu.GetLocationToLocationDistance(firstLocation, secondLocation)
+		local x1 = firstLocation.x
+		local x2 = secondLocation.x
+		local y1 = firstLocation.y
+		local y2 = secondLocation.y
+		return math.sqrt(math.pow(y2 - y1, 2) + math.pow(x2 - x1, 2))
 	end
-	function b.GetUnitTowardDistanceLocation(m, C, D)
-		local E = m:GetLocation()
-		local F = (C:GetLocation() - E) / GetUnitToUnitDistance(m, C)
-		return E + D * F
+	function Fu.GetUnitTowardDistanceLocation(unit, target, distance)
+		local unitLocation = unit:GetLocation()
+		local direction = (target:GetLocation() - unitLocation) / GetUnitToUnitDistance(unit, target)
+		return unitLocation + distance * direction
 	end
-	function b.GetLocationTowardDistanceLocation(m, G, D)
-		local E = m:GetLocation()
-		local F = (G - E) / GetUnitToLocationDistance(m, G)
-		return E + D * F
+	function Fu.GetLocationTowardDistanceLocation(unit, location, distance)
+		local unitLocation = unit:GetLocation()
+		local direction = (location - unitLocation) / GetUnitToLocationDistance(unit, location)
+		return unitLocation + distance * direction
 	end
-	function b.GetFaceTowardDistanceLocation(m, D)
-		local E = m:GetLocation()
-		local H = m:GetFacing() * math.pi / 180
-		local F = Vector(math.cos(H), math.sin(H))
-		return E + D * F
+	function Fu.GetFaceTowardDistanceLocation(unit, distance)
+		local unitLocation = unit:GetLocation()
+		local facingRadians = unit:GetFacing() * math.pi / 180
+		local direction = Vector(math.cos(facingRadians), math.sin(facingRadians))
+		return unitLocation + distance * direction
 	end
-	function b.GetCastLocation(m, n, I, f)
-		local D = GetUnitToUnitDistance(m, n)
-		if D <= I then
-			return n:GetLocation()
+	function Fu.GetCastLocation(bot, target, castRange, radius)
+		local distance = GetUnitToUnitDistance(bot, target)
+		if distance <= castRange then
+			return target:GetLocation()
 		end
-		if D <= I + f - 120 then
-			return b.GetUnitTowardDistanceLocation(m, n, I)
+		if distance <= castRange + radius - 120 then
+			return Fu.GetUnitTowardDistanceLocation(bot, target, castRange)
 		end
 		if
-			D < I + f - 18
+			distance < castRange + radius - 18
 			and (
-				b.IsDisabled(n)
-				or n:GetCurrentMovementSpeed() <= 160
-				or n:IsFacingLocation(m:GetLocation(), 45)
-				or m:IsFacingLocation(n:GetLocation(), 45) and n:GetCurrentMovementSpeed() <= 220
+				Fu.IsDisabled(target)
+				or target:GetCurrentMovementSpeed() <= 160
+				or target:IsFacingLocation(bot:GetLocation(), 45)
+				or bot:IsFacingLocation(target:GetLocation(), 45) and target:GetCurrentMovementSpeed() <= 220
 			)
 		then
-			return b.GetUnitTowardDistanceLocation(m, n, I + 18)
+			return Fu.GetUnitTowardDistanceLocation(bot, target, castRange + 18)
 		end
 		if
-			D < I + f + 28
-			and n:IsFacingLocation(m:GetLocation(), 30)
-			and m:IsFacingLocation(n:GetLocation(), 30)
-			and n:GetMovementDirectionStability() > 0.95
-			and n:GetCurrentMovementSpeed() >= 300
+			distance < castRange + radius + 28
+			and target:IsFacingLocation(bot:GetLocation(), 30)
+			and bot:IsFacingLocation(target:GetLocation(), 30)
+			and target:GetMovementDirectionStability() > 0.95
+			and target:GetCurrentMovementSpeed() >= 300
 		then
-			return b.GetUnitTowardDistanceLocation(m, n, I + 18)
+			return Fu.GetUnitTowardDistanceLocation(bot, target, castRange + 18)
 		end
 		return nil
 	end
-	function b.GetDelayCastLocation(m, n, I, f, K)
-		local L = b.GetCorrectLoc(n, K)
-		local D = GetUnitToLocationDistance(m, L)
-		if D > I + f - 16 then
+	function Fu.GetDelayCastLocation(bot, target, castRange, radius, delay)
+		local predictedLocation = Fu.GetCorrectLoc(target, delay)
+		local distance = GetUnitToLocationDistance(bot, predictedLocation)
+		if distance > castRange + radius - 16 then
 			return nil
 		end
-		if D > I - f * 0.38 then
-			return b.GetLocationTowardDistanceLocation(m, L, I + 8)
+		if distance > castRange - radius * 0.38 then
+			return Fu.GetLocationTowardDistanceLocation(bot, predictedLocation, castRange + 8)
 		end
-		return L
+		return predictedLocation
 	end
-	function b.GetCenterOfUnits(M)
-		if #M == 0 then
+	function Fu.GetCenterOfUnits(units)
+		if #units == 0 then
 			return Vector(0.0, 0.0)
 		end
-		local N = Vector(0.0, 0.0)
-		local O = 0
-		for P, Q in pairs(M) do
-			if b.IsValid(Q) then
-				N = N + Q:GetLocation()
-				O = O + 1
+		local locationSum = Vector(0.0, 0.0)
+		local count = 0
+		for _, unit in pairs(units) do
+			if Fu.IsValid(unit) then
+				locationSum = locationSum + unit:GetLocation()
+				count = count + 1
 			end
 		end
-		if O == 0 then
+		if count == 0 then
 			return Vector(0.0, 0.0)
 		end
-		return N / O
+		return locationSum / count
 	end
-	function b.GetNearestLaneFrontLocation(R, S, T)
-		local U = GetTeam()
-		if S then
-			U = GetOpposingTeam()
+	function Fu.GetNearestLaneFrontLocation(location, isEnemy, delta)
+		local team = GetTeam()
+		if isEnemy then
+			team = GetOpposingTeam()
 		end
-		local V = GetLaneFrontLocation(U, LANE_TOP, T)
-		local W = GetLaneFrontLocation(U, LANE_MID, T)
-		local X = GetLaneFrontLocation(U, LANE_BOT, T)
-		local Y = b.GetLocationToLocationDistance(R, V)
-		local Z = b.GetLocationToLocationDistance(R, W)
-		local _ = b.GetLocationToLocationDistance(R, X)
-		if Y < Z and Y < _ then
-			return V
+		local topFront = GetLaneFrontLocation(team, LANE_TOP, delta)
+		local midFront = GetLaneFrontLocation(team, LANE_MID, delta)
+		local botFront = GetLaneFrontLocation(team, LANE_BOT, delta)
+		local topDistance = Fu.GetLocationToLocationDistance(location, topFront)
+		local midDistance = Fu.GetLocationToLocationDistance(location, midFront)
+		local botDistance = Fu.GetLocationToLocationDistance(location, botFront)
+		if topDistance < midDistance and topDistance < botDistance then
+			return topFront
 		end
-		if _ < Z and _ < Y then
-			return X
+		if botDistance < midDistance and botDistance < topDistance then
+			return botFront
 		end
-		return W
+		return midFront
 	end
-	function b.RandomForwardVector(a0)
-		local a1 = RandomVector(a0)
+	function Fu.RandomForwardVector(length)
+		local vector = RandomVector(length)
 		if GetTeam() == TEAM_RADIANT then
-			a1.x = a1.x > 0 and a1.x or -a1.x
-			a1.y = a1.y > 0 and a1.y or -a1.y
+			vector.x = vector.x > 0 and vector.x or -vector.x
+			vector.y = vector.y > 0 and vector.y or -vector.y
 		end
 		if GetTeam() == TEAM_DIRE then
-			a1.x = a1.x < 0 and a1.x or -a1.x
-			a1.y = a1.y < 0 and a1.y or -a1.y
+			vector.x = vector.x < 0 and vector.x or -vector.x
+			vector.y = vector.y < 0 and vector.y or -vector.y
 		end
-		return a1
+		return vector
 	end
-	function b.GetDistance(a2, a3)
-		return math.sqrt((a2[1] - a3[1]) * (a2[1] - a3[1]) + (a2[2] - a3[2]) * (a2[2] - a3[2]))
+	function Fu.GetDistance(first, second)
+		return math.sqrt((first[1] - second[1]) * (first[1] - second[1]) + (first[2] - second[2]) * (first[2] - second[2]))
 	end
-	function b.IsHeroBetweenMeAndLocation(a4, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local m = GetBot()
-		local a5 = b.GetNearbyHeroes(m, 1600, false, BOT_MODE_NONE)
-		for P, a6 in pairs(a5) do
-			if a6 ~= a4 then
-				local l = PointToLineDistance(g, h, a6:GetLocation())
-				if l ~= nil and l.within and l.distance < f then
+	function Fu.IsHeroBetweenMeAndLocation(unit, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local bot = GetBot()
+		local allies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
+		for _, ally in pairs(allies) do
+			if ally ~= unit then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, ally:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
 					return true
 				end
 			end
 		end
-		local a7 = b.GetNearbyHeroes(m, 1600, true, BOT_MODE_NONE)
-		for P, a8 in pairs(a7) do
-			if a8 ~= a4 and not b.IsSuspiciousIllusion(a8) then
-				local l = PointToLineDistance(g, h, a8:GetLocation())
-				if l ~= nil and l.within and l.distance < f then
-					return true
-				end
-			end
-		end
-		return false
-	end
-	function b.IsEnemyBetweenMeAndLocation(a4, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local m = GetBot()
-		local a7 = b.GetNearbyHeroes(m, 1600, true, BOT_MODE_NONE)
-		for P, a8 in pairs(a7) do
-			if a8 ~= a4 and not b.IsSuspiciousIllusion(a8) then
-				local l = PointToLineDistance(g, h, a8:GetLocation())
-				if l ~= nil and l.within and l.distance < f then
+		local enemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		for _, enemy in pairs(enemies) do
+			if enemy ~= unit and not Fu.IsSuspiciousIllusion(enemy) then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, enemy:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.IsHeroBetweenMeAndTarget(a4, a9, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local a5 = b.GetNearbyHeroes(a4, 1600, false, BOT_MODE_NONE)
-		for P, a6 in pairs(a5) do
-			if a6 ~= a9 and a6 ~= a4 then
-				local l = PointToLineDistance(g, h, a6:GetLocation())
-				if l ~= nil and l.within == true and l.distance < f then
-					return true
-				end
-			end
-		end
-		local a7 = b.GetNearbyHeroes(a4, 1600, true, BOT_MODE_NONE)
-		for P, a8 in pairs(a7) do
-			if a8 ~= a9 and a8 ~= a4 then
-				local l = PointToLineDistance(g, h, a8:GetLocation())
-				if l ~= nil and l.within and l.distance < f then
+	function Fu.IsEnemyBetweenMeAndLocation(unit, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local bot = GetBot()
+		local enemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		for _, enemy in pairs(enemies) do
+			if enemy ~= unit and not Fu.IsSuspiciousIllusion(enemy) then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, enemy:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.IsCreepBetweenMeAndLocation(a4, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local m = GetBot()
-		local aa = m:GetNearbyLaneCreeps(1600, true)
-		for P, ab in pairs(aa) do
-			local l = PointToLineDistance(g, h, ab:GetLocation())
-			if l ~= nil and l.within and l.distance < f then
+	function Fu.IsHeroBetweenMeAndTarget(unit, target, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local allies = Fu.GetNearbyHeroes(unit, 1600, false, BOT_MODE_NONE)
+		for _, ally in pairs(allies) do
+			if ally ~= target and ally ~= unit then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, ally:GetLocation())
+				if lineInfo ~= nil and lineInfo.within == true and lineInfo.distance < radius then
+					return true
+				end
+			end
+		end
+		local enemies = Fu.GetNearbyHeroes(unit, 1600, true, BOT_MODE_NONE)
+		for _, enemy in pairs(enemies) do
+			if enemy ~= target and enemy ~= unit then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, enemy:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
+					return true
+				end
+			end
+		end
+		return false
+	end
+	function Fu.IsCreepBetweenMeAndLocation(unit, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local bot = GetBot()
+		local enemyCreeps = bot:GetNearbyLaneCreeps(1600, true)
+		for _, creep in pairs(enemyCreeps) do
+			local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+			if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
 				return true
 			end
 		end
-		local ac = m:GetNearbyLaneCreeps(1600, false)
-		for P, ab in pairs(ac) do
-			local l = PointToLineDistance(g, h, ab:GetLocation())
-			if l ~= nil and l.within and l.distance < f then
+		local allyCreeps = bot:GetNearbyLaneCreeps(1600, false)
+		for _, creep in pairs(allyCreeps) do
+			local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+			if lineInfo ~= nil and lineInfo.within and lineInfo.distance < radius then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsUnitBetweenMeAndLocation(a4, a9, ad, f)
-		local g = a4:GetLocation()
-		local h = ad
-		for P, Q in pairs(GetUnitList(UNIT_LIST_ALL)) do
+	function Fu.IsUnitBetweenMeAndLocation(unit, target, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		for _, otherUnit in pairs(GetUnitList(UNIT_LIST_ALL)) do
 			if
-				b.IsValid(Q)
-				and GetUnitToUnitDistance(GetBot(), Q) <= 1600
-				and not Q:IsBuilding()
-				and not string.find(Q:GetUnitName(), "ward")
-				and a4 ~= Q
-				and a9 ~= Q
+				Fu.IsValid(otherUnit)
+				and GetUnitToUnitDistance(GetBot(), otherUnit) <= 1600
+				and not otherUnit:IsBuilding()
+				and not string.find(otherUnit:GetUnitName(), "ward")
+				and unit ~= otherUnit
+				and target ~= otherUnit
 			then
-				local ae = f + Q:GetBoundingRadius()
-				local l = PointToLineDistance(g, h, Q:GetLocation())
-				if l ~= nil and l.within and l.distance <= ae then
+				local hitRadius = radius + otherUnit:GetBoundingRadius()
+				local lineInfo = PointToLineDistance(startLocation, endLocation, otherUnit:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= hitRadius then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.IsCreepBetweenMeAndTarget(a4, a9, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local af = a4:GetNearbyCreeps(1600, false)
-		for j, ab in pairs(af) do
-			local l = PointToLineDistance(g, h, ab:GetLocation())
-			if l ~= nil and l.within and l.distance <= f then
+	function Fu.IsCreepBetweenMeAndTarget(unit, target, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local creeps = unit:GetNearbyCreeps(1600, false)
+		for _, creep in pairs(creeps) do
+			local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+			if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius then
 				return true
 			end
 		end
-		if a9:IsHero() then
-			af = a9:GetNearbyCreeps(1600, true)
-			for j, ab in pairs(af) do
-				local l = PointToLineDistance(g, h, ab:GetLocation())
-				if l ~= nil and l.within and l.distance <= f then
+		if target:IsHero() then
+			creeps = target:GetNearbyCreeps(1600, true)
+			for _, creep in pairs(creeps) do
+				local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius then
 					return true
 				end
 			end
 		end
-		af = a4:GetNearbyCreeps(1600, true)
-		for j, ab in pairs(af) do
-			local l = PointToLineDistance(g, h, ab:GetLocation())
-			if l ~= nil and l.within and l.distance <= f then
+		creeps = unit:GetNearbyCreeps(1600, true)
+		for _, creep in pairs(creeps) do
+			local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+			if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius then
 				return true
 			end
 		end
-		if a9:IsHero() then
-			af = a9:GetNearbyCreeps(1600, false)
-			for j, ab in pairs(af) do
-				local l = PointToLineDistance(g, h, ab:GetLocation())
-				if l ~= nil and l.within and l.distance <= f then
+		if target:IsHero() then
+			creeps = target:GetNearbyCreeps(1600, false)
+			for _, creep in pairs(creeps) do
+				local lineInfo = PointToLineDistance(startLocation, endLocation, creep:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.IsAllyHeroBetweenMeAndTarget(a4, a9, e, f)
-		local g = a4:GetLocation()
-		local h = e
-		local a5 = b.GetNearbyHeroes(a4, 1600, false, BOT_MODE_NONE)
-		for P, a6 in pairs(a5) do
-			if a6 ~= a4 then
-				local l = PointToLineDistance(g, h, a6:GetLocation())
-				if l ~= nil and l.within and l.distance <= f + 50 then
+	function Fu.IsAllyHeroBetweenMeAndTarget(unit, target, location, radius)
+		local startLocation = unit:GetLocation()
+		local endLocation = location
+		local allies = Fu.GetNearbyHeroes(unit, 1600, false, BOT_MODE_NONE)
+		for _, ally in pairs(allies) do
+			if ally ~= unit then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, ally:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius + 50 then
 					return true
 				end
 			end
 		end
-		local a7 = b.GetNearbyHeroes(a9, 1600, true, BOT_MODE_NONE)
-		for P, a8 in pairs(a7) do
-			if a8 ~= a4 and not b.IsSuspiciousIllusion(a8) then
-				local l = PointToLineDistance(g, h, a8:GetLocation())
-				if l ~= nil and l.within and l.distance <= f + 50 then
+		local enemies = Fu.GetNearbyHeroes(target, 1600, true, BOT_MODE_NONE)
+		for _, enemy in pairs(enemies) do
+			if enemy ~= unit and not Fu.IsSuspiciousIllusion(enemy) then
+				local lineInfo = PointToLineDistance(startLocation, endLocation, enemy:GetLocation())
+				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius + 50 then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.AdjustLocationWithOffset(e, a1, ag)
-		local ah = e
-		local ai = ag:GetFacing()
-		local aj = a1 * math.cos(ai)
-		local ak = a1 * math.sin(ai)
-		ah = ah + Vector(aj, ak)
-		return ah
+	function Fu.AdjustLocationWithOffset(location, offset, unit)
+		local result = location
+		local facing = unit:GetFacing()
+		local offsetX = offset * math.cos(facing)
+		local offsetY = offset * math.sin(facing)
+		result = result + Vector(offsetX, offsetY)
+		return result
 	end
-	function b.AdjustLocationWithOffsetTowardsFountain(loc, al)
-		return b.Utils.GetOffsetLocationTowardsTargetLocation(loc, b.GetTeamFountain(), al)
+	function Fu.AdjustLocationWithOffsetTowardsFountain(loc, distance)
+		return Fu.Utils.GetOffsetLocationTowardsTargetLocation(loc, Fu.GetTeamFountain(), distance)
 	end
-	function b.GetXUnitsTowardsLocation2(am, an, M)
-		local ao = (an - am):Normalized()
-		return am + ao * M
+	function Fu.GetXUnitsTowardsLocation2(startLocation, targetLocation, distance)
+		local direction = (targetLocation - startLocation):Normalized()
+		return startLocation + direction * distance
 	end
-	function b.GetRandomLocationWithinDist(x, ap, aq)
-		local ar = math.random() * 2 * math.pi
-		local as = math.random(ap, aq)
-		local at = x.x + as * math.cos(ar)
-		local au = x.y + as * math.sin(ar)
-		return Vector(at, au, x.z)
+	function Fu.GetRandomLocationWithinDist(center, minDistance, maxDistance)
+		local angle = math.random() * 2 * math.pi
+		local distance = math.random(minDistance, maxDistance)
+		local newX = center.x + distance * math.cos(angle)
+		local newY = center.y + distance * math.sin(angle)
+		return Vector(newX, newY, center.z)
 	end
-	function b.AreTreesBetween(m, loc, av)
-		local aw = m:GetNearbyTrees(GetUnitToLocationDistance(m, loc))
-		for P, ax in pairs(aw) do
-			local ay = GetTreeLocation(ax)
-			local az = m:GetLocation()
-			local aA = loc
-			if ay ~= az then
-				local aB = 1
-				local aC = 1
-				local aD = 0
-				if ay.x - az.x == 0 then
-					aC = 0
-					aD = -ay.x
+	function Fu.AreTreesBetween(bot, loc, radius)
+		local trees = bot:GetNearbyTrees(GetUnitToLocationDistance(bot, loc))
+		for _, tree in pairs(trees) do
+			local treeLocation = GetTreeLocation(tree)
+			local botLocation = bot:GetLocation()
+			local targetLocation = loc
+			if treeLocation ~= botLocation then
+				local lineA = 1
+				local lineB = 1
+				local lineC = 0
+				if treeLocation.x - botLocation.x == 0 then
+					lineB = 0
+					lineC = -treeLocation.x
 				else
-					aB = -(ay.y - az.y) / (ay.x - az.x)
-					aD = -(ay.y + ay.x * aB)
+					lineA = -(treeLocation.y - botLocation.y) / (treeLocation.x - botLocation.x)
+					lineC = -(treeLocation.y + treeLocation.x * lineA)
 				end
-				local aE = math.abs((aB * aA.x + aC * aA.y + aD) / math.sqrt(aB * aB + aC * aC))
-				if aE <= av and GetUnitToLocationDistance(m, loc) > b.GetDistance(ay, loc) + 50 then
+				local distanceToLine = math.abs((lineA * targetLocation.x + lineB * targetLocation.y + lineC) / math.sqrt(lineA * lineA + lineB * lineB))
+				if distanceToLine <= radius and GetUnitToLocationDistance(bot, loc) > Fu.GetDistance(treeLocation, loc) + 50 then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.VectorTowards(g, aF, D)
-		local aG = (aF - g):Normalized()
-		return g + aG * D
+	function Fu.VectorTowards(startLocation, targetLocation, distance)
+		local direction = (targetLocation - startLocation):Normalized()
+		return startLocation + direction * distance
 	end
-	function b.VectorAway(g, aF, D)
-		local aG = (g - aF):Normalized()
-		return g + aG * D
+	function Fu.VectorAway(startLocation, awayFromLocation, distance)
+		local direction = (startLocation - awayFromLocation):Normalized()
+		return startLocation + direction * distance
 	end
-	function b.GetBestRetreatTree(m, I)
-		local aw = m:GetNearbyTrees(I)
-		local aH = b.VectorTowards(m:GetLocation(), b.GetTeamFountain(), 1000)
-		local aI = nil
-		local aq = 0
-		for P, ax in pairs(aw) do
-			local aJ = GetTreeLocation(ax)
+	function Fu.GetBestRetreatTree(bot, range)
+		local trees = bot:GetNearbyTrees(range)
+		local retreatLocation = Fu.VectorTowards(bot:GetLocation(), Fu.GetTeamFountain(), 1000)
+		local bestTreeLocation = nil
+		local maxDistance = 0
+		for _, tree in pairs(trees) do
+			local treeLocation = GetTreeLocation(tree)
 			if
-				not b.AreTreesBetween(m, aJ, 100)
-				and GetUnitToLocationDistance(m, aJ) > aq
-				and GetUnitToLocationDistance(m, aJ) < I
-				and b.GetDistance(aJ, aH) < 880
+				not Fu.AreTreesBetween(bot, treeLocation, 100)
+				and GetUnitToLocationDistance(bot, treeLocation) > maxDistance
+				and GetUnitToLocationDistance(bot, treeLocation) < range
+				and Fu.GetDistance(treeLocation, retreatLocation) < 880
 			then
-				aq = GetUnitToLocationDistance(m, aJ)
-				-- Was `aI = loc` (an undefined global), so this never returned a tree and Timber Chain's
+				maxDistance = GetUnitToLocationDistance(bot, treeLocation)
+				-- Was `bestTreeLocation = loc` (an undefined global), so this never returned a tree and Timber Chain's
 				-- retreat branch never fired (hero review, Timbersaw).
-				aI = aJ
+				bestTreeLocation = treeLocation
 			end
 		end
-		if aI ~= nil and aq > m:GetAttackRange() then
-			return aI
+		if bestTreeLocation ~= nil and maxDistance > bot:GetAttackRange() then
+			return bestTreeLocation
 		end
-		return aI
+		return bestTreeLocation
 	end
-	function b.GetBestTree(m, aK, aL, I, aM)
-		local aN = nil
-		local aw = m:GetNearbyTrees(I)
-		local aO = 10000
-		for P, ax in pairs(aw) do
-			local ay = GetTreeLocation(ax)
-			local az = m:GetLocation()
-			local aA = aK
-			if ay ~= az then
-				local aB = 1
-				local aC = 1
-				local aD = 0
-				if ay.x - az.x == 0 then
-					aC = 0
-					aD = -ay.x
+	function Fu.GetBestTree(bot, location, target, range, radius)
+		local bestTree = nil
+		local trees = bot:GetNearbyTrees(range)
+		local minDistance = 10000
+		for _, tree in pairs(trees) do
+			local treeLocation = GetTreeLocation(tree)
+			local botLocation = bot:GetLocation()
+			local targetLocation = location
+			if treeLocation ~= botLocation then
+				local lineA = 1
+				local lineB = 1
+				local lineC = 0
+				if treeLocation.x - botLocation.x == 0 then
+					lineB = 0
+					lineC = -treeLocation.x
 				else
-					aB = -(ay.y - az.y) / (ay.x - az.x)
-					aD = -(ay.y + ay.x * aB)
+					lineA = -(treeLocation.y - botLocation.y) / (treeLocation.x - botLocation.x)
+					lineC = -(treeLocation.y + treeLocation.x * lineA)
 				end
-				local aE = math.abs((aB * aA.x + aC * aA.y + aD) / math.sqrt(aB * aB + aC * aC))
+				local distanceToLine = math.abs((lineA * targetLocation.x + lineB * targetLocation.y + lineC) / math.sqrt(lineA * lineA + lineB * lineB))
 				if
-					aE <= aM
-					and aO > GetUnitToLocationDistance(aL, ay)
-					and GetUnitToLocationDistance(aL, ay) <= GetUnitToLocationDistance(m, ay)
+					distanceToLine <= radius
+					and minDistance > GetUnitToLocationDistance(target, treeLocation)
+					and GetUnitToLocationDistance(target, treeLocation) <= GetUnitToLocationDistance(bot, treeLocation)
 				then
-					aN = ax
-					aO = GetUnitToLocationDistance(aL, ay)
+					bestTree = tree
+					minDistance = GetUnitToLocationDistance(target, treeLocation)
 				end
 			end
 		end
-		return aN
+		return bestTree
 	end
-	function b.GetUltLoc(m, ag, aP, I, a2)
-		local aQ = ag:GetVelocity()
-		local aR = b.GetDistance(Vector(0, 0), aQ)
-		if aR > 800 then
-			aQ = aQ / aR * ag:GetCurrentMovementSpeed()
+	function Fu.GetUltLoc(bot, target, manaCost, range, projectileSpeed)
+		local velocity = target:GetVelocity()
+		local speed = Fu.GetDistance(Vector(0, 0), velocity)
+		if speed > 800 then
+			velocity = velocity / speed * target:GetCurrentMovementSpeed()
 		end
-		local ay = m:GetLocation()
-		local az = ag:GetLocation()
-		local aB = aQ.x * aQ.x + aQ.y * aQ.y - a2 * a2
-		local aC = -2 * (aQ.x * (ay.x - az.x) + aQ.y * (ay.y - az.y))
-		local aD = (ay.x - az.x) * (ay.x - az.x) + (ay.y - az.y) * (ay.y - az.y)
-		local a3 = math.max(
-			(-aC + math.sqrt(aC * aC - 4 * aB * aD)) / (2 * aB),
-			(-aC - math.sqrt(aC * aC - 4 * aB * aD)) / (2 * aB)
+		local botLocation = bot:GetLocation()
+		local targetLocation = target:GetLocation()
+		local quadA = velocity.x * velocity.x + velocity.y * velocity.y - projectileSpeed * projectileSpeed
+		local quadB = -2 * (velocity.x * (botLocation.x - targetLocation.x) + velocity.y * (botLocation.y - targetLocation.y))
+		local quadC = (botLocation.x - targetLocation.x) * (botLocation.x - targetLocation.x) + (botLocation.y - targetLocation.y) * (botLocation.y - targetLocation.y)
+		local hitTime = math.max(
+			(-quadB + math.sqrt(quadB * quadB - 4 * quadA * quadC)) / (2 * quadA),
+			(-quadB - math.sqrt(quadB * quadB - 4 * quadA * quadC)) / (2 * quadA)
 		)
-		local aH = (a3 + 0.35) * aQ + az
-		if GetUnitToLocationDistance(m, aH) > I or m:GetMana() < 100 + aP then
+		local ultLocation = (hitTime + 0.35) * velocity + targetLocation
+		if GetUnitToLocationDistance(bot, ultLocation) > range or bot:GetMana() < 100 + manaCost then
 			return nil
 		end
-		if ag:GetMovementDirectionStability() < 0.4 or not m:IsFacingLocation(ag:GetLocation(), 60) then
-			aH = b.VectorTowards(az, b.GetEnemyFountain(), 180)
+		if target:GetMovementDirectionStability() < 0.4 or not bot:IsFacingLocation(target:GetLocation(), 60) then
+			ultLocation = Fu.VectorTowards(targetLocation, Fu.GetEnemyFountain(), 180)
 		end
-		if b.IsDisabled(ag) then
-			aH = ag:GetLocation()
+		if Fu.IsDisabled(target) then
+			ultLocation = target:GetLocation()
 		end
-		return aH
+		return ultLocation
 	end
 	return J
 end
-return a
+return installPositioning

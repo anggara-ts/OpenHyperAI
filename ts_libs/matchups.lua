@@ -1,3 +1,3 @@
 -- Support library: matchups.
-local a = {}
-return a
+local Matchups = {}
+return Matchups

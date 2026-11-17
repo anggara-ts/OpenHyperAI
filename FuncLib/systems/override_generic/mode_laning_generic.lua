@@ -1,190 +1,190 @@
 -- Override for the built-in mode_laning_generic mode.
-local a = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 BotsInit = require("game/botsinit")
-local b = BotsInit.CreateGeneric()
-local c = GetBot()
-function b.OnStart() end
-function b.OnEnd() end
-local d
-local e, f, g
-local h = 0
-function b.GetDesire()
-	local i = c.isBear or string.find(c:GetUnitName(), "lone_druid_bear")
-	if i then
-		local j = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-		local k = j.GetLoneDruid(c)
-		if k and k.hero and a.IsValidHero(k.hero) and k.hero:IsAlive() then
-			local l = k.hero:GetActiveMode()
+local X = BotsInit.CreateGeneric()
+local bot = GetBot()
+function X.OnStart() end
+function X.OnEnd() end
+local targetLane
+local tangoDesire, tangoTree, tangoSlot
+local nextMoveTime = 0
+function X.GetDesire()
+	local isBear = bot.isBear or string.find(bot:GetUnitName(), "lone_druid_bear")
+	if isBear then
+		local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+		local loneDruid = Utils.GetLoneDruid(bot)
+		if loneDruid and loneDruid.hero and Fu.IsValidHero(loneDruid.hero) and loneDruid.hero:IsAlive() then
+			local druidMode = loneDruid.hero:GetActiveMode()
 			if
-				l == BOT_MODE_ATTACK
-				or l == BOT_MODE_DEFEND_ALLY
-				or l == BOT_MODE_TEAM_ROAM
-				or l == BOT_MODE_ROSHAN
-				or l == BOT_MODE_FARM
+				druidMode == BOT_MODE_ATTACK
+				or druidMode == BOT_MODE_DEFEND_ALLY
+				or druidMode == BOT_MODE_TEAM_ROAM
+				or druidMode == BOT_MODE_ROSHAN
+				or druidMode == BOT_MODE_FARM
 			then
 				return BOT_MODE_DESIRE_NONE
 			end
-			local m = a.GetProperTarget(k.hero)
-			if a.IsValidHero(m) and GetUnitToUnitDistance(c, m) < 1200 then
+			local druidTarget = Fu.GetProperTarget(loneDruid.hero)
+			if Fu.IsValidHero(druidTarget) and GetUnitToUnitDistance(bot, druidTarget) < 1200 then
 				return BOT_MODE_DESIRE_NONE
 			end
 		end
 	end
-	e, f = ConsiderTango()
-	if e > 0 then
+	tangoDesire, tangoTree = ConsiderTango()
+	if tangoDesire > 0 then
 		return BOT_MODE_DESIRE_ABSOLUTE
 	end
-	if not d then
-		d = GetBotTargetLane()
+	if not targetLane then
+		targetLane = GetBotTargetLane()
 	end
 	if GetGameMode() == GAMEMODE_1V1MID or GetGameMode() == GAMEMODE_MO then
 		return 1
 	end
-	local n = DotaTime()
-	local o = c:GetLevel()
+	local time = DotaTime()
+	local level = bot:GetLevel()
 	if GetGameMode() == 23 then
-		n = n * 1.65
+		time = time * 1.65
 	end
-	if n <= 10 then
-		c.isInLanePhase = true
+	if time <= 10 then
+		bot.isInLanePhase = true
 		return 0.268
 	end
-	if n <= 9 * 60 and o <= 7 then
-		c.isInLanePhase = true
+	if time <= 9 * 60 and level <= 7 then
+		bot.isInLanePhase = true
 		return 0.446
 	end
-	if n <= 12 * 60 and o <= 11 then
-		c.isInLanePhase = true
+	if time <= 12 * 60 and level <= 11 then
+		bot.isInLanePhase = true
 		return 0.369
 	end
 	-- Not after 15:00 (game 032, 22:00: Muerta, level 15 or lower with the cores' average net worth
 	-- under 12000, was still laning and followed her wave deep toward the enemy towers alone).
-	if n <= 15 * 60 and o <= 15 and a.GetCoresAverageNetworth() < 12000 then
-		c.isInLanePhase = true
+	if time <= 15 * 60 and level <= 15 and Fu.GetCoresAverageNetworth() < 12000 then
+		bot.isInLanePhase = true
 		return 0.228
 	end
-	c.isInLanePhase = false
+	bot.isInLanePhase = false
 	return BOT_MODE_DESIRE_VERYLOW
 end
 function GetBotTargetLane()
 	if IsLanMode and IsLanMode() then
-		local p = c:GetAssignedLane()
-		if p == LANE_TOP or p == LANE_MID or p == LANE_BOT then
-			d = p
-			return d
+		local assignedLane = bot:GetAssignedLane()
+		if assignedLane == LANE_TOP or assignedLane == LANE_MID or assignedLane == LANE_BOT then
+			targetLane = assignedLane
+			return targetLane
 		end
 	end
-	local q = a.GetPosition(c)
+	local position = Fu.GetPosition(bot)
 	if GetTeam() == TEAM_RADIANT then
-		if q == 2 then
-			d = LANE_MID
-		elseif q == 1 or q == 5 then
-			d = LANE_BOT
-		elseif q == 3 or q == 4 then
-			d = LANE_TOP
+		if position == 2 then
+			targetLane = LANE_MID
+		elseif position == 1 or position == 5 then
+			targetLane = LANE_BOT
+		elseif position == 3 or position == 4 then
+			targetLane = LANE_TOP
 		end
 	else
-		if q == 2 then
-			d = LANE_MID
-		elseif q == 1 or q == 5 then
-			d = LANE_TOP
-		elseif q == 3 or q == 4 then
-			d = LANE_BOT
+		if position == 2 then
+			targetLane = LANE_MID
+		elseif position == 1 or position == 5 then
+			targetLane = LANE_TOP
+		elseif position == 3 or position == 4 then
+			targetLane = LANE_BOT
 		end
 	end
-	return d
+	return targetLane
 end
-function b.Think()
-	if not c:IsAlive() or a.CanNotUseAction(c) or c:IsChanneling() or c:IsDisarmed() then
+function X.Think()
+	if not bot:IsAlive() or Fu.CanNotUseAction(bot) or bot:IsChanneling() or bot:IsDisarmed() then
 		return
 	end
-	local r = c:GetAttackRange()
-	local s = d or c:GetAssignedLane()
-	local t = c:GetNearbyLaneCreeps(1200, false)
-	local u = c:GetNearbyLaneCreeps(1200, true)
-	local v = c:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	local w = c:GetNearbyTowers(1200, true)
-	if e and e > 0 and f then
-		local x = c:GetItemInSlot(g)
-		c:Action_UseAbilityOnTree(x, f)
+	local attackRange = bot:GetAttackRange()
+	local lane = targetLane or bot:GetAssignedLane()
+	local allyCreeps = bot:GetNearbyLaneCreeps(1200, false)
+	local enemyCreeps = bot:GetNearbyLaneCreeps(1200, true)
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	local enemyTowers = bot:GetNearbyTowers(1200, true)
+	if tangoDesire and tangoDesire > 0 and tangoTree then
+		local tango = bot:GetItemInSlot(tangoSlot)
+		bot:Action_UseAbilityOnTree(tango, tangoTree)
 		return
 	end
 	if
-		c:WasRecentlyDamagedByAnyHero(2.0) and #a.GetHeroesTargetingUnit(v, c) >= 1
-		or a.IsValidBuilding(w[1]) and w[1]:GetAttackTarget() == c
-		or c:WasRecentlyDamagedByCreep(2.0)
-			and not (c:HasModifier("modifier_tower_aura") or c:HasModifier("modifier_tower_aura_bonus"))
-			and #t > 0
+		bot:WasRecentlyDamagedByAnyHero(2.0) and #Fu.GetHeroesTargetingUnit(nearbyEnemies, bot) >= 1
+		or Fu.IsValidBuilding(enemyTowers[1]) and enemyTowers[1]:GetAttackTarget() == bot
+		or bot:WasRecentlyDamagedByCreep(2.0)
+			and not (bot:HasModifier("modifier_tower_aura") or bot:HasModifier("modifier_tower_aura_bonus"))
+			and #allyCreeps > 0
 	then
-		local y = a.AdjustLocationWithOffsetTowardsFountain(c:GetLocation(), 500)
-		c:Action_MoveToLocation(y + RandomVector(50))
+		local retreatLocation = Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 500)
+		bot:Action_MoveToLocation(retreatLocation + RandomVector(50))
 		return
 	end
-	if c:WasRecentlyDamagedByTower(1.0) and #u > 0 then
-		local z = c:GetNearbyTowers(750, true)
-		if #z > 0 then
-			for A, B in pairs(u) do
-				if a.IsValid(B) and GetUnitToUnitDistance(B, z[1]) < 700 then
-					c:Action_AttackUnit(B, true)
+	if bot:WasRecentlyDamagedByTower(1.0) and #enemyCreeps > 0 then
+		local closeTowers = bot:GetNearbyTowers(750, true)
+		if #closeTowers > 0 then
+			for _, creep in pairs(enemyCreeps) do
+				if Fu.IsValid(creep) and GetUnitToUnitDistance(creep, closeTowers[1]) < 700 then
+					bot:Action_AttackUnit(creep, true)
 					return
 				end
 			end
 		end
 	end
-	if a.IsValidBuilding(w[1]) then
-		local C = GetUnitToUnitDistance(c, w[1])
-		if C < 800 and #u < 3 then
-			c:Action_MoveToLocation(a.VectorAway(c:GetLocation(), w[1]:GetLocation(), 950) + RandomVector(75))
+	if Fu.IsValidBuilding(enemyTowers[1]) then
+		local towerDistance = GetUnitToUnitDistance(bot, enemyTowers[1])
+		if towerDistance < 800 and #enemyCreeps < 3 then
+			bot:Action_MoveToLocation(Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950) + RandomVector(75))
 			return
 		end
-		if C < 900 and c:WasRecentlyDamagedByTower(2.0) then
-			c:Action_MoveToLocation(a.VectorAway(c:GetLocation(), w[1]:GetLocation(), 950))
+		if towerDistance < 900 and bot:WasRecentlyDamagedByTower(2.0) then
+			bot:Action_MoveToLocation(Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950))
 			return
 		end
 	end
-	local bSupport = a.GetPosition(c) >= 4
+	local bSupport = Fu.GetPosition(bot) >= 4
 	-- Supports deny first and leave the last hits to their core.
 	if bSupport then
-		local denyCreep = GetBestDenyCreep(t)
-		if a.IsValid(denyCreep) then
-			c:Action_AttackUnit(denyCreep, true)
+		local denyCreep = GetBestDenyCreep(allyCreeps)
+		if Fu.IsValid(denyCreep) then
+			bot:Action_AttackUnit(denyCreep, true)
 			return
 		end
 	end
-	local D = GetBestLastHitCreep(u)
-	if a.IsValid(D) then
-		local i = c.isBear or string.find(c:GetUnitName(), "lone_druid_bear")
+	local lastHitCreep = GetBestLastHitCreep(enemyCreeps)
+	if Fu.IsValid(lastHitCreep) then
+		local isBear = bot.isBear or string.find(bot:GetUnitName(), "lone_druid_bear")
 		local bCanLastHit
 		if bSupport then
 			-- Do not compete with a core for last hits.
-			bCanLastHit = not a.IsThereNonSelfCoreNearby(1000)
+			bCanLastHit = not Fu.IsThereNonSelfCoreNearby(1000)
 		else
-			local E = a.GetLanePartner(c)
-			bCanLastHit = i
-				or E == nil
-				or a.IsCore(c)
-				or not a.IsCore(c) and a.IsCore(E) and (not E:IsAlive() or not a.IsInRange(c, E, 800))
+			local lanePartner = Fu.GetLanePartner(bot)
+			bCanLastHit = isBear
+				or lanePartner == nil
+				or Fu.IsCore(bot)
+				or not Fu.IsCore(bot) and Fu.IsCore(lanePartner) and (not lanePartner:IsAlive() or not Fu.IsInRange(bot, lanePartner, 800))
 		end
 		if bCanLastHit then
-			if GetUnitToUnitDistance(c, D) > r then
-				c:Action_MoveToUnit(D)
+			if GetUnitToUnitDistance(bot, lastHitCreep) > attackRange then
+				bot:Action_MoveToUnit(lastHitCreep)
 			else
-				c:Action_AttackUnit(D, true)
+				bot:Action_AttackUnit(lastHitCreep, true)
 			end
 			return
 		end
 	end
 	-- Cores deny after looking for a last hit. Supports already denied above.
 	if not bSupport then
-		local F = GetBestDenyCreep(t)
-		if a.IsValid(F) then
-			c:Action_AttackUnit(F, true)
+		local denyCreep = GetBestDenyCreep(allyCreeps)
+		if Fu.IsValid(denyCreep) then
+			bot:Action_AttackUnit(denyCreep, true)
 			return
 		end
 	end
 	-- Aggressive poke on our half; never chase into enemy T1 (rune/tower bait).
-	if a.IsInLaningPhase and a.IsInLaningPhase() and a.GetHP(c) >= 0.55 then
-		if not (c:WasRecentlyDamagedByAnyHero(1.0) and a.GetHP(c) < 0.75) then
+	if Fu.IsInLaningPhase and Fu.IsInLaningPhase() and Fu.GetHP(bot) >= 0.55 then
+		if not (bot:WasRecentlyDamagedByAnyHero(1.0) and Fu.GetHP(bot) < 0.75) then
 			local function laneT1(team, lane)
 				if lane == LANE_TOP then
 					return GetTower(team, TOWER_TOP_1)
@@ -195,21 +195,21 @@ function b.Think()
 				end
 				return nil
 			end
-			local allyT1 = laneT1(GetTeam(), s)
-			local enemyT1 = laneT1(GetOpposingTeam(), s)
-			local atk = c:GetAttackRange()
+			local allyT1 = laneT1(GetTeam(), lane)
+			local enemyT1 = laneT1(GetOpposingTeam(), lane)
+			local pokeRange = bot:GetAttackRange()
 			if allyT1 ~= nil and allyT1:IsAlive() then
-				for _, enemy in pairs(v or {}) do
+				for _, enemy in pairs(nearbyEnemies or {}) do
 					if
-						a.IsValidHero(enemy)
-						and a.CanBeAttacked(enemy)
-						and not a.IsSuspiciousIllusion(enemy)
-						and a.IsInRange(c, enemy, atk)
-						and not CreepAggroUnsafe(c)
+						Fu.IsValidHero(enemy)
+						and Fu.CanBeAttacked(enemy)
+						and not Fu.IsSuspiciousIllusion(enemy)
+						and Fu.IsInRange(bot, enemy, pokeRange)
+						and not CreepAggroUnsafe(bot)
 					then
 						local selfUnderTower = enemyT1 ~= nil
 							and enemyT1:IsAlive()
-							and GetUnitToUnitDistance(c, enemyT1) < (enemyT1:GetAttackRange() or 700) + 180
+							and GetUnitToUnitDistance(bot, enemyT1) < (enemyT1:GetAttackRange() or 700) + 180
 						local enemyUnderTower = enemyT1 ~= nil
 							and enemyT1:IsAlive()
 							and GetUnitToUnitDistance(enemy, enemyT1) < (enemyT1:GetAttackRange() or 700) + 250
@@ -217,19 +217,19 @@ function b.Think()
 							not selfUnderTower
 							and not enemyUnderTower
 							and GetUnitToUnitDistance(enemy, allyT1) <= 3800
-							and GetUnitToUnitDistance(c, allyT1) <= 4000
+							and GetUnitToUnitDistance(bot, allyT1) <= 4000
 						then
 							local now = DotaTime()
-							if c.sOffsideHarassChatTime == nil or now - c.sOffsideHarassChatTime >= 10 then
-								c.sOffsideHarassChatTime = now
+							if bot.sOffsideHarassChatTime == nil or now - bot.sOffsideHarassChatTime >= 10 then
+								bot.sOffsideHarassChatTime = now
 								local name = string.gsub(enemy:GetUnitName(), "npc_dota_hero_", "")
-								name = string.gsub(name, "_(%l)", function(ch)
-									return " " .. string.upper(ch)
+								name = string.gsub(name, "_(%l)", function(letter)
+									return " " .. string.upper(letter)
 								end)
 								name = string.upper(string.sub(name, 1, 1)) .. string.sub(name, 2)
-								c:ActionImmediate_Chat("Harassing " .. name, false)
+								bot:ActionImmediate_Chat("Harassing " .. name, false)
 							end
-							c:Action_AttackUnit(enemy, true)
+							bot:Action_AttackUnit(enemy, true)
 							return
 						end
 					end
@@ -237,69 +237,69 @@ function b.Think()
 			end
 		end
 	end
-	local i = c.isBear or string.find(c:GetUnitName(), "lone_druid_bear")
-	if not a.IsCore(c) and not i and a.GetHP(c) > 0.5 and not CreepAggroUnsafe(c) then
-		local H = GetHarassTarget(v)
-		if a.IsValidHero(H) then
-			c:Action_AttackUnit(H, true)
+	local isBear = bot.isBear or string.find(bot:GetUnitName(), "lone_druid_bear")
+	if not Fu.IsCore(bot) and not isBear and Fu.GetHP(bot) > 0.5 and not CreepAggroUnsafe(bot) then
+		local harassTarget = GetHarassTarget(nearbyEnemies)
+		if Fu.IsValidHero(harassTarget) then
+			bot:Action_AttackUnit(harassTarget, true)
 			return
 		end
 	end
-	local I = GetFurthestEnemyAttackRange(v)
-	if I == 0 then
-		I = math.max(r, 330)
+	local standOffDistance = GetFurthestEnemyAttackRange(nearbyEnemies)
+	if standOffDistance == 0 then
+		standOffDistance = math.max(attackRange, 330)
 	end
 	-- A melee core held back at a ranged laner's attack range cannot walk in for a last hit in time.
-	if a.IsCore(c) and r < 326 and a.GetHP(c) >= 0.45 then
-		I = math.min(I, 300)
+	if Fu.IsCore(bot) and attackRange < 326 and Fu.GetHP(bot) >= 0.45 then
+		standOffDistance = math.min(standOffDistance, 300)
 	end
-	local J = GetLaneFrontAmount(GetTeam(), s, false)
-	local K = GetLaneFrontAmount(GetOpposingTeam(), s, false)
-	local L = GetLaneFrontLocation(GetTeam(), s, -I)
-	if K < J then
-		L = GetLaneFrontLocation(GetOpposingTeam(), s, -I)
+	local allyFrontAmount = GetLaneFrontAmount(GetTeam(), lane, false)
+	local enemyFrontAmount = GetLaneFrontAmount(GetOpposingTeam(), lane, false)
+	local moveLocation = GetLaneFrontLocation(GetTeam(), lane, -standOffDistance)
+	if enemyFrontAmount < allyFrontAmount then
+		moveLocation = GetLaneFrontLocation(GetOpposingTeam(), lane, -standOffDistance)
 	end
-	if DotaTime() >= h then
-		c:Action_MoveToLocation(L + RandomVector(300))
-		h = DotaTime() + RandomFloat(0.05, 0.2)
+	if DotaTime() >= nextMoveTime then
+		bot:Action_MoveToLocation(moveLocation + RandomVector(300))
+		nextMoveTime = DotaTime() + RandomFloat(0.05, 0.2)
 	end
 end
-function GetBestLastHitCreep(M)
-	local N = c:GetAttackDamage()
-	if c:GetItemSlotType(c:FindItemSlot("item_quelling_blade")) == ITEM_SLOT_TYPE_MAIN then
-		if c:GetAttackRange() > 310 or c:GetUnitName() == "npc_dota_hero_templar_assassin" then
-			N = N + 4
+function GetBestLastHitCreep(creeps)
+	local attackDamage = bot:GetAttackDamage()
+	if bot:GetItemSlotType(bot:FindItemSlot("item_quelling_blade")) == ITEM_SLOT_TYPE_MAIN then
+		if bot:GetAttackRange() > 310 or bot:GetUnitName() == "npc_dota_hero_templar_assassin" then
+			attackDamage = attackDamage + 4
 		else
-			N = N + 8
+			attackDamage = attackDamage + 8
 		end
 	end
-	for A, B in pairs(M) do
-		if a.IsValid(B) and a.CanBeAttacked(B) then
-			local O = a.GetAttackProDelayTime(c, B)
-			if a.WillKillTarget(B, N, DAMAGE_TYPE_PHYSICAL, O) then
-				return B
+	for _, creep in pairs(creeps) do
+		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
+			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
+			if Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, attackDelay) then
+				return creep
 			end
 		end
 	end
 	return nil
 end
-function GetBestDenyCreep(M)
+function GetBestDenyCreep(creeps)
 	local fallback = nil
-	local attackRange = c:GetAttackRange()
-	for A, B in pairs(M) do
+	local attackRange = bot:GetAttackRange()
+	for _, creep in pairs(creeps) do
 		if
-			a.IsValid(B)
-			and a.GetHP(B) < 0.49
-			and a.CanBeAttacked(B)
-			and B:GetHealth() <= c:GetAttackDamage()
-			and a.IsDeniableLaneCreep(B)
+			Fu.IsValid(creep)
+			and Fu.GetHP(creep) < 0.49
+			and Fu.CanBeAttacked(creep)
+			and creep:GetHealth() <= bot:GetAttackDamage()
+			and Fu.IsDeniableLaneCreep(creep)
 		then
 			-- Prefer a deny that can be executed immediately. Otherwise keep the
 			-- first valid creep so the bot can walk up to it.
-			if GetUnitToUnitDistance(c, B) <= attackRange + 100 then
-				return B
+			if GetUnitToUnitDistance(bot, creep) <= attackRange + 100 then
+				return creep
 			elseif fallback == nil then
-				fallback = B
+				fallback = creep
 			end
 		end
 	end
@@ -309,7 +309,7 @@ function CreepAggroUnsafe(hero)
 	local creeps = hero:GetNearbyLaneCreeps(500, true) or {}
 	local fresh, hitting = 0, 0
 	for _, creep in pairs(creeps) do
-		if a.IsValid(creep) then
+		if Fu.IsValid(creep) then
 			if creep:GetAttackTarget() == hero then
 				hitting = hitting + 1
 			else
@@ -319,75 +319,75 @@ function CreepAggroUnsafe(hero)
 	end
 	return fresh > 0 or hitting >= 2
 end
-function GetHarassTarget(P)
-	local enemyTowers = c:GetNearbyTowers(1000, true)
-	local atk = c:GetAttackRange()
-	for A, Q in pairs(P) do
+function GetHarassTarget(enemies)
+	local enemyTowers = bot:GetNearbyTowers(1000, true)
+	local attackRange = bot:GetAttackRange()
+	for _, enemy in pairs(enemies) do
 		if
-			a.IsValidHero(Q)
-			and a.IsInRange(c, Q, atk)
-			and a.CanBeAttacked(Q)
-			and not a.IsSuspiciousIllusion(Q)
+			Fu.IsValidHero(enemy)
+			and Fu.IsInRange(bot, enemy, attackRange)
+			and Fu.CanBeAttacked(enemy)
+			and not Fu.IsSuspiciousIllusion(enemy)
 		then
 			-- Skip tower-hugging bait.
-			if a.IsValidBuilding(enemyTowers[1]) then
-				local tr = (enemyTowers[1]:GetAttackRange() or 700) + 200
-				if GetUnitToUnitDistance(c, enemyTowers[1]) < tr or GetUnitToUnitDistance(Q, enemyTowers[1]) < tr + 80 then
+			if Fu.IsValidBuilding(enemyTowers[1]) then
+				local towerRange = (enemyTowers[1]:GetAttackRange() or 700) + 200
+				if GetUnitToUnitDistance(bot, enemyTowers[1]) < towerRange or GetUnitToUnitDistance(enemy, enemyTowers[1]) < towerRange + 80 then
 					goto continue_harass
 				end
 			end
-			return Q
+			return enemy
 		end
 		::continue_harass::
 	end
 	return nil
 end
-function GetFurthestEnemyAttackRange(R)
-	local S = 0
-	for A, T in pairs(R) do
-		if a.IsValidHero(T) and not a.IsSuspiciousIllusion(T) then
-			local U = T:GetAttackRange()
-			if U > S then
-				S = U
+function GetFurthestEnemyAttackRange(enemies)
+	local maxRange = 0
+	for _, enemy in pairs(enemies) do
+		if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) then
+			local enemyRange = enemy:GetAttackRange()
+			if enemyRange > maxRange then
+				maxRange = enemyRange
 			end
 		end
 	end
-	return S
+	return maxRange
 end
 function ConsiderTango()
-	if c:HasModifier("modifier_tango_heal") then
+	if bot:HasModifier("modifier_tango_heal") then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	e = 0
-	g = a.FindItemSlotNotInNonbackpack(c, "item_tango")
-	if g < 0 then
-		g = a.FindItemSlotNotInNonbackpack(c, "item_tango_single")
+	tangoDesire = 0
+	tangoSlot = Fu.FindItemSlotNotInNonbackpack(bot, "item_tango")
+	if tangoSlot < 0 then
+		tangoSlot = Fu.FindItemSlotNotInNonbackpack(bot, "item_tango_single")
 	end
 	if
-		g >= 0
-		and c:OriginalGetMaxHealth() - c:OriginalGetHealth() > 250
-		and a.GetHP(c) > 0.15
-		and not a.IsAttacking(c)
-		and not c:WasRecentlyDamagedByAnyHero(2)
+		tangoSlot >= 0
+		and bot:OriginalGetMaxHealth() - bot:OriginalGetHealth() > 250
+		and Fu.GetHP(bot) > 0.15
+		and not Fu.IsAttacking(bot)
+		and not bot:WasRecentlyDamagedByAnyHero(2)
 	then
-		local V = c:GetNearbyTrees(800)
-		local W = V[1]
-		local X = a.GetNearbyHeroes(c, 1000, true, BOT_MODE_NONE)
-		local Y = X[1]
-		local Z = c:GetNearbyTowers(1400, true)
-		local _ = Z[1]
-		if W ~= nil then
-			local a0 = GetTreeLocation(W)
+		local nearbyTrees = bot:GetNearbyTrees(800)
+		local tree = nearbyTrees[1]
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		local nearestEnemy = nearbyEnemies[1]
+		local enemyTowers = bot:GetNearbyTowers(1400, true)
+		local nearestTower = enemyTowers[1]
+		if tree ~= nil then
+			local treeLocation = GetTreeLocation(tree)
 			if
-				IsLocationVisible(a0)
-				and IsLocationPassable(a0)
-				and (#X == 0 or GetUnitToLocationDistance(c, a0) * 1.6 < GetUnitToUnitDistance(c, Y))
-				and (#Z == 0 or GetUnitToLocationDistance(_, a0) > 920)
+				IsLocationVisible(treeLocation)
+				and IsLocationPassable(treeLocation)
+				and (#nearbyEnemies == 0 or GetUnitToLocationDistance(bot, treeLocation) * 1.6 < GetUnitToUnitDistance(bot, nearestEnemy))
+				and (#enemyTowers == 0 or GetUnitToLocationDistance(nearestTower, treeLocation) > 920)
 			then
-				return BOT_ACTION_DESIRE_HIGH, W
+				return BOT_ACTION_DESIRE_HIGH, tree
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return b
+return X

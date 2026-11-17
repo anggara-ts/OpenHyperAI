@@ -1,28 +1,28 @@
 -- Push the top lane towers.
-local a = require(GetScriptDirectory() .. "/FuncLib/systems/push")
-local b = GetBot()
-if b.PushLaneDesire == nil then
-	b.PushLaneDesire = { 0, 0, 0 }
+local Push = require(GetScriptDirectory() .. "/FuncLib/systems/push")
+local bot = GetBot()
+if bot.PushLaneDesire == nil then
+	bot.PushLaneDesire = { 0, 0, 0 }
 end
 function GetDesire()
-	if ShouldSkipBotThink(b) then
+	if ShouldSkipBotThink(bot) then
 		return 0
 	end
-	return a.GetPushDesire(b, LANE_TOP)
+	return Push.GetPushDesire(bot, LANE_TOP)
 end
 function Think()
-	if ShouldSkipBotThink(b) then
+	if ShouldSkipBotThink(bot) then
 		return
 	end
-	a.PushThink(b, LANE_TOP)
+	Push.PushThink(bot, LANE_TOP)
 end
 if SafeCall then
-	local c = GetDesire
-	local d = Think
-	if c then
-		GetDesire = SafeCall(c, 0, "PUSH_TOWER_TOP_GetDesire")
+	local getDesire = GetDesire
+	local think = Think
+	if getDesire then
+		GetDesire = SafeCall(getDesire, 0, "PUSH_TOWER_TOP_GetDesire")
 	end
-	if d then
-		Think = SafeCall(d, nil, "PUSH_TOWER_TOP_Think")
+	if think then
+		Think = SafeCall(think, nil, "PUSH_TOWER_TOP_Think")
 	end
 end

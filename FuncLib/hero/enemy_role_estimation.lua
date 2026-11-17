@@ -1,135 +1,135 @@
 -- Hero-specific helper: enemy role estimation.
-local function a(b)
-	local c = {}
-	local d = 0
-	for e in pairs(b) do
-		d = d + 1
-		c[d] = b[e]
+local function objectValues(object)
+	local result = {}
+	local count = 0
+	for key in pairs(object) do
+		count = count + 1
+		result[count] = object[key]
 	end
-	return c
+	return result
 end
-local function f(self, g)
-	if g ~= nil then
-		table.sort(self, function(h, i)
-			return g(nil, h, i) < 0
+local function arraySort(self, compareFn)
+	if compareFn ~= nil then
+		table.sort(self, function(left, right)
+			return compareFn(nil, left, right) < 0
 		end)
 	else
 		table.sort(self)
 	end
 	return self
 end
-local function j(self, k, l)
-	local c = {}
-	for m = 1, #self do
-		c[m] = k(l, self[m], m - 1, self)
+local function arrayMap(self, callbackFn, thisArg)
+	local result = {}
+	for i = 1, #self do
+		result[i] = callbackFn(thisArg, self[i], i - 1, self)
 	end
-	return c
+	return result
 end
-local function n(...)
+local function countVarargs(...)
 	return select("#", ...)
 end
-local function o(...)
-	local p = { ... }
-	p.sparseLength = n(...)
-	return p
+local function packSpread(...)
+	local packed = { ... }
+	packed.sparseLength = countVarargs(...)
+	return packed
 end
-local function q(p, ...)
-	local r = { ... }
-	local s = n(...)
-	local t = p.sparseLength
-	for m = 1, s do
-		p[t + m] = r[m]
+local function appendSpread(packed, ...)
+	local values = { ... }
+	local valueCount = countVarargs(...)
+	local length = packed.sparseLength
+	for i = 1, valueCount do
+		packed[length + i] = values[i]
 	end
-	p.sparseLength = t + s
+	packed.sparseLength = length + valueCount
 end
-local function u(p)
-	local v = unpack or table.unpack
-	return v(p, 1, p.sparseLength)
+local function unpackSpread(packed)
+	local unpackFn = unpack or table.unpack
+	return unpackFn(packed, 1, packed.sparseLength)
 end
-local w = {}
-local x, y, z, A, B, C, D
-local E = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local F = E.UnitType
-local G = E.AttributeType
-local H = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local I = H.IsValidHero
-function x(J)
-	local K = 0
+local EnemyRoleEstimation = {}
+local calculateNetWorth, calculateOffensivePower, normalizeScores, OFFENSIVE_ITEM_VALUES, NET_WORTH_WEIGHT, OFFENSIVE_POWER_WEIGHT, LEVEL_WEIGHT
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local UnitType = Dota.UnitType
+local AttributeType = Dota.AttributeType
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local IsValidHero = Utils.IsValidHero
+function calculateNetWorth(hero)
+	local netWorth = 0
 	do
-		local m = 0
-		while m <= 15 do
-			local L = J:GetItemInSlot(m)
-			if L ~= nil then
-				K = K + GetItemCost(L:GetName())
+		local slot = 0
+		while slot <= 15 do
+			local item = hero:GetItemInSlot(slot)
+			if item ~= nil then
+				netWorth = netWorth + GetItemCost(item:GetName())
 			end
-			m = m + 1
+			slot = slot + 1
 		end
 	end
-	return K
+	return netWorth
 end
-function y(J)
-	local M = 0
-	M = M + J:GetAttackDamage()
-	local N = J:GetPrimaryAttribute()
-	if N == G.Strength then
-		M = M + J:GetAttributeValue(G.Strength) * 2
-	elseif N == G.Agility then
-		M = M + J:GetAttributeValue(G.Agility) * 2
-	elseif N == G.Intellect then
-		M = M + J:GetAttributeValue(G.Intellect) * 2
-	elseif N == G.All then
-		M = M
-			+ J:GetAttributeValue(G.Strength) * 0.7
-			+ J:GetAttributeValue(G.Agility) * 0.7
-			+ J:GetAttributeValue(G.Intellect) * 0.7
+function calculateOffensivePower(hero)
+	local power = 0
+	power = power + hero:GetAttackDamage()
+	local primaryAttribute = hero:GetPrimaryAttribute()
+	if primaryAttribute == AttributeType.Strength then
+		power = power + hero:GetAttributeValue(AttributeType.Strength) * 2
+	elseif primaryAttribute == AttributeType.Agility then
+		power = power + hero:GetAttributeValue(AttributeType.Agility) * 2
+	elseif primaryAttribute == AttributeType.Intellect then
+		power = power + hero:GetAttributeValue(AttributeType.Intellect) * 2
+	elseif primaryAttribute == AttributeType.All then
+		power = power
+			+ hero:GetAttributeValue(AttributeType.Strength) * 0.7
+			+ hero:GetAttributeValue(AttributeType.Agility) * 0.7
+			+ hero:GetAttributeValue(AttributeType.Intellect) * 0.7
 	end
 	do
-		local m = 0
-		while m <= 8 do
-			local L = J:GetItemInSlot(m)
-			if L ~= nil then
-				local O = L:GetName()
-				local P = A[O]
-				if P ~= nil then
-					M = M + P
+		local slot = 0
+		while slot <= 8 do
+			local item = hero:GetItemInSlot(slot)
+			if item ~= nil then
+				local itemName = item:GetName()
+				local itemValue = OFFENSIVE_ITEM_VALUES[itemName]
+				if itemValue ~= nil then
+					power = power + itemValue
 				end
 			end
-			m = m + 1
+			slot = slot + 1
 		end
 	end
-	return M
+	return power
 end
-function z(Q)
-	local R = j(Q, function(S, T)
-		return T.netWorth
+function normalizeScores(heroInfos)
+	local netWorths = arrayMap(heroInfos, function(_, info)
+		return info.netWorth
 	end)
-	local U = j(Q, function(S, T)
-		return T.offensivePower
+	local offensivePowers = arrayMap(heroInfos, function(_, info)
+		return info.offensivePower
 	end)
-	local V = j(Q, function(S, T)
-		return T.level
+	local levels = arrayMap(heroInfos, function(_, info)
+		return info.level
 	end)
-	local W = o(unpack(R))
-	q(W, 1)
-	local X = math.max(u(W))
-	local Y = o(unpack(U))
-	q(Y, 1)
-	local Z = math.max(u(Y))
-	local _ = o(unpack(V))
-	q(_, 1)
-	local a0 = math.max(u(_))
-	for S, a1 in ipairs(Q) do
-		local a2 = a1.netWorth / X
-		local a3 = a1.offensivePower / Z
-		local a4 = a1.level / a0
-		a1.totalScore = a2 * B + a3 * C + a4 * D
+	local netWorthArgs = packSpread(unpack(netWorths))
+	appendSpread(netWorthArgs, 1)
+	local maxNetWorth = math.max(unpackSpread(netWorthArgs))
+	local powerArgs = packSpread(unpack(offensivePowers))
+	appendSpread(powerArgs, 1)
+	local maxPower = math.max(unpackSpread(powerArgs))
+	local levelArgs = packSpread(unpack(levels))
+	appendSpread(levelArgs, 1)
+	local maxLevel = math.max(unpackSpread(levelArgs))
+	for _, info in ipairs(heroInfos) do
+		local netWorthScore = info.netWorth / maxNetWorth
+		local powerScore = info.offensivePower / maxPower
+		local levelScore = info.level / maxLevel
+		info.totalScore = netWorthScore * NET_WORTH_WEIGHT + powerScore * OFFENSIVE_POWER_WEIGHT + levelScore * LEVEL_WEIGHT
 	end
 end
-local a5 = {}
-local a6 = {}
-local a7 = 0
-local a8 = 5
-A = {
+local heroInfoByPlayer = {}
+local positionByPlayer = {}
+local lastUpdateTime = 0
+local UPDATE_INTERVAL = 5
+OFFENSIVE_ITEM_VALUES = {
 	item_desolator = 60,
 	item_desolator_2 = 80,
 	item_daedalus = 88,
@@ -164,55 +164,55 @@ A = {
 	item_pirate_hat = 80,
 	item_stormcrafter = 20,
 }
-B = 0.3
-C = 0.3
-D = 0.4
-local function a9(aa)
-	for S, J in ipairs(aa) do
-		if I(J) then
-			local ab = x(J)
-			local ac = y(J)
-			local ad = J:GetLevel()
-			local ae = J:GetPlayerID()
-			local af = ab * B + ac * C + ad * D
-			a5[ae] = { hero = J, netWorth = ab, offensivePower = ac, level = ad, totalScore = af }
+NET_WORTH_WEIGHT = 0.3
+OFFENSIVE_POWER_WEIGHT = 0.3
+LEVEL_WEIGHT = 0.4
+local function updateHeroInfos(heroes)
+	for _, hero in ipairs(heroes) do
+		if IsValidHero(hero) then
+			local netWorth = calculateNetWorth(hero)
+			local offensivePower = calculateOffensivePower(hero)
+			local level = hero:GetLevel()
+			local playerId = hero:GetPlayerID()
+			local totalScore = netWorth * NET_WORTH_WEIGHT + offensivePower * OFFENSIVE_POWER_WEIGHT + level * LEVEL_WEIGHT
+			heroInfoByPlayer[playerId] = { hero = hero, netWorth = netWorth, offensivePower = offensivePower, level = level, totalScore = totalScore }
 		end
 	end
 end
-local function ag()
-	local Q = {}
-	for S, a1 in ipairs(a(a5)) do
-		Q[#Q + 1] = a1
+local function estimatePositions()
+	local heroInfos = {}
+	for _, info in ipairs(objectValues(heroInfoByPlayer)) do
+		heroInfos[#heroInfos + 1] = info
 	end
-	z(Q)
-	f(Q, function(S, h, i)
-		return i.totalScore - h.totalScore
+	normalizeScores(heroInfos)
+	arraySort(heroInfos, function(_, left, right)
+		return right.totalScore - left.totalScore
 	end)
 	do
-		local ah = 0
-		while ah < #Q do
-			local a1 = Q[ah + 1]
-			local ai = ah + 1
-			if ai > 5 then
-				ai = 5
+		local index = 0
+		while index < #heroInfos do
+			local info = heroInfos[index + 1]
+			local position = index + 1
+			if position > 5 then
+				position = 5
 			end
-			if I(a1.hero) then
-				a6[a1.hero:GetPlayerID()] = ai
+			if IsValidHero(info.hero) then
+				positionByPlayer[info.hero:GetPlayerID()] = position
 			end
-			ah = ah + 1
+			index = index + 1
 		end
 	end
-	return a6
+	return positionByPlayer
 end
-function w.UpdateEnemyHeroPositions()
-	if DotaTime() - a7 > a8 then
-		a7 = DotaTime()
-		local aa = GetUnitList(F.EnemyHeroes)
-		a9(aa)
-		ag()
+function EnemyRoleEstimation.UpdateEnemyHeroPositions()
+	if DotaTime() - lastUpdateTime > UPDATE_INTERVAL then
+		lastUpdateTime = DotaTime()
+		local enemyHeroes = GetUnitList(UnitType.EnemyHeroes)
+		updateHeroInfos(enemyHeroes)
+		estimatePositions()
 	end
 end
-function w.GetEnemyPosition(ae)
-	return a6[ae]
+function EnemyRoleEstimation.GetEnemyPosition(playerId)
+	return positionByPlayer[playerId]
 end
-return w
+return EnemyRoleEstimation

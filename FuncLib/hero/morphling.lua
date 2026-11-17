@@ -1,7 +1,7 @@
 -- Hero-specific helper: morphling.
-local a = {}
-local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local c = {
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local morphData = {
 	["npc_dota_hero_abaddon"] = { engage_score = 2, retreat_score = 1, is_good_to_morph_back = false, time_len = {
 		12,
 		10,
@@ -736,39 +736,39 @@ local c = {
 		6,
 	} },
 }
-function a.GetMorphEngageScore(d)
-	if c[d] ~= nil and c[d].engage_score ~= nil then
-		return c[d].engage_score
+function X.GetMorphEngageScore(heroName)
+	if morphData[heroName] ~= nil and morphData[heroName].engage_score ~= nil then
+		return morphData[heroName].engage_score
 	end
 	return 0.1
 end
-function a.GetMorphRetreatScore(d)
-	if c[d] ~= nil and c[d].retreat_score ~= nil then
-		if c[d].retreat_score >= 5 then
-			return c[d].retreat_score
+function X.GetMorphRetreatScore(heroName)
+	if morphData[heroName] ~= nil and morphData[heroName].retreat_score ~= nil then
+		if morphData[heroName].retreat_score >= 5 then
+			return morphData[heroName].retreat_score
 		end
 	end
 	return -1
 end
-function a.IsGoodToMorphBack(d)
-	if c[d] ~= nil and c[d].is_good_to_morph_back ~= nil then
-		return c[d].is_good_to_morph_back
+function X.IsGoodToMorphBack(heroName)
+	if morphData[heroName] ~= nil and morphData[heroName].is_good_to_morph_back ~= nil then
+		return morphData[heroName].is_good_to_morph_back
 	end
 	return false
 end
-function a.GetMorphLength(e, d)
-	local f = 0
-	if c[d] ~= nil then
-		if e:GetLevel() <= 6 then
-			f = c[d].time_len[1]
-		elseif e:GetLevel() <= 9 then
-			f = c[d].time_len[2]
-		elseif e:GetLevel() <= 12 then
-			f = c[d].time_len[3]
+function X.GetMorphLength(bot, heroName)
+	local morphLength = 0
+	if morphData[heroName] ~= nil then
+		if bot:GetLevel() <= 6 then
+			morphLength = morphData[heroName].time_len[1]
+		elseif bot:GetLevel() <= 9 then
+			morphLength = morphData[heroName].time_len[2]
+		elseif bot:GetLevel() <= 12 then
+			morphLength = morphData[heroName].time_len[3]
 		else
-			f = c[d].time_len[4]
+			morphLength = morphData[heroName].time_len[4]
 		end
 	end
-	return f
+	return morphLength
 end
-return a
+return X

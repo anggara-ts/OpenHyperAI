@@ -123,15 +123,15 @@ function Strategy.EnemyDamage()
 	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
 		local name = GetSelectedHeroName(pid)
 		if name ~= nil and name ~= "" then
-			local o = DAMAGE_OVERRIDE[name]
-			if o ~= nil then
-				magic = magic + o.magic
-				physical = physical + o.physical
+			local override = DAMAGE_OVERRIDE[name]
+			if override ~= nil then
+				magic = magic + override.magic
+				physical = physical + override.physical
 			else
-				local r = Roles[name]
-				if r ~= nil then
-					magic = magic + (r.nuker or 0) + 0.25 * (r.disabler or 0)
-					physical = physical + (r.carry or 0) + 0.25 * (r.pusher or 0)
+				local heroRoles = Roles[name]
+				if heroRoles ~= nil then
+					magic = magic + (heroRoles.nuker or 0) + 0.25 * (heroRoles.disabler or 0)
+					physical = physical + (heroRoles.carry or 0) + 0.25 * (heroRoles.pusher or 0)
 				end
 			end
 		end
@@ -158,16 +158,16 @@ function Strategy.EnemyHeavyPhysical()
 	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
 		local name = GetSelectedHeroName(pid)
 		if name ~= nil and name ~= "" and not ILLUSION_HEROES[name] then
-			local o = DAMAGE_OVERRIDE[name]
-			local r = Roles[name]
-			local w = 0
-			if o ~= nil then
-				w = o.physical > o.magic and o.physical or 0
-			elseif r ~= nil and (r.carry or 0) > (r.nuker or 0) then
-				w = r.carry or 0
+			local override = DAMAGE_OVERRIDE[name]
+			local heroRoles = Roles[name]
+			local physicalWeight = 0
+			if override ~= nil then
+				physicalWeight = override.physical > override.magic and override.physical or 0
+			elseif heroRoles ~= nil and (heroRoles.carry or 0) > (heroRoles.nuker or 0) then
+				physicalWeight = heroRoles.carry or 0
 			end
-			if w >= 2 then
-				weight = weight + w
+			if physicalWeight >= 2 then
+				weight = weight + physicalWeight
 				names[#names + 1] = (string.gsub(name, "npc_dota_hero_", ""))
 			end
 		end
@@ -234,16 +234,16 @@ function Strategy.TeamPlan()
 			members[#members + 1] = { name = name, order = POS_ORDER[pos] or 9, idx = idx }
 		end
 	end
-	table.sort(members, function(x, y)
-		if x.order ~= y.order then
-			return x.order < y.order
+	table.sort(members, function(left, right)
+		if left.order ~= right.order then
+			return left.order < right.order
 		end
-		return x.idx < y.idx
+		return left.idx < right.idx
 	end)
 	local rank, kind = Strategy.RankTeamItems()
 	local plan, owner = {}, {}
-	for _, m in ipairs(members) do
-		local options = FLEX[m.name]
+	for _, member in ipairs(members) do
+		local options = FLEX[member.name]
 		local pick = nil
 		for _, item in ipairs(rank) do
 			if owner[item] == nil and Has(options, item) then
@@ -260,9 +260,9 @@ function Strategy.TeamPlan()
 			end
 		end
 		if pick ~= nil then
-			plan[m.name] = pick
+			plan[member.name] = pick
 			if TEAM_ITEMS[pick] then
-				owner[pick] = m.name
+				owner[pick] = member.name
 			end
 		end
 	end

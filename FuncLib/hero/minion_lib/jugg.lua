@@ -1,54 +1,54 @@
 -- Thinking for summoned units: jugg.
-local a = {}
-local b = GetAncient(GetTeam())
-local c = nil
-if b ~= nil then
-	c = b:GetLocation()
+local X = {}
+local ancient = GetAncient(GetTeam())
+local ancientLocation = nil
+if ancient ~= nil then
+	ancientLocation = ancient:GetLocation()
 end
-function a.HealingWardThink(d)
-	local e = d:GetNearbyHeroes(1200, true, BOT_MODE_DESIRE_NONE)
-	local f = nil
-	local g = nil
-	local h = 0.99
+function X.HealingWardThink(healingWard)
+	local nearbyEnemies = healingWard:GetNearbyHeroes(1200, true, BOT_MODE_DESIRE_NONE)
+	local moveLocation = nil
+	local weakestAlly = nil
+	local lowestHpRatio = 0.99
 	for i = 1, #GetTeamPlayers(GetTeam()) do
-		local j = GetTeamMember(i)
-		if j ~= nil and j:IsAlive() and GetUnitToUnitDistance(j, d) <= 1200 then
-			local k = j:GetHealth() / j:GetMaxHealth()
-			if k < h then
-				h = k
-				g = j
+		local teamMember = GetTeamMember(i)
+		if teamMember ~= nil and teamMember:IsAlive() and GetUnitToUnitDistance(teamMember, healingWard) <= 1200 then
+			local memberHpRatio = teamMember:GetHealth() / teamMember:GetMaxHealth()
+			if memberHpRatio < lowestHpRatio then
+				lowestHpRatio = memberHpRatio
+				weakestAlly = teamMember
 			end
 		end
 	end
-	if #e == 0 then
-		local l = d:FindAoELocation(false, true, d:GetLocation(), 1000, 400, 0, 0)
-		if l.count >= 2 then
-			f = l.targetloc
+	if #nearbyEnemies == 0 then
+		local allyHeroAoe = healingWard:FindAoELocation(false, true, healingWard:GetLocation(), 1000, 400, 0, 0)
+		if allyHeroAoe.count >= 2 then
+			moveLocation = allyHeroAoe.targetloc
 		end
-		if f == nil then
-			if g ~= nil then
-				f = g:GetLocation()
+		if moveLocation == nil then
+			if weakestAlly ~= nil then
+				moveLocation = weakestAlly:GetLocation()
 			end
 		end
-		if f == nil then
-			local m = d:FindAoELocation(false, false, d:GetLocation(), 800, 400, 0, 0)
-			if m.count >= 1 then
-				f = m.targetloc
+		if moveLocation == nil then
+			local allyCreepAoe = healingWard:FindAoELocation(false, false, healingWard:GetLocation(), 800, 400, 0, 0)
+			if allyCreepAoe.count >= 1 then
+				moveLocation = allyCreepAoe.targetloc
 			end
 		end
 	else
-		if g ~= nil then
-			f = g:GetLocation()
+		if weakestAlly ~= nil then
+			moveLocation = weakestAlly:GetLocation()
 		end
 	end
-	if f ~= nil then
-		if f == GetBot():GetLocation() then
+	if moveLocation ~= nil then
+		if moveLocation == GetBot():GetLocation() then
 			return
 		else
-			d:Action_MoveToLocation(f)
+			healingWard:Action_MoveToLocation(moveLocation)
 		end
 	else
-		d:Action_MoveToLocation(c)
+		healingWard:Action_MoveToLocation(ancientLocation)
 	end
 end
-return a
+return X

@@ -1,9 +1,9 @@
 -- Lookup table: hero roles map.
-local a = {}
-local b = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
-local c = b.HeroName
-a.HeroRolesMap = {
-	[c.Abaddon] = {
+local HeroRoles = {}
+local Heroes = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
+local HeroName = Heroes.HeroName
+HeroRoles.HeroRolesMap = {
+	[HeroName.Abaddon] = {
 		carry = 1,
 		disabler = 0,
 		durable = 2,
@@ -16,7 +16,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.Underlord] = {
+	[HeroName.Underlord] = {
 		carry = 0,
 		disabler = 1,
 		durable = 1,
@@ -29,7 +29,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Alchemist] = {
+	[HeroName.Alchemist] = {
 		carry = 2,
 		disabler = 1,
 		durable = 2,
@@ -42,7 +42,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.AncientApparition] = {
+	[HeroName.AncientApparition] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -55,7 +55,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Antimage] = {
+	[HeroName.Antimage] = {
 		carry = 3,
 		disabler = 0,
 		durable = 0,
@@ -68,7 +68,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.ArcWarden] = {
+	[HeroName.ArcWarden] = {
 		carry = 3,
 		disabler = 0,
 		durable = 0,
@@ -81,7 +81,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Axe] = {
+	[HeroName.Axe] = {
 		carry = 1,
 		disabler = 2,
 		durable = 3,
@@ -94,7 +94,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Bane] = {
+	[HeroName.Bane] = {
 		carry = 1,
 		disabler = 3,
 		durable = 1,
@@ -107,7 +107,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Batrider] = {
+	[HeroName.Batrider] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -120,7 +120,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Beastmaster] = {
+	[HeroName.Beastmaster] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -133,7 +133,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Bloodseeker] = {
+	[HeroName.Bloodseeker] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -146,7 +146,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.BountyHunter] = {
+	[HeroName.BountyHunter] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -159,7 +159,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Brewmaster] = {
+	[HeroName.Brewmaster] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -172,7 +172,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Bristleback] = {
+	[HeroName.Bristleback] = {
 		carry = 2,
 		disabler = 0,
 		durable = 3,
@@ -185,7 +185,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Broodmother] = {
+	[HeroName.Broodmother] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -198,7 +198,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Centaur] = {
+	[HeroName.Centaur] = {
 		carry = 0,
 		disabler = 1,
 		durable = 3,
@@ -211,7 +211,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.ChaosKnight] = {
+	[HeroName.ChaosKnight] = {
 		carry = 3,
 		disabler = 2,
 		durable = 2,
@@ -224,7 +224,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Chen] = {
+	[HeroName.Chen] = {
 		carry = 0,
 		disabler = 0,
 		durable = 0,
@@ -237,7 +237,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Clinkz] = {
+	[HeroName.Clinkz] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -250,7 +250,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.CrystalMaiden] = {
+	[HeroName.CrystalMaiden] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -263,7 +263,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.DarkSeer] = {
+	[HeroName.DarkSeer] = {
 		carry = 0,
 		disabler = 1,
 		durable = 0,
@@ -276,7 +276,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.DarkWillow] = {
+	[HeroName.DarkWillow] = {
 		carry = 1,
 		disabler = 3,
 		durable = 0,
@@ -289,7 +289,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Dawnbreaker] = {
+	[HeroName.Dawnbreaker] = {
 		carry = 1,
 		disabler = 2,
 		durable = 1,
@@ -302,7 +302,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.Dazzle] = {
+	[HeroName.Dazzle] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -315,7 +315,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.DeathProphet] = {
+	[HeroName.DeathProphet] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -328,7 +328,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Disruptor] = {
+	[HeroName.Disruptor] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -341,7 +341,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Doom] = {
+	[HeroName.Doom] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -354,7 +354,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.DragonKnight] = {
+	[HeroName.DragonKnight] = {
 		carry = 2,
 		disabler = 2,
 		durable = 2,
@@ -367,7 +367,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.DrowRanger] = {
+	[HeroName.DrowRanger] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -380,7 +380,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.EarthSpirit] = {
+	[HeroName.EarthSpirit] = {
 		carry = 1,
 		disabler = 1,
 		durable = 1,
@@ -393,7 +393,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Earthshaker] = {
+	[HeroName.Earthshaker] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -406,7 +406,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.ElderTitan] = {
+	[HeroName.ElderTitan] = {
 		carry = 0,
 		disabler = 1,
 		durable = 1,
@@ -419,7 +419,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.EmberSpirit] = {
+	[HeroName.EmberSpirit] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -432,7 +432,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Enchantress] = {
+	[HeroName.Enchantress] = {
 		carry = 0,
 		disabler = 0,
 		durable = 1,
@@ -445,7 +445,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Enigma] = {
+	[HeroName.Enigma] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -458,7 +458,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.FacelessVoid] = {
+	[HeroName.FacelessVoid] = {
 		carry = 2,
 		disabler = 2,
 		durable = 1,
@@ -471,7 +471,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.NaturesProphet] = {
+	[HeroName.NaturesProphet] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -484,7 +484,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Grimstroke] = {
+	[HeroName.Grimstroke] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -497,7 +497,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Gyrocopter] = {
+	[HeroName.Gyrocopter] = {
 		carry = 3,
 		disabler = 1,
 		durable = 0,
@@ -510,7 +510,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Hoodwink] = {
+	[HeroName.Hoodwink] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -523,7 +523,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Huskar] = {
+	[HeroName.Huskar] = {
 		carry = 2,
 		disabler = 0,
 		durable = 2,
@@ -536,7 +536,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Invoker] = {
+	[HeroName.Invoker] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -549,7 +549,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Jakiro] = {
+	[HeroName.Jakiro] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -562,7 +562,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Juggernaut] = {
+	[HeroName.Juggernaut] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -575,7 +575,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.KeeperOfTheLight] = {
+	[HeroName.KeeperOfTheLight] = {
 		carry = 0,
 		disabler = 1,
 		durable = 0,
@@ -588,7 +588,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Kunkka] = {
+	[HeroName.Kunkka] = {
 		carry = 1,
 		disabler = 1,
 		durable = 1,
@@ -601,7 +601,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.LegionCommander] = {
+	[HeroName.LegionCommander] = {
 		carry = 1,
 		disabler = 2,
 		durable = 1,
@@ -614,7 +614,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.Leshrac] = {
+	[HeroName.Leshrac] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -627,7 +627,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Lich] = {
+	[HeroName.Lich] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -640,7 +640,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Lifestealer] = {
+	[HeroName.Lifestealer] = {
 		carry = 2,
 		disabler = 1,
 		durable = 2,
@@ -653,7 +653,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Lina] = {
+	[HeroName.Lina] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -666,7 +666,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Lion] = {
+	[HeroName.Lion] = {
 		carry = 1,
 		disabler = 3,
 		durable = 0,
@@ -679,7 +679,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.LoneDruid] = {
+	[HeroName.LoneDruid] = {
 		carry = 2,
 		disabler = 0,
 		durable = 1,
@@ -692,7 +692,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Luna] = {
+	[HeroName.Luna] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -705,7 +705,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Lycan] = {
+	[HeroName.Lycan] = {
 		carry = 2,
 		disabler = 0,
 		durable = 1,
@@ -718,7 +718,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Magnus] = {
+	[HeroName.Magnus] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -731,7 +731,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Marci] = {
+	[HeroName.Marci] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -744,7 +744,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Mars] = {
+	[HeroName.Mars] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -757,7 +757,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Medusa] = {
+	[HeroName.Medusa] = {
 		carry = 3,
 		disabler = 1,
 		durable = 1,
@@ -770,7 +770,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Meepo] = {
+	[HeroName.Meepo] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -783,7 +783,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Mirana] = {
+	[HeroName.Mirana] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -796,7 +796,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.MonkeyKing] = {
+	[HeroName.MonkeyKing] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -809,7 +809,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Morphling] = {
+	[HeroName.Morphling] = {
 		carry = 3,
 		disabler = 1,
 		durable = 2,
@@ -822,7 +822,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Muerta] = {
+	[HeroName.Muerta] = {
 		carry = 3,
 		disabler = 1,
 		durable = 0,
@@ -835,7 +835,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.NagaSiren] = {
+	[HeroName.NagaSiren] = {
 		carry = 3,
 		disabler = 2,
 		durable = 0,
@@ -848,7 +848,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Necrophos] = {
+	[HeroName.Necrophos] = {
 		carry = 1,
 		disabler = 1,
 		durable = 1,
@@ -861,7 +861,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.ShadowFiend] = {
+	[HeroName.ShadowFiend] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -874,7 +874,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.NightStalker] = {
+	[HeroName.NightStalker] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -887,7 +887,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.NyxAssassin] = {
+	[HeroName.NyxAssassin] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -900,7 +900,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.OutworldDestroyer] = {
+	[HeroName.OutworldDestroyer] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -913,7 +913,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.OgreMagi] = {
+	[HeroName.OgreMagi] = {
 		carry = 1,
 		disabler = 2,
 		durable = 1,
@@ -926,7 +926,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Omniknight] = {
+	[HeroName.Omniknight] = {
 		carry = 1,
 		disabler = 0,
 		durable = 2,
@@ -939,7 +939,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.Oracle] = {
+	[HeroName.Oracle] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -952,7 +952,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Pangolier] = {
+	[HeroName.Pangolier] = {
 		carry = 2,
 		disabler = 2,
 		durable = 1,
@@ -965,7 +965,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.PhantomAssassin] = {
+	[HeroName.PhantomAssassin] = {
 		carry = 3,
 		disabler = 0,
 		durable = 0,
@@ -978,7 +978,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.PhantomLancer] = {
+	[HeroName.PhantomLancer] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -991,7 +991,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Phoenix] = {
+	[HeroName.Phoenix] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1004,7 +1004,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.PrimalBeast] = {
+	[HeroName.PrimalBeast] = {
 		carry = 0,
 		disabler = 1,
 		durable = 3,
@@ -1017,7 +1017,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Puck] = {
+	[HeroName.Puck] = {
 		carry = 1,
 		disabler = 3,
 		durable = 0,
@@ -1030,7 +1030,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Pudge] = {
+	[HeroName.Pudge] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -1043,7 +1043,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Pugna] = {
+	[HeroName.Pugna] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -1056,7 +1056,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.QueenOfPain] = {
+	[HeroName.QueenOfPain] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -1069,7 +1069,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Razor] = {
+	[HeroName.Razor] = {
 		carry = 2,
 		disabler = 0,
 		durable = 2,
@@ -1082,7 +1082,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Ringmaster] = {
+	[HeroName.Ringmaster] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -1095,7 +1095,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Clockwerk] = {
+	[HeroName.Clockwerk] = {
 		carry = 1,
 		disabler = 2,
 		durable = 1,
@@ -1108,7 +1108,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Riki] = {
+	[HeroName.Riki] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -1121,7 +1121,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Rubick] = {
+	[HeroName.Rubick] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1134,7 +1134,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.SandKing] = {
+	[HeroName.SandKing] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -1147,7 +1147,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.ShadowDeamon] = {
+	[HeroName.ShadowDeamon] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -1160,7 +1160,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.ShadowShaman] = {
+	[HeroName.ShadowShaman] = {
 		carry = 0,
 		disabler = 3,
 		durable = 0,
@@ -1173,7 +1173,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Timbersaw] = {
+	[HeroName.Timbersaw] = {
 		carry = 1,
 		disabler = 0,
 		durable = 2,
@@ -1186,7 +1186,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Silencer] = {
+	[HeroName.Silencer] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -1199,7 +1199,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.WraithKing] = {
+	[HeroName.WraithKing] = {
 		carry = 2,
 		disabler = 2,
 		durable = 3,
@@ -1212,7 +1212,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.SkywrathMage] = {
+	[HeroName.SkywrathMage] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1225,7 +1225,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Slardar] = {
+	[HeroName.Slardar] = {
 		carry = 2,
 		disabler = 1,
 		durable = 2,
@@ -1238,7 +1238,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Slark] = {
+	[HeroName.Slark] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -1251,7 +1251,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Snapfire] = {
+	[HeroName.Snapfire] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1264,7 +1264,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Sniper] = {
+	[HeroName.Sniper] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -1277,7 +1277,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Spectre] = {
+	[HeroName.Spectre] = {
 		carry = 3,
 		disabler = 0,
 		durable = 1,
@@ -1290,7 +1290,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.SpiritBreaker] = {
+	[HeroName.SpiritBreaker] = {
 		carry = 1,
 		disabler = 2,
 		durable = 2,
@@ -1303,7 +1303,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.StormSpirit] = {
+	[HeroName.StormSpirit] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -1316,7 +1316,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Sven] = {
+	[HeroName.Sven] = {
 		carry = 2,
 		disabler = 2,
 		durable = 2,
@@ -1329,7 +1329,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Techies] = {
+	[HeroName.Techies] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1342,7 +1342,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.TemplarAssassin] = {
+	[HeroName.TemplarAssassin] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -1355,7 +1355,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Terrorblade] = {
+	[HeroName.Terrorblade] = {
 		carry = 3,
 		disabler = 0,
 		durable = 0,
@@ -1368,7 +1368,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Tidehunter] = {
+	[HeroName.Tidehunter] = {
 		carry = 1,
 		disabler = 2,
 		durable = 3,
@@ -1381,7 +1381,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Tinker] = {
+	[HeroName.Tinker] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -1394,7 +1394,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Tiny] = {
+	[HeroName.Tiny] = {
 		carry = 3,
 		disabler = 1,
 		durable = 2,
@@ -1407,7 +1407,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.TreantProtector] = {
+	[HeroName.TreantProtector] = {
 		carry = 0,
 		disabler = 1,
 		durable = 1,
@@ -1420,7 +1420,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.TrollWarlord] = {
+	[HeroName.TrollWarlord] = {
 		carry = 3,
 		disabler = 1,
 		durable = 1,
@@ -1433,7 +1433,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Tusk] = {
+	[HeroName.Tusk] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -1446,7 +1446,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Undying] = {
+	[HeroName.Undying] = {
 		carry = 0,
 		disabler = 1,
 		durable = 2,
@@ -1459,7 +1459,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.Ursa] = {
+	[HeroName.Ursa] = {
 		carry = 2,
 		disabler = 1,
 		durable = 1,
@@ -1472,7 +1472,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.VengefulSpirit] = {
+	[HeroName.VengefulSpirit] = {
 		carry = 0,
 		disabler = 2,
 		durable = 0,
@@ -1485,7 +1485,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Venomancer] = {
+	[HeroName.Venomancer] = {
 		carry = 1,
 		disabler = 1,
 		durable = 0,
@@ -1498,7 +1498,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Viper] = {
+	[HeroName.Viper] = {
 		carry = 3,
 		disabler = 1,
 		durable = 2,
@@ -1511,7 +1511,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Visage] = {
+	[HeroName.Visage] = {
 		carry = 1,
 		disabler = 1,
 		durable = 1,
@@ -1524,7 +1524,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.VoidSpirit] = {
+	[HeroName.VoidSpirit] = {
 		carry = 2,
 		disabler = 1,
 		durable = 0,
@@ -1537,7 +1537,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 0,
 	},
-	[c.Warlock] = {
+	[HeroName.Warlock] = {
 		carry = 1,
 		disabler = 1,
 		durable = 1,
@@ -1550,7 +1550,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Weaver] = {
+	[HeroName.Weaver] = {
 		carry = 2,
 		disabler = 0,
 		durable = 0,
@@ -1563,7 +1563,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Windrunner] = {
+	[HeroName.Windrunner] = {
 		carry = 3,
 		disabler = 1,
 		durable = 0,
@@ -1576,7 +1576,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.WinterWyvern] = {
+	[HeroName.WinterWyvern] = {
 		carry = 1,
 		disabler = 2,
 		durable = 0,
@@ -1589,7 +1589,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.IO] = {
+	[HeroName.IO] = {
 		carry = 0,
 		disabler = 0,
 		durable = 0,
@@ -1602,7 +1602,7 @@ a.HeroRolesMap = {
 		ranged = 0,
 		healer = 1,
 	},
-	[c.WitchDoctor] = {
+	[HeroName.WitchDoctor] = {
 		carry = 0,
 		disabler = 1,
 		durable = 0,
@@ -1615,7 +1615,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 1,
 	},
-	[c.Zeus] = {
+	[HeroName.Zeus] = {
 		carry = 1,
 		disabler = 0,
 		durable = 0,
@@ -1628,7 +1628,7 @@ a.HeroRolesMap = {
 		ranged = 1,
 		healer = 0,
 	},
-	[c.Kez] = {
+	[HeroName.Kez] = {
 		carry = 3,
 		disabler = 1,
 		durable = 1,
@@ -1642,56 +1642,56 @@ a.HeroRolesMap = {
 		healer = 0,
 	},
 }
-a.InvisHeroes = {
-	[c.PhantomAssassin] = 1,
-	[c.Clinkz] = 1,
-	[c.Mirana] = 1,
-	[c.Riki] = 1,
-	[c.NyxAssassin] = 1,
-	[c.BountyHunter] = 1,
-	[c.Invoker] = 1,
-	[c.SandKing] = 1,
-	[c.TreantProtector] = 1,
-	[c.Weaver] = 1,
+HeroRoles.InvisHeroes = {
+	[HeroName.PhantomAssassin] = 1,
+	[HeroName.Clinkz] = 1,
+	[HeroName.Mirana] = 1,
+	[HeroName.Riki] = 1,
+	[HeroName.NyxAssassin] = 1,
+	[HeroName.BountyHunter] = 1,
+	[HeroName.Invoker] = 1,
+	[HeroName.SandKing] = 1,
+	[HeroName.TreantProtector] = 1,
+	[HeroName.Weaver] = 1,
 }
-function a.HasRole(d, e)
-	local f = a.HeroRolesMap[d]
-	if f == nil then
+function HeroRoles.HasRole(heroName, role)
+	local roles = HeroRoles.HeroRolesMap[heroName]
+	if roles == nil then
 		return false
 	end
-	return f[e] > 0
+	return roles[role] > 0
 end
-function a.IsCarry(d)
-	return a.HasRole(d, "carry")
+function HeroRoles.IsCarry(heroName)
+	return HeroRoles.HasRole(heroName, "carry")
 end
-function a.IsDisabler(d)
-	return a.HasRole(d, "disabler")
+function HeroRoles.IsDisabler(heroName)
+	return HeroRoles.HasRole(heroName, "disabler")
 end
-function a.IsDurable(d)
-	return a.HasRole(d, "durable")
+function HeroRoles.IsDurable(heroName)
+	return HeroRoles.HasRole(heroName, "durable")
 end
-function a.HasEscape(d)
-	return a.HasRole(d, "escape")
+function HeroRoles.HasEscape(heroName)
+	return HeroRoles.HasRole(heroName, "escape")
 end
-function a.IsInitiator(d)
-	return a.HasRole(d, "initiator")
+function HeroRoles.IsInitiator(heroName)
+	return HeroRoles.HasRole(heroName, "initiator")
 end
-function a.IsJungler(d)
-	return a.HasRole(d, "jungler")
+function HeroRoles.IsJungler(heroName)
+	return HeroRoles.HasRole(heroName, "jungler")
 end
-function a.IsNuker(d)
-	return a.HasRole(d, "nuker")
+function HeroRoles.IsNuker(heroName)
+	return HeroRoles.HasRole(heroName, "nuker")
 end
-function a.IsSupport(d)
-	return a.HasRole(d, "support")
+function HeroRoles.IsSupport(heroName)
+	return HeroRoles.HasRole(heroName, "support")
 end
-function a.IsPusher(d)
-	return a.HasRole(d, "pusher")
+function HeroRoles.IsPusher(heroName)
+	return HeroRoles.HasRole(heroName, "pusher")
 end
-function a.IsRanged(d)
-	return a.HasRole(d, "ranged")
+function HeroRoles.IsRanged(heroName)
+	return HeroRoles.HasRole(heroName, "ranged")
 end
-function a.IsHealer(d)
-	return a.HasRole(d, "healer")
+function HeroRoles.IsHealer(heroName)
+	return HeroRoles.HasRole(heroName, "healer")
 end
-return a
+return HeroRoles

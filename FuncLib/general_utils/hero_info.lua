@@ -1,295 +1,295 @@
 -- Shared helper: hero info.
-local function a(b)
-	function b.IsCore(c)
-		return b.GetPosition(c) <= 3
+local function installHeroInfo(Fu)
+	function Fu.IsCore(hero)
+		return Fu.GetPosition(hero) <= 3
 	end
-	local d = {}
-	function b.IsPosxHuman(e)
-		if d[e] ~= nil then
-			return d[e]
+	local isPositionHumanCache = {}
+	function Fu.IsPosxHuman(position)
+		if isPositionHumanCache[position] ~= nil then
+			return isPositionHumanCache[position]
 		end
-		for f, g in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			if b.IsValidHero(g) and b.GetPosition(g) == e and not g:IsBot() then
-				d[e] = true
+		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+			if Fu.IsValidHero(allyHero) and Fu.GetPosition(allyHero) == position and not allyHero:IsBot() then
+				isPositionHumanCache[position] = true
 				return true
 			end
 		end
-		d[e] = false
+		isPositionHumanCache[position] = false
 		return false
 	end
-	function b.GetPosition(c)
-		if c.isBear then
-			return b.GetPosition(b.Utils.GetLoneDruid(c).hero)
+	function Fu.GetPosition(hero)
+		if hero.isBear then
+			return Fu.GetPosition(Fu.Utils.GetLoneDruid(hero).hero)
 		end
-		local h = b.Role.GetPosition(c)
-		if h == nil then
-			h = 2
+		local position = Fu.Role.GetPosition(hero)
+		if position == nil then
+			position = 2
 		end
-		return h
+		return position
 	end
-	function b.GetExpectedLane(c)
+	function Fu.GetExpectedLane(hero)
 		if IsLanMode and IsLanMode() then
-			local i = c:GetAssignedLane()
-			if i == LANE_TOP or i == LANE_MID or i == LANE_BOT then
-				return i
+			local assignedLane = hero:GetAssignedLane()
+			if assignedLane == LANE_TOP or assignedLane == LANE_MID or assignedLane == LANE_BOT then
+				return assignedLane
 			end
 		end
-		local j = b.GetPosition(c)
-		local k = c:GetTeam()
-		if k == TEAM_RADIANT then
-			if j == 2 then
+		local position = Fu.GetPosition(hero)
+		local team = hero:GetTeam()
+		if team == TEAM_RADIANT then
+			if position == 2 then
 				return LANE_MID
-			elseif j == 1 or j == 5 then
+			elseif position == 1 or position == 5 then
 				return LANE_BOT
-			elseif j == 3 or j == 4 then
+			elseif position == 3 or position == 4 then
 				return LANE_TOP
 			end
 		else
-			if j == 2 then
+			if position == 2 then
 				return LANE_MID
-			elseif j == 1 or j == 5 then
+			elseif position == 1 or position == 5 then
 				return LANE_TOP
-			elseif j == 3 or j == 4 then
+			elseif position == 3 or position == 4 then
 				return LANE_BOT
 			end
 		end
-		return c:GetAssignedLane() or LANE_MID
+		return hero:GetAssignedLane() or LANE_MID
 	end
-	function b.IsNotSelf(c, g)
-		if c:GetUnitName() ~= g:GetUnitName() then
+	function Fu.IsNotSelf(unitA, unitB)
+		if unitA:GetUnitName() ~= unitB:GetUnitName() then
 			return true
 		end
 		return false
 	end
-	function b.IsThereNonSelfCoreNearby(l)
-		local m = GetBot()
-		local n = b.GetNearbyHeroes(m, l, false, BOT_MODE_NONE)
-		for f, g in pairs(n) do
-			if b.IsCore(g) and m ~= g then
+	function Fu.IsThereNonSelfCoreNearby(radius)
+		local bot = GetBot()
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, radius, false, BOT_MODE_NONE)
+		for _, allyHero in pairs(nearbyAllies) do
+			if Fu.IsCore(allyHero) and bot ~= allyHero then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsThereCoreNearby(l)
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local p = GetTeamMember(o)
-			if p ~= nil and p ~= GetBot() and b.IsCore(p) and b.IsInRange(GetBot(), p, l) then
+	function Fu.IsThereCoreNearby(radius)
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and member ~= GetBot() and Fu.IsCore(member) and Fu.IsInRange(GetBot(), member, radius) then
 				return true
 			end
 		end
 		return false
 	end
-	function b.GetClosestCore(c, l)
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local q = GetTeamMember(o)
+	function Fu.GetClosestCore(hero, radius)
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
 			if
-				q ~= nil
-				and q:IsAlive()
-				and q ~= c
-				and b.IsCore(c)
-				and GetUnitToUnitDistance(c, q) <= l
-				and not b.IsSuspiciousIllusion(q)
+				member ~= nil
+				and member:IsAlive()
+				and member ~= hero
+				and Fu.IsCore(hero)
+				and GetUnitToUnitDistance(hero, member) <= radius
+				and not Fu.IsSuspiciousIllusion(member)
 			then
-				return q
+				return member
 			end
 		end
 		return nil
 	end
-	function b.GetClosestAlly(c, l)
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local q = GetTeamMember(o)
+	function Fu.GetClosestAlly(hero, radius)
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
 			if
-				q ~= nil
-				and q:IsAlive()
-				and q ~= c
-				and GetUnitToUnitDistance(c, q) <= l
-				and not b.IsSuspiciousIllusion(q)
+				member ~= nil
+				and member:IsAlive()
+				and member ~= hero
+				and GetUnitToUnitDistance(hero, member) <= radius
+				and not Fu.IsSuspiciousIllusion(member)
 			then
-				return q
+				return member
 			end
 		end
 		return nil
 	end
-	function b.GetLanePartner(c)
-		if c:GetAssignedLane() == LANE_MID then
+	function Fu.GetLanePartner(hero)
+		if hero:GetAssignedLane() == LANE_MID then
 			return nil
 		end
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local q = GetTeamMember(o)
-			if q ~= nil and q:IsAlive() and q ~= c and q:GetAssignedLane() == c:GetAssignedLane() then
-				return q
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsAlive() and member ~= hero and member:GetAssignedLane() == hero:GetAssignedLane() then
+				return member
 			end
 		end
 		return nil
 	end
-	function b.GetFirstBotInTeam()
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local g = GetTeamMember(o)
-			if g ~= nil and g:IsBot() then
-				return g
+	function Fu.GetFirstBotInTeam()
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsBot() then
+				return member
 			end
 		end
 	end
-	function b.GetClosestTeamLane(r)
-		local s = GetLocationAlongLane(LANE_TOP, GetLaneFrontAmount(GetTeam(), LANE_TOP, false))
-		local t = GetLocationAlongLane(LANE_MID, GetLaneFrontAmount(GetTeam(), LANE_MID, false))
-		local u = GetLocationAlongLane(LANE_BOT, GetLaneFrontAmount(GetTeam(), LANE_BOT, false))
-		local v = GetUnitToLocationDistance(r, s)
-		local w = GetUnitToLocationDistance(r, t)
-		local x = GetUnitToLocationDistance(r, u)
-		if v < w and v < x then
-			return s
-		elseif w < v and w < x then
-			return t
-		elseif x < v and x < w then
-			return u
+	function Fu.GetClosestTeamLane(unit)
+		local topFront = GetLocationAlongLane(LANE_TOP, GetLaneFrontAmount(GetTeam(), LANE_TOP, false))
+		local midFront = GetLocationAlongLane(LANE_MID, GetLaneFrontAmount(GetTeam(), LANE_MID, false))
+		local bottomFront = GetLocationAlongLane(LANE_BOT, GetLaneFrontAmount(GetTeam(), LANE_BOT, false))
+		local topDistance = GetUnitToLocationDistance(unit, topFront)
+		local midDistance = GetUnitToLocationDistance(unit, midFront)
+		local bottomDistance = GetUnitToLocationDistance(unit, bottomFront)
+		if topDistance < midDistance and topDistance < bottomDistance then
+			return topFront
+		elseif midDistance < topDistance and midDistance < bottomDistance then
+			return midFront
+		elseif bottomDistance < topDistance and bottomDistance < midDistance then
+			return bottomFront
 		end
-		return t
+		return midFront
 	end
-	function b.GetCoresAverageNetworth()
-		local c = GetBot()
-		if c._coreNWCache and DotaTime() - c._coreNWCache[1] <= 2.0 then
-			return c._coreNWCache[2]
+	function Fu.GetCoresAverageNetworth()
+		local bot = GetBot()
+		if bot._coreNWCache and DotaTime() - bot._coreNWCache[1] <= 2.0 then
+			return bot._coreNWCache[2]
 		end
-		local y = 0
-		local z = 0
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local q = GetTeamMember(o)
-			if b.IsValidHero(q) and b.IsCore(q) then
-				y = y + q:GetNetWorth()
-				z = z + 1
+		local totalNetworth = 0
+		local coreCount = 0
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if Fu.IsValidHero(member) and Fu.IsCore(member) then
+				totalNetworth = totalNetworth + member:GetNetWorth()
+				coreCount = coreCount + 1
 			end
 		end
-		local A = y / z
-		c._coreNWCache = { DotaTime(), A }
-		return A
+		local averageNetworth = totalNetworth / coreCount
+		bot._coreNWCache = { DotaTime(), averageNetworth }
+		return averageNetworth
 	end
-	function b.IsHaveAegis(c)
-		return c:FindItemSlot("item_aegis") >= 0
+	function Fu.IsHaveAegis(hero)
+		return hero:FindItemSlot("item_aegis") >= 0
 	end
-	function b.DoesTeamHaveAegis()
-		local c = GetBot()
-		if c._aegisCache and DotaTime() - c._aegisCache[1] <= 2.0 then
-			return c._aegisCache[2]
+	function Fu.DoesTeamHaveAegis()
+		local bot = GetBot()
+		if bot._aegisCache and DotaTime() - bot._aegisCache[1] <= 2.0 then
+			return bot._aegisCache[2]
 		end
-		local B = GetTeamPlayers(GetTeam())
-		for o = 1, #B do
-			local q = GetTeamMember(o)
-			if b.IsValidHero(q) and b.IsHaveAegis(q) then
-				c._aegisCache = { DotaTime(), true }
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		for i = 1, #teamPlayers do
+			local member = GetTeamMember(i)
+			if Fu.IsValidHero(member) and Fu.IsHaveAegis(member) then
+				bot._aegisCache = { DotaTime(), true }
 				return true
 			end
 		end
-		c._aegisCache = { DotaTime(), false }
+		bot._aegisCache = { DotaTime(), false }
 		return false
 	end
-	function b.IsOtherAllysTarget(r)
-		local c = GetBot()
-		local C = b.GetNearbyHeroes(c, 800, false, BOT_MODE_NONE)
-		if #C <= 1 then
+	function Fu.IsOtherAllysTarget(target)
+		local bot = GetBot()
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+		if #nearbyAllies <= 1 then
 			return false
 		end
-		for f, g in pairs(C) do
+		for _, allyHero in pairs(nearbyAllies) do
 			if
-				b.IsValid(g)
-				and g ~= c
-				and not g:IsIllusion()
-				and (b.GetProperTarget(g) == r or not g:IsBot() and g:IsFacingLocation(r:GetLocation(), 20))
+				Fu.IsValid(allyHero)
+				and allyHero ~= bot
+				and not allyHero:IsIllusion()
+				and (Fu.GetProperTarget(allyHero) == target or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 20))
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsAllysTarget(r)
-		local c = GetBot()
-		local C = b.GetNearbyHeroes(c, 800, false, BOT_MODE_NONE)
-		for f, g in pairs(C) do
+	function Fu.IsAllysTarget(target)
+		local bot = GetBot()
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+		for _, allyHero in pairs(nearbyAllies) do
 			if
-				b.IsValid(g)
-				and not g:IsIllusion()
-				and (b.GetProperTarget(g) == r or not g:IsBot() and g:IsFacingLocation(r:GetLocation(), 12))
+				Fu.IsValid(allyHero)
+				and not allyHero:IsIllusion()
+				and (Fu.GetProperTarget(allyHero) == target or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 12))
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsEnemyFacingUnit(c, l, D)
-		local E = c:GetLocation()
-		if l > 1600 then
-			l = 1600
+	function Fu.IsEnemyFacingUnit(unit, radius, facingAngle)
+		local unitLocation = unit:GetLocation()
+		if radius > 1600 then
+			radius = 1600
 		end
-		local F = b.GetNearbyHeroes(c, l, true, BOT_MODE_NONE)
-		for f, G in pairs(F) do
-			if b.IsValid(G) and G:IsFacingLocation(E, D) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(unit, radius, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValid(enemyHero) and enemyHero:IsFacingLocation(unitLocation, facingAngle) then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsEnemyTargetUnit(H, l)
-		if l > 1600 then
-			l = 1600
+	function Fu.IsEnemyTargetUnit(unit, radius)
+		if radius > 1600 then
+			radius = 1600
 		end
-		local F = b.GetNearbyHeroes(GetBot(), l, true, BOT_MODE_NONE)
-		for f, G in pairs(F) do
-			if b.IsValid(G) and b.GetProperTarget(G) == H then
+		local nearbyEnemies = Fu.GetNearbyHeroes(GetBot(), radius, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValid(enemyHero) and Fu.GetProperTarget(enemyHero) == unit then
 				return true
 			end
 		end
 		return false
 	end
-	function b.CheckLoneDruid()
-		local I = { hero = nil, bear = nil }
-		for f, r in pairs(GetUnitList(UNIT_LIST_ALL)) do
-			if b.IsValid(r) and not b.IsSuspiciousIllusion(r) then
-				local J = r:GetUnitName()
-				if J == "npc_dota_hero_lone_druid" then
-					I.hero = r
-				elseif J == "npc_dota_hero_lone_druid_bear" then
-					I.bear = r
+	function Fu.CheckLoneDruid()
+		local loneDruid = { hero = nil, bear = nil }
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALL)) do
+			if Fu.IsValid(unit) and not Fu.IsSuspiciousIllusion(unit) then
+				local unitName = unit:GetUnitName()
+				if unitName == "npc_dota_hero_lone_druid" then
+					loneDruid.hero = unit
+				elseif unitName == "npc_dota_hero_lone_druid_bear" then
+					loneDruid.bear = unit
 				end
 			end
 		end
-		return I
+		return loneDruid
 	end
-	function b.GetHumanPing()
-		local K = nil
-		for o = 1, #GetTeamPlayers(GetTeam()) do
-			local q = GetTeamMember(o)
-			if q ~= nil and not q:IsBot() then
-				return q, q:GetMostRecentPing()
+	function Fu.GetHumanPing()
+		local ping = nil
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and not member:IsBot() then
+				return member, member:GetMostRecentPing()
 			end
 		end
-		return nil, K
+		return nil, ping
 	end
-	function b.FindEnemyUnit(L)
-		for f, r in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-			if b.IsValid(r) then
-				if string.find(r:GetUnitName(), L) then
-					return r
+	function Fu.FindEnemyUnit(unitNamePattern)
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+			if Fu.IsValid(unit) then
+				if string.find(unit:GetUnitName(), unitNamePattern) then
+					return unit
 				end
 			end
 		end
 		return nil
 	end
-	function b.HasEnemyIceSpireNearby(c, M)
-		for f, G in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-			if b.IsValid(G) and G:GetUnitName() == "npc_dota_lich_ice_spire" and b.IsInRange(c, G, M) then
-				return G
+	function Fu.HasEnemyIceSpireNearby(unit, radius)
+		for _, enemyUnit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+			if Fu.IsValid(enemyUnit) and enemyUnit:GetUnitName() == "npc_dota_lich_ice_spire" and Fu.IsInRange(unit, enemyUnit, radius) then
+				return enemyUnit
 			end
 		end
 		return false
 	end
-	function b.AnyAllyAffectedByChainFrost(c, M)
-		for f, g in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-			if b.IsValid(g) and b.IsInRange(c, g, M) and g ~= c and g:HasModifier("modifier_lich_chainfrost_slow") then
+	function Fu.AnyAllyAffectedByChainFrost(unit, radius)
+		for _, allyUnit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+			if Fu.IsValid(allyUnit) and Fu.IsInRange(unit, allyUnit, radius) and allyUnit ~= unit and allyUnit:HasModifier("modifier_lich_chainfrost_slow") then
 				return true
 			end
 		end
 		return false
 	end
 end
-return a
+return installHeroInfo

@@ -1,13 +1,13 @@
 -- Shared bot system: log.
-local a = print
-function _G.log(b, ...)
+local rawPrint = print
+function _G.log(format, ...)
 	if not IsDebug then
 		return
 	end
 	if select("#", ...) == 0 then
-		a(b)
+		rawPrint(format)
 	else
-		a(string.format(b, ...))
+		rawPrint(string.format(format, ...))
 	end
 end
 return { log = _G.log }

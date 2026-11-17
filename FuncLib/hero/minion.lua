@@ -1,84 +1,84 @@
 -- Hero-specific helper: minion.
-local a = {}
-local b = GetBot()
-if b == nil or b:IsInvulnerable() or not b:IsHero() or not string.find(b:GetUnitName(), "hero") then
+local X = {}
+local bot = GetBot()
+if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(bot:GetUnitName(), "hero") then
 	return
 end
-local c = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/attacking_wards")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/primal_split")
-local f = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/familiars")
-local g = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/illusions")
-local h = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/minion_with_skill")
-local i = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/vengeful_spirit")
-local j = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/jugg")
-local k = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
-local l = 0.3
-local m = 0.5
-local n = 0.7
-local o = 1.0
-local function p(q)
-	if c.IsPrimalSplit(q) then
-		return l
+local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
+local AttackingWards = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/attacking_wards")
+local PrimalSplit = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/primal_split")
+local Familiars = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/familiars")
+local Illusions = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/illusions")
+local MinionWithSkill = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/minion_with_skill")
+local VengefulSpirit = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/vengeful_spirit")
+local Jugg = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/jugg")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local fastThinkInterval = 0.3
+local mediumThinkInterval = 0.5
+local slowThinkInterval = 0.7
+local simpleAttackInterval = 1.0
+local function GetThinkInterval(minion)
+	if MinionUtils.IsPrimalSplit(minion) then
+		return fastThinkInterval
 	end
-	if q:IsHero() and q:IsIllusion() and q:GetUnitName() == "npc_dota_hero_vengefulspirit" then
-		return l
+	if minion:IsHero() and minion:IsIllusion() and minion:GetUnitName() == "npc_dota_hero_vengefulspirit" then
+		return fastThinkInterval
 	end
-	if c.IsFamiliar(q) then
-		return m
+	if MinionUtils.IsFamiliar(minion) then
+		return mediumThinkInterval
 	end
-	if c.IsAttackingWard(q) then
-		return m
+	if MinionUtils.IsAttackingWard(minion) then
+		return mediumThinkInterval
 	end
-	if c.IsMinionWithSkill(q) then
-		return m
+	if MinionUtils.IsMinionWithSkill(minion) then
+		return mediumThinkInterval
 	end
-	if q:IsHero() and q:IsIllusion() then
-		return n
+	if minion:IsHero() and minion:IsIllusion() then
+		return slowThinkInterval
 	end
-	if c.IsMinionWithNoSkill(q) then
-		return n
+	if MinionUtils.IsMinionWithNoSkill(minion) then
+		return slowThinkInterval
 	end
-	return o
+	return simpleAttackInterval
 end
-local function r(s)
-	return s ~= nil and not s:IsNull() and s:IsAlive() and not s:IsInvulnerable() and not s:IsAttackImmune()
+local function IsAttackable(unit)
+	return unit ~= nil and not unit:IsNull() and unit:IsAlive() and not unit:IsInvulnerable() and not unit:IsAttackImmune()
 end
-local function t(u, q)
-	local v = q:GetAttackTarget()
-	if r(v) and v:IsHero() and GetUnitToUnitDistance(q, v) < 1200 then
+local function SimpleAttackThink(bot, minion)
+	local currentTarget = minion:GetAttackTarget()
+	if IsAttackable(currentTarget) and currentTarget:IsHero() and GetUnitToUnitDistance(minion, currentTarget) < 1200 then
 		return
 	end
-	local w = q:GetNearbyHeroes(1000, true, BOT_MODE_NONE)
-	if w then
-		for x = 1, #w do
-			if r(w[x]) then
-				if v ~= w[x] then
-					q:Action_AttackUnit(w[x], false)
+	local nearbyEnemyHeroes = minion:GetNearbyHeroes(1000, true, BOT_MODE_NONE)
+	if nearbyEnemyHeroes then
+		for i = 1, #nearbyEnemyHeroes do
+			if IsAttackable(nearbyEnemyHeroes[i]) then
+				if currentTarget ~= nearbyEnemyHeroes[i] then
+					minion:Action_AttackUnit(nearbyEnemyHeroes[i], false)
 				end
 				return
 			end
 		end
 	end
-	local y = u:GetAttackTarget()
-	if r(y) and GetUnitToUnitDistance(q, y) < 1200 then
-		if v ~= y then
-			q:Action_AttackUnit(y, false)
+	local botTarget = bot:GetAttackTarget()
+	if IsAttackable(botTarget) and GetUnitToUnitDistance(minion, botTarget) < 1200 then
+		if currentTarget ~= botTarget then
+			minion:Action_AttackUnit(botTarget, false)
 		end
 		return
 	end
-	local z = q:GetNearbyCreeps(800, true)
-	if z then
-		for x = 1, #z do
-			if r(z[x]) then
-				if v ~= z[x] then
-					q:Action_AttackUnit(z[x], false)
+	local nearbyEnemyCreeps = minion:GetNearbyCreeps(800, true)
+	if nearbyEnemyCreeps then
+		for i = 1, #nearbyEnemyCreeps do
+			if IsAttackable(nearbyEnemyCreeps[i]) then
+				if currentTarget ~= nearbyEnemyCreeps[i] then
+					minion:Action_AttackUnit(nearbyEnemyCreeps[i], false)
 				end
 				return
 			end
 		end
 	end
-	q:Action_MoveToLocation(u:GetLocation())
+	minion:Action_MoveToLocation(bot:GetLocation())
 end
 local function HawkScoutPoint(owner)
 	local ancient = GetAncient(GetOpposingTeam())
@@ -114,90 +114,90 @@ local function HawkThink(owner, hawk)
 		hawk:Action_MoveToLocation(goal)
 	end
 end
-function a.IllusionThink(q)
-	return a.MinionThink(q)
+function X.IllusionThink(minion)
+	return X.MinionThink(minion)
 end
-function a.IsValidUnit(q)
-	return c.IsValidUnit(q)
+function X.IsValidUnit(minion)
+	return MinionUtils.IsValidUnit(minion)
 end
-function a.HealingWardThink(A)
-	j.HealingWardThink(A)
+function X.HealingWardThink(ward)
+	Jugg.HealingWardThink(ward)
 end
-function a.MinionThink(q)
-	if not q or q:IsNull() or not q:IsAlive() then
+function X.MinionThink(minion)
+	if not minion or minion:IsNull() or not minion:IsAlive() then
 		return
 	end
-	if c.IsHawk(q) then
+	if MinionUtils.IsHawk(minion) then
 		local owner = GetBot()
 		if owner == nil or owner:GetUnitName() ~= "npc_dota_hero_beastmaster" then
 			return
 		end
 		local now = DotaTime()
-		if q._hawkThink ~= nil and now - q._hawkThink < 0.4 then
+		if minion._hawkThink ~= nil and now - minion._hawkThink < 0.4 then
 			return
 		end
-		q._hawkThink = now
-		HawkThink(owner, q)
+		minion._hawkThink = now
+		HawkThink(owner, minion)
 		return
 	end
-	local B = q._minionTier
-	if B == nil then
-		B = p(q)
-		q._minionTier = B
-		q._minionThinkTime = 0
+	local thinkInterval = minion._minionTier
+	if thinkInterval == nil then
+		thinkInterval = GetThinkInterval(minion)
+		minion._minionTier = thinkInterval
+		minion._minionThinkTime = 0
 	end
-	local C = q._minionThinkTime or 0
-	local D = B * (1 + (k.ThinkLess or 0))
-	local E = DotaTime() - C
-	if E < D then
-		local F = q:GetAttackTarget()
-		local G = F == nil
-			or F:IsNull()
-			or not F:IsAlive()
-			or F:IsInvulnerable()
-			or F:IsAttackImmune()
-			or GetUnitToUnitDistance(q, F) > 1600
-		if not G or E < 0.2 then
+	local lastThinkTime = minion._minionThinkTime or 0
+	local scaledInterval = thinkInterval * (1 + (CustomLoader.ThinkLess or 0))
+	local elapsed = DotaTime() - lastThinkTime
+	if elapsed < scaledInterval then
+		local attackTarget = minion:GetAttackTarget()
+		local needsNewTarget = attackTarget == nil
+			or attackTarget:IsNull()
+			or not attackTarget:IsAlive()
+			or attackTarget:IsInvulnerable()
+			or attackTarget:IsAttackImmune()
+			or GetUnitToUnitDistance(minion, attackTarget) > 1600
+		if not needsNewTarget or elapsed < 0.2 then
 			return
 		end
 	end
-	q._minionThinkTime = DotaTime()
-	local u = GetBot()
-	if u == nil then
+	minion._minionThinkTime = DotaTime()
+	local bot = GetBot()
+	if bot == nil then
 		return
 	end
-	if not c.IsValidUnit(q) then
+	if not MinionUtils.IsValidUnit(minion) then
 		return
 	end
-	if c.CantBeControlled(q) or c.IsShamanFowlPlayChicken(q) then
+	if MinionUtils.CantBeControlled(minion) or MinionUtils.IsShamanFowlPlayChicken(minion) then
 		return
 	end
-	if B >= o then
-		t(u, q)
+	if thinkInterval >= simpleAttackInterval then
+		SimpleAttackThink(bot, minion)
 		return
 	end
 	if
-		q:IsHero() and q:IsIllusion() and q:GetUnitName() ~= "npc_dota_hero_vengefulspirit" or c.IsMinionWithNoSkill(q)
+		minion:IsHero() and minion:IsIllusion() and minion:GetUnitName() ~= "npc_dota_hero_vengefulspirit" or MinionUtils.IsMinionWithNoSkill(minion)
 	then
-		g.Think(u, q)
+		Illusions.Think(bot, minion)
 		return
 	end
-	if q:IsHero() and q:IsIllusion() and q:GetUnitName() == "npc_dota_hero_vengefulspirit" then
-		i.Think(u, q)
+	if minion:IsHero() and minion:IsIllusion() and minion:GetUnitName() == "npc_dota_hero_vengefulspirit" then
+		VengefulSpirit.Think(bot, minion)
 		return
 	end
-	if c.IsAttackingWard(q) then
-		d.Think(u, q)
+	if MinionUtils.IsAttackingWard(minion) then
+		AttackingWards.Think(bot, minion)
 		return
 	end
-	if c.IsPrimalSplit(q) then
-		e.MinionThink(u, q)
+	if MinionUtils.IsPrimalSplit(minion) then
+		PrimalSplit.MinionThink(bot, minion)
 		return
 	end
-	if c.IsFamiliar(q) then
-		f.Think(u, q)
+	if MinionUtils.IsFamiliar(minion) then
+		Familiars.Think(bot, minion)
 		return
 	end
-	h.Think(u, q)
+	MinionWithSkill.Think(bot, minion)
 end
-return a
+return X

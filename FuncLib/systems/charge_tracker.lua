@@ -97,182 +97,182 @@ local function Short(bot)
 	return (string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
 end
 
-local function Has(bot, fn)
-	local ok, v = pcall(function()
-		return bot[fn](bot)
+local function Has(bot, methodName)
+	local ok, result = pcall(function()
+		return bot[methodName](bot)
 	end)
-	return ok and v == true
+	return ok and result == true
 end
 
 local function TalentLearned(bot, name)
-	local ok, v = pcall(function()
-		local t = bot:GetAbilityByName(name)
-		return t ~= nil and t:IsTrained()
+	local ok, result = pcall(function()
+		local talent = bot:GetAbilityByName(name)
+		return talent ~= nil and talent:IsTrained()
 	end)
-	return ok and v == true
+	return ok and result == true
 end
 
 
 local function RuntimeMax(ability)
-	local ok, v = pcall(function()
+	local ok, result = pcall(function()
 		return ability:GetSpecialValueInt("AbilityCharges")
 	end)
-	if ok and type(v) == "number" and v > 0 and v < 20 then
-		return v
+	if ok and type(result) == "number" and result > 0 and result < 20 then
+		return result
 	end
 	return 0
 end
 
-local function MaxCharges(bot, ability, d)
+local function MaxCharges(bot, ability, chargeData)
 	local level = ability:GetLevel()
-	local max = ByLevel(d.base, level) or 0
+	local max = ByLevel(chargeData.base, level) or 0
 	local hasShard = false
 	pcall(function()
 		hasShard = bot:HasModifier("modifier_item_aghanims_shard")
 	end)
-	if d.shard ~= nil and hasShard then
-		max = d.shard
+	if chargeData.shard ~= nil and hasShard then
+		max = chargeData.shard
 	end
-	if d.scepter ~= nil and Has(bot, "HasScepter") then
-		max = d.scepter
+	if chargeData.scepter ~= nil and Has(bot, "HasScepter") then
+		max = chargeData.scepter
 	end
-	if d.talent ~= nil and TalentLearned(bot, d.talent[1]) then
-		max = max + d.talent[2]
+	if chargeData.talent ~= nil and TalentLearned(bot, chargeData.talent[1]) then
+		max = max + chargeData.talent[2]
 	end
 	return math.max(max, RuntimeMax(ability))
 end
 
-local function RestoreTime(bot, ability, d)
+local function RestoreTime(bot, ability, chargeData)
 	local level = ability:GetLevel()
-	local ok, v = pcall(function()
+	local ok, result = pcall(function()
 		return ability:GetSpecialValueFloat("AbilityChargeRestoreTime")
 	end)
-	if ok and type(v) == "number" and v > 0 then
-		return v
+	if ok and type(result) == "number" and result > 0 then
+		return result
 	end
 	local hasShard = false
 	pcall(function()
 		hasShard = bot:HasModifier("modifier_item_aghanims_shard")
 	end)
-	local r = (hasShard and ByLevel(d.restoreShard, level)) or ByLevel(d.restore, level)
-	if r ~= nil and r > 0 then
-		return r
+	local tableRestore = (hasShard and ByLevel(chargeData.restoreShard, level)) or ByLevel(chargeData.restore, level)
+	if tableRestore ~= nil and tableRestore > 0 then
+		return tableRestore
 	end
-	local okCd, cd = pcall(function()
+	local okCd, cooldown = pcall(function()
 		return ability:GetCooldown()
 	end)
-	if okCd and type(cd) == "number" and cd > 0 then
-		return cd
+	if okCd and type(cooldown) == "number" and cooldown > 0 then
+		return cooldown
 	end
 	return 20
 end
 
-local function Log(bot, ability, s, why)
+local function Log(bot, ability, chargeState, why)
 	pcall(print, string.format(
 		"[OHA-CHARGES] t=%.0f %s %s n=%d/%d why=%s next=%s",
 		DotaTime(),
 		Short(bot),
 		ability:GetName(),
-		s.n,
-		s.max,
+		chargeState.n,
+		chargeState.max,
 		why,
-		s.nextAt ~= nil and string.format("%.0f", s.nextAt) or "-"
+		chargeState.nextAt ~= nil and string.format("%.0f", chargeState.nextAt) or "-"
 	))
 end
 
-local function Spend(bot, ability, s, restoreTime, why)
-	s.n = math.max(0, s.n - 1)
-	if s.nextAt == nil and s.n < s.max then
-		s.nextAt = DotaTime() + restoreTime
+local function Spend(bot, ability, chargeState, restoreTime, why)
+	chargeState.n = math.max(0, chargeState.n - 1)
+	if chargeState.nextAt == nil and chargeState.n < chargeState.max then
+		chargeState.nextAt = DotaTime() + restoreTime
 	end
-	s.pending = math.max(0, (s.pending or 0) - 1)
-	s.spentAt = DotaTime()
-	Log(bot, ability, s, why)
+	chargeState.pending = math.max(0, (chargeState.pending or 0) - 1)
+	chargeState.spentAt = DotaTime()
+	Log(bot, ability, chargeState, why)
 end
 
-local function Probe(bot, ability, s, castable)
-	local okCd, cd = pcall(function()
+local function Probe(bot, ability, chargeState, castable)
+	local okCd, cooldown = pcall(function()
 		return ability:GetCooldownTimeRemaining()
 	end)
-	cd = okCd and type(cd) == "number" and cd or -1
-	local key = string.format("%s|%s|%d|%d", tostring(castable), tostring(cd > 0), RuntimeMax(ability), s.n)
-	if key == s.probeKey or DotaTime() < (s.probeAt or -999) then
+	cooldown = okCd and type(cooldown) == "number" and cooldown or -1
+	local key = string.format("%s|%s|%d|%d", tostring(castable), tostring(cooldown > 0), RuntimeMax(ability), chargeState.n)
+	if key == chargeState.probeKey or DotaTime() < (chargeState.probeAt or -999) then
 		return
 	end
-	s.probeKey = key
-	s.probeAt = DotaTime() + 1
+	chargeState.probeKey = key
+	chargeState.probeAt = DotaTime() + 1
 	pcall(print, string.format(
 		"[OHA-CHARGES] t=%.0f %s %s probe castable=%s cd=%.1f runtimeMax=%d max=%d tracked=%d",
 		DotaTime(),
 		Short(bot),
 		ability:GetName(),
 		tostring(castable),
-		cd,
+		cooldown,
 		RuntimeMax(ability),
-		s.max,
-		s.n
+		chargeState.max,
+		chargeState.n
 	))
 end
 
 local function TickAbility(bot, ability, slot)
-	local d = DATA[ability:GetName()]
-	if d == nil or not ability:IsTrained() then
+	local chargeData = DATA[ability:GetName()]
+	if chargeData == nil or not ability:IsTrained() then
 		return
 	end
 	local name = ability:GetName()
 	local now = DotaTime()
-	local max = MaxCharges(bot, ability, d)
-	local s = slot[name]
+	local max = MaxCharges(bot, ability, chargeData)
+	local chargeState = slot[name]
 	if max <= 1 then
 		slot[name] = nil
 		return
 	end
-	local restoreTime = RestoreTime(bot, ability, d)
-	if s == nil then
-		s = { n = max, max = max, inPhase = false, pending = 0 }
-		if d.startEmpty then
-			s.n = 0
-			s.nextAt = now + restoreTime
+	local restoreTime = RestoreTime(bot, ability, chargeData)
+	if chargeState == nil then
+		chargeState = { n = max, max = max, inPhase = false, pending = 0 }
+		if chargeData.startEmpty then
+			chargeState.n = 0
+			chargeState.nextAt = now + restoreTime
 		end
-		slot[name] = s
-		Log(bot, ability, s, "learned")
-	elseif max ~= s.max then
-		s.max = max
-		s.n = math.min(s.n, max)
-		if s.n < max and s.nextAt == nil then
-			s.nextAt = now + restoreTime
+		slot[name] = chargeState
+		Log(bot, ability, chargeState, "learned")
+	elseif max ~= chargeState.max then
+		chargeState.max = max
+		chargeState.n = math.min(chargeState.n, max)
+		if chargeState.n < max and chargeState.nextAt == nil then
+			chargeState.nextAt = now + restoreTime
 		end
-		Log(bot, ability, s, "max-changed")
+		Log(bot, ability, chargeState, "max-changed")
 	end
-	while s.nextAt ~= nil and now >= s.nextAt and s.n < s.max do
-		s.n = s.n + 1
-		s.nextAt = s.n < s.max and s.nextAt + restoreTime or nil
-		Log(bot, ability, s, "restore")
+	while chargeState.nextAt ~= nil and now >= chargeState.nextAt and chargeState.n < chargeState.max do
+		chargeState.n = chargeState.n + 1
+		chargeState.nextAt = chargeState.n < chargeState.max and chargeState.nextAt + restoreTime or nil
+		Log(bot, ability, chargeState, "restore")
 	end
 	-- Casts. 1) The cast phase was seen and ended. 2) Zero cast point spells (Leap, Land Mines)
 	-- have no phase to see: a cast order we issued (Issued) followed by a mana drop close to the
 	-- spell's cost, or by the death of the ordered target.
 	local phase = ability:IsInAbilityPhase()
 	local mana = bot:GetMana()
-	if s.inPhase and not phase then
-		Spend(bot, ability, s, restoreTime, "cast")
-	elseif (s.pending or 0) > 0 then
-		if now > (s.pendingUntil or -999) then
-			s.pending = 0
-			s.pendingTarget = nil
-		elseif now - (s.spentAt or -999) > 0.3 then
+	if chargeState.inPhase and not phase then
+		Spend(bot, ability, chargeState, restoreTime, "cast")
+	elseif (chargeState.pending or 0) > 0 then
+		if now > (chargeState.pendingUntil or -999) then
+			chargeState.pending = 0
+			chargeState.pendingTarget = nil
+		elseif now - (chargeState.spentAt or -999) > 0.3 then
 			local cost = ability:GetManaCost()
-			local drop = (s.lastMana or mana) - mana
+			local drop = (chargeState.lastMana or mana) - mana
 			if cost > 0 and drop >= cost * 0.75 and drop <= cost * 1.25 + 10 then
-				Spend(bot, ability, s, restoreTime, "cast-mana")
-			elseif s.pendingTarget ~= nil and not phase and not s.pendingTarget:IsAlive() then
-				s.pendingTarget = nil
-				Spend(bot, ability, s, restoreTime, "cast-target-died")
+				Spend(bot, ability, chargeState, restoreTime, "cast-mana")
+			elseif chargeState.pendingTarget ~= nil and not phase and not chargeState.pendingTarget:IsAlive() then
+				chargeState.pendingTarget = nil
+				Spend(bot, ability, chargeState, restoreTime, "cast-target-died")
 			end
 		end
 	end
-	s.inPhase = phase
-	s.lastMana = mana
+	chargeState.inPhase = phase
+	chargeState.lastMana = mana
 	-- Correct with what the API shows, only when the hero is free to cast and it has stayed that
 	-- way for 1s (no flicker).
 	local free = bot:IsAlive()
@@ -284,29 +284,29 @@ local function TickAbility(bot, ability, slot)
 		and bot:GetMana() >= ability:GetManaCost()
 	local castable = ability:IsFullyCastable()
 	if free then
-		if not castable and s.n > 0 then
-			s.emptySince = s.emptySince or now
-			if now - s.emptySince >= 1 then
-				s.n = 0
-				if s.nextAt == nil then
-					s.nextAt = now + restoreTime
+		if not castable and chargeState.n > 0 then
+			chargeState.emptySince = chargeState.emptySince or now
+			if now - chargeState.emptySince >= 1 then
+				chargeState.n = 0
+				if chargeState.nextAt == nil then
+					chargeState.nextAt = now + restoreTime
 				end
-				Log(bot, ability, s, "resync-empty")
+				Log(bot, ability, chargeState, "resync-empty")
 			end
 		else
-			s.emptySince = nil
-			if castable and s.n == 0 then
+			chargeState.emptySince = nil
+			if castable and chargeState.n == 0 then
 				-- A charge just came in, so the next one starts restoring now (game 014: the timer
 				-- from learn time gave Sacrifice a second charge 90s early).
-				s.n = 1
-				s.nextAt = s.n < s.max and now + restoreTime or nil
-				Log(bot, ability, s, "resync-one")
+				chargeState.n = 1
+				chargeState.nextAt = chargeState.n < chargeState.max and now + restoreTime or nil
+				Log(bot, ability, chargeState, "resync-one")
 			end
 		end
 	else
-		s.emptySince = nil
+		chargeState.emptySince = nil
 	end
-	Probe(bot, ability, s, castable)
+	Probe(bot, ability, chargeState, castable)
 end
 
 -- Once per think per bot.
@@ -314,25 +314,25 @@ function ChargeTracker.Tick(bot)
 	if bot == nil or not bot:IsHero() or bot:IsIllusion() then
 		return
 	end
-	local id = bot:GetPlayerID()
+	local playerId = bot:GetPlayerID()
 	local now = DotaTime()
-	state[id] = state[id] or {}
-	if tracked[id] == nil or now >= (scanAt[id] or -999) then
-		scanAt[id] = now + 5
+	state[playerId] = state[playerId] or {}
+	if tracked[playerId] == nil or now >= (scanAt[playerId] or -999) then
+		scanAt[playerId] = now + 5
 		local list = {}
 		for i = 0, 23 do
-			local ab = bot:GetAbilityInSlot(i)
-			if ab ~= nil and not ab:IsNull() and DATA[ab:GetName()] ~= nil then
-				list[#list + 1] = ab
+			local ability = bot:GetAbilityInSlot(i)
+			if ability ~= nil and not ability:IsNull() and DATA[ability:GetName()] ~= nil then
+				list[#list + 1] = ability
 			end
 		end
-		tracked[id] = list
+		tracked[playerId] = list
 	end
-	for _, ab in ipairs(tracked[id]) do
-		if ab ~= nil and not ab:IsNull() then
-			local ok, err = pcall(TickAbility, bot, ab, state[id])
-			if not ok and not state[id]._errLogged then
-				state[id]._errLogged = true
+	for _, ability in ipairs(tracked[playerId]) do
+		if ability ~= nil and not ability:IsNull() then
+			local ok, err = pcall(TickAbility, bot, ability, state[playerId])
+			if not ok and not state[playerId]._errLogged then
+				state[playerId]._errLogged = true
 				pcall(print, "[OHA-ERROR] charge_tracker: " .. tostring(err))
 			end
 		end
@@ -345,8 +345,8 @@ function ChargeTracker.Count(bot, ability)
 		return nil
 	end
 	local slot = state[bot:GetPlayerID()]
-	local s = slot and slot[ability:GetName()]
-	return s and s.n or nil
+	local chargeState = slot and slot[ability:GetName()]
+	return chargeState and chargeState.n or nil
 end
 
 -- Mark a cast order (count = how many casts were queued), so a cast with no visible cast phase
@@ -356,12 +356,12 @@ function ChargeTracker.Issued(bot, ability, target, count)
 		return
 	end
 	local slot = state[bot:GetPlayerID()]
-	local s = slot and slot[ability:GetName()]
-	if s ~= nil then
+	local chargeState = slot and slot[ability:GetName()]
+	if chargeState ~= nil then
 		count = count or 1
-		s.pending = (s.pending or 0) + count
-		s.pendingUntil = DotaTime() + 1 + count * 0.6
-		s.pendingTarget = target
+		chargeState.pending = (chargeState.pending or 0) + count
+		chargeState.pendingUntil = DotaTime() + 1 + count * 0.6
+		chargeState.pendingTarget = target
 	end
 end
 

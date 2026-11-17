@@ -1,108 +1,108 @@
 -- Shared helper: math helper.
-local function a(b)
-	function b.IsUnitValid(c)
-		if c == nil then
+local function installMathHelpers(Fu)
+	function Fu.IsUnitValid(unit)
+		if unit == nil then
 			return false
 		end
-		local d, e = pcall(function()
-			return not c:IsNull()
+		local ok, notNull = pcall(function()
+			return not unit:IsNull()
 		end)
-		if not d or not e then
+		if not ok or not notNull then
 			return false
 		end
 		return true
 	end
-	function b.GetHP(c)
-		if not b.IsUnitValid(c) or not c:CanBeSeen() or not c:IsAlive() then
+	function Fu.GetHP(unit)
+		if not Fu.IsUnitValid(unit) or not unit:CanBeSeen() or not unit:IsAlive() then
 			return 0
 		end
-		local f = c:GetHealth()
-		local g = c:GetMaxHealth()
-		if GetTeam() == c:GetTeam() then
-			f = c:OriginalGetHealth()
-			g = c:OriginalGetMaxHealth()
+		local health = unit:GetHealth()
+		local maxHealth = unit:GetMaxHealth()
+		if GetTeam() == unit:GetTeam() then
+			health = unit:OriginalGetHealth()
+			maxHealth = unit:OriginalGetMaxHealth()
 		end
-		if f <= 0 then
+		if health <= 0 then
 			return 0
 		end
-		return f / g
+		return health / maxHealth
 	end
-	function b.GetMP(h)
-		if not b.IsUnitValid(h) then
+	function Fu.GetMP(unit)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		if h:GetUnitName() == "npc_dota_hero_huskar" then
-			return h:GetHealth() / h:GetMaxHealth()
+		if unit:GetUnitName() == "npc_dota_hero_huskar" then
+			return unit:GetHealth() / unit:GetMaxHealth()
 		end
-		return h:GetMana() / h:GetMaxMana()
+		return unit:GetMana() / unit:GetMaxMana()
 	end
-	function b.GetManaAfter(i)
-		local h = GetBot()
-		return (h:GetMana() - i) / h:GetMaxMana()
+	function Fu.GetManaAfter(manaCost)
+		local bot = GetBot()
+		return (bot:GetMana() - manaCost) / bot:GetMaxMana()
 	end
-	function b.GetHealthAfter(j)
-		local h = GetBot()
-		return (h:GetHealth() - j) / h:GetMaxHealth()
+	function Fu.GetHealthAfter(damage)
+		local bot = GetBot()
+		return (bot:GetHealth() - damage) / bot:GetMaxHealth()
 	end
-	function b.GetOne(k)
-		return math.floor(k * 10) / 10
+	function Fu.GetOne(value)
+		return math.floor(value * 10) / 10
 	end
-	function b.ToNearest500(l)
-		return math.floor(l / 500 + 0.5) * 500
+	function Fu.ToNearest500(value)
+		return math.floor(value / 500 + 0.5) * 500
 	end
-	function b.CombineTwoTable(m, n)
-		local o = m
-		local p = #m
-		for q, r in pairs(n) do
-			o[p + q] = r
+	function Fu.CombineTwoTable(first, second)
+		local combined = first
+		local firstLength = #first
+		for index, item in pairs(second) do
+			combined[firstLength + index] = item
 		end
-		return o
+		return combined
 	end
-	function b.CheckBitfieldFlag(s, t)
-		return s / t % 2 >= 1
+	function Fu.CheckBitfieldFlag(bitfield, flag)
+		return bitfield / flag % 2 >= 1
 	end
-	function b.GetETAWithAcceleration(u, v, w)
-		return (math.sqrt(2 * w * u + v * v) - v) / w
+	function Fu.GetETAWithAcceleration(distance, speed, acceleration)
+		return (math.sqrt(2 * acceleration * distance + speed * speed) - speed) / acceleration
 	end
-	local x = {}
-	function b.HasNotActionLast(y, z)
-		if x[z] == nil then
-			x[z] = -90
+	local lastActionTime = {}
+	function Fu.HasNotActionLast(interval, actionKey)
+		if lastActionTime[actionKey] == nil then
+			lastActionTime[actionKey] = -90
 		end
-		if DotaTime() > x[z] + y then
-			x[z] = DotaTime()
+		if DotaTime() > lastActionTime[actionKey] + interval then
+			lastActionTime[actionKey] = DotaTime()
 			return true
 		end
 		return false
 	end
-	function b.CountNotStunnedUnits(A, B, C, D)
-		local E = 0
-		if B.count >= D then
-			for F, c in pairs(A) do
+	function Fu.CountNotStunnedUnits(units, aoe, radius, minCount)
+		local count = 0
+		if aoe.count >= minCount then
+			for _, unit in pairs(units) do
 				if
-					GetUnitToLocationDistance(c, B.targetloc) <= C
-					and not c:IsInvulnerable()
-					and not b.IsDisabled(c)
+					GetUnitToLocationDistance(unit, aoe.targetloc) <= radius
+					and not unit:IsInvulnerable()
+					and not Fu.IsDisabled(unit)
 				then
-					E = E + 1
+					count = count + 1
 				end
 			end
 		end
-		return E
+		return count
 	end
-	function b.HasHealingItem(h)
-		return b.HasItem(h, "item_tango")
-			or b.HasItem(h, "item_tango_single")
-			or b.HasItem(h, "item_flask")
-			or b.HasItem(h, "item_bottle")
-			or b.HasItem(h, "item_faerie_fire")
-			or b.HasItem(h, "item_enchanted_mango")
-			or b.HasItem(h, "item_famango")
-			or b.HasItem(h, "item_great_famango")
-			or b.HasItem(h, "item_greater_famango")
-			or h:HasModifier("modifier_tango_heal")
-			or h:HasModifier("modifier_flask_healing")
-			or h:HasModifier("modifier_bottle_regeneration")
+	function Fu.HasHealingItem(unit)
+		return Fu.HasItem(unit, "item_tango")
+			or Fu.HasItem(unit, "item_tango_single")
+			or Fu.HasItem(unit, "item_flask")
+			or Fu.HasItem(unit, "item_bottle")
+			or Fu.HasItem(unit, "item_faerie_fire")
+			or Fu.HasItem(unit, "item_enchanted_mango")
+			or Fu.HasItem(unit, "item_famango")
+			or Fu.HasItem(unit, "item_great_famango")
+			or Fu.HasItem(unit, "item_greater_famango")
+			or unit:HasModifier("modifier_tango_heal")
+			or unit:HasModifier("modifier_flask_healing")
+			or unit:HasModifier("modifier_bottle_regeneration")
 	end
 end
-return a
+return installMathHelpers

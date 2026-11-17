@@ -1,5 +1,5 @@
 -- Lookup table: hero display names per language (from Fretbots; also used by the Fretbots plugin).
-local a = {
+local HeroDisplayNames = {
 	en = {
 		npc_dota_hero_abaddon = "Abaddon",
 		npc_dota_hero_abyssal_underlord = "Underlord",
@@ -521,4 +521,4 @@ local a = {
 		npc_dota_hero_largo = "Large",
 	},
 }
-return a
+return HeroDisplayNames

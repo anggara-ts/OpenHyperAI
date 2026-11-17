@@ -1,77 +1,77 @@
 -- Walks to the secret shop.
-local a = GetBot()
-local b = a:GetUnitName()
+local bot = GetBot()
+local botName = bot:GetUnitName()
 if
-	a == nil
-	or a:IsInvulnerable()
-	or not a:IsHero()
-	or not a:IsAlive()
-	or not string.find(b, "hero")
-	or a:IsIllusion()
+	bot == nil
+	or bot:IsInvulnerable()
+	or not bot:IsHero()
+	or not bot:IsAlive()
+	or not string.find(botName, "hero")
+	or bot:IsIllusion()
 then
 	return
 end
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
-d.ThinkLess = d.Enable and d.ThinkLess or 1
-local e = a:GetTeam()
-local f = e == TEAM_RADIANT and TEAM_DIRE or TEAM_RADIANT
-local g = {}
-local h = nil
-local i = GetShopLocation(GetTeam(), SHOP_SECRET)
-local j = GetShopLocation(GetTeam(), SHOP_SECRET2)
-local k = false
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
+local team = bot:GetTeam()
+local enemyTeam = team == TEAM_RADIANT and TEAM_DIRE or TEAM_RADIANT
+local SecretShop = {}
+local preferredSecretShop = nil
+local secretShop1Location = GetShopLocation(GetTeam(), SHOP_SECRET)
+local secretShop2Location = GetShopLocation(GetTeam(), SHOP_SECRET2)
+local hasItemToSell = false
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	local l = GetDesireHelper()
-	return l
+	local desire = GetDesireHelper()
+	return desire
 end
 function GetDesireHelper()
-	if c.Utils.IsTeamPushingSecondTierOrHighGround(a) then
+	if Fu.Utils.IsTeamPushingSecondTierOrHighGround(bot) then
 		return BOT_MODE_DESIRE_NONE
 	end
-	local m = GetAncient(GetTeam())
+	local ancient = GetAncient(GetTeam())
 	if
-		c.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
-		or m and c.Utils.CountEnemyHeroesNear(m:GetLocation(), 2500) >= 1
+		Fu.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
+		or ancient and Fu.Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2500) >= 1
 	then
 		return BOT_MODE_DESIRE_NONE
 	end
-	if c.IsFarming(a) and c.IsPushing(a) and c.IsDefending(a) then
+	if Fu.IsFarming(bot) and Fu.IsPushing(bot) and Fu.IsDefending(bot) then
 		return BOT_MODE_DESIRE_NONE
 	end
-	if not g.IsSuitableToBuy() then
+	if not SecretShop.IsSuitableToBuy() then
 		return BOT_MODE_DESIRE_NONE
 	end
-	local n = true
-	for o = 0, 8 do
-		if a:GetItemInSlot(o) == nil then
-			n = false
+	local isInventoryFull = true
+	for slot = 0, 8 do
+		if bot:GetItemInSlot(slot) == nil then
+			isInventoryFull = false
 		end
 	end
-	if n then
-		if a:GetLevel() > 11 and a:FindItemSlot("item_aegis") < 0 then
-			k, itemSlot = g.HaveItemToSell()
-			if k then
-				h = g.GetPreferedSecretShop()
-				if h ~= nil then
-					return RemapValClamped(GetUnitToLocationDistance(a, h), 6000, 0, 0.75, 0.95)
+	if isInventoryFull then
+		if bot:GetLevel() > 11 and bot:FindItemSlot("item_aegis") < 0 then
+			hasItemToSell, itemSlot = SecretShop.HaveItemToSell()
+			if hasItemToSell then
+				preferredSecretShop = SecretShop.GetPreferedSecretShop()
+				if preferredSecretShop ~= nil then
+					return RemapValClamped(GetUnitToLocationDistance(bot, preferredSecretShop), 6000, 0, 0.75, 0.95)
 				end
 			end
 		end
 		return BOT_MODE_DESIRE_NONE
 	end
-	local p = a.theCourier
-	local q = GetCourierState(p)
-	if a.SecretShop and q ~= COURIER_STATE_MOVING then
-		h = g.GetPreferedSecretShop()
-		if h ~= nil and q == COURIER_STATE_DEAD then
-			return RemapValClamped(GetUnitToLocationDistance(a, h), 6000, 0, 0.7, 0.85)
+	local courier = bot.theCourier
+	local courierState = GetCourierState(courier)
+	if bot.SecretShop and courierState ~= COURIER_STATE_MOVING then
+		preferredSecretShop = SecretShop.GetPreferedSecretShop()
+		if preferredSecretShop ~= nil and courierState == COURIER_STATE_DEAD then
+			return RemapValClamped(GetUnitToLocationDistance(bot, preferredSecretShop), 6000, 0, 0.7, 0.85)
 		else
-			if h ~= nil and GetUnitToLocationDistance(a, h) <= 3200 then
-				return RemapValClamped(GetUnitToLocationDistance(a, h), 3200, 0, 0.7, 0.85)
+			if preferredSecretShop ~= nil and GetUnitToLocationDistance(bot, preferredSecretShop) <= 3200 then
+				return RemapValClamped(GetUnitToLocationDistance(bot, preferredSecretShop), 3200, 0, 0.7, 0.85)
 			end
 		end
 	end
@@ -80,26 +80,26 @@ end
 function OnStart() end
 function OnEnd() end
 function Think()
-	if c.CanNotUseAction(a) then
+	if Fu.CanNotUseAction(bot) then
 		return
 	end
-	if a:IsChanneling() or a:NumQueuedActions() > 0 or a:IsCastingAbility() or a:IsUsingAbility() then
+	if bot:IsChanneling() or bot:NumQueuedActions() > 0 or bot:IsCastingAbility() or bot:IsUsingAbility() then
 		return
 	end
-	if h == nil then
-		h = g.GetPreferedSecretShop()
+	if preferredSecretShop == nil then
+		preferredSecretShop = SecretShop.GetPreferedSecretShop()
 	end
-	if a:DistanceFromSecretShop() == 0 then
-		a:Action_MoveToLocation(h + RandomVector(200))
+	if bot:DistanceFromSecretShop() == 0 then
+		bot:Action_MoveToLocation(preferredSecretShop + RandomVector(200))
 		return
 	end
-	if a:DistanceFromSecretShop() > 0 then
-		a:Action_MoveToLocation(h + RandomVector(20))
+	if bot:DistanceFromSecretShop() > 0 then
+		bot:Action_MoveToLocation(preferredSecretShop + RandomVector(20))
 		return
 	end
 end
-function g.HaveItemToSell()
-	local r = {
+function SecretShop.HaveItemToSell()
+	local sellableItems = {
 		"item_clarity",
 		"item_faerie_fire",
 		"item_tango",
@@ -110,58 +110,58 @@ function g.HaveItemToSell()
 		"item_infused_raindrop",
 		"item_bottle",
 	}
-	for s, t in pairs(r) do
-		local u = a:FindItemSlot(t)
-		if u >= 0 and u <= 8 then
-			return true, u
+	for _, itemName in pairs(sellableItems) do
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 and slot <= 8 then
+			return true, slot
 		end
 	end
 	return false, nil
 end
-function g.GetPreferedSecretShop()
+function SecretShop.GetPreferedSecretShop()
 	if GetTeam() == TEAM_RADIANT then
-		if GetUnitToLocationDistance(a, j) <= 3800 then
-			return j
+		if GetUnitToLocationDistance(bot, secretShop2Location) <= 3800 then
+			return secretShop2Location
 		else
-			return i
+			return secretShop1Location
 		end
 	end
-	if GetUnitToLocationDistance(a, i) <= 3800 then
-		return i
+	if GetUnitToLocationDistance(bot, secretShop1Location) <= 3800 then
+		return secretShop1Location
 	else
-		return j
+		return secretShop2Location
 	end
 end
-function g.IsSuitableToBuy()
-	local v = a:GetActiveMode()
-	local w = c.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
+function SecretShop.IsSuitableToBuy()
+	local activeMode = bot:GetActiveMode()
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	if
-		not a:IsAlive()
-		or a:HasModifier("modifier_item_shadow_amulet_fade")
-		or v == BOT_MODE_RETREAT and a:GetActiveModeDesire() >= BOT_MODE_DESIRE_HIGH
-		or v == BOT_MODE_ATTACK
-		or v == BOT_MODE_DEFEND_ALLY
-		or w ~= nil and #w >= 2
-		or w[1] ~= nil and g.IsStronger(a, w[1])
-		or GetUnitToUnitDistance(a, GetAncient(GetTeam())) < 2300
-		or GetUnitToUnitDistance(a, GetAncient(GetOpposingTeam())) < 3500
+		not bot:IsAlive()
+		or bot:HasModifier("modifier_item_shadow_amulet_fade")
+		or activeMode == BOT_MODE_RETREAT and bot:GetActiveModeDesire() >= BOT_MODE_DESIRE_HIGH
+		or activeMode == BOT_MODE_ATTACK
+		or activeMode == BOT_MODE_DEFEND_ALLY
+		or nearbyEnemies ~= nil and #nearbyEnemies >= 2
+		or nearbyEnemies[1] ~= nil and SecretShop.IsStronger(bot, nearbyEnemies[1])
+		or GetUnitToUnitDistance(bot, GetAncient(GetTeam())) < 2300
+		or GetUnitToUnitDistance(bot, GetAncient(GetOpposingTeam())) < 3500
 	then
 		return false
 	end
 	return true
 end
-function g.IsStronger(a, x)
-	local y = a:GetEstimatedDamageToTarget(true, x, 4.0, DAMAGE_TYPE_ALL)
-	local z = x:GetEstimatedDamageToTarget(true, a, 4.0, DAMAGE_TYPE_ALL)
-	return z > y
+function SecretShop.IsStronger(bot, enemy)
+	local botDamage = bot:GetEstimatedDamageToTarget(true, enemy, 4.0, DAMAGE_TYPE_ALL)
+	local enemyDamage = enemy:GetEstimatedDamageToTarget(true, bot, 4.0, DAMAGE_TYPE_ALL)
+	return enemyDamage > botDamage
 end
 if SafeCall then
-	local A = GetDesire
-	local B = Think
-	if A then
-		GetDesire = SafeCall(A, 0, "SECRET_SHOP_GetDesire")
+	local originalGetDesire = GetDesire
+	local originalThink = Think
+	if originalGetDesire then
+		GetDesire = SafeCall(originalGetDesire, 0, "SECRET_SHOP_GetDesire")
 	end
-	if B then
-		Think = SafeCall(B, nil, "SECRET_SHOP_Think")
+	if originalThink then
+		Think = SafeCall(originalThink, nil, "SECRET_SHOP_Think")
 	end
 end

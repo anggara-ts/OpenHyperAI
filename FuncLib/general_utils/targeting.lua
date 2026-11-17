@@ -1,259 +1,259 @@
 -- Shared helper: targeting.
-local function a(b)
-	function b.GetVulnerableWeakestUnit(c, d, e, f)
-		local g = {}
-		if d then
-			g = b.GetNearbyHeroes(c, f, e, BOT_MODE_NONE)
+local function installTargeting(Fu)
+	function Fu.GetVulnerableWeakestUnit(bot, isHero, isEnemy, radius)
+		local units = {}
+		if isHero then
+			units = Fu.GetNearbyHeroes(bot, radius, isEnemy, BOT_MODE_NONE)
 		else
-			g = c:GetNearbyLaneCreeps(f, e)
+			units = bot:GetNearbyLaneCreeps(radius, isEnemy)
 		end
-		return b.GetAttackableWeakestUnitFromList(c, g)
+		return Fu.GetAttackableWeakestUnitFromList(bot, units)
 	end
-	function b.GetVulnerableUnitNearLoc(c, d, e, h, f, i)
-		local g = {}
-		local j = nil
-		local k = 10000
-		if d then
-			g = b.GetNearbyHeroes(c, h, e, BOT_MODE_NONE)
+	function Fu.GetVulnerableUnitNearLoc(bot, isHero, isEnemy, searchRadius, radius, location)
+		local units = {}
+		local weakestUnit = nil
+		local lowestHealth = 10000
+		if isHero then
+			units = Fu.GetNearbyHeroes(bot, searchRadius, isEnemy, BOT_MODE_NONE)
 		else
-			g = c:GetNearbyLaneCreeps(h, e)
+			units = bot:GetNearbyLaneCreeps(searchRadius, isEnemy)
 		end
-		for l, m in pairs(g) do
-			if GetUnitToLocationDistance(m, i) < f and m:GetHealth() < k and b.CanCastOnNonMagicImmune(m) then
-				j = m
-				k = m:GetHealth()
+		for _, unit in pairs(units) do
+			if GetUnitToLocationDistance(unit, location) < radius and unit:GetHealth() < lowestHealth and Fu.CanCastOnNonMagicImmune(unit) then
+				weakestUnit = unit
+				lowestHealth = unit:GetHealth()
 			end
 		end
-		return j
+		return weakestUnit
 	end
-	function b.GetAoeEnemyHeroLocation(c, h, f, n)
-		local o = c:FindAoELocation(true, true, c:GetLocation(), h, f, 0, 0)
-		if o.count >= n then
-			local p = b.GetEnemyList(c, 1600)
-			local q = 0
-			for l, r in pairs(p) do
-				if GetUnitToLocationDistance(r, o.targetloc) <= f and not r:IsMagicImmune() then
-					q = q + 1
+	function Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, minCount)
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
+		if aoe.count >= minCount then
+			local enemyList = Fu.GetEnemyList(bot, 1600)
+			local count = 0
+			for _, enemy in pairs(enemyList) do
+				if GetUnitToLocationDistance(enemy, aoe.targetloc) <= radius and not enemy:IsMagicImmune() then
+					count = count + 1
 				end
 			end
-			if q >= n then
-				return o.targetloc
+			if count >= minCount then
+				return aoe.targetloc
 			end
 		end
 		return nil
 	end
-	function b.GetProperTarget(c)
-		local s = nil
-		if c:GetTeam() == GetBot():GetTeam() then
-			s = c:GetTarget()
+	function Fu.GetProperTarget(unit)
+		local target = nil
+		if unit:GetTeam() == GetBot():GetTeam() then
+			target = unit:GetTarget()
 		end
-		if s == nil and c:CanBeSeen() then
-			s = c:GetAttackTarget()
+		if target == nil and unit:CanBeSeen() then
+			target = unit:GetAttackTarget()
 		end
-		if s ~= nil and s:GetTeam() == c:GetTeam() and (s:IsHero() or s:IsBuilding()) then
-			s = nil
+		if target ~= nil and target:GetTeam() == unit:GetTeam() and (target:IsHero() or target:IsBuilding()) then
+			target = nil
 		end
-		return s
+		return target
 	end
-	function b.GetMostHpUnit(g)
-		local t = nil
-		local u = 0
-		for l, v in pairs(g) do
-			local w = v:GetHealth()
-			if v ~= nil and not b.IsRoshan(v) and not b.IsTormentor(v) and w > u then
-				t = v
-				u = w
+	function Fu.GetMostHpUnit(units)
+		local mostHpUnit = nil
+		local mostHp = 0
+		for _, unit in pairs(units) do
+			local health = unit:GetHealth()
+			if unit ~= nil and not Fu.IsRoshan(unit) and not Fu.IsTormentor(unit) and health > mostHp then
+				mostHpUnit = unit
+				mostHp = health
 			end
 		end
-		return t
+		return mostHpUnit
 	end
 	-- Best creep to eat (Hand of Midas, Doom's Devour, Night Stalker's Midnight Feast): highest level, then
 	-- highest max HP. maxLevel caps the level (Devour creep_level), nil = no cap. Never Roshan / Tormentor,
 	-- ancients only when allowAncient, never dominated or allied-controlled units.
-	function b.GetBestCreepToEat(g, maxLevel, allowAncient)
+	function Fu.GetBestCreepToEat(units, maxLevel, allowAncient)
 		local best, bestLvl, bestHp = nil, -1, -1
-		for _, v in pairs(g or {}) do
+		for _, unit in pairs(units or {}) do
 			if
-				b.IsValid(v)
-				and b.CanBeAttacked(v)
-				and not b.IsRoshan(v)
-				and not b.IsTormentor(v)
-				and not v:IsDominated()
-				and (allowAncient or not v:IsAncientCreep())
-				and (maxLevel == nil or v:GetLevel() <= maxLevel)
+				Fu.IsValid(unit)
+				and Fu.CanBeAttacked(unit)
+				and not Fu.IsRoshan(unit)
+				and not Fu.IsTormentor(unit)
+				and not unit:IsDominated()
+				and (allowAncient or not unit:IsAncientCreep())
+				and (maxLevel == nil or unit:GetLevel() <= maxLevel)
 			then
-				local lvl, hp = v:GetLevel(), v:GetMaxHealth()
+				local lvl, hp = unit:GetLevel(), unit:GetMaxHealth()
 				if lvl > bestLvl or lvl == bestLvl and hp > bestHp then
-					best, bestLvl, bestHp = v, lvl, hp
+					best, bestLvl, bestHp = unit, lvl, hp
 				end
 			end
 		end
 		return best
 	end
-	function b.GetLeastHpUnit(g)
-		local x = nil
-		local y = 999999
-		for l, v in pairs(g) do
-			local w = v:GetHealth()
-			if w < y then
-				x = v
-				y = w
+	function Fu.GetLeastHpUnit(units)
+		local leastHpUnit = nil
+		local leastHp = 999999
+		for _, unit in pairs(units) do
+			local health = unit:GetHealth()
+			if health < leastHp then
+				leastHpUnit = unit
+				leastHp = health
 			end
 		end
-		return x
+		return leastHpUnit
 	end
-	function b.GetAttackableWeakestUnit(c, f, d, e)
-		local g = {}
-		if f > 1600 then
-			f = 1600
+	function Fu.GetAttackableWeakestUnit(bot, radius, isHero, isEnemy)
+		local units = {}
+		if radius > 1600 then
+			radius = 1600
 		end
-		if d then
-			g = b.GetNearbyHeroes(c, f, e, BOT_MODE_NONE)
+		if isHero then
+			units = Fu.GetNearbyHeroes(bot, radius, isEnemy, BOT_MODE_NONE)
 		else
-			g = c:GetNearbyLaneCreeps(f, e)
+			units = bot:GetNearbyLaneCreeps(radius, isEnemy)
 		end
-		return b.GetAttackableWeakestUnitFromList(c, g)
+		return Fu.GetAttackableWeakestUnitFromList(bot, units)
 	end
-	function b.GetAttackableWeakestUnitFromList(c, g)
-		if c == nil then
-			c = GetBot()
+	function Fu.GetAttackableWeakestUnitFromList(bot, units)
+		if bot == nil then
+			bot = GetBot()
 		end
-		local j = nil
-		local z = math.huge
-		local A = c:GetAttackRange()
-		for l, v in pairs(g) do
-			if b.IsValidTarget(v) then
-				local B = v:GetHealth()
-				local C = 0
-				local D = GetUnitToUnitDistance(c, v)
-				if b.IsValidHero(v) then
-					C = v:GetRawOffensivePower()
+		local weakestUnit = nil
+		local lowestScore = math.huge
+		local attackRange = bot:GetAttackRange()
+		for _, unit in pairs(units) do
+			if Fu.IsValidTarget(unit) then
+				local health = unit:GetHealth()
+				local offensivePower = 0
+				local distance = GetUnitToUnitDistance(bot, unit)
+				if Fu.IsValidHero(unit) then
+					offensivePower = unit:GetRawOffensivePower()
 				end
 				if
-					b.IsValid(v)
-					and not v:IsAttackImmune()
-					and not v:IsInvulnerable()
-					and not b.HasForbiddenModifier(v)
-					and not b.IsSuspiciousIllusion(v)
-					and not b.CannotBeKilled(c, v)
+					Fu.IsValid(unit)
+					and not unit:IsAttackImmune()
+					and not unit:IsInvulnerable()
+					and not Fu.HasForbiddenModifier(unit)
+					and not Fu.IsSuspiciousIllusion(unit)
+					and not Fu.CannotBeKilled(bot, unit)
 				then
-					local E = 0.7
-					local F = 0.3
-					local G = B * E - C * F
-					if G < z then
-						z = G
-						j = v
+					local healthWeight = 0.7
+					local powerWeight = 0.3
+					local score = health * healthWeight - offensivePower * powerWeight
+					if score < lowestScore then
+						lowestScore = score
+						weakestUnit = unit
 					end
 				end
 			end
 		end
-		return j
+		return weakestUnit
 	end
-	function b.ConsiderTarget()
-		local c = GetBot()
-		if not b.IsRunning(c) or c:HasModifier("modifier_item_hurricane_pike_range") then
+	function Fu.ConsiderTarget()
+		local bot = GetBot()
+		if not Fu.IsRunning(bot) or bot:HasModifier("modifier_item_hurricane_pike_range") then
 			return
 		end
-		local H = b.GetProperTarget(c)
-		if not b.IsValidHero(H) then
+		local target = Fu.GetProperTarget(bot)
+		if not Fu.IsValidHero(target) then
 			return
 		end
-		local I = c:GetAttackRange() + 69
-		if I > 1600 then
-			I = 1600
+		local attackRange = bot:GetAttackRange() + 69
+		if attackRange > 1600 then
+			attackRange = 1600
 		end
-		if I < 300 then
-			I = 350
+		if attackRange < 300 then
+			attackRange = 350
 		end
-		local J = b.GetAttackableWeakestUnit(c, I, true, true)
-		if b.IsValidHero(J) and (GetUnitToUnitDistance(H, c) > I or b.HasForbiddenModifier(H)) then
-			c:SetTarget(J)
+		local weakestHero = Fu.GetAttackableWeakestUnit(bot, attackRange, true, true)
+		if Fu.IsValidHero(weakestHero) and (GetUnitToUnitDistance(target, bot) > attackRange or Fu.HasForbiddenModifier(target)) then
+			bot:SetTarget(weakestHero)
 			return
 		end
 	end
-	function b.GetMostHPPercent(K, L)
-		local M = 0
-		local N = nil
-		for l, v in pairs(K) do
-			local O = v:GetHealth() / v:GetMaxHealth()
-			if (L and b.CanCastOnMagicImmune(v) or not L and b.CanCastOnNonMagicImmune(v)) and O > M then
-				N = v
-				M = O
+	function Fu.GetMostHPPercent(units, allowMagicImmune)
+		local mostHpPercent = 0
+		local bestUnit = nil
+		for _, unit in pairs(units) do
+			local hpPercent = unit:GetHealth() / unit:GetMaxHealth()
+			if (allowMagicImmune and Fu.CanCastOnMagicImmune(unit) or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)) and hpPercent > mostHpPercent then
+				bestUnit = unit
+				mostHpPercent = hpPercent
 			end
 		end
-		return N
+		return bestUnit
 	end
-	function b.GetCanBeKilledUnit(P, Q, R, L)
-		local s = nil
-		for l, v in pairs(P) do
+	function Fu.GetCanBeKilledUnit(units, damage, damageType, allowMagicImmune)
+		local killableUnit = nil
+		for _, unit in pairs(units) do
 			if
-				(L and b.CanCastOnMagicImmune(v) or not L and b.CanCastOnNonMagicImmune(v)) and b.CanKillTarget(v, Q, R)
+				(allowMagicImmune and Fu.CanCastOnMagicImmune(unit) or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)) and Fu.CanKillTarget(unit, damage, damageType)
 			then
-				s = v
+				killableUnit = unit
 			end
 		end
-		return s
+		return killableUnit
 	end
-	function b.GetClosestUnit(P)
-		local s = nil
-		if P ~= nil and #P >= 1 then
-			return P[1]
+	function Fu.GetClosestUnit(units)
+		local closestUnit = nil
+		if units ~= nil and #units >= 1 then
+			return units[1]
 		end
-		return s
+		return closestUnit
 	end
-	function b.GetStrongestUnit(S, T, e, U, V)
-		local P = b.GetNearbyHeroes(T, S, e, BOT_MODE_NONE)
-		local W = nil
-		local X = 0
-		for Y = 1, #P do
+	function Fu.GetStrongestUnit(radius, bot, isEnemy, allowMagicImmune, duration)
+		local nearbyHeroes = Fu.GetNearbyHeroes(bot, radius, isEnemy, BOT_MODE_NONE)
+		local strongestUnit = nil
+		local highestDamage = 0
+		for i = 1, #nearbyHeroes do
 			if
-				b.IsValidTarget(P[Y])
-				and b.IsValidTarget(T)
+				Fu.IsValidTarget(nearbyHeroes[i])
+				and Fu.IsValidTarget(bot)
 				and (
-					U == true and b.CanCastOnMagicImmune(P[Y]) == true
-					or U == false and b.CanCastOnNonMagicImmune(P[Y]) == true
+					allowMagicImmune == true and Fu.CanCastOnMagicImmune(nearbyHeroes[i]) == true
+					or allowMagicImmune == false and Fu.CanCastOnNonMagicImmune(nearbyHeroes[i]) == true
 				)
 			then
-				local Z = P[Y]:GetEstimatedDamageToTarget(true, T, V, DAMAGE_TYPE_ALL)
-				if Z > X then
-					X = Z
-					W = P[Y]
+				local estimatedDamage = nearbyHeroes[i]:GetEstimatedDamageToTarget(true, bot, duration, DAMAGE_TYPE_ALL)
+				if estimatedDamage > highestDamage then
+					highestDamage = estimatedDamage
+					strongestUnit = nearbyHeroes[i]
 				end
 			end
 		end
-		return W
+		return strongestUnit
 	end
-	function b.GetStrongestEnemyHero(_)
-		local a0 = nil
-		local a1 = 0
-		for a2, r in pairs(_) do
-			if b.IsValidTarget(r) and b.IsNotImmune(r) and not b.IsSuspiciousIllusion(r) then
-				if r:GetHealth() > a1 then
-					a0 = r
-					a1 = r:GetHealth()
+	function Fu.GetStrongestEnemyHero(heroList)
+		local strongestHero = nil
+		local highestHealth = 0
+		for _, enemy in pairs(heroList) do
+			if Fu.IsValidTarget(enemy) and Fu.IsNotImmune(enemy) and not Fu.IsSuspiciousIllusion(enemy) then
+				if enemy:GetHealth() > highestHealth then
+					strongestHero = enemy
+					highestHealth = enemy:GetHealth()
 				end
 			end
 		end
-		return a0
+		return strongestHero
 	end
-	function b.GetWeakestUnit(a3)
-		return b.GetAttackableWeakestUnitFromList(nil, a3)
+	function Fu.GetWeakestUnit(units)
+		return Fu.GetAttackableWeakestUnitFromList(nil, units)
 	end
-	function b.GetHeroCountAttackingTarget(a4, s)
-		local a5 = 0
-		for l, a6 in pairs(a4) do
+	function Fu.GetHeroCountAttackingTarget(heroes, target)
+		local count = 0
+		for _, hero in pairs(heroes) do
 			if
-				b.IsValidHero(a6)
-				and b.IsInRange(a6, s, 1600)
-				and b.IsGoingOnSomeone(a6)
-				and a6:CanBeSeen()
-				and (a6:GetAttackTarget() == s or a6:GetTarget() == s)
-				and not b.IsSuspiciousIllusion(a6)
+				Fu.IsValidHero(hero)
+				and Fu.IsInRange(hero, target, 1600)
+				and Fu.IsGoingOnSomeone(hero)
+				and hero:CanBeSeen()
+				and (hero:GetAttackTarget() == target or hero:GetTarget() == target)
+				and not Fu.IsSuspiciousIllusion(hero)
 			then
-				a5 = a5 + 1
+				count = count + 1
 			end
 		end
-		return a5
+		return count
 	end
 end
-return a
+return installTargeting

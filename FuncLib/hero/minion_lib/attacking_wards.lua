@@ -1,27 +1,27 @@
 -- Thinking for summoned units: attacking wards.
-local a = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local b = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
-local c = {}
-function c.Think(d, e)
-	local f = e:GetAttackRange()
-	if f == nil or f < 400 then
-		f = 500
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
+local X = {}
+function X.Think(ownerBot, ward)
+	local attackRange = ward:GetAttackRange()
+	if attackRange == nil or attackRange < 400 then
+		attackRange = 500
 	end
 	-- Priority: heroes > creeps > towers/buildings.
-	local g = b.GetWeakestHero(f, e)
-	if g == nil then
-		g = b.GetWeakestCreep(f, e)
+	local target = MinionUtils.GetWeakestHero(attackRange, ward)
+	if target == nil then
+		target = MinionUtils.GetWeakestCreep(attackRange, ward)
 	end
-	if g == nil then
-		g = b.GetWeakestTower(f, e)
+	if target == nil then
+		target = MinionUtils.GetWeakestTower(attackRange, ward)
 	end
-	if g == nil or b.IsNotAllowedToAttack(g) then
+	if target == nil or MinionUtils.IsNotAllowedToAttack(target) then
 		return
 	end
-	if e._lastWardTarget == g and e:GetAttackTarget() == g then
+	if ward._lastWardTarget == target and ward:GetAttackTarget() == target then
 		return
 	end
-	e._lastWardTarget = g
-	e:Action_AttackUnit(g, false)
+	ward._lastWardTarget = target
+	ward:Action_AttackUnit(target, false)
 end
-return c
+return X

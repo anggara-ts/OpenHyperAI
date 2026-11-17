@@ -420,6 +420,15 @@ function MapObjectives.LotusCheckedThisMark(loc)
 	return false
 end
 
+-- Game data: a Healing Lotus restores 125 HP and 125 mana (replenish_amount), so low mana counts.
+function MapObjectives.LotusNeedy(hero)
+	if hero == nil or not hero:IsAlive() then
+		return false
+	end
+	local hp = hero:GetHealth() / math.max(1, hero:GetMaxHealth())
+	local mp = hero:GetMana() / math.max(1, hero:GetMaxMana())
+	return hp < 0.5 or mp < 0.35
+end
 function MapObjectives.LotusScore(hero, loc)
 	if hero == nil or not hero:IsAlive() then
 		return -99999
@@ -446,8 +455,19 @@ function MapObjectives.LotusScore(hero, loc)
 	end
 	local hp = hero:GetHealth() / math.max(1, hero:GetMaxHealth())
 	local mp = hero:GetMana() / math.max(1, hero:GetMaxMana())
-	if hp < 0.7 or mp < 0.45 then
+	if MapObjectives.LotusNeedy(hero) then
+		-- Needs it now (a lotus restores HP and mana): ahead of a support's +1200.
+		score = score + 1500
+	elseif hp < 0.7 or mp < 0.45 then
 		score = score + 250
+	end
+	-- A full main inventory takes a lotus only when it needs one (it makes room then), so the pick
+	-- goes to a teammate with a free slot instead of a bot that will log why=room and stay.
+	if not MapObjectives.LotusNeedy(hero) then
+		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+		if Item.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
+			score = score - 3000
+		end
 	end
 	-- Already carrying a lotus: slightly less need to contest again.
 	if
@@ -896,8 +916,14 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		-- 1000 with no enemy hero within 1600 of it, not checked by the team this spawn cycle, is
 		-- worth a short detour at any time; the lotus count cannot be read, so a stand that finds
 		-- nothing marks it checked for the team until the next spawn.
+		-- Game 036, 33:00-33:30: the bottom lotus spawned while Radiant pushed the bottom lane, four
+		-- heroes 3600-3900 from it and later within 1600; all logged why=outside, because the spawn
+		-- window (nearSpawn, up to 45s after the mark) switched pass-by off while the 6s linger after
+		-- the mark had already ended. Pass-by now also runs from 6s after the mark. A bot that needs
+		-- it (under 50% HP or 35% mana: a lotus restores both) detours up to 2500 instead of 1000.
 		local passBy = false
-		if not nearSpawn and spawnOpen then
+		local needy = MapObjectives.LotusNeedy(bot)
+		if spawnOpen and (not nearSpawn or toNext > 32 and sinceLast > 6) then
 			local okLP, laningNow = pcall(function()
 				return require(GetScriptDirectory() .. "/FuncLib/func_utils").IsInLaningPhase()
 			end)
@@ -905,7 +931,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				local ploc, pdist = MapObjectives.PickClosestLocation(bot, (MapObjectives.GetLotusPoolLocations()))
 				if
 					ploc ~= nil
-					and pdist <= 1000
+					and pdist <= (needy and 2500 or 1000)
 					and HeroesNearLoc(ploc, 1600) == 0
 					and not MapObjectives.LotusCheckedThisMark(ploc)
 				then
@@ -1042,11 +1068,23 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				end
 			elseif not mainRoom then
 				failWhy = "room"
-				-- Full main inventory (user call): only a hurt bot (under 50% HP, above the 28% floor) makes
-				-- room (cheapest main item to the backpack) and takes the trip; otherwise the lotus is
-				-- skipped and nothing is moved.
-				if loc ~= nil and dist <= maxWalk and hp >= 0.28 and hp < 0.5 then
-					pcall(MapObjectives.EnsureInventorySlot, bot)
+				-- Full main inventory (user call): only a bot that needs it (under 50% HP, above the 28%
+				-- floor, or under 35% mana: game 036, Slark near empty) makes room (cheapest main item to
+				-- the backpack) and takes the trip; otherwise the lotus is skipped and nothing is moved.
+				if loc ~= nil and dist <= maxWalk and hp >= 0.28 and needy then
+					local okR, made = pcall(MapObjectives.EnsureInventorySlot, bot)
+					local logNow = DotaTime() >= (bot._lotusRoomLogAt or -999)
+					if logNow then
+						bot._lotusRoomLogAt = DotaTime() + 5
+					end
+					pcall(logNow and print or function() end, string.format(
+						"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(okR and made),
+						hp,
+						bot:GetMana() / math.max(1, bot:GetMaxMana())
+					))
 				end
 			elseif loc == nil then
 				failWhy = "no-pool"

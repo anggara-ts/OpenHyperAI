@@ -2139,7 +2139,9 @@ a.ConsiderItemDesire["item_enchanted_mango"] = function(bm)
 	local bq = "none"
 	local hEffectTarget = nil
 	local bw = nil
-	if b:GetMana() < 150 then
+	-- Game data: Mango restores 100 mana. Also eat it below 30% mana once the 100 fits, so a late-game
+	-- pool (Slark, game 036) does not have to fall under 150 first.
+	if b:GetMana() < 150 or f.GetMP(b) < 0.3 and b:GetMaxMana() - b:GetMana() >= 100 then
 		hEffectTarget = b
 		bw = "自己吃"
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, bq, bw
@@ -4278,6 +4280,22 @@ local function SentrySpotFor(loc)
 	end
 	return Vector(me.x + dx / len * 480, me.y + dy / len * 480, loc.z)
 end
+-- No sentry where True Sight already is (our towers, an allied sentry or Gem: Site.IsLocationHaveTrueSight),
+-- and none closer than 1050 (sentry True Sight radius, game files) to an allied sentry, so the circles
+-- do not overlap. User rule.
+local SENTRY_SIGHT = 1050
+local function SentrySpotUseless(spot)
+	if f.Site.IsLocationHaveTrueSight(spot) then
+		return "true-sight"
+	end
+	for _, w in pairs(GetUnitList(UNIT_LIST_ALLIED_WARDS) or {}) do
+		if f.IsValid(w) and w:GetUnitName() == "npc_dota_sentry_wards" and GetUnitToLocationDistance(w, spot) < SENTRY_SIGHT then
+			return "sentry-near"
+		end
+	end
+	return nil
+end
+a.SentrySpotUseless = SentrySpotUseless
 function a.ConsiderSentryReveal(item, isDispenser)
 	if ReadyMainItem("item_dust") ~= nil then
 		return BOT_ACTION_DESIRE_NONE
@@ -4285,6 +4303,15 @@ function a.ConsiderSentryReveal(item, isDispenser)
 	local pid, loc, who = FaderSpot(500 + 1000)
 	if pid == nil then
 		return BOT_ACTION_DESIRE_NONE
+	end
+	do
+		local why = SentrySpotUseless(loc) or SentrySpotUseless(SentrySpotFor(loc))
+		if why ~= nil then
+			b._faders[pid] = nil
+			pcall(print, string.format("[OHA-ITEM] t=%.0f %s sentry-skip on %s why=%s", DotaTime(),
+				(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")), (string.gsub(tostring(who), "npc_dota_hero_", "")), why))
+			return BOT_ACTION_DESIRE_NONE
+		end
 	end
 	if isDispenser then
 		if (item:GetSecondaryCharges() or 0) <= 0 then
@@ -5573,6 +5600,7 @@ a.ConsiderItemDesire["item_ward_sentry"] = function(bm)
 				and not br:HasModifier("modifier_slardar_amplify_damage")
 				and not br:HasModifier("modifier_item_dustofappearance")
 				and not f.Site.IsLocationHaveTrueSight(br:GetLocation())
+				and SentrySpotUseless(f.GetUnitTowardDistanceLocation(b, br, bv)) == nil
 			then
 				hEffectTarget = f.GetUnitTowardDistanceLocation(b, br, bv)
 				bw = "插真眼针对:" .. f.Chat.GetNormName(br)

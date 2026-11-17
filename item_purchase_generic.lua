@@ -1964,6 +1964,76 @@ function ItemPurchaseThink()
 			end
 		end
 	end
+	-- Mana consumables parked in the backpack (Clarity, Enchanted Mango) were never brought back, so a bot
+	-- with an empty mana pool kept them unused (game 036, 30:00+: Slark's Clarity arrived in slot 6).
+	-- Game data: Clarity 6 mana/s for 25s (the usage rule skips it within 4s of hero damage), Mango 100
+	-- mana at once. Below 35% mana, swap one into a main slot: a free slot, a parked consumable, else the
+	-- cheapest swappable item that is not one the backpack-promote routine would pull straight back.
+	-- The usage rules (item_clarity / item_enchanted_mango) cast it once the 6s backpack cooldown ends.
+	if w > (a._lastBackpackMana or -100) + 3.0 and e.GetMP(a) < 0.35 and a:DistanceFromFountain() > 2000 then
+		local manaSlot, manaName = -1, nil
+		for slot = 6, 8 do
+			local it = a:GetItemInSlot(slot)
+			if it ~= nil and not it:IsNull() then
+				local name = it:GetName()
+				if name == "item_enchanted_mango" or name == "item_clarity" and not a:WasRecentlyDamagedByAnyHero(4.0) then
+					manaSlot, manaName = slot, name
+					if name == "item_enchanted_mango" then
+						break
+					end
+				end
+			end
+		end
+		if manaName ~= nil then
+			a._lastBackpackMana = w
+			local dest = nil
+			for slot = 0, 5 do
+				local it = a:GetItemInSlot(slot)
+				if it == nil then
+					dest = slot
+					break
+				end
+			end
+			if dest == nil then
+				local bestCost = math.huge
+				for slot = 0, 5 do
+					local it = a:GetItemInSlot(slot)
+					local name = it ~= nil and not it:IsNull() and it:GetName() or nil
+					if
+						name ~= nil
+						and name ~= "item_clarity"
+						and name ~= "item_enchanted_mango"
+						and not tPromoteFromBackpack[name]
+						and not c.IsCanNotSwitchItem(name)
+						and not string.find(name, "item_ward", 1, true)
+					then
+						local cost = PARK_IN_BACKPACK[name] and 0 or (GetItemCost(name) or 0)
+						if cost < bestCost then
+							bestCost, dest = cost, slot
+						end
+					end
+				end
+			end
+			local out = dest ~= nil and a:GetItemInSlot(dest) or nil
+			if dest ~= nil then
+				a:ActionImmediate_SwapItems(manaSlot, dest)
+			end
+			-- [OHA-MANA] unverified: whether the swap lands (swaps were often no-ops in earlier builds).
+			-- moved= shows what sits in the main slot right after the order.
+			local moved = dest ~= nil and a:GetItemInSlot(dest) or nil
+			pcall(print, string.format(
+				"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s mp=%.2f",
+				w,
+				(string.gsub(b, "npc_dota_hero_", "")),
+				(string.gsub(manaName, "item_", "")),
+				manaSlot,
+				dest ~= nil and tostring(dest) or "none",
+				out ~= nil and not out:IsNull() and (string.gsub(out:GetName(), "item_", "")) or "-",
+				moved ~= nil and not moved:IsNull() and (string.gsub(moved:GetName(), "item_", "")) or "-",
+				e.GetMP(a)
+			))
+		end
+	end
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
 	if w > (a._lastBackpackLotus or -100) + 3.0 then
 		local lotusName, lotusSlot, lotusItem = BackpackLotus()

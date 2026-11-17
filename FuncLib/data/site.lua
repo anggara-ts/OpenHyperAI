@@ -287,9 +287,16 @@ w.IsLocationHaveTrueSight = function(at)
 			return true
 		end
 	end
-	local aH = GetBot():GetNearbyTowers(1600, false)
-	for ao, az in ipairs(aH) do
-		if GetUnitToLocationDistance(az, at) < M then
+	-- Our towers anywhere on the map (was only towers within 1600 of the bot, so a spot under a far
+	-- tower looked uncovered and the ward mode walked a sentry there).
+	for ao, az in ipairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+		if
+			az ~= nil
+			and not az:IsNull()
+			and az:IsAlive()
+			and string.find(az:GetUnitName(), "tower", 1, true) ~= nil
+			and GetUnitToLocationDistance(az, at) < M
+		then
 			return true
 		end
 	end

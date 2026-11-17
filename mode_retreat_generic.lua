@@ -1266,4 +1266,10 @@ if SafeCall then
 		GetDesire = SafeCall(originalGetDesire, 0, "RETREAT_GetDesire")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("retreat.GetDesire", GetDesire)
+	Think = Perf.Wrap("retreat.Think", Think)
+end
 return Retreat

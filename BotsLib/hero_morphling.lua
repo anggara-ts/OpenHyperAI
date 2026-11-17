@@ -85,7 +85,7 @@ local replicateAbility = SafeAbility(bot:GetAbilityByName("morphling_replicate")
 local morphReplicateAbility = SafeAbility(bot:GetAbilityByName("morphling_morph_replicate"), "morphling_morph_replicate", "morphling")
 local waveformDesire, waveformLocation
 local adaptiveStrikeDesire, adaptiveStrikeTarget
-local attributeShiftDesire
+local attributeShiftDesire, attributeShiftType -- the type was the global `Type`
 local replicateDesire, replicateTarget
 local replicatedHeroName = ""
 local botTarget
@@ -239,9 +239,9 @@ function X.SkillsComplement()
 	end
 	if bot.IsMorphling then
 		X.SetRatios()
-		attributeShiftDesire, Type = X.ConsiderAtttributeShift()
+		attributeShiftDesire, attributeShiftType = X.ConsiderAtttributeShift()
 		if attributeShiftDesire > 0 then
-			if Type == "agi" then
+			if attributeShiftType == "agi" then
 				bot:Action_UseAbility(morphAgiAbility)
 			else
 				bot:Action_UseAbility(morphStrAbility)

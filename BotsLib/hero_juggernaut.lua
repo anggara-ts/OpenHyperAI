@@ -178,7 +178,7 @@ function X.ConsiderQ()
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(creepSearchRadius, true)
 		if (#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			castTarget = creep
+			castTarget = laneCreeps[1] -- was the undefined global creep (nil); label only
 			debugText = "Q-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, debugText
 		end

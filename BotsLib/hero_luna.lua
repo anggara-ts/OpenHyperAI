@@ -176,8 +176,9 @@ function X.ConsiderLucentBeam()
 			and Fu.IsInRange(bot, botTarget, castRange + 75)
 		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
-			local alliesAroundTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
-			if alliesNearTarget ~= nil and alliesAroundTarget ~= nil and #alliesNearTarget >= #alliesAroundTarget then
+			-- The target's own allies (false). Both calls used true, so the check was always true.
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end

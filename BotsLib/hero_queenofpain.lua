@@ -476,7 +476,7 @@ function X.ConsiderE()
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost * 0.32) and #nearbyAllies <= 3 then
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		if (#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			castTarget = creep
+			castTarget = laneCreeps[1] -- was the undefined global creep (nil); Scream is no-target
 			debugText = "E-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
 		end

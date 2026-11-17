@@ -321,9 +321,16 @@ function X.ConsiderQ()
 			local bestUnit = nil
 			local bestCount = 0
 			for _, allyCreep in pairs(allyCreeps) do
+				-- Purification hits enemies within "radius" of the healed unit. The count used to ignore
+				-- the candidate creep, so every ally creep scored the same.
 				local killableCount = 0
 				for i = 1, #enemyLaneCreeps do
-					if enemyLaneCreeps[i]:GetHealth() < heal then
+					if
+						Fu.IsValid(allyCreep)
+						and Fu.IsValid(enemyLaneCreeps[i])
+						and GetUnitToUnitDistance(enemyLaneCreeps[i], allyCreep) <= radius
+						and enemyLaneCreeps[i]:GetHealth() < heal
+					then
 						killableCount = killableCount + 1
 					end
 				end

@@ -72,6 +72,7 @@ local cullingBladeDesire, cullingBladeTarget
 local aetherRange = 0
 local isAttacking
 local mpRatio, hpRatio, nearbyEnemies, nearbyAllies
+local botTarget -- was a global set every think
 function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
@@ -174,7 +175,7 @@ function X.ConsiderQ()
 	then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius - 50, true)
 		if #nearbyLaneCreeps >= 4 and not nearbyLaneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			castTarget = creep
+			castTarget = nearbyLaneCreeps[1] -- was the undefined global creep (nil); label only
 			castReason = "Q-带线" .. #nearbyLaneCreeps
 			return BOT_ACTION_DESIRE_HIGH, castReason
 		end

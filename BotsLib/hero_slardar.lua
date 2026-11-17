@@ -198,7 +198,7 @@ function X.ConsiderW()
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and #nearbyAllies <= 2 then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(crushRadius, true)
 		if (#nearbyLaneCreeps >= 4 or #nearbyLaneCreeps >= 3 and mpRatio > 0.82) and not nearbyLaneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			castTarget = creep
+			castTarget = nearbyLaneCreeps[1] -- was the undefined global creep (nil); Crush is no-target
 			castLog = "W-带线AOE" .. #nearbyLaneCreeps
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castLog
 		end

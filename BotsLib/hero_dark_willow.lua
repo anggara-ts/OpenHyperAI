@@ -347,7 +347,7 @@ function X.ConsiderBedlam()
 	end
 	if isGoingOnSomeone then
 		if Fu.IsInRange(bot, botTarget, castRange) and Fu.IsValidTarget(botTarget) then
-			return BOT_ACTION_DESIRE_HIGH, allyTarget
+			return BOT_ACTION_DESIRE_HIGH, bot -- was the undefined global allyTarget; Bedlam is no-target
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

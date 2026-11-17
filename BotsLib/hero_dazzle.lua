@@ -613,7 +613,8 @@ function X.GetAbilityEMaxDamage(enemyTarget)
 	local radius = shadowWaveAbility:GetSpecialValueInt("damage_radius")
 	local alliesAroundTarget = Fu.GetUnitAllyCountAroundEnemyTarget(enemyTarget, radius)
 	local maxDamage = shadowWaveAbility:GetSpecialValueInt("damage") + shadowWaveBonusDamage
-	return alliesAroundTarget * nDamage
+	-- Each ally Shadow Wave heals near the target hits it for "damage" (game data; was the undefined global nDamage).
+	return alliesAroundTarget * maxDamage
 end
 function X.GetEnemyFacingAllyDamage(ally, radius, duration)
 	local enemyList = Fu.GetEnemyList(ally, radius)

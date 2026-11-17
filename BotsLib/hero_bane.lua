@@ -109,6 +109,7 @@ local fiendsGripDesire, fiendsGripTarget
 local brainSapBonusDamage = 0
 local brainSapTargetType = nil
 local botLevel, mpRatio, nearbyEnemies, nearbyAllies
+local botTarget -- was a global set every think
 function X.SkillsComplement()
 	if brainSapTargetType == nil and brainSapAbility:IsTrained() then
 		brainSapTargetType = brainSapAbility:GetTargetType()

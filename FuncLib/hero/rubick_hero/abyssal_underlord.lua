@@ -294,15 +294,15 @@ function X.ConsiderFiendsGate()
 	end
 	if lanePushCount[1] ~= nil and lanePushCount[1] >= 3 and laneDistanceSum[1] / lanePushCount[1] <= 1200 then
 		if GetUnitToLocationDistance(bot, GetLaneFrontLocation(GetTeam(), LANE_TOP, 0)) > 4000 then
-			return BOT_ACTION_DESIRE_HIGH, GetUnitToLocationDistance(GetTeam(), LANE_TOP, 0)
+			return BOT_ACTION_DESIRE_HIGH, GetLaneFrontLocation(GetTeam(), LANE_TOP, 0)
 		end
 	elseif lanePushCount[2] ~= nil and lanePushCount[2] >= 3 and laneDistanceSum[2] / lanePushCount[2] <= 1200 then
 		if GetUnitToLocationDistance(bot, GetLaneFrontLocation(GetTeam(), LANE_MID, 0)) > 4000 then
-			return BOT_ACTION_DESIRE_HIGH, GetUnitToLocationDistance(GetTeam(), LANE_MID, 0)
+			return BOT_ACTION_DESIRE_HIGH, GetLaneFrontLocation(GetTeam(), LANE_MID, 0)
 		end
 	elseif lanePushCount[3] ~= nil and lanePushCount[3] >= 3 and laneDistanceSum[3] / lanePushCount[3] <= 1200 then
 		if GetUnitToLocationDistance(bot, GetLaneFrontLocation(GetTeam(), LANE_BOT, 0)) > 4000 then
-			return BOT_ACTION_DESIRE_HIGH, GetUnitToLocationDistance(GetTeam(), LANE_BOT, 0)
+			return BOT_ACTION_DESIRE_HIGH, GetLaneFrontLocation(GetTeam(), LANE_BOT, 0)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

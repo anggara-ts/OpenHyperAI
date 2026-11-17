@@ -455,7 +455,7 @@ function X.ConsiderE()
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost * 0.32) and #nearbyAllies <= 3 then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		if (#laneCreeps >= 3 or #laneCreeps >= 2 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			target = creep
+			target = laneCreeps[1] -- was the undefined global creep (nil); Anchor Smash is no-target
 			reason = "E-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, reason
 		end

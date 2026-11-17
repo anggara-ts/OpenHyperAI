@@ -127,7 +127,8 @@ function X.ConsiderTarBomb()
 	local damage = 40 + 20 * abilityLevel - 1
 	local radius = 325
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	local nearbyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE) -- enemies (true), though the loop at the end of this function treats them as retreating allies
+	-- Allies for the "save a retreating ally" loop at the end (was a second enemy list).
+	local nearbyHeroes = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidTarget(enemyHero)
@@ -397,11 +398,16 @@ function X.ConsiderBurningBarrage()
 	end
 	if Fu.IsFarming(bot) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
+		-- Keep mana for Skeleton Walk only when it was also stolen (the handle is nil otherwise).
+		local skeletonWalkMana = 0
+		if skeletonWalkAbility ~= nil and not skeletonWalkAbility:IsNull() then
+			skeletonWalkMana = skeletonWalkAbility:GetManaCost()
+		end
 		if
 			neutralCreeps ~= nil
 			and #neutralCreeps >= 1
 			and Fu.IsAttacking(bot)
-			and Fu.GetManaAfter(burningBarrageAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost()
+			and Fu.GetManaAfter(burningBarrageAbility:GetManaCost()) * bot:GetMana() > skeletonWalkMana
 		then
 			if Fu.IsBigCamp(neutralCreeps) or neutralCreeps[1]:IsAncientCreep() then
 				if #neutralCreeps >= 2 then

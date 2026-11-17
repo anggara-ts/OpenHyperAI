@@ -263,7 +263,7 @@ function X.ConsiderQ()
 			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
 			and (#laneCreeps >= 5 or mpRatio > 0.88 and #laneCreeps >= 4)
 		then
-			castTarget = creep
+			castTarget = laneCreeps[1] -- was the undefined global creep (nil); Starstorm is no-target
 			castReason = "Q-带线"
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 		end

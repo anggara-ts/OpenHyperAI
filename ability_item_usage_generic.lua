@@ -4930,6 +4930,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		end
 	end
 	if activeMode == BOT_MODE_LANING and not Usage.JustTeleported() then
+		local shouldTp
 		hEffectTarget, shouldTp = Usage.GetLaningTPLocation(bot, tpDistance, botLocation)
 		castReason = "出去发育"
 		if shouldTp then
@@ -5247,7 +5248,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	then
 		local farmLane, farmLaneDesire = Fu.GetMostFarmLaneDesire(bot)
 		if farmLaneDesire > 0.1 then
-			farmTpLoc = GetLaneFrontLocation(team, farmLane, 0)
+			local farmTpLoc = GetLaneFrontLocation(team, farmLane, 0)
 			local nearestTpSpot = Fu.GetNearbyLocationToTp(farmTpLoc)
 			if
 				nearestTpSpot ~= nil
@@ -7679,12 +7680,17 @@ Usage.ConsiderItemDesire["item_minotaur_horn"] = function(item)
 	if
 		bot:IsMagicImmune()
 		or not Fu.CanBeAttacked(bot)
-		or not bot:HasModifier("modifier_item_lotus_orb_active")
-		or not bot:HasModifier("modifier_antimage_spell_shield")
+		-- Already protected: skip. Was "or not lotus or not spell shield", which needed BOTH buffs
+		-- to get past this check, so the horn was never used.
+		or bot:HasModifier("modifier_item_lotus_orb_active")
+		or bot:HasModifier("modifier_antimage_spell_shield")
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local nEnemyHeroes = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+	-- Were globals; nAllyHeroes was never set at all (nil count, runtime error).
+	local nInRangeEnemy
+	local nAllyHeroes = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
 	if (Fu.IsGoingOnSomeone(bot) or Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot)) and #nEnemyHeroes > 0 then
 		if bot:IsRooted() then
 			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil

@@ -1,6 +1,5 @@
 -- Ancient Apparition: skill build, item build, and ability use for this hero.
 -- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
-local Pos4SellList, Pos5SellList
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -61,8 +60,6 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_wind_waker",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-Pos4SellList = { "item_magic_wand" }
-Pos5SellList = { "item_magic_wand" }
 X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}

@@ -1,6 +1,4 @@
 -- Hero-specific helper: rubick.
--- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
-local DOTA_UNIT_TARGET_TEAM_FRIENDLY, DOTA_UNIT_TARGET_TEAM_ENEMY, DOTA_UNIT_TARGET_TEAM_BOTH
 local X = {}
 local bot = GetBot()
 local Abaddon = require(GetScriptDirectory() .. "/FuncLib/hero/rubick_hero/abaddon")

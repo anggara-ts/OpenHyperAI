@@ -140,6 +140,8 @@ local isGoingOnSomeone
 local isInTeamFight
 local lastSpiritMoveTime = 0
 local spiritMoveInterval = 1.0
+-- fix: these were globals. Forward-declared locals: the "function X()" definitions below assign these.
+local ConsiderAstralSpirit, ConsiderMoveAstralSpirit, ConsiderReturnSpirit, ConsiderEarthSplitter, ConsiderEchoStomp
 function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) or bot:IsCastingAbility() or bot:IsChanneling() then
 		return

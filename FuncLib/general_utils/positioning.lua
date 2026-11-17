@@ -414,7 +414,8 @@ local function installPositioning(Fu)
 		if bestTreeLocation ~= nil and maxDistance > bot:GetAttackRange() then
 			return bestTreeLocation
 		end
-		return bestTreeLocation
+		-- Returned bestTreeLocation here too, so the attack-range check above did nothing.
+		return nil
 	end
 	function Fu.GetBestTree(bot, location, target, range, radius)
 		local bestTree = nil
@@ -481,6 +482,5 @@ local function installPositioning(Fu)
 		end
 		return ultLocation
 	end
-	return J
 end
 return installPositioning

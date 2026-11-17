@@ -280,6 +280,7 @@ local function installHeroState(Fu)
 		if bot:WasRecentlyDamagedByAnyHero(2.0) or bot:WasRecentlyDamagedByTower(2.0) or #nearbyEnemies >= 2 then
 			return true
 		end
+		return false
 	end
 	function Fu.IsDisabled(unit)
 		if not Fu.IsUnitValid(unit) then
@@ -466,7 +467,8 @@ local function installHeroState(Fu)
 			or Fu.GetModifierTime(unit, "modifier_oracle_false_promise_timer") > 0.6
 	end
 	function Fu.DoesSomeoneHaveModifier(units, modifierName)
-		if not Fu.IsUnitValid(units) then
+		-- Was `not Fu.IsUnitValid(units)`: a list is not a unit, so this always returned false.
+		if units == nil then
 			return false
 		end
 		for _, unit in pairs(units) do

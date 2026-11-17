@@ -8,6 +8,7 @@ local counterspellAllyAbility
 local manaOverloadAbility
 local manaVoidAbility
 local botTarget
+local lastBlinkFragmentLogTime = -999
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -345,7 +346,9 @@ function X.ConsiderBlinkFragment()
 					enemyNearbyEnemies ~= nil
 					and enemyNearbyAllies ~= nil
 					and #enemyNearbyEnemies >= #enemyNearbyAllies
-					and targetHealth < enemyHero:GetHealth()
+					-- fix: was "targetHealth < GetHealth()" with targetHealth starting at 99999, so no target was
+					-- ever picked; now the lowest-health enemy, as the 99999 start means.
+					and enemyHero:GetHealth() < targetHealth
 				then
 					targetHealth = enemyHero:GetHealth()
 					blinkTarget = enemyHero
@@ -353,6 +356,18 @@ function X.ConsiderBlinkFragment()
 			end
 		end
 		if blinkTarget ~= nil then
+			if DotaTime() >= lastBlinkFragmentLogTime + 5 then
+				lastBlinkFragmentLogTime = DotaTime()
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUBICK] t=%.0f stolen blink fragment engage target=%s hp=%d",
+						DotaTime(),
+						blinkTarget:GetUnitName(),
+						targetHealth
+					)
+				)
+			end
 			return BOT_ACTION_DESIRE_HIGH, blinkTarget:GetLocation()
 		end
 	end

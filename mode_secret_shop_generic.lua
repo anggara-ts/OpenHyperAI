@@ -1,12 +1,11 @@
 -- Walks to the secret shop.
 local bot = GetBot()
-local botName = bot:GetUnitName()
 if
 	bot == nil
 	or bot:IsInvulnerable()
 	or not bot:IsHero()
 	or not bot:IsAlive()
-	or not string.find(botName, "hero")
+	or not string.find(bot:GetUnitName(), "hero")
 	or bot:IsIllusion()
 then
 	return
@@ -53,7 +52,7 @@ function GetDesireHelper()
 	end
 	if isInventoryFull then
 		if bot:GetLevel() > 11 and bot:FindItemSlot("item_aegis") < 0 then
-			hasItemToSell, itemSlot = SecretShop.HaveItemToSell()
+			hasItemToSell = SecretShop.HaveItemToSell()
 			if hasItemToSell then
 				preferredSecretShop = SecretShop.GetPreferedSecretShop()
 				if preferredSecretShop ~= nil then

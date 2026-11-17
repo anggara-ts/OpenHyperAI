@@ -620,7 +620,7 @@ function Dispel.ShouldUseAllyDispelItem(bot)
 				end
 				if not ally:HasModifier("modifier_item_lotus_orb_active") then
 					local allyNearbyEnemies = ally:GetNearbyHeroes(800, true, BotMode.None)
-					if allyNearbyEnemies ~= nil and allyNearbyEnemies ~= nil then
+					if allyNearbyEnemies ~= nil then
 						for _, enemyHero in ipairs(allyNearbyEnemies) do
 							if enemyHero and not enemyHero:IsNull() and enemyHero:IsAlive() then
 								local enemyName = enemyHero:GetUnitName()

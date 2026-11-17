@@ -514,7 +514,7 @@ function X.ConsiderTreeDance()
 				and bot:DistanceFromFountain() > 1000
 			then
 				local nearbyTrees = bot:GetNearbyTrees(castRange)
-				local escapeTree = GetFurthestTree(nearbyTrees)
+				local escapeTree = X.GetTreeNearestOurAncient(nearbyTrees)
 				if
 					escapeTree ~= nil
 					and (
@@ -702,7 +702,8 @@ function X.ConsiderWukongsCommand()
 	if isInTeamFight then
 		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius / 2, 1, 0)
 		if aoe.count >= 2 then
-			local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
+			-- fix: count enemies at the cast location (was around the bot)
+			local nearbyEnemies = Fu.GetEnemiesNearLoc(aoe.targetloc, radius)
 			if
 				nearbyEnemies ~= nil
 				and #nearbyEnemies >= 2
@@ -733,7 +734,8 @@ function X.ConsiderWukongsCommand()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function GetFurthestTree(trees)
+-- Escape tree for Tree Dance: the one nearest our ancient (was the global GetFurthestTree).
+function X.GetTreeNearestOurAncient(trees)
 	if GetAncient(GetTeam()) == nil then
 		return nil
 	end

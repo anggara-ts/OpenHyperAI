@@ -11,6 +11,11 @@ local hookshotAbility
 local lastPowerCogsTime = -1
 local lastRoshanFlareTime = -1
 local botTarget
+local lastAllyHookLogTime = -999
+-- Handles of the other Clockwerk spells are nil unless Rubick stole that spell too.
+local function IsStolenSpellReady(spell)
+	return spell ~= nil and not spell:IsNull() and spell:IsFullyCastable()
+end
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -156,7 +161,7 @@ function X.ConsiderBatteryAssault()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -316,17 +321,22 @@ function X.ConsiderRocketFlare()
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
+		-- Keep mana for Hookshot only when it was also stolen (the handle is nil otherwise).
+		local hookshotMana = 0
+		if hookshotAbility ~= nil and not hookshotAbility:IsNull() then
+			hookshotMana = hookshotAbility:GetManaCost()
+		end
 		if
 			GetUnitToLocationDistance(bot, roshanLocation) > 1600
 			and DotaTime() > lastRoshanFlareTime + 15
-			and Fu.GetManaAfter(rocketFlareAbility:GetManaCost()) * bot:GetMana() > hookshotAbility:GetManaCost()
+			and Fu.GetManaAfter(rocketFlareAbility:GetManaCost()) * bot:GetMana() > hookshotMana
 		then
 			lastRoshanFlareTime = DotaTime()
 			return BOT_ACTION_DESIRE_HIGH, roshanLocation
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -369,8 +379,8 @@ function X.ConsiderHookshot()
 						if
 							bot:GetEstimatedDamageToTarget(true, enemyHero, 5, DAMAGE_TYPE_ALL)
 								> enemyHero:GetHealth()
-							and powerCogsAbility:IsFullyCastable()
-							and batteryAssaultAbility:IsFullyCastable()
+							and IsStolenSpellReady(powerCogsAbility)
+							and IsStolenSpellReady(batteryAssaultAbility)
 						then
 							bot:SetTarget(enemyHero)
 							return BOT_ACTION_DESIRE_HIGH, hookLocation
@@ -409,7 +419,8 @@ function X.ConsiderHookshot()
 							and allyHero:DistanceFromFountain() > 1600
 							and bot:DistanceFromFountain() > allyHero:DistanceFromFountain()
 							and GetUnitToUnitDistance(bot, allyHero) > 1200
-							and not Fu.IsNotSelf(bot, allyHero)
+							-- fix: was "not Fu.IsNotSelf" (= allyHero is Rubick himself), so the hook-to-ally escape never fired
+							and Fu.IsNotSelf(bot, allyHero)
 						then
 							local delay = GetUnitToUnitDistance(bot, allyHero) / speed + castPoint
 							local hookLocation = allyHero:GetExtrapolatedLocation(delay)
@@ -419,6 +430,18 @@ function X.ConsiderHookshot()
 								and not Fu.IsLocationInChrono(hookLocation)
 								and not Fu.IsLocationInArena(hookLocation, 800)
 							then
+								if DotaTime() >= lastAllyHookLogTime + 5 then
+									lastAllyHookLogTime = DotaTime()
+									pcall(
+										print,
+										string.format(
+											"[OHA-RUBICK] t=%.0f stolen hookshot escape to ally=%s dist=%.0f",
+											DotaTime(),
+											allyHero:GetUnitName(),
+											GetUnitToUnitDistance(bot, allyHero)
+										)
+									)
+								end
 								return BOT_ACTION_DESIRE_HIGH, hookLocation
 							end
 						end

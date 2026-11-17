@@ -17,15 +17,20 @@ function X.ConsiderStolenSpell(ability)
 	end
 	botTarget = Fu.GetProperTarget(bot)
 	local abilityName = ability:GetName()
+	-- Reset each call: it stayed nil without a Blink (ConsiderFirefly compares it) or kept an old value.
+	blinkLassoDesire = BOT_ACTION_DESIRE_NONE
 	if X.HasBlink() and abilityName == "batrider_flaming_lasso" then
 		flamingLassoAbility = ability
 		blinkLassoDesire, BlinkLassoTarget = X.ConsiderBlinkLasso()
 		if blinkLassoDesire > 0 then
 			bot:Action_ClearActions(false)
-			FireflyDesire = X.ConsiderFirefly()
-			if FireflyDesire > 0 then
-				bot:ActionQueue_UseAbility(fireflyAbility)
-				bot:ActionQueue_Delay(0.1)
+			-- Firefly is nil unless it was stolen too.
+			if fireflyAbility ~= nil and not fireflyAbility:IsNull() then
+				FireflyDesire = X.ConsiderFirefly()
+				if FireflyDesire > 0 then
+					bot:ActionQueue_UseAbility(fireflyAbility)
+					bot:ActionQueue_Delay(0.1)
+				end
 			end
 			if X.CanBKB() then
 				bot:ActionQueue_UseAbility(bkbItem)
@@ -291,8 +296,10 @@ function X.ConsiderFlamebreak()
 				and not enemiesNearAlly[1]:HasModifier("modifier_enigma_black_hole_pull")
 				and not enemiesNearAlly[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
-				local delay = GetUnitToUnitDistance(bot, botTarget) / speed + castPoint
-				return BOT_ACTION_DESIRE_HIGH, enemiesNearAlly[1]:GetExtrapolatedLocation(delay + castPoint)
+				-- fix: the delay used botTarget's distance (nil here when Rubick has no target) and added the
+				-- cast point twice; measure to the enemy being hit.
+				local delay = GetUnitToUnitDistance(bot, enemiesNearAlly[1]) / speed + castPoint
+				return BOT_ACTION_DESIRE_HIGH, enemiesNearAlly[1]:GetExtrapolatedLocation(delay)
 			end
 		end
 	end

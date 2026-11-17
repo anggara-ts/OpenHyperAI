@@ -83,14 +83,14 @@ function X.SkillsComplement()
 		return
 	end
 	timeWalkDesire, timeWalkLocation = X.ConsiderTimeWalk()
-	if timeWalkDesire > 0 and IsAllowedToCast(timeWalkAbility:GetManaCost()) then
+	if timeWalkDesire > 0 and X.IsAllowedToCast(timeWalkAbility:GetManaCost()) then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbilityOnLocation(timeWalkAbility, timeWalkLocation)
 		lastTimeWalkLocation = timeWalkLocation
 		return
 	end
 	timeDilationDesire = X.ConsiderTimeDilation()
-	if timeDilationDesire > 0 and IsAllowedToCast(timeDilationAbility:GetManaCost()) then
+	if timeDilationDesire > 0 and X.IsAllowedToCast(timeDilationAbility:GetManaCost()) then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbility(timeDilationAbility)
 		return
@@ -392,10 +392,10 @@ function X.ConsiderChronosphere()
 				and Fu.IsChasingTarget(enemyHero, bot)
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 				and not Fu.IsDisabled(enemyHero)
-				and not nearbyEnemyHeroes[1]:HasModifier("modifier_legion_commander_duel")
-				and not nearbyEnemyHeroes[1]:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemyHero:HasModifier("modifier_legion_commander_duel")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1200, false, BOT_MODE_NONE)
+				local enemyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				if enemyAllies ~= nil and #enemyAllies > #nearbyAllies + 2 and #nearbyAllies <= 1 then
 					local aoeLocation =
 						bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
@@ -457,7 +457,8 @@ function X.ConsiderTimeWalkReverse()
 	then
 		local targetEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 		local targetAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-		if targetEnemies ~= nil and targetAllies ~= nil then
+		-- lastTimeWalkLocation is nil until this bot has cast Time Walk itself.
+		if targetEnemies ~= nil and targetAllies ~= nil and lastTimeWalkLocation ~= nil then
 			if
 				#targetAllies > #targetEnemies
 				and GetUnitToLocationDistance(bot, lastTimeWalkLocation) > GetUnitToLocationDistance(
@@ -472,7 +473,7 @@ function X.ConsiderTimeWalkReverse()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function IsAllowedToCast(manaCost)
+function X.IsAllowedToCast(manaCost)
 	if
 		chronosphereAbility ~= nil
 		and not chronosphereAbility:IsNull()

@@ -682,7 +682,7 @@ function Ward.IsOtherWardClose(location, unitName, radius, isAllied, requireFres
 		then
 			if requireFreshWard then
 				if
-					unitName == "item_ward_observer"
+					unitName == "npc_dota_observer_wards"
 					and Fu.GetModifierTime(ward, "modifier_item_buff_ward") >= 360 / 2
 				then
 					return true

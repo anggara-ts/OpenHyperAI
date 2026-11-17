@@ -314,8 +314,8 @@ function X.ConsiderResonantPulse()
 		end
 	end
 	if
-		Fu.IsPushing(bot)
-		or Fu.IsDefending(bot) and not bot:HasModifier("modifier_void_spirit_resonant_pulse_physical_buff")
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and not bot:HasModifier("modifier_void_spirit_resonant_pulse_physical_buff")
 	then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius + 200, true, BOT_MODE_NONE)
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)

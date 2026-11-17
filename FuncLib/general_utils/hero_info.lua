@@ -92,7 +92,7 @@ local function installHeroInfo(Fu)
 				member ~= nil
 				and member:IsAlive()
 				and member ~= hero
-				and Fu.IsCore(hero)
+				and Fu.IsCore(member)
 				and GetUnitToUnitDistance(hero, member) <= radius
 				and not Fu.IsSuspiciousIllusion(member)
 			then

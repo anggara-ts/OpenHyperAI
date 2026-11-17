@@ -193,7 +193,8 @@ function X.ConsiderWhirlingDeath()
 		if
 			nearbyAllies ~= nil
 			and nearbyEnemyHeroes
-			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio and bot:WasRecentlyDamagedByAnyHero(3))
+			-- was "hpRatio and ...": a number is always true, so the HP part did nothing; 0.51 as in Reactive Armor.
+			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio < 0.51 and bot:WasRecentlyDamagedByAnyHero(3))
 			and Fu.IsValidHero(nearbyEnemyHeroes[1])
 			and Fu.CanCastOnNonMagicImmune(nearbyEnemyHeroes[1])
 			and Fu.IsInRange(bot, nearbyEnemyHeroes[1], radius)
@@ -204,6 +205,7 @@ function X.ConsiderWhirlingDeath()
 			and not nearbyEnemyHeroes[1]:HasModifier("modifier_oracle_false_promise_timer")
 			and not nearbyEnemyHeroes[1]:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
+			X.LogRetreatHp("whirling-death", #nearbyEnemyHeroes, #nearbyAllies)
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
@@ -315,7 +317,8 @@ function X.ConsiderTimberChain()
 		if
 			nearbyAllies ~= nil
 			and nearbyEnemyHeroes ~= nil
-			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio and bot:WasRecentlyDamagedByAnyHero(3))
+			-- was "hpRatio and ...": a number is always true, so the HP part did nothing; 0.51 as in Reactive Armor.
+			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio < 0.51 and bot:WasRecentlyDamagedByAnyHero(3))
 			and Fu.IsValidHero(nearbyEnemyHeroes[1])
 			and Fu.IsInRange(bot, nearbyEnemyHeroes[1], 500)
 			and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
@@ -323,6 +326,7 @@ function X.ConsiderTimberChain()
 		then
 			local retreatTreeLocation = Fu.GetBestRetreatTree(bot, castRange)
 			if retreatTreeLocation ~= nil then
+				X.LogRetreatHp("timber-chain", #nearbyEnemyHeroes, #nearbyAllies)
 				return BOT_ACTION_DESIRE_HIGH, retreatTreeLocation
 			end
 		end
@@ -404,7 +408,8 @@ function X.ConsiderChakram()
 		if
 			nearbyAllies ~= nil
 			and nearbyEnemyHeroes ~= nil
-			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio and bot:WasRecentlyDamagedByAnyHero(3))
+			-- was "hpRatio and ...": a number is always true, so the HP part did nothing; 0.51 as in Reactive Armor.
+			and (#nearbyEnemyHeroes > #nearbyAllies or hpRatio < 0.51 and bot:WasRecentlyDamagedByAnyHero(3))
 			and Fu.IsValidHero(nearbyEnemyHeroes[1])
 			and Fu.CanCastOnNonMagicImmune(nearbyEnemyHeroes[1])
 			and Fu.IsInRange(bot, nearbyEnemyHeroes[1], 500)
@@ -412,6 +417,7 @@ function X.ConsiderChakram()
 			and not Fu.IsDisabled(nearbyEnemyHeroes[1])
 		then
 			local travelTime = GetUnitToUnitDistance(bot, nearbyEnemyHeroes[1]) / speed + castPoint
+			X.LogRetreatHp("chakram", #nearbyEnemyHeroes, #nearbyAllies)
 			return BOT_ACTION_DESIRE_HIGH, nearbyEnemyHeroes[1]:GetExtrapolatedLocation(travelTime), travelTime
 		end
 	end
@@ -461,7 +467,7 @@ function X.ConsiderChakramReturn()
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if DotaTime() < chakramCastTime + chakramFlightTime or StillTraveling(1) then
+	if DotaTime() < chakramCastTime + chakramFlightTime or X.StillTraveling(1) then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, chakramAbility:GetCastRange())
@@ -541,7 +547,25 @@ function X.ConsiderFlamethrower()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function StillTraveling(chakramIndex)
+-- [OHA-SHREDDER] retreat cast under the new HP < 0.51 rule (the HP part had no effect before).
+function X.LogRetreatHp(spell, enemies, allies)
+	if DotaTime() < (bot._retreatHpLogAt or -999) then
+		return
+	end
+	bot._retreatHpLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-SHREDDER] t=%.0f retreat %s enemies=%d allies=%d hp=%.2f",
+			DotaTime(),
+			spell,
+			enemies,
+			allies,
+			hpRatio or 0
+		)
+	)
+end
+function X.StillTraveling(chakramIndex)
 	local linearProjectiles = GetLinearProjectiles()
 	for _, projectile in pairs(linearProjectiles) do
 		if

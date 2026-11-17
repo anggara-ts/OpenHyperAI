@@ -100,13 +100,14 @@ function X.SkillsComplement()
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = Fu.GetMP(bot)
-	phaseOrbDesire, phaseOrbLocation, PhaseDuration = X.ConsiderPhaseOrb()
+	local phaseDuration
+	phaseOrbDesire, phaseOrbLocation, phaseDuration = X.ConsiderPhaseOrb()
 	if phaseOrbDesire > 0 then
 		bot:Action_ClearActions(false)
 		bot:ActionQueue_UseAbilityOnLocation(illusoryOrbAbility, phaseOrbLocation)
 		bot:ActionQueue_Delay(0.1)
 		bot:ActionQueue_UseAbility(phaseShiftAbility)
-		bot:ActionQueue_Delay(PhaseDuration - 0.3)
+		bot:ActionQueue_Delay(phaseDuration - 0.3)
 		bot:ActionQueue_UseAbility(etherealJauntAbility)
 		return
 	end
@@ -480,8 +481,11 @@ function X.ConsiderEtherealJaunt()
 										#alliesNearOrb <= 1
 										and #enemiesNearOrb == 1
 										and targetTowers ~= nil
-										and #targetAllies == 0
+										and #targetTowers == 0
 									then
+										-- was "#targetAllies == 0", never true (the target counts itself);
+										-- the laning branch above checks the towers the same way.
+										X.LogJaunt("solo-no-tower", botTarget)
 										return BOT_ACTION_DESIRE_HIGH
 									end
 									if #alliesNearOrb >= 2 then
@@ -511,6 +515,23 @@ function X.ConsiderEtherealJaunt()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-PUCK] Jaunt to the orb onto a lone target with no tower near it, at most once per 10s.
+function X.LogJaunt(reason, target)
+	if DotaTime() < (bot._jauntLogAt or -999) then
+		return
+	end
+	bot._jauntLogAt = DotaTime() + 10
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f jaunt why=%s target=%s hp=%.2f",
+			DotaTime(),
+			reason,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(target)
+		)
+	)
 end
 -- [OHA-PUCK] pick-off Dream Coil on a lone target, at most once per 10s.
 function X.LogCoil(reason, target)
@@ -611,7 +632,7 @@ function X.ConsiderDreamCoil()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function CanDoPhaseOrb()
+local function CanDoPhaseOrb()
 	if phaseShiftAbility:IsFullyCastable() and illusoryOrbAbility:IsFullyCastable() then
 		local comboManaCost = phaseShiftAbility:GetManaCost() + illusoryOrbAbility:GetManaCost()
 		if bot:GetMana() >= comboManaCost then

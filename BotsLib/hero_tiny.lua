@@ -425,7 +425,7 @@ function X.ConsiderTreeGrab()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE)
 	if
 		not isRetreating
-		and bot:GetHealth() > 0.15
+		and hpRatio > 0.15
 		and bot:DistanceFromFountain() > 800
 		and nearbyEnemies ~= nil
 		and #nearbyEnemies == 0

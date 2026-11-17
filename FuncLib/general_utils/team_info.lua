@@ -181,6 +181,8 @@ local function installTeamInfo(Fu)
 		return result
 	end
 	function Fu.IsTargetedByEnemyWithModifier(heroes, modifierName)
+		-- Read the global `bot` (nil, or whichever bot some hero file last stored there), not the caller.
+		local bot = GetBot()
 		for _, enemyHero in pairs(heroes) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -290,11 +292,11 @@ local function installTeamInfo(Fu)
 		end
 		local result = {}
 		for _, hero in pairs(heroes) do
-			if
-				Fu.IsValidHero(hero)
-				and not Fu.IsMeepoClone(hero)
-				and not bot:HasModifier("modifier_arc_warden_tempest_double")
-			then
+			-- Used to test the CALLER's modifier (`bot:HasModifier("modifier_arc_warden_tempest_double")`), so an
+			-- Arc Warden Tempest Double calling this got an empty list (blind in fights). Doubles in the list are
+			-- kept on purpose: an enemy Double hits as hard as the real hero and must count as a threat and a
+			-- target. Fu.GetRealEnemyHeroes is the variant that leaves Doubles out.
+			if Fu.IsValidHero(hero) and not Fu.IsMeepoClone(hero) then
 				table.insert(result, hero)
 			end
 		end
@@ -310,7 +312,7 @@ local function installTeamInfo(Fu)
 		if #heroes > 0 and #creeps > 0 then
 			units = heroes
 			for i = 1, #creeps do
-				table.insert(units, creeps[1])
+				table.insert(units, creeps[i])
 			end
 		elseif #heroes == 0 then
 			units = creeps

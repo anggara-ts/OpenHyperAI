@@ -234,7 +234,7 @@ function X.ConsiderAcornShot()
 	end
 	if
 		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
-		and (Fu.HasItem(bot, "item_maelstrom") or Fu.HasItem(bot, "item_mjollnir") or Fu.HasItem(bot, "item_mjollnir"))
+		and (Fu.HasItem(bot, "item_maelstrom") or Fu.HasItem(bot, "item_mjollnir"))
 		and abilityLevel >= 3
 		and not Fu.IsThereNonSelfCoreNearby(600)
 	then

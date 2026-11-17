@@ -4,28 +4,31 @@ local ownerHero
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local stoneFormAbility
 local isFamiliarBusy = false
+-- Were accidental globals (shared with every other script in the VM).
+local ConsiderStoneForm, ConsiderFamiliarRetreat, ConsiderFamiliarAttack, ConsiderFamiliarMove
+local ConsiderReturn, ConsiderBearRetreat, ConsiderBearAttack, ConsiderBearMove
 function X.FamiliarThink(hero, familiar)
 	if Fu.CanNotUseAbility(familiar) then
 		return
 	end
 	ownerHero = hero
 	stoneFormAbility = familiar:GetAbilityByName("visage_summon_familiars_stone_form")
-	Desire = ConsiderStoneForm(familiar, stoneFormAbility)
+	local Desire = ConsiderStoneForm(familiar, stoneFormAbility)
 	if Desire > 0 then
 		familiar:Action_UseAbilityOnLocation(stoneFormAbility, familiar:GetLocation())
 		return
 	end
-	RetreatDesire, RetreatLocation = ConsiderFamiliarRetreat(familiar)
+	local RetreatDesire, RetreatLocation = ConsiderFamiliarRetreat(familiar)
 	if RetreatDesire > 0 then
 		familiar:Action_MoveToLocation(RetreatLocation)
 		return
 	end
-	AttackDesire, AttackTarget = ConsiderFamiliarAttack(familiar)
+	local AttackDesire, AttackTarget = ConsiderFamiliarAttack(familiar)
 	if AttackDesire > 0 then
 		familiar:Action_AttackUnit(AttackTarget, false)
 		return
 	end
-	MoveDesire, MoveLocation = ConsiderFamiliarMove(familiar)
+	local MoveDesire, MoveLocation = ConsiderFamiliarMove(familiar)
 	if MoveDesire > 0 then
 		familiar:Action_MoveToLocation(MoveLocation)
 		return
@@ -179,22 +182,22 @@ function X.BearThink(hero, bear)
 	ownerHero = hero
 	bearTarget = Fu.GetProperTarget(ownerHero)
 	returnAbility = bear:GetAbilityByName("lone_druid_spirit_bear_return")
-	Desire = ConsiderReturn(bear, returnAbility)
+	local Desire = ConsiderReturn(bear, returnAbility)
 	if Desire > 0 then
 		bear:Action_UseAbility(returnAbility)
 		return
 	end
-	RetreatDesire, RetreatLocation = ConsiderBearRetreat(bear)
+	local RetreatDesire, RetreatLocation = ConsiderBearRetreat(bear)
 	if RetreatDesire > 0 then
 		bear:Action_MoveToLocation(RetreatLocation)
 		return
 	end
-	AttackDesire, AttackTarget = ConsiderBearAttack(bear)
+	local AttackDesire, AttackTarget = ConsiderBearAttack(bear)
 	if AttackDesire > 0 then
 		bear:Action_AttackUnit(AttackTarget, false)
 		return
 	end
-	MoveDesire, MoveLocation = ConsiderBearMove(bear)
+	local MoveDesire, MoveLocation = ConsiderBearMove(bear)
 	if MoveDesire > 0 then
 		bear:Action_MoveToLocation(MoveLocation)
 		return
@@ -265,7 +268,7 @@ function ConsiderBearAttack(bear)
 	end
 	if Fu.IsDoingRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero) then
 		if
-			(Fu.IsRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero))
+			(Fu.IsRoshan(bearTarget) or Fu.IsTormentor(bearTarget))
 			and Fu.IsInRange(ownerHero, bearTarget, 500)
 			and Fu.IsAttacking(ownerHero)
 		then

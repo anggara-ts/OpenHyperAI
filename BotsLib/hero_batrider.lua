@@ -419,7 +419,7 @@ function X.ConsiderFlamebreak()
 				and not allyNearbyEnemies[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
 				local travelTime = GetUnitToUnitDistance(bot, allyNearbyEnemies[1]) / speed + castPoint
-				return BOT_ACTION_DESIRE_HIGH, allyNearbyEnemies[1]:GetExtrapolatedLocation(travelTime + castPoint)
+				return BOT_ACTION_DESIRE_HIGH, allyNearbyEnemies[1]:GetExtrapolatedLocation(travelTime)
 			end
 		end
 	end

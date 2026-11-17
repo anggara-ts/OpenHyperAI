@@ -32,7 +32,6 @@ local hasHumanAlly = false
 local tormentorStartTime = 0
 local tormentorCooldownUntil = 0
 local tormentorTimeout = 60
-local unusedFiveMinutes = 5 * 60
 local lastDebugLogTime = 0
 local nextWaitMoveTime = 0
 local lastScoutCheckTime = 0

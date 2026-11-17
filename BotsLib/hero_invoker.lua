@@ -577,9 +577,8 @@ function X.ConsiderPreInvoke()
 			elseif
 				exortAbility:IsTrained()
 				and (
-					bot:HasModifier("modifier_invoker_quas_instance") or bot:HasModifier(
-						"modifier_invoker_wex_instance"
-					)
+					bot:HasModifier("modifier_invoker_quas_instance")
+					or bot:HasModifier("modifier_invoker_wex_instance")
 				)
 			then
 				X.QueueElements(exortAbility, exortAbility, exortAbility)

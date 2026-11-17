@@ -435,9 +435,8 @@ function X.ConsiderTreeGrab()
 			nearbyTrees ~= nil
 			and #nearbyTrees > 0
 			and (
-				IsLocationVisible(GetTreeLocation(nearbyTrees[1])) or IsLocationPassable(
-					GetTreeLocation(nearbyTrees[1])
-				)
+				IsLocationVisible(GetTreeLocation(nearbyTrees[1]))
+				or IsLocationPassable(GetTreeLocation(nearbyTrees[1]))
 			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]

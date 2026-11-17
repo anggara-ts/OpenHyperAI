@@ -518,9 +518,8 @@ function X.ConsiderTreeDance()
 				if
 					escapeTree ~= nil
 					and (
-						IsLocationVisible(GetTreeLocation(escapeTree)) or IsLocationPassable(
-							GetTreeLocation(escapeTree)
-						)
+						IsLocationVisible(GetTreeLocation(escapeTree))
+						or IsLocationPassable(GetTreeLocation(escapeTree))
 					)
 				then
 					return BOT_ACTION_DESIRE_HIGH, escapeTree

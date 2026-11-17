@@ -16,7 +16,7 @@ open, unresolved issue that can be fixed from code, logs and game data has a **r
 - Note the start time; keep a running log of what you did per issue for the morning report.
 
 ## 1. Queue
-- `gh issue list --state open --json number,title,labels,body`. Keep issues with at least one unticked
+- `gh issue list --state open --json number,title,labels,body`. Skip `icebox` issues. Keep issues with at least one unticked
   task item (`- [ ]`). Skip `no-pr`, and skip items that need the maintainer: label `design`, or an item that
   asks for a decision. Put a question for each skipped item in the morning report.
 - Order: `P1 critical`, `P2 high`, `P3 medium`, `P4 low`, then oldest first. Untriaged issues: triage them

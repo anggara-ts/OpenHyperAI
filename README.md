@@ -19,15 +19,31 @@ Dota only loads bot scripts from:
 <Steam>/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots
 ```
 
-### 1. Clone the repo
+### 1. Get the code
+
+**With git** (easy updates with `git pull`):
 
 ```bash
-git clone https://github.com/anggara-ts/OpenHyperAI.git
+git clone https://github.com/anggara-ts/OpenHyperAI-too.git
 ```
 
-Put the clone wherever you like (for example `Documents\OpenHyperAI`).
+Put the clone wherever you like (for example `Documents\OpenHyperAI-too`), then link it in step 2.
 
-### 2. Install into Dota’s `vscripts/bots` folder
+**Without git (manual download):**
+
+1. Download the zip of the `main` branch: <https://github.com/anggara-ts/OpenHyperAI-too/archive/refs/heads/main.zip>
+2. Extract it. You get a folder `OpenHyperAI-too-main`, which holds `bot_generic.lua`, `hero_selection.lua`, `BotsLib`, `FuncLib` and so on.
+3. If `dota 2 beta/game/dota/scripts/vscripts/bots` already exists, rename it (for example `bots_old`). Then move the extracted folder there and rename it to `bots`. The files must sit directly inside `bots`:
+
+   ```text
+   .../scripts/vscripts/bots/bot_generic.lua      correct
+   .../scripts/vscripts/bots/OpenHyperAI-too-main/bot_generic.lua   wrong: Dota won't find it
+   ```
+4. Skip step 2 and go to step 3. To update later, download the zip again and replace the `bots` folder; keep your settings in the permanent Customize folder (step 3) so an update doesn't reset them.
+
+The install scripts in `Install-to-vscript/` don't cover this: they link the **Steam Workshop** copy, not a download.
+
+### 2. Link a git clone into Dota’s `vscripts/bots` folder
 
 **Option A — symlink (recommended for development)**
 
@@ -36,7 +52,7 @@ Point Dota’s `bots` folder at this repo so edits apply immediately.
 **Windows** (run Command Prompt / PowerShell **as Administrator**):
 
 ```bat
-mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\Users\<YOU>\Documents\OpenHyperAI"
+mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\Users\<YOU>\Documents\OpenHyperAI-too"
 ```
 
 Adjust both paths if your Steam library or clone location differs. If a `bots` folder already exists, rename or remove it first.
@@ -44,14 +60,14 @@ Adjust both paths if your Steam library or clone location differs. If a `bots` f
 **macOS / Linux:**
 
 ```bash
-ln -s "/path/to/OpenHyperAI" "$HOME/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+ln -s "/path/to/OpenHyperAI-too" "$HOME/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
 ```
 
-**Option B — use the included install scripts**
+**Option B — the Workshop copy**
 
-If you also have the Workshop copy, see [`Install-to-vscript/README.md`](Install-to-vscript/README.md) for Windows / macOS / Linux helper scripts that symlink Workshop → `vscripts/bots`.
+If you play the Steam Workshop copy instead of this repo, see [`Install-to-vscript/README.md`](Install-to-vscript/README.md) for Windows / macOS / Linux helper scripts that symlink Workshop → `vscripts/bots`.
 
-For a pure Git install, Option A is enough.
+For a git clone, Option A is enough. For a manual download, see step 1.
 
 ### 3. (Optional) Permanent Customize folder
 

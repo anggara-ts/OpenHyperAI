@@ -174,6 +174,8 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
      (several times per game).
    - `P3 medium`: a hero-specific misplay or a missed optimisation.
    - `P4 low`: polish, cosmetic, chat, nice-to-have.
+   - `icebox` (instead of a priority): a parked idea, not scheduled. No priority label, not picked up by
+     `/goodnight` or the lineup, until the maintainer moves it out.
    Work and test in priority order (P1 first; the test lineup favours the higher priority when slots are
    short). Re-check the priorities at every game review: raise an issue that keeps showing up, lower one
    that turned out rare.

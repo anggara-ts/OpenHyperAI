@@ -95,6 +95,7 @@ const prsNow = DRY ? prs : JSON.parse(gh(["pr", "list", "--state", "open", "--li
 for (const issue of issues) {
 	const prio = issue.labels.map((l) => l.name).find((n) => PRIORITY.includes(n));
 	if (!prio) {
+		if (issue.labels.some((l) => l.name === "icebox")) continue; // parked on purpose: no priority
 		untriaged.push(issue.number);
 		continue;
 	}

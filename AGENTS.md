@@ -14,14 +14,25 @@ no unit-test harness: the checks below plus a real bot game are the test.
 | `FuncLib/systems/` | Shared systems: push, defend, wards, items, roles, logging, version. |
 | `FuncLib/hero/` | Shared hero code: minions/illusions, Rubick's stolen spells (`rubick_hero/`), sub-units. |
 | `FuncLib/data/` | Static tables (hero names, matchups, position weights, spell lists). |
+| `FuncLib/dota/` | Dota API names and constants (`index`, `enums`, `interfaces`, `heroes`). |
+| `FuncLib/lib/` | Generic libraries: `json` (dkjson), `http_req`, `native_operators`. |
 | `mode_*_generic.lua` | Bot modes (laning, farm, retreat, push, defend, roshan, rune, ward, ...). |
-| `ability_item_usage_generic.lua`, `item_purchase_generic.lua`, `hero_selection.lua` | Item/ability use, buying, drafting. |
+| `ability_item_usage_generic.lua`, `item_purchase_generic.lua`, `hero_selection.lua`, `bot_generic.lua` | Item/ability use, buying, drafting, per-bot think. |
 | `Customize/general.lua` | User settings and **local test lineups**. |
 | `Customize/version.lua` | Build number shown in game. |
 | `Util/` | Node.js developer tools (log splitter, build checks); see `Util/README.md`. |
-| `docs/` | Notes such as `BOT_API_RUNTIME.md` (what the bot API really exposes). |
+| `Docs/` | Notes such as `BOT_API_RUNTIME.md` (what the bot API really exposes). |
 
+Folders use PascalCase (`BotsLib`, `FuncLib`, `Customize`, `Util`, `Docs`); files inside use snake_case.
 The optional Fretbots / Buff plugin lives on the orphan branch `plugin-fretbots`, not here.
+
+### Files the engine loads from the root
+
+Dota loads these only from the root of the `bots` folder, by exact name; a copy in a subfolder is never run
+(the bot silently falls back to Valve's default): `mode_<mode>_generic.lua`, `bot_generic.lua`,
+`hero_selection.lua`, `ability_item_usage_generic.lua`, `item_purchase_generic.lua`. Keep them in the root and
+put shared logic in `FuncLib/`. A mode file whose name doesn't match a real mode (e.g. `mode_roam_generic_wip`)
+is never loaded either; don't keep such copies.
 
 ### Valve default modes we keep on purpose
 
@@ -103,7 +114,7 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   installed game files (`scripts/npc` inside the VPKs) or the Valve datafeed
   (`https://www.dota2.com/datafeed/herodata?language=english&hero_id=N`). Cite the source in a comment when it
   drives a number.
-- The bot API differs from online docs; see `docs/BOT_API_RUNTIME.md` (e.g. no vector-targeted cast order).
+- The bot API differs from online docs; see `Docs/BOT_API_RUNTIME.md` (e.g. no vector-targeted cast order).
 
 ## Logging
 

@@ -499,7 +499,7 @@ local function arrayIncludes(self, searchElement, fromIndex)
 end
 local Utils = {}
 local dangerZones, humanPlayerInTeam
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Barracks = Dota.Barracks
 local BotActionType = Dota.BotActionType
 local BotMode = Dota.BotMode
@@ -508,16 +508,16 @@ local Team = Dota.Team
 local Tower = Dota.Tower
 local UnitType = Dota.UnitType
 local BotScriptEnums = Dota.BotScriptEnums
-local HttpReq = require(GetScriptDirectory() .. "/ts_libs/utils/http_utils/http_req")
+local HttpReq = require(GetScriptDirectory() .. "/FuncLib/lib/http_req")
 local Request = HttpReq.Request
-local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local NativeOperators = require(GetScriptDirectory() .. "/FuncLib/lib/native_operators")
 local add = NativeOperators.add
 local dot = NativeOperators.dot
 local length2D = NativeOperators.length2D
 local length3D = NativeOperators.length3D
 local multiply = NativeOperators.multiply
 local sub = NativeOperators.sub
-local Heroes = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
+local Heroes = require(GetScriptDirectory() .. "/FuncLib/dota/heroes")
 local HeroName = Heroes.HeroName
 local CacheKeys = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
 function Utils.IsValidUnit(unit)
@@ -650,7 +650,7 @@ function Utils.GetItemFromCountedInventory(bot, itemName, slotCount)
 	end
 	return nil
 end
-require(GetScriptDirectory() .. "/ts_libs/utils/json")
+require(GetScriptDirectory() .. "/FuncLib/lib/json")
 Utils.DebugMode = false
 Utils.ScriptID = 3246316298
 Utils.RadiantFountainTpPoint = Vector(-7172, -6652, 384)

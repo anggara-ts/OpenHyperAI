@@ -30,7 +30,7 @@ end
 local Push = {}
 local refreshThreatState, getGameState, getLocationState, getUnitState, discountLaneCost, getLaneTargetBuilding, humanPingSeconds, enemyAncient, lastThreatTick, teamPushLane, enemyHeroesAtAncient, enemyHeroesOnHighGround, laneFrontHasEnemies, wasDefendPinged, recentDefendTime, maxPushDesire, lockedPushLane, lockedPushLaneUntil, isBotOnlyGame, pushAfterDefendUntil, lastDefendDesire, pushAfterDefendSeconds, stateCacheSeconds, gameStateCache, locationStateCache, unitStateCache, ancientThreatRadius, laneTargetCache
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Barracks = Dota.Barracks
 local BotMode = Dota.BotMode
 local BotModeDesire = Dota.BotModeDesire
@@ -117,7 +117,7 @@ local getGlobalLocationState = Cache.getGlobalLocationState
 local getCachedAlliesNearLoc = Cache.getCachedAlliesNearLoc
 local getCachedEnemiesNearLoc = Cache.getCachedEnemiesNearLoc
 local autoCleanupCache = Cache.autoCleanupCache
-local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local NativeOperators = require(GetScriptDirectory() .. "/FuncLib/lib/native_operators")
 local add = NativeOperators.add
 local CacheKeys = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
 function refreshThreatState(team)

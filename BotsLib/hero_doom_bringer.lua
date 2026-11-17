@@ -164,58 +164,36 @@ function a.ConsiderDevour()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
+	-- Game data: creep_level 4/5/6/6 is the highest creep level Devour can eat at each skill level;
+	-- ancients only with the Shard (can_target_ancient). Old code took the most-HP neutral with no level
+	-- check (refused order every think when it was above the cap) or simply the first creep listed.
 	local N = q:GetSpecialValueInt("creep_level")
-	local O = b:GetNearbyCreeps(1200, true)
+	if N <= 0 then
+		N = ({ 4, 5, 6, 6 })[math.max(1, math.min(4, q:GetLevel()))]
+	end
+	local canAncient = q:GetSpecialValueInt("can_target_ancient") > 0 or c.HasAghanimsShard(b)
 	if not K then
 		local P = b:GetNearbyTowers(1600, true)
-		local Q = a.GetRangedOrSiegeCreep(O, N)
-		if Q ~= nil then
-			if
-				c.IsLaning(b)
-				and P ~= nil
-				and (#P == 0 or #P >= 1 and c.IsValidBuilding(P[1]) and GetUnitToUnitDistance(Q, P[1]) > 700)
-			then
-				return BOT_ACTION_DESIRE_HIGH, Q
-			end
-		end
-		for R, S in pairs(O) do
+		-- Lane creeps next to an enemy tower are skipped, as before.
+		local O = {}
+		for _, S in pairs(b:GetNearbyCreeps(1200, true) or {}) do
 			if
 				c.IsValid(S)
-				and c.CanBeAttacked(S)
-				and S:GetLevel() <= N
-				and not c.IsRoshan(S)
-				and not c.IsTormentor(S)
+				and (
+					S:GetTeam() == TEAM_NEUTRAL
+					or P == nil
+					or #P == 0
+					or not c.IsValidBuilding(P[1])
+					or GetUnitToUnitDistance(S, P[1]) > 700
+				)
 			then
-				if
-					c.IsInLaningPhase()
-					and S:GetTeam() ~= b:GetTeam()
-					and S:GetTeam() ~= TEAM_NEUTRAL
-					and P ~= nil
-					and (#P == 0 or #P >= 1 and c.IsValidBuilding(P[1]) and GetUnitToUnitDistance(S, P[1]) > 700)
-				then
-					return BOT_ACTION_DESIRE_HIGH, S
-				end
-				Q = nil
-				if S and S:GetTeam() == TEAM_NEUTRAL then
-					Q = c.GetMostHpUnit(O)
-				end
-				if Q ~= nil then
-					-- datafeed: Devouring Ancients now comes from Aghanim's Shard (can_target_ancient), not
-					-- special_bonus_unique_doom_2, which is no longer one of Doom's talents
-					if
-						Q:IsAncientCreep()
-						and (q:GetSpecialValueInt("can_target_ancient") > 0 or c.HasAghanimsShard(b))
-					then
-						return BOT_ACTION_DESIRE_HIGH, Q
-					end
-					if not Q:IsAncientCreep() then
-						return BOT_ACTION_DESIRE_HIGH, Q
-					end
-				end
-				if not S:IsAncientCreep() then
-					return BOT_ACTION_DESIRE_HIGH, S
-				end
+				O[#O + 1] = S
 			end
+		end
+		-- Highest level, then highest max HP, within the level cap.
+		local Q = c.GetBestCreepToEat(O, N, canAncient)
+		if Q ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, Q
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -952,20 +930,5 @@ function a.ConsiderDevourAbility(a8)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, ""
-end
-function a.GetRangedOrSiegeCreep(O, ae)
-	for R, S in pairs(O) do
-		if
-			c.IsValid(S)
-			and c.CanBeAttacked(S)
-			and S:GetLevel() <= ae
-			and (c.IsKeyWordUnit("siege", S) or c.IsKeyWordUnit("ranged", S))
-			and not c.IsRoshan(S)
-			and not c.IsTormentor(S)
-		then
-			return S
-		end
-	end
-	return nil
 end
 return a

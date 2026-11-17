@@ -67,6 +67,29 @@ local function a(b)
 		end
 		return t
 	end
+	-- Best creep to eat (Hand of Midas, Doom's Devour, Night Stalker's Midnight Feast): highest level, then
+	-- highest max HP. maxLevel caps the level (Devour creep_level), nil = no cap. Never Roshan / Tormentor,
+	-- ancients only when allowAncient, never dominated or allied-controlled units.
+	function b.GetBestCreepToEat(g, maxLevel, allowAncient)
+		local best, bestLvl, bestHp = nil, -1, -1
+		for _, v in pairs(g or {}) do
+			if
+				b.IsValid(v)
+				and b.CanBeAttacked(v)
+				and not b.IsRoshan(v)
+				and not b.IsTormentor(v)
+				and not v:IsDominated()
+				and (allowAncient or not v:IsAncientCreep())
+				and (maxLevel == nil or v:GetLevel() <= maxLevel)
+			then
+				local lvl, hp = v:GetLevel(), v:GetMaxHealth()
+				if lvl > bestLvl or lvl == bestLvl and hp > bestHp then
+					best, bestLvl, bestHp = v, lvl, hp
+				end
+			end
+		end
+		return best
+	end
 	function b.GetLeastHpUnit(g)
 		local x = nil
 		local y = 999999

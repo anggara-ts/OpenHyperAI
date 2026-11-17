@@ -171,11 +171,12 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    Work and test in priority order (P1 first; the test lineup favours the higher priority when slots are
    short). Re-check the priorities at every game review: raise an issue that keeps showing up, lower one
    that turned out rare.
-2. **Draft PR per issue, automatically.** `node Util/issue-prs.js` opens a draft PR for every open issue without
-   one: branch `<fix|feat|docs|chore>/issue-<N>-<slug>` from `origin/main`, one signed empty commit, the PR
-   template and **`Refs #N`** (never `Closes #N`: merging a PR must not close the issue). Run it right after
-   filing issues. It runs locally, not as a GitHub Action, because commits must be signed with the maintainer's
-   key.
+2. **Start work (WIP) on an issue.** Filing an issue opens no PR. When work on it starts,
+   `node Util/issue-prs.js <N> [<N> ...]` (or the `wip` label) creates the branch
+   `<fix|feat|docs|chore>/issue-<N>-<slug>` from `origin/main`, one signed empty commit and a draft PR with the
+   template and **`Refs #N`** (never `Closes #N`: merging a PR must not close the issue). Run without numbers it
+   only copies each issue's priority label to its PRs and lists untriaged issues. It runs locally, not as a GitHub
+   Action, because commits must be signed with the maintainer's key.
 3. **Work on the PR branch.** Before the first real commit, merge `origin/main` into it if `main` moved. Commit
    (signed, pre-commit hooks), push, keep CI green, and fill the PR description in the change-log format
    (see Branches and pull requests). Mark the PR ready for review when the code is done.
@@ -262,8 +263,8 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
   Tormentor, buybacks), mode flip-flops (`[OHA-FLIP]`, `[OHA-STUCK]`). Map log line numbers to the build's
   commit (`git show <sha>:<file>`).
 - Write findings as: what happened (time + log line) / why it matters / code location / suggested fix /
-  confidence. File them as task items on grouped issue cards (step 1) and let `Util/issue-prs.js` open PRs for
-  new cards; a single `fix/game-NNN` PR is fine for many small fixes from one review.
+  confidence. File them as task items on grouped issue cards (step 1); PRs are opened when work on a card starts
+  (step 2). A single `fix/game-NNN` PR is fine for many small fixes from one review.
 
 ## Skills (Claude Code)
 
@@ -271,12 +272,13 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 
 | Skill | When |
 |---|---|
-| `/start-issue` | file findings or requests as grouped issue cards with task items, open draft PRs |
+| `/start-issue` | file findings or requests as grouped issue cards with task items and a priority |
 | `/create-pr` | code done: checks, signed commit, CI, change-log description, tracker entry |
 | `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, what the game tests |
 | `/check-live-event` | the maintainer reports an event during a live game |
 | `/review-game` | the game ended: `after-game.js`, tracker, PR comments, findings, issues, next lineup |
 | `/merge-pr` | a PR is READY TO MERGE: mute proven logs, tick checks, squash-merge, tick issue items |
+| `/goodnight` | the maintainer is away: fix every open, unresolved issue in priority order, one ready PR each, build the next game |
 
 ## Things not to do
 

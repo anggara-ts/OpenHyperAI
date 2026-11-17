@@ -118,7 +118,7 @@ Match logs go to `Util/match-logs/` (git-ignored). They contain your Steam accou
 ## Making a change
 
 1. **Start from an issue.** Every change starts as a GitHub issue. Problems in an area are grouped into one card, with one task item per problem.
-   - Maintainers run `node Util/issue-prs.js` to open a draft PR (and branch) for each new issue.
+   - When work on an issue starts, maintainers run `node Util/issue-prs.js <N>` to create its branch and draft PR.
    - Otherwise create a branch from `main`: `fix/<topic>`, `feat/<topic>`, `chore/<topic>` or `docs/<topic>`.
 2. **Write the code** following `AGENTS.md`:
    - readable names, no new globals;

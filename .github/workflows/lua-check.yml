@@ -32,11 +32,8 @@ jobs:
           [ "$fail" -eq 0 ]
 
   lint:
-    name: Lint (luacheck, report only)
+    name: Lint (luacheck)
     runs-on: ubuntu-latest
-    # Report only for now: the code base predates the lint. Make it blocking once the
-    # warnings are cleaned up (remove continue-on-error).
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - name: Install luacheck

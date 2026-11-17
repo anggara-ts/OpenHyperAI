@@ -3,7 +3,9 @@
 -- [OHA-*] diagnostics for behaviour already confirmed working in test games. Muted so the
 -- console log shows what still needs work. Delete a line here to bring that log back.
 local OHA_MUTED = {
-	"^%[OHA%-LANE%]", -- laning standoff / last hits
+	-- Only the 20s laning summary (standoff / last hits). lasthit-skip, harass-step, summons-step-back and
+	-- go-home print again: the whole tag was muted, so game 037 could not show them working.
+	"^%[OHA%-LANE%] t=%S+ %S+ pos=%d",
 	"^%[OHA%-TUSK%] t=%S+ snowball%-launch", -- early launch (median 0.6s)
 	"^%[OHA%-TUSK%] t=%S+ punch ", -- Tag Team before Punch
 	"^%[OHA%-TUSK%] t=%S+ tag%-team ",

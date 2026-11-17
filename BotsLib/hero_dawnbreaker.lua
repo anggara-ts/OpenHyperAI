@@ -465,7 +465,31 @@ function X.ConsiderSolarGuardian()
 					or {}
 				local enemyAoe = { count = #enemiesAtSpot }
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
-				if allyAoe.count >= 1 and enemyAoe.count >= 1 then
+				-- allyDist: closest allied hero other than her to the spot, at current positions (the ally
+				-- count uses predicted positions and may include her; game 036 review).
+				local spot = allyAoe ~= nil and allyAoe.targetloc or nil
+				local allyDist, allyName, nearestAlly = -1, "-", nil
+				if spot ~= nil then
+					for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+						if Fu.IsValidHero(allyHero) and allyHero ~= bot and not allyHero:IsIllusion() then
+							local distance = GetUnitToLocationDistance(allyHero, spot)
+							if allyDist < 0 or distance < allyDist then
+								allyDist, allyName, nearestAlly =
+									distance, (string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", "")), allyHero
+							end
+						end
+					end
+				end
+				-- Game 037, 33:31: she landed 672 from the nearest ally (radius 500, +150 talent). A spot
+				-- farther than radius - 100 from that ally moves to radius - 200 from him, toward the
+				-- original spot, and must still have an enemy hero within the radius.
+				local fromDist = allyDist
+				if nearestAlly ~= nil and allyDist > radius - 100 then
+					spot = Fu.GetXUnitsTowardsLocation2(nearestAlly:GetLocation(), spot, radius - 200)
+					allyDist = GetUnitToLocationDistance(nearestAlly, spot)
+					enemyAoe.count = #Fu.GetEnemiesNearLoc(spot, radius)
+				end
+				if nearestAlly ~= nil and allyAoe.count >= 1 and enemyAoe.count >= 1 then
 					-- Queue BKB for after channel+airtime land, not before cast.
 					if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and not bot:IsMagicImmune() and CanBKB() then
 						isBkbPending = true
@@ -473,32 +497,22 @@ function X.ConsiderSolarGuardian()
 					end
 					if DotaTime() >= (bot._sgLogAt or -999) then
 						bot._sgLogAt = DotaTime() + 5
-						-- allyDist: closest allied hero other than her to the spot, at current positions (the
-						-- ally count uses predicted positions and may include her; game 036 review).
-						local allyDist, allyName = -1, "-"
-						for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-							if Fu.IsValidHero(allyHero) and allyHero ~= bot and not allyHero:IsIllusion() then
-								local distance = GetUnitToLocationDistance(allyHero, allyAoe.targetloc)
-								if allyDist < 0 or distance < allyDist then
-									allyDist, allyName =
-										distance, (string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", ""))
-								end
-							end
-						end
 						pcall(
 							print,
 							string.format(
-								"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s",
+								"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s radius=%d moved-from=%d",
 								DotaTime(),
 								allyAoe.count,
 								enemyAoe.count,
-								GetUnitToLocationDistance(bot, allyAoe.targetloc),
+								GetUnitToLocationDistance(bot, spot),
 								math.floor(allyDist),
-								allyName
+								allyName,
+								radius,
+								fromDist ~= allyDist and math.floor(fromDist) or -1
 							)
 						)
 					end
-					return BOT_ACTION_DESIRE_HIGH, allyAoe.targetloc
+					return BOT_ACTION_DESIRE_HIGH, spot
 				end
 			end
 		end

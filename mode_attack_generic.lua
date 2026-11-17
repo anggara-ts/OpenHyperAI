@@ -6,7 +6,12 @@ local AttackOverride
 if not ShouldSkipBotThink(bot) and Utils.BuggyHeroesDueToValveTooLazy[botName] then
 	AttackOverride = dofile(GetScriptDirectory() .. "/FuncLib/systems/override_generic/mode_attack_generic")
 end
+-- Heroes not on the list keep Valve's attack mode: this file defines no GetDesire/Think for them,
+-- and defining one would replace Valve's with no way to call it. Their attack-mode extras (kiting:
+-- FuncLib/hero/special_units.lua TryKiteInAttack) run from the per-think item/ability hook. The
+-- flag tells that hook this hero kites from the override's Think instead.
 if AttackOverride ~= nil then
+	bot._ohaAttackOverride = true
 	function GetDesire()
 		if ShouldSkipBotThink(bot) then
 			return 0

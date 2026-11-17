@@ -616,6 +616,33 @@ function X.ConsiderKazuraiKatana()
 	if burstPct <= 0 then
 		burstPct = 0.5
 	end
+	-- Game 037: no impale-kill / impale-burst at all. "modifier_kez_katana_bleed" is not in the game
+	-- data (modifier names are not in the KV files), so it cannot be confirmed: every 10s, list the
+	-- modifiers on the hero Kez is hitting in Katana stance, to find the real bleed name and count.
+	if
+		bot.kez_mode == "katana"
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, katanaAttackRange + 100)
+		and DotaTime() >= (bot._kezBleedModLogAt or -999)
+	then
+		bot._kezBleedModLogAt = DotaTime() + 10
+		local mods = {}
+		for i = 0, botTarget:NumModifiers() - 1 do
+			mods[#mods + 1] = tostring(botTarget:GetModifierName(i))
+				.. "x"
+				.. tostring(botTarget:GetModifierStackCount(i))
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-KEZ] t=%.0f impale-check target=%s stacks(katana_bleed)=%d mods=%s",
+				DotaTime(),
+				(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+				Fu.GetModifierCount(botTarget, "modifier_kez_katana_bleed"),
+				table.concat(mods, ",")
+			)
+		)
+	end
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemyHero)

@@ -522,8 +522,9 @@ end
 Site.IsTheClosestOne = function(bot, location)
 	local closestDistance = GetUnitToLocationDistance(bot, location)
 	local closestBot = bot
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local teammate = GetTeamMember(playerId)
+	-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review).
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local teammate = GetTeamMember(slot)
 		if teammate and teammate:IsAlive() and teammate:GetActiveMode() == BotMode.Farm then
 			local teammateDistance = GetUnitToLocationDistance(teammate, location)
 			if teammateDistance < closestDistance then

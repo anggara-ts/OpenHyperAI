@@ -413,11 +413,14 @@ function X.ConsiderUnstableConcoctionThrow()
 			end
 		end
 	end
-	-- Fallback: any hero in range. Game data (throw): brew_time 5.0 for the full stun/damage
-	-- (max_stun 1.75-3.25 vs min 0.25), brew_explosion 7.0. It used the 2s gate (retreatThrowDelay), so whenever an
-	-- enemy was in range it threw at ~2s, ahead of the 4.25s (fullBrewThrowDelay) kill/engage branches above. The 2s
-	-- throw stays only for the retreat case (isRetreating) above.
-	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and DotaTime() >= concoctionStartTime + fullBrewThrowDelay then
+	-- Fallback: any hero in range. Game data: brew_time 5.0 for the full stun/damage. The brew ability
+	-- (alchemist_unstable_concoction) gives brew_explosion 5.5 and max_stun 1.7/2.2/2.7/3.2; the hidden throw
+	-- ability's own block still lists brew_explosion 7.0 and max_stun 1.75-3.25 (that is where the old "7.0"
+	-- comment came from). 5.5 is the deadline used below, since it is safe under either value. It used the 2s
+	-- gate (retreatThrowDelay), so whenever an enemy was in range it threw at ~2s, ahead of the 4.25s
+	-- (fullBrewThrowDelay) kill/engage branches above. The 2s throw stays only for the retreat case above.
+	local brewed = DotaTime() - concoctionStartTime
+	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and brewed >= fullBrewThrowDelay then
 		for _, enemyHero in pairs(nearbyEnemies) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -426,14 +429,60 @@ function X.ConsiderUnstableConcoctionThrow()
 			then
 				print(
 					string.format(
-						"[OHA-ALCHEMIST] concoction throw why=fallback target=%s brewed=%.1fs",
+						"[OHA-ALCHEMIST] t=%.0f concoction throw why=fallback target=%s brewed=%.1fs",
+						DotaTime(),
 						enemyHero:GetUnitName(),
-						DotaTime() - concoctionStartTime
+						brewed
 					)
 				)
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
+	end
+	-- Forced throw before the brew explodes on him (5.5s; 0.2s cast point): from 5.0s brewed, the nearest
+	-- enemy hero he can target, illusions included. The throw targets heroes only (game data: target type
+	-- HERO, flag NOT_CREEP_HERO), so with no hero in range nothing can be thrown and it is logged.
+	local explodeAt = unstableConcoctionAbility:GetSpecialValueFloat("brew_explosion")
+	if explodeAt <= 0 or explodeAt > 5.5 then
+		explodeAt = 5.5
+	end
+	if brewed >= explodeAt - 0.5 and brewed < explodeAt + 1 then
+		local nearest, nearestDist = nil, castRange + 100
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, castRange + 100, true, BOT_MODE_NONE) or {}) do
+			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				local distance = GetUnitToUnitDistance(bot, enemyHero)
+				if distance <= nearestDist then
+					nearest, nearestDist = enemyHero, distance
+				end
+			end
+		end
+		local logNow = DotaTime() >= (bot._alchForceLogAt or -999)
+		if logNow then
+			bot._alchForceLogAt = DotaTime() + 3
+		end
+		if nearest ~= nil then
+			pcall(
+				logNow and print or function() end,
+				string.format(
+					"[OHA-ALCHEMIST] t=%.0f concoction throw why=forced target=%s dist=%d brewed=%.1fs explode=%.1f",
+					DotaTime(),
+					nearest:GetUnitName(),
+					nearestDist,
+					brewed,
+					explodeAt
+				)
+			)
+			return BOT_ACTION_DESIRE_ABSOLUTE, nearest
+		end
+		pcall(
+			logNow and print or function() end,
+			string.format(
+				"[OHA-ALCHEMIST] t=%.0f concoction throw why=no-target brewed=%.1fs explode=%.1f",
+				DotaTime(),
+				brewed,
+				explodeAt
+			)
+		)
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

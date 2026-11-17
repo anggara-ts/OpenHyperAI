@@ -547,7 +547,102 @@ local function PreferBloodGrenadeOverBranch()
 		)
 	end
 end
+-- Game 037: a backpack item pulled into the main inventory was back in the backpack a few seconds
+-- later, and the routine pulled it again at every swap-pair gap (Night Stalker's Clarity every 12s,
+-- t=1162-1203; Lion's healing lotus every 12s; Hoodwink's Dust every 2 minutes). No Lua routine in
+-- our code moves a Clarity, a lotus or Dust out of the main inventory (every ActionImmediate_SwapItems
+-- call site checked), and the swap wrapper refuses the reverse swap of the same pair for 11s, so the
+-- swap itself does not stick (games 008-012: 216 of 217 swaps checked 0.5s later had not happened).
+-- Each pull is now checked 1.5s later: [OHA-ITEM] pull-check result=stuck/reverted/gone. A reverted
+-- item is not pulled again for 30s, so the routines stop re-ordering it.
+local PULL_CHECK_AFTER = 1.5
+local PULL_BACKOFF = 30
+local function WatchPull(tag, item, dest)
+	if item == nil or item:IsNull() then
+		return
+	end
+	bot._pullWatch = bot._pullWatch or {}
+	bot._pullWatch[#bot._pullWatch + 1] = {
+		tag = tag,
+		item = item,
+		name = item:GetName(),
+		dest = dest,
+		at = DotaTime(),
+		charges = item:GetCurrentCharges() or 0,
+	}
+end
+-- True when the swap wrapper (global_overrides.lua) passed the swap a<->b on to the engine just now
+-- (it records _swapCheck only then; a swap it refused for the pair gap or a fight leaves none).
+local function SwapIssued(slotA, slotB)
+	local check = bot._swapCheck
+	return check ~= nil and check.at == DotaTime() and check.a == slotA and check.b == slotB
+end
+local function PullBackedOff(name)
+	return bot._pullBackoff ~= nil and (bot._pullBackoff[name] or -1) > DotaTime()
+end
+local function CheckPulls()
+	local list = bot._pullWatch
+	if list == nil or #list == 0 then
+		return
+	end
+	local now = DotaTime()
+	local keep = {}
+	for _, watch in ipairs(list) do
+		if now - watch.at < PULL_CHECK_AFTER then
+			keep[#keep + 1] = watch
+		else
+			local slot = -1
+			for s = 0, 8 do
+				if bot:GetItemInSlot(s) == watch.item then
+					slot = s
+					break
+				end
+			end
+			local result = slot < 0 and "gone" or (slot <= 5 and "stuck" or "reverted")
+			local inDest = bot:GetItemInSlot(watch.dest)
+			if slot < 0 then
+				-- Item handles may not compare equal across calls: fall back to names.
+				if inDest ~= nil and not inDest:IsNull() and inDest:GetName() == watch.name then
+					result, slot = "stuck", watch.dest
+				else
+					for s = 6, 8 do
+						local it = bot:GetItemInSlot(s)
+						if it ~= nil and not it:IsNull() and it:GetName() == watch.name then
+							result, slot = "reverted", s
+							break
+						end
+					end
+				end
+			end
+			if result == "reverted" then
+				bot._pullBackoff = bot._pullBackoff or {}
+				bot._pullBackoff[watch.name] = now + PULL_BACKOFF
+			end
+			local found = slot >= 0 and bot:GetItemInSlot(slot) or nil
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s pull-check %s %s result=%s slot=%d dest=%d(%s) after=%.1f charges=%d->%d%s",
+					now,
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					watch.tag,
+					(string.gsub(watch.name, "^item_", "")),
+					result,
+					slot,
+					watch.dest,
+					inDest ~= nil and (string.gsub(inDest:GetName(), "^item_", "")) or "-",
+					now - watch.at,
+					watch.charges,
+					found ~= nil and not found:IsNull() and (found:GetCurrentCharges() or 0) or -1,
+					result == "reverted" and string.format(" backoff=%ds", PULL_BACKOFF) or ""
+				)
+			)
+		end
+	end
+	bot._pullWatch = keep
+end
 local function PromoteBackpackCounters()
+	CheckPulls()
 	if DotaTime() < promoteNextCheck then
 		return
 	end
@@ -564,7 +659,12 @@ local function PromoteBackpackCounters()
 			bot._promoteTries[hBpItem:GetName()] = nil
 			tries = nil
 		end
-		if hBpItem ~= nil and tPromoteFromBackpack[hBpItem:GetName()] and not (tries ~= nil and tries.n >= 2) then
+		if
+			hBpItem ~= nil
+			and tPromoteFromBackpack[hBpItem:GetName()]
+			and not (tries ~= nil and tries.n >= 2)
+			and not PullBackedOff(hBpItem:GetName())
+		then
 			local nBpCost = tPromoteAnyCost[hBpItem:GetName()] and math.huge or GetItemCost(hBpItem:GetName())
 			local nBestSlot, nBestCost = -1, nBpCost
 			for nSlot = 0, 5 do
@@ -594,6 +694,9 @@ local function PromoteBackpackCounters()
 				tryRecord.untilAt = DotaTime() + 120
 				bot._promoteTries[hBpItem:GetName()] = tryRecord
 				bot:ActionImmediate_SwapItems(nBpSlot, nBestSlot)
+				if SwapIssued(nBpSlot, nBestSlot) then
+					WatchPull("promote", hBpItem, nBestSlot)
+				end
 				return
 			end
 		end
@@ -2033,8 +2136,10 @@ function ItemPurchaseThink()
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
 				if
-					name == "item_enchanted_mango"
-					or name == "item_clarity" and not bot:WasRecentlyDamagedByAnyHero(4.0)
+					(
+						name == "item_enchanted_mango"
+						or name == "item_clarity" and not bot:WasRecentlyDamagedByAnyHero(4.0)
+					) and not PullBackedOff(name)
 				then
 					manaSlot, manaName = slot, name
 					if name == "item_enchanted_mango" then
@@ -2074,16 +2179,23 @@ function ItemPurchaseThink()
 				end
 			end
 			local out = dest ~= nil and bot:GetItemInSlot(dest) or nil
+			local manaItem = bot:GetItemInSlot(manaSlot)
+			local issued = false
 			if dest ~= nil then
 				bot:ActionImmediate_SwapItems(manaSlot, dest)
+				issued = SwapIssued(manaSlot, dest)
+				if issued then
+					-- Checked 1.5s later (CheckPulls); a reverted pull backs off 30s.
+					WatchPull("mana", manaItem, dest)
+				end
 			end
-			-- [OHA-MANA] unverified: whether the swap lands (swaps were often no-ops in earlier builds).
-			-- moved= shows what sits in the main slot right after the order.
+			-- moved= shows what sits in the main slot right after the order; issued=false means the
+			-- swap wrapper held it (pair gap or fight), which game 037 printed as a repeat every 4s.
 			local moved = dest ~= nil and bot:GetItemInSlot(dest) or nil
 			pcall(
 				print,
 				string.format(
-					"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s mp=%.2f",
+					"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s issued=%s mp=%.2f",
 					now,
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					(string.gsub(manaName, "item_", "")),
@@ -2091,6 +2203,7 @@ function ItemPurchaseThink()
 					dest ~= nil and tostring(dest) or "none",
 					out ~= nil and not out:IsNull() and (string.gsub(out:GetName(), "item_", "")) or "-",
 					moved ~= nil and not moved:IsNull() and (string.gsub(moved:GetName(), "item_", "")) or "-",
+					tostring(issued),
 					Fu.GetMP(bot)
 				)
 			)
@@ -2099,7 +2212,8 @@ function ItemPurchaseThink()
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
 	if now > (bot._lastBackpackLotus or -100) + 3.0 then
 		local lotusName, lotusSlot, lotusItem = BackpackLotus()
-		if lotusItem ~= nil then
+		-- A pull that reverted (CheckPulls) waits 30s; Lion re-pulled a lotus every 12s in game 037.
+		if lotusItem ~= nil and not PullBackedOff(lotusName) then
 			bot._lastBackpackLotus = now
 			local hp = Fu.GetHP(bot)
 			local mp = Fu.GetMP(bot)
@@ -2115,6 +2229,9 @@ function ItemPurchaseThink()
 			local dest = Item.GetMainInvLessValItemSlot(bot)
 			if dest ~= nil and dest >= 0 then
 				bot:ActionImmediate_SwapItems(lotusSlot, dest)
+				if SwapIssued(lotusSlot, dest) then
+					WatchPull("lotus", lotusItem, dest)
+				end
 				local moved = bot:GetItemInSlot(dest)
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == lotusName then
 					MatchTrace.Buy(bot, lotusName, "backpack lotus swap and use")

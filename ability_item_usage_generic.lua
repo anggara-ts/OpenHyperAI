@@ -20,13 +20,15 @@ local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_lo
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()
 	local myId = bot:GetPlayerID()
 	local loggerId = nil
-	for _, pid in ipairs(GetTeamPlayers(GetTeam())) do
-		local member = GetTeamMember(pid)
+	-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review).
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(slot)
 		if member ~= nil and member:IsBot() and not member:IsIllusion() and member:IsAlive() then
 			local id = member:GetPlayerID()
 			if loggerId == nil or id < loggerId then
@@ -620,6 +622,35 @@ function Usage.SetReplyHumanTime(chatEvent)
 		replyToAllChat = not chatEvent.team_only
 	end
 end
+-- [OHA-BUYBACK]: every buyback with its reason, and a support's skipped one (once per 10s).
+local function BuybackLog(what, why, ancientHp, remaining)
+	pcall(
+		print,
+		string.format(
+			"[OHA-BUYBACK] t=%.0f %s %s why=%s pos=%d anc=%.2f remaining=%.0f gold=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			why,
+			Fu.GetPosition(bot),
+			ancientHp,
+			remaining,
+			bot:GetGold()
+		)
+	)
+end
+local function BuybackNow(why, ancientHp, remaining)
+	Fu.Role["lastbbtime"] = DotaTime()
+	BuybackLog("buyback", why, ancientHp, remaining)
+	bot:ActionImmediate_Buyback()
+end
+local function BuybackSkipLog(why, ancientHp, remaining)
+	if DotaTime() < (bot._buybackSkipLogAt or -99) + 10 then
+		return
+	end
+	bot._buybackSkipLogAt = DotaTime()
+	BuybackLog("skip", why, ancientHp, remaining)
+end
 local function ConsiderBuyback()
 	if Fu.IsMeepoClone(bot) then
 		return
@@ -645,38 +676,57 @@ local function ConsiderBuyback()
 	local ancient = GetAncient(GetTeam())
 	local respawnTime = bot:GetRespawnTime()
 	local remainingRespawnTime = Usage.GetRemainingRespawnTime()
-	if ancient ~= nil and ancient:GetHealth() < 0.8 then
+	local ancientHp = ancient ~= nil and Fu.GetHP(ancient) or 1
+	-- Game 037: this compared the Ancient's absolute HP with 0.8 and a table with 0, so it never fired.
+	-- Fu.GetEnemiesAroundLoc returns a threat score, not a count.
+	if ancient ~= nil and ancientHp < 0.8 then
 		local enemiesNearAncient = Fu.GetEnemiesAroundLoc(ancient:GetLocation(), 1500)
 		local alliesNearAncient = Fu.GetAlliesNearLoc(ancient:GetLocation(), 1500)
-		if enemiesNearAncient > 1 and alliesNearAncient == 0 and remainingRespawnTime > 20 then
-			Fu.Role["lastbbtime"] = DotaTime()
-			bot:ActionImmediate_Buyback()
+		if enemiesNearAncient > 1 and #alliesNearAncient == 0 and remainingRespawnTime > 20 then
+			BuybackNow("ancient-hp", ancientHp, remainingRespawnTime)
 			return
 		end
 	end
 	if respawnTime < 45 then
 		return
 	end
-	if bot:GetLevel() > 24 and remainingRespawnTime > 80 then
-		local teamFightLocation = Fu.GetTeamFightLocation(bot)
-		if teamFightLocation ~= nil then
-			Fu.Role["lastbbtime"] = DotaTime()
-			bot:ActionImmediate_Buyback()
-			return
-		end
+	local wantWhy = nil
+	if bot:GetLevel() > 24 and remainingRespawnTime > 80 and Fu.GetTeamFightLocation(bot) ~= nil then
+		wantWhy = "teamfight"
 	end
-	if remainingRespawnTime < 40 then
-		return
-	end
-	if ancient ~= nil then
+	if wantWhy == nil and remainingRespawnTime >= 40 and ancient ~= nil then
 		local enemyCountNearAncient = Usage.GetNumEnemyNearby(ancient)
 		local aliveAllyCount = Fu.GetNumOfAliveHeroes(false)
 		if enemyCountNearAncient > 0 and enemyCountNearAncient >= aliveAllyCount then
-			Fu.Role["lastbbtime"] = DotaTime()
-			bot:ActionImmediate_Buyback()
-			return
+			wantWhy = "enemies-at-base"
 		end
 	end
+	if wantWhy == nil then
+		return
+	end
+	-- Game 037: Lion (pos 5) bought back with five Dire on our high ground and died again 39s later. A
+	-- support buys back only for an Ancient defense (the Ancient hurt with enemies at it) or into a
+	-- fight we are winning (more allies than enemies at the team fight).
+	if Fu.GetPosition(bot) >= 4 then
+		local supportWhy = nil
+		if ancient ~= nil and ancientHp < 0.8 and #Fu.GetEnemiesNearLoc(ancient:GetLocation(), 1600) > 0 then
+			supportWhy = "ancient-defense"
+		else
+			local fightLocation = Fu.GetTeamFightLocation(bot)
+			if
+				fightLocation ~= nil
+				and #Fu.GetAlliesNearLoc(fightLocation, 1600) > #Fu.GetEnemiesNearLoc(fightLocation, 1600)
+			then
+				supportWhy = "won-fight"
+			end
+		end
+		if supportWhy == nil then
+			BuybackSkipLog("support-" .. wantWhy, ancientHp, remainingRespawnTime)
+			return
+		end
+		wantWhy = wantWhy .. "+" .. supportWhy
+	end
+	BuybackNow(wantWhy, ancientHp, remainingRespawnTime)
 end
 local lastCourierActionTime = -90
 local courierState = -1
@@ -4413,15 +4463,18 @@ local function SentryReady()
 	local dispenser = ReadyMainItem("item_ward_dispenser")
 	return dispenser ~= nil and (dispenser:GetSecondaryCharges() or 0) > 0
 end
--- A fader out of sight whose last spot is within maxDist and still in our vision.
-local function FaderSpot(maxDist)
+-- A fader out of sight whose last spot is within maxDist and still in our vision. Faders in skip
+-- (playerId -> DotaTime until which he is passed over) are passed over.
+local function FaderSpot(maxDist, skip)
 	TrackFaders()
+	local now = DotaTime()
 	for playerId, fader in pairs(bot._faders) do
 		local info = GetHeroLastSeenInfo(playerId)
 		local lastSeen = info ~= nil and info[1] or nil
 		local loc = lastSeen ~= nil and lastSeen.location or fader.loc
 		local gone = lastSeen == nil or lastSeen.time_since_seen > 0.1
-		if gone and GetUnitToLocationDistance(bot, loc) <= maxDist and IsLocationVisible(loc) then
+		local skipped = skip ~= nil and (skip[playerId] or -1) > now
+		if gone and not skipped and GetUnitToLocationDistance(bot, loc) <= maxDist and IsLocationVisible(loc) then
 			return playerId, loc, fader.name
 		end
 	end
@@ -4475,18 +4528,21 @@ function Usage.ConsiderSentryReveal(item, isDispenser)
 	if ReadyMainItem("item_dust") ~= nil then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local pid, loc, who = FaderSpot(500 + 1000)
+	-- Game 037: a skip cleared the fader and the next think re-added him (up to 30 lines/s). A skipped
+	-- fader is now passed over for 5s, so the skip is logged once per fader per 5s.
+	bot._sentrySkipUntil = bot._sentrySkipUntil or {}
+	local pid, loc, who = FaderSpot(500 + 1000, bot._sentrySkipUntil)
 	if pid == nil then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	do
 		local why = SentrySpotUseless(loc) or SentrySpotUseless(SentrySpotFor(loc))
 		if why ~= nil then
-			bot._faders[pid] = nil
+			bot._sentrySkipUntil[pid] = DotaTime() + 5
 			pcall(
 				print,
 				string.format(
-					"[OHA-ITEM] t=%.0f %s sentry-skip on %s why=%s",
+					"[OHA-ITEM] t=%.0f %s sentry-skip on %s why=%s hold=5s",
 					DotaTime(),
 					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 					(string.gsub(tostring(who), "npc_dota_hero_", "")),
@@ -5776,6 +5832,96 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Teleports held back (game 037, 24:09-27:28, 15-2 at our bottom lane):
+-- - base siege (3+ enemy heroes at a T3, barracks, T4 or the Ancient, kept 10s: defend.lua
+--   GetBaseSiege): no TP to a spot more than 5000 from our Ancient (Hoodwink t=1572 TP'd out of the
+--   fountain to farm the Dire top while five Dire were at our bottom T3);
+-- - group-up (defend.lua): no TP anywhere but the group point;
+-- - a lone TP into 3+ enemy heroes waits until 2 allies are there or teleporting there (Night
+--   Stalker t=1449 "go to the teamfight", the moment Meepo died there).
+-- TPs to the fountain (retreat) are never held.
+local function TpHoldReason(target)
+	local ok, targetX, targetY = pcall(function()
+		return target.x, target.y
+	end)
+	if not ok or type(targetX) ~= "number" or type(targetY) ~= "number" then
+		return nil
+	end
+	local now = DotaTime()
+	if Fu.GetLocationToLocationDistance(target, Fu.GetTeamFountain()) <= 2500 then
+		return nil
+	end
+	local ancient = GetAncient(team)
+	local states = Fu.Utils.GameStates
+	local siege = states ~= nil and states.baseSiege or nil
+	if
+		siege ~= nil
+		and now - siege.at <= 10
+		and ancient ~= nil
+		and Fu.GetLocationToLocationDistance(target, ancient:GetLocation()) > 5000
+	then
+		return "base-siege", siege.n, -1
+	end
+	if (bot._defendGroupUpUntil or -1) > now and bot._defendGroupUpPoint ~= nil then
+		if Fu.GetLocationToLocationDistance(target, bot._defendGroupUpPoint) > 2000 then
+			return "group-up", -1, -1
+		end
+		return nil
+	end
+	local enemies = #Fu.GetLastSeenEnemiesNearLoc(target, 1800)
+	if enemies >= 3 then
+		local allies = 0
+		for _, ally in ipairs(Fu.GetAlliesNearLoc(target, 1800)) do
+			if ally ~= bot then
+				allies = allies + 1
+			end
+		end
+		for _, playerId in ipairs(Fu.Utils.GetAllyIdsInTpToLocation(target, 2500)) do
+			if playerId ~= bot:GetPlayerID() then
+				allies = allies + 1
+			end
+		end
+		local ancientDying = ancient ~= nil
+			and Fu.GetHP(ancient) < 0.4
+			and Fu.GetLocationToLocationDistance(target, ancient:GetLocation()) <= 2500
+		if allies < 2 and not ancientDying then
+			return "lone-into-" .. enemies, enemies, allies
+		end
+	end
+	return nil
+end
+do
+	local tpRule = Usage.ConsiderItemDesire["item_tpscroll"]
+	Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
+		local desire, target, castType, castReason = tpRule(item)
+		if desire == nil or desire <= 0 or target == nil then
+			return desire, target, castType, castReason
+		end
+		local why, enemies, allies = TpHoldReason(target)
+		if why == nil then
+			return desire, target, castType, castReason
+		end
+		if DotaTime() >= (bot._tpHoldLogAt or -999) then
+			bot._tpHoldLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-TP] t=%.0f %s tp-hold why=%s reason=%s mode=%s enemies=%d allies=%d to=%.0f,%.0f",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					why,
+					tostring(castReason),
+					tostring(bot:GetActiveMode()),
+					enemies,
+					allies,
+					target.x,
+					target.y
+				)
+			)
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
 end
 Usage.ConsiderItemDesire["item_urn_of_shadows"] = function(item)
 	if item:GetCurrentCharges() == 0 then
@@ -8927,6 +9073,11 @@ function ItemUsageThink()
 	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
 	local okDeaggro, deaggroed = pcall(Usage.DeflectTowerAggro)
 	if okDeaggro and deaggroed then
+		return
+	end
+	-- Kiting for heroes on Valve's attack mode (the override attack mode kites from its own Think).
+	local okKite, kited = pcall(SpecialUnits.TryKiteInAttack, bot)
+	if okKite and kited then
 		return
 	end
 	LogHumanPing()

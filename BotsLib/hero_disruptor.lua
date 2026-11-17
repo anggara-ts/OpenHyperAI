@@ -742,7 +742,8 @@ function X.ConsiderKineticField()
 						end
 					end
 					if
-						Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange)
+						Fu.IsInRange(bot, botTarget, castRange + radius)
+						and not Fu.IsInRange(bot, botTarget, castRange)
 					then
 						enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius * 0.8)
 						if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then

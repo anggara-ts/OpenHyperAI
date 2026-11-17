@@ -950,8 +950,9 @@ function Utils.SetFrameProcessTime(bot)
 	end
 end
 function Utils.GetHumanPing()
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local member = GetTeamMember(playerId)
+	-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review); same in the loops below.
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(slot)
 		if member ~= nil and not member:IsBot() then
 			return member, member:GetMostRecentPing()
 		end
@@ -965,11 +966,11 @@ function Utils.IsPingedByAnyPlayer(bot, maxAge, minDistance, maxDistance)
 	local pings = {}
 	minDistance = minDistance or 1500
 	maxDistance = maxDistance or 10000
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
 		do
 			local continueLoop
 			repeat
-				local member = GetTeamMember(playerId)
+				local member = GetTeamMember(slot)
 				if member == nil or member:IsIllusion() or member == bot then
 					continueLoop = true
 					break
@@ -1247,14 +1248,15 @@ end
 function Utils.GetNearbyAllyAverageHpPercent(bot, radius)
 	local hpRatioSum = 0
 	local allyCount = 0
-	for _, playerId in ipairs(GetTeamPlayers(bot:GetTeam())) do
-		local ally = GetTeamMember(playerId)
+	for slot = 1, #GetTeamPlayers(bot:GetTeam()) do
+		local ally = GetTeamMember(slot)
 		if ally and ally:IsAlive() and GetUnitToUnitDistance(ally, bot) <= radius then
 			hpRatioSum = hpRatioSum + ally:GetHealth() / ally:GetMaxHealth()
 			allyCount = allyCount + 1
 		end
 	end
-	return allyCount ~= nil and hpRatioSum / allyCount or 0
+	-- Was `allyCount ~= nil` (always true), so no ally in range gave 0/0 = NaN.
+	return allyCount > 0 and hpRatioSum / allyCount or 0
 end
 function Utils.IsWithoutSpellShield(unit)
 	return not unit:HasModifier("modifier_item_sphere_target")
@@ -1622,12 +1624,11 @@ function Utils.IsTeamPushingSecondTierOrHighGround(bot)
 	end
 	local enemyAncient = GetAncient(GetOpposingTeam())
 	if enemyAncient ~= nil then
-		for _, playerId in ipairs(GetTeamPlayers(bot:GetTeam())) do
-			if IsHeroAlive(playerId) then
-				local member = GetTeamMember(playerId)
+		for slot = 1, #GetTeamPlayers(bot:GetTeam()) do
+			local member = GetTeamMember(slot)
+			if member ~= nil and member:IsAlive() then
 				if
-					member ~= nil
-					and #(member:GetNearbyHeroes(2000, false, BotMode.None) or {}) >= 2
+					#(member:GetNearbyHeroes(2000, false, BotMode.None) or {}) >= 2
 					and (
 						Utils.IsNearEnemySecondTierTower(member, 2000)
 						or Utils.IsNearEnemyHighGroundTower(member, 3000)
@@ -1693,8 +1694,8 @@ function Utils.FindAllyWithAtLeastDistanceAway(bot, minDistance)
 		log("[ERROR] Wrong usage of the method")
 		return nil
 	end
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local member = GetTeamMember(playerId)
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(slot)
 		if member ~= nil and member:IsAlive() and GetUnitToUnitDistance(member, bot) >= minDistance then
 			return member
 		end
@@ -1998,8 +1999,8 @@ function Utils.HasTeamMemberWithCriticalSpellInCooldown(targetLocation)
 	if cached ~= nil then
 		return cached
 	end
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local member = GetTeamMember(playerId)
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(slot)
 		if member ~= nil and member:IsAlive() then
 			local travelTime = GetUnitToLocationDistance(member, targetLocation) / member:GetCurrentMovementSpeed()
 			if Utils.HasCriticalSpellWithCooldown(member, travelTime) then
@@ -2017,8 +2018,8 @@ function Utils.HasTeamMemberWithCriticalItemInCooldown(targetLocation)
 	if cached ~= nil then
 		return cached
 	end
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local member = GetTeamMember(playerId)
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(slot)
 		if member ~= nil and member:IsAlive() then
 			local travelTime = GetUnitToLocationDistance(member, targetLocation) / member:GetCurrentMovementSpeed()
 			for _, itemName in ipairs(Utils.ImportantItems) do

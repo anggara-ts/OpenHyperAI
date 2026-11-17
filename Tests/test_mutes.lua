@@ -32,6 +32,8 @@ local MUTED = {
 	"[OHA-SHREDDER] t=82 retreat whirling-death enemies=1 allies=1 hp=0.48",
 	"[OHA-EMBER_SPIRIT] t=496 retreat to remnant 1128 away (farthest toward fountain)",
 	"[OHA-TUSK] t=3240 buddies-retreat chaser=keeper_of_the_light ally=shredder enemies=1",
+	"[OHA-RETREAT] t=7 meepo healthy-fight-kept hp=1.00 allies=1 visible=1 recent=2 hit=false",
+	"[OHA-FARM] t=541 obsidian_destroyer enemy-camp-uncovered lane=3 campToAncient=9903 waveToAncient=12591 at=3978,-5027",
 }
 local KEPT = {
 	"[OHA-FARM] t=631 alchemist enemy-half-withdraw why=outnumbered mode=16 at=-870,-657 to=822,918 alive=5/5",
@@ -42,6 +44,8 @@ local KEPT = {
 	"[OHA-ITEM] t=2374 rubick pull-check promote dust result=reverted slot=6 dest=4(mekansm)",
 	"[OHA-FORAGE] t=1191 keeper_of_the_light eat item_foragers_health slot0",
 	"[OHA-PUCK] t=73 jaunt why=solo-no-tower target=ember_spirit hp=0.58",
+	"[OHA-RETREAT] t=1834 abaddon hard-retreat healthy-outnumbered hp=0.85 allies=1 visible=3 hit=true",
+	"[OHA-PUSH] t=1834 abaddon wait-outside-tower why=backdoor tower=npc_dota_goodguys_tower2_mid dist=994 range=868",
 	"[OHA-LANE] t=300 lion lasthit-skip why=low-hp creep=creep_goodguys_melee by=lina hp=0.35 walk=0",
 	"[OHA-MEEPO] t=240 poof-skip why=no-target",
 	"[OHA-BUYBACK] t=2326 meepo buyback why=enemies-at-base pos=2 anc=1.00 remaining=62 gold=1695",

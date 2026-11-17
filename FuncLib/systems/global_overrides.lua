@@ -41,6 +41,9 @@ local OHA_MUTED = {
 	"^%[OHA%-SHREDDER%] t=%S+ retreat",
 	"^%[OHA%-EMBER_SPIRIT%] t=%S+ retreat to remnant",
 	"^%[OHA%-TUSK%] t=%S+ buddies%-retreat",
+	-- Proven in game 040 (PR #20); muted 2026-11-18.
+	"^%[OHA%-RETREAT%] t=%S+ %S+ healthy%-fight%-kept", -- 234 per game
+	"^%[OHA%-FARM%] t=%S+ %S+ enemy%-camp%-uncovered", -- 622 per game
 }
 if _G.OHA_RAW_PRINT == nil then
 	_G.OHA_RAW_PRINT = print

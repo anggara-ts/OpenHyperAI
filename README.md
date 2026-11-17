@@ -112,12 +112,13 @@ This GitHub repo is for local development and changes on top of that work.
 |---|---|
 | `BotsLib/` | Per-hero builds & ability logic |
 | `FuncLib/` | Shared bot libraries & systems |
-| `FretBots/` | Optional harder / bonus mode |
 | `Customize/` | User settings (picks, bans, locale) |
 | `Install-to-vscript/` | Symlink install helpers |
 | `mode_*_generic.lua` | Mode scripts (farm, push, defend, roam, …) |
 
 More detail on libraries: [`FuncLib/README.md`](FuncLib/README.md).
+
+Optional Fretbots / Buff plugin (extra gold, XP and neutral items for bots): branch [`plugin-fretbots`](../../tree/plugin-fretbots), with its own install script and README.
 
 ---
 

@@ -1,4 +1,4 @@
--- Fretbots server-side helper: HeroNames.
+-- Lookup table: hero display names per language (from Fretbots; also used by the Fretbots plugin).
 local a = {
 	en = {
 		npc_dota_hero_abaddon = "Abaddon",

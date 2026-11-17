@@ -155,28 +155,7 @@ Customize.Force_Group_Push_Level = 1
 -- 1 is default, bot may choose to farm more in game. 2 is balanced for push vs farm. 3 is almost no farm, all push.
 Customize.Push_Frequency = 1
 
--- The Enhanced Fretbots mode settings:
--- For more about Fretbots mode: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/68
--- Note: these settings below will override the pre-defind settings in Fretbots folder.
-Customize.Fretbots = {
-	-- Default difficulty, a number between: [0, 10]. Used when nobody votes.
-	-- 0 is the lightest: almost no extra gold or XP, and no bonuses when a bot dies.
-	-- 1 is a small edge. 2 pushes a carry toward roughly 300 GPM and feels heavy.
-	-- 5 is about 1.2x the bonus and 10 is 2x. A chat vote still overrides this.
-	Default_Difficulty = 1,
-
-	-- Default ally bots bonus scale comparing to enemy bots, a number between: [0, 1]
-	Default_Ally_Scale = 0.5,
-
-	-- Set whether or not allowing the team to vote for difficulty. If false, will directly apply the default difficulty.
-	Allow_To_Vote = true,
-
-	-- Set to false disables all sounds from Fretbots mode
-	Play_Sounds = true,
-
-	-- Set to play chatwheel taunt sounds when human player died
-	Player_Death_Sound = true,
-}
+-- Fretbots settings moved to the optional Fretbots plugin (branch plugin-fretbots, Customize/fretbots.lua).
 
 -- Make bots think less, 0: fully think through every tick, 1 to 10: sample heavy item/ability
 -- rescans less often when already attacking a valid target (safe: ~every 3 frames * ThinkLess).

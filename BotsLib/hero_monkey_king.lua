@@ -146,6 +146,8 @@ function a.SkillsComplement()
 	O = c.IsInTeamFight(b, 1200)
 	E, F = a.ConsiderWukongsCommand()
 	if E > 0 then
+		-- Game 036: FPS hitch at 35:29 with no script cause found; log the cast to line it up next time.
+		print(string.format("[OHA-MONKEY_KING] wukong cast t=%.0f", DotaTime()))
 		b:Action_UseAbilityOnLocation(u, F)
 		return
 	end

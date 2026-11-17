@@ -171,14 +171,19 @@ function buildSection(lines, summary) {
 		const isAncestor = (a) => cp.spawnSync("git", ["merge-base", "--is-ancestor", a, commit], { cwd: ROOT }).status === 0;
 		for (const [n, p] of Object.entries(tracker.prs || {})) {
 			if (!p.branch) continue;
-			// The PR's own (non-merge) commits must all be in the build. Merge commits are ignored: a later
-			// "merge main into the PR" commit doesn't change what the PR contributes.
-			const own = git(["rev-list", "--no-merges", `origin/main..origin/${p.branch}`]).split(/\r?\n/).filter(Boolean);
+			// The PR's own (non-merge) commits that change Lua must all be in the build. Merge commits are
+			// ignored (a later "merge main into the PR" doesn't change what the PR contributes), and so are
+			// commits that touch no Lua (CI, docs, tools): game 038 ran #6's code, but #6's CI-only commit
+			// came later and the PR was counted as missing. A PR with no Lua commits uses all of them.
+			const range = `origin/main..origin/${p.branch}`;
+			const lines = (out) => out.split(/\r?\n/).filter(Boolean);
+			const luaOwn = lines(git(["rev-list", "--no-merges", range, "--", "*.lua"]));
+			const own = luaOwn.length ? luaOwn : lines(git(["rev-list", "--no-merges", range]));
 			const ok = own.length ? own.every(isAncestor) : isAncestor(`origin/${p.branch}`);
 			(ok ? inBuild : notIn).push(n);
 		}
 		gamePrs = inBuild;
-		out.push("", `Tracked PRs in this game's build (all their own commits are ancestors of the build commit): ${inBuild.map((n) => "#" + n).join(" ") || "none"}`);
+		out.push("", `Tracked PRs in this game's build (all their own Lua commits are ancestors of the build commit): ${inBuild.map((n) => "#" + n).join(" ") || "none"}`);
 		if (notIn.length) out.push(`Not in this build (their items are not checked): ${notIn.map((n) => "#" + n).join(" ")}`);
 	}
 	return out.join("\n");

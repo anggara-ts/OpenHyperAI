@@ -196,7 +196,7 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    game runs.
 8. **Review the game** (below), then for the tracked PRs:
    - `after-game.js` works out which tracked PRs were in the game from git: a PR counts when all its own
-     (non-merge) commits are ancestors of the `[OHA-BUILD]` commit, so one `test/next` game tests many PRs and a
+     (non-merge) commits that change Lua are ancestors of the `[OHA-BUILD]` commit, so one `test/next` game tests many PRs and a
      rebuilt `test/next` doesn't lose the mapping. It runs `node Util/verify.js check <log> --game NNN --prs <those>`,
      which auto-passes or auto-fails items with
      `expect` rules, keeps items pending when none of their `heroes` played, and shows sample lines for the rest;

@@ -402,15 +402,15 @@ local function IsFeastCreep(cr)
 		or string.find(nm, "neutral", 1, true) ~= nil
 		or string.find(nm, "siege", 1, true) ~= nil
 end
--- Fullest creep in range: eating it saves the most attacks (like Devour / Midas on the biggest creep).
+-- Highest level, then highest max HP creep in range (same rule as Midas and Devour).
 local function BestFeastCreep(range)
-	local best, bestHp = nil, -1
+	local list = {}
 	for _, cr in pairs(b:GetNearbyCreeps(range, true) or {}) do
-		if IsFeastCreep(cr) and cr:GetHealth() > bestHp then
-			best, bestHp = cr, cr:GetHealth()
+		if IsFeastCreep(cr) then
+			list[#list + 1] = cr
 		end
 	end
-	return best
+	return c.GetBestCreepToEat(list, nil, false)
 end
 function a.ConsiderMidnightFeast()
 	local now = DotaTime()
@@ -437,8 +437,9 @@ function a.ConsiderMidnightFeast()
 	local enemies = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 	local nEnemies = enemies ~= nil and #enemies or 0
 	local why, cr = nil, nil
-	-- Heal: low HP, or low mana and hurt. Only a creep next to him while heroes are around.
-	if hp < 0.5 or G < 0.5 and hp < 0.75 then
+	-- Heal: HP under 75% or mana under 50% (no mana cost, 30-39s cooldown, so no need to wait for 50% HP).
+	-- Only a creep next to him while heroes are around.
+	if hp < 0.75 or G < 0.5 then
 		cr = BestFeastCreep(nEnemies > 0 and 300 or 600)
 		why = "heal"
 	end

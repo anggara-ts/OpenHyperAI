@@ -2942,17 +2942,9 @@ a.ConsiderItemDesire["item_hand_of_midas"] = function(bm)
 	if #bc >= 1 then
 		bv = 628
 	end
-	local co = b:GetNearbyCreeps(bv, true)
-	local cp = nil
-	local cq = 0
-	for aX, b2 in pairs(co) do
-		if f.IsValid(b2) and not b2:IsMagicImmune() and not b2:IsAncientCreep() then
-			if b2:GetLevel() > cq then
-				cq = b2:GetLevel()
-				cp = b2
-			end
-		end
-	end
+	-- Game data: unit target, enemy creeps, NOT_ANCIENTS, MAGIC_IMMUNE_ENEMIES allowed, 600 range.
+	-- Highest level, then highest max HP (ties used to go to whichever creep was listed first).
+	local cp = f.GetBestCreepToEat(b:GetNearbyCreeps(bv, true), nil, false)
 	if cp ~= nil then
 		hEffectTarget = cp
 		bw = "点金小兵:" .. hEffectTarget:GetUnitName()

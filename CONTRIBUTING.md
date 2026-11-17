@@ -79,6 +79,25 @@ Settings come from `vscripts/game/Customize/general.lua` when that file exists (
 
 Add `-condebug` to Dota's launch options (Steam → Dota 2 → Properties → Launch Options). The console is then written to `game/dota/console*.log`. The review tools read those logs.
 
+### 6. API tokens (optional)
+
+Some developer tools read API tokens from a `.env` file in the repo root. It is git-ignored, so the tokens stay
+on your machine. Start from the template:
+
+```sh
+cp .env.example .env
+```
+
+then fill in the values. Each one is explained in `.env.example`. Today there is one:
+
+| Variable | Used by | How to get it |
+|---|---|---|
+| `STRATZ_TOKEN` | item-build second opinion (`Util/item-builds/`, issue #38): per-position item data | log in to [stratz.com](https://stratz.com) with Steam, open your account's API section, copy the token |
+
+Without a token, the tools that need it fall back to sources that need none (OpenDota) or skip that source.
+Never commit `.env`, paste a token into an issue or PR, or print it in a log. If a token leaks, revoke it on
+the site and make a new one.
+
 ## Playing a test game
 
 1. Dota 2 → **Play → Custom Lobbies → Create**.

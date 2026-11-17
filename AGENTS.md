@@ -271,6 +271,8 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 ## Things not to do
 
 - Do not commit `Customize/general.lua` test lineups, match logs, or anything with the Steam ID.
+- Do not commit `.env` or print, log or paste its values (API tokens; template and docs: `.env.example`,
+  CONTRIBUTING.md step 6).
 - Do not force-push, rewrite published history, or skip signing.
 - Do not change a mechanic from memory; check the game data.
 - Do not stack branches on unmerged branches; use `test-build.js` to test several PRs together.

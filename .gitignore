@@ -15,3 +15,7 @@ Util/verify/
 Customize/build_info.lua
 # Local secrets for the Util/ tools (API tokens). Template: .env.example
 .env
+
+# Item-build second opinion (Util/item-builds/check.js): API cache and generated report
+Util/item-builds/cache/
+Util/item-builds/report.md

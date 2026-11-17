@@ -1,8 +1,18 @@
 # pre-commit hooks (https://pre-commit.com). Install once per clone:
 #   pip install pre-commit && pre-commit install
-# On every commit, StyLua formats the staged .lua files with stylua.toml (same version as CI).
-# If it changed a file, the commit stops: review, `git add` the formatted files, and commit again.
+# On every commit:
+#   - no commits directly on main (work on a branch and open a PR; PRs are squash-merged),
+#   - no new file over 500 KB (match logs, dumps, binaries; the largest Lua file is ~330 KB),
+#   - StyLua formats the staged .lua files with stylua.toml (same version as CI). If it changed a file,
+#     the commit stops: review, `git add` the formatted files, and commit again.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: check-added-large-files
+        args: [--maxkb=500]
   - repo: https://github.com/JohnnyMorganz/StyLua
     rev: v2.6.0
     hooks:

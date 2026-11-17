@@ -28,3 +28,6 @@ Rules: `AGENTS.md` ("Reviewing a game", workflow steps 7-8). Checklist:
 7. **Merge what passed:** skill `merge-pr` for every PR that `node Util/verify.js show` marks READY.
 8. **Report** to the user: how the game went in 3-4 lines, what passed/failed per PR, new issues, the next
    lineup, and what you'll fix next.
+
+An observation that turns out to be an API or engine limit (not a bug we can fix): add or update it in the main
+post of discussion #50 (AGENTS.md, "Known limitations"), with the evidence and the issue.

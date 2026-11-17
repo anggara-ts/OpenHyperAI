@@ -4,6 +4,10 @@ Runtime dump from the game itself, not from the online docs. Taken on 2026-11-16
 
 The online references ([Valve Developer Wiki](https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting), [ModDota](https://docs.moddota.com/lua_bots/)) carry no date and describe an older API. Where they disagree with this file, this file wins.
 
+The list of known limitations (what bots can't do, why, and the workaround) is kept in the main post of
+[discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50); update it when a limitation is
+confirmed or disproved.
+
 ## Key findings
 
 - **No vector-target order.** Abilities can only be cast with no target, on a unit, on a location or on a tree (plus the Push/Queue variants). A vector-targeted spell such as Muerta's Dead Shot cannot have its direction chosen.

@@ -161,6 +161,16 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    is a new task item there, not a new card. Labels: `bug`, `enhancement`, `needs-confirmation` (seen once,
    verify next game), `design` (needs a decision), `game-review` (came from watching a game), `chore`; `no-pr`
    skips step 2.
+   **Priority:** every issue gets exactly one priority label when it is filed, and its PRs carry the same label
+   (`Util/issue-prs.js` copies it and lists untriaged issues):
+   - `P1 critical`: a crash or script error, or a team-wide misplay that loses games (seen in most games).
+   - `P2 high`: a frequent wrong decision in a common situation (all heroes), or a hero kit badly broken
+     (several times per game).
+   - `P3 medium`: a hero-specific misplay or a missed optimisation.
+   - `P4 low`: polish, cosmetic, chat, nice-to-have.
+   Work and test in priority order (P1 first; the test lineup favours the higher priority when slots are
+   short). Re-check the priorities at every game review: raise an issue that keeps showing up, lower one
+   that turned out rare.
 2. **Draft PR per issue, automatically.** `node Util/issue-prs.js` opens a draft PR for every open issue without
    one: branch `<fix|feat|docs|chore>/issue-<N>-<slug>` from `origin/main`, one signed empty commit, the PR
    template and **`Refs #N`** (never `Closes #N`: merging a PR must not close the issue). Run it right after

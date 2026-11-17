@@ -10,6 +10,8 @@
 //   - a draft PR titled "<prefix>: <issue title> (#N)" with the PR template and "Refs #N".
 //     Never "Closes #N": merging a PR must not close the issue. The issue is closed by hand when every
 //     task item in it is ticked (an issue card can need several PRs or games).
+// Every open PR that refers to an issue gets the issue's priority label (P1 critical .. P4 low), and issues
+// without one are listed as untriaged.
 // Issues labelled "no-pr" are skipped. Runs locally (not as a GitHub Action) because the branch rules require
 // commits signed with the maintainer's key.
 "use strict";
@@ -40,7 +42,10 @@ function slug(title) {
 }
 
 const issues = JSON.parse(gh(["issue", "list", "--state", "open", "--limit", "200", "--json", "number,title,labels,url"]));
-const prs = JSON.parse(gh(["pr", "list", "--state", "all", "--limit", "300", "--json", "number,headRefName,body"]));
+const prs = JSON.parse(
+	gh(["pr", "list", "--state", "all", "--limit", "300", "--json", "number,headRefName,body,state,labels"])
+);
+const PRIORITY = ["P1 critical", "P2 high", "P3 medium", "P4 low"];
 const covered = new Set();
 for (const pr of prs) {
 	for (const m of (pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|related to|part of)\s+#(\d+)/gi)) covered.add(Number(m[1]));
@@ -70,3 +75,26 @@ for (const issue of issues) {
 	made++;
 }
 console.log(DRY ? "dry run, nothing created" : `${made} draft PR(s) created`);
+
+// Priority: the issue decides, its open PRs follow. Untriaged issues are listed so they get a label.
+const untriaged = [];
+const prsNow = DRY ? prs : JSON.parse(gh(["pr", "list", "--state", "open", "--limit", "300", "--json", "number,headRefName,body,labels"]));
+for (const issue of issues) {
+	const prio = issue.labels.map((l) => l.name).find((n) => PRIORITY.includes(n));
+	if (!prio) {
+		untriaged.push(issue.number);
+		continue;
+	}
+	for (const pr of prsNow) {
+		const refs = [...(pr.body || "").matchAll(/(?:refs?|related to|part of)\s+#(\d+)/gi)].map((m) => Number(m[1]));
+		const b = pr.headRefName.match(/issue-(\d+)/);
+		if (!refs.includes(issue.number) && !(b && Number(b[1]) === issue.number)) continue;
+		const has = (pr.labels || []).map((l) => l.name);
+		if (has.includes(prio) && !has.some((n) => PRIORITY.includes(n) && n !== prio)) continue;
+		const args = ["pr", "edit", String(pr.number), "--add-label", prio];
+		for (const other of PRIORITY) if (other !== prio && has.includes(other)) args.push("--remove-label", other);
+		console.log(`PR #${pr.number}: priority ${prio} (from issue #${issue.number})`);
+		if (!DRY) gh(args);
+	}
+}
+if (untriaged.length) console.log(`untriaged issues (add P1 critical / P2 high / P3 medium / P4 low): ${untriaged.map((n) => "#" + n).join(" ")}`);

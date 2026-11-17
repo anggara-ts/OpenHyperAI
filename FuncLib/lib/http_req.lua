@@ -6,7 +6,7 @@ local function createClass(self)
 	return class
 end
 local Module = {}
-local Json = require(GetScriptDirectory() .. "/ts_libs/utils/json")
+local Json = require(GetScriptDirectory() .. "/FuncLib/lib/json")
 Module.Request = createClass()
 local Request = Module.Request
 Request.name = "Request"

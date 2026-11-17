@@ -1,6 +1,6 @@
 -- Shared bot system: role.
 local Role = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local GameMode = Dota.GameMode
 local GameState = Dota.GameState
 local Lane = Dota.Lane

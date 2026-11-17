@@ -41,7 +41,7 @@ end
 local Defend = {}
 local getDefendState, getGameState, getLaneState, getUnitLists, locationKey, locationRadiusKey, countRecentlySeenEnemies, isAliveBuilding, isBaseDefenseActive, isDefendingOtherLane, getWeightedEnemyCount, getMostThreatenedLane, getClosestPosition, noOtherTravelBootsDefender, getHighGroundWaitPoint, pingForDefense, localizationLoaded, Localization, humanPingSeconds, maxDefendDesire, ancientThreatRadius, baseDefenseSeconds, enemyCountCacheSeconds, lastSeenSeconds, ourTeam, threatLaneLock, baseDefenseUntil, travelBootsDefenderTime, enemyCountCache, stateCacheSeconds, gameStateCache, laneStateCache, unitListCache
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Barracks = Dota.Barracks
 local BotMode = Dota.BotMode
 local BotModeDesire = Dota.BotModeDesire
@@ -49,7 +49,7 @@ local Lane = Dota.Lane
 local Team = Dota.Team
 local Tower = Dota.Tower
 local UnitType = Dota.UnitType
-local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local NativeOperators = require(GetScriptDirectory() .. "/FuncLib/lib/native_operators")
 local vectorAdd = NativeOperators.add
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local getLocationToLocationDistance = Utils.GetLocationToLocationDistance

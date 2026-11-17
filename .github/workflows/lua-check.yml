@@ -2,7 +2,7 @@ name: Lua check
 
 on:
   push:
-    branches: [main, "release-*", "fix/**", update-mechanism-7.41f, plugin-fretbots]
+    branches: [main, "release-*", "fix/**", "feat/**", "chore/**", "docs/**", plugin-fretbots]
   pull_request:
   workflow_dispatch:
 

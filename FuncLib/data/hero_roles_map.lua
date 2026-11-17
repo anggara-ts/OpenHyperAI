@@ -1,6 +1,6 @@
 -- Lookup table: hero roles map.
 local HeroRoles = {}
-local Heroes = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
+local Heroes = require(GetScriptDirectory() .. "/FuncLib/dota/heroes")
 local HeroName = Heroes.HeroName
 HeroRoles.HeroRolesMap = {
 	[HeroName.Abaddon] = {

@@ -90,7 +90,7 @@ local function arraySplice(self, ...)
 	return removed
 end
 local Site = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local BotModeDesire = Dota.BotModeDesire
 local UnitType = Dota.UnitType
 local BotMode = Dota.BotMode

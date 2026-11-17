@@ -5,7 +5,7 @@
 -- A role holding under 5% of the hero's role picks is capped at 5, under 10% at 25. hero_selection
 -- always keeps a weight above 50 as a candidate and keeps lower ones with a chance (RandomInt(5, 50)).
 local M = {}
-local Heroes = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
+local Heroes = require(GetScriptDirectory() .. "/FuncLib/dota/heroes")
 local HeroName = Heroes.HeroName
 local heroPositions = {
 	[HeroName.Abaddon] = { 25, 5, 52, 63, 96 },

@@ -77,7 +77,7 @@ local function tableSplice(self, ...)
 end
 local X = {}
 local banHero, pickHero, isHumanPicked, isExcludedHero, randomAvailableHero, allHumansSelected, selectHeroes, collectPickedHeroes, removeFromPicked, assignLanes, extraHeroPool, pickedHeroes, heroesSelected, banCount, pickCount, excludedHeroes, laneAssignments, heroPool, humanPickedHeroes, positionAssignments
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local GameState = Dota.GameState
 local HeroPickState = Dota.HeroPickState
 local Lane = Dota.Lane

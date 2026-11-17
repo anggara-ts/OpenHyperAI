@@ -171,7 +171,7 @@ local function arrayForEach(self, callback, thisArg)
 	end
 end
 local Cache = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Lane = Dota.Lane
 local UnitType = Dota.UnitType
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

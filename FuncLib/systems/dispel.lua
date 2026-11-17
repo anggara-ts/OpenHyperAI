@@ -68,7 +68,7 @@ do
 	end
 end
 local Dispel = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local BotMode = Dota.BotMode
 local debuffInfo = {
 	modifier_stunned = {

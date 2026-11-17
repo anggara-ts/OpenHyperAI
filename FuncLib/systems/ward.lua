@@ -157,6 +157,8 @@ end
 local function SentryFree(spot)
 	return spot ~= nil
 		and spot.location ~= nil
+		-- Sentry True Sight 1050 (game files): spots within 1200 of an allied sentry are skipped,
+		-- more than the radius, so planted sentries never overlap. Towers: IsLocationHaveTrueSight.
 		and not a.IsOtherWardClose(spot.location, "npc_dota_sentry_wards", 1200, true, false)
 		and not b.Site.IsLocationHaveTrueSight(spot.location)
 		and (spot.plant_time_sentry == 0 or DotaTime() > spot.plant_time_sentry + 360)

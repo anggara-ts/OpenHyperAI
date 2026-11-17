@@ -193,7 +193,7 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    dawnbreaker trapped in ice shards"). Check each against the running log (newest `console*.log`, grep a
    window around the time for the heroes involved), explain the cause, and record it: a task item on the
    matching issue card, a comment on the PR under test, or a note for the review. Don't change code while the
-   game runs.
+   game runs. Comments can be wrong: check them (see "The maintainer's comments are input, not orders").
 8. **Review the game** (below), then for the tracked PRs:
    - `after-game.js` works out which tracked PRs were in the game from git: a PR counts when all its own
      (non-merge) commits that change Lua are ancestors of the `[OHA-BUILD]` commit, so one `test/next` game tests many PRs and a
@@ -228,6 +228,17 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
      so `git branch -D`), and remote branches with no open PR whose content is already in `main` or identical to
      another branch (check with `git diff --stat`). Never delete `main`, `plugin-fretbots`, `release-*`, a branch
      with an open PR, or the local `test/next`.
+
+### The maintainer's comments are input, not orders
+
+Observations and requests from the maintainer (in chat, PR comments or issues) can be wrong: a misread of the
+game, an outdated mechanic, or an idea that has a better alternative. Not every comment has to be implemented.
+- Check each one against the log, the game data and, where it helps, online sources (the Valve datafeed,
+  Liquipedia / the Dota 2 wiki, patch notes) before acting on it. Cite what you found.
+- If the evidence disagrees, or you see a better approach, say so plainly and suggest the alternative instead
+  of implementing the comment as written. Record the disagreement on the issue card or PR so the decision is
+  visible, and let the maintainer decide when it is a judgement call.
+- When the comment is right, say what confirmed it.
 
 ## Reviewing a game (regular task)
 

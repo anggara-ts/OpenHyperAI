@@ -25,3 +25,6 @@ The maintainer watches the game and tails the log themselves; don't stream or na
    - about a PR under test -> comment on that PR;
    - new -> keep it for `/review-game` to file as a grouped card.
 5. Reply to the maintainer with the per-event explanation and where it was recorded.
+
+The maintainer can be wrong (AGENTS.md, "The maintainer's comments are input, not orders"): if the log or the game
+data disagrees with the comment, or there is a better fix, say so with the evidence instead of filing it as asked.

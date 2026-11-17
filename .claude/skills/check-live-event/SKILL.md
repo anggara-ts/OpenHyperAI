@@ -28,3 +28,6 @@ The maintainer watches the game and tails the log themselves; don't stream or na
 
 The maintainer can be wrong (AGENTS.md, "The maintainer's comments are input, not orders"): if the log or the game
 data disagrees with the comment, or there is a better fix, say so with the evidence instead of filing it as asked.
+
+An observation that turns out to be an API or engine limit (not a bug we can fix): add or update it in the main
+post of discussion #50 (AGENTS.md, "Known limitations"), with the evidence and the issue.

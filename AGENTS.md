@@ -128,6 +128,12 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   (`https://www.dota2.com/datafeed/herodata?language=english&hero_id=N`). Cite the source in a comment when it
   drives a number.
 - The bot API differs from online docs; see `Docs/BOT_API_RUNTIME.md` (e.g. no vector-targeted cast order).
+- **Known limitations** (what bots can't do because the API or engine doesn't allow it) are listed in the main post
+  of [discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50). When a game, test or source
+  confirms a new limitation, disproves one, or a workaround is found, **edit the main post** (not only a reply):
+  move the item between "Confirmed" and "Not confirmed yet", with the evidence (log line, test, Valve source) and
+  the related issue. `gh api graphql` with `updateDiscussion` edits it. Record API facts in
+  `Docs/BOT_API_RUNTIME.md` too.
 
 ## Logging
 

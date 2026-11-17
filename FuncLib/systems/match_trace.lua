@@ -32,6 +32,14 @@ local versionOk, versionMod = pcall(require, GetScriptDirectory() .. "/Customize
 if versionOk and type(versionMod) == "table" and versionMod.number then
 	version = versionMod.number
 end
+-- [OHA-BUILD] details (commit/branch come from Customize/build_info.lua; "release" when it is missing).
+local buildLine = string.format(
+	"version=%s commit=%s branch=%s dirty=%s",
+	tostring(version),
+	tostring(versionOk and type(versionMod) == "table" and versionMod.commit or "release"),
+	tostring(versionOk and type(versionMod) == "table" and versionMod.branch or "-"),
+	tostring(versionOk and type(versionMod) == "table" and versionMod.dirty == true)
+)
 
 local fileReady = {}
 local lastKindAt = {}
@@ -317,6 +325,10 @@ function MatchTrace.MatchMarker(phase, detail)
 			detail or ""
 		)
 	)
+	-- The build, once per game per team: hero selection prints "start" once per team, right as the game loads.
+	if phase == "start" then
+		print(string.format("[OHA-BUILD] %s team=%s", buildLine, TeamTag(GetTeam())))
+	end
 end
 
 local function AncientDead(team)

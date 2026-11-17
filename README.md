@@ -115,10 +115,19 @@ This GitHub repo is for local development and changes on top of that work.
 | `Customize/` | User settings (picks, bans, locale) |
 | `Install-to-vscript/` | Symlink install helpers |
 | `mode_*_generic.lua` | Mode scripts (farm, push, defend, roam, …) |
+| `Util/` | Developer tools (log splitter, game review, test tracker) |
+| `Tests/` | LuaJIT tests with a stub bot API |
+| `Docs/` | Notes (what the bot API really exposes) |
 
 More detail on libraries: [`FuncLib/README.md`](FuncLib/README.md).
 
 Optional Fretbots / Buff plugin (extra gold, XP and neutral items for bots): branch [`plugin-fretbots`](../../tree/plugin-fretbots), with its own install script and README.
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md): setup (git hooks, signed commits, linking Dota to your clone), test games, and the issue -> PR -> game test -> merge flow. Rules for code and PRs are in [`AGENTS.md`](AGENTS.md).
 
 ---
 

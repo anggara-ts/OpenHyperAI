@@ -479,6 +479,10 @@ function GetDesireHelper()
 			if c:HasModifier("modifier_item_satanic_unholy") then
 				a8 = a8 - GetAdjustedDesireValue(0.3)
 			end
+			-- Monkey King's Jingu charges: 20-80% lifesteal on hits, so stay in while above 20% HP.
+			if c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses") and b.GetHP(c) > 0.2 then
+				a8 = a8 - GetAdjustedDesireValue(0.2)
+			end
 			local U = c:GetAbilityByName("slark_shadow_dance")
 			if
 				b.CanCastAbility(U)
@@ -557,7 +561,9 @@ local function CommittedKill()
 	if not (b.IsDisabled(k) or b.GetHP(k) < 0.4) then
 		return false
 	end
-	return c:HasModifier("modifier_item_satanic_unholy") or b.GetHP(c) >= 0.35
+	return c:HasModifier("modifier_item_satanic_unholy")
+		or c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses") and b.GetHP(c) >= 0.2
+		or b.GetHP(c) >= 0.35
 end
 function a.ShouldRun()
 	if c:IsChanneling() or not c:IsAlive() then

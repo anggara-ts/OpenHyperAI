@@ -100,6 +100,15 @@ function r.GetDesire()
 			if a.IsDisabled(D) then
 				F = F * 3
 			end
+			-- Jingu Mastery (game data): required_hits 4 (3 with the talent) on the same hero within
+			-- counter_duration 5.5-10s gives 4 empowered attacks (+30-180 damage, 20-80% lifesteal). The
+			-- counter sits on the enemy: keep hitting the marked hero instead of switching targets.
+			if m == "npc_dota_hero_monkey_king" then
+				local jinguStacks = a.GetModifierCount(D, "modifier_monkey_king_quadruple_tap_counter")
+				if jinguStacks > 0 then
+					F = F * (1.5 + jinguStacks)
+				end
+			end
 			if a.IsEarlyGame() or a.IsInLaningPhase() then
 				if a.IsValidBuilding(z[1]) and a.IsInRange(D, z[1], 900) then
 					-- Hard reject tower-hugging bait (starting gold rune → dive).
@@ -250,7 +259,13 @@ function r.GetDesire()
 					a0 = a0 + BOT_MODE_DESIRE_HIGH
 				end
 			end
-			if c:HasModifier("modifier_item_satanic_unholy") and a.IsInRange(c, d.unit, e - 75) and f < 0.6 then
+			-- Lifesteal windows: Satanic Unholy Rage (175% lifesteal, 6s) and Monkey King's Jingu charges
+			-- (20-80% lifesteal + bonus damage). Every hit heals and hurts, so fight while it lasts. Was
+			-- only below 60% HP and within attack range - 75, so it stopped as soon as the heal worked.
+			if
+				(c:HasModifier("modifier_item_satanic_unholy") or c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses"))
+				and a.IsInRange(c, d.unit, e + 150)
+			then
 				if #v >= #x and Z >= 1 / 3 or Z >= 0.8 then
 					a0 = a0 + BOT_MODE_DESIRE_HIGH
 				end

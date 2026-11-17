@@ -337,6 +337,32 @@ function D()
 	R = { lane = aP, ["until"] = DotaTime() + 3 }
 	return aP
 end
+-- Lane of a base threat: most enemy heroes last seen (8s) within 2200 of that lane's high-ground
+-- spot (G: in front of the T3 / barracks). Kept 20s when they drop out of sight, so a Dire push
+-- that steps into fog does not hand the base to the first lane in the list (top); creep-only
+-- threats fall back to the D() lane.
+local baseLaneMem = { lane = nil, t = -999 }
+local function BaseThreatLane(team, fallback)
+	local best, bestN = nil, 0
+	for _, lane in ipairs({ a3.Top, a3.Mid, a3.Bot }) do
+		local loc = G(team, lane)
+		if loc ~= nil then
+			local n = y(loc, 2200, 8)
+			if n > bestN then
+				best, bestN = lane, n
+			end
+		end
+	end
+	if best ~= nil then
+		baseLaneMem = { lane = best, t = DotaTime() }
+		return best, "seen"
+	end
+	if baseLaneMem.lane ~= nil and DotaTime() - baseLaneMem.t <= 20 then
+		return baseLaneMem.lane, "remembered"
+	end
+	return fallback, "fallback"
+end
+local laneNames = { [a3.Top] = "top", [a3.Mid] = "mid", [a3.Bot] = "bot" }
 function E(aZ, a_)
 	local b0 = nil
 	local b1 = math.huge
@@ -894,6 +920,37 @@ function r.GetDefendDesireHelper(af, aF)
 			af.laneToDefend = aF
 		end
 	end
+	-- Base under threat: only the threatened lane defends. Every other lane used to keep a 0.7 share
+	-- of the base floor, so when the attacked lane dipped for a moment (game 036, 37:09: Radiant
+	-- enemies at the bottom T3 out of sight, bot read 0 "no-threat", top 0.30 "base-floor"), Primal
+	-- Beast's defend mode flipped to top and he TPed from the fountain to the top T2, chatting
+	-- "Defending the base!". The bot then stays on the base lane: no "no-threat" exit below either.
+	local baseLane = nil
+	if ch.active or ca >= 2 then
+		local why
+		baseLane, why = BaseThreatLane(az.team, c8)
+		if baseLane ~= nil and aF ~= baseLane then
+			if DotaTime() >= (af._baseLaneLogAt or -999) then
+				af._baseLaneLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-DEFEND] t=%.0f %s base-lane=%s(%s) d8lane=%s hg=%d anc=%d skip=%s",
+					DotaTime(),
+					(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(laneNames[baseLane]),
+					why,
+					tostring(laneNames[c8]),
+					c9 or 0,
+					ca or 0,
+					tostring(laneNames[aF])
+				))
+			end
+			return DefNone(af, "base-other-lane")
+		end
+		if baseLane ~= nil and baseLane ~= c8 then
+			-- The defend location and the lane to defend follow the threatened lane.
+			af.laneToDefend = baseLane
+		end
+	end
 	local cp = A()
 	if am then
 		if ca >= 1 then
@@ -1012,7 +1069,7 @@ function r.GetDefendDesireHelper(af, aF)
 			end
 		end
 	end
-	if not cK then
+	if not cK and baseLane == nil then
 		local cL = Z.GetLastSeenEnemiesNearLoc(cA:GetLocation(), 1200)
 		if not cJ and #cL == 0 or #cL == 0 and #Z.GetAlliesNearLoc(cA:GetLocation(), 1600) >= 1 then
 			return DefNone(af, "no-threat")

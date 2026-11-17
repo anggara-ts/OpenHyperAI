@@ -4891,6 +4891,20 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 				end
 			end
 		end
+		-- Enemy heroes on our high ground (seen within 3500 of our Ancient): defend on foot. A TP from
+		-- the fountain to a lane front only takes the bot out of the base (game 036, 37:09: Primal
+		-- Beast TP'd to top while Dire was on the bottom high ground).
+		do
+			local anc = GetAncient(GetTeam())
+			local onHg = anc ~= nil and f.GetLastSeenEnemiesNearLoc(anc:GetLocation(), 3500) or {}
+			if #onHg >= 1 then
+				if DotaTime() >= (b._tpHgSkipLogAt or -999) then
+					b._tpHgSkipLogAt = DotaTime() + 10
+					pcall(print, string.format("[OHA-TP] t=%.0f %s fountain-tp skip why=enemies-on-hg n=%d", DotaTime(), c, #onHg))
+				end
+				return BOT_ACTION_DESIRE_NONE
+			end
+		end
 		local dS = GetLaneFrontLocation(GetTeam(), dO, -500)
 		local dT = { [LANE_TOP] = "top", [LANE_MID] = "mid", [LANE_BOT] = "bot" }
 		-- Printed every think while at the fountain (6,541 lines in one game); once per 10s now.

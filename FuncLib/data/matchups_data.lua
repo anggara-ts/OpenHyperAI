@@ -1,5 +1,5 @@
 -- Fretbots server-side helper: matchups data.
-local a = {
+local MatchupsData = {
 	["npc_dota_hero_antimage"] = {
 		["npc_dota_hero_chen"] = 18.18,
 		["npc_dota_hero_tinker"] = 15.56,
@@ -5335,28 +5335,28 @@ local a = {
 		["npc_dota_hero_brewmaster"] = -20,
 	},
 }
-function a.GetAdvantage(b, c)
-	if a[b] and a[b][c] then
-		return a[b][c]
+function MatchupsData.GetAdvantage(heroName, otherHeroName)
+	if MatchupsData[heroName] and MatchupsData[heroName][otherHeroName] then
+		return MatchupsData[heroName][otherHeroName]
 	end
 	return 0
 end
-function a.IsSynergy(d, e)
-	if not a[d] or not a[e] then
+function MatchupsData.IsSynergy(heroName, otherHeroName)
+	if not MatchupsData[heroName] or not MatchupsData[otherHeroName] then
 		return false
 	end
-	local f = 0
-	for c, g in pairs(a[d]) do
-		if g > 1.5 then
-			local h = a.GetAdvantage(c, e)
-			if h > 1.5 then
-				f = f + 1
+	local sharedCounterCount = 0
+	for enemyHeroName, advantage in pairs(MatchupsData[heroName]) do
+		if advantage > 1.5 then
+			local otherAdvantage = MatchupsData.GetAdvantage(enemyHeroName, otherHeroName)
+			if otherAdvantage > 1.5 then
+				sharedCounterCount = sharedCounterCount + 1
 			end
 		end
 	end
-	return f >= 2
+	return sharedCounterCount >= 2
 end
-function a.IsCounter(b, c)
-	return a.GetAdvantage(b, c) > 2.0
+function MatchupsData.IsCounter(heroName, otherHeroName)
+	return MatchupsData.GetAdvantage(heroName, otherHeroName) > 2.0
 end
-return a
+return MatchupsData

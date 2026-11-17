@@ -1,771 +1,825 @@
 -- Shared helper: team info.
-local function a(b)
-	local c = {}
-	local d = -1
-	local function e(f)
-		local g = GameTime()
-		if g ~= d then
-			c = {}
-			d = g
+local function installTeamInfo(Fu)
+	local unitListCache = {}
+	local unitListCacheTime = -1
+	local function GetCachedUnitList(listType)
+		local now = GameTime()
+		if now ~= unitListCacheTime then
+			unitListCache = {}
+			unitListCacheTime = now
 		end
-		if c[f] then
-			return c[f]
+		if unitListCache[listType] then
+			return unitListCache[listType]
 		end
-		local h = GetUnitList(f)
-		c[f] = h
-		return h
+		local units = GetUnitList(listType)
+		unitListCache[listType] = units
+		return units
 	end
-	b.GetCachedUnitList = e
-	local i = nil
-	local j = -1
-	function b.GetRealEnemyHeroes()
-		local g = GameTime()
-		if g == j and i then
-			return i
+	Fu.GetCachedUnitList = GetCachedUnitList
+	local realEnemyHeroesCache = nil
+	local realEnemyHeroesTime = -1
+	function Fu.GetRealEnemyHeroes()
+		local now = GameTime()
+		if now == realEnemyHeroesTime and realEnemyHeroesCache then
+			return realEnemyHeroesCache
 		end
-		local k = e(UNIT_LIST_ENEMY_HEROES)
-		local l = {}
-		for m, n in pairs(k) do
+		local enemyHeroes = GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)
+		local realHeroes = {}
+		for _, hero in pairs(enemyHeroes) do
 			if
-				b.IsValidHero(n)
-				and not b.IsSuspiciousIllusion(n)
-				and not b.IsMeepoClone(n)
-				and not n:HasModifier("modifier_arc_warden_tempest_double")
+				Fu.IsValidHero(hero)
+				and not Fu.IsSuspiciousIllusion(hero)
+				and not Fu.IsMeepoClone(hero)
+				and not hero:HasModifier("modifier_arc_warden_tempest_double")
 			then
-				table.insert(l, n)
+				table.insert(realHeroes, hero)
 			end
 		end
-		i = l
-		j = g
-		return l
+		realEnemyHeroesCache = realHeroes
+		realEnemyHeroesTime = now
+		return realHeroes
 	end
-	function b.GetUnitAllyCountAroundEnemyTarget(o, p)
-		local q = o:GetLocation()
-		local r = b.GetNearbyAroundLocationUnitCount(false, true, p, q)
-		local s = b.GetNearbyAroundLocationUnitCount(false, false, p, q)
-		return r + s
+	function Fu.GetUnitAllyCountAroundEnemyTarget(target, radius)
+		local location = target:GetLocation()
+		local heroCount = Fu.GetNearbyAroundLocationUnitCount(false, true, radius, location)
+		local creepCount = Fu.GetNearbyAroundLocationUnitCount(false, false, radius, location)
+		return heroCount + creepCount
 	end
-	function b.GetAroundTargetEnemyUnitCount(o, p)
-		local q = o:GetLocation()
-		return b.GetAroundTargetLocEnemyUnitCount(q, p)
+	function Fu.GetAroundTargetEnemyUnitCount(target, radius)
+		local location = target:GetLocation()
+		return Fu.GetAroundTargetLocEnemyUnitCount(location, radius)
 	end
-	function b.GetAroundTargetLocEnemyUnitCount(q, p)
-		local r = b.GetNearbyAroundLocationUnitCount(true, true, p, q)
-		local s = b.GetNearbyAroundLocationUnitCount(true, false, p, q)
-		return r + s
+	function Fu.GetAroundTargetLocEnemyUnitCount(location, radius)
+		local heroCount = Fu.GetNearbyAroundLocationUnitCount(true, true, radius, location)
+		local creepCount = Fu.GetNearbyAroundLocationUnitCount(true, false, radius, location)
+		return heroCount + creepCount
 	end
-	function b.GetAroundTargetEnemyHeroCount(o, p)
-		return b.GetNearbyAroundLocationUnitCount(true, true, p, o:GetLocation())
+	function Fu.GetAroundTargetEnemyHeroCount(target, radius)
+		return Fu.GetNearbyAroundLocationUnitCount(true, true, radius, target:GetLocation())
 	end
-	function b.GetNearbyAroundLocationUnitCount(t, u, p, v)
-		local w = 0
-		if u then
-			if t then
-				w = #b.GetEnemiesNearLoc(v, p)
+	function Fu.GetNearbyAroundLocationUnitCount(isEnemy, heroesOnly, radius, location)
+		local count = 0
+		if heroesOnly then
+			if isEnemy then
+				count = #Fu.GetEnemiesNearLoc(location, radius)
 			else
-				w = #b.GetAlliesNearLoc(v, p)
+				count = #Fu.GetAlliesNearLoc(location, radius)
 			end
 		else
-			if t then
-				for m, x in pairs(e(UNIT_LIST_ENEMIES)) do
-					if b.IsValid(x) and GetUnitToLocationDistance(x, v) <= p then
-						w = w + 1
+			if isEnemy then
+				for _, unit in pairs(GetCachedUnitList(UNIT_LIST_ENEMIES)) do
+					if Fu.IsValid(unit) and GetUnitToLocationDistance(unit, location) <= radius then
+						count = count + 1
 					end
 				end
 			else
-				for m, x in pairs(e(UNIT_LIST_ALLIES)) do
-					if b.IsValid(x) and GetUnitToLocationDistance(x, v) <= p then
-						w = w + 1
+				for _, unit in pairs(GetCachedUnitList(UNIT_LIST_ALLIES)) do
+					if Fu.IsValid(unit) and GetUnitToLocationDistance(unit, location) <= radius then
+						count = count + 1
 					end
 				end
 			end
 		end
-		return w
+		return count
 	end
-	function b.GetAttackEnemysAllyCreepCount(o, p)
+	function Fu.GetAttackEnemysAllyCreepCount(target, radius)
 		local bot = GetBot()
-		local y = bot:GetNearbyCreeps(p, false)
-		local z = 0
-		for m, A in pairs(y) do
-			if A:IsAlive() and A:CanBeSeen() and A:GetAttackTarget() == o then
-				z = z + 1
+		local allyCreeps = bot:GetNearbyCreeps(radius, false)
+		local count = 0
+		for _, creep in pairs(allyCreeps) do
+			if creep:IsAlive() and creep:CanBeSeen() and creep:GetAttackTarget() == target then
+				count = count + 1
 			end
 		end
-		return z
+		return count
 	end
-	function b.GetRetreatingAlliesNearLoc(v, p)
-		local B = {}
-		for C = 1, #GetTeamPlayers(GetTeam()) do
-			local D = GetTeamMember(C)
-			if D ~= nil and D:IsAlive() and GetUnitToLocationDistance(D, v) <= p and b.IsRetreating(D) then
-				table.insert(B, D)
-			end
-		end
-		return B
-	end
-	function b.GetAlliesNearLoc(v, p)
-		local B = {}
-		if v == nil then
-			return B
-		end
-		for C = 1, #GetTeamPlayers(GetTeam()) do
-			local D = GetTeamMember(C)
-			if D ~= nil and D:IsAlive() and GetUnitToLocationDistance(D, v) <= p then
-				table.insert(B, D)
-			end
-		end
-		return B
-	end
-	function b.GetEnemiesNearLoc(v, p)
-		local E = {}
-		if v == nil then
-			return E
-		end
-		for m, F in pairs(b.GetRealEnemyHeroes()) do
-			if GetUnitToLocationDistance(F, v) <= p then
-				table.insert(E, F)
-			end
-		end
-		return E
-	end
-	function b.GetIllusionsNearLoc(v, p)
-		local G = {}
-		for m, F in pairs(e(UNIT_LIST_ENEMY_HEROES)) do
+	function Fu.GetRetreatingAlliesNearLoc(location, radius)
+		local allies = {}
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
 			if
-				b.IsValidHero(F)
-				and GetUnitToLocationDistance(F, v) <= p
-				and b.IsSuspiciousIllusion(F)
-				and not b.IsMeepoClone(F)
+				member ~= nil
+				and member:IsAlive()
+				and GetUnitToLocationDistance(member, location) <= radius
+				and Fu.IsRetreating(member)
 			then
-				table.insert(G, F)
+				table.insert(allies, member)
 			end
 		end
-		return G
+		return allies
 	end
-	function b.GetHeroesTargetingUnit(H, I)
-		local J = {}
-		for m, F in pairs(H) do
+	function Fu.GetAlliesNearLoc(location, radius)
+		local allies = {}
+		if location == nil then
+			return allies
+		end
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsAlive() and GetUnitToLocationDistance(member, location) <= radius then
+				table.insert(allies, member)
+			end
+		end
+		return allies
+	end
+	function Fu.GetEnemiesNearLoc(location, radius)
+		local enemies = {}
+		if location == nil then
+			return enemies
+		end
+		for _, enemyHero in pairs(Fu.GetRealEnemyHeroes()) do
+			if GetUnitToLocationDistance(enemyHero, location) <= radius then
+				table.insert(enemies, enemyHero)
+			end
+		end
+		return enemies
+	end
+	function Fu.GetIllusionsNearLoc(location, radius)
+		local illusions = {}
+		for _, enemyHero in pairs(GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)) do
 			if
-				b.IsValidHero(F)
-				and not b.IsSuspiciousIllusion(F)
-				and (F:GetAttackTarget() == I or b.IsChasingTarget(F, I))
+				Fu.IsValidHero(enemyHero)
+				and GetUnitToLocationDistance(enemyHero, location) <= radius
+				and Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsMeepoClone(enemyHero)
 			then
-				table.insert(J, F)
+				table.insert(illusions, enemyHero)
 			end
 		end
-		return J
+		return illusions
 	end
-	function b.GetSameUnitType(I, p, K, L)
-		local J = {}
-		local M = e(UNIT_LIST_ALL)
-		for m, x in pairs(M) do
-			if b.IsValid(x) and x:GetUnitName() == K and GetUnitToUnitDistance(x, I) <= p then
-				if L then
-					if x:GetAttackTarget() == I or b.IsChasingTarget(x, I) then
-						table.insert(J, x)
+	function Fu.GetHeroesTargetingUnit(heroes, target)
+		local result = {}
+		for _, enemyHero in pairs(heroes) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and (enemyHero:GetAttackTarget() == target or Fu.IsChasingTarget(enemyHero, target))
+			then
+				table.insert(result, enemyHero)
+			end
+		end
+		return result
+	end
+	function Fu.GetSameUnitType(target, radius, unitName, onlyTargeting)
+		local result = {}
+		local units = GetCachedUnitList(UNIT_LIST_ALL)
+		for _, unit in pairs(units) do
+			if
+				Fu.IsValid(unit)
+				and unit:GetUnitName() == unitName
+				and GetUnitToUnitDistance(unit, target) <= radius
+			then
+				if onlyTargeting then
+					if unit:GetAttackTarget() == target or Fu.IsChasingTarget(unit, target) then
+						table.insert(result, unit)
 					end
 				else
-					table.insert(J, x)
+					table.insert(result, unit)
 				end
 			end
 		end
-		return J
+		return result
 	end
-	function b.IsTargetedByEnemyWithModifier(H, N)
-		for m, F in pairs(H) do
-			if b.IsValidHero(F) and F:HasModifier(N) and (F:GetAttackTarget() == bot or b.IsChasingTarget(F, bot)) then
+	function Fu.IsTargetedByEnemyWithModifier(heroes, modifierName)
+		for _, enemyHero in pairs(heroes) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero:HasModifier(modifierName)
+				and (enemyHero:GetAttackTarget() == bot or Fu.IsChasingTarget(enemyHero, bot))
+			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.GetInvUnitInLocCount(bot, p, O, P, Q)
-		local R = 0
-		if p > 1600 then
-			p = 1600
+	function Fu.GetInvUnitInLocCount(bot, range, radius, location, includeMagicImmune)
+		local count = 0
+		if range > 1600 then
+			range = 1600
 		end
-		local M = b.GetNearbyHeroes(bot, p, true, BOT_MODE_NONE)
-		for m, S in pairs(M) do
+		local units = Fu.GetNearbyHeroes(bot, range, true, BOT_MODE_NONE)
+		for _, enemy in pairs(units) do
 			if
-				(Q and b.CanCastOnMagicImmune(S) or not Q and b.CanCastOnNonMagicImmune(S))
-				and GetUnitToLocationDistance(S, P) <= O
+				(
+					includeMagicImmune and Fu.CanCastOnMagicImmune(enemy)
+					or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(enemy)
+				) and GetUnitToLocationDistance(enemy, location) <= radius
 			then
-				R = R + 1
+				count = count + 1
 			end
 		end
-		return R
+		return count
 	end
-	function b.GetInLocLaneCreepCount(bot, p, O, P)
-		local R = 0
-		if p > 1600 then
-			p = 1600
+	function Fu.GetInLocLaneCreepCount(bot, range, radius, location)
+		local count = 0
+		if range > 1600 then
+			range = 1600
 		end
-		local M = bot:GetNearbyLaneCreeps(p, true)
-		for m, S in pairs(M) do
-			if GetUnitToLocationDistance(S, P) <= O then
-				R = R + 1
+		local units = bot:GetNearbyLaneCreeps(range, true)
+		for _, creep in pairs(units) do
+			if GetUnitToLocationDistance(creep, location) <= radius then
+				count = count + 1
 			end
 		end
-		return R
+		return count
 	end
-	function b.GetInvUnitCount(Q, M)
-		local R = 0
-		if M ~= nil then
-			for m, S in pairs(M) do
-				if Q and b.CanCastOnMagicImmune(S) or not Q and b.CanCastOnNonMagicImmune(S) then
-					R = R + 1
+	function Fu.GetInvUnitCount(includeMagicImmune, units)
+		local count = 0
+		if units ~= nil then
+			for _, unit in pairs(units) do
+				if
+					includeMagicImmune and Fu.CanCastOnMagicImmune(unit)
+					or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(unit)
+				then
+					count = count + 1
 				end
 			end
 		end
-		return R
+		return count
 	end
-	function b.GetAroundTargetAllyHeroCount(o, p)
-		local T = b.GetAlliesNearLoc(o:GetLocation(), p)
-		return #T
+	function Fu.GetAroundTargetAllyHeroCount(target, radius)
+		local allies = Fu.GetAlliesNearLoc(target:GetLocation(), radius)
+		return #allies
 	end
-	function b.GetAroundTargetOtherAllyHeroCount(bot, o, p)
-		local T = b.GetAlliesNearLoc(o:GetLocation(), p)
-		if GetUnitToUnitDistance(bot, o) <= p then
-			return #T - 1
+	function Fu.GetAroundTargetOtherAllyHeroCount(bot, target, radius)
+		local allies = Fu.GetAlliesNearLoc(target:GetLocation(), radius)
+		if GetUnitToUnitDistance(bot, target) <= radius then
+			return #allies - 1
 		end
-		return #T
+		return #allies
 	end
-	function b.GetAllyCreepNearLoc(bot, v, p)
-		local U = bot:GetNearbyCreeps(1600, false)
-		local V = {}
-		for m, A in pairs(U) do
-			if A ~= nil and A:IsAlive() and GetUnitToLocationDistance(A, v) <= p then
-				table.insert(V, A)
+	function Fu.GetAllyCreepNearLoc(bot, location, radius)
+		local creeps = bot:GetNearbyCreeps(1600, false)
+		local nearCreeps = {}
+		for _, creep in pairs(creeps) do
+			if creep ~= nil and creep:IsAlive() and GetUnitToLocationDistance(creep, location) <= radius then
+				table.insert(nearCreeps, creep)
 			end
 		end
-		return V
+		return nearCreeps
 	end
-	function b.GetAllyUnitCountAroundEnemyTarget(bot, o, p)
-		local T = b.GetAlliesNearLoc(o:GetLocation(), p)
-		local W = b.GetAllyCreepNearLoc(bot, o:GetLocation(), p)
-		return #T + #W
+	function Fu.GetAllyUnitCountAroundEnemyTarget(bot, target, radius)
+		local allies = Fu.GetAlliesNearLoc(target:GetLocation(), radius)
+		local creeps = Fu.GetAllyCreepNearLoc(bot, target:GetLocation(), radius)
+		return #allies + #creeps
 	end
-	local X = 0.15
-	local function Y(bot, Z, _)
+	local CACHE_TTL = 0.15
+	local function GetFrameCached(bot, key, maxAge)
 		if bot._fc == nil then
 			return nil
 		end
-		local a0 = bot._fc[Z]
-		if a0 and DotaTime() - a0[1] <= (_ or X) then
-			return a0[2]
+		local entry = bot._fc[key]
+		if entry and DotaTime() - entry[1] <= (maxAge or CACHE_TTL) then
+			return entry[2]
 		end
 		return nil
 	end
-	local function a1(bot, Z, a2)
+	local function SetFrameCached(bot, key, value)
 		if bot._fc == nil then
 			bot._fc = {}
 		end
-		bot._fc[Z] = { DotaTime(), a2 }
+		bot._fc[key] = { DotaTime(), value }
 	end
-	function b.GetNearbyHeroes(bot, p, t, a3)
-		if not a3 then
-			a3 = BOT_MODE_NONE
+	function Fu.GetNearbyHeroes(bot, radius, isEnemy, mode)
+		if not mode then
+			mode = BOT_MODE_NONE
 		end
-		local a4 = bot:GetNearbyHeroes(p, t, a3)
-		if not a4 then
-			return a4
+		local heroes = bot:GetNearbyHeroes(radius, isEnemy, mode)
+		if not heroes then
+			return heroes
 		end
-		local a5 = {}
-		for m, n in pairs(a4) do
+		local result = {}
+		for _, hero in pairs(heroes) do
 			if
-				b.IsValidHero(n)
-				and not b.IsMeepoClone(n)
+				Fu.IsValidHero(hero)
+				and not Fu.IsMeepoClone(hero)
 				and not bot:HasModifier("modifier_arc_warden_tempest_double")
 			then
-				table.insert(a5, n)
+				table.insert(result, hero)
 			end
 		end
-		return a5
+		return result
 	end
-	function b.GetAroundBotUnitList(bot, p, t)
-		if p > 1600 then
-			p = 1600
+	function Fu.GetAroundBotUnitList(bot, radius, isEnemy)
+		if radius > 1600 then
+			radius = 1600
 		end
-		local T = b.GetNearbyHeroes(bot, p, t, BOT_MODE_NONE)
-		local W = bot:GetNearbyCreeps(p, t)
-		local M = {}
-		if #T > 0 and #W > 0 then
-			M = T
-			for C = 1, #W do
-				table.insert(M, W[1])
+		local heroes = Fu.GetNearbyHeroes(bot, radius, isEnemy, BOT_MODE_NONE)
+		local creeps = bot:GetNearbyCreeps(radius, isEnemy)
+		local units = {}
+		if #heroes > 0 and #creeps > 0 then
+			units = heroes
+			for i = 1, #creeps do
+				table.insert(units, creeps[1])
 			end
-		elseif #T == 0 then
-			M = W
-		elseif #W == 0 then
-			M = T
+		elseif #heroes == 0 then
+			units = creeps
+		elseif #creeps == 0 then
+			units = heroes
 		end
-		return M
+		return units
 	end
-	function b.GetAllyList(bot, p)
-		if p > 1600 then
-			p = 1600
+	function Fu.GetAllyList(bot, radius)
+		if radius > 1600 then
+			radius = 1600
 		end
-		local a6 = {}
-		local a7 = b.GetNearbyHeroes(bot, p, false, BOT_MODE_NONE)
-		if #a7 <= 1 then
-			return a7
+		local allies = {}
+		local heroes = Fu.GetNearbyHeroes(bot, radius, false, BOT_MODE_NONE)
+		if #heroes <= 1 then
+			return heroes
 		end
-		for m, a8 in pairs(a7) do
-			if a8 ~= nil and a8:IsAlive() and not a8:IsIllusion() then
-				table.insert(a6, a8)
-			end
-		end
-		return a6
-	end
-	function b.GetAllyCount(bot, p)
-		local a6 = b.GetAllyList(bot, p)
-		return #a6
-	end
-	function b.GetAroundEnemyHeroList(p)
-		if p > 1600 then
-			p = 1600
-		end
-		return b.GetNearbyHeroes(GetBot(), p, true, BOT_MODE_NONE)
-	end
-	function b.GetEnemyList(bot, p)
-		if p > 1600 then
-			p = 1600
-		end
-		local a9 = {}
-		local a7 = b.GetNearbyHeroes(bot, p, true, BOT_MODE_NONE)
-		if a7[1] == nil then
-			return a7
-		end
-		for m, aa in pairs(a7) do
-			if aa ~= nil and type(aa) == "table" and aa:IsAlive() and not b.IsSuspiciousIllusion(aa) then
-				table.insert(a9, aa)
+		for _, ally in pairs(heroes) do
+			if ally ~= nil and ally:IsAlive() and not ally:IsIllusion() then
+				table.insert(allies, ally)
 			end
 		end
-		return a9
+		return allies
 	end
-	function b.GetEnemyCount(bot, p)
-		local a9 = b.GetEnemyList(bot, p)
-		return #a9
+	function Fu.GetAllyCount(bot, radius)
+		local allies = Fu.GetAllyList(bot, radius)
+		return #allies
 	end
-	function b.GetLastSeenEnemiesNearLoc(v, p)
-		local E = {}
-		for C, ab in pairs(GetTeamPlayers(GetOpposingTeam())) do
-			if IsHeroAlive(ab) then
-				local ac = GetHeroLastSeenInfo(ab)
-				if ac ~= nil then
-					local ad = ac[1]
+	function Fu.GetAroundEnemyHeroList(radius)
+		if radius > 1600 then
+			radius = 1600
+		end
+		return Fu.GetNearbyHeroes(GetBot(), radius, true, BOT_MODE_NONE)
+	end
+	function Fu.GetEnemyList(bot, radius)
+		if radius > 1600 then
+			radius = 1600
+		end
+		local enemies = {}
+		local heroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+		if heroes[1] == nil then
+			return heroes
+		end
+		for _, enemy in pairs(heroes) do
+			if enemy ~= nil and type(enemy) == "table" and enemy:IsAlive() and not Fu.IsSuspiciousIllusion(enemy) then
+				table.insert(enemies, enemy)
+			end
+		end
+		return enemies
+	end
+	function Fu.GetEnemyCount(bot, radius)
+		local enemies = Fu.GetEnemyList(bot, radius)
+		return #enemies
+	end
+	function Fu.GetLastSeenEnemiesNearLoc(location, radius)
+		local enemies = {}
+		for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(playerId) then
+				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+				if lastSeenInfo ~= nil then
+					local lastSeen = lastSeenInfo[1]
 					if
-						ad ~= nil
-						and b.GetLocationToLocationDistance(v, ad.location) <= p
-						and ad.time_since_seen < 5.0
+						lastSeen ~= nil
+						and Fu.GetLocationToLocationDistance(location, lastSeen.location) <= radius
+						and lastSeen.time_since_seen < 5.0
 					then
-						table.insert(E, ab)
+						table.insert(enemies, playerId)
 					end
 				end
 			end
 		end
-		return E
+		return enemies
 	end
-	function b.GetNumOfAliveHeroes(t)
+	function Fu.GetNumOfAliveHeroes(isEnemy)
 		local bot = GetBot()
-		local ae = GetTeam()
-		if t then
-			ae = GetOpposingTeam()
+		local team = GetTeam()
+		if isEnemy then
+			team = GetOpposingTeam()
 		end
-		local af = 80000 + ae
-		local ag = Y(bot, af, 1.0)
-		if ag then
-			return ag
+		local cacheKey = 80000 + team
+		local cached = GetFrameCached(bot, cacheKey, 1.0)
+		if cached then
+			return cached
 		end
-		local ah = 0
-		for C, ab in pairs(GetTeamPlayers(ae)) do
-			if IsHeroAlive(ab) then
-				ah = ah + 1
+		local count = 0
+		for _, playerId in pairs(GetTeamPlayers(team)) do
+			if IsHeroAlive(playerId) then
+				count = count + 1
 			end
 		end
-		a1(bot, af, ah)
-		return ah
+		SetFrameCached(bot, cacheKey, count)
+		return count
 	end
-	function b.GetHeroesNearLocation(t, ai, aj)
-		local a5 = {}
-		local T = t and e(UNIT_LIST_ENEMY_HEROES) or e(UNIT_LIST_ALLIED_HEROES)
-		for m, n in pairs(T) do
-			if n ~= nil and n:IsAlive() and n:CanBeSeen() and GetUnitToLocationDistance(n, ai) <= aj then
-				table.insert(a5, n)
+	function Fu.GetHeroesNearLocation(isEnemy, location, radius)
+		local result = {}
+		local heroes = isEnemy and GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)
+			or GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)
+		for _, hero in pairs(heroes) do
+			if
+				hero ~= nil
+				and hero:IsAlive()
+				and hero:CanBeSeen()
+				and GetUnitToLocationDistance(hero, location) <= radius
+			then
+				table.insert(result, hero)
 			end
 		end
-		return a5
+		return result
 	end
-	function b.GetAverageLevel(t)
+	function Fu.GetAverageLevel(isEnemy)
 		local bot = GetBot()
-		local ae = GetTeam()
-		if t then
-			ae = GetOpposingTeam()
+		local team = GetTeam()
+		if isEnemy then
+			team = GetOpposingTeam()
 		end
-		local af = 81000 + ae
-		local ag = Y(bot, af, 2.0)
-		if ag then
-			return ag
+		local cacheKey = 81000 + team
+		local cached = GetFrameCached(bot, cacheKey, 2.0)
+		if cached then
+			return cached
 		end
-		local ah = 0
-		local ak = 0
-		for C, ab in pairs(GetTeamPlayers(ae)) do
-			ak = ak + GetHeroLevel(ab)
-			ah = ah + 1
+		local count = 0
+		local totalLevel = 0
+		for _, playerId in pairs(GetTeamPlayers(team)) do
+			totalLevel = totalLevel + GetHeroLevel(playerId)
+			count = count + 1
 		end
-		local al = ak / ah
-		a1(bot, af, al)
-		return al
+		local averageLevel = totalLevel / count
+		SetFrameCached(bot, cacheKey, averageLevel)
+		return averageLevel
 	end
-	function b.GetNumOfTeamTotalKills(t)
-		local ah = 0
-		local ae = GetOpposingTeam()
-		if t then
-			ae = GetTeam()
+	function Fu.GetNumOfTeamTotalKills(isEnemy)
+		local count = 0
+		local team = GetOpposingTeam()
+		if isEnemy then
+			team = GetTeam()
 		end
-		local am = b.CK
-		if am then
-			local an = b.Utils.GetCachedVars(am.NUM_TEAM_TOTAL_KILLS + ae, 1)
-			if an ~= nil then
-				return an
+		local cacheKeys = Fu.CK
+		if cacheKeys then
+			local cached = Fu.Utils.GetCachedVars(cacheKeys.NUM_TEAM_TOTAL_KILLS + team, 1)
+			if cached ~= nil then
+				return cached
 			end
 		end
-		for C, ab in pairs(GetTeamPlayers(ae)) do
-			ah = ah + GetHeroDeaths(ab)
+		for _, playerId in pairs(GetTeamPlayers(team)) do
+			count = count + GetHeroDeaths(playerId)
 		end
-		if am then
-			b.Utils.SetCachedVars(am.NUM_TEAM_TOTAL_KILLS + ae, ah)
+		if cacheKeys then
+			Fu.Utils.SetCachedVars(cacheKeys.NUM_TEAM_TOTAL_KILLS + team, count)
 		end
-		return ah
+		return count
 	end
-	function b.GetUnitWithMinDistanceToLoc(I, ao, ap, aq, v)
-		local ar = ap
-		local as = aq
-		for C = 1, #ao do
-			if ao[C] ~= nil and ao[C] ~= I and b.CanCastOnNonMagicImmune(ao[C]) then
-				local at = GetUnitToLocationDistance(ao[C], v)
-				if at < as then
-					as = at
-					ar = ao[C]
+	function Fu.GetUnitWithMinDistanceToLoc(sourceUnit, units, defaultUnit, defaultDistance, location)
+		local closestUnit = defaultUnit
+		local closestDistance = defaultDistance
+		for i = 1, #units do
+			if units[i] ~= nil and units[i] ~= sourceUnit and Fu.CanCastOnNonMagicImmune(units[i]) then
+				local distance = GetUnitToLocationDistance(units[i], location)
+				if distance < closestDistance then
+					closestDistance = distance
+					closestUnit = units[i]
 				end
 			end
 		end
-		return as, ar
+		return closestDistance, closestUnit
 	end
-	function b.GetUnitWithMaxDistanceToLoc(I, ao, ap, aq, v)
-		local au = ap
-		local av = aq
-		for C = 1, #ao do
-			if ao[C] ~= nil and ao[C] ~= I and b.CanCastOnNonMagicImmune(ao[C]) then
-				local at = GetUnitToLocationDistance(ao[C], v)
-				if at > av then
-					av = at
-					au = ao[C]
+	function Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, units, defaultUnit, defaultDistance, location)
+		local farthestUnit = defaultUnit
+		local farthestDistance = defaultDistance
+		for i = 1, #units do
+			if units[i] ~= nil and units[i] ~= sourceUnit and Fu.CanCastOnNonMagicImmune(units[i]) then
+				local distance = GetUnitToLocationDistance(units[i], location)
+				if distance > farthestDistance then
+					farthestDistance = distance
+					farthestUnit = units[i]
 				end
 			end
 		end
-		return av, au
+		return farthestDistance, farthestUnit
 	end
-	function b.GetFurthestUnitToLocationFrommAll(I, aw, v)
-		local ax = b.GetNearbyHeroes(I, aw, false, BOT_MODE_NONE)
-		local ay = b.GetNearbyHeroes(I, aw, true, BOT_MODE_NONE)
-		local az = I:GetNearbyLaneCreeps(aw, false)
-		local aA = I:GetNearbyLaneCreeps(aw, true)
-		local aB = GetUnitToLocationDistance(I, v)
-		local aC = I
-		aB, aC = b.GetUnitWithMaxDistanceToLoc(I, ax, aC, aB, v)
-		aB, aC = b.GetUnitWithMaxDistanceToLoc(I, ay, aC, aB, v)
-		aB, aC = b.GetUnitWithMaxDistanceToLoc(I, az, aC, aB, v)
-		aB, aC = b.GetUnitWithMaxDistanceToLoc(I, aA, aC, aB, v)
-		if aC ~= I then
-			return aC
+	function Fu.GetFurthestUnitToLocationFrommAll(sourceUnit, radius, location)
+		local allies = Fu.GetNearbyHeroes(sourceUnit, radius, false, BOT_MODE_NONE)
+		local enemies = Fu.GetNearbyHeroes(sourceUnit, radius, true, BOT_MODE_NONE)
+		local allyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, false)
+		local enemyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, true)
+		local distance = GetUnitToLocationDistance(sourceUnit, location)
+		local farthestUnit = sourceUnit
+		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, allies, farthestUnit, distance, location)
+		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, enemies, farthestUnit, distance, location)
+		distance, farthestUnit =
+			Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, allyCreeps, farthestUnit, distance, location)
+		distance, farthestUnit =
+			Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, enemyCreeps, farthestUnit, distance, location)
+		if farthestUnit ~= sourceUnit then
+			return farthestUnit
 		end
 		return nil
 	end
-	function b.GetClosestUnitToLocationFrommAll(I, aw, v)
-		local ax = b.GetNearbyHeroes(I, aw, false, BOT_MODE_NONE)
-		local ay = b.GetNearbyHeroes(I, aw, true, BOT_MODE_NONE)
-		local az = I:GetNearbyLaneCreeps(aw, false)
-		local aA = I:GetNearbyLaneCreeps(aw, true)
-		local aB = GetUnitToLocationDistance(I, v)
-		local aD = I
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, ax, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, ay, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, az, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, aA, aD, aB, v)
-		if aD ~= I then
-			return aD
+	function Fu.GetClosestUnitToLocationFrommAll(sourceUnit, radius, location)
+		local allies = Fu.GetNearbyHeroes(sourceUnit, radius, false, BOT_MODE_NONE)
+		local enemies = Fu.GetNearbyHeroes(sourceUnit, radius, true, BOT_MODE_NONE)
+		local allyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, false)
+		local enemyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, true)
+		local distance = GetUnitToLocationDistance(sourceUnit, location)
+		local closestUnit = sourceUnit
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, allies, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, enemies, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, allyCreeps, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, enemyCreeps, closestUnit, distance, location)
+		if closestUnit ~= sourceUnit then
+			return closestUnit
 		end
 		return nil
 	end
-	function b.GetClosestUnitToLocationFrommAll2(I, aw, v)
-		local ax = b.GetNearbyHeroes(I, aw, false, BOT_MODE_NONE)
-		local ay = b.GetNearbyHeroes(I, aw, true, BOT_MODE_NONE)
-		local az = I:GetNearbyLaneCreeps(aw, false)
-		local aA = I:GetNearbyLaneCreeps(aw, true)
-		local aB = 10000
-		local aD = nil
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, ax, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, ay, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, az, aD, aB, v)
-		aB, aD = b.GetUnitWithMinDistanceToLoc(I, aA, aD, aB, v)
-		if aD ~= nil then
-			return aD
+	function Fu.GetClosestUnitToLocationFrommAll2(sourceUnit, radius, location)
+		local allies = Fu.GetNearbyHeroes(sourceUnit, radius, false, BOT_MODE_NONE)
+		local enemies = Fu.GetNearbyHeroes(sourceUnit, radius, true, BOT_MODE_NONE)
+		local allyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, false)
+		local enemyCreeps = sourceUnit:GetNearbyLaneCreeps(radius, true)
+		local distance = 10000
+		local closestUnit = nil
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, allies, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, enemies, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, allyCreeps, closestUnit, distance, location)
+		distance, closestUnit = Fu.GetUnitWithMinDistanceToLoc(sourceUnit, enemyCreeps, closestUnit, distance, location)
+		if closestUnit ~= nil then
+			return closestUnit
 		end
 		return nil
 	end
-	function b.GetAliveAllyCoreCount()
-		local ah = 0
-		for m, aE in pairs(e(UNIT_LIST_ALLIED_HEROES)) do
-			if b.IsValidHero(aE) and b.IsCore(aE) and not aE:IsIllusion() then
-				ah = ah + 1
+	function Fu.GetAliveAllyCoreCount()
+		local count = 0
+		for _, ally in pairs(GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)) do
+			if Fu.IsValidHero(ally) and Fu.IsCore(ally) and not ally:IsIllusion() then
+				count = count + 1
 			end
 		end
-		return ah
+		return count
 	end
-	function b.GetMeepos()
-		local aF = {}
-		for m, aE in pairs(e(UNIT_LIST_ALLIED_HEROES)) do
-			if b.IsValidHero(aE) and aE:GetUnitName() == "npc_dota_hero_meepo" and not b.IsSuspiciousIllusion(aE) then
-				table.insert(aF, aE)
+	function Fu.GetMeepos()
+		local meepos = {}
+		for _, ally in pairs(GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)) do
+			if
+				Fu.IsValidHero(ally)
+				and ally:GetUnitName() == "npc_dota_hero_meepo"
+				and not Fu.IsSuspiciousIllusion(ally)
+			then
+				table.insert(meepos, ally)
 			end
 		end
-		return aF
+		return meepos
 	end
-	function b.NumHumanBotPlayersInTeam()
-		local aG, aH = 0, 0
-		for m, D in pairs(GetTeamPlayers(GetTeam())) do
-			if not IsPlayerBot(D) then
-				aG = aG + 1
+	function Fu.NumHumanBotPlayersInTeam()
+		local humanCount, botCount = 0, 0
+		for _, playerId in pairs(GetTeamPlayers(GetTeam())) do
+			if not IsPlayerBot(playerId) then
+				humanCount = humanCount + 1
 			else
-				aH = aH + 1
+				botCount = botCount + 1
 			end
 		end
-		return aG, aH
+		return humanCount, botCount
 	end
-	function b.GetEnemiesAroundAncient(bot, p)
+	function Fu.GetEnemiesAroundAncient(bot, radius)
 		if bot == nil then
 			bot = GetBot()
 		end
-		return b.GetEnemiesAroundLoc(GetAncient(bot:GetTeam()):GetLocation(), p)
+		return Fu.GetEnemiesAroundLoc(GetAncient(bot:GetTeam()):GetLocation(), radius)
 	end
-	function b.GetEnemiesAroundLoc(v, p)
-		if not p then
-			p = 2000
+	function Fu.GetEnemiesAroundLoc(location, radius)
+		if not radius then
+			radius = 2000
 		end
-		local aI = 0
-		local aJ = GetAncient(GetBot():GetTeam()):GetLocation()
-		for m, ab in pairs(GetTeamPlayers(GetOpposingTeam())) do
-			if IsHeroAlive(ab) then
-				local ac = GetHeroLastSeenInfo(ab)
-				if ac ~= nil then
-					local ad = ac[1]
+		local threat = 0
+		local ancientLocation = GetAncient(GetBot():GetTeam()):GetLocation()
+		for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(playerId) then
+				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+				if lastSeenInfo ~= nil then
+					local lastSeen = lastSeenInfo[1]
 					if
-						ad ~= nil
-						and b.GetLocationToLocationDistance(v, ad.location) <= p
-						and ad.time_since_seen < 5.0
+						lastSeen ~= nil
+						and Fu.GetLocationToLocationDistance(location, lastSeen.location) <= radius
+						and lastSeen.time_since_seen < 5.0
 					then
-						aI = aI + GetHeroLevel(ab) / 3
-						if b.GetLocationToLocationDistance(aJ, v) < 1600 then
-							aI = aI + 2
+						threat = threat + GetHeroLevel(playerId) / 3
+						if Fu.GetLocationToLocationDistance(ancientLocation, location) < 1600 then
+							threat = threat + 2
 						end
 					end
 				end
 			end
 		end
-		for m, x in pairs(e(UNIT_LIST_ENEMIES)) do
-			if b.IsValid(x) and GetUnitToLocationDistance(x, v) <= p then
-				local aK = x:GetUnitName()
-				if x:IsCreep() then
-					aI = aI + 1
+		for _, unit in pairs(GetCachedUnitList(UNIT_LIST_ENEMIES)) do
+			if Fu.IsValid(unit) and GetUnitToLocationDistance(unit, location) <= radius then
+				local unitName = unit:GetUnitName()
+				if unit:IsCreep() then
+					threat = threat + 1
 					if
-						x:IsAncientCreep()
-						or x:HasModifier("modifier_chen_holy_persuasion")
-						or x:HasModifier("modifier_dominated")
+						unit:IsAncientCreep()
+						or unit:HasModifier("modifier_chen_holy_persuasion")
+						or unit:HasModifier("modifier_dominated")
 					then
-						aI = aI + 1
+						threat = threat + 1
 					end
-				elseif string.find(x:GetUnitName(), "spiderling") then
-					aI = aI + 0.1
-				elseif string.find(x:GetUnitName(), "eidolon") then
-					aI = aI + 0.3
-				elseif string.find(aK, "siege") and not string.find(aK, "upgraded") then
-					aI = aI + 0.6
-				elseif string.find(aK, "upgraded") then
-					aI = aI + 1
-				elseif string.find(aK, "warlock_golem") then
+				elseif string.find(unit:GetUnitName(), "spiderling") then
+					threat = threat + 0.1
+				elseif string.find(unit:GetUnitName(), "eidolon") then
+					threat = threat + 0.3
+				elseif string.find(unitName, "siege") and not string.find(unitName, "upgraded") then
+					threat = threat + 0.6
+				elseif string.find(unitName, "upgraded") then
+					threat = threat + 1
+				elseif string.find(unitName, "warlock_golem") then
 					if DotaTime() < 10 * 60 then
-						aI = aI + 3
+						threat = threat + 3
 					elseif DotaTime() < 20 * 60 then
-						aI = aI + 2.5
+						threat = threat + 2.5
 					elseif DotaTime() < 30 * 60 then
-						aI = aI + 2
+						threat = threat + 2
 					else
-						aI = aI + 1.5
+						threat = threat + 1.5
 					end
-				elseif string.find(aK, "lone_druid_bear") then
-					aI = aI + 3
-				elseif string.find(aK, "shadow_shaman_ward") then
-					aI = aI + 2
-				elseif string.find(x:GetUnitName(), "tombstone") then
-					aI = aI + 2
-				elseif b.IsSuspiciousIllusion(x) then
+				elseif string.find(unitName, "lone_druid_bear") then
+					threat = threat + 3
+				elseif string.find(unitName, "shadow_shaman_ward") then
+					threat = threat + 2
+				elseif string.find(unit:GetUnitName(), "tombstone") then
+					threat = threat + 2
+				elseif Fu.IsSuspiciousIllusion(unit) then
 					if
-						x:HasModifier("modifier_arc_warden_tempest_double")
-						or string.find(x:GetUnitName(), "chaos_knight")
-						or string.find(x:GetUnitName(), "naga_siren")
+						unit:HasModifier("modifier_arc_warden_tempest_double")
+						or string.find(unit:GetUnitName(), "chaos_knight")
+						or string.find(unit:GetUnitName(), "naga_siren")
 					then
-						aI = aI + 2
+						threat = threat + 2
 					end
-				elseif not (string.find(aK, "observer_wards") or string.find(aK, "sentry_wards")) then
-					aI = aI + 1
+				elseif not (string.find(unitName, "observer_wards") or string.find(unitName, "sentry_wards")) then
+					threat = threat + 1
 				end
-				if b.GetLocationToLocationDistance(aJ, v) < 1600 then
-					aI = aI + 2
+				if Fu.GetLocationToLocationDistance(ancientLocation, location) < 1600 then
+					threat = threat + 2
 				end
 			end
 		end
-		return aI
+		return threat
 	end
-	local aL = {}
-	local aM = {}
-	function b.GetInventoryNetworth()
-		local aN = 0
-		local aO = 0
+	local allyNetworths = {}
+	local enemyNetworths = {}
+	function Fu.GetInventoryNetworth()
+		local allyNetworth = 0
+		local enemyNetworth = 0
 		if math.floor(DotaTime()) % 2 == 0 then
-			for C = 1, #GetTeamPlayers(GetTeam()) do
-				local a8 = GetTeamMember(C)
-				if a8 then
-					local aP = 0
-					for aQ = 0, 8 do
-						local aR = a8:GetItemInSlot(aQ)
-						if aR then
-							aP = aP + GetItemCost(aR:GetName())
+			for i = 1, #GetTeamPlayers(GetTeam()) do
+				local member = GetTeamMember(i)
+				if member then
+					local itemsCost = 0
+					for slot = 0, 8 do
+						local item = member:GetItemInSlot(slot)
+						if item then
+							itemsCost = itemsCost + GetItemCost(item:GetName())
 						end
 					end
-					local ab = a8:GetPlayerID()
-					if aL[ab] == nil then
-						aL[ab] = 0
+					local playerId = member:GetPlayerID()
+					if allyNetworths[playerId] == nil then
+						allyNetworths[playerId] = 0
 					end
-					if aL[ab] < aP then
-						aL[ab] = aP
+					if allyNetworths[playerId] < itemsCost then
+						allyNetworths[playerId] = itemsCost
 					end
 				end
 			end
-			for m, aa in pairs(e(UNIT_LIST_ENEMY_HEROES)) do
+			for _, enemy in pairs(GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)) do
 				if
-					b.IsValidHero(aa)
-					and not b.IsSuspiciousIllusion(aa)
-					and not aa:HasModifier("modifier_arc_warden_tempest_double")
-					and not string.find(aa:GetUnitName(), "lone_druid_bear")
-					and not b.IsMeepoClone(aa)
+					Fu.IsValidHero(enemy)
+					and not Fu.IsSuspiciousIllusion(enemy)
+					and not enemy:HasModifier("modifier_arc_warden_tempest_double")
+					and not string.find(enemy:GetUnitName(), "lone_druid_bear")
+					and not Fu.IsMeepoClone(enemy)
 				then
-					local ab = aa:GetPlayerID()
-					local aP = 0
-					for C = 0, 8 do
-						local aR = aa:GetItemInSlot(C)
-						if aR then
-							aP = aP + GetItemCost(aR:GetName())
+					local playerId = enemy:GetPlayerID()
+					local itemsCost = 0
+					for i = 0, 8 do
+						local item = enemy:GetItemInSlot(i)
+						if item then
+							itemsCost = itemsCost + GetItemCost(item:GetName())
 						end
 					end
-					if aM[ab] == nil then
-						aM[ab] = 0
+					if enemyNetworths[playerId] == nil then
+						enemyNetworths[playerId] = 0
 					end
-					if aM[ab] < aP then
-						aM[ab] = aP
+					if enemyNetworths[playerId] < itemsCost then
+						enemyNetworths[playerId] = itemsCost
 					end
 				end
 			end
 		end
-		for m, aS in pairs(aL) do
-			aN = aN + aS
+		for _, networth in pairs(allyNetworths) do
+			allyNetworth = allyNetworth + networth
 		end
-		for m, aS in pairs(aM) do
-			aO = aO + aS
+		for _, networth in pairs(enemyNetworths) do
+			enemyNetworth = enemyNetworth + networth
 		end
-		return aN, aO
+		return allyNetworth, enemyNetworth
 	end
-	function b.GetAliveCoreCount(aT)
+	function Fu.GetAliveCoreCount(isEnemy)
 		local bot = GetBot()
-		local af = 82000 + (aT and 1 or 0)
-		local ag = Y(bot, af, 1.0)
-		if ag then
-			return ag
+		local cacheKey = 82000 + (isEnemy and 1 or 0)
+		local cached = GetFrameCached(bot, cacheKey, 1.0)
+		if cached then
+			return cached
 		end
-		local ah = 0
-		if aT then
-			for m, F in pairs(e(UNIT_LIST_ENEMY_HEROES)) do
-				if b.IsValidHero(F) and not b.IsSuspiciousIllusion(F) and b.IsCore(F) then
-					ah = ah + 1
+		local count = 0
+		if isEnemy then
+			for _, enemyHero in pairs(GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)) do
+				if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and Fu.IsCore(enemyHero) then
+					count = count + 1
 				end
 			end
 		else
-			for m, aE in pairs(e(UNIT_LIST_ALLIED_HEROES)) do
-				if b.IsValidHero(aE) and not aE:IsIllusion() and b.IsCore(aE) then
-					ah = ah + 1
+			for _, ally in pairs(GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)) do
+				if Fu.IsValidHero(ally) and not ally:IsIllusion() and Fu.IsCore(ally) then
+					count = count + 1
 				end
 			end
 		end
-		a1(bot, af, ah)
-		return ah
+		SetFrameCached(bot, cacheKey, count)
+		return count
 	end
-	function b.GetEnemyCountInLane(aU)
-		local ah = 0
-		local aV = GetLaneFrontLocation(GetTeam(), aU, 0)
-		for m, ab in pairs(GetTeamPlayers(GetOpposingTeam())) do
-			if IsHeroAlive(ab) then
-				local ac = GetHeroLastSeenInfo(ab)
-				if ac ~= nil then
-					local ad = ac[1]
-					if ad ~= nil and b.GetDistance(aV, ad.location) < 1600 and ad.time_since_seen < 6 then
-						ah = ah + 1
+	function Fu.GetEnemyCountInLane(lane)
+		local count = 0
+		local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
+		for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(playerId) then
+				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+				if lastSeenInfo ~= nil then
+					local lastSeen = lastSeenInfo[1]
+					if
+						lastSeen ~= nil
+						and Fu.GetDistance(laneFront, lastSeen.location) < 1600
+						and lastSeen.time_since_seen < 6
+					then
+						count = count + 1
 					end
 				end
 			end
 		end
-		return ah
+		return count
 	end
-	function b.GetCreepListAroundTargetCanKill(o, p, aW, t, aX, aY)
-		if p > 1600 then
-			p = 1600
+	function Fu.GetCreepListAroundTargetCanKill(target, radius, maxHealth, isEnemy, neutralsOnly, creepsOnly)
+		if radius > 1600 then
+			radius = 1600
 		end
-		local W = {}
-		if o ~= nil then
-			if aX then
-				for m, A in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
-					if b.IsValid(A) and o ~= A and GetUnitToUnitDistance(o, A) <= p and A:GetHealth() <= aW then
-						table.insert(W, A)
+		local creeps = {}
+		if target ~= nil then
+			if neutralsOnly then
+				for _, creep in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
+						table.insert(creeps, creep)
 					end
 				end
-			elseif aY then
-				local M = GetUnitList(UNIT_LIST_ALLIED_CREEPS)
-				if t then
-					M = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
+			elseif creepsOnly then
+				local units = GetUnitList(UNIT_LIST_ALLIED_CREEPS)
+				if isEnemy then
+					units = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
 				end
-				for m, A in pairs(M) do
-					if b.IsValid(A) and o ~= A and GetUnitToUnitDistance(o, A) <= p and A:GetHealth() <= aW then
-						table.insert(W, A)
+				for _, creep in pairs(units) do
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
+						table.insert(creeps, creep)
 					end
 				end
 			else
-				local M = GetUnitList(UNIT_LIST_ALLIED_CREEPS)
-				if t then
-					M = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
+				local units = GetUnitList(UNIT_LIST_ALLIED_CREEPS)
+				if isEnemy then
+					units = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
 				end
-				for m, A in pairs(M) do
-					if b.IsValid(A) and o ~= A and GetUnitToUnitDistance(o, A) <= p and A:GetHealth() <= aW then
-						table.insert(W, A)
+				for _, creep in pairs(units) do
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
+						table.insert(creeps, creep)
 					end
 				end
-				M = GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)
-				for m, A in pairs(M) do
-					if b.IsValid(A) and o ~= A and GetUnitToUnitDistance(o, A) <= p and A:GetHealth() <= aW then
-						table.insert(W, A)
+				units = GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)
+				for _, creep in pairs(units) do
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
+						table.insert(creeps, creep)
 					end
 				end
 			end
 		end
-		return W
+		return creeps
 	end
 end
-return a
+return installTeamInfo

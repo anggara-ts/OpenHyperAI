@@ -1,421 +1,449 @@
 -- Shared bot system: role.
-local a = {}
-local b = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local c = b.GameMode
-local d = b.GameState
-local e = b.Lane
-local f = b.Team
-local g = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local h = g.NumHumanBotPlayersInTeam
-local i = require(GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
-local j = require(GetScriptDirectory() .. "/FuncLib/hero/enemy_role_estimation")
-local k = j.GetEnemyPosition
-a.RoleAssignment = { TEAM_RADIANT = { 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5 }, TEAM_DIRE = {
-	1,
-	2,
-	3,
-	4,
-	5,
-	1,
-	2,
-	3,
-	4,
-	5,
-	1,
-	2,
-	3,
-	4,
-	5,
-} }
-a.IsCarry = function(l)
-	return i.IsCarry(l)
+local Role = {}
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local GameMode = Dota.GameMode
+local GameState = Dota.GameState
+local Lane = Dota.Lane
+local Team = Dota.Team
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local NumHumanBotPlayersInTeam = Utils.NumHumanBotPlayersInTeam
+local HeroRolesMap = require(GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
+local EnemyRoleEstimation = require(GetScriptDirectory() .. "/FuncLib/hero/enemy_role_estimation")
+local GetEnemyPosition = EnemyRoleEstimation.GetEnemyPosition
+Role.RoleAssignment = {
+	TEAM_RADIANT = { 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5 },
+	TEAM_DIRE = {
+		1,
+		2,
+		3,
+		4,
+		5,
+		1,
+		2,
+		3,
+		4,
+		5,
+		1,
+		2,
+		3,
+		4,
+		5,
+	},
+}
+Role.IsCarry = function(heroName)
+	return HeroRolesMap.IsCarry(heroName)
 end
-a.IsDisabler = function(l)
-	return i.IsDisabler(l)
+Role.IsDisabler = function(heroName)
+	return HeroRolesMap.IsDisabler(heroName)
 end
-a.IsDurable = function(l)
-	return i.IsDurable(l)
+Role.IsDurable = function(heroName)
+	return HeroRolesMap.IsDurable(heroName)
 end
-a.HasEscape = function(l)
-	return i.HasEscape(l)
+Role.HasEscape = function(heroName)
+	return HeroRolesMap.HasEscape(heroName)
 end
-a.IsInitiator = function(l)
-	return i.IsInitiator(l)
+Role.IsInitiator = function(heroName)
+	return HeroRolesMap.IsInitiator(heroName)
 end
-a.IsJungler = function(l)
-	return i.IsJungler(l)
+Role.IsJungler = function(heroName)
+	return HeroRolesMap.IsJungler(heroName)
 end
-a.IsNuker = function(l)
-	return i.IsNuker(l)
+Role.IsNuker = function(heroName)
+	return HeroRolesMap.IsNuker(heroName)
 end
-a.IsSupport = function(l)
-	return i.IsSupport(l)
+Role.IsSupport = function(heroName)
+	return HeroRolesMap.IsSupport(heroName)
 end
-a.IsPusher = function(l)
-	return i.IsPusher(l)
+Role.IsPusher = function(heroName)
+	return HeroRolesMap.IsPusher(heroName)
 end
-a.IsRanged = function(l)
-	return i.IsRanged(l)
+Role.IsRanged = function(heroName)
+	return HeroRolesMap.IsRanged(heroName)
 end
-a.IsHealer = function(l)
-	return i.IsHealer(l)
+Role.IsHealer = function(heroName)
+	return HeroRolesMap.IsHealer(heroName)
 end
-a.IsMelee = function(m)
-	return m <= 326
+Role.IsMelee = function(attackRange)
+	return attackRange <= 326
 end
-a.CanBeOfflaner = function(l)
-	return a.IsInitiator(l) and a.IsDurable(l)
+Role.CanBeOfflaner = function(heroName)
+	return Role.IsInitiator(heroName) and Role.IsDurable(heroName)
 end
-a.CanBeMidlaner = function(l)
-	return i.IsCarry(l)
+Role.CanBeMidlaner = function(heroName)
+	return HeroRolesMap.IsCarry(heroName)
 end
-a.CanBeSafeLaneCarry = function(l)
-	return i.IsCarry(l)
+Role.CanBeSafeLaneCarry = function(heroName)
+	return HeroRolesMap.IsCarry(heroName)
 end
-a.CanBeSupport = function(l)
-	return i.IsSupport(l)
+Role.CanBeSupport = function(heroName)
+	return HeroRolesMap.IsSupport(heroName)
 end
-a.GetCurrentSuitableRole = function(n, l)
-	local o = n:GetAssignedLane()
-	if a.CanBeSupport(l) and o ~= e.Mid then
+Role.GetCurrentSuitableRole = function(bot, heroName)
+	local assignedLane = bot:GetAssignedLane()
+	if Role.CanBeSupport(heroName) and assignedLane ~= Lane.Mid then
 		return "support"
-	elseif a.CanBeMidlaner(l) and o == e.Mid then
+	elseif Role.CanBeMidlaner(heroName) and assignedLane == Lane.Mid then
 		return "midlaner"
 	elseif
-		a.CanBeSafeLaneCarry(l) and (GetTeam() == f.Radiant and o == e.Bot or GetTeam() == f.Dire and o == e.Top)
+		Role.CanBeSafeLaneCarry(heroName)
+		and (
+			GetTeam() == Team.Radiant and assignedLane == Lane.Bot
+			or GetTeam() == Team.Dire and assignedLane == Lane.Top
+		)
 	then
 		return "carry"
-	elseif a.CanBeOfflaner(l) and (GetTeam() == f.Radiant and o == e.Top or GetTeam() == f.Dire and o == e.Bot) then
+	elseif
+		Role.CanBeOfflaner(heroName)
+		and (
+			GetTeam() == Team.Radiant and assignedLane == Lane.Top
+			or GetTeam() == Team.Dire and assignedLane == Lane.Bot
+		)
+	then
 		return "offlaner"
 	else
 		return "unknown"
 	end
 end
-a.GetBestEffortSuitableRole = function(l)
-	if a.CanBeSupport(l) then
+Role.GetBestEffortSuitableRole = function(heroName)
+	if Role.CanBeSupport(heroName) then
 		return 4
-	elseif a.CanBeMidlaner(l) then
+	elseif Role.CanBeMidlaner(heroName) then
 		return 2
-	elseif a.CanBeSafeLaneCarry(l) then
+	elseif Role.CanBeSafeLaneCarry(heroName) then
 		return 1
-	elseif a.CanBeOfflaner(l) then
+	elseif Role.CanBeOfflaner(heroName) then
 		return 3
 	else
 		return 3
 	end
 end
-a.invisEnemyExist = false
-local p = false
-local q = -90
-a.UpdateInvisEnemyStatus = function(n)
-	if a.invisEnemyExist then
+Role.invisEnemyExist = false
+local checkedEnemyPicks = false
+local lastInvisItemCheckTime = -90
+Role.UpdateInvisEnemyStatus = function(bot)
+	if Role.invisEnemyExist then
 		return
 	end
-	if p == false then
-		local r = GetTeamPlayers(GetOpposingTeam())
+	if checkedEnemyPicks == false then
+		local enemyPlayerIds = GetTeamPlayers(GetOpposingTeam())
 		do
-			local s = 0
-			while s < #r do
-				if i.InvisHeroes[GetSelectedHeroName(r[s + 1])] == 1 then
-					a.invisEnemyExist = true
+			local i = 0
+			while i < #enemyPlayerIds do
+				if HeroRolesMap.InvisHeroes[GetSelectedHeroName(enemyPlayerIds[i + 1])] == 1 then
+					Role.invisEnemyExist = true
 					break
 				end
-				s = s + 1
+				i = i + 1
 			end
 		end
-		p = true
-	elseif p == true and DotaTime() > 10 * 60 and DotaTime() > q + 3 then
-		local t = n:GetNearbyHeroes(1600, true, 0)
-		if #t > 0 then
+		checkedEnemyPicks = true
+	elseif checkedEnemyPicks == true and DotaTime() > 10 * 60 and DotaTime() > lastInvisItemCheckTime + 3 then
+		local nearbyEnemies = bot:GetNearbyHeroes(1600, true, 0)
+		if #nearbyEnemies > 0 then
 			do
-				local s = 0
-				while s < #t do
-					local u = t[s + 1]
-					if u ~= nil and u:CanBeSeen() then
-						local v = u:FindItemSlot("item_shadow_amulet")
-						local w = u:FindItemSlot("item_glimmer_cape")
-						local x = u:FindItemSlot("item_invis_sword")
-						local y = u:FindItemSlot("item_silver_edge")
-						if v >= 0 or w >= 0 or x >= 0 or y >= 0 then
-							a.invisEnemyExist = true
+				local i = 0
+				while i < #nearbyEnemies do
+					local enemyHero = nearbyEnemies[i + 1]
+					if enemyHero ~= nil and enemyHero:CanBeSeen() then
+						local shadowAmuletSlot = enemyHero:FindItemSlot("item_shadow_amulet")
+						local glimmerCapeSlot = enemyHero:FindItemSlot("item_glimmer_cape")
+						local shadowBladeSlot = enemyHero:FindItemSlot("item_invis_sword")
+						local silverEdgeSlot = enemyHero:FindItemSlot("item_silver_edge")
+						if
+							shadowAmuletSlot >= 0
+							or glimmerCapeSlot >= 0
+							or shadowBladeSlot >= 0
+							or silverEdgeSlot >= 0
+						then
+							Role.invisEnemyExist = true
 							break
 						end
 					end
-					s = s + 1
+					i = i + 1
 				end
 			end
 		end
-		q = DotaTime()
+		lastInvisItemCheckTime = DotaTime()
 	end
 end
-a.supportExist = nil
-a.UpdateSupportStatus = function(n)
-	if a.supportExist then
+Role.supportExist = nil
+Role.UpdateSupportStatus = function(bot)
+	if Role.supportExist then
 		return true
 	end
-	if a.GetPosition(n) >= 4 then
-		a.supportExist = true
+	if Role.GetPosition(bot) >= 4 then
+		Role.supportExist = true
 		return true
 	end
-	local z = GetTeamPlayers(GetTeam())
+	local teamPlayerIds = GetTeamPlayers(GetTeam())
 	do
-		local s = 0
-		while s < #z do
-			local A = GetTeamMember(s + 1)
-			if A ~= nil and A:IsHero() and a.GetPosition(A) >= 4 then
-				a.supportExist = true
+		local i = 0
+		while i < #teamPlayerIds do
+			local teamMember = GetTeamMember(i + 1)
+			if teamMember ~= nil and teamMember:IsHero() and Role.GetPosition(teamMember) >= 4 then
+				Role.supportExist = true
 				return true
 			end
-			s = s + 1
+			i = i + 1
 		end
 	end
 	return false
 end
-a.sayRate = false
-a.NotSayRate = function()
-	return a.sayRate == false
+Role.sayRate = false
+Role.NotSayRate = function()
+	return Role.sayRate == false
 end
-a.sayJiDi = false
-a.NotSayJiDi = function()
-	return a.sayJiDi == false
+Role.sayJiDi = false
+Role.NotSayJiDi = function()
+	return Role.sayJiDi == false
 end
-a.replyMemberID = nil
-a.GetReplyMemberID = function()
-	if a.replyMemberID ~= nil then
-		return a.replyMemberID
+Role.replyMemberID = nil
+Role.GetReplyMemberID = function()
+	if Role.replyMemberID ~= nil then
+		return Role.replyMemberID
 	end
-	local B = GetTeamPlayers(GetTeam())
-	local C = #B
-	local D = 0
+	local teamPlayerIds = GetTeamPlayers(GetTeam())
+	local playerCount = #teamPlayerIds
+	local humanCount = 0
 	do
-		local s = 0
-		while s < #B do
-			if not IsPlayerBot(B[s + 1]) then
-				D = D + 1
+		local i = 0
+		while i < #teamPlayerIds do
+			if not IsPlayerBot(teamPlayerIds[i + 1]) then
+				humanCount = humanCount + 1
 			end
-			s = s + 1
+			i = i + 1
 		end
 	end
-	a.replyMemberID = B[RandomInt(D + 1, C) + 1]
-	return a.replyMemberID
+	Role.replyMemberID = teamPlayerIds[RandomInt(humanCount + 1, playerCount) + 1]
+	return Role.replyMemberID
 end
-a.memberIDIndexTable = nil
-a.IsAllyMemberID = function(E)
-	if a.memberIDIndexTable == nil then
-		local B = GetTeamPlayers(GetTeam())
-		if #B > 0 then
-			a.memberIDIndexTable = {}
+Role.memberIDIndexTable = nil
+Role.IsAllyMemberID = function(playerId)
+	if Role.memberIDIndexTable == nil then
+		local teamPlayerIds = GetTeamPlayers(GetTeam())
+		if #teamPlayerIds > 0 then
+			Role.memberIDIndexTable = {}
 			do
-				local s = 0
-				while s < #B do
-					a.memberIDIndexTable[B[s + 1]] = true
-					s = s + 1
+				local i = 0
+				while i < #teamPlayerIds do
+					Role.memberIDIndexTable[teamPlayerIds[i + 1]] = true
+					i = i + 1
 				end
 			end
 		end
 	end
-	return a.memberIDIndexTable and a.memberIDIndexTable[E] == true
+	return Role.memberIDIndexTable and Role.memberIDIndexTable[playerId] == true
 end
-a.enemyIDIndexTable = nil
-a.IsEnemyMemberID = function(E)
-	if a.enemyIDIndexTable == nil then
-		local F = GetTeamPlayers(GetOpposingTeam())
-		if #F > 0 then
-			a.enemyIDIndexTable = {}
+Role.enemyIDIndexTable = nil
+Role.IsEnemyMemberID = function(playerId)
+	if Role.enemyIDIndexTable == nil then
+		local enemyPlayerIds = GetTeamPlayers(GetOpposingTeam())
+		if #enemyPlayerIds > 0 then
+			Role.enemyIDIndexTable = {}
 			do
-				local s = 0
-				while s < #F do
-					a.enemyIDIndexTable[F[s + 1]] = true
-					s = s + 1
+				local i = 0
+				while i < #enemyPlayerIds do
+					Role.enemyIDIndexTable[enemyPlayerIds[i + 1]] = true
+					i = i + 1
 				end
 			end
 		else
 			return false
 		end
 	end
-	return a.enemyIDIndexTable and a.enemyIDIndexTable[E] == true
+	return Role.enemyIDIndexTable and Role.enemyIDIndexTable[playerId] == true
 end
-a.sLastChatString = "-0"
-a.sLastChatTime = -90
-a.SetLastChatString = function(G)
-	a.sLastChatString = G
-	a.sLastChatTime = DotaTime()
+Role.sLastChatString = "-0"
+Role.sLastChatTime = -90
+Role.SetLastChatString = function(chatString)
+	Role.sLastChatString = chatString
+	Role.sLastChatTime = DotaTime()
 end
-a.ShouldTpToDefend = function()
-	if a.sLastChatString == "-都来守家" and a.sLastChatTime >= DotaTime() - 10 then
+Role.ShouldTpToDefend = function()
+	if Role.sLastChatString == "-都来守家" and Role.sLastChatTime >= DotaTime() - 10 then
 		return true
 	end
 	return false
 end
-a.fLastGiveTangoTime = -90
-a.aegisHero = nil
-a.IsAllyHaveAegis = function()
-	if a.aegisHero ~= nil and a.aegisHero:FindItemSlot("item_aegis") < 0 then
-		a.aegisHero = nil
+Role.fLastGiveTangoTime = -90
+Role.aegisHero = nil
+Role.IsAllyHaveAegis = function()
+	if Role.aegisHero ~= nil and Role.aegisHero:FindItemSlot("item_aegis") < 0 then
+		Role.aegisHero = nil
 	end
-	return a.aegisHero ~= nil
+	return Role.aegisHero ~= nil
 end
-a.lastbbtime = -90
-a.ShouldBuyBack = function()
-	return DotaTime() > a.lastbbtime + 1
+Role.lastbbtime = -90
+Role.ShouldBuyBack = function()
+	return DotaTime() > Role.lastbbtime + 1
 end
-a.lastFarmTpTime = -90
-a.ShouldTpToFarm = function()
-	return DotaTime() > a.lastFarmTpTime + 4
+Role.lastFarmTpTime = -90
+Role.ShouldTpToFarm = function()
+	return DotaTime() > Role.lastFarmTpTime + 4
 end
-a.lastPowerRuneTime = 90
-a.IsPowerRuneKnown = function()
-	return math.floor(a.lastPowerRuneTime / 120) == math.floor(DotaTime() / 120)
+Role.lastPowerRuneTime = 90
+Role.IsPowerRuneKnown = function()
+	return math.floor(Role.lastPowerRuneTime / 120) == math.floor(DotaTime() / 120)
 end
-a.campCount = 18
-a.GetCampCount = function()
-	return a.campCount
+Role.campCount = 18
+Role.GetCampCount = function()
+	return Role.campCount
 end
-a.hasRefreshDone = true
-a.IsCampRefreshDone = function()
-	return a.hasRefreshDone == true
+Role.hasRefreshDone = true
+Role.IsCampRefreshDone = function()
+	return Role.hasRefreshDone == true
 end
-a.availableCampTable = {}
-a.GetAvailableCampCount = function()
-	return #a.availableCampTable
+Role.availableCampTable = {}
+Role.GetAvailableCampCount = function()
+	return #Role.availableCampTable
 end
-a.nStopWaitTime = RandomInt(3, 8)
-a.GetRuneActionTime = function()
-	return a.nStopWaitTime
+Role.nStopWaitTime = RandomInt(3, 8)
+Role.GetRuneActionTime = function()
+	return Role.nStopWaitTime
 end
-a.GetPositionForCM = function(n)
-	local H = nil
-	if GetTeam() ~= n:GetTeam() then
-		H = k(n:GetPlayerID())
-		if H ~= nil then
-			return H
+Role.GetPositionForCM = function(bot)
+	local position = nil
+	if GetTeam() ~= bot:GetTeam() then
+		position = GetEnemyPosition(bot:GetPlayerID())
+		if position ~= nil then
+			return position
 		end
 		return 3
 	end
-	local o = n:GetAssignedLane()
-	local I = n:GetUnitName()
-	if o == e.Mid then
-		H = 2
-	elseif o == e.Top then
-		if n:GetTeam() == f.Radiant then
-			if a.CanBeOfflaner(I) then
-				H = 3
+	local assignedLane = bot:GetAssignedLane()
+	local heroName = bot:GetUnitName()
+	if assignedLane == Lane.Mid then
+		position = 2
+	elseif assignedLane == Lane.Top then
+		if bot:GetTeam() == Team.Radiant then
+			if Role.CanBeOfflaner(heroName) then
+				position = 3
 			else
-				H = 4
+				position = 4
 			end
 		else
-			if a.CanBeSafeLaneCarry(I) then
-				H = 1
+			if Role.CanBeSafeLaneCarry(heroName) then
+				position = 1
 			else
-				H = 5
+				position = 5
 			end
 		end
-	elseif o == e.Bot then
-		if n:GetTeam() == f.Radiant then
-			if a.CanBeSafeLaneCarry(I) then
-				H = 1
+	elseif assignedLane == Lane.Bot then
+		if bot:GetTeam() == Team.Radiant then
+			if Role.CanBeSafeLaneCarry(heroName) then
+				position = 1
 			else
-				H = 5
+				position = 5
 			end
 		else
-			if a.CanBeOfflaner(I) then
-				H = 3
+			if Role.CanBeOfflaner(heroName) then
+				position = 3
 			else
-				H = 4
+				position = 4
 			end
 		end
 	end
-	if H == nil then
-		H = 1
-		log("[ERROR] Failed to determine role for bot %s in CM. It got assigned lane#: %s. Set it to pos: %s", I, o, H)
+	if position == nil then
+		position = 1
+		log(
+			"[ERROR] Failed to determine role for bot %s in CM. It got assigned lane#: %s. Set it to pos: %s",
+			heroName,
+			assignedLane,
+			position
+		)
 	end
-	return H
+	return position
 end
-a.GetRoleFromId = function(n)
-	local J = GetTeamPlayers(n:GetTeam())
-	local I = n:GetUnitName()
-	local K = n:GetTeam() == f.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
+Role.GetRoleFromId = function(bot)
+	local teamPlayerIds = GetTeamPlayers(bot:GetTeam())
+	local heroName = bot:GetUnitName()
+	local teamKey = bot:GetTeam() == Team.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
 	do
-		local s = 0
-		while s < #J do
-			if GetSelectedHeroName(J[s + 1]) == I then
-				return a.RoleAssignment[K][s + 1]
+		local i = 0
+		while i < #teamPlayerIds do
+			if GetSelectedHeroName(teamPlayerIds[i + 1]) == heroName then
+				return Role.RoleAssignment[teamKey][i + 1]
 			end
-			s = s + 1
+			i = i + 1
 		end
 	end
 	return nil
 end
-a.HeroPositions = {}
-a.GetPosition = function(n)
-	if n ~= nil and n:GetTeam() ~= GetTeam() then
-		local L = k(n:GetPlayerID())
-		return L ~= nil and L or 3
+Role.HeroPositions = {}
+Role.GetPosition = function(bot)
+	if bot ~= nil and bot:GetTeam() ~= GetTeam() then
+		local enemyPosition = GetEnemyPosition(bot:GetPlayerID())
+		return enemyPosition ~= nil and enemyPosition or 3
 	end
-	local H = n.assignedRole
-	if H == nil and (GetGameMode() == c.Cm or GetGameMode() == c.ReverseCm) then
-		local M, N = h(n:GetTeam())
-		if M == 0 then
-			H = a.GetPositionForCM(n)
+	local position = bot.assignedRole
+	if position == nil and (GetGameMode() == GameMode.Cm or GetGameMode() == GameMode.ReverseCm) then
+		local humanCount, botCount = NumHumanBotPlayersInTeam(bot:GetTeam())
+		if humanCount == 0 then
+			position = Role.GetPositionForCM(bot)
 		end
 	end
-	local O = n:GetPlayerID()
-	local P = n:GetUnitName()
-	local Q = n:GetAssignedLane()
-	if n.lastAssignedLane ~= nil and n.lastAssignedLane ~= Q then
-		H = nil
-		n.assignedRole = nil
-		if O ~= nil then
-			a.HeroPositions[O] = nil
+	local playerId = bot:GetPlayerID()
+	local heroName = bot:GetUnitName()
+	local assignedLane = bot:GetAssignedLane()
+	if bot.lastAssignedLane ~= nil and bot.lastAssignedLane ~= assignedLane then
+		position = nil
+		bot.assignedRole = nil
+		if playerId ~= nil then
+			Role.HeroPositions[playerId] = nil
 		end
 	end
-	n.lastAssignedLane = Q
-	if (H == nil or GetGameState() == d.PreGame) and O ~= nil then
-		local R = a.HeroPositions[O]
-		if R ~= nil then
-			H = R
+	bot.lastAssignedLane = assignedLane
+	if (position == nil or GetGameState() == GameState.PreGame) and playerId ~= nil then
+		local cachedPosition = Role.HeroPositions[playerId]
+		if cachedPosition ~= nil then
+			position = cachedPosition
 		else
-			local J = GetTeamPlayers(n:GetTeam())
-			local K = n:GetTeam() == f.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
-			local I = n:GetUnitName()
-			if #J >= 5 then
+			local teamPlayerIds = GetTeamPlayers(bot:GetTeam())
+			local teamKey = bot:GetTeam() == Team.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
+			local heroName = bot:GetUnitName()
+			if #teamPlayerIds >= 5 then
 				do
-					local s = 0
-					while s < #J do
-						if GetSelectedHeroName(J[s + 1]) == I then
-							H = a.RoleAssignment[K][s + 1]
+					local i = 0
+					while i < #teamPlayerIds do
+						if GetSelectedHeroName(teamPlayerIds[i + 1]) == heroName then
+							position = Role.RoleAssignment[teamKey][i + 1]
 							break
 						end
-						s = s + 1
+						i = i + 1
 					end
 				end
 			end
-			if H == nil then
-				local S = n:GetTeam() == f.Radiant and O + 1 or O - 4
-				if S >= 1 and S <= 5 then
-					H = a.RoleAssignment[K][S]
+			if position == nil then
+				local slotIndex = bot:GetTeam() == Team.Radiant and playerId + 1 or playerId - 4
+				if slotIndex >= 1 and slotIndex <= 5 then
+					position = Role.RoleAssignment[teamKey][slotIndex]
 				end
 			end
-			if H ~= nil then
-				a.HeroPositions[O] = H
+			if position ~= nil then
+				Role.HeroPositions[playerId] = position
 			end
 		end
 	end
-	n.assignedRole = H
-	if H == nil and GetGameState() ~= d.PreGame then
-		H = a.GetPositionForCM(n)
-		log("[ERROR] Failed to match bot role for bot: %s, PlayerID: %s, fallback pos: %s", P, O, H)
-		n.assignedRole = H
+	bot.assignedRole = position
+	if position == nil and GetGameState() ~= GameState.PreGame then
+		position = Role.GetPositionForCM(bot)
+		log(
+			"[ERROR] Failed to match bot role for bot: %s, PlayerID: %s, fallback pos: %s",
+			heroName,
+			playerId,
+			position
+		)
+		bot.assignedRole = position
 	end
-	if H == nil then
-		H = 3
+	if position == nil then
+		position = 3
 	end
-	return H
+	return position
 end
-a.IsPvNMode = function()
-	return a.IsAllShadow()
+Role.IsPvNMode = function()
+	return Role.IsAllShadow()
 end
-a.IsAllShadow = function()
+Role.IsAllShadow = function()
 	return false
 end
-return a
+return Role

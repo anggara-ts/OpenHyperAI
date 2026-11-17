@@ -4,12 +4,12 @@ if GetScriptDirectory == nil then
 		return "bots"
 	end
 end
-local a = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local b = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
-local c = {}
-c.defaultPostfix = "OHA-DEV"
-c.maxTeamSize = 12
-local d = {
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local TeamNames = {}
+TeamNames.defaultPostfix = "OHA-DEV"
+TeamNames.maxTeamSize = 12
+local teamList = {
 	{ name = "XG", players = { "Ame", "Xm", "Xxs", "XinQ", "xNova" } },
 	{ name = "PARI", players = { "Satanic", "No[o]ne-", "DM", "9Class", "Dukalis" } },
 	{ name = "FLCN", players = { "ATF", "Malr1ne", "skiter", "Sneyking", "Cr1t-" } },
@@ -70,10 +70,16 @@ local d = {
 		},
 	},
 }
-local e = {
-	{ name = "阴司", players = { "钟馗", "阎罗", "孟婆", "判官", "黑无常", "白无常", "牛头", "马面" } },
+local chineseTeamList = {
+	{
+		name = "阴司",
+		players = { "钟馗", "阎罗", "孟婆", "判官", "黑无常", "白无常", "牛头", "马面" },
+	},
 	{ name = "天宫", players = { "哪吒", "杨戬", "雷震", "李靖", "巨灵", "托塔", "哮天", "哪父" } },
-	{ name = "妖魔", players = { "饕餮", "穷奇", "梼杌", "混沌", "九婴", "无支祁", "相柳", "猰貐" } },
+	{
+		name = "妖魔",
+		players = { "饕餮", "穷奇", "梼杌", "混沌", "九婴", "无支祁", "相柳", "猰貐" },
+	},
 	{ name = "水神", players = { "河伯", "海若", "风伯", "雨师", "水德", "洛神", "共工", "玄冥" } },
 	{ name = "火雷", players = { "祝融", "火神", "雷公", "电母", "赤焰", "炎帝", "火德", "金乌" } },
 	{ name = "英魂", players = { "刑天", "后羿", "夸父", "精卫", "黄帝", "炎帝", "神农", "蚩尤" } },
@@ -110,45 +116,45 @@ local e = {
 		},
 	},
 }
-d = RandomInt(1, 2) >= 2 and e or d
-local function f(g, h)
-	local i = {}
-	local j = {}
-	local k = 0
+teamList = RandomInt(1, 2) >= 2 and chineseTeamList or teamList
+local function buildTeamNames(customNames, customTeamName)
+	local names = {}
+	local customPlayerNames = {}
+	local teamIndex = 0
 	repeat
-		k = RandomInt(1, #d)
-	until k % 2 == GetTeam() - 2 and (d[k].name ~= "ADD" or d[k].name ~= "上古")
-	i = a.MergeLists(d[k].players, d[#d].players)
-	if g and #g > 0 then
-		for l = 1, #g do
-			if g[l] and g[l] ~= "Random" then
-				i[l] = g[l]
-				table.insert(j, g[l])
+		teamIndex = RandomInt(1, #teamList)
+	until teamIndex % 2 == GetTeam() - 2 and (teamList[teamIndex].name ~= "ADD" or teamList[teamIndex].name ~= "上古")
+	names = Utils.MergeLists(teamList[teamIndex].players, teamList[#teamList].players)
+	if customNames and #customNames > 0 then
+		for slot = 1, #customNames do
+			if customNames[slot] and customNames[slot] ~= "Random" then
+				names[slot] = customNames[slot]
+				table.insert(customPlayerNames, customNames[slot])
 			end
 		end
 	end
-	local m = b.Enable and b.Show_Team_Names
-	local n = h and h ~= "" and h or d[k].name
-	local o = {}
-	for l = 1, c.maxTeamSize do
-		local p = table.remove(i, 1)
-		if a.HasValue(j, p) then
-			table.insert(o, p)
-		elseif m then
-			table.insert(o, n .. "." .. p .. "." .. c.defaultPostfix)
+	local showTeamNames = CustomLoader.Enable and CustomLoader.Show_Team_Names
+	local teamName = customTeamName and customTeamName ~= "" and customTeamName or teamList[teamIndex].name
+	local botNames = {}
+	for _ = 1, TeamNames.maxTeamSize do
+		local playerName = table.remove(names, 1)
+		if Utils.HasValue(customPlayerNames, playerName) then
+			table.insert(botNames, playerName)
+		elseif showTeamNames then
+			table.insert(botNames, teamName .. "." .. playerName .. "." .. TeamNames.defaultPostfix)
 		else
-			table.insert(o, p .. "." .. c.defaultPostfix)
+			table.insert(botNames, playerName .. "." .. TeamNames.defaultPostfix)
 		end
 	end
-	return o
+	return botNames
 end
-function c.generateTeams(g)
-	local q = g and g.Radiant or {}
-	local r = g and g.Dire or {}
-	local s = b.Enable and b.Radiant_Team_Name or nil
-	local t = b.Enable and b.Dire_Team_Name or nil
-	local u = f(q, s)
-	local v = f(r, t)
-	return { Radiant = u, Dire = v }
+function TeamNames.generateTeams(customNames)
+	local radiantNames = customNames and customNames.Radiant or {}
+	local direNames = customNames and customNames.Dire or {}
+	local radiantTeamName = CustomLoader.Enable and CustomLoader.Radiant_Team_Name or nil
+	local direTeamName = CustomLoader.Enable and CustomLoader.Dire_Team_Name or nil
+	local radiantBotNames = buildTeamNames(radiantNames, radiantTeamName)
+	local direBotNames = buildTeamNames(direNames, direTeamName)
+	return { Radiant = radiantBotNames, Dire = direBotNames }
 end
-return c
+return TeamNames

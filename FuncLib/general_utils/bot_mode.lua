@@ -1,194 +1,207 @@
 -- Shared helper: bot mode.
-local function a(b)
-	function b.IsInTeamFight(c, d)
-		if not b.IsUnitValid(c) then
+local function installBotMode(Fu)
+	function Fu.IsInTeamFight(unit, radius)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		if d == nil or d > 1600 then
-			d = 1600
+		if radius == nil or radius > 1600 then
+			radius = 1600
 		end
-		if c._tfCache and DotaTime() - c._tfCache[1] <= 0.2 then
-			return c._tfCache[2]
+		if unit._tfCache and DotaTime() - unit._tfCache[1] <= 0.2 then
+			return unit._tfCache[2]
 		end
-		local e = b.GetNearbyHeroes(c, d, false, BOT_MODE_ATTACK)
-		local f = #e >= 2
-		c._tfCache = { DotaTime(), f }
-		return f
+		local attackingAllies = Fu.GetNearbyHeroes(unit, radius, false, BOT_MODE_ATTACK)
+		local isInFight = #attackingAllies >= 2
+		unit._tfCache = { DotaTime(), isInFight }
+		return isInFight
 	end
-	function b.IsRetreating(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsRetreating(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		local h = c:GetActiveModeDesire()
-		local i = c:WasRecentlyDamagedByAnyHero(2.0)
-		return g == BOT_MODE_RETREAT and h > BOT_MODE_DESIRE_MODERATE and c:DistanceFromFountain() > 0
-			or g == BOT_MODE_EVASIVE_MANEUVERS and i
-			or c:HasModifier("modifier_bloodseeker_rupture") and i
-			or g == BOT_MODE_FARM and h > BOT_MODE_DESIRE_ABSOLUTE
+		local mode = unit:GetActiveMode()
+		local modeDesire = unit:GetActiveModeDesire()
+		local recentlyDamaged = unit:WasRecentlyDamagedByAnyHero(2.0)
+		return mode == BOT_MODE_RETREAT and modeDesire > BOT_MODE_DESIRE_MODERATE and unit:DistanceFromFountain() > 0
+			or mode == BOT_MODE_EVASIVE_MANEUVERS and recentlyDamaged
+			or unit:HasModifier("modifier_bloodseeker_rupture") and recentlyDamaged
+			or mode == BOT_MODE_FARM and modeDesire > BOT_MODE_DESIRE_ABSOLUTE
 	end
-	function b.IsGoingOnSomeone(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsGoingOnSomeone(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		return g == BOT_MODE_ROAM
-			or g == BOT_MODE_TEAM_ROAM
-			or g == BOT_MODE_GANK
-			or g == BOT_MODE_ATTACK
-			or g == BOT_MODE_DEFEND_ALLY
+		local mode = unit:GetActiveMode()
+		return mode == BOT_MODE_ROAM
+			or mode == BOT_MODE_TEAM_ROAM
+			or mode == BOT_MODE_GANK
+			or mode == BOT_MODE_ATTACK
+			or mode == BOT_MODE_DEFEND_ALLY
 	end
-	function b.IsDefending(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsDefending(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		return g == BOT_MODE_DEFEND_TOWER_TOP or g == BOT_MODE_DEFEND_TOWER_MID or g == BOT_MODE_DEFEND_TOWER_BOT
+		local mode = unit:GetActiveMode()
+		return mode == BOT_MODE_DEFEND_TOWER_TOP
+			or mode == BOT_MODE_DEFEND_TOWER_MID
+			or mode == BOT_MODE_DEFEND_TOWER_BOT
 	end
-	function b.IsPushing(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsPushing(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		return g == BOT_MODE_PUSH_TOWER_TOP or g == BOT_MODE_PUSH_TOWER_MID or g == BOT_MODE_PUSH_TOWER_BOT
+		local mode = unit:GetActiveMode()
+		return mode == BOT_MODE_PUSH_TOWER_TOP or mode == BOT_MODE_PUSH_TOWER_MID or mode == BOT_MODE_PUSH_TOWER_BOT
 	end
-	function b.IsLaning(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsLaning(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		return g == BOT_MODE_LANING
+		local mode = unit:GetActiveMode()
+		return mode == BOT_MODE_LANING
 	end
-	function b.IsDoingRoshan(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsDoingRoshan(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		return c:GetActiveMode() == BOT_MODE_ROSHAN
+		return unit:GetActiveMode() == BOT_MODE_ROSHAN
 	end
 	-- Leave the pit when this hero is low and Roshan is still healthy. Stay out until
 	-- 60% HP so they do not step back in on the next heal tick. Huskar wants to be low.
-	function b.ShouldLeaveRoshanFight(c)
-		if not b.IsUnitValid(c) or not c:IsAlive() then
+	function Fu.ShouldLeaveRoshanFight(unit)
+		if not Fu.IsUnitValid(unit) or not unit:IsAlive() then
 			return false
 		end
-		if c:GetUnitName() == "npc_dota_hero_huskar" then
+		if unit:GetUnitName() == "npc_dota_hero_huskar" then
 			return false
 		end
-		local hp = b.GetHP(c)
-		local handle = b.Utils.GameStates and b.Utils.GameStates.roshHandle
-		local roshHp = 1
-		if b.IsUnitValid(handle) and handle:IsAlive() and handle:CanBeSeen() then
-			roshHp = b.GetHP(handle)
+		local hpRatio = Fu.GetHP(unit)
+		local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+		local roshanHpRatio = 1
+		if Fu.IsUnitValid(roshanHandle) and roshanHandle:IsAlive() and roshanHandle:CanBeSeen() then
+			roshanHpRatio = Fu.GetHP(roshanHandle)
 		end
-		if roshHp <= 0.5 then
-			c._roshHoldOut = false
+		if roshanHpRatio <= 0.5 then
+			unit._roshHoldOut = false
 			return false
 		end
-		if hp < 0.45 then
-			if not c._roshHoldOut and log then
+		if hpRatio < 0.45 then
+			if not unit._roshHoldOut and log then
 				log(
 					string.format(
 						"[ROSH] %s leave hp=%.2f rosh=%.2f",
-						string.gsub(c:GetUnitName(), "npc_dota_hero_", ""),
-						hp,
-						roshHp
+						string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""),
+						hpRatio,
+						roshanHpRatio
 					)
 				)
 			end
-			c._roshHoldOut = true
+			unit._roshHoldOut = true
 		end
-		if c._roshHoldOut and hp < 0.6 then
+		if unit._roshHoldOut and hpRatio < 0.6 then
 			return true
 		end
-		c._roshHoldOut = false
+		unit._roshHoldOut = false
 		return false
 	end
-	function b.IsFarming(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsFarming(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		local j = b.GetProperTarget(c)
-		return g == BOT_MODE_FARM or j ~= nil and j:IsAlive() and j:GetTeam() == TEAM_NEUTRAL and not b.IsRoshan(j)
+		local mode = unit:GetActiveMode()
+		local target = Fu.GetProperTarget(unit)
+		return mode == BOT_MODE_FARM
+			or target ~= nil and target:IsAlive() and target:GetTeam() == TEAM_NEUTRAL and not Fu.IsRoshan(target)
 	end
-	function b.IsTeamActivityCount(c, k)
-		local l = GetTeamPlayers(GetTeam())
-		for m = 1, #l do
-			local n = GetTeamMember(m)
-			if n ~= nil and n:IsAlive() then
-				if b.GetAllyCount(n, 1600) >= k then
+	function Fu.IsTeamActivityCount(unit, count)
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		for i = 1, #teamPlayers do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsAlive() then
+				if Fu.GetAllyCount(member, 1600) >= count then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.GetSpecialModeAllies(c, o, p)
-		if not b.IsUnitValid(c) then
+	function Fu.GetSpecialModeAllies(unit, range, targetMode)
+		if not Fu.IsUnitValid(unit) then
 			return {}
 		end
-		local q = {}
-		local l = GetTeamPlayers(GetTeam())
-		for m = 1, #l do
-			local n = GetTeamMember(m)
-			if n ~= nil and n:IsAlive() then
-				if n:GetActiveMode() == p and GetUnitToUnitDistance(n, c) <= o then
-					table.insert(q, n)
+		local allies = {}
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		for i = 1, #teamPlayers do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsAlive() then
+				if member:GetActiveMode() == targetMode and GetUnitToUnitDistance(member, unit) <= range then
+					table.insert(allies, member)
 				end
 			end
 		end
-		return q
+		return allies
 	end
-	function b.GetSpecialModeAlliesCount(p)
-		local q = b.GetSpecialModeAllies(GetBot(), 99999, p)
-		return #q
+	function Fu.GetSpecialModeAlliesCount(targetMode)
+		local allies = Fu.GetSpecialModeAllies(GetBot(), 99999, targetMode)
+		return #allies
 	end
-	function b.GetTeamFightLocation(c)
-		if not b.IsUnitValid(c) then
+	function Fu.GetTeamFightLocation(unit)
+		if not Fu.IsUnitValid(unit) then
 			return nil
 		end
-		local r = nil
-		local l = GetTeamPlayers(GetTeam())
-		for m = 1, #l do
-			local n = GetTeamMember(m)
-			if n ~= nil and n:IsAlive() and b.IsInTeamFight(n, 1500) and b.GetEnemyCount(n, 1400) >= 2 then
-				local q = b.GetSpecialModeAllies(n, 1400, BOT_MODE_ATTACK)
-				r = b.GetCenterOfUnits(q)
+		local fightLocation = nil
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		for i = 1, #teamPlayers do
+			local member = GetTeamMember(i)
+			if
+				member ~= nil
+				and member:IsAlive()
+				and Fu.IsInTeamFight(member, 1500)
+				and Fu.GetEnemyCount(member, 1400) >= 2
+			then
+				local allies = Fu.GetSpecialModeAllies(member, 1400, BOT_MODE_ATTACK)
+				fightLocation = Fu.GetCenterOfUnits(allies)
 				break
 			end
 		end
-		return r
+		return fightLocation
 	end
-	function b.GetTeamFightAlliesCount(c)
-		if not b.IsUnitValid(c) then
+	function Fu.GetTeamFightAlliesCount(unit)
+		if not Fu.IsUnitValid(unit) then
 			return 0
 		end
-		local l = GetTeamPlayers(GetTeam())
-		local k = 0
-		for m = 1, #l do
-			local n = GetTeamMember(m)
-			if n ~= nil and n:IsAlive() and b.IsInTeamFight(n, 1200) and b.GetEnemyCount(n, 1400) >= 2 then
-				k = b.GetSpecialModeAlliesCount(BOT_MODE_ATTACK)
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		local alliesCount = 0
+		for i = 1, #teamPlayers do
+			local member = GetTeamMember(i)
+			if
+				member ~= nil
+				and member:IsAlive()
+				and Fu.IsInTeamFight(member, 1200)
+				and Fu.GetEnemyCount(member, 1400) >= 2
+			then
+				alliesCount = Fu.GetSpecialModeAlliesCount(BOT_MODE_ATTACK)
 				break
 			end
 		end
-		return k
+		return alliesCount
 	end
-	function b.IsDoingTormentor(c)
-		if not b.IsUnitValid(c) then
+	function Fu.IsDoingTormentor(unit)
+		if not Fu.IsUnitValid(unit) then
 			return false
 		end
-		local g = c:GetActiveMode()
-		return g == BOT_MODE_SIDE_SHOP or g == BOT_MODE_WATCHER
+		local mode = unit:GetActiveMode()
+		return mode == BOT_MODE_SIDE_SHOP or mode == BOT_MODE_WATCHER
 	end
-	function b.IsAnyAllyDefending(c, s)
-		for t, u in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			if b.IsValidHero(u) and b.IsNotSelf(c, u) then
-				local g = u:GetActiveMode()
+	function Fu.IsAnyAllyDefending(unit, lane)
+		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+			if Fu.IsValidHero(allyHero) and Fu.IsNotSelf(unit, allyHero) then
+				local mode = allyHero:GetActiveMode()
 				if
-					g == BOT_MODE_DEFEND_TOWER_TOP and s == LANE_TOP
-					or g == BOT_MODE_DEFEND_TOWER_MID and s == LANE_MID
-					or g == BOT_MODE_DEFEND_TOWER_BOT and s == LANE_BOT
+					mode == BOT_MODE_DEFEND_TOWER_TOP and lane == LANE_TOP
+					or mode == BOT_MODE_DEFEND_TOWER_MID and lane == LANE_MID
+					or mode == BOT_MODE_DEFEND_TOWER_BOT and lane == LANE_BOT
 				then
 					return true
 				end
@@ -197,4 +210,4 @@ local function a(b)
 		return false
 	end
 end
-return a
+return installBotMode

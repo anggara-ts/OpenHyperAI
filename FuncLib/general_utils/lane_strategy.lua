@@ -1,99 +1,104 @@
 -- Shared helper: lane strategy.
-local function a(b)
-	function b.ShouldGoFarmDuringLaning(c)
-		local d = c:GetAssignedLane()
-		return b.IsInLaningPhase()
-			and GetHeroDeaths(c:GetPlayerID()) >= 4
-			and (GetHeroKills(c:GetPlayerID()) == 0 or GetHeroKills(c:GetPlayerID()) / GetHeroDeaths(c:GetPlayerID()) < 0.5)
-			and b.IsCore(c)
-			and c:GetLevel() >= 4
-			and c:GetLevel() < 10
-			and b.GetEnemyCountInLane(d) >= 1
+local function installLaneStrategy(Fu)
+	function Fu.ShouldGoFarmDuringLaning(bot)
+		local assignedLane = bot:GetAssignedLane()
+		return Fu.IsInLaningPhase()
+			and GetHeroDeaths(bot:GetPlayerID()) >= 4
+			and (GetHeroKills(bot:GetPlayerID()) == 0 or GetHeroKills(bot:GetPlayerID()) / GetHeroDeaths(
+				bot:GetPlayerID()
+			) < 0.5)
+			and Fu.IsCore(bot)
+			and bot:GetLevel() >= 4
+			and bot:GetLevel() < 10
+			and Fu.GetEnemyCountInLane(assignedLane) >= 1
 	end
-	function b.GetMostFarmLaneDesire(c)
-		local e = GetFarmLaneDesire(LANE_TOP)
-		local f = GetFarmLaneDesire(LANE_MID)
-		local g = GetFarmLaneDesire(LANE_BOT)
-		if e > f and e > g then
-			return LANE_TOP, e
+	function Fu.GetMostFarmLaneDesire(bot)
+		local topLaneDesire = GetFarmLaneDesire(LANE_TOP)
+		local midLaneDesire = GetFarmLaneDesire(LANE_MID)
+		local botLaneDesire = GetFarmLaneDesire(LANE_BOT)
+		if topLaneDesire > midLaneDesire and topLaneDesire > botLaneDesire then
+			return LANE_TOP, topLaneDesire
 		end
-		if g > f and g > e then
-			return LANE_BOT, g
+		if botLaneDesire > midLaneDesire and botLaneDesire > topLaneDesire then
+			return LANE_BOT, botLaneDesire
 		end
 		if DotaTime() < 8 * 60 then
-			return c:GetAssignedLane(), 0.667
+			return bot:GetAssignedLane(), 0.667
 		end
-		return LANE_MID, f
+		return LANE_MID, midLaneDesire
 	end
-	function b.GetMostDefendLaneDesire()
-		local e = b.GetDefendLaneDesire(LANE_TOP)
-		local f = b.GetDefendLaneDesire(LANE_MID)
-		local g = b.GetDefendLaneDesire(LANE_BOT)
-		if f > e and f > g then
-			return LANE_MID, f
+	function Fu.GetMostDefendLaneDesire()
+		local topLaneDesire = Fu.GetDefendLaneDesire(LANE_TOP)
+		local midLaneDesire = Fu.GetDefendLaneDesire(LANE_MID)
+		local botLaneDesire = Fu.GetDefendLaneDesire(LANE_BOT)
+		if midLaneDesire > topLaneDesire and midLaneDesire > botLaneDesire then
+			return LANE_MID, midLaneDesire
 		end
-		if e > f and e > g then
-			return LANE_TOP, e
+		if topLaneDesire > midLaneDesire and topLaneDesire > botLaneDesire then
+			return LANE_TOP, topLaneDesire
 		end
-		if g > f and g > e then
-			return LANE_BOT, g
+		if botLaneDesire > midLaneDesire and botLaneDesire > topLaneDesire then
+			return LANE_BOT, botLaneDesire
 		end
-		return LANE_MID, f
+		return LANE_MID, midLaneDesire
 	end
-	function b.GetDefendLaneDesire(d)
-		local h, i = GetDefendLaneDesire(d), GetBot().DefendLaneDesire
-		if i ~= nil and i[d] ~= nil and i[d] > h then
-			return i[d]
+	function Fu.GetDefendLaneDesire(lane)
+		local defendDesire, customDesires = GetDefendLaneDesire(lane), GetBot().DefendLaneDesire
+		if customDesires ~= nil and customDesires[lane] ~= nil and customDesires[lane] > defendDesire then
+			return customDesires[lane]
 		end
-		return h
+		return defendDesire
 	end
-	function b.IsPingCloseToValidTower(j, k, l, m)
-		if k and k.location then
-			local n = UNIT_LIST_ALLIED_BUILDINGS
-			if j == GetOpposingTeam() then
-				n = UNIT_LIST_ENEMY_BUILDINGS
+	function Fu.IsPingCloseToValidTower(team, ping, maxDistance, maxPingAge)
+		if ping and ping.location then
+			local buildingList = UNIT_LIST_ALLIED_BUILDINGS
+			if team == GetOpposingTeam() then
+				buildingList = UNIT_LIST_ENEMY_BUILDINGS
 			end
-			for o, p in pairs(GetUnitList(n)) do
+			for _, building in pairs(GetUnitList(buildingList)) do
 				if
-					p ~= nil
-					and p:IsAlive()
-					and p:CanBeSeen()
-					and not p:IsInvulnerable()
-					and not p:HasModifier("modifier_backdoor_protection")
-					and not p:HasModifier("modifier_backdoor_protection_in_base")
-					and not p:HasModifier("modifier_backdoor_protection_active")
-					and not string.find(p:GetUnitName(), "fillers")
+					building ~= nil
+					and building:IsAlive()
+					and building:CanBeSeen()
+					and not building:IsInvulnerable()
+					and not building:HasModifier("modifier_backdoor_protection")
+					and not building:HasModifier("modifier_backdoor_protection_in_base")
+					and not building:HasModifier("modifier_backdoor_protection_active")
+					and not string.find(building:GetUnitName(), "fillers")
 				then
-					local q = p:GetUnitName()
-					if b.GetDistance(p:GetLocation(), k.location) <= l and GameTime() < k.time + m then
-						local r = LANE_MID
-						if string.find(q, "_fort") then
-							r = LANE_MID
-						elseif string.find(q, "_top") then
-							r = LANE_TOP
-						elseif string.find(q, "_mid") then
-							r = LANE_MID
-						elseif string.find(q, "_bot") then
-							r = LANE_BOT
+					local buildingName = building:GetUnitName()
+					if
+						Fu.GetDistance(building:GetLocation(), ping.location) <= maxDistance
+						and GameTime() < ping.time + maxPingAge
+					then
+						local lane = LANE_MID
+						if string.find(buildingName, "_fort") then
+							lane = LANE_MID
+						elseif string.find(buildingName, "_top") then
+							lane = LANE_TOP
+						elseif string.find(buildingName, "_mid") then
+							lane = LANE_MID
+						elseif string.find(buildingName, "_bot") then
+							lane = LANE_BOT
 						end
-						return true, r
+						return true, lane
 					end
 				end
 			end
 		end
 		return false, -1
 	end
-	function b.GetMostPushLaneDesire()
-		local e = GetPushLaneDesire(LANE_TOP)
-		local f = GetPushLaneDesire(LANE_MID)
-		local g = GetPushLaneDesire(LANE_BOT)
-		if e > f and e > g then
-			return LANE_TOP, e
+	function Fu.GetMostPushLaneDesire()
+		local topLaneDesire = GetPushLaneDesire(LANE_TOP)
+		local midLaneDesire = GetPushLaneDesire(LANE_MID)
+		local botLaneDesire = GetPushLaneDesire(LANE_BOT)
+		if topLaneDesire > midLaneDesire and topLaneDesire > botLaneDesire then
+			return LANE_TOP, topLaneDesire
 		end
-		if g > f and g > e then
-			return LANE_BOT, g
+		if botLaneDesire > midLaneDesire and botLaneDesire > topLaneDesire then
+			return LANE_BOT, botLaneDesire
 		end
-		return LANE_MID, f
+		return LANE_MID, midLaneDesire
 	end
 end
-return a
+return installLaneStrategy

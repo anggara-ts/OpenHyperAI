@@ -1,32 +1,33 @@
 -- Abaddon: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
-local k
-local l
-if h == "pos_1" or h == "pos_2" then
-	k = j[1]
-	l = c.Skill.GetTalentBuild(i[1])
-elseif h == "pos_3" then
-	k = j[1]
-	l = c.Skill.GetTalentBuild(i[2])
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local nAbilityBuildList
+local nTalentBuildList
+if sRole == "pos_1" or sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
+elseif sRole == "pos_3" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 else
-	k = j[2]
-	l = c.Skill.GetTalentBuild(i[3])
+	nAbilityBuildList = tAllAbilityBuildList[2]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[3])
 end
-local m = {}
-m["pos_1"] = {
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -46,8 +47,8 @@ m["pos_1"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-m["pos_2"] = m["pos_1"]
-m["pos_3"] = {
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -66,7 +67,7 @@ m["pos_3"] = {
 	"item_travel_boots_2",
 	"item_moon_shard",
 }
-m["pos_4"] = {
+sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_blood_grenade",
@@ -86,7 +87,7 @@ m["pos_4"] = {
 	"item_wind_waker",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_blood_grenade",
@@ -106,8 +107,8 @@ m["pos_5"] = {
 	"item_wind_waker",
 	"item_moon_shard",
 }
-a["sBuyList"] = m[h]
-a["sSellList"] = {
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
 	"item_lotus_orb",
@@ -115,274 +116,282 @@ a["sSellList"] = {
 	"item_wind_waker",
 	"item_blade_mail",
 }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
-local p = SafeAbility(b:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
-local q, r
-local s, t
-local u = false
-local v, w
-local x, y
+local mistCoilAbility = SafeAbility(bot:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
+local aphoticShieldAbility =
+	SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
+local mistCoilDesire, mistCoilTarget
+local aphoticShieldDesire, aphoticShieldTarget
+local isAttacking = false
+local botTarget, hpRatio
+local nearbyAllies, nearbyEnemies
 -- [OHA-ABADDON]: new casts (Borrowed Time by hand, Mist Coil harass), at most once per 10s per reason.
 local function LogAbaddon(why)
-	b._abaddonLogAt = b._abaddonLogAt or {}
-	if DotaTime() < (b._abaddonLogAt[why] or -999) then
+	bot._abaddonLogAt = bot._abaddonLogAt or {}
+	if DotaTime() < (bot._abaddonLogAt[why] or -999) then
 		return
 	end
-	b._abaddonLogAt[why] = DotaTime() + 10
-	pcall(print, string.format("[OHA-ABADDON] t=%.0f %s hp=%.2f", DotaTime(), why, c.GetHP(b)))
+	bot._abaddonLogAt[why] = DotaTime() + 10
+	pcall(print, string.format("[OHA-ABADDON] t=%.0f %s hp=%.2f", DotaTime(), why, Fu.GetHP(bot)))
 end
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	o = SafeAbility(b:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
-	p = SafeAbility(b:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
-	u = c.IsAttacking(b)
-	w = c.GetHP(b)
-	v = c.GetProperTarget(b)
-	x = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	y = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	mistCoilAbility = SafeAbility(bot:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
+	aphoticShieldAbility =
+		SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
+	isAttacking = Fu.IsAttacking(bot)
+	hpRatio = Fu.GetHP(bot)
+	botTarget = Fu.GetProperTarget(bot)
+	nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	-- fix: Borrowed Time (active, strong dispel, datafeed) was never cast; it only auto-fired below
 	-- hp_threshold 400 HP, which late game is ~10% HP and too late against burst.
-	local borrowedTime = b:GetAbilityByName("abaddon_borrowed_time")
-	if a.ConsiderBorrowedTime(borrowedTime) > 0 then
-		b:Action_UseAbility(borrowedTime)
+	local borrowedTime = bot:GetAbilityByName("abaddon_borrowed_time")
+	if X.ConsiderBorrowedTime(borrowedTime) > 0 then
+		bot:Action_UseAbility(borrowedTime)
 		return
 	end
-	s, t = a.ConsiderAphoticShield()
-	if s > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(p, t)
+	aphoticShieldDesire, aphoticShieldTarget = X.ConsiderAphoticShield()
+	if aphoticShieldDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnEntity(aphoticShieldAbility, aphoticShieldTarget)
 		return
 	end
-	q, r = a.ConsiderMistCoil()
-	if q > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(o, r)
+	mistCoilDesire, mistCoilTarget = X.ConsiderMistCoil()
+	if mistCoilDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnEntity(mistCoilAbility, mistCoilTarget)
 		return
 	end
 end
-function a.ConsiderMistCoil()
-	if not c.CanCastAbility(o) then
+function X.ConsiderMistCoil()
+	if not Fu.CanCastAbility(mistCoilAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local z = c.GetProperCastRange(false, b, o:GetCastRange())
-	local A = o:GetCastPoint()
+	local castRange = Fu.GetProperCastRange(false, bot, mistCoilAbility:GetCastRange())
+	local castPoint = mistCoilAbility:GetCastPoint()
 	-- datafeed: Mist Coil's damage value is "damage_heal"; "target_damage" no longer exists (read 0)
-	local B = o:GetSpecialValueInt("damage_heal")
-	local C = o:GetSpecialValueInt("missile_speed")
-	local D = o:GetManaCost()
-	local E = c.GetManaAfter(D)
-	local F = c.GetManaThreshold(b, D, { p })
-	for G, H in pairs(y) do
+	local damage = mistCoilAbility:GetSpecialValueInt("damage_heal")
+	local projectileSpeed = mistCoilAbility:GetSpecialValueInt("missile_speed")
+	local manaCost = mistCoilAbility:GetManaCost()
+	local manaAfter = Fu.GetManaAfter(manaCost)
+	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { aphoticShieldAbility })
+	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(H)
-			and c.CanBeAttacked(H)
-			and c.IsInRange(b, H, z)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanBeAttacked(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
 			-- fix: Mist Coil is SPELL_IMMUNITY_ENEMIES_NO (game data); CanCastOnMagicImmune let it target BKB heroes
-			and c.CanCastOnNonMagicImmune(H)
-			and c.CanCastOnTargetAdvanced(H)
-			and not H:HasModifier("modifier_dazzle_shallow_grave")
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not H:HasModifier("modifier_oracle_false_promise_timer")
-			and not H:HasModifier("modifier_templar_assassin_refraction_absorb")
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local I = GetUnitToUnitDistance(b, H) / C + A
-			if c.WillKillTarget(H, B, DAMAGE_TYPE_MAGICAL, I) then
-				return BOT_ACTION_DESIRE_HIGH, H
+			local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
+			if Fu.WillKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL, delay) then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	local J = nil
-	local K = math.huge
-	for G, L in pairs(x) do
+	local weakestAlly = nil
+	local weakestAllyHp = math.huge
+	for _, allyHero in pairs(nearbyAllies) do
 		if
-			c.IsValidHero(L)
-			and c.CanBeAttacked(L)
-			and c.IsInRange(b, L, z + 200)
-			and L ~= b
-			and not L:IsIllusion()
-			and not L:HasModifier("modifier_doom_bringer_doom_aura_enemy")
-			and not L:HasModifier("modifier_ice_blast")
-			and not L:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not L:HasModifier("modifier_fountain_aura_buff")
-			and not L:HasModifier("modifier_rune_regen")
+			Fu.IsValidHero(allyHero)
+			and Fu.CanBeAttacked(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange + 200)
+			and allyHero ~= bot
+			and not allyHero:IsIllusion()
+			and not allyHero:HasModifier("modifier_doom_bringer_doom_aura_enemy")
+			and not allyHero:HasModifier("modifier_ice_blast")
+			and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not allyHero:HasModifier("modifier_fountain_aura_buff")
+			and not allyHero:HasModifier("modifier_rune_regen")
 		then
-			local M = c.GetHP(L)
-			if M < K and M <= 0.8 then
-				J = L
-				K = M
+			local allyHp = Fu.GetHP(allyHero)
+			if allyHp < weakestAllyHp and allyHp <= 0.8 then
+				weakestAlly = allyHero
+				weakestAllyHp = allyHp
 			end
-			if L:WasRecentlyDamagedByAnyHero(2.0) and c.IsDisabled(L) and M < 0.8 then
-				return BOT_ACTION_DESIRE_HIGH, L
+			if allyHero:WasRecentlyDamagedByAnyHero(2.0) and Fu.IsDisabled(allyHero) and allyHp < 0.8 then
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 		end
 	end
-	if J then
-		return BOT_ACTION_DESIRE_HIGH, J
+	if weakestAlly then
+		return BOT_ACTION_DESIRE_HIGH, weakestAlly
 	end
 	-- fix: Mist Coil only hit enemy heroes to finish them. While engaging, coil the target
 	-- (damage_heal, magical) when mana allows and Abaddon can afford the 40 self-damage.
 	if
-		c.IsGoingOnSomeone(b)
-		and c.IsValidHero(v)
-		and c.IsInRange(b, v, z)
-		and c.CanCastOnNonMagicImmune(v)
-		and c.CanCastOnTargetAdvanced(v)
-		and not c.IsSuspiciousIllusion(v)
-		and E > F
-		and w > 0.4
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.CanCastOnTargetAdvanced(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+		and manaAfter > manaThreshold
+		and hpRatio > 0.4
 	then
 		LogAbaddon("coil-engage")
-		return BOT_ACTION_DESIRE_HIGH, v
+		return BOT_ACTION_DESIRE_HIGH, botTarget
 	end
-	if c.IsLaning(b) and c.IsEarlyGame() and E > F + 0.1 then
-		local N = b:GetNearbyLaneCreeps(math.min(z + 300, 1600), true)
-		for G, O in pairs(N) do
-			if c.IsValid(O) and c.CanBeAttacked(O) and not c.IsOtherAllysTarget(O) then
-				local I = GetUnitToUnitDistance(b, O) / C + A
-				if c.WillKillTarget(O, B, DAMAGE_TYPE_MAGICAL, I) then
-					local P = O:GetUnitName()
-					local Q = b:FindAoELocation(true, true, O:GetLocation(), 0, 800, 0, 0)
-					if string.find(P, "ranged") then
-						if Q.count > 0 or c.IsUnitTargetedByTower(O, false) then
-							return BOT_ACTION_DESIRE_HIGH, O
+	if Fu.IsLaning(bot) and Fu.IsEarlyGame() and manaAfter > manaThreshold + 0.1 then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(math.min(castRange + 300, 1600), true)
+		for _, creep in pairs(nearbyLaneCreeps) do
+			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsOtherAllysTarget(creep) then
+				local delay = GetUnitToUnitDistance(bot, creep) / projectileSpeed + castPoint
+				if Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL, delay) then
+					local creepName = creep:GetUnitName()
+					local enemyHeroesNearCreep = bot:FindAoELocation(true, true, creep:GetLocation(), 0, 800, 0, 0)
+					if string.find(creepName, "ranged") then
+						if enemyHeroesNearCreep.count > 0 or Fu.IsUnitTargetedByTower(creep, false) then
+							return BOT_ACTION_DESIRE_HIGH, creep
 						end
 					end
-					if c.IsEnemyTargetUnit(O, 1200) and E > F + 0.2 then
-						return BOT_ACTION_DESIRE_HIGH, O
+					if Fu.IsEnemyTargetUnit(creep, 1200) and manaAfter > manaThreshold + 0.2 then
+						return BOT_ACTION_DESIRE_HIGH, creep
 					end
 				end
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
+	if Fu.IsDoingRoshan(bot) then
 		if
-			c.IsRoshan(v)
-			and c.CanBeAttacked(v)
-			and c.CanCastOnNonMagicImmune(v)
-			and c.IsInRange(b, v, z)
-			and u
-			and E > 0.5
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > 0.5
 		then
-			return BOT_ACTION_DESIRE_HIGH, v
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(v) and c.IsInRange(b, v, z) and u and E > 0.5 then
-			return BOT_ACTION_DESIRE_HIGH, v
+	if Fu.IsDoingTormentor(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > 0.5
+		then
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderAphoticShield()
-	if not c.CanCastAbility(p) then
+function X.ConsiderAphoticShield()
+	if not Fu.CanCastAbility(aphoticShieldAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local z = c.GetProperCastRange(false, b, p:GetCastRange())
-	local D = p:GetManaCost()
-	local E = c.GetManaAfter(D)
-	local F = c.GetManaThreshold(b, D, { o })
-	for G, L in pairs(x) do
+	local castRange = Fu.GetProperCastRange(false, bot, aphoticShieldAbility:GetCastRange())
+	local manaCost = aphoticShieldAbility:GetManaCost()
+	local manaAfter = Fu.GetManaAfter(manaCost)
+	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { mistCoilAbility })
+	for _, allyHero in pairs(nearbyAllies) do
 		if
-			c.IsValidHero(L)
-			and c.CanBeAttacked(L)
-			and c.IsInRange(b, L, z + 300)
-			and not L:IsIllusion()
+			Fu.IsValidHero(allyHero)
+			and Fu.CanBeAttacked(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange + 300)
+			and not allyHero:IsIllusion()
 			-- fix: Aphotic Shield has DOTA_UNIT_TARGET_FLAG_NOT_MAGIC_IMMUNE_ALLIES (game data); a BKB ally is an invalid target
-			and not L:IsMagicImmune()
-			and not L:HasModifier("modifier_abaddon_aphotic_shield")
-			and not L:HasModifier("modifier_abaddon_borrowed_time")
-			and not L:HasModifier("modifier_doom_bringer_doom_aura_enemy")
-			and not L:HasModifier("modifier_ice_blast")
-			and not L:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not L:HasModifier("modifier_fountain_aura_buff")
-			and not L:HasModifier("modifier_rune_regen")
+			and not allyHero:IsMagicImmune()
+			and not allyHero:HasModifier("modifier_abaddon_aphotic_shield")
+			and not allyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not allyHero:HasModifier("modifier_doom_bringer_doom_aura_enemy")
+			and not allyHero:HasModifier("modifier_ice_blast")
+			and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not allyHero:HasModifier("modifier_fountain_aura_buff")
+			and not allyHero:HasModifier("modifier_rune_regen")
 		then
-			local M = c.GetHP(L)
-			if L:HasModifier("modifier_legion_commander_duel") then
-				return BOT_ACTION_DESIRE_HIGH, L
+			local allyHp = Fu.GetHP(allyHero)
+			if allyHero:HasModifier("modifier_legion_commander_duel") then
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
-			if c.IsDisabled(L) then
-				return BOT_ACTION_DESIRE_HIGH, L
+			if Fu.IsDisabled(allyHero) then
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
-			if c.IsGoingOnSomeone(L) then
-				local R = c.GetProperTarget(L)
+			if Fu.IsGoingOnSomeone(allyHero) then
+				local allyTarget = Fu.GetProperTarget(allyHero)
 				if
-					c.IsValidHero(R)
-					and c.IsInRange(L, R, L:GetAttackRange() + 300)
-					and not c.IsSuspiciousIllusion(R)
+					Fu.IsValidHero(allyTarget)
+					and Fu.IsInRange(allyHero, allyTarget, allyHero:GetAttackRange() + 300)
+					and not Fu.IsSuspiciousIllusion(allyTarget)
 				then
-					if M < 0.4 or E > F + 0.1 then
-						return BOT_ACTION_DESIRE_HIGH, L
+					if allyHp < 0.4 or manaAfter > manaThreshold + 0.1 then
+						return BOT_ACTION_DESIRE_HIGH, allyHero
 					end
 				end
 			end
-			if c.IsRetreating(L) and not c.IsRealInvisible(L) then
-				if L:WasRecentlyDamagedByAnyHero(2.0) and M < 0.75 then
-					return BOT_ACTION_DESIRE_HIGH, L
+			if Fu.IsRetreating(allyHero) and not Fu.IsRealInvisible(allyHero) then
+				if allyHero:WasRecentlyDamagedByAnyHero(2.0) and allyHp < 0.75 then
+					return BOT_ACTION_DESIRE_HIGH, allyHero
 				end
 			end
-			if c.IsDoingRoshan(b) then
-				if c.IsRoshan(v) and c.IsInRange(b, v, 800) and u and M < 0.5 then
-					return BOT_ACTION_DESIRE_HIGH, L
+			if Fu.IsDoingRoshan(bot) then
+				if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and allyHp < 0.5 then
+					return BOT_ACTION_DESIRE_HIGH, allyHero
 				end
 			end
-			if c.IsDoingTormentor(b) then
-				if c.IsTormentor(v) and c.IsInRange(b, v, 800) and u and M < 0.5 then
-					return BOT_ACTION_DESIRE_HIGH, L
+			if Fu.IsDoingTormentor(bot) then
+				if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and allyHp < 0.5 then
+					return BOT_ACTION_DESIRE_HIGH, allyHero
 				end
 			end
-			if L:WasRecentlyDamagedByAnyHero(2.0) and M < 0.4 and E > F + 0.1 then
-				return BOT_ACTION_DESIRE_HIGH, L
+			if allyHero:WasRecentlyDamagedByAnyHero(2.0) and allyHp < 0.4 and manaAfter > manaThreshold + 0.1 then
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 		end
 	end
-	if c.IsRetreating(b) and not c.IsRealInvisible(b) then
-		if b:WasRecentlyDamagedByAnyHero(2.0) and w < 0.75 then
-			return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) then
+		if bot:WasRecentlyDamagedByAnyHero(2.0) and hpRatio < 0.75 then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
-	if c.IsFarming(b) and u and E > F + 0.1 then
-		local S = b:GetNearbyCreeps(1600, true)
+	if Fu.IsFarming(bot) and isAttacking and manaAfter > manaThreshold + 0.1 then
+		local nearbyCreeps = bot:GetNearbyCreeps(1600, true)
 		if
-			#S > 0
-			and w < 0.5
-			and not b:HasModifier("modifier_abaddon_aphotic_shield")
-			and not b:HasModifier("modifier_abaddon_borrowed_time")
+			#nearbyCreeps > 0
+			and hpRatio < 0.5
+			and not bot:HasModifier("modifier_abaddon_aphotic_shield")
+			and not bot:HasModifier("modifier_abaddon_borrowed_time")
 		then
-			return BOT_ACTION_DESIRE_HIGH, b
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 -- Borrowed Time by hand: under hero damage in a fight, before burst drops him through the
 -- 400 HP auto-trigger. The cast also strong-dispels him (datafeed).
-function a.ConsiderBorrowedTime(borrowedTime)
-	if not c.CanCastAbility(borrowedTime) or b:HasModifier("modifier_abaddon_borrowed_time") then
+function X.ConsiderBorrowedTime(borrowedTime)
+	if not Fu.CanCastAbility(borrowedTime) or bot:HasModifier("modifier_abaddon_borrowed_time") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if not b:WasRecentlyDamagedByAnyHero(1.5) then
+	if not bot:WasRecentlyDamagedByAnyHero(1.5) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local enemiesNear = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
+	local enemiesNear = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
 	if enemiesNear == nil or #enemiesNear == 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if w < 0.35 or w < 0.5 and #enemiesNear >= 2 then
+	if hpRatio < 0.35 or hpRatio < 0.5 and #enemiesNear >= 2 then
 		LogAbaddon("borrowed-time enemies=" .. #enemiesNear)
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

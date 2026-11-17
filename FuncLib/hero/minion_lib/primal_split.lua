@@ -1,269 +1,300 @@
 -- Thinking for summoned units: primal split.
-local a = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local b = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
-local c = {}
-local d = nil
-local e, f, g, h = 0, 0, 0, 0
-local i, j, k
-function c.MinionThink(l, m)
-	d = l
-	k = a.GetProperTarget(d)
-	i = m:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	j = m:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	if a.IsValid(m) then
-		if string.find(m:GetUnitName(), "npc_dota_brewmaster_storm") then
-			if m:IsUsingAbility() then
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
+local X = {}
+local bot = nil
+local dispelMagicDesire, cycloneDesire, windWalkDesire, hurlBoulderDesire = 0, 0, 0, 0
+local botTarget
+function X.MinionThink(ownerBot, minion)
+	bot = ownerBot
+	botTarget = Fu.GetProperTarget(bot)
+	if Fu.IsValid(minion) then
+		if string.find(minion:GetUnitName(), "npc_dota_brewmaster_storm") then
+			if minion:IsUsingAbility() then
 				return
 			end
-			DispelMagic = m:GetAbilityByName("brewmaster_storm_dispel_magic")
-			Cyclone = m:GetAbilityByName("brewmaster_storm_cyclone")
-			WindWalk = m:GetAbilityByName("brewmaster_storm_wind_walk")
-			e, DispelMagicTarget = UseDispelMagic(m)
-			if e > 0 then
-				m:Action_UseAbilityOnLocation(DispelMagic, DispelMagicTarget)
+			DispelMagic = minion:GetAbilityByName("brewmaster_storm_dispel_magic")
+			Cyclone = minion:GetAbilityByName("brewmaster_storm_cyclone")
+			WindWalk = minion:GetAbilityByName("brewmaster_storm_wind_walk")
+			dispelMagicDesire, DispelMagicTarget = UseDispelMagic(minion)
+			if dispelMagicDesire > 0 then
+				minion:Action_UseAbilityOnLocation(DispelMagic, DispelMagicTarget)
 				return
 			end
-			f, CycloneTarget = UseCyclone(m)
-			if f > 0 then
-				m:Action_UseAbilityOnEntity(Cyclone, CycloneTarget)
+			cycloneDesire, CycloneTarget = UseCyclone(minion)
+			if cycloneDesire > 0 then
+				minion:Action_UseAbilityOnEntity(Cyclone, CycloneTarget)
 				return
 			end
-			g, WindWalkTarget = UseWindWalk(m)
-			if g > 0 then
-				m:Action_UseAbility(WindWalk)
+			windWalkDesire, WindWalkTarget = UseWindWalk(minion)
+			if windWalkDesire > 0 then
+				minion:Action_UseAbility(WindWalk)
 				return
 			end
 		end
-		if string.find(m:GetUnitName(), "npc_dota_brewmaster_earth") then
-			if m:IsUsingAbility() then
+		if string.find(minion:GetUnitName(), "npc_dota_brewmaster_earth") then
+			if minion:IsUsingAbility() then
 				return
 			end
-			HurlBoulder = m:GetAbilityByName("brewmaster_earth_hurl_boulder")
-			h, HurlBoulderTarget = UseHurlBoulder(m)
-			if h > 0 then
-				m:Action_UseAbilityOnEntity(HurlBoulder, HurlBoulderTarget)
+			HurlBoulder = minion:GetAbilityByName("brewmaster_earth_hurl_boulder")
+			hurlBoulderDesire, HurlBoulderTarget = UseHurlBoulder(minion)
+			if hurlBoulderDesire > 0 then
+				minion:Action_UseAbilityOnEntity(HurlBoulder, HurlBoulderTarget)
 				return
 			end
-			if m:GetHealth() <= m:GetMaxHealth() * 0.25 then
-				m:Action_MoveToLocation(a.GetTeamFountain())
+			if minion:GetHealth() <= minion:GetMaxHealth() * 0.25 then
+				minion:Action_MoveToLocation(Fu.GetTeamFountain())
 				return
 			end
-			local n = nil
-			local o = 0
-			for p = 1, 5 do
-				local q = GetTeamMember(p)
-				if a.IsValidHero(q) and q:IsAlive() then
-					local r = q:GetAttackDamage()
-					if r > o then
-						o = r
-						n = q
+			local strongestAlly = nil
+			local maxAttackDamage = 0
+			for i = 1, 5 do
+				local teamMember = GetTeamMember(i)
+				if Fu.IsValidHero(teamMember) and teamMember:IsAlive() then
+					local attackDamage = teamMember:GetAttackDamage()
+					if attackDamage > maxAttackDamage then
+						maxAttackDamage = attackDamage
+						strongestAlly = teamMember
 					end
 				end
 			end
-			if n ~= nil then
-				local s = n:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-				if s and #s >= 1 then
-					m:Action_AttackUnit(a.GetWeakestUnit(s), false)
+			if strongestAlly ~= nil then
+				local allyEnemies = strongestAlly:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+				if allyEnemies and #allyEnemies >= 1 then
+					minion:Action_AttackUnit(Fu.GetWeakestUnit(allyEnemies), false)
 					return
 				end
-				if GetUnitToUnitDistance(m, n) > 400 then
-					m:Action_MoveToLocation(n:GetLocation())
+				if GetUnitToUnitDistance(minion, strongestAlly) > 400 then
+					minion:Action_MoveToLocation(strongestAlly:GetLocation())
 					return
 				end
 			end
 		end
-		if string.find(m:GetUnitName(), "npc_dota_brewmaster_fire") then
+		if string.find(minion:GetUnitName(), "npc_dota_brewmaster_fire") then
 		end
-		if string.find(m:GetUnitName(), "npc_dota_brewmaster_void") then
-			if m:IsUsingAbility() then
+		if string.find(minion:GetUnitName(), "npc_dota_brewmaster_void") then
+			if minion:IsUsingAbility() then
 				return
 			end
-			AstralPull = m:GetAbilityByName("brewmaster_void_astral_pull")
-			AstralPullDesire, AstralPullTarget = UseAstralPull(m)
+			AstralPull = minion:GetAbilityByName("brewmaster_void_astral_pull")
+			AstralPullDesire, AstralPullTarget = UseAstralPull(minion)
 			if AstralPullDesire > 0 then
-				m:Action_UseAbility(AstralPull)
+				minion:Action_UseAbility(AstralPull)
 				return
 			end
 		end
-		local t = AttackUnits(m)
-		if t ~= nil then
-			m:Action_AttackUnit(t, false)
+		local attackTarget = AttackUnits(minion)
+		if attackTarget ~= nil then
+			minion:Action_AttackUnit(attackTarget, false)
 			return
 		end
-		local u, v = ConsiderMove(m)
-		if u > 0 then
-			m:Action_MoveToLocation(v)
+		local moveDesire, moveLocation = ConsiderMove(minion)
+		if moveDesire > 0 then
+			minion:Action_MoveToLocation(moveLocation)
 			return
 		end
 	end
 end
-function AttackUnits(m)
-	local w = d:GetActiveMode()
-	if a.IsGoingOnSomeone(d) and a.IsValidHero(k) then
-		if GetUnitToUnitDistance(m, k) <= 1600 then
-			return k
+function AttackUnits(minion)
+	local botMode = bot:GetActiveMode()
+	if Fu.IsGoingOnSomeone(bot) and Fu.IsValidHero(botTarget) then
+		if GetUnitToUnitDistance(minion, botTarget) <= 1600 then
+			return botTarget
 		end
 	end
-	if w == BOT_MODE_RETREAT or w == BOT_MODE_SECRET_SHOP or w == BOT_MODE_WARD or w == BOT_MODE_RUNE then
-		local x = m:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
-		if x and #x >= 1 then
-			return a.GetWeakestUnit(x)
+	if
+		botMode == BOT_MODE_RETREAT
+		or botMode == BOT_MODE_SECRET_SHOP
+		or botMode == BOT_MODE_WARD
+		or botMode == BOT_MODE_RUNE
+	then
+		local nearbyEnemies = minion:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
+		if nearbyEnemies and #nearbyEnemies >= 1 then
+			return Fu.GetWeakestUnit(nearbyEnemies)
 		end
-		local y = m:GetNearbyLaneCreeps(1600, true)
-		if y and #y >= 1 then
-			return a.GetWeakestUnit(y)
+		local nearbyCreeps = minion:GetNearbyLaneCreeps(1600, true)
+		if nearbyCreeps and #nearbyCreeps >= 1 then
+			return Fu.GetWeakestUnit(nearbyCreeps)
 		end
 		return nil
 	end
-	if w == BOT_MODE_LANING then
-		local z = m:GetNearbyTowers(800, true)
-		for A, B in pairs(z) do
-			if a.IsValidBuilding(B) then
-				local C = B:GetAttackTarget()
-				if C == m or GetUnitToUnitDistance(m, B) <= 700 then
+	if botMode == BOT_MODE_LANING then
+		local enemyTowers = minion:GetNearbyTowers(800, true)
+		for _, tower in pairs(enemyTowers) do
+			if Fu.IsValidBuilding(tower) then
+				local towerTarget = tower:GetAttackTarget()
+				if towerTarget == minion or GetUnitToUnitDistance(minion, tower) <= 700 then
 					return nil
 				end
 			end
 		end
-		local D = d:GetAttackTarget()
-		if D ~= nil then
-			return D
+		local botAttackTarget = bot:GetAttackTarget()
+		if botAttackTarget ~= nil then
+			return botAttackTarget
 		end
-		local x = m:GetNearbyHeroes(800, true, BOT_MODE_NONE)
-		if x and #x >= 1 then
-			for A, E in pairs(x) do
-				if a.IsValidHero(E) and E:GetAttackTarget() == m then
+		local nearbyEnemies = minion:GetNearbyHeroes(800, true, BOT_MODE_NONE)
+		if nearbyEnemies and #nearbyEnemies >= 1 then
+			for _, enemyHero in pairs(nearbyEnemies) do
+				if Fu.IsValidHero(enemyHero) and enemyHero:GetAttackTarget() == minion then
 					return nil
 				end
 			end
-			return a.GetWeakestUnit(x)
+			return Fu.GetWeakestUnit(nearbyEnemies)
 		end
 		return nil
 	end
-	if w == BOT_MODE_FARM then
-		local y = m:GetNearbyLaneCreeps(1600, true)
-		if y and #y >= 1 then
-			return a.GetWeakestUnit(y)
+	if botMode == BOT_MODE_FARM then
+		local nearbyCreeps = minion:GetNearbyLaneCreeps(1600, true)
+		if nearbyCreeps and #nearbyCreeps >= 1 then
+			return Fu.GetWeakestUnit(nearbyCreeps)
 		end
-		y = m:GetNearbyCreeps(1600, true)
-		if y and #y >= 1 then
-			return a.GetWeakestUnit(y)
+		nearbyCreeps = minion:GetNearbyCreeps(1600, true)
+		if nearbyCreeps and #nearbyCreeps >= 1 then
+			return Fu.GetWeakestUnit(nearbyCreeps)
 		end
 		return nil
 	end
-	if a.IsPushing(d) then
-		local y = m:GetNearbyLaneCreeps(1600, true)
-		if y and #y >= 1 then
-			return a.GetWeakestUnit(y)
+	if Fu.IsPushing(bot) then
+		local nearbyCreeps = minion:GetNearbyLaneCreeps(1600, true)
+		if nearbyCreeps and #nearbyCreeps >= 1 then
+			return Fu.GetWeakestUnit(nearbyCreeps)
 		end
-		local F = m:GetNearbyBarracks(1600, true)
-		if F then
-			for A, G in pairs(F) do
-				if a.IsValidBuilding(G) and not G:IsInvulnerable() and string.find(G:GetUnitName(), "melee") then
-					return G
+		local enemyBarracks = minion:GetNearbyBarracks(1600, true)
+		if enemyBarracks then
+			for _, barracks in pairs(enemyBarracks) do
+				if
+					Fu.IsValidBuilding(barracks)
+					and not barracks:IsInvulnerable()
+					and string.find(barracks:GetUnitName(), "melee")
+				then
+					return barracks
 				end
 			end
-			for A, G in pairs(F) do
-				if a.IsValidBuilding(G) and not G:IsInvulnerable() then
-					return G
-				end
-			end
-		end
-		local H = m:GetNearbyTowers(1600, true)
-		if H and #H >= 1 and a.IsValidBuilding(H[1]) and not H[1]:IsInvulnerable() then
-			return H[1]
-		end
-		local I = GetAncient(GetOpposingTeam())
-		if I and a.IsValidBuilding(I) and not I:IsInvulnerable() and GetUnitToUnitDistance(m, I) <= 1600 then
-			return I
-		end
-		return nil
-	end
-	if a.IsDefending(d) then
-		local y = m:GetNearbyLaneCreeps(1600, true)
-		if y and #y >= 1 then
-			return a.GetWeakestUnit(y)
-		end
-		return nil
-	end
-	if w == BOT_MODE_ROSHAN then
-		local y = m:GetNearbyCreeps(1600, true)
-		if y then
-			for A, J in pairs(y) do
-				if a.IsRoshan(J) then
-					return J
+			for _, barracks in pairs(enemyBarracks) do
+				if Fu.IsValidBuilding(barracks) and not barracks:IsInvulnerable() then
+					return barracks
 				end
 			end
 		end
+		local enemyTowers = minion:GetNearbyTowers(1600, true)
+		if
+			enemyTowers
+			and #enemyTowers >= 1
+			and Fu.IsValidBuilding(enemyTowers[1])
+			and not enemyTowers[1]:IsInvulnerable()
+		then
+			return enemyTowers[1]
+		end
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		if
+			enemyAncient
+			and Fu.IsValidBuilding(enemyAncient)
+			and not enemyAncient:IsInvulnerable()
+			and GetUnitToUnitDistance(minion, enemyAncient) <= 1600
+		then
+			return enemyAncient
+		end
 		return nil
 	end
-	local x = m:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	if x and #x >= 1 then
-		return a.GetWeakestUnit(x)
+	if Fu.IsDefending(bot) then
+		local nearbyCreeps = minion:GetNearbyLaneCreeps(1600, true)
+		if nearbyCreeps and #nearbyCreeps >= 1 then
+			return Fu.GetWeakestUnit(nearbyCreeps)
+		end
+		return nil
 	end
-	local y = m:GetNearbyLaneCreeps(1600, true)
-	if y and #y >= 1 then
-		return y[1]
+	if botMode == BOT_MODE_ROSHAN then
+		local nearbyCreeps = minion:GetNearbyCreeps(1600, true)
+		if nearbyCreeps then
+			for _, creep in pairs(nearbyCreeps) do
+				if Fu.IsRoshan(creep) then
+					return creep
+				end
+			end
+		end
+		return nil
 	end
-	local H = m:GetNearbyTowers(1600, true)
-	if H and #H >= 1 and a.IsValidBuilding(H[1]) then
-		return H[1]
+	local nearbyEnemies = minion:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	if nearbyEnemies and #nearbyEnemies >= 1 then
+		return Fu.GetWeakestUnit(nearbyEnemies)
+	end
+	local nearbyCreeps = minion:GetNearbyLaneCreeps(1600, true)
+	if nearbyCreeps and #nearbyCreeps >= 1 then
+		return nearbyCreeps[1]
+	end
+	local enemyTowers = minion:GetNearbyTowers(1600, true)
+	if enemyTowers and #enemyTowers >= 1 and Fu.IsValidBuilding(enemyTowers[1]) then
+		return enemyTowers[1]
 	end
 	return nil
 end
-function UseDispelMagic(m)
+function UseDispelMagic(minion)
 	if not DispelMagic:IsFullyCastable() then
 		return 0, nil
 	end
-	if a.CanNotUseAbility(m) then
+	if Fu.CanNotUseAbility(minion) then
 		return 0, nil
 	end
-	local K = DispelMagic:GetCastRange()
-	local L = DispelMagic:GetSpecialValueInt("radius")
-	local M = d:FindAoELocation(true, true, m:GetLocation(), K, L / 2, 0, 0)
-	if M.count >= 2 then
-		return BOT_ACTION_DESIRE_HIGH, M.targetloc
+	local castRange = DispelMagic:GetCastRange()
+	local radius = DispelMagic:GetSpecialValueInt("radius")
+	local aoeLocation = bot:FindAoELocation(true, true, minion:GetLocation(), castRange, radius / 2, 0, 0)
+	if aoeLocation.count >= 2 then
+		return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 	end
 	return 0, nil
 end
-function UseCyclone(m)
+function UseCyclone(minion)
 	if not Cyclone:IsFullyCastable() then
 		return 0, nil
 	end
-	if a.CanNotUseAbility(m) then
+	if Fu.CanNotUseAbility(minion) then
 		return 0, nil
 	end
-	local K = Cyclone:GetCastRange()
-	local x = m:GetNearbyHeroes(K + 500, true, BOT_MODE_NONE)
-	local N = a.FilterEnemiesForStun(x)
-	local t = nil
-	for A, E in pairs(x) do
-		if a.IsValidTarget(E) and E:IsChanneling() and a.IsNotImmune(E) and not a.IsReflectingSpells(E) then
-			t = E
+	local castRange = Cyclone:GetCastRange()
+	local nearbyEnemies = minion:GetNearbyHeroes(castRange + 500, true, BOT_MODE_NONE)
+	local stunnableEnemies = Fu.FilterEnemiesForStun(nearbyEnemies)
+	local cycloneTarget = nil
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if
+			Fu.IsValidTarget(enemyHero)
+			and enemyHero:IsChanneling()
+			and Fu.IsNotImmune(enemyHero)
+			and not Fu.IsReflectingSpells(enemyHero)
+		then
+			cycloneTarget = enemyHero
 			break
 		end
 	end
-	if t == nil and a.IsGoingOnSomeone(d) then
-		local O = k
-		for A, E in pairs(N) do
-			if a.IsValidHero(E) and E ~= O and not E:IsMagicImmune() and not a.IsReflectingSpells(E) then
-				t = E
+	if cycloneTarget == nil and Fu.IsGoingOnSomeone(bot) then
+		local ownerTarget = botTarget
+		for _, enemyHero in pairs(stunnableEnemies) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero ~= ownerTarget
+				and not enemyHero:IsMagicImmune()
+				and not Fu.IsReflectingSpells(enemyHero)
+			then
+				cycloneTarget = enemyHero
 				break
 			end
 		end
 	end
-	if t == nil and #N >= 2 then
-		local P = a.GetStrongestEnemyHero(N)
-		if P ~= nil and not P:IsMagicImmune() and not a.IsReflectingSpells(P) then
-			t = P
+	if cycloneTarget == nil and #stunnableEnemies >= 2 then
+		local strongestEnemy = Fu.GetStrongestEnemyHero(stunnableEnemies)
+		if
+			strongestEnemy ~= nil
+			and not strongestEnemy:IsMagicImmune()
+			and not Fu.IsReflectingSpells(strongestEnemy)
+		then
+			cycloneTarget = strongestEnemy
 		end
 	end
-	if t ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, t
+	if cycloneTarget ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, cycloneTarget
 	end
 	return 0, nil
 end
-function UseWindWalk(m)
+function UseWindWalk(minion)
 	if not WindWalk:IsFullyCastable() then
 		return 0, nil
 	end
@@ -273,101 +304,114 @@ function UseWindWalk(m)
 	if Cyclone:IsFullyCastable() then
 		return 0, nil
 	end
-	if a.CanNotUseAbility(m) then
+	if Fu.CanNotUseAbility(minion) then
 		return 0, nil
 	end
 	return BOT_ACTION_DESIRE_HIGH
 end
-function UseHurlBoulder(m)
+function UseHurlBoulder(minion)
 	if not HurlBoulder:IsFullyCastable() then
 		return 0, nil
 	end
-	if a.CanNotUseAbility(m) then
+	if Fu.CanNotUseAbility(minion) then
 		return 0, nil
 	end
-	local K = HurlBoulder:GetCastRange()
-	local Q = HurlBoulder:GetSpecialValueInt("damage")
-	local x = m:GetNearbyHeroes(K, true, BOT_MODE_NONE)
-	for A, E in pairs(x) do
+	local castRange = HurlBoulder:GetCastRange()
+	local damage = HurlBoulder:GetSpecialValueInt("damage")
+	local nearbyEnemies = minion:GetNearbyHeroes(castRange, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			a.IsValidHero(E)
-			and not E:IsMagicImmune()
-			and not a.IsReflectingSpells(E)
-			and (E:IsChanneling() or Q > E:GetHealth())
+			Fu.IsValidHero(enemyHero)
+			and not enemyHero:IsMagicImmune()
+			and not Fu.IsReflectingSpells(enemyHero)
+			and (enemyHero:IsChanneling() or damage > enemyHero:GetHealth())
 		then
-			return BOT_ACTION_DESIRE_HIGH, E
+			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end
 	if
-		a.IsGoingOnSomeone(d)
-		and a.IsValidHero(k)
-		and a.IsInRange(m, k, K)
-		and not k:IsMagicImmune()
-		and not a.IsReflectingSpells(k)
-		and not a.IsDisabled(k)
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(minion, botTarget, castRange)
+		and not botTarget:IsMagicImmune()
+		and not Fu.IsReflectingSpells(botTarget)
+		and not Fu.IsDisabled(botTarget)
 	then
-		return BOT_ACTION_DESIRE_HIGH, k
+		return BOT_ACTION_DESIRE_HIGH, botTarget
 	end
-	if a.IsRetreating(d) then
-		local P = a.GetStrongestEnemyHero(x)
-		if P ~= nil and not P:IsMagicImmune() and not a.IsReflectingSpells(P) then
-			return BOT_ACTION_DESIRE_HIGH, P
+	if Fu.IsRetreating(bot) then
+		local strongestEnemy = Fu.GetStrongestEnemyHero(nearbyEnemies)
+		if
+			strongestEnemy ~= nil
+			and not strongestEnemy:IsMagicImmune()
+			and not Fu.IsReflectingSpells(strongestEnemy)
+		then
+			return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 		end
 	end
-	local R = m:GetNearbyTowers(1600, false)
-	for A, B in pairs(R) do
-		local C = B:GetAttackTarget()
-		if a.IsValidHero(C) and not C:IsMagicImmune() and not a.IsDisabled(C) and not a.IsReflectingSpells(C) then
-			return BOT_ACTION_DESIRE_HIGH, C
+	local allyTowers = minion:GetNearbyTowers(1600, false)
+	for _, tower in pairs(allyTowers) do
+		local towerTarget = tower:GetAttackTarget()
+		if
+			Fu.IsValidHero(towerTarget)
+			and not towerTarget:IsMagicImmune()
+			and not Fu.IsDisabled(towerTarget)
+			and not Fu.IsReflectingSpells(towerTarget)
+		then
+			return BOT_ACTION_DESIRE_HIGH, towerTarget
 		end
 	end
 	return 0, nil
 end
-function UseAstralPull(m)
+function UseAstralPull(minion)
 	if not AstralPull:IsFullyCastable() then
 		return 0, nil
 	end
-	if a.CanNotUseAbility(m) then
+	if Fu.CanNotUseAbility(minion) then
 		return 0, nil
 	end
-	local S = 800
-	local Q = AstralPull:GetAbilityDamage()
-	local x = m:GetNearbyHeroes(S, true, BOT_MODE_NONE)
-	if x ~= nil and #x >= 1 then
-		for A, E in pairs(x) do
-			if a.IsValidHero(E) and not a.IsReflectingSpells(E) and (E:IsChanneling() or Q > E:GetHealth()) then
-				return BOT_ACTION_DESIRE_HIGH, E
+	local searchRange = 800
+	local damage = AstralPull:GetAbilityDamage()
+	local nearbyEnemies = minion:GetNearbyHeroes(searchRange, true, BOT_MODE_NONE)
+	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsReflectingSpells(enemyHero)
+				and (enemyHero:IsChanneling() or damage > enemyHero:GetHealth())
+			then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
 	return 0, nil
 end
-function ConsiderMove(m)
-	if b.CantMove(m) then
+function ConsiderMove(minion)
+	if MinionUtils.CantMove(minion) then
 		return BOT_MODE_DESIRE_NONE, 0
 	end
-	local w = d:GetActiveMode()
-	if w == BOT_MODE_LANING then
-		local z = m:GetNearbyTowers(800, true)
-		for A, B in pairs(z) do
-			if a.IsValidBuilding(B) then
-				local C = B:GetAttackTarget()
-				if C == m or GetUnitToUnitDistance(m, B) <= 700 then
-					return BOT_ACTION_DESIRE_HIGH, a.GetTeamFountain()
+	local botMode = bot:GetActiveMode()
+	if botMode == BOT_MODE_LANING then
+		local enemyTowers = minion:GetNearbyTowers(800, true)
+		for _, tower in pairs(enemyTowers) do
+			if Fu.IsValidBuilding(tower) then
+				local towerTarget = tower:GetAttackTarget()
+				if towerTarget == minion or GetUnitToUnitDistance(minion, tower) <= 700 then
+					return BOT_ACTION_DESIRE_HIGH, Fu.GetTeamFountain()
 				end
 			end
 		end
-		local x = m:GetNearbyHeroes(800, true, BOT_MODE_NONE)
-		for A, E in pairs(x or {}) do
-			if a.IsValidHero(E) and E:GetAttackTarget() == m then
-				return BOT_ACTION_DESIRE_HIGH, d:GetLocation()
+		local nearbyEnemies = minion:GetNearbyHeroes(800, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies or {}) do
+			if Fu.IsValidHero(enemyHero) and enemyHero:GetAttackTarget() == minion then
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
-	local T = GetUnitToUnitDistance(m, d)
-	if T > 200 then
-		return BOT_ACTION_DESIRE_HIGH, d:GetLocation()
+	local distanceToBot = GetUnitToUnitDistance(minion, bot)
+	if distanceToBot > 200 then
+		return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 	end
-	return BOT_ACTION_DESIRE_HIGH, d:GetLocation() + RandomVector(200)
+	return BOT_ACTION_DESIRE_HIGH, bot:GetLocation() + RandomVector(200)
 end
-return c
+return X

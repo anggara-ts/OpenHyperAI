@@ -1,112 +1,110 @@
 -- Hero-specific helper: special units.
-local a = {}
-local b
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-function a.GetDesire(d)
-	local e = c.GetHP(b)
-	local f = c.IsRetreating(b)
-	local g = c.IsRealInvisible(b)
-	local h = c.IsGoingOnSomeone(b)
-	b = d
-	if c.CanNotUseAction(b) or b:IsDisarmed() then
+local X = {}
+local bot
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+function X.GetDesire(thinkingBot)
+	local hpRatio = Fu.GetHP(bot)
+	local isRetreating = Fu.IsRetreating(bot)
+	local isRealInvisible = Fu.IsRealInvisible(bot)
+	local isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
+	bot = thinkingBot
+	if Fu.CanNotUseAction(bot) or bot:IsDisarmed() then
 		return 0
 	end
-	b.special_unit_target = nil
-	local i = b:GetHealth()
-	local j = e
-	local k = b:GetLocation()
-	local l = b:GetAttackRange()
-	local m = c.GetAlliesNearLoc(b:GetLocation(), 1600)
-	local n = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	local o = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local p = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	local q = c.GetProperTarget(b)
-	local r = b:GetUnitName()
-	local s = false
-	for t = 1, #GetTeamPlayers(GetTeam()) do
-		local u = GetTeamMember(t)
-		if u ~= nil and u:GetUnitName() == "npc_dota_hero_rattletrap" then
-			s = true
-			break
-		end
-	end
+	bot.special_unit_target = nil
+	local health = bot:GetHealth()
+	local botHpRatio = hpRatio
+	local botLocation = bot:GetLocation()
+	local attackRange = bot:GetAttackRange()
+	local alliesNearLoc = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
+	local enemiesNearLoc = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600)
+	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	local botTarget = Fu.GetProperTarget(bot)
+	local botName = bot:GetUnitName()
 	-- Escape Shadow Shaman serpent ward traps (self or ally) before other specials.
 	-- Below teamfight priority; above creeps when no enemy hero is nearby.
 	do
-		local snakeDesire, snakeTarget = a.GetSerpentWardEscapeDesire(b, l, p)
-		if snakeDesire > 0 and c.IsValid(snakeTarget) then
-			b.special_unit_target = snakeTarget
+		local snakeDesire, snakeTarget = X.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemies)
+		if snakeDesire > 0 and Fu.IsValid(snakeTarget) then
+			bot.special_unit_target = snakeTarget
 			return snakeDesire
 		end
 	end
 	-- Deward: revealed enemy obs/sentry under ally true sight.
 	do
-		local wardDesire, wardTarget = a.GetDewardDesire(b, l, n)
-		if wardDesire > 0 and c.IsValid(wardTarget) then
-			b.special_unit_target = wardTarget
+		local wardDesire, wardTarget = X.GetDewardDesire(bot, attackRange, enemiesNearLoc)
+		if wardDesire > 0 and Fu.IsValid(wardTarget) then
+			bot.special_unit_target = wardTarget
 			return wardDesire
 		end
 	end
-	for v, w in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if c.IsValid(w) and c.CanBeAttacked(w) and c.IsInRange(b, w, 1600) then
-			b.special_unit_target = w
-			local x = w:GetUnitName()
-			local y = a.GetUnitAttackDamageWithinTime(b, 8.0)
-			local z = c.GetHP(w)
-			local A = w:GetLocation()
-			local B = GetUnitToUnitDistance(b, w) <= l
-			if string.find(x, "rattletrap_cog") then
-				if string.find(r, "rattletrap") and B then
-					if h then
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+		if Fu.IsValid(unit) and Fu.CanBeAttacked(unit) and Fu.IsInRange(bot, unit, 1600) then
+			bot.special_unit_target = unit
+			local unitName = unit:GetUnitName()
+			local botDamage = X.GetUnitAttackDamageWithinTime(bot, 8.0)
+			local unitHpRatio = Fu.GetHP(unit)
+			local unitLocation = unit:GetLocation()
+			local isInAttackRange = GetUnitToUnitDistance(bot, unit) <= attackRange
+			if string.find(unitName, "rattletrap_cog") then
+				if string.find(botName, "rattletrap") and isInAttackRange then
+					if isGoingOnSomeone then
 						if
-							c.IsValidHero(q)
-							and c.CanCastOnNonMagicImmune(q)
-							and c.IsInRange(b, q, 800)
-							and not c.IsInRange(b, q, 400)
-							and not (c.IsInRange(b, q, 800) and c.IsChasingTarget(b, q))
+							Fu.IsValidHero(botTarget)
+							and Fu.CanCastOnNonMagicImmune(botTarget)
+							and Fu.IsInRange(bot, botTarget, 800)
+							and not Fu.IsInRange(bot, botTarget, 400)
+							and not (Fu.IsInRange(bot, botTarget, 800) and Fu.IsChasingTarget(bot, botTarget))
 						then
-							local C = PointToLineDistance(k, q:GetLocation(), A)
-							if C ~= nil and C.within and C.distance <= 185 then
+							local lineDistance = PointToLineDistance(botLocation, botTarget:GetLocation(), unitLocation)
+							if lineDistance ~= nil and lineDistance.within and lineDistance.distance <= 185 then
 								return 2
 							end
 						end
 					end
-					if f and g then
-						for v, D in pairs(n) do
+					if isRetreating and isRealInvisible then
+						for _, enemyHero in pairs(enemiesNearLoc) do
 							if
-								c.IsValidHero(D)
-								and c.IsInRange(b, D, 800)
-								and not c.IsInRange(b, q, 400)
-								and c.IsChasingTarget(D, b)
+								Fu.IsValidHero(enemyHero)
+								and Fu.IsInRange(bot, enemyHero, 800)
+								and not Fu.IsInRange(bot, botTarget, 400)
+								and Fu.IsChasingTarget(enemyHero, bot)
 							then
-								local C = PointToLineDistance(k, q:GetLocation(), A)
-								if C ~= nil and C.within and C.distance <= 185 then
+								local lineDistance =
+									PointToLineDistance(botLocation, botTarget:GetLocation(), unitLocation)
+								if lineDistance ~= nil and lineDistance.within and lineDistance.distance <= 185 then
 									return 2
 								end
 							end
 						end
 					end
 				else
-					local E = c.GetPowerCogsCountInLoc(k, 1000)
-					local F = c.GetPowerCogsCountInLoc(k, 216)
-					if #p >= 1 then
-						local G = c.GetEnemiesNearLoc(k, 800)
-						if E == 8 and F >= 4 and B then
-							if #G == 0 or h or f and not g and #G >= 1 or #m < #n then
+					local cogsNearby = Fu.GetPowerCogsCountInLoc(botLocation, 1000)
+					local cogsInRing = Fu.GetPowerCogsCountInLoc(botLocation, 216)
+					if #nearbyEnemies >= 1 then
+						local closeEnemies = Fu.GetEnemiesNearLoc(botLocation, 800)
+						if cogsNearby == 8 and cogsInRing >= 4 and isInAttackRange then
+							if
+								#closeEnemies == 0
+								or isGoingOnSomeone
+								or isRetreating and not isRealInvisible and #closeEnemies >= 1
+								or #alliesNearLoc < #enemiesNearLoc
+							then
 								return 0.95
 							else
 								return 0.55
 							end
 						end
 					end
-					if #n == 0 then
-						if E == 8 and F >= 4 and B then
+					if #enemiesNearLoc == 0 then
+						if cogsNearby == 8 and cogsInRing >= 4 and isInAttackRange then
 							return 0.90
 						else
 							if
-								b:GetTeam() ~= w:GetTeam()
-								and c.IsInRange(b, w, l + 350)
-								and not c.IsInLaningPhase()
+								bot:GetTeam() ~= unit:GetTeam()
+								and Fu.IsInRange(bot, unit, attackRange + 350)
+								and not Fu.IsInLaningPhase()
 							then
 								return 0.75
 							else
@@ -116,66 +114,73 @@ function a.GetDesire(d)
 					end
 				end
 			end
-			if b:GetTeam() ~= w:GetTeam() then
+			if bot:GetTeam() ~= unit:GetTeam() then
 				if
-					string.find(x, "juggernaut_healing_ward")
-					or string.find(x, "roshans_banner")
-					or string.find(x, "land_mine")
-					or string.find(x, "ignis_fatuus")
+					string.find(unitName, "juggernaut_healing_ward")
+					or string.find(unitName, "roshans_banner")
+					or string.find(unitName, "land_mine")
+					or string.find(unitName, "ignis_fatuus")
 				then
-					if c.IsInRange(b, w, l) then
+					if Fu.IsInRange(bot, unit, attackRange) then
 						return 1
 					end
-					if c.IsInRange(b, w, l + 200) then
-						return RemapValClamped(e, 0.1, 0.9, 0, 0.96)
+					if Fu.IsInRange(bot, unit, attackRange + 200) then
+						return RemapValClamped(hpRatio, 0.1, 0.9, 0, 0.96)
 					end
-					if #p == 0 then
-						return RemapValClamped(e, 0.2, 0.9, 0, 0.9)
+					if #nearbyEnemies == 0 then
+						return RemapValClamped(hpRatio, 0.2, 0.9, 0, 0.9)
 					end
-					if #m >= #n then
-						return RemapValClamped(e, 0.2, 0.9, 0, 0.7)
+					if #alliesNearLoc >= #enemiesNearLoc then
+						return RemapValClamped(hpRatio, 0.2, 0.9, 0, 0.7)
 					end
 				end
-				if string.find(x, "siege") then
-					if #p == 0 and c.GetDistanceFromAncient(b, false) < 3000 then
+				if string.find(unitName, "siege") then
+					if #nearbyEnemies == 0 and Fu.GetDistanceFromAncient(bot, false) < 3000 then
 						return 0.5
 					end
 				end
 				if
-					string.find(x, "shadow_shaman_ward")
-					or string.find(x, "invoker_forged_spirit")
-					or string.find(x, "venomancer_plague_ward")
-					or string.find(x, "clinkz_skeleton_archer")
+					string.find(unitName, "shadow_shaman_ward")
+					or string.find(unitName, "invoker_forged_spirit")
+					or string.find(unitName, "venomancer_plague_ward")
+					or string.find(unitName, "clinkz_skeleton_archer")
 				then
-					if e > 0.7 and c.IsInRange(b, w, l) then
-						if #n == 0 then
-							return RemapValClamped(e, 0.3, 0.9, 0, 0.75)
+					if hpRatio > 0.7 and Fu.IsInRange(bot, unit, attackRange) then
+						if #enemiesNearLoc == 0 then
+							return RemapValClamped(hpRatio, 0.3, 0.9, 0, 0.75)
 						end
-						if #m >= #n then
+						if #alliesNearLoc >= #enemiesNearLoc then
 							return 0.4
 						end
 					end
-					if e < 0.7 and c.IsStuck(b) then
-						return RemapValClamped(e, 0.2, 0.8, 0.7, 0.3)
+					if hpRatio < 0.7 and Fu.IsStuck(bot) then
+						return RemapValClamped(hpRatio, 0.2, 0.8, 0.7, 0.3)
 					end
-					local H = a.GetUnitTypeAttackingBot(k, 1600, x)
-					local I = a.GetTotalAttackDamage(H, 8.0)
-					y = a.GetUnitAttackDamageWithinTime(b, 5.0)
-					if not c.IsInTeamFight(b, 900) and not (f and g) then
-						if I < i or c.IsInRange(b, w, l) and not c.IsInRange(b, w, w:GetAttackRange()) then
+					local attackingUnits = X.GetUnitTypeAttackingBot(botLocation, 1600, unitName)
+					local unitsDamage = X.GetTotalAttackDamage(attackingUnits, 8.0)
+					botDamage = X.GetUnitAttackDamageWithinTime(bot, 5.0)
+					if not Fu.IsInTeamFight(bot, 900) and not (isRetreating and isRealInvisible) then
+						if
+							unitsDamage < health
+							or Fu.IsInRange(bot, unit, attackRange)
+								and not Fu.IsInRange(bot, unit, unit:GetAttackRange())
+						then
 							return 0.31
 						end
 					end
 				end
-				if string.find(x, "pugna_nether_ward") then
-					if c.IsInRange(b, w, l + 150) then
+				if string.find(unitName, "pugna_nether_ward") then
+					if Fu.IsInRange(bot, unit, attackRange + 150) then
 						if
-							h and c.IsValidHero(q) and c.IsInRange(b, q, l - 130) and c.GetHP(q) < 0.5
-							or a.IsBeingAttackedByHero(b) and j < 0.5
+							isGoingOnSomeone
+								and Fu.IsValidHero(botTarget)
+								and Fu.IsInRange(bot, botTarget, attackRange - 130)
+								and Fu.GetHP(botTarget) < 0.5
+							or X.IsBeingAttackedByHero(bot) and botHpRatio < 0.5
 						then
 							return 0.35
 						else
-							if not a.IsBeingAttackedByHero(b) then
+							if not X.IsBeingAttackedByHero(bot) then
 								return 0.60
 							end
 						end
@@ -184,144 +189,162 @@ function a.GetDesire(d)
 					end
 				end
 				if
-					string.find(x, "grimstroke_ink_creature")
-					or string.find(x, "weaver_swarm")
-					or string.find(x, "tidehunter_anchor")
+					string.find(unitName, "grimstroke_ink_creature")
+					or string.find(unitName, "weaver_swarm")
+					or string.find(unitName, "tidehunter_anchor")
 				then
-					if #n == 0 then
+					if #enemiesNearLoc == 0 then
 						return 0.9
 					end
 					if
-						h and c.IsValidHero(q) and c.IsInRange(b, q, l - 130) and c.GetHP(q) < 0.5
-						or a.IsBeingAttackedByHero(b) and j < 0.5
+						isGoingOnSomeone
+							and Fu.IsValidHero(botTarget)
+							and Fu.IsInRange(bot, botTarget, attackRange - 130)
+							and Fu.GetHP(botTarget) < 0.5
+						or X.IsBeingAttackedByHero(bot) and botHpRatio < 0.5
 					then
 						return 0.35
 					end
-					if not a.IsHeroWithinRadius(n, l - 130) then
+					if not X.IsHeroWithinRadius(enemiesNearLoc, attackRange - 130) then
 						return 0.96
 					end
-					if not a.IsBeingAttackedByHero(b) then
+					if not X.IsBeingAttackedByHero(bot) then
 						return 0.8
 					else
 					end
 				end
-				if string.find(x, "gyrocopter_homing_missile") then
-					if not c.IsInTeamFight(b, 900) and B and not (f and g) then
-						if not c.IsRunning(w) or not c.IsInRange(b, w, 250) then
+				if string.find(unitName, "gyrocopter_homing_missile") then
+					if
+						not Fu.IsInTeamFight(bot, 900)
+						and isInAttackRange
+						and not (isRetreating and isRealInvisible)
+					then
+						if not Fu.IsRunning(unit) or not Fu.IsInRange(bot, unit, 250) then
 							return 0.9
 						end
 					end
 				end
-				if string.find(x, "zeus_cloud") then
-					if #m >= #n or #p == 0 then
-						if B then
+				if string.find(unitName, "zeus_cloud") then
+					if #alliesNearLoc >= #enemiesNearLoc or #nearbyEnemies == 0 then
+						if isInAttackRange then
 							return 0.7
 						end
-						return RemapValClamped(e, 0.3, 0.9, 0, 0.65)
+						return RemapValClamped(hpRatio, 0.3, 0.9, 0, 0.65)
 					end
 				end
-				if string.find(x, "lone_druid_bear") or string.find(x, "npc_dota_brewmaster") then
-					if #m >= 2 and #o > #p then
+				if string.find(unitName, "lone_druid_bear") or string.find(unitName, "npc_dota_brewmaster") then
+					if #alliesNearLoc >= 2 and #nearbyAllies > #nearbyEnemies then
 						return 0.45
 					end
-					if not a.IsUnitAfterUnit(w, b) then
+					if not X.IsUnitAfterUnit(unit, bot) then
 						return BOT_ACTION_DESIRE_HIGH
 					end
-					if z < 0.25 then
-						if a.IsUnitAfterUnit(w, b) then
-							return RemapValClamped(j, 0.25, 0.9, 0.2, 0.9)
+					if unitHpRatio < 0.25 then
+						if X.IsUnitAfterUnit(unit, bot) then
+							return RemapValClamped(botHpRatio, 0.25, 0.9, 0.2, 0.9)
 						else
 							return 0.45
 						end
 					end
 				end
 				if
-					w:HasModifier("modifier_dominated")
-					or w:HasModifier("modifier_chen_holy_persuasion")
-					or string.find(x, "visage_familiar")
+					unit:HasModifier("modifier_dominated")
+					or unit:HasModifier("modifier_chen_holy_persuasion")
+					or string.find(unitName, "visage_familiar")
 				then
-					local J = a.GetUnitAttackDamageWithinTime(w, 5.5)
-					y = a.GetUnitAttackDamageWithinTime(b, 5.0)
-					if not c.IsInTeamFight(b, 1200) and not (f and not g) and B and y > z and J < i then
+					local unitDamage = X.GetUnitAttackDamageWithinTime(unit, 5.5)
+					botDamage = X.GetUnitAttackDamageWithinTime(bot, 5.0)
+					if
+						not Fu.IsInTeamFight(bot, 1200)
+						and not (isRetreating and not isRealInvisible)
+						and isInAttackRange
+						and botDamage > unitHpRatio
+						and unitDamage < health
+					then
 						return 0.5
 					end
 				end
 				if
-					string.find(x, "lycan_wolf")
-					or string.find(x, "eidolon")
-					or string.find(x, "beastmaster_boar")
-					or string.find(x, "beastmaster_greater_boar")
-					or string.find(x, "furion_treant")
-					or string.find(x, "broodmother_spiderling")
-					or string.find(x, "skeleton_warrior")
+					string.find(unitName, "lycan_wolf")
+					or string.find(unitName, "eidolon")
+					or string.find(unitName, "beastmaster_boar")
+					or string.find(unitName, "beastmaster_greater_boar")
+					or string.find(unitName, "furion_treant")
+					or string.find(unitName, "broodmother_spiderling")
+					or string.find(unitName, "skeleton_warrior")
 				then
-					local K = a.GetUnitTypeAttackingBot(k, 1600, x)
-					local J = a.GetTotalAttackDamage(K, 4.0)
-					local L = a.GetTotalUnitHealth(K)
-					y = a.GetUnitAttackDamageWithinTime(b, 4.0)
-					if not c.IsInTeamFight(b, 1200) and B and y > L and J < i then
-						return RemapValClamped(j, 0.25, 0.9, 0.2, 0.5)
+					local attackingUnits = X.GetUnitTypeAttackingBot(botLocation, 1600, unitName)
+					local unitsDamage = X.GetTotalAttackDamage(attackingUnits, 4.0)
+					local unitsHealth = X.GetTotalUnitHealth(attackingUnits)
+					botDamage = X.GetUnitAttackDamageWithinTime(bot, 4.0)
+					if
+						not Fu.IsInTeamFight(bot, 1200)
+						and isInAttackRange
+						and botDamage > unitsHealth
+						and unitsDamage < health
+					then
+						return RemapValClamped(botHpRatio, 0.25, 0.9, 0.2, 0.5)
 					end
 				end
-				if string.find(x, "observer_wards") or string.find(x, "sentry_wards") then
+				if string.find(unitName, "observer_wards") or string.find(unitName, "sentry_wards") then
 					-- Handled earlier via GetDewardDesire; keep a fallback.
-					if a.HasTrueSightNear(w:GetLocation()) then
-						if not a.IsBeingAttackedByHero(b) or #n <= 1 then
-							if c.IsInRange(b, w, l + 200) then
+					if X.HasTrueSightNear(unit:GetLocation()) then
+						if not X.IsBeingAttackedByHero(bot) or #enemiesNearLoc <= 1 then
+							if Fu.IsInRange(bot, unit, attackRange + 200) then
 								return 1.15
 							end
 							return 0.95
 						end
 					end
 				end
-				if string.find(x, "phoenix_sun") then
+				if string.find(unitName, "phoenix_sun") then
 					if
-						(#m >= #n or c.WeAreStronger(b, 1600))
-						and not b:HasModifier("modifier_phoenix_fire_spirit_burn")
-						and not f
+						(#alliesNearLoc >= #enemiesNearLoc or Fu.WeAreStronger(bot, 1600))
+						and not bot:HasModifier("modifier_phoenix_fire_spirit_burn")
+						and not isRetreating
 					then
-						local M = c.GetAlliesNearLoc(w:GetLocation(), 900)
-						if c.IsInRange(b, w, l + 200) and #M >= 2 then
+						local alliesNearUnit = Fu.GetAlliesNearLoc(unit:GetLocation(), 900)
+						if Fu.IsInRange(bot, unit, attackRange + 200) and #alliesNearUnit >= 2 then
 							return 1.2
 						end
-						if c.IsInRange(b, w, l + 300) and #M >= 2 then
+						if Fu.IsInRange(bot, unit, attackRange + 300) and #alliesNearUnit >= 2 then
 							return 1.1
 						end
-						if c.IsInRange(b, w, l + 400) then
-							return RemapValClamped(e, 0.2, 0.9, 0.4, 0.97)
+						if Fu.IsInRange(bot, unit, attackRange + 400) then
+							return RemapValClamped(hpRatio, 0.2, 0.9, 0.4, 0.97)
 						end
-						return RemapValClamped(e, 0.2, 0.9, 0, 0.9)
+						return RemapValClamped(hpRatio, 0.2, 0.9, 0, 0.9)
 					end
 				end
-				if string.find(x, "tombstone") then
-					if #o >= #p and not f then
-						if c.IsInRange(b, w, l + 200) then
-							return RemapValClamped(e, 0.25, 0.9, 0.4, 0.96)
+				if string.find(unitName, "tombstone") then
+					if #nearbyAllies >= #nearbyEnemies and not isRetreating then
+						if Fu.IsInRange(bot, unit, attackRange + 200) then
+							return RemapValClamped(hpRatio, 0.25, 0.9, 0.4, 0.96)
 						end
 						return 0.56
 					end
 				end
-				if string.find(x, "undying_zombie") then
-					if #o >= #p and not f then
-						if B then
+				if string.find(unitName, "undying_zombie") then
+					if #nearbyAllies >= #nearbyEnemies and not isRetreating then
+						if isInAttackRange then
 							return 0.6
 						end
 						return 0.25
 					end
 				end
-				if string.find(x, "warlock_golem") then
-					y = a.GetUnitAttackDamageWithinTime(b, 5)
-					local J = a.GetUnitAttackDamageWithinTime(w, 5)
-					if not c.IsInTeamFight(b, 1600) and #o >= #p then
-						local N = y > z and J * 1.2 < j
-						if c.IsInRange(b, w, l + 300) then
-							if not a.IsUnitAfterUnit(w, b) or a.IsUnitAfterUnit(w, b) and N then
+				if string.find(unitName, "warlock_golem") then
+					botDamage = X.GetUnitAttackDamageWithinTime(bot, 5)
+					local unitDamage = X.GetUnitAttackDamageWithinTime(unit, 5)
+					if not Fu.IsInTeamFight(bot, 1600) and #nearbyAllies >= #nearbyEnemies then
+						local canWinTrade = botDamage > unitHpRatio and unitDamage * 1.2 < botHpRatio
+						if Fu.IsInRange(bot, unit, attackRange + 300) then
+							if not X.IsUnitAfterUnit(unit, bot) or X.IsUnitAfterUnit(unit, bot) and canWinTrade then
 								return 0.35
 							else
 								return 0.25
 							end
 						else
-							if not a.IsUnitAfterUnit(w, b) or a.IsUnitAfterUnit(w, b) and N then
+							if not X.IsUnitAfterUnit(unit, bot) or X.IsUnitAfterUnit(unit, bot) and canWinTrade then
 								return 0.25
 							end
 						end
@@ -332,63 +355,63 @@ function a.GetDesire(d)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.Think(d)
-	local O = d or b
-	if O == nil or c.CanNotUseAction(O) then
+function X.Think(unit)
+	local thinkingUnit = unit or bot
+	if thinkingUnit == nil or Fu.CanNotUseAction(thinkingUnit) then
 		return
 	end
-	local P = O.special_unit_target
-	if c.IsValid(P) and not O:IsDisarmed() then
-		O:Action_AttackUnit(P, true)
+	local target = thinkingUnit.special_unit_target
+	if Fu.IsValid(target) and not thinkingUnit:IsDisarmed() then
+		thinkingUnit:Action_AttackUnit(target, true)
 		return
 	end
 end
-function a.IsUnitAfterUnit(Q, R)
-	return Q:GetAttackTarget() == R or c.IsChasingTarget(Q, R)
+function X.IsUnitAfterUnit(unit, target)
+	return unit:GetAttackTarget() == target or Fu.IsChasingTarget(unit, target)
 end
-function a.GetTotalAttackDamage(K, S)
-	local T = 0
-	for v, w in pairs(K) do
-		if c.IsValid(w) then
-			T = T + w:GetAttackDamage() * w:GetAttackSpeed() * S
+function X.GetTotalAttackDamage(units, duration)
+	local totalDamage = 0
+	for _, unit in pairs(units) do
+		if Fu.IsValid(unit) then
+			totalDamage = totalDamage + unit:GetAttackDamage() * unit:GetAttackSpeed() * duration
 		end
 	end
-	return T
+	return totalDamage
 end
-function a.GetUnitTypeAttackingBot(U, V, W)
-	local X = {}
-	for v, w in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+function X.GetUnitTypeAttackingBot(location, radius, unitName)
+	local matchingUnits = {}
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
 		if
-			c.IsValid(w)
-			and w:GetUnitName() == W
-			and GetUnitToLocationDistance(w, U) <= V
-			and (w:GetAttackTarget() == b or c.IsChasingTarget(w, b))
+			Fu.IsValid(unit)
+			and unit:GetUnitName() == unitName
+			and GetUnitToLocationDistance(unit, location) <= radius
+			and (unit:GetAttackTarget() == bot or Fu.IsChasingTarget(unit, bot))
 		then
-			table.insert(X, w)
+			table.insert(matchingUnits, unit)
 		end
 	end
-	return X
+	return matchingUnits
 end
-function a.GetUnitAttackDamageWithinTime(w, S)
-	return w:GetAttackDamage() * w:GetAttackSpeed() * S
+function X.GetUnitAttackDamageWithinTime(unit, duration)
+	return unit:GetAttackDamage() * unit:GetAttackSpeed() * duration
 end
-function a.GetTotalUnitHealth(K)
-	local Y = 0
-	for t = 1, #K do
-		Y = Y + K[t]:GetHealth()
+function X.GetTotalUnitHealth(units)
+	local totalHealth = 0
+	for i = 1, #units do
+		totalHealth = totalHealth + units[i]:GetHealth()
 	end
-	return Y
+	return totalHealth
 end
-function a.IsBeingAttackedByHero(w)
-	for v, Z in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if c.IsValidHero(Z) and Z:GetAttackTarget() == w then
+function X.IsBeingAttackedByHero(unit)
+	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+		if Fu.IsValidHero(enemyHero) and enemyHero:GetAttackTarget() == unit then
 			return true
 		end
 	end
 	return false
 end
-function a.IsHeroWithinRadius(K, V)
-	if c.IsValidHero(K[1]) and c.IsInRange(b, K[1], V) then
+function X.IsHeroWithinRadius(heroes, radius)
+	if Fu.IsValidHero(heroes[1]) and Fu.IsInRange(bot, heroes[1], radius) then
 		return true
 	end
 	return false
@@ -396,11 +419,11 @@ end
 -- Ally sentry / tower true sight radius (~925); use 1000 to match site.lua.
 local TRUE_SIGHT_RADIUS = 1000
 
-function a.IsThereSentry(_)
-	return a.HasTrueSightNear(_)
+function X.IsThereSentry(loc)
+	return X.HasTrueSightNear(loc)
 end
 
-function a.HasTrueSightNear(loc)
+function X.HasTrueSightNear(loc)
 	local alliedWards = GetUnitList(UNIT_LIST_ALLIED_WARDS)
 	for _, ward in pairs(alliedWards) do
 		if
@@ -422,7 +445,7 @@ function a.HasTrueSightNear(loc)
 		-- Gem carriers grant true sight.
 		local allies = GetUnitList(UNIT_LIST_ALLIED_HEROES)
 		for _, ally in pairs(allies) do
-			if c.IsValidHero(ally) and GetUnitToLocationDistance(ally, loc) <= TRUE_SIGHT_RADIUS then
+			if Fu.IsValidHero(ally) and GetUnitToLocationDistance(ally, loc) <= TRUE_SIGHT_RADIUS then
 				local gem = ally:FindItemSlot("item_gem")
 				if gem >= 0 and gem <= 5 then
 					return true
@@ -433,38 +456,38 @@ function a.HasTrueSightNear(loc)
 	return false
 end
 
-function a.IsEnemyWard(unit)
-	if not c.IsValid(unit) then
+function X.IsEnemyWard(unit)
+	if not Fu.IsValid(unit) then
 		return false
 	end
 	local name = unit:GetUnitName()
 	return string.find(name, "observer_wards") ~= nil or string.find(name, "sentry_wards") ~= nil
 end
 
-function a.IsSerpentWard(unit)
-	if not c.IsValid(unit) then
+function X.IsSerpentWard(unit)
+	if not Fu.IsValid(unit) then
 		return false
 	end
 	return string.find(unit:GetUnitName(), "shadow_shaman_ward") ~= nil
 end
 
-function a.GetEnemySerpentWardsNear(loc, radius)
+function X.GetEnemySerpentWardsNear(loc, radius)
 	local wards = {}
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if a.IsSerpentWard(unit) and c.CanBeAttacked(unit) and GetUnitToLocationDistance(unit, loc) <= radius then
+		if X.IsSerpentWard(unit) and Fu.CanBeAttacked(unit) and GetUnitToLocationDistance(unit, loc) <= radius then
 			wards[#wards + 1] = unit
 		end
 	end
 	return wards
 end
 
-function a.IsHeroTrappedBySerpentWards(hero)
-	if not c.IsValidHero(hero) or not hero:IsAlive() then
+function X.IsHeroTrappedBySerpentWards(hero)
+	if not Fu.IsValidHero(hero) or not hero:IsAlive() then
 		return false, nil
 	end
-	local wards = a.GetEnemySerpentWardsNear(hero:GetLocation(), 420)
-	local n = #wards
-	if n <= 0 then
+	local wards = X.GetEnemySerpentWardsNear(hero:GetLocation(), 420)
+	local wardCount = #wards
+	if wardCount <= 0 then
 		return false, nil
 	end
 	local beingHit = false
@@ -475,7 +498,7 @@ function a.IsHeroTrappedBySerpentWards(hero)
 		end
 	end
 	-- Mass Serpent Ward rings trap a hero; open a gap by killing one.
-	if n >= 3 or (n >= 2 and (c.IsStuck(hero) or beingHit)) then
+	if wardCount >= 3 or (wardCount >= 2 and (Fu.IsStuck(hero) or beingHit)) then
 		return true, wards
 	end
 	return false, wards
@@ -483,15 +506,15 @@ end
 
 -- The ward standing between the trapped hero and safety. Killing any other one
 -- keeps the ring closed and the hero dies inside it.
-function a.GetExitSerpentWard(wards, trapped)
+function X.GetExitSerpentWard(wards, trapped)
 	if wards == nil or trapped == nil then
 		return nil
 	end
 	local from = trapped:GetLocation()
-	local dest = c.GetTeamFountain()
+	local dest = Fu.GetTeamFountain()
 	local best, bestLine = nil, 99999
 	for _, ward in pairs(wards) do
-		if c.IsValid(ward) and c.CanBeAttacked(ward) then
+		if Fu.IsValid(ward) and Fu.CanBeAttacked(ward) then
 			local line = PointToLineDistance(from, dest, ward:GetLocation())
 			local off = (line ~= nil and line.within) and line.distance or 99999
 			if off < bestLine then
@@ -503,8 +526,8 @@ function a.GetExitSerpentWard(wards, trapped)
 	return best
 end
 
-function a.GetBestSerpentWardToKill(wards, bot, attackRange, trapped)
-	local exitWard = a.GetExitSerpentWard(wards, trapped or bot)
+function X.GetBestSerpentWardToKill(wards, bot, attackRange, trapped)
+	local exitWard = X.GetExitSerpentWard(wards, trapped or bot)
 	if exitWard ~= nil then
 		return exitWard
 	end
@@ -515,7 +538,7 @@ function a.GetBestSerpentWardToKill(wards, bot, attackRange, trapped)
 	local bestScore = -1
 	local reach = (attackRange or bot:GetAttackRange()) + 450
 	for _, ward in pairs(wards) do
-		if c.IsValid(ward) and c.CanBeAttacked(ward) then
+		if Fu.IsValid(ward) and Fu.CanBeAttacked(ward) then
 			local dist = GetUnitToUnitDistance(bot, ward)
 			if dist <= math.max(reach, 900) then
 				-- Prefer low HP and already in attack range so we open a gap fast.
@@ -531,28 +554,28 @@ function a.GetBestSerpentWardToKill(wards, bot, attackRange, trapped)
 	return best
 end
 
-function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
-	if bot == nil or c.CanNotUseAction(bot) or bot:IsDisarmed() then
+function X.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
+	if bot == nil or Fu.CanNotUseAction(bot) or bot:IsDisarmed() then
 		return 0, nil
 	end
 	-- Team fights come first for an ally's trap. A bot trapped itself escapes even in a fight (game 034,
 	-- 11:30: Axe in a Mass Serpent Ward ring during a fight killed some snakes, never left, died;
 	-- datafeed: 10 wards, spawn radius 150, 2 hits each, 45s).
-	local inFight = c.IsInTeamFight(bot, 1200)
-	if inFight and not a.IsHeroTrappedBySerpentWards(bot) then
+	local inFight = Fu.IsInTeamFight(bot, 1200)
+	if inFight and not X.IsHeroTrappedBySerpentWards(bot) then
 		return 0, nil
 	end
 
 	local enemyHeroCount = 0
 	for _, hero in pairs(nearbyEnemyHeroes or {}) do
-		if c.IsValidHero(hero) and not c.IsSuspiciousIllusion(hero) then
+		if Fu.IsValidHero(hero) and not Fu.IsSuspiciousIllusion(hero) then
 			enemyHeroCount = enemyHeroCount + 1
 		end
 	end
 
 	local trapWards = nil
 	local trapped = nil
-	local selfTrapped, selfWards = a.IsHeroTrappedBySerpentWards(bot)
+	local selfTrapped, selfWards = X.IsHeroTrappedBySerpentWards(bot)
 	if selfTrapped then
 		trapWards = selfWards
 		trapped = bot
@@ -566,7 +589,7 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 				and not ally:IsIllusion()
 				and GetUnitToUnitDistance(bot, ally) <= 1800
 			then
-				local allyTrapped, allyWards = a.IsHeroTrappedBySerpentWards(ally)
+				local allyTrapped, allyWards = X.IsHeroTrappedBySerpentWards(ally)
 				if allyTrapped then
 					trapWards = allyWards
 					trapped = ally
@@ -580,12 +603,12 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 		return 0, nil
 	end
 
-	local target = a.GetBestSerpentWardToKill(trapWards, bot, attackRange, trapped)
+	local target = X.GetBestSerpentWardToKill(trapWards, bot, attackRange, trapped)
 	if target == nil then
 		return 0, nil
 	end
 	-- Remember the snake opening our own way out: when it dies, the item think walks the bot out
-	-- through the gap (a.WalkOutOfSnakes in ability_item_usage_generic.lua).
+	-- through the gap (Usage.WalkOutOfSnakes in ability_item_usage_generic.lua).
 	if trapped == bot then
 		bot._snakeExitWard = target
 		bot._snakeExitWardLoc = target:GetLocation()
@@ -610,8 +633,8 @@ function a.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemyHeroes)
 	return 0.95, target
 end
 
-function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
-	if bot == nil or c.CanNotUseAction(bot) or bot:IsDisarmed() then
+function X.GetDewardDesire(bot, attackRange, nearbyEnemies)
+	if bot == nil or Fu.CanNotUseAction(bot) or bot:IsDisarmed() then
 		return 0, nil
 	end
 	local best = nil
@@ -619,10 +642,10 @@ function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
 	local searchRange = math.max(1600, attackRange + 400)
 
 	local function consider(unit)
-		if not c.IsValid(unit) or not c.CanBeAttacked(unit) then
+		if not Fu.IsValid(unit) or not Fu.CanBeAttacked(unit) then
 			return
 		end
-		if not a.IsEnemyWard(unit) then
+		if not X.IsEnemyWard(unit) then
 			return
 		end
 		if bot:GetTeam() == unit:GetTeam() then
@@ -633,7 +656,7 @@ function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
 			return
 		end
 		-- Already visible/attackable wards are fair game; also accept true-sight coverage.
-		if not unit:CanBeSeen() and not a.HasTrueSightNear(unit:GetLocation()) then
+		if not unit:CanBeSeen() and not X.HasTrueSightNear(unit:GetLocation()) then
 			return
 		end
 		if dist < bestDist then
@@ -656,7 +679,7 @@ function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
 		return 0, nil
 	end
 
-	local underFire = a.IsBeingAttackedByHero(bot) and #(nearbyEnemies or {}) > 1
+	local underFire = X.IsBeingAttackedByHero(bot) and #(nearbyEnemies or {}) > 1
 	if underFire and bestDist > attackRange + 150 then
 		return 0, nil
 	end
@@ -665,37 +688,40 @@ function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
 	-- and 5 enemies around (1.10-1.25 beats retreat and attack). Below 50% HP with 2+ enemy heroes
 	-- near, or hit by a hero in the last 2s: leave the ward. Any enemy hero within 1200: at most
 	-- 0.9, under attack (0.95) and the hard retreat (0.98).
-	local hp = c.GetHP(bot)
-	local foes = c.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
-	local function DewardLog(what, v)
+	local hp = Fu.GetHP(bot)
+	local foes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
+	local function DewardLog(what, desire)
 		if DotaTime() >= (bot._dewardLogAt or -999) then
 			bot._dewardLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-DEWARD] t=%.0f %s %s desire=%.2f hp=%.2f foes=%d dist=%d",
-				DotaTime(),
-				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-				what,
-				v,
-				hp,
-				#foes,
-				bestDist
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-DEWARD] t=%.0f %s %s desire=%.2f hp=%.2f foes=%d dist=%d",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					what,
+					desire,
+					hp,
+					#foes,
+					bestDist
+				)
+			)
 		end
 	end
 	if hp < 0.5 and (#foes >= 2 or bot:WasRecentlyDamagedByAnyHero(2.0)) then
 		DewardLog("skip-low-hp", 0)
 		return 0, nil
 	end
-	local d = 0.95
+	local desire = 0.95
 	if bestDist <= attackRange + 50 then
-		d = 1.25
+		desire = 1.25
 	elseif bestDist <= attackRange + 350 then
-		d = 1.1
+		desire = 1.1
 	end
-	if #foes >= 1 and d > 0.9 then
-		d = 0.9
-		DewardLog("capped-enemies-near", d)
+	if #foes >= 1 and desire > 0.9 then
+		desire = 0.9
+		DewardLog("capped-enemies-near", desire)
 	end
-	return d, best
+	return desire, best
 end
-return a
+return X

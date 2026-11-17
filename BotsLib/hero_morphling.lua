@@ -1,30 +1,31 @@
 -- Morphling: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = require(GetScriptDirectory() .. "/FuncLib/data/spell_list")
-local g = c.Skill.GetTalentList(b)
-local h = c.Skill.GetAbilityList(b)
-local i = c.Item.GetRoleItemsBuyList(b)
-local j = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local SpellList = require(GetScriptDirectory() .. "/FuncLib/data/spell_list")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local k = { { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 } }
-local l
-local m
-if i == "pos_2" then
-	l = k[2]
-	m = c.Skill.GetTalentBuild(j[2])
+local tAllAbilityBuildList =
+	{ { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 } }
+local nAbilityBuildList
+local nTalentBuildList
+if sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[2]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 else
-	l = k[1]
-	m = c.Skill.GetTalentBuild(j[1])
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 end
-local n = {}
+local sRoleItemsBuyList = {}
 -- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
-n["pos_1"] = {
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -43,7 +44,7 @@ n["pos_1"] = {
 	"item_ultimate_scepter_2",
 }
 -- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
-n["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -62,567 +63,633 @@ n["pos_2"] = {
 	"item_satanic",
 	"item_ultimate_scepter_2",
 }
-n["pos_3"] = n["pos_1"]
-n["pos_4"] = n["pos_1"]
-n["pos_5"] = n["pos_1"]
-a["sBuyList"] = n[i]
-a["sSellList"] = { "item_magic_wand", "item_circlet", "item_hydras_breath", "item_vladmir" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_magic_wand", "item_circlet", "item_hydras_breath", "item_vladmir" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-l, m, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(l, m, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(h, l, g, m)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(o)
-	e.MinionThink(o)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local p = SafeAbility(b:GetAbilityByName("morphling_waveform"), "morphling_waveform", "morphling")
-local q = SafeAbility(b:GetAbilityByName("morphling_adaptive_strike_agi"), "morphling_adaptive_strike_agi", "morphling")
-local s = SafeAbility(b:GetAbilityByName("morphling_morph_agi"), "morphling_morph_agi", "morphling")
-local t = SafeAbility(b:GetAbilityByName("morphling_morph_str"), "morphling_morph_str", "morphling")
-local u = SafeAbility(b:GetAbilityByName("morphling_replicate"), "morphling_replicate", "morphling")
-local v = SafeAbility(b:GetAbilityByName("morphling_morph_replicate"), "morphling_morph_replicate", "morphling")
-local w, x
-local y, z
-local C
-local D, E
-local F = ""
-local G
-local H, I
-local J, K
-local L = false
-if b.IsMorphling == nil then
-	b.IsMorphling = true
+local waveformAbility = SafeAbility(bot:GetAbilityByName("morphling_waveform"), "morphling_waveform", "morphling")
+local adaptiveStrikeAgiAbility =
+	SafeAbility(bot:GetAbilityByName("morphling_adaptive_strike_agi"), "morphling_adaptive_strike_agi", "morphling")
+local morphAgiAbility = SafeAbility(bot:GetAbilityByName("morphling_morph_agi"), "morphling_morph_agi", "morphling")
+local morphStrAbility = SafeAbility(bot:GetAbilityByName("morphling_morph_str"), "morphling_morph_str", "morphling")
+local replicateAbility = SafeAbility(bot:GetAbilityByName("morphling_replicate"), "morphling_replicate", "morphling")
+local morphReplicateAbility =
+	SafeAbility(bot:GetAbilityByName("morphling_morph_replicate"), "morphling_morph_replicate", "morphling")
+local waveformDesire, waveformLocation
+local adaptiveStrikeDesire, adaptiveStrikeTarget
+local attributeShiftDesire, attributeShiftType -- the type was the global `Type`
+local replicateDesire, replicateTarget
+local replicatedHeroName = ""
+local botTarget
+local hpRatio
+local nearbyAllies, nearbyEnemies
+local isStrengthPrimary = false
+if bot.IsMorphling == nil then
+	bot.IsMorphling = true
 end
-local M = 1
-local N = 1
-local O = 24
-local P = 23
-local Q = 4.2
-local R = 2.6
-local S = {}
-local function T(U)
-	if U == nil then
+local agiRatio = 1
+local baseAgility = 24
+local baseStrength = 23
+local agilityGain = 4.2
+local strengthGain = 2.6
+local heroModuleCache = {}
+local function ThinkAsReplicatedHero(ability)
+	if ability == nil then
 		return
 	end
-	local V = f.GetSpellHeroName(U:GetName())
-	if V == nil then
+	local heroName = SpellList.GetSpellHeroName(ability:GetName())
+	if heroName == nil then
 		return
 	end
-	if not S[V] then
-		S[V] = require(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(V, "npc_dota_", ""))
+	if not heroModuleCache[heroName] then
+		heroModuleCache[heroName] =
+			require(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(heroName, "npc_dota_", ""))
 	end
-	local W = S[V]
-	if W and W.SkillsComplement then
-		W.SkillsComplement()
+	local heroModule = heroModuleCache[heroName]
+	if heroModule and heroModule.SkillsComplement then
+		heroModule.SkillsComplement()
 	end
 end
-local X = { 0, math.huge }
-local Y = math.pi
-local Z
-local _
-local a0
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local replicateTimes = { 0, math.huge }
+local replicateDuration = math.pi
+local isEngaging
+local isRetreating
+local isAttacking
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local a1 = d.Build(b)
-	Z = a1.isEngaging
-	_ = a1.isRetreating
-	a0 = c.IsAttacking(b)
-	J = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	K = a1.enemies
-	G = a1.target
-	H = a1.hp
-	I = a1.mp
-	L = b:GetPrimaryAttribute() == ATTRIBUTE_STRENGTH and true or false
-	if b:GetAbilityInSlot(0) == p then
-		b.IsMorphling = true
+	local context = AbilityContext.Build(bot)
+	isEngaging = context.isEngaging
+	isRetreating = context.isRetreating
+	isAttacking = Fu.IsAttacking(bot)
+	nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	nearbyEnemies = context.enemies
+	botTarget = context.target
+	hpRatio = context.hp
+	isStrengthPrimary = bot:GetPrimaryAttribute() == ATTRIBUTE_STRENGTH and true or false
+	if bot:GetAbilityInSlot(0) == waveformAbility then
+		bot.IsMorphling = true
 	else
-		b.IsMorphling = false
+		bot.IsMorphling = false
 	end
-	if b:HasModifier("modifier_morphling_replicate_manager") then
-		if DotaTime() > X[2] + Y + 0.25 + 0.1 then
-			if b.IsMorphling == true then
-				if Z and c.IsValidHero(G) and c.IsInRange(b, G, 900) then
-					if IsGoodToMorphBack(F, true) or H > 0.8 or H > 0.5 and #J > #K then
-						b:Action_UseAbility(v)
-						X[1] = DotaTime()
+	if bot:HasModifier("modifier_morphling_replicate_manager") then
+		if DotaTime() > replicateTimes[2] + replicateDuration + 0.25 + 0.1 then
+			if bot.IsMorphling == true then
+				if isEngaging and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 900) then
+					if
+						IsGoodToMorphBack(replicatedHeroName, true)
+						or hpRatio > 0.8
+						or hpRatio > 0.5 and #nearbyAllies > #nearbyEnemies
+					then
+						bot:Action_UseAbility(morphReplicateAbility)
+						replicateTimes[1] = DotaTime()
 						return
 					end
 				end
-				if _ and not c.IsRealInvisible(b) and IsGoodToMorphBack(F, false) and not c.CanCastAbility(p, 3) then
-					local a2 = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-					if #a2 > 0 and H > 0.4 then
-						b:Action_UseAbility(v)
-						X[1] = DotaTime()
+				if
+					isRetreating
+					and not Fu.IsRealInvisible(bot)
+					and IsGoodToMorphBack(replicatedHeroName, false)
+					and not Fu.CanCastAbility(waveformAbility, 3)
+				then
+					local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+					if #enemiesNearBot > 0 and hpRatio > 0.4 then
+						bot:Action_UseAbility(morphReplicateAbility)
+						replicateTimes[1] = DotaTime()
 						return
 					end
 				end
 			end
 		end
-		if DotaTime() < X[1] + 3 + 0.25 + 0.1 then
-			if b.IsMorphling == false and c.CanCastAbility(v) then
-				if Y == math.pi then
-					local a3 = false
-					local a4 = 0
-					local a5 = 0
-					local a6 = 0
-					for a7 = 0, 7 do
-						local a8 = b:GetAbilityInSlot(a7)
+		if DotaTime() < replicateTimes[1] + 3 + 0.25 + 0.1 then
+			if bot.IsMorphling == false and Fu.CanCastAbility(morphReplicateAbility) then
+				if replicateDuration == math.pi then
+					local hasSpellReady = false
+					local cooldownCount = 0
+					local weightedCooldownSum = 0
+					local weightSum = 0
+					for slot = 0, 7 do
+						local slotAbility = bot:GetAbilityInSlot(slot)
 						if
-							a8
-							and a8 ~= v
-							and a8:IsTrained()
-							and not a8:IsPassive()
-							and string.find(a8:GetName(), string.gsub(F, "npc_dota_hero_", ""))
-							and not string.find(a8:GetName(), "morphling")
+							slotAbility
+							and slotAbility ~= morphReplicateAbility
+							and slotAbility:IsTrained()
+							and not slotAbility:IsPassive()
+							and string.find(
+								slotAbility:GetName(),
+								string.gsub(replicatedHeroName, "npc_dota_hero_", "")
+							)
+							and not string.find(slotAbility:GetName(), "morphling")
 						then
-							if c.CanCastAbilitySoon(a8, 1.5) then
-								a3 = true
+							if Fu.CanCastAbilitySoon(slotAbility, 1.5) then
+								hasSpellReady = true
 							end
-							local a9 = a8:GetCooldown()
-							if a9 > 0 then
-								local aa = 1 / math.sqrt(a9)
-								a5 = a5 + a9 * aa
-								a6 = a6 + aa
-								a4 = a4 + 1
+							local cooldown = slotAbility:GetCooldown()
+							if cooldown > 0 then
+								local weight = 1 / math.sqrt(cooldown)
+								weightedCooldownSum = weightedCooldownSum + cooldown * weight
+								weightSum = weightSum + weight
+								cooldownCount = cooldownCount + 1
 							end
 						end
 					end
-					if not a3 then
-						b:Action_UseAbility(v)
-						X[2] = DotaTime()
+					if not hasSpellReady then
+						bot:Action_UseAbility(morphReplicateAbility)
+						replicateTimes[2] = DotaTime()
 						return
 					end
-					if a4 > 0 then
-						Y = Max(a5 / a6, math.pi)
+					if cooldownCount > 0 then
+						replicateDuration = Max(weightedCooldownSum / weightSum, math.pi)
 					end
 				end
-				for a7 = 0, 6 do
-					local a8 = b:GetAbilityInSlot(a7)
-					if a8 ~= nil and a8 ~= v then
-						T(a8)
+				for slot = 0, 6 do
+					local slotAbility = bot:GetAbilityInSlot(slot)
+					if slotAbility ~= nil and slotAbility ~= morphReplicateAbility then
+						ThinkAsReplicatedHero(slotAbility)
 					end
 				end
 			end
 		else
-			local ab = true
+			local shouldMorphBack = true
 			if
-				b:HasModifier("modifier_terrorblade_metamorphosis")
-				or b:HasModifier("modifier_terrorblade_metamorphosis_transform")
+				bot:HasModifier("modifier_terrorblade_metamorphosis")
+				or bot:HasModifier("modifier_terrorblade_metamorphosis_transform")
 			then
-				if H > 0.4 and Z then
-					ab = false
+				if hpRatio > 0.4 and isEngaging then
+					shouldMorphBack = false
 				end
 			end
-			if F == "npc_dota_hero_obsidian_destroyer" then
-				local ac = b:GetAbilityInSlot(0)
-				local ad = b:GetAbilityInSlot(2)
-				if ac and ac:IsTrained() and ac:GetLevel() >= 3 and (ad and ad:IsTrained() and ac:GetLevel() >= 3) then
-					if Z then
-						ab = false
+			if replicatedHeroName == "npc_dota_hero_obsidian_destroyer" then
+				local firstAbility = bot:GetAbilityInSlot(0)
+				local thirdAbility = bot:GetAbilityInSlot(2)
+				if
+					firstAbility
+					and firstAbility:IsTrained()
+					and firstAbility:GetLevel() >= 3
+					and (thirdAbility and thirdAbility:IsTrained() and firstAbility:GetLevel() >= 3)
+				then
+					if isEngaging then
+						shouldMorphBack = false
 					end
 				end
 			end
-			if ab then
-				if b.IsMorphling == false and c.CanCastAbility(v) then
-					b:Action_UseAbility(v)
-					X[2] = DotaTime()
+			if shouldMorphBack then
+				if bot.IsMorphling == false and Fu.CanCastAbility(morphReplicateAbility) then
+					bot:Action_UseAbility(morphReplicateAbility)
+					replicateTimes[2] = DotaTime()
 					return
 				end
 			end
 		end
 	else
-		Y = math.pi
-		X = { 0, math.huge }
-		F = ""
+		replicateDuration = math.pi
+		replicateTimes = { 0, math.huge }
+		replicatedHeroName = ""
 	end
-	if b.IsMorphling then
-		a.SetRatios()
-		C, Type = a.ConsiderAtttributeShift()
-		if C > 0 then
-			if Type == "agi" then
-				b:Action_UseAbility(s)
+	if bot.IsMorphling then
+		X.SetRatios()
+		attributeShiftDesire, attributeShiftType = X.ConsiderAtttributeShift()
+		if attributeShiftDesire > 0 then
+			if attributeShiftType == "agi" then
+				bot:Action_UseAbility(morphAgiAbility)
 			else
-				b:Action_UseAbility(t)
+				bot:Action_UseAbility(morphStrAbility)
 			end
 			return
 		end
-		w, x = a.ConsiderWaveform()
-		if w > 0 then
-			c.SetQueuePtToINT(b, false)
-			b:ActionQueue_UseAbilityOnLocation(p, x)
+		waveformDesire, waveformLocation = X.ConsiderWaveform()
+		if waveformDesire > 0 then
+			Fu.SetQueuePtToINT(bot, false)
+			bot:ActionQueue_UseAbilityOnLocation(waveformAbility, waveformLocation)
 			return
 		end
-		y, z = a.ConsiderAdaptiveStrikeAGI()
-		if y > 0 then
-			c.SetQueuePtToINT(b, false)
-			b:ActionQueue_UseAbilityOnEntity(q, z)
+		adaptiveStrikeDesire, adaptiveStrikeTarget = X.ConsiderAdaptiveStrikeAGI()
+		if adaptiveStrikeDesire > 0 then
+			Fu.SetQueuePtToINT(bot, false)
+			bot:ActionQueue_UseAbilityOnEntity(adaptiveStrikeAgiAbility, adaptiveStrikeTarget)
 			return
 		end
-		D, E = a.ConsiderMorph()
-		if D > 0 then
-			b:Action_UseAbilityOnEntity(u, E)
-			X[1] = DotaTime()
-			F = E:GetUnitName()
+		replicateDesire, replicateTarget = X.ConsiderMorph()
+		if replicateDesire > 0 then
+			bot:Action_UseAbilityOnEntity(replicateAbility, replicateTarget)
+			replicateTimes[1] = DotaTime()
+			replicatedHeroName = replicateTarget:GetUnitName()
 			return
 		end
 	end
 end
-function a.ConsiderWaveform()
-	if not c.CanCastAbility(p) or b:IsRooted() then
+function X.ConsiderWaveform()
+	if not Fu.CanCastAbility(waveformAbility) or bot:IsRooted() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local ae = c.GetProperCastRange(false, b, p:GetCastRange())
-	local af = p:GetCastPoint()
-	local ag = p:GetSpecialValueInt("speed")
+	local castRange = Fu.GetProperCastRange(false, bot, waveformAbility:GetCastRange())
+	local castPoint = waveformAbility:GetCastPoint()
+	local speed = waveformAbility:GetSpecialValueInt("speed")
 	-- datafeed: Waveform damage is AbilityDamage 75/150/225/300; "#AbilityDamage" is not a special value key.
-	local ah = p:GetAbilityDamage()
-	local ai = p:GetSpecialValueInt("width")
-	local aj = p:GetManaCost()
-	local ak = c.GetManaAfter(aj)
-	local al = c.GetManaThreshold(b, aj, { q, u })
-	local am = c.GetManaThreshold(b, aj, { p, q, u })
-	local an = c.GetTeamFountain()
-	local ao = c.VectorTowards(b:GetLocation(), an, ae)
-	if c.IsStuck(b) then
-		return BOT_ACTION_DESIRE_HIGH, ao
+	local damage = waveformAbility:GetAbilityDamage()
+	local width = waveformAbility:GetSpecialValueInt("width")
+	local manaCost = waveformAbility:GetManaCost()
+	local manaAfter = Fu.GetManaAfter(manaCost)
+	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { adaptiveStrikeAgiAbility, replicateAbility })
+	local manaThresholdAll =
+		Fu.GetManaThreshold(bot, manaCost, { waveformAbility, adaptiveStrikeAgiAbility, replicateAbility })
+	local teamFountain = Fu.GetTeamFountain()
+	local retreatLocation = Fu.VectorTowards(bot:GetLocation(), teamFountain, castRange)
+	if Fu.IsStuck(bot) then
+		return BOT_ACTION_DESIRE_HIGH, retreatLocation
 	end
-	if not c.IsRealInvisible(b) and not b:IsMagicImmune() then
+	if not Fu.IsRealInvisible(bot) and not bot:IsMagicImmune() then
 		if
-			c.IsStunProjectileIncoming(b, 500)
-			or not b:HasModifier("modifier_sniper_assassinate") and c.IsWillBeCastUnitTargetSpell(b, 400)
+			Fu.IsStunProjectileIncoming(bot, 500)
+			or not bot:HasModifier("modifier_sniper_assassinate") and Fu.IsWillBeCastUnitTargetSpell(bot, 400)
 		then
-			return BOT_ACTION_DESIRE_HIGH, ao
+			return BOT_ACTION_DESIRE_HIGH, retreatLocation
 		end
 	end
-	if Z then
+	if isEngaging then
 		if
-			c.IsValidHero(G)
-			and c.CanBeAttacked(G)
-			and GetUnitToLocationDistance(G, c.GetEnemyFountain()) > 1200
-			and not c.IsInRange(b, G, b:GetAttackRange())
-			and not c.IsSuspiciousIllusion(G)
-			and not G:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
+			Fu.IsValidHero(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and GetUnitToLocationDistance(botTarget, Fu.GetEnemyFountain()) > 1200
+			and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			local ap = c.WeAreStronger(b, 1200)
-			if #J >= #K and ap then
-				local aq = GetUnitToUnitDistance(b, G) / ag + af
-				local ar = c.VectorAway(G:GetLocation(), b:GetLocation(), 300)
-				local as = G:HasModifier("modifier_tower_aura_bonus")
-				if GetUnitToLocationDistance(b, ar) <= ae then
-					if IsLocationPassable(ar) then
-						if c.IsInLaningPhase() then
-							if not as or c.WillKillTarget(G, ah, DAMAGE_TYPE_MAGICAL, aq) then
-								return BOT_ACTION_DESIRE_HIGH, ar
+			local weAreStronger = Fu.WeAreStronger(bot, 1200)
+			if #nearbyAllies >= #nearbyEnemies and weAreStronger then
+				local travelTime = GetUnitToUnitDistance(bot, botTarget) / speed + castPoint
+				local targetLocation = Fu.VectorAway(botTarget:GetLocation(), bot:GetLocation(), 300)
+				local isUnderTower = botTarget:HasModifier("modifier_tower_aura_bonus")
+				if GetUnitToLocationDistance(bot, targetLocation) <= castRange then
+					if IsLocationPassable(targetLocation) then
+						if Fu.IsInLaningPhase() then
+							if
+								not isUnderTower
+								or Fu.WillKillTarget(botTarget, damage, DAMAGE_TYPE_MAGICAL, travelTime)
+							then
+								return BOT_ACTION_DESIRE_HIGH, targetLocation
 							end
 						else
-							return BOT_ACTION_DESIRE_HIGH, ar
+							return BOT_ACTION_DESIRE_HIGH, targetLocation
 						end
 					end
 				end
-				if GetUnitToLocationDistance(b, ar) > ae and GetUnitToLocationDistance(b, ar) < ae + 350 then
-					if IsLocationPassable(ar) then
-						if c.IsInLaningPhase() then
-							if not as or c.WillKillTarget(G, ah, DAMAGE_TYPE_MAGICAL, aq) then
-								return BOT_ACTION_DESIRE_HIGH, ar
-							end
-						else
-							return BOT_ACTION_DESIRE_HIGH, ar
-						end
-					end
-				end
-			end
-		end
-	end
-	if _ and not c.IsRealInvisible(b) then
-		for at, au in pairs(K) do
-			if c.IsValidHero(au) and not c.IsSuspiciousIllusion(au) then
 				if
-					c.IsChasingTarget(au, b) and not c.IsInTeamFight(b, 1200) and b:WasRecentlyDamagedByAnyHero(3.0)
-					or #K > #J
-					or H < 0.65 and b:WasRecentlyDamagedByAnyHero(3.0)
+					GetUnitToLocationDistance(bot, targetLocation) > castRange
+					and GetUnitToLocationDistance(bot, targetLocation) < castRange + 350
 				then
-					return BOT_ACTION_DESIRE_HIGH, ao
-				end
-			end
-		end
-	end
-	local av = b:GetNearbyCreeps(Min(ae + 300, 1600), true)
-	if c.IsPushing(b) and a0 and ak > am and ak > 0.5 and #J <= 3 and #K == 0 then
-		for at, aw in pairs(av) do
-			if c.IsValid(aw) and c.CanBeAttacked(aw) then
-				local ax = b:FindAoELocation(true, false, aw:GetLocation(), 0, ai, 0, 0)
-				if ax.count >= 4 and IsLocationPassable(ax.targetloc) then
-					return BOT_ACTION_DESIRE_HIGH, ax.targetloc
-				end
-			end
-		end
-	end
-	if c.IsDefending(b) and a0 and ak > al and #K == 0 then
-		for at, aw in pairs(av) do
-			if c.IsValid(aw) and c.CanBeAttacked(aw) then
-				local ax = b:FindAoELocation(true, false, aw:GetLocation(), 0, ai, 0, 0)
-				if ax.count >= 4 and IsLocationPassable(ax.targetloc) then
-					return BOT_ACTION_DESIRE_HIGH, ax.targetloc
-				end
-			end
-		end
-	end
-	if c.IsFarming(b) and ak > am and #K == 0 and not c.IsLateGame() then
-		for at, aw in pairs(av) do
-			if c.IsValid(aw) and c.CanBeAttacked(aw) then
-				local ax = b:FindAoELocation(true, false, aw:GetLocation(), 0, ai, 0, 0)
-				if ax.count >= 3 or ax.count >= 2 and aw:IsAncientCreep() then
-					local ar = c.VectorAway(ax.targetloc, b:GetLocation(), 350)
-					if IsLocationPassable(ar) then
-						return BOT_ACTION_DESIRE_HIGH, ax.targetloc
+					if IsLocationPassable(targetLocation) then
+						if Fu.IsInLaningPhase() then
+							if
+								not isUnderTower
+								or Fu.WillKillTarget(botTarget, damage, DAMAGE_TYPE_MAGICAL, travelTime)
+							then
+								return BOT_ACTION_DESIRE_HIGH, targetLocation
+							end
+						else
+							return BOT_ACTION_DESIRE_HIGH, targetLocation
+						end
 					end
 				end
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) and ak > am + 0.15 and ak > 0.5 then
-		local ay = c.GetCurrentRoshanLocation()
-		if GetUnitToLocationDistance(b, ay) > 2000 and #K == 0 and IsLocationPassable(ay) then
-			return BOT_ACTION_DESIRE_HIGH, c.VectorTowards(b:GetLocation(), ay, ae)
+	if isRetreating and not Fu.IsRealInvisible(bot) then
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+				if
+					Fu.IsChasingTarget(enemyHero, bot)
+						and not Fu.IsInTeamFight(bot, 1200)
+						and bot:WasRecentlyDamagedByAnyHero(3.0)
+					or #nearbyEnemies > #nearbyAllies
+					or hpRatio < 0.65 and bot:WasRecentlyDamagedByAnyHero(3.0)
+				then
+					return BOT_ACTION_DESIRE_HIGH, retreatLocation
+				end
+			end
 		end
 	end
-	if c.IsDoingTormentor(b) and ak > am + 0.15 and ak > 0.5 then
-		local az = c.GetTormentorLocation()
-		if GetUnitToLocationDistance(b, az) > 2000 and #K == 0 and IsLocationPassable(az) then
-			return BOT_ACTION_DESIRE_HIGH, c.VectorTowards(b:GetLocation(), az, ae)
+	local nearbyCreeps = bot:GetNearbyCreeps(Min(castRange + 300, 1600), true)
+	if
+		Fu.IsPushing(bot)
+		and isAttacking
+		and manaAfter > manaThresholdAll
+		and manaAfter > 0.5
+		and #nearbyAllies <= 3
+		and #nearbyEnemies == 0
+	then
+		for _, creep in pairs(nearbyCreeps) do
+			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
+				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, width, 0, 0)
+				if aoeLocation.count >= 4 and IsLocationPassable(aoeLocation.targetloc) then
+					return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				end
+			end
 		end
 	end
-	local ax = b:FindAoELocation(true, false, b:GetLocation(), ae, ai, 0, ah)
-	if ax.count >= 5 and #K <= 1 and ak > am then
-		return BOT_ACTION_DESIRE_HIGH, ax.targetloc
+	if Fu.IsDefending(bot) and isAttacking and manaAfter > manaThreshold and #nearbyEnemies == 0 then
+		for _, creep in pairs(nearbyCreeps) do
+			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
+				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, width, 0, 0)
+				if aoeLocation.count >= 4 and IsLocationPassable(aoeLocation.targetloc) then
+					return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				end
+			end
+		end
+	end
+	if Fu.IsFarming(bot) and manaAfter > manaThresholdAll and #nearbyEnemies == 0 and not Fu.IsLateGame() then
+		for _, creep in pairs(nearbyCreeps) do
+			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
+				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, width, 0, 0)
+				if aoeLocation.count >= 3 or aoeLocation.count >= 2 and creep:IsAncientCreep() then
+					local targetLocation = Fu.VectorAway(aoeLocation.targetloc, bot:GetLocation(), 350)
+					if IsLocationPassable(targetLocation) then
+						return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+					end
+				end
+			end
+		end
+	end
+	if Fu.IsDoingRoshan(bot) and manaAfter > manaThresholdAll + 0.15 and manaAfter > 0.5 then
+		local roshanLocation = Fu.GetCurrentRoshanLocation()
+		if
+			GetUnitToLocationDistance(bot, roshanLocation) > 2000
+			and #nearbyEnemies == 0
+			and IsLocationPassable(roshanLocation)
+		then
+			return BOT_ACTION_DESIRE_HIGH, Fu.VectorTowards(bot:GetLocation(), roshanLocation, castRange)
+		end
+	end
+	if Fu.IsDoingTormentor(bot) and manaAfter > manaThresholdAll + 0.15 and manaAfter > 0.5 then
+		local tormentorLocation = Fu.GetTormentorLocation()
+		if
+			GetUnitToLocationDistance(bot, tormentorLocation) > 2000
+			and #nearbyEnemies == 0
+			and IsLocationPassable(tormentorLocation)
+		then
+			return BOT_ACTION_DESIRE_HIGH, Fu.VectorTowards(bot:GetLocation(), tormentorLocation, castRange)
+		end
+	end
+	local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, width, 0, damage)
+	if aoeLocation.count >= 5 and #nearbyEnemies <= 1 and manaAfter > manaThresholdAll then
+		return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderAdaptiveStrikeAGI()
-	if not c.CanCastAbility(q) then
+function X.ConsiderAdaptiveStrikeAGI()
+	if not Fu.CanCastAbility(adaptiveStrikeAgiAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local ae = c.GetProperCastRange(false, b, q:GetCastRange())
-	local af = q:GetCastPoint()
-	local aA = q:GetSpecialValueFloat("damage_min")
-	local aB = q:GetSpecialValueFloat("damage_max")
-	local aC = b:GetAttributeValue(ATTRIBUTE_AGILITY)
-	local aD = b:GetAttributeValue(ATTRIBUTE_STRENGTH)
-	local ah = q:GetSpecialValueInt("damage_base")
-	local ag = q:GetSpecialValueInt("projectile_speed")
-	local aj = q:GetManaCost()
-	local ak = c.GetManaAfter(aj)
-	local al = c.GetManaThreshold(b, aj, { p, u })
-	local am = c.GetManaThreshold(b, aj, { p, q, u })
-	local aE = aC > aD * 1.5
-	if aE then
-		ah = ah + aB * aC
+	local castRange = Fu.GetProperCastRange(false, bot, adaptiveStrikeAgiAbility:GetCastRange())
+	local castPoint = adaptiveStrikeAgiAbility:GetCastPoint()
+	local damageMin = adaptiveStrikeAgiAbility:GetSpecialValueFloat("damage_min")
+	local damageMax = adaptiveStrikeAgiAbility:GetSpecialValueFloat("damage_max")
+	local agility = bot:GetAttributeValue(ATTRIBUTE_AGILITY)
+	local strength = bot:GetAttributeValue(ATTRIBUTE_STRENGTH)
+	local damage = adaptiveStrikeAgiAbility:GetSpecialValueInt("damage_base")
+	local projectileSpeed = adaptiveStrikeAgiAbility:GetSpecialValueInt("projectile_speed")
+	local manaCost = adaptiveStrikeAgiAbility:GetManaCost()
+	local manaAfter = Fu.GetManaAfter(manaCost)
+	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { waveformAbility, replicateAbility })
+	local manaThresholdAll =
+		Fu.GetManaThreshold(bot, manaCost, { waveformAbility, adaptiveStrikeAgiAbility, replicateAbility })
+	local isAgilityStrike = agility > strength * 1.5
+	if isAgilityStrike then
+		damage = damage + damageMax * agility
 	else
-		ah = ah + aA * aC
+		damage = damage + damageMin * agility
 	end
-	for at, au in pairs(K) do
+	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(au)
-			and c.IsInRange(b, au, ae)
-			and c.CanCastOnNonMagicImmune(au)
-			and c.CanCastOnTargetAdvanced(au)
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
 		then
-			local aF = GetUnitToUnitDistance(b, au) / ag + af
+			local travelTime = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
 			-- Interrupt a TP or channel at any attribute split: the stun is 0.5s even at minimum (stun_min,
 			-- game data). It needed Strength 50% above Agility, which a carry Morphling almost never has.
 			local interrupt = false
-			if au:HasModifier("modifier_teleporting") then
-				interrupt = c.GetModifierTime(au, "modifier_teleporting") > aF
-			elseif au:IsChanneling() and ak > am and not c.IsRealInvisible(b) and not _ then
+			if enemyHero:HasModifier("modifier_teleporting") then
+				interrupt = Fu.GetModifierTime(enemyHero, "modifier_teleporting") > travelTime
+			elseif
+				enemyHero:IsChanneling()
+				and manaAfter > manaThresholdAll
+				and not Fu.IsRealInvisible(bot)
+				and not isRetreating
+			then
 				interrupt = true
 			end
 			if interrupt then
-				if DotaTime() >= (b._morphIntLogAt or -999) then
-					b._morphIntLogAt = DotaTime() + 3
-					pcall(print, string.format(
-						"[OHA-MORPH] t=%.0f strike-interrupt target=%s agi=%d str=%d",
-						DotaTime(),
-						(string.gsub(au:GetUnitName(), "npc_dota_hero_", "")),
-						math.floor(aC),
-						math.floor(aD)
-					))
+				if DotaTime() >= (bot._morphIntLogAt or -999) then
+					bot._morphIntLogAt = DotaTime() + 3
+					pcall(
+						print,
+						string.format(
+							"[OHA-MORPH] t=%.0f strike-interrupt target=%s agi=%d str=%d",
+							DotaTime(),
+							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+							math.floor(agility),
+							math.floor(strength)
+						)
+					)
 				end
-				return BOT_ACTION_DESIRE_HIGH, au
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			if
-				c.WillKillTarget(au, ah, DAMAGE_TYPE_MAGICAL, aF)
-				and not au:HasModifier("modifier_abaddon_borrowed_time")
-				and not au:HasModifier("modifier_dazzle_shallow_grave")
-				and not au:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not au:HasModifier("modifier_oracle_false_promise_timer")
-				and not au:HasModifier("modifier_troll_warlord_battle_trance")
+				Fu.WillKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL, travelTime)
+				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+				and not enemyHero:HasModifier("modifier_troll_warlord_battle_trance")
 			then
-				return BOT_ACTION_DESIRE_HIGH, au
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) and aE then
-		local aG = nil
-		local aH = 0
-		for at, au in pairs(K) do
+	if Fu.IsInTeamFight(bot, 1200) and isAgilityStrike then
+		local bestTarget = nil
+		local bestDamageRatio = 0
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(au)
-				and c.CanBeAttacked(au)
-				and c.IsInRange(b, au, ae)
-				and c.CanCastOnNonMagicImmune(au)
-				and c.CanCastOnTargetAdvanced(au)
-				and not au:HasModifier("modifier_abaddon_borrowed_time")
-				and not au:HasModifier("modifier_dazzle_shallow_grave")
-				and not au:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not au:HasModifier("modifier_oracle_false_promise_timer")
-				and not au:HasModifier("modifier_templar_assassin_refraction_absorb")
-				and not au:HasModifier("modifier_troll_warlord_battle_trance")
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanBeAttacked(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+				and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
+				and not enemyHero:HasModifier("modifier_troll_warlord_battle_trance")
 			then
-				if c.IsInEtherealForm(au) then
-					return BOT_ACTION_DESIRE_HIGH, au
+				if Fu.IsInEtherealForm(enemyHero) then
+					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
-				local aI = au:GetActualIncomingDamage(ah, DAMAGE_TYPE_MAGICAL) / au:GetHealth()
-				if aI > aH then
-					aG = au
-					aH = aI
+				local damageRatio = enemyHero:GetActualIncomingDamage(damage, DAMAGE_TYPE_MAGICAL)
+					/ enemyHero:GetHealth()
+				if damageRatio > bestDamageRatio then
+					bestTarget = enemyHero
+					bestDamageRatio = damageRatio
 				end
 			end
 		end
-		if aG then
-			return BOT_ACTION_DESIRE_HIGH, aG
+		if bestTarget then
+			return BOT_ACTION_DESIRE_HIGH, bestTarget
 		end
 	end
-	if Z and aE then
+	if isEngaging and isAgilityStrike then
 		if
-			c.IsValidTarget(G)
-			and c.CanBeAttacked(G)
-			and c.IsInRange(b, G, ae)
-			and c.CanCastOnNonMagicImmune(G)
-			and c.CanCastOnTargetAdvanced(G)
-			and c.GetHP(G) < 0.6
-			and not G:HasModifier("modifier_abaddon_borrowed_time")
-			and not G:HasModifier("modifier_dazzle_shallow_grave")
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not G:HasModifier("modifier_oracle_false_promise_timer")
-			and not G:HasModifier("modifier_ursa_enrage")
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and Fu.GetHP(botTarget) < 0.6
+			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
+			and not botTarget:HasModifier("modifier_dazzle_shallow_grave")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not botTarget:HasModifier("modifier_oracle_false_promise_timer")
+			and not botTarget:HasModifier("modifier_ursa_enrage")
 		then
-			return BOT_ACTION_DESIRE_HIGH, G
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if _ and not c.IsRealInvisible(b) and not aE then
-		for at, au in pairs(K) do
+	if isRetreating and not Fu.IsRealInvisible(bot) and not isAgilityStrike then
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(au)
-				and c.CanBeAttacked(au)
-				and c.IsInRange(b, au, ae)
-				and c.CanCastOnNonMagicImmune(au)
-				and c.CanCastOnTargetAdvanced(au)
-				and not c.IsDisabled(au)
-				and b:WasRecentlyDamagedByHero(au, 3.0)
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanBeAttacked(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
 			then
-				return BOT_ACTION_DESIRE_HIGH, au
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	local av = b:GetNearbyCreeps(Min(ae + 300, 1600), true)
-	if c.IsFarming(b) and ak > al and (L or aE) then
-		local aJ = nil
-		local aK = 0
-		for at, aw in pairs(av) do
-			if c.IsValid(aw) and c.CanBeAttacked(aw) and c.CanCastOnTargetAdvanced(aw) and c.GetHP(aw) > 0.4 then
-				local aL = aw:GetActualIncomingDamage(ah, DAMAGE_TYPE_MAGICAL) / aw:GetHealth()
-				if aL > aK then
-					aJ = aw
-					aK = aL
+	local nearbyCreeps = bot:GetNearbyCreeps(Min(castRange + 300, 1600), true)
+	if Fu.IsFarming(bot) and manaAfter > manaThreshold and (isStrengthPrimary or isAgilityStrike) then
+		local bestCreep = nil
+		local bestCreepRatio = 0
+		for _, creep in pairs(nearbyCreeps) do
+			if
+				Fu.IsValid(creep)
+				and Fu.CanBeAttacked(creep)
+				and Fu.CanCastOnTargetAdvanced(creep)
+				and Fu.GetHP(creep) > 0.4
+			then
+				local creepDamageRatio = creep:GetActualIncomingDamage(damage, DAMAGE_TYPE_MAGICAL) / creep:GetHealth()
+				if creepDamageRatio > bestCreepRatio then
+					bestCreep = creep
+					bestCreepRatio = creepDamageRatio
 				end
 			end
 		end
-		if aJ then
-			return BOT_ACTION_DESIRE_HIGH, aJ
+		if bestCreep then
+			return BOT_ACTION_DESIRE_HIGH, bestCreep
 		end
 	end
-	if c.IsLaning(b) and c.IsInLaningPhase() and ak > al then
-		local aM = b:GetNearbyLaneCreeps(ae, true)
-		for at, aw in pairs(aM) do
+	if Fu.IsLaning(bot) and Fu.IsInLaningPhase() and manaAfter > manaThreshold then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
+		for _, creep in pairs(nearbyLaneCreeps) do
 			if
-				c.IsValid(aw)
-				and c.CanBeAttacked(aw)
-				and c.CanCastOnTargetAdvanced(aw)
+				Fu.IsValid(creep)
+				and Fu.CanBeAttacked(creep)
+				and Fu.CanCastOnTargetAdvanced(creep)
 				and (
-					not L
-						and (c.IsKeyWordUnit("ranged", aw) or c.IsKeyWordUnit("siege", aw) or c.IsKeyWordUnit(
+					not isStrengthPrimary
+						and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
 							"flagbearer",
-							aw
+							creep
 						))
-					or ak > 0.5
+					or manaAfter > 0.5
 				)
 			then
-				local aF = GetUnitToUnitDistance(b, aw) / ag + af
-				if c.WillKillTarget(aw, ah, DAMAGE_TYPE_MAGICAL, aF) then
-					local ax = b:FindAoELocation(true, true, aw:GetLocation(), 0, 600, 0, 0)
-					if ax.count > 0 or c.IsUnitTargetedByTower(aw, false) then
-						return BOT_ACTION_DESIRE_HIGH, aw
+				local travelTime = GetUnitToUnitDistance(bot, creep) / projectileSpeed + castPoint
+				if Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL, travelTime) then
+					local aoeLocation = bot:FindAoELocation(true, true, creep:GetLocation(), 0, 600, 0, 0)
+					if aoeLocation.count > 0 or Fu.IsUnitTargetedByTower(creep, false) then
+						return BOT_ACTION_DESIRE_HIGH, creep
 					end
 				end
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) and aE then
+	if Fu.IsDoingRoshan(bot) and isAgilityStrike then
 		if
-			c.IsRoshan(G)
-			and c.IsInRange(b, G, ae)
-			and c.CanBeAttacked(G)
-			and c.CanCastOnNonMagicImmune(G)
-			and a0
-			and ak > al
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and isAttacking
+			and manaAfter > manaThreshold
 		then
-			return BOT_ACTION_DESIRE_HIGH, G
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if c.IsDoingTormentor(b) and aE then
-		if c.IsTormentor(G) and c.IsInRange(b, G, ae) and a0 and ak > al then
+	if Fu.IsDoingTormentor(bot) and isAgilityStrike then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > manaThreshold
+		then
 			-- Return the Tormentor: the caller casts on the second value, which was nil here.
-			return BOT_ACTION_DESIRE_HIGH, G
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderAtttributeShift()
-	if not c.CanCastAbility(s) or not c.CanCastAbility(t) then
+function X.ConsiderAtttributeShift()
+	if not Fu.CanCastAbility(morphAgiAbility) or not Fu.CanCastAbility(morphStrAbility) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local aP = b:GetNetWorth()
-	local aQ = b:GetAttackRange()
-	local aR = s:GetToggleState()
-	local aS = t:GetToggleState()
-	local aN = c.GetAlliesNearLoc(b:GetLocation(), 1200)
-	local a2 = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-	local aT = b:GetNearbyTowers(1100, true)
-	local ap = c.WeAreStronger(b, 1600)
-	local aC = b:GetAttributeValue(ATTRIBUTE_AGILITY)
-	local aD = b:GetAttributeValue(ATTRIBUTE_STRENGTH)
-	local aU = aC / aD * 1.5
-	if _ and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(5.0) then
-		if b:WasRecentlyDamagedByAnyHero(3.0) then
-			if aS == false then
+	local netWorth = bot:GetNetWorth()
+	local attackRange = bot:GetAttackRange()
+	local isAgiMorphOn = morphAgiAbility:GetToggleState()
+	local isStrMorphOn = morphStrAbility:GetToggleState()
+	local alliesNearBot = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
+	local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+	local nearbyTowers = bot:GetNearbyTowers(1100, true)
+	local weAreStronger = Fu.WeAreStronger(bot, 1600)
+	local agility = bot:GetAttributeValue(ATTRIBUTE_AGILITY)
+	local strength = bot:GetAttributeValue(ATTRIBUTE_STRENGTH)
+	local agiStrRatio = agility / strength * 1.5
+	if isRetreating and not Fu.IsRealInvisible(bot) and bot:WasRecentlyDamagedByAnyHero(5.0) then
+		if bot:WasRecentlyDamagedByAnyHero(3.0) then
+			if isStrMorphOn == false then
 				return BOT_ACTION_DESIRE_HIGH, "str"
 			end
 			return BOT_ACTION_DESIRE_NONE, ""
 		end
-		if b:HasModifier("modifier_fountain_aura_buff") and #a2 == 0 then
-			if M < 0.5 then
-				if aR == false then
+		if bot:HasModifier("modifier_fountain_aura_buff") and #enemiesNearBot == 0 then
+			if agiRatio < 0.5 then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			else
-				if M > 0.5 + 0.02 then
-					if aS == false then
+				if agiRatio > 0.5 + 0.02 then
+					if isStrMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "str"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
@@ -630,64 +697,64 @@ function a.ConsiderAtttributeShift()
 			end
 			return BOT_ACTION_DESIRE_NONE, ""
 		end
-		if aS == true then
+		if isStrMorphOn == true then
 			return BOT_ACTION_DESIRE_HIGH, "str"
 		end
 		return BOT_ACTION_DESIRE_NONE, ""
 	end
-	if L then
-		if aP > 30000 then
-			if aU < 1.0 then
-				if aR == false then
+	if isStrengthPrimary then
+		if netWorth > 30000 then
+			if agiStrRatio < 1.0 then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			else
-				if aU > 1.0 + 0.02 then
-					if aS == false then
+				if agiStrRatio > 1.0 + 0.02 then
+					if isStrMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "str"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				end
 			end
 		else
-			local aV = c.IsInLaningPhase() and 0.4 or 0.6
-			if aP > 20000 then
-				aV = 0.5
+			local targetAgiRatio = Fu.IsInLaningPhase() and 0.4 or 0.6
+			if netWorth > 20000 then
+				targetAgiRatio = 0.5
 			end
-			if M < aV then
-				if aR == false then
+			if agiRatio < targetAgiRatio then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			end
-			if M > aV + 0.02 then
-				if aS == false then
+			if agiRatio > targetAgiRatio + 0.02 then
+				if isStrMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "str"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			end
 		end
 	else
-		if Z then
+		if isEngaging then
 			if
-				c.IsValidHero(G)
-				and (c.CanBeAttacked(G) or #a2 > 1)
-				and c.IsInRange(b, G, aQ + 300)
-				and not G:HasModifier("modifier_necrolyte_reapers_scythe")
+				Fu.IsValidHero(botTarget)
+				and (Fu.CanBeAttacked(botTarget) or #enemiesNearBot > 1)
+				and Fu.IsInRange(bot, botTarget, attackRange + 300)
+				and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local aV = RemapValClamped(aP, 5000, 25000, 0.5, 0.90)
-				if #a2 > #aN and not ap then
-					aV = aV * 0.75
+				local targetAgiRatio = RemapValClamped(netWorth, 5000, 25000, 0.5, 0.90)
+				if #enemiesNearBot > #alliesNearBot and not weAreStronger then
+					targetAgiRatio = targetAgiRatio * 0.75
 				end
-				if M < aV and H > 0.3 then
-					if aR == false then
+				if agiRatio < targetAgiRatio and hpRatio > 0.3 then
+					if isAgiMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "agi"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				else
-					if M > aV + 0.02 then
-						if aS == false then
+					if agiRatio > targetAgiRatio + 0.02 then
+						if isStrMorphOn == false then
 							return BOT_ACTION_DESIRE_HIGH, "str"
 						end
 						return BOT_ACTION_DESIRE_NONE, ""
@@ -695,68 +762,72 @@ function a.ConsiderAtttributeShift()
 				end
 			end
 		end
-		if c.IsPushing(b) or c.IsDefending(b) then
-			local aV = RemapValClamped(aP, 5000, 20000, 0.5, 0.75)
-			if #a2 > #aN and not ap then
-				aV = aV * 0.75
+		if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+			local targetAgiRatio = RemapValClamped(netWorth, 5000, 20000, 0.5, 0.75)
+			if #enemiesNearBot > #alliesNearBot and not weAreStronger then
+				targetAgiRatio = targetAgiRatio * 0.75
 			end
-			if M < aV and H > 0.3 then
-				if aR == false then
+			if agiRatio < targetAgiRatio and hpRatio > 0.3 then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			else
-				if M > aV + 0.02 then
-					if aS == false then
+				if agiRatio > targetAgiRatio + 0.02 then
+					if isStrMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "str"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				end
 			end
 		end
-		if c.IsLaning(b) and c.IsInLaningPhase() then
-			local aV = RemapValClamped(b:GetLevel(), 1, 6, 0.55, 0.6)
-			if M < aV then
-				if aR == false then
+		if Fu.IsLaning(bot) and Fu.IsInLaningPhase() then
+			local targetAgiRatio = RemapValClamped(bot:GetLevel(), 1, 6, 0.55, 0.6)
+			if agiRatio < targetAgiRatio then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			else
-				if M > aV + 0.02 then
-					if aS == false then
+				if agiRatio > targetAgiRatio + 0.02 then
+					if isStrMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "str"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				end
 			end
 		end
-		if c.IsFarming(b) and H > 0.3 then
-			local aV = RemapValClamped(aP, 5000, 20000, 0.55, 0.85)
-			if M < aV then
-				if aR == false then
+		if Fu.IsFarming(bot) and hpRatio > 0.3 then
+			local targetAgiRatio = RemapValClamped(netWorth, 5000, 20000, 0.55, 0.85)
+			if agiRatio < targetAgiRatio then
+				if isAgiMorphOn == false then
 					return BOT_ACTION_DESIRE_HIGH, "agi"
 				end
 				return BOT_ACTION_DESIRE_NONE, ""
 			else
-				if M > aV + 0.02 then
-					if aS == false then
+				if agiRatio > targetAgiRatio + 0.02 then
+					if isStrMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "str"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				end
 			end
 		end
-		if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-			if (c.IsRoshan(G) or c.IsTormentor(G)) and c.CanBeAttacked(G) and c.IsInRange(b, G, 1000) then
-				local aV = RemapValClamped(aP, 5000, 20000, 0.5, 0.85)
-				if M < aV and H > 0.35 then
-					if aR == false then
+		if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
+			if
+				(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+				and Fu.CanBeAttacked(botTarget)
+				and Fu.IsInRange(bot, botTarget, 1000)
+			then
+				local targetAgiRatio = RemapValClamped(netWorth, 5000, 20000, 0.5, 0.85)
+				if agiRatio < targetAgiRatio and hpRatio > 0.35 then
+					if isAgiMorphOn == false then
 						return BOT_ACTION_DESIRE_HIGH, "agi"
 					end
 					return BOT_ACTION_DESIRE_NONE, ""
 				else
-					if M > aV + 0.02 then
-						if aS == false then
+					if agiRatio > targetAgiRatio + 0.02 then
+						if isStrMorphOn == false then
 							return BOT_ACTION_DESIRE_HIGH, "str"
 						end
 						return BOT_ACTION_DESIRE_NONE, ""
@@ -765,340 +836,356 @@ function a.ConsiderAtttributeShift()
 			end
 		end
 	end
-	if aS == true then
+	if isStrMorphOn == true then
 		return BOT_ACTION_DESIRE_HIGH, "str"
 	end
-	if aR == true then
+	if isAgiMorphOn == true then
 		return BOT_ACTION_DESIRE_HIGH, "agi"
 	end
 	return BOT_ACTION_DESIRE_NONE, ""
 end
-function a.ConsiderMorph()
-	if not c.CanCastAbility(u) then
+function X.ConsiderMorph()
+	if not Fu.CanCastAbility(replicateAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local ae = c.GetProperCastRange(false, b, u:GetCastRange())
-	if c.IsInTeamFight(b, 1200) then
-		local aW = nil
-		local aX = 0
-		for at, au in pairs(K) do
+	local castRange = Fu.GetProperCastRange(false, bot, replicateAbility:GetCastRange())
+	if Fu.IsInTeamFight(bot, 1200) then
+		local bestTarget = nil
+		local bestScore = 0
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(au)
-				and c.IsInRange(b, au, ae)
-				and c.CanCastOnTargetAdvanced(au)
-				and not c.IsSuspiciousIllusion(au)
-				and not string.find(au:GetUnitName(), "huskar")
-				and not string.find(au:GetUnitName(), "invoker")
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not string.find(enemyHero:GetUnitName(), "huskar")
+				and not string.find(enemyHero:GetUnitName(), "invoker")
 			then
-				local aY = au:GetEstimatedDamageToTarget(false, b, 5.0, DAMAGE_TYPE_MAGICAL)
-					+ au:GetEstimatedDamageToTarget(false, b, 5.0, DAMAGE_TYPE_PURE)
-				if aY > aX then
-					aW = au
-					aX = aY
+				local spellDamage = enemyHero:GetEstimatedDamageToTarget(false, bot, 5.0, DAMAGE_TYPE_MAGICAL)
+					+ enemyHero:GetEstimatedDamageToTarget(false, bot, 5.0, DAMAGE_TYPE_PURE)
+				if spellDamage > bestScore then
+					bestTarget = enemyHero
+					bestScore = spellDamage
 				end
 			end
 		end
-		if aW then
-			return BOT_ACTION_DESIRE_HIGH, aW
+		if bestTarget then
+			return BOT_ACTION_DESIRE_HIGH, bestTarget
 		end
 	end
-	if Z then
+	if isEngaging then
 		if
-			c.IsValidHero(G)
-			and c.CanBeAttacked(G)
-			and c.IsInRange(b, G, 1200)
-			and c.GetHP(G) < 0.5
-			and not c.IsSuspiciousIllusion(G)
-			and not G:HasModifier("modifier_abaddon_borrowed_time")
-			and not G:HasModifier("modifier_dazzle_shallow_grave")
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not G:HasModifier("modifier_oracle_false_promise_timer")
+			Fu.IsValidHero(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1200)
+			and Fu.GetHP(botTarget) < 0.5
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
+			and not botTarget:HasModifier("modifier_dazzle_shallow_grave")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not botTarget:HasModifier("modifier_oracle_false_promise_timer")
 		then
-			local aZ = 6.0
-			local a_ = c.GetTotalEstimatedDamageToTarget(J, G, aZ)
-			if a_ > G:GetHealth() + G:GetHealthRegen() * aZ and #J >= #K and H > 0.4 then
-				local a2 = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
-				if not c.IsLateGame() and #a2 > 0 or #a2 > 1 then
-					local aW = nil
-					local aX = -math.huge
-					for at, au in pairs(a2) do
+			local duration = 6.0
+			local totalAllyDamage = Fu.GetTotalEstimatedDamageToTarget(nearbyAllies, botTarget, duration)
+			if
+				totalAllyDamage > botTarget:GetHealth() + botTarget:GetHealthRegen() * duration
+				and #nearbyAllies >= #nearbyEnemies
+				and hpRatio > 0.4
+			then
+				local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+				if not Fu.IsLateGame() and #enemiesNearBot > 0 or #enemiesNearBot > 1 then
+					local bestTarget = nil
+					local bestScore = -math.huge
+					for _, enemyHero in pairs(enemiesNearBot) do
 						if
-							c.IsValidHero(au)
-							and c.CanCastOnTargetAdvanced(au)
-							and not au:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
-							and not au:HasModifier("modifier_item_helm_of_the_undying_active")
-							and not string.find(au:GetUnitName(), "huskar")
-							and not string.find(au:GetUnitName(), "invoker")
+							Fu.IsValidHero(enemyHero)
+							and Fu.CanCastOnTargetAdvanced(enemyHero)
+							and not enemyHero:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
+							and not enemyHero:HasModifier("modifier_item_helm_of_the_undying_active")
+							and not string.find(enemyHero:GetUnitName(), "huskar")
+							and not string.find(enemyHero:GetUnitName(), "invoker")
 						then
-							local aY = au:GetEstimatedDamageToTarget(false, b, 5.0, DAMAGE_TYPE_MAGICAL)
-								+ au:GetEstimatedDamageToTarget(false, b, 5.0, DAMAGE_TYPE_PURE)
-							local b0 = GetMorphEngageScore(au:GetUnitName()) * aY
-							if b0 > aX then
-								aW = au
-								aX = b0
+							local spellDamage = enemyHero:GetEstimatedDamageToTarget(
+								false,
+								bot,
+								5.0,
+								DAMAGE_TYPE_MAGICAL
+							) + enemyHero:GetEstimatedDamageToTarget(false, bot, 5.0, DAMAGE_TYPE_PURE)
+							local engageScore = GetMorphEngageScore(enemyHero:GetUnitName()) * spellDamage
+							if engageScore > bestScore then
+								bestTarget = enemyHero
+								bestScore = engageScore
 							end
 						end
 					end
-					if aW ~= nil then
-						return BOT_ACTION_DESIRE_HIGH, aW
+					if bestTarget ~= nil then
+						return BOT_ACTION_DESIRE_HIGH, bestTarget
 					end
 				end
 			end
 		end
 	end
 	if
-		_
-		and not c.IsRealInvisible(b)
-		and b:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH
-		and b:WasRecentlyDamagedByAnyHero(3.0)
-		and not c.CanCastAbility(p, 3.0)
-		and H > 0.5
+		isRetreating
+		and not Fu.IsRealInvisible(bot)
+		and bot:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH
+		and bot:WasRecentlyDamagedByAnyHero(3.0)
+		and not Fu.CanCastAbility(waveformAbility, 3.0)
+		and hpRatio > 0.5
 	then
-		local aW = nil
-		local aX = 0
-		for at, au in pairs(K) do
-			if c.IsValidHero(au) and c.IsInRange(b, au, ae) and c.CanCastOnTargetAdvanced(au) then
-				local b1 = GetMorphRetreatScore(au:GetUnitName())
-				if b1 > 0 and b1 > aX then
-					aW = au
-					aX = b1
+		local bestTarget = nil
+		local bestScore = 0
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
+				local retreatScore = GetMorphRetreatScore(enemyHero:GetUnitName())
+				if retreatScore > 0 and retreatScore > bestScore then
+					bestTarget = enemyHero
+					bestScore = retreatScore
 				end
 			end
 		end
-		if aW ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, aW
+		if bestTarget ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, bestTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.SetRatios()
-	local a4 = 0
-	local b2 = 0
-	local b3 = 0
-	local b4 = b:GetPrimaryAttribute()
-	local b5 = { 0, 1, 2, 3, 4, 5, 16, 17 }
-	for a7 = 1, #b5 do
-		local b6 = b:GetItemInSlot(b5[a7])
-		if b6 then
-			local b7 = b6:GetName()
-			if string.find(b7, "item_power_treads") then
-				local b8 = b6:GetSpecialValueInt("bonus_stat")
-				local b9 = b6:GetPowerTreadsStat()
-				if b9 == ATTRIBUTE_AGILITY then
-					b2 = b2 + b8
-				elseif b9 == ATTRIBUTE_STRENGTH then
-					b3 = b3 + b8
+function X.SetRatios()
+	local talentStatLevels = 0
+	local bonusAgility = 0
+	local bonusStrength = 0
+	local primaryAttribute = bot:GetPrimaryAttribute()
+	local itemSlots = { 0, 1, 2, 3, 4, 5, 16, 17 }
+	for i = 1, #itemSlots do
+		local item = bot:GetItemInSlot(itemSlots[i])
+		if item then
+			local itemName = item:GetName()
+			if string.find(itemName, "item_power_treads") then
+				local bonusStat = item:GetSpecialValueInt("bonus_stat")
+				local treadsStat = item:GetPowerTreadsStat()
+				if treadsStat == ATTRIBUTE_AGILITY then
+					bonusAgility = bonusAgility + bonusStat
+				elseif treadsStat == ATTRIBUTE_STRENGTH then
+					bonusStrength = bonusStrength + bonusStat
 				end
 			end
-			if string.find(b7, "evolved") then
-				local ba = b6:GetSpecialValueInt("primary_stat")
-				if b4 == ATTRIBUTE_AGILITY then
-					b2 = b2 + ba
-				elseif b4 == ATTRIBUTE_STRENGTH then
-					b3 = b3 + ba
+			if string.find(itemName, "evolved") then
+				local primaryStatBonus = item:GetSpecialValueInt("primary_stat")
+				if primaryAttribute == ATTRIBUTE_AGILITY then
+					bonusAgility = bonusAgility + primaryStatBonus
+				elseif primaryAttribute == ATTRIBUTE_STRENGTH then
+					bonusStrength = bonusStrength + primaryStatBonus
 				end
 			end
-			local bb = b6:GetSpecialValueInt("bonus_all_stats")
-			b2 = b2 + b6:GetSpecialValueInt("bonus_agility") + bb
-			b3 = b3 + b6:GetSpecialValueInt("bonus_strength") + bb
+			local bonusAllStats = item:GetSpecialValueInt("bonus_all_stats")
+			bonusAgility = bonusAgility + item:GetSpecialValueInt("bonus_agility") + bonusAllStats
+			bonusStrength = bonusStrength + item:GetSpecialValueInt("bonus_strength") + bonusAllStats
 		end
 	end
-	a4 = 0
-	if b:GetLevel() >= 26 then
-		a4 = 7
-	elseif b:GetLevel() >= 24 then
-		a4 = 6
-	elseif b:GetLevel() >= 23 then
-		a4 = 5
-	elseif b:GetLevel() >= 22 then
-		a4 = 4
-	elseif b:GetLevel() >= 21 then
-		a4 = 3
-	elseif b:GetLevel() >= 19 then
-		a4 = 2
-	elseif b:GetLevel() >= 17 then
-		a4 = 1
+	talentStatLevels = 0
+	if bot:GetLevel() >= 26 then
+		talentStatLevels = 7
+	elseif bot:GetLevel() >= 24 then
+		talentStatLevels = 6
+	elseif bot:GetLevel() >= 23 then
+		talentStatLevels = 5
+	elseif bot:GetLevel() >= 22 then
+		talentStatLevels = 4
+	elseif bot:GetLevel() >= 21 then
+		talentStatLevels = 3
+	elseif bot:GetLevel() >= 19 then
+		talentStatLevels = 2
+	elseif bot:GetLevel() >= 17 then
+		talentStatLevels = 1
 	end
-	if b4 == ATTRIBUTE_AGILITY then
-		b2 = b2 + a4 * 3 + a4 * 2
-		b3 = b3 + a4 * 2
-	elseif b4 == ATTRIBUTE_STRENGTH then
-		b2 = b2 + a4 * 2
-		b3 = b3 + a4 * 3 + a4 * 2
+	if primaryAttribute == ATTRIBUTE_AGILITY then
+		bonusAgility = bonusAgility + talentStatLevels * 3 + talentStatLevels * 2
+		bonusStrength = bonusStrength + talentStatLevels * 2
+	elseif primaryAttribute == ATTRIBUTE_STRENGTH then
+		bonusAgility = bonusAgility + talentStatLevels * 2
+		bonusStrength = bonusStrength + talentStatLevels * 3 + talentStatLevels * 2
 	end
-	local bc = b:GetAbilityInSlot(14)
-	local bd = b:GetAbilityInSlot(16)
-	if bc ~= nil and bc:IsTrained() then
-		b2 = b2 + bc:GetSpecialValueInt("value")
+	local agilityTalent = bot:GetAbilityInSlot(14)
+	local strengthTalent = bot:GetAbilityInSlot(16)
+	if agilityTalent ~= nil and agilityTalent:IsTrained() then
+		bonusAgility = bonusAgility + agilityTalent:GetSpecialValueInt("value")
 	end
-	if bd ~= nil and bd:IsTrained() then
-		b3 = b3 + bd:GetSpecialValueInt("value")
+	if strengthTalent ~= nil and strengthTalent:IsTrained() then
+		bonusStrength = bonusStrength + strengthTalent:GetSpecialValueInt("value")
 	end
-	local be = O + Q * (b:GetLevel() - 1)
-	local bf = P + R * (b:GetLevel() - 1)
-	local bg = b:GetAttributeValue(ATTRIBUTE_AGILITY)
-	local bh = b:GetAttributeValue(ATTRIBUTE_STRENGTH)
-	local bi = bg - be
-	local bj = bh - bf
-	local bk = be + bi - b2
-	local bl = bf + bj - b3
-	M = bk / (bk + bl)
-	N = bl / (bk + bl)
+	local expectedBaseAgility = baseAgility + agilityGain * (bot:GetLevel() - 1)
+	local expectedBaseStrength = baseStrength + strengthGain * (bot:GetLevel() - 1)
+	local currentAgility = bot:GetAttributeValue(ATTRIBUTE_AGILITY)
+	local currentStrength = bot:GetAttributeValue(ATTRIBUTE_STRENGTH)
+	local agilityGained = currentAgility - expectedBaseAgility
+	local strengthGained = currentStrength - expectedBaseStrength
+	local morphableAgility = expectedBaseAgility + agilityGained - bonusAgility
+	local morphableStrength = expectedBaseStrength + strengthGained - bonusStrength
+	agiRatio = morphableAgility / (morphableAgility + morphableStrength)
 end
-local function bm(bn, bo, bp, bq)
-	return { scoreEngage = bn, scoreRetreat = bo, goodToEngageBack = bp, goodToRetreatBack = bq }
+local function MakeMorphScore(scoreEngage, scoreRetreat, goodToEngageBack, goodToRetreatBack)
+	return {
+		scoreEngage = scoreEngage,
+		scoreRetreat = scoreRetreat,
+		goodToEngageBack = goodToEngageBack,
+		goodToRetreatBack = goodToRetreatBack,
+	}
 end
-local br = {
-	["npc_dota_hero_abaddon"] = bm(0.3, 0.1, false, false),
-	["npc_dota_hero_abyssal_underlord"] = bm(0.8, 0.5, true, true),
-	["npc_dota_hero_alchemist"] = bm(0.4, 0.2, false, false),
-	["npc_dota_hero_ancient_apparition"] = bm(0.7, 0.4, true, false),
-	["npc_dota_hero_antimage"] = bm(0.5, 0.9, true, true),
-	["npc_dota_hero_arc_warden"] = bm(0.4, 0.1, true, false),
-	["npc_dota_hero_axe"] = bm(0.3, 0.5, false, false),
-	["npc_dota_hero_bane"] = bm(0.8, 0.5, true, true),
-	["npc_dota_hero_batrider"] = bm(0.3, 0.3, false, false),
-	["npc_dota_hero_beastmaster"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_bloodseeker"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_bounty_hunter"] = bm(0.2, 0.6, false, true),
-	["npc_dota_hero_brewmaster"] = bm(0.3, 0.3, false, false),
-	["npc_dota_hero_bristleback"] = bm(0.4, 0.2, false, false),
-	["npc_dota_hero_broodmother"] = bm(0.5, 0.1, false, false),
-	["npc_dota_hero_centaur"] = bm(0.4, 0.3, true, false),
-	["npc_dota_hero_chaos_knight"] = bm(0.6, 0.5, true, false),
-	["npc_dota_hero_chen"] = bm(0.4, 0.1, false, false),
-	["npc_dota_hero_clinkz"] = bm(0.3, 0.2, false, false),
-	["npc_dota_hero_crystal_maiden"] = bm(0.8, 0.8, true, true),
-	["npc_dota_hero_dark_seer"] = bm(0.2, 0.5, true, true),
-	["npc_dota_hero_dark_willow"] = bm(0.6, 0.5, true, true),
-	["npc_dota_hero_dawnbreaker"] = bm(0.6, 0.4, true, false),
-	["npc_dota_hero_dazzle"] = bm(0.8, 0.2, true, false),
-	["npc_dota_hero_death_prophet"] = bm(0.5, 0.2, true, false),
-	["npc_dota_hero_disruptor"] = bm(0.8, 0.5, true, true),
-	["npc_dota_hero_doom_bringer"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_dragon_knight"] = bm(0.6, 0.8, true, true),
-	["npc_dota_hero_drow_ranger"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_earth_spirit"] = bm(0.8, 1, true, true),
-	["npc_dota_hero_earthshaker"] = bm(1, 1, true, true),
-	["npc_dota_hero_elder_titan"] = bm(0.1, 0.1, false, false),
-	["npc_dota_hero_ember_spirit"] = bm(0.5, 0.4, true, true),
-	["npc_dota_hero_enchantress"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_enigma"] = bm(0.2, 0.5, false, false),
-	["npc_dota_hero_faceless_void"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_furion"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_grimstroke"] = bm(0.8, 0.4, true, true),
-	["npc_dota_hero_gyrocopter"] = bm(0.6, 0.4, true, false),
-	["npc_dota_hero_hoodwink"] = bm(0.5, 0.3, true, false),
-	["npc_dota_hero_huskar"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_invoker"] = bm(0.5, 0.3, true, false),
-	["npc_dota_hero_jakiro"] = bm(0.6, 0.6, true, false),
-	["npc_dota_hero_juggernaut"] = bm(0.8, 0.3, true, true),
-	["npc_dota_hero_keeper_of_the_light"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_kunkka"] = bm(0.4, 0.4, true, true),
-	["npc_dota_hero_legion_commander"] = bm(0.6, 0.4, true, true),
-	["npc_dota_hero_leshrac"] = bm(0.6, 0.4, true, true),
-	["npc_dota_hero_lich"] = bm(0.7, 0.2, true, false),
-	["npc_dota_hero_life_stealer"] = bm(0.8, 0.4, true, true),
-	["npc_dota_hero_lina"] = bm(0.4, 0.2, true, true),
-	["npc_dota_hero_lion"] = bm(1, 1, true, true),
-	["npc_dota_hero_lone_druid"] = bm(0.1, 0.1, false, false),
-	["npc_dota_hero_luna"] = bm(0.4, 0.2, false, false),
-	["npc_dota_hero_lycan"] = bm(0.7, 0.2, true, false),
-	["npc_dota_hero_magnataur"] = bm(0.4, 0.7, true, true),
-	["npc_dota_hero_marci"] = bm(0.3, 0.3, false, false),
-	["npc_dota_hero_mars"] = bm(0.7, 0.4, true, true),
-	["npc_dota_hero_medusa"] = bm(0.1, 0.2, true, false),
-	["npc_dota_hero_meepo"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_mirana"] = bm(0.3, 0.7, false, true),
-	["npc_dota_hero_monkey_king"] = bm(0.4, 0.4, true, false),
-	["npc_dota_hero_muerta"] = bm(0.5, 0.3, true, false),
-	["npc_dota_hero_naga_siren"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_necrolyte"] = bm(0.2, 0.1, true, true),
-	["npc_dota_hero_nevermore"] = bm(0.2, 0.1, true, false),
-	["npc_dota_hero_night_stalker"] = bm(0.5, 0.2, true, false),
-	["npc_dota_hero_nyx_assassin"] = bm(0.6, 0.6, true, true),
-	["npc_dota_hero_obsidian_destroyer"] = bm(0.8, 0.8, true, true),
-	["npc_dota_hero_ogre_magi"] = bm(0.8, 0.7, true, true),
-	["npc_dota_hero_omniknight"] = bm(0.3, 0.3, true, false),
-	["npc_dota_hero_oracle"] = bm(0.3, 0.3, true, false),
-	["npc_dota_hero_pangolier"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_phantom_lancer"] = bm(0.1, 0.3, false, true),
-	["npc_dota_hero_phantom_assassin"] = bm(0.3, 0.3, false, true),
-	["npc_dota_hero_phoenix"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_primal_beast"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_puck"] = bm(0.6, 0.5, true, true),
-	["npc_dota_hero_pudge"] = bm(0.5, 0.1, true, false),
-	["npc_dota_hero_pugna"] = bm(0.4, 0.1, true, true),
-	["npc_dota_hero_queenofpain"] = bm(0.9, 0.9, true, true),
-	["npc_dota_hero_rattletrap"] = bm(0.2, 0.2, true, false),
-	["npc_dota_hero_razor"] = bm(0.8, 0.2, true, false),
-	["npc_dota_hero_riki"] = bm(0.2, 0.2, true, true),
-	["npc_dota_hero_ringmaster"] = bm(0.4, 0.1, false, false),
-	["npc_dota_hero_rubick"] = bm(0.3, 0.5, false, true),
-	["npc_dota_hero_sand_king"] = bm(1, 1, true, true),
-	["npc_dota_hero_shadow_demon"] = bm(0.8, 0.5, true, false),
-	["npc_dota_hero_shadow_shaman"] = bm(0.9, 0.8, true, true),
-	["npc_dota_hero_shredder"] = bm(0.4, 0.8, true, true),
-	["npc_dota_hero_silencer"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_skeleton_king"] = bm(0.2, 0.3, false, false),
-	["npc_dota_hero_skywrath_mage"] = bm(0.5, 0.1, true, false),
-	["npc_dota_hero_slardar"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_slark"] = bm(0.7, 0.7, true, true),
-	["npc_dota_hero_snapfire"] = bm(0.5, 0.5, true, false),
-	["npc_dota_hero_sniper"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_spectre"] = bm(0.1, 0.1, false, false),
-	["npc_dota_hero_spirit_breaker"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_storm_spirit"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_sven"] = bm(0.5, 0.5, true, true),
-	["npc_dota_hero_techies"] = bm(0.3, 0.2, false, false),
-	["npc_dota_hero_templar_assassin"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_terrorblade"] = bm(0.5, 0.1, false, false),
-	["npc_dota_hero_tidehunter"] = bm(0.3, 0.3, false, false),
-	["npc_dota_hero_tinker"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_tiny"] = bm(0.9, 0.7, true, true),
-	["npc_dota_hero_treant"] = bm(0.3, 0.2, false, false),
-	["npc_dota_hero_troll_warlord"] = bm(0.2, 0.2, false, false),
-	["npc_dota_hero_tusk"] = bm(0.3, 0.6, false, true),
-	["npc_dota_hero_undying"] = bm(0.1, 0.1, false, false),
-	["npc_dota_hero_ursa"] = bm(0.5, 0.3, true, false),
-	["npc_dota_hero_vengefulspirit"] = bm(0.7, 0.6, true, true),
-	["npc_dota_hero_venomancer"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_viper"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_visage"] = bm(0.2, 0.1, false, false),
-	["npc_dota_hero_void_spirit"] = bm(0.6, 0.6, true, true),
-	["npc_dota_hero_warlock"] = bm(0.4, 0.2, false, false),
-	["npc_dota_hero_weaver"] = bm(0.2, 0.8, false, true),
-	["npc_dota_hero_windrunner"] = bm(0.4, 0.5, true, true),
-	["npc_dota_hero_wisp"] = bm(0.1, 0.1, false, false),
-	["npc_dota_hero_witch_doctor"] = bm(0.5, 0.5, true, false),
-	["npc_dota_hero_zuus"] = bm(0.5, 0.2, true, false),
+local morphTargetScores = {
+	["npc_dota_hero_abaddon"] = MakeMorphScore(0.3, 0.1, false, false),
+	["npc_dota_hero_abyssal_underlord"] = MakeMorphScore(0.8, 0.5, true, true),
+	["npc_dota_hero_alchemist"] = MakeMorphScore(0.4, 0.2, false, false),
+	["npc_dota_hero_ancient_apparition"] = MakeMorphScore(0.7, 0.4, true, false),
+	["npc_dota_hero_antimage"] = MakeMorphScore(0.5, 0.9, true, true),
+	["npc_dota_hero_arc_warden"] = MakeMorphScore(0.4, 0.1, true, false),
+	["npc_dota_hero_axe"] = MakeMorphScore(0.3, 0.5, false, false),
+	["npc_dota_hero_bane"] = MakeMorphScore(0.8, 0.5, true, true),
+	["npc_dota_hero_batrider"] = MakeMorphScore(0.3, 0.3, false, false),
+	["npc_dota_hero_beastmaster"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_bloodseeker"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_bounty_hunter"] = MakeMorphScore(0.2, 0.6, false, true),
+	["npc_dota_hero_brewmaster"] = MakeMorphScore(0.3, 0.3, false, false),
+	["npc_dota_hero_bristleback"] = MakeMorphScore(0.4, 0.2, false, false),
+	["npc_dota_hero_broodmother"] = MakeMorphScore(0.5, 0.1, false, false),
+	["npc_dota_hero_centaur"] = MakeMorphScore(0.4, 0.3, true, false),
+	["npc_dota_hero_chaos_knight"] = MakeMorphScore(0.6, 0.5, true, false),
+	["npc_dota_hero_chen"] = MakeMorphScore(0.4, 0.1, false, false),
+	["npc_dota_hero_clinkz"] = MakeMorphScore(0.3, 0.2, false, false),
+	["npc_dota_hero_crystal_maiden"] = MakeMorphScore(0.8, 0.8, true, true),
+	["npc_dota_hero_dark_seer"] = MakeMorphScore(0.2, 0.5, true, true),
+	["npc_dota_hero_dark_willow"] = MakeMorphScore(0.6, 0.5, true, true),
+	["npc_dota_hero_dawnbreaker"] = MakeMorphScore(0.6, 0.4, true, false),
+	["npc_dota_hero_dazzle"] = MakeMorphScore(0.8, 0.2, true, false),
+	["npc_dota_hero_death_prophet"] = MakeMorphScore(0.5, 0.2, true, false),
+	["npc_dota_hero_disruptor"] = MakeMorphScore(0.8, 0.5, true, true),
+	["npc_dota_hero_doom_bringer"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_dragon_knight"] = MakeMorphScore(0.6, 0.8, true, true),
+	["npc_dota_hero_drow_ranger"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_earth_spirit"] = MakeMorphScore(0.8, 1, true, true),
+	["npc_dota_hero_earthshaker"] = MakeMorphScore(1, 1, true, true),
+	["npc_dota_hero_elder_titan"] = MakeMorphScore(0.1, 0.1, false, false),
+	["npc_dota_hero_ember_spirit"] = MakeMorphScore(0.5, 0.4, true, true),
+	["npc_dota_hero_enchantress"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_enigma"] = MakeMorphScore(0.2, 0.5, false, false),
+	["npc_dota_hero_faceless_void"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_furion"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_grimstroke"] = MakeMorphScore(0.8, 0.4, true, true),
+	["npc_dota_hero_gyrocopter"] = MakeMorphScore(0.6, 0.4, true, false),
+	["npc_dota_hero_hoodwink"] = MakeMorphScore(0.5, 0.3, true, false),
+	["npc_dota_hero_huskar"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_invoker"] = MakeMorphScore(0.5, 0.3, true, false),
+	["npc_dota_hero_jakiro"] = MakeMorphScore(0.6, 0.6, true, false),
+	["npc_dota_hero_juggernaut"] = MakeMorphScore(0.8, 0.3, true, true),
+	["npc_dota_hero_keeper_of_the_light"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_kunkka"] = MakeMorphScore(0.4, 0.4, true, true),
+	["npc_dota_hero_legion_commander"] = MakeMorphScore(0.6, 0.4, true, true),
+	["npc_dota_hero_leshrac"] = MakeMorphScore(0.6, 0.4, true, true),
+	["npc_dota_hero_lich"] = MakeMorphScore(0.7, 0.2, true, false),
+	["npc_dota_hero_life_stealer"] = MakeMorphScore(0.8, 0.4, true, true),
+	["npc_dota_hero_lina"] = MakeMorphScore(0.4, 0.2, true, true),
+	["npc_dota_hero_lion"] = MakeMorphScore(1, 1, true, true),
+	["npc_dota_hero_lone_druid"] = MakeMorphScore(0.1, 0.1, false, false),
+	["npc_dota_hero_luna"] = MakeMorphScore(0.4, 0.2, false, false),
+	["npc_dota_hero_lycan"] = MakeMorphScore(0.7, 0.2, true, false),
+	["npc_dota_hero_magnataur"] = MakeMorphScore(0.4, 0.7, true, true),
+	["npc_dota_hero_marci"] = MakeMorphScore(0.3, 0.3, false, false),
+	["npc_dota_hero_mars"] = MakeMorphScore(0.7, 0.4, true, true),
+	["npc_dota_hero_medusa"] = MakeMorphScore(0.1, 0.2, true, false),
+	["npc_dota_hero_meepo"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_mirana"] = MakeMorphScore(0.3, 0.7, false, true),
+	["npc_dota_hero_monkey_king"] = MakeMorphScore(0.4, 0.4, true, false),
+	["npc_dota_hero_muerta"] = MakeMorphScore(0.5, 0.3, true, false),
+	["npc_dota_hero_naga_siren"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_necrolyte"] = MakeMorphScore(0.2, 0.1, true, true),
+	["npc_dota_hero_nevermore"] = MakeMorphScore(0.2, 0.1, true, false),
+	["npc_dota_hero_night_stalker"] = MakeMorphScore(0.5, 0.2, true, false),
+	["npc_dota_hero_nyx_assassin"] = MakeMorphScore(0.6, 0.6, true, true),
+	["npc_dota_hero_obsidian_destroyer"] = MakeMorphScore(0.8, 0.8, true, true),
+	["npc_dota_hero_ogre_magi"] = MakeMorphScore(0.8, 0.7, true, true),
+	["npc_dota_hero_omniknight"] = MakeMorphScore(0.3, 0.3, true, false),
+	["npc_dota_hero_oracle"] = MakeMorphScore(0.3, 0.3, true, false),
+	["npc_dota_hero_pangolier"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_phantom_lancer"] = MakeMorphScore(0.1, 0.3, false, true),
+	["npc_dota_hero_phantom_assassin"] = MakeMorphScore(0.3, 0.3, false, true),
+	["npc_dota_hero_phoenix"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_primal_beast"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_puck"] = MakeMorphScore(0.6, 0.5, true, true),
+	["npc_dota_hero_pudge"] = MakeMorphScore(0.5, 0.1, true, false),
+	["npc_dota_hero_pugna"] = MakeMorphScore(0.4, 0.1, true, true),
+	["npc_dota_hero_queenofpain"] = MakeMorphScore(0.9, 0.9, true, true),
+	["npc_dota_hero_rattletrap"] = MakeMorphScore(0.2, 0.2, true, false),
+	["npc_dota_hero_razor"] = MakeMorphScore(0.8, 0.2, true, false),
+	["npc_dota_hero_riki"] = MakeMorphScore(0.2, 0.2, true, true),
+	["npc_dota_hero_ringmaster"] = MakeMorphScore(0.4, 0.1, false, false),
+	["npc_dota_hero_rubick"] = MakeMorphScore(0.3, 0.5, false, true),
+	["npc_dota_hero_sand_king"] = MakeMorphScore(1, 1, true, true),
+	["npc_dota_hero_shadow_demon"] = MakeMorphScore(0.8, 0.5, true, false),
+	["npc_dota_hero_shadow_shaman"] = MakeMorphScore(0.9, 0.8, true, true),
+	["npc_dota_hero_shredder"] = MakeMorphScore(0.4, 0.8, true, true),
+	["npc_dota_hero_silencer"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_skeleton_king"] = MakeMorphScore(0.2, 0.3, false, false),
+	["npc_dota_hero_skywrath_mage"] = MakeMorphScore(0.5, 0.1, true, false),
+	["npc_dota_hero_slardar"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_slark"] = MakeMorphScore(0.7, 0.7, true, true),
+	["npc_dota_hero_snapfire"] = MakeMorphScore(0.5, 0.5, true, false),
+	["npc_dota_hero_sniper"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_spectre"] = MakeMorphScore(0.1, 0.1, false, false),
+	["npc_dota_hero_spirit_breaker"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_storm_spirit"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_sven"] = MakeMorphScore(0.5, 0.5, true, true),
+	["npc_dota_hero_techies"] = MakeMorphScore(0.3, 0.2, false, false),
+	["npc_dota_hero_templar_assassin"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_terrorblade"] = MakeMorphScore(0.5, 0.1, false, false),
+	["npc_dota_hero_tidehunter"] = MakeMorphScore(0.3, 0.3, false, false),
+	["npc_dota_hero_tinker"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_tiny"] = MakeMorphScore(0.9, 0.7, true, true),
+	["npc_dota_hero_treant"] = MakeMorphScore(0.3, 0.2, false, false),
+	["npc_dota_hero_troll_warlord"] = MakeMorphScore(0.2, 0.2, false, false),
+	["npc_dota_hero_tusk"] = MakeMorphScore(0.3, 0.6, false, true),
+	["npc_dota_hero_undying"] = MakeMorphScore(0.1, 0.1, false, false),
+	["npc_dota_hero_ursa"] = MakeMorphScore(0.5, 0.3, true, false),
+	["npc_dota_hero_vengefulspirit"] = MakeMorphScore(0.7, 0.6, true, true),
+	["npc_dota_hero_venomancer"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_viper"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_visage"] = MakeMorphScore(0.2, 0.1, false, false),
+	["npc_dota_hero_void_spirit"] = MakeMorphScore(0.6, 0.6, true, true),
+	["npc_dota_hero_warlock"] = MakeMorphScore(0.4, 0.2, false, false),
+	["npc_dota_hero_weaver"] = MakeMorphScore(0.2, 0.8, false, true),
+	["npc_dota_hero_windrunner"] = MakeMorphScore(0.4, 0.5, true, true),
+	["npc_dota_hero_wisp"] = MakeMorphScore(0.1, 0.1, false, false),
+	["npc_dota_hero_witch_doctor"] = MakeMorphScore(0.5, 0.5, true, false),
+	["npc_dota_hero_zuus"] = MakeMorphScore(0.5, 0.2, true, false),
 }
-function GetMorphEngageScore(bs)
-	if br[bs] and br[bs].scoreEngage then
-		return br[bs].scoreEngage
+function GetMorphEngageScore(heroName)
+	if morphTargetScores[heroName] and morphTargetScores[heroName].scoreEngage then
+		return morphTargetScores[heroName].scoreEngage
 	end
 	return 0.1
 end
-function GetMorphRetreatScore(bs)
-	if br[bs] and br[bs].scoreRetreat then
-		if br[bs].scoreRetreat >= 0.5 then
-			return br[bs].scoreRetreat
+function GetMorphRetreatScore(heroName)
+	if morphTargetScores[heroName] and morphTargetScores[heroName].scoreRetreat then
+		if morphTargetScores[heroName].scoreRetreat >= 0.5 then
+			return morphTargetScores[heroName].scoreRetreat
 		end
 	end
 	return -1
 end
-function IsGoodToMorphBack(bs, bt)
-	if br[bs] then
-		if bt then
-			if br[bs].goodToEngageBack then
-				return br[bs].goodToEngageBack
+function IsGoodToMorphBack(heroName, forEngage)
+	if morphTargetScores[heroName] then
+		if forEngage then
+			if morphTargetScores[heroName].goodToEngageBack then
+				return morphTargetScores[heroName].goodToEngageBack
 			end
 		else
-			if br[bs].goodToRetreatBack then
-				return br[bs].goodToRetreatBack
+			if morphTargetScores[heroName].goodToRetreatBack then
+				return morphTargetScores[heroName].goodToRetreatBack
 			end
 		end
 	end
 	return false
 end
-return a
+return X

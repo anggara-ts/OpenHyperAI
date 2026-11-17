@@ -1,476 +1,487 @@
 -- Shared helper: item ability.
-local function a(b)
-	local c = 1 == 10
-	local d = 0.39
-	function b.GetUltimateAbility(e)
-		return e:GetAbilityInSlot(5)
+local function installItemAbility(Fu)
+	local isDebugLogEnabled = 1 == 10
+	local spamManaThreshold = 0.39
+	function Fu.GetUltimateAbility(unit)
+		return unit:GetAbilityInSlot(5)
 	end
-	function b.CanUseRefresherShard(e)
-		local f = b.GetUltimateAbility(e)
-		if f ~= nil and f:IsPassive() == false then
-			local g = f:GetCooldown()
-			local h = f:GetManaCost()
-			local i = 2
+	function Fu.CanUseRefresherShard(bot)
+		local ultimate = Fu.GetUltimateAbility(bot)
+		if ultimate ~= nil and ultimate:IsPassive() == false then
+			local cooldown = ultimate:GetCooldown()
+			local manaCost = ultimate:GetManaCost()
+			local minElapsed = 2
 			if
-				e:GetMana() >= h * 2
-				and f:GetCooldownTimeRemaining() >= g / 2
-				and g - f:GetCooldownTimeRemaining() >= i
+				bot:GetMana() >= manaCost * 2
+				and ultimate:GetCooldownTimeRemaining() >= cooldown / 2
+				and cooldown - ultimate:GetCooldownTimeRemaining() >= minElapsed
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.GetMostUltimateCDUnit()
-		local j = nil
-		local k = 0
-		for l, m in pairs(GetTeamPlayers(GetTeam())) do
-			if IsHeroAlive(m) then
-				local n = GetTeamMember(l)
+	function Fu.GetMostUltimateCDUnit()
+		local bestUnit = nil
+		local bestCooldown = 0
+		for index, playerId in pairs(GetTeamPlayers(GetTeam())) do
+			if IsHeroAlive(playerId) then
+				local member = GetTeamMember(index)
 				if
-					n ~= nil
-					and n:IsAlive()
-					and n:GetUnitName() ~= "npc_dota_hero_nevermore"
-					and n:GetUnitName() ~= "npc_dota_hero_arc_warden"
+					member ~= nil
+					and member:IsAlive()
+					and member:GetUnitName() ~= "npc_dota_hero_nevermore"
+					and member:GetUnitName() ~= "npc_dota_hero_arc_warden"
 				then
-					if n:GetUnitName() == "npc_dota_hero_silencer" or n:GetUnitName() == "npc_dota_hero_warlock" then
-						return n
+					if
+						member:GetUnitName() == "npc_dota_hero_silencer"
+						or member:GetUnitName() == "npc_dota_hero_warlock"
+					then
+						return member
 					end
-					local f = b.GetUltimateAbility(n)
-					if f ~= nil and f:IsPassive() == false and f:GetCooldown() >= k then
-						j = n
-						k = f:GetCooldown()
+					local ultimate = Fu.GetUltimateAbility(member)
+					if ultimate ~= nil and ultimate:IsPassive() == false and ultimate:GetCooldown() >= bestCooldown then
+						bestUnit = member
+						bestCooldown = ultimate:GetCooldown()
 					end
 				end
 			end
 		end
-		return j
+		return bestUnit
 	end
-	function b.CanCastAbilityOnTarget(o, p)
-		return o:CanBeSeen()
-			and (p or not o:IsMagicImmune())
-			and not o:IsInvulnerable()
-			and not b.IsSuspiciousIllusion(o)
-			and not b.HasForbiddenModifier(o)
+	function Fu.CanCastAbilityOnTarget(target, canPierceMagicImmune)
+		return target:CanBeSeen()
+			and (canPierceMagicImmune or not target:IsMagicImmune())
+			and not target:IsInvulnerable()
+			and not Fu.IsSuspiciousIllusion(target)
+			and not Fu.HasForbiddenModifier(target)
 	end
-	function b.CanCastAbility(q)
+	function Fu.CanCastAbility(ability)
 		if
-			q == nil
-			or q:IsNull()
-			or q:IsPassive()
-			or q:IsHidden()
-			or not q:IsTrained()
-			or not q:IsFullyCastable()
-			or not q:IsActivated()
+			ability == nil
+			or ability:IsNull()
+			or ability:IsPassive()
+			or ability:IsHidden()
+			or not ability:IsTrained()
+			or not ability:IsFullyCastable()
+			or not ability:IsActivated()
 		then
 			return false
 		end
 		return true
 	end
-	function b.CanBlinkDagger(e)
-		local r = nil
-		for l = 0, 5 do
-			local s = e:GetItemInSlot(l)
+	function Fu.CanBlinkDagger(bot)
+		local blink = nil
+		for slot = 0, 5 do
+			local item = bot:GetItemInSlot(slot)
 			if
-				s ~= nil
+				item ~= nil
 				and (
-					s:GetName() == "item_blink"
-					or s:GetName() == "item_overwhelming_blink"
-					or s:GetName() == "item_arcane_blink"
-					or s:GetName() == "item_swift_blink"
+					item:GetName() == "item_blink"
+					or item:GetName() == "item_overwhelming_blink"
+					or item:GetName() == "item_arcane_blink"
+					or item:GetName() == "item_swift_blink"
 				)
 			then
-				r = s
+				blink = item
 				break
 			end
 		end
-		if r ~= nil and r:IsFullyCastable() then
-			e.Blink = r
+		if blink ~= nil and blink:IsFullyCastable() then
+			bot.Blink = blink
 			return true
 		end
 		return false
 	end
-	function b.CanBlackKingBar(e)
-		local t = nil
-		for l = 0, 5 do
-			local s = e:GetItemInSlot(l)
-			if s ~= nil and s:GetName() == "item_black_king_bar" then
-				t = s
+	function Fu.CanBlackKingBar(bot)
+		local bkb = nil
+		for slot = 0, 5 do
+			local item = bot:GetItemInSlot(slot)
+			if item ~= nil and item:GetName() == "item_black_king_bar" then
+				bkb = item
 				break
 			end
 		end
-		if t ~= nil and t:IsFullyCastable() then
-			e.BlackKingBar = t
+		if bkb ~= nil and bkb:IsFullyCastable() then
+			bot.BlackKingBar = bkb
 			return true
 		end
 		return false
 	end
-	function b.HasItemInInventory(u)
-		return GetBot():FindItemSlot(u) >= 0
+	function Fu.HasItemInInventory(itemName)
+		return GetBot():FindItemSlot(itemName) >= 0
 	end
-	function b.GetItem(v)
-		for l = 0, 5 do
-			local s = GetBot():GetItemInSlot(l)
-			if s ~= nil and s:GetName() == v then
-				return s
+	function Fu.GetItem(itemName)
+		for slot = 0, 5 do
+			local item = GetBot():GetItemInSlot(slot)
+			if item ~= nil and item:GetName() == itemName then
+				return item
 			end
 		end
 		return nil
 	end
-	function b.GetItem2(e, w)
-		for l = 0, 16 do
-			local s = e:GetItemInSlot(l)
-			if s ~= nil then
-				if string.find(s:GetName(), w) then
-					return s
+	function Fu.GetItem2(unit, itemName)
+		for slot = 0, 16 do
+			local item = unit:GetItemInSlot(slot)
+			if item ~= nil then
+				if string.find(item:GetName(), itemName) then
+					return item
 				end
 			end
 		end
 		return nil
 	end
-	function b.GetAbility(e, x)
-		for l = 0, 23 do
-			local q = e:GetAbilityInSlot(l)
-			if q ~= nil and q:GetName() == x then
-				return q
+	function Fu.GetAbility(unit, abilityName)
+		for slot = 0, 23 do
+			local ability = unit:GetAbilityInSlot(slot)
+			if ability ~= nil and ability:GetName() == abilityName then
+				return ability
 			end
 		end
 		return nil
 	end
-	function b.GetComboItem(e, w)
-		local y = e:FindItemSlot(w)
-		if y >= 0 and y <= 5 then
-			return e:GetItemInSlot(y)
+	function Fu.GetComboItem(bot, itemName)
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 and slot <= 5 then
+			return bot:GetItemInSlot(slot)
 		end
 	end
-	function b.HasItem(e, w)
-		local y = e:FindItemSlot(w)
-		if y >= 0 and y <= 5 then
+	function Fu.HasItem(bot, itemName)
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 and slot <= 5 then
 			return true
 		end
 		return false
 	end
-	function b.FindItemSlotNotInNonbackpack(e, w)
-		local y = e:FindItemSlot(w)
-		if y >= 0 and y <= 5 then
-			return y
+	function Fu.FindItemSlotNotInNonbackpack(bot, itemName)
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 and slot <= 5 then
+			return slot
 		end
 		return -1
 	end
-	function b.IsItemAvailable(w)
-		local e = GetBot()
-		local z = e:FindItemSlot(w)
-		if z >= 0 and z <= 5 then
-			return e:GetItemInSlot(z)
+	function Fu.IsItemAvailable(itemName)
+		local bot = GetBot()
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 and slot <= 5 then
+			return bot:GetItemInSlot(slot)
 		end
 	end
-	function b.IsAllowedToSpam(e, A)
-		if e:HasModifier("modifier_silencer_curse_of_the_silent") then
+	function Fu.IsAllowedToSpam(bot, manaCost)
+		if bot:HasModifier("modifier_silencer_curse_of_the_silent") then
 			return false
 		end
-		if e:HasModifier("modifier_rune_regen") then
+		if bot:HasModifier("modifier_rune_regen") then
 			return true
 		end
-		return (e:GetMana() - A) / e:GetMaxMana() >= d
+		return (bot:GetMana() - manaCost) / bot:GetMaxMana() >= spamManaThreshold
 	end
-	function b.SetQueueToInvisible(e)
-		if e:IsAlive() and not e:IsInvisible() and not e:HasModifier("modifier_item_dustofappearance") then
-			local B = e:GetNearbyTowers(888, true)
-			if B[1] ~= nil then
+	function Fu.SetQueueToInvisible(bot)
+		if bot:IsAlive() and not bot:IsInvisible() and not bot:HasModifier("modifier_item_dustofappearance") then
+			local nearbyTowers = bot:GetNearbyTowers(888, true)
+			if nearbyTowers[1] ~= nil then
 				return
 			end
-			local C = b.IsItemAvailable("item_shadow_amulet")
-			if C ~= nil and C:IsFullyCastable() then
-				e:ActionQueue_UseAbilityOnEntity(C, e)
+			local shadowAmulet = Fu.IsItemAvailable("item_shadow_amulet")
+			if shadowAmulet ~= nil and shadowAmulet:IsFullyCastable() then
+				bot:ActionQueue_UseAbilityOnEntity(shadowAmulet, bot)
 				return
 			end
-			local D = b.IsItemAvailable("item_glimmer_cape")
-			if D ~= nil and D:IsFullyCastable() then
-				e:ActionQueue_UseAbilityOnEntity(D, e)
+			local glimmerCape = Fu.IsItemAvailable("item_glimmer_cape")
+			if glimmerCape ~= nil and glimmerCape:IsFullyCastable() then
+				bot:ActionQueue_UseAbilityOnEntity(glimmerCape, bot)
 				return
 			end
-			local E = b.IsItemAvailable("item_invis_sword")
-			if E ~= nil and E:IsFullyCastable() then
-				e:ActionQueue_UseAbility(E)
+			local shadowBlade = Fu.IsItemAvailable("item_invis_sword")
+			if shadowBlade ~= nil and shadowBlade:IsFullyCastable() then
+				bot:ActionQueue_UseAbility(shadowBlade)
 				return
 			end
-			local F = b.IsItemAvailable("item_silver_edge")
-			if F ~= nil and F:IsFullyCastable() then
-				e:ActionQueue_UseAbility(F)
+			local silverEdge = Fu.IsItemAvailable("item_silver_edge")
+			if silverEdge ~= nil and silverEdge:IsFullyCastable() then
+				bot:ActionQueue_UseAbility(silverEdge)
 				return
 			end
 		end
 	end
-	function b.SetQueueSwitchPtToINT(e)
-		local G = b.IsItemAvailable("item_power_treads")
-		if G ~= nil and G:IsFullyCastable() then
-			if G:GetPowerTreadsStat() == ATTRIBUTE_INTELLECT then
-				e:ActionQueue_UseAbility(G)
-				e:ActionQueue_UseAbility(G)
+	function Fu.SetQueueSwitchPtToINT(bot)
+		local powerTreads = Fu.IsItemAvailable("item_power_treads")
+		if powerTreads ~= nil and powerTreads:IsFullyCastable() then
+			if powerTreads:GetPowerTreadsStat() == ATTRIBUTE_INTELLECT then
+				bot:ActionQueue_UseAbility(powerTreads)
+				bot:ActionQueue_UseAbility(powerTreads)
 				return
-			elseif G:GetPowerTreadsStat() == ATTRIBUTE_STRENGTH then
-				e:ActionQueue_UseAbility(G)
-				return
-			end
-		end
-	end
-	function b.SetQueueUseSoulRing(e)
-		local H = b.IsItemAvailable("item_soul_ring")
-		if H ~= nil and H:IsFullyCastable() then
-			local I = b.GetEnemyCount(e, 1600)
-			local J = b.GetHP(e)
-			local K = b.GetMP(e)
-			if J > 0.35 + 0.1 * I and K < 0.99 - 0.1 * I and (I <= 2 or J > K * 2.5) then
-				e:ActionQueue_UseAbility(H)
+			elseif powerTreads:GetPowerTreadsStat() == ATTRIBUTE_STRENGTH then
+				bot:ActionQueue_UseAbility(powerTreads)
 				return
 			end
 		end
 	end
-	function b.SetQueuePtToINT(e, L)
-		e:Action_ClearActions(false)
-		if L then
-			b.SetQueueUseSoulRing(e)
+	function Fu.SetQueueUseSoulRing(bot)
+		local soulRing = Fu.IsItemAvailable("item_soul_ring")
+		if soulRing ~= nil and soulRing:IsFullyCastable() then
+			local enemyCount = Fu.GetEnemyCount(bot, 1600)
+			local hpRatio = Fu.GetHP(bot)
+			local mpRatio = Fu.GetMP(bot)
+			if
+				hpRatio > 0.35 + 0.1 * enemyCount
+				and mpRatio < 0.99 - 0.1 * enemyCount
+				and (enemyCount <= 2 or hpRatio > mpRatio * 2.5)
+			then
+				bot:ActionQueue_UseAbility(soulRing)
+				return
+			end
+		end
+	end
+	function Fu.SetQueuePtToINT(bot, useSoulRing)
+		bot:Action_ClearActions(false)
+		if useSoulRing then
+			Fu.SetQueueUseSoulRing(bot)
 		end
 		-- Game 031, 66:30: OD kept switching his Power Treads. Every spell switched them to
 		-- Intelligence and the Treads rule switched them back (to Strength while retreating, or to
 		-- his main attribute 0.2s later). No switch for a spell while the Treads rule wants Strength.
-		local okR, wantStr = pcall(function()
-			return b.IsRetreating(e) and e:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE
-				or e:GetHealth() < 0.3 * e:GetMaxHealth()
+		local ok, wantsStrength = pcall(function()
+			return Fu.IsRetreating(bot) and bot:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE
+				or bot:GetHealth() < 0.3 * bot:GetMaxHealth()
 		end)
-		if okR and wantStr then
+		if ok and wantsStrength then
 			return
 		end
-		if not b.IsPTReady(e, ATTRIBUTE_INTELLECT) then
-			e._ptSpellSwitchAt = DotaTime()
-			b.SetQueueSwitchPtToINT(e)
+		if not Fu.IsPTReady(bot, ATTRIBUTE_INTELLECT) then
+			bot._ptSpellSwitchAt = DotaTime()
+			Fu.SetQueueSwitchPtToINT(bot)
 		end
 	end
-	function b.IsPTReady(e, M)
+	function Fu.IsPTReady(bot, attribute)
 		if
-			not e:IsAlive()
-			or e:IsMuted()
-			or e:IsChanneling()
-			or e:IsInvisible()
-			or e:GetHealth() / e:GetMaxHealth() < 0.2
+			not bot:IsAlive()
+			or bot:IsMuted()
+			or bot:IsChanneling()
+			or bot:IsInvisible()
+			or bot:GetHealth() / bot:GetMaxHealth() < 0.2
 		then
 			return true
 		end
-		if M == ATTRIBUTE_INTELLECT then
-			M = ATTRIBUTE_AGILITY
-		elseif M == ATTRIBUTE_AGILITY then
-			M = ATTRIBUTE_INTELLECT
+		if attribute == ATTRIBUTE_INTELLECT then
+			attribute = ATTRIBUTE_AGILITY
+		elseif attribute == ATTRIBUTE_AGILITY then
+			attribute = ATTRIBUTE_INTELLECT
 		end
-		local G = b.IsItemAvailable("item_power_treads")
-		if G ~= nil and G:IsFullyCastable() then
-			if G:GetPowerTreadsStat() ~= M then
+		local powerTreads = Fu.IsItemAvailable("item_power_treads")
+		if powerTreads ~= nil and powerTreads:IsFullyCastable() then
+			if powerTreads:GetPowerTreadsStat() ~= attribute then
 				return false
 			end
 		end
 		return true
 	end
-	function b.ShouldSwitchPTStat(e, G)
-		local N = G:GetPowerTreadsStat()
-		local O = e:GetPrimaryAttribute()
-		if N == ATTRIBUTE_INTELLECT then
-			N = ATTRIBUTE_AGILITY
-		elseif N == ATTRIBUTE_AGILITY then
-			N = ATTRIBUTE_INTELLECT
+	function Fu.ShouldSwitchPTStat(bot, powerTreads)
+		local currentStat = powerTreads:GetPowerTreadsStat()
+		local primaryAttribute = bot:GetPrimaryAttribute()
+		if currentStat == ATTRIBUTE_INTELLECT then
+			currentStat = ATTRIBUTE_AGILITY
+		elseif currentStat == ATTRIBUTE_AGILITY then
+			currentStat = ATTRIBUTE_INTELLECT
 		end
-		if O ~= ATTRIBUTE_INTELLECT and O ~= ATTRIBUTE_STRENGTH and O ~= ATTRIBUTE_AGILITY then
-			return N ~= ATTRIBUTE_STRENGTH
+		if
+			primaryAttribute ~= ATTRIBUTE_INTELLECT
+			and primaryAttribute ~= ATTRIBUTE_STRENGTH
+			and primaryAttribute ~= ATTRIBUTE_AGILITY
+		then
+			return currentStat ~= ATTRIBUTE_STRENGTH
 		end
-		return O ~= N
+		return primaryAttribute ~= currentStat
 	end
-	function b.IsCastingUltimateAbility(e)
-		if e:CanBeSeen() and (e:IsCastingAbility() or e:IsUsingAbility()) then
-			local P = e:GetCurrentActiveAbility()
-			if P ~= nil and P:IsUltimate() then
+	function Fu.IsCastingUltimateAbility(unit)
+		if unit:CanBeSeen() and (unit:IsCastingAbility() or unit:IsUsingAbility()) then
+			local activeAbility = unit:GetCurrentActiveAbility()
+			if activeAbility ~= nil and activeAbility:IsUltimate() then
 				return true
 			end
 		end
 		return false
 	end
-	function b.ConsiderForMkbDisassembleMask(e)
-		if e.maskDismantleDone == nil then
-			e.maskDismantleDone = false
+	function Fu.ConsiderForMkbDisassembleMask(bot)
+		if bot.maskDismantleDone == nil then
+			bot.maskDismantleDone = false
 		end
-		if e.staffUnlockDone == nil then
-			e.staffUnlockDone = false
+		if bot.staffUnlockDone == nil then
+			bot.staffUnlockDone = false
 		end
-		if e.lifestealUnlockDone == nil then
-			e.lifestealUnlockDone = false
+		if bot.lifestealUnlockDone == nil then
+			bot.lifestealUnlockDone = false
 		end
-		if e.dismantleCheckTime == nil then
-			e.dismantleCheckTime = 600
+		if bot.dismantleCheckTime == nil then
+			bot.dismantleCheckTime = 600
 		end
-		if e.staffUnlockDone then
+		if bot.staffUnlockDone then
 			return
 		end
-		if e.dismantleCheckTime < DotaTime() + 1.0 then
-			e.dismantleCheckTime = DotaTime()
-			local Q = e:FindItemSlot("item_mask_of_madness")
-			local R = e:FindItemSlot("item_claymore")
-			local S = e:FindItemSlot("item_reaver")
+		if bot.dismantleCheckTime < DotaTime() + 1.0 then
+			bot.dismantleCheckTime = DotaTime()
+			local maskSlot = bot:FindItemSlot("item_mask_of_madness")
+			local claymoreSlot = bot:FindItemSlot("item_claymore")
+			local reaverSlot = bot:FindItemSlot("item_reaver")
 			if
-				not e.maskDismantleDone
-				and (e:GetItemInSlot(6) == nil or e:GetItemInSlot(7) == nil or e:GetItemInSlot(8) == nil)
+				not bot.maskDismantleDone
+				and (bot:GetItemInSlot(6) == nil or bot:GetItemInSlot(7) == nil or bot:GetItemInSlot(8) == nil)
 			then
 				if
-					Q >= 0
-					and Q <= 8
-					and (S >= 0 and S <= 8 or R >= 0 and R <= 8)
-					and (e:GetGold() >= 1400 or e:GetStashValue() >= 1400 or e:GetCourierValue() >= 1400)
+					maskSlot >= 0
+					and maskSlot <= 8
+					and (reaverSlot >= 0 and reaverSlot <= 8 or claymoreSlot >= 0 and claymoreSlot <= 8)
+					and (bot:GetGold() >= 1400 or bot:GetStashValue() >= 1400 or bot:GetCourierValue() >= 1400)
 				then
-					if c then
-						log("%s mask Dismantle1", e:GetUnitName())
+					if isDebugLogEnabled then
+						log("%s mask Dismantle1", bot:GetUnitName())
 					end
-					e.maskDismantleDone = true
-					e:ActionImmediate_DisassembleItem(e:GetItemInSlot(Q))
+					bot.maskDismantleDone = true
+					bot:ActionImmediate_DisassembleItem(bot:GetItemInSlot(maskSlot))
 					return
 				end
-				if Q >= 0 and Q <= 8 and R >= 0 and S >= 0 then
-					if c then
-						log("%s mask Dismantle2", e:GetUnitName())
+				if maskSlot >= 0 and maskSlot <= 8 and claymoreSlot >= 0 and reaverSlot >= 0 then
+					if isDebugLogEnabled then
+						log("%s mask Dismantle2", bot:GetUnitName())
 					end
-					e.maskDismantleDone = true
-					e:ActionImmediate_DisassembleItem(e:GetItemInSlot(Q))
+					bot.maskDismantleDone = true
+					bot:ActionImmediate_DisassembleItem(bot:GetItemInSlot(maskSlot))
 					return
 				end
 			end
-			if not e.maskDismantleDone then
+			if not bot.maskDismantleDone then
 				return
 			end
-			local T = e:FindItemSlot("item_lifesteal")
-			local U = e:FindItemSlot("item_quarterstaff")
-			if T >= 0 and not e.lifestealUnlockDone then
-				if c then
-					log("%s lifestealUnlockDone", e:GetUnitName())
+			local lifestealSlot = bot:FindItemSlot("item_lifesteal")
+			local quarterstaffSlot = bot:FindItemSlot("item_quarterstaff")
+			if lifestealSlot >= 0 and not bot.lifestealUnlockDone then
+				if isDebugLogEnabled then
+					log("%s lifestealUnlockDone", bot:GetUnitName())
 				end
-				e.lifestealUnlockDone = true
-				e:ActionImmediate_SetItemCombineLock(e:GetItemInSlot(T), false)
+				bot.lifestealUnlockDone = true
+				bot:ActionImmediate_SetItemCombineLock(bot:GetItemInSlot(lifestealSlot), false)
 				return
 			end
-			local V = e:FindItemSlot("item_satanic")
-			if V >= 0 and U >= 0 and not e.staffUnlockDone then
-				if c then
-					log("%s staffUnlockDone", e:GetUnitName())
+			local satanicSlot = bot:FindItemSlot("item_satanic")
+			if satanicSlot >= 0 and quarterstaffSlot >= 0 and not bot.staffUnlockDone then
+				if isDebugLogEnabled then
+					log("%s staffUnlockDone", bot:GetUnitName())
 				end
-				e.staffUnlockDone = true
-				e:ActionImmediate_SetItemCombineLock(e:GetItemInSlot(U), false)
+				bot.staffUnlockDone = true
+				bot:ActionImmediate_SetItemCombineLock(bot:GetItemInSlot(quarterstaffSlot), false)
 				return
 			end
 		end
 	end
-	function b.CanBeCast(q)
-		return q:IsTrained() and q:IsFullyCastable() and q:IsHidden() == false
+	function Fu.CanBeCast(ability)
+		return ability:IsTrained() and ability:IsFullyCastable() and ability:IsHidden() == false
 	end
-	function b.CanSpamSpell(e, h)
-		local W = 1.0
-		if h < 100 then
-			W = 0.6
+	function Fu.CanSpamSpell(bot, manaCost)
+		local threshold = 1.0
+		if manaCost < 100 then
+			threshold = 0.6
 		end
-		return (e:GetMana() - h) / e:GetMaxMana() >= W - e:GetLevel() / (3 * 30)
+		return (bot:GetMana() - manaCost) / bot:GetMaxMana() >= threshold - bot:GetLevel() / (3 * 30)
 	end
-	local X = 200
-	local Y = 1600
-	function b.GetProperCastRange(Z, _, a0)
-		local a1 = _:GetAttackRange()
-		if Z then
-			return a0
-		elseif a0 <= a1 then
-			return a1 + X
-		elseif a0 + X <= Y then
-			return a0 + X
-		elseif a0 > Y then
-			return Y
+	local castRangeBonus = 200
+	local maxCastRange = 1600
+	function Fu.GetProperCastRange(isExactRange, unit, castRange)
+		local attackRange = unit:GetAttackRange()
+		if isExactRange then
+			return castRange
+		elseif castRange <= attackRange then
+			return attackRange + castRangeBonus
+		elseif castRange + castRangeBonus <= maxCastRange then
+			return castRange + castRangeBonus
+		elseif castRange > maxCastRange then
+			return maxCastRange
 		else
-			return a0
+			return castRange
 		end
 	end
-	local a2 = 30
-	function b.AllowedToSpam(e, h)
-		return (e:GetMana() - h) / e:GetMaxMana() >= 1.0 - e:GetLevel() / (2 * a2)
+	local maxLevel = 30
+	function Fu.AllowedToSpam(bot, manaCost)
+		return (bot:GetMana() - manaCost) / bot:GetMaxMana() >= 1.0 - bot:GetLevel() / (2 * maxLevel)
 	end
-	function b.HasAghanimsShard(e)
-		return e:HasModifier("modifier_item_aghanims_shard")
+	function Fu.HasAghanimsShard(unit)
+		return unit:HasModifier("modifier_item_aghanims_shard")
 	end
-	function b.CanCastAbilitySoon(q, a3)
+	function Fu.CanCastAbilitySoon(ability, seconds)
 		if
-			q == nil
-			or q:IsNull()
-			or q:GetName() == ""
-			or q:IsPassive()
-			or q:IsHidden()
-			or not q:IsTrained()
-			or not q:IsActivated()
+			ability == nil
+			or ability:IsNull()
+			or ability:GetName() == ""
+			or ability:IsPassive()
+			or ability:IsHidden()
+			or not ability:IsTrained()
+			or not ability:IsActivated()
 		then
 			return false
 		end
-		if q:GetCooldownTimeRemaining() > a3 then
+		if ability:GetCooldownTimeRemaining() > seconds then
 			return false
 		end
 		return true
 	end
-	function b.GetManaThreshold(e, A, a4)
-		local a5 = 0
-		local a6 = e:GetManaRegen()
-		local a7 = e:GetMaxMana()
-		local a8 = { 0, 1, 2, 3, 4, 5, 15 }
-		for l = 1, #a8 do
-			local u = e:GetItemInSlot(a8[l])
-			if u then
-				local w = u:GetName()
-				if w == "item_tpscroll" or w == "item_black_king_bar" then
-					local a9 = u:GetManaCost()
-					if b.CanCastAbilitySoon(u, A / a6) then
-						a5 = a5 + a9 / a7
+	function Fu.GetManaThreshold(bot, manaCost, abilities)
+		local threshold = 0
+		local manaRegen = bot:GetManaRegen()
+		local maxMana = bot:GetMaxMana()
+		local slots = { 0, 1, 2, 3, 4, 5, 15 }
+		for i = 1, #slots do
+			local item = bot:GetItemInSlot(slots[i])
+			if item then
+				local itemName = item:GetName()
+				if itemName == "item_tpscroll" or itemName == "item_black_king_bar" then
+					local itemManaCost = item:GetManaCost()
+					if Fu.CanCastAbilitySoon(item, manaCost / manaRegen) then
+						threshold = threshold + itemManaCost / maxMana
 					end
 				end
 			end
 		end
-		for aa, ab in pairs(a4) do
-			if type(ab) == "number" then
-				a5 = a5 + ab / a7
+		for _, ability in pairs(abilities) do
+			if type(ability) == "number" then
+				threshold = threshold + ability / maxMana
 			else
-				if b.CanCastAbilitySoon(ab, A / a6) then
-					a5 = a5 + ab:GetManaCost() / a7
+				if Fu.CanCastAbilitySoon(ability, manaCost / manaRegen) then
+					threshold = threshold + ability:GetManaCost() / maxMana
 				end
 			end
 		end
-		return a5
+		return threshold
 	end
-	function b.HasInvisibilityOrItem(ac)
+	function Fu.HasInvisibilityOrItem(unit)
 		if
-			ac:HasInvisibility(false)
-			or b.HasItem(ac, "item_shadow_amulet")
-			or b.HasItem(ac, "item_glimmer_cape")
-			or b.HasItem(ac, "item_invis_sword")
-			or b.HasItem(ac, "item_silver_edge")
+			unit:HasInvisibility(false)
+			or Fu.HasItem(unit, "item_shadow_amulet")
+			or Fu.HasItem(unit, "item_glimmer_cape")
+			or Fu.HasItem(unit, "item_invis_sword")
+			or Fu.HasItem(unit, "item_silver_edge")
 		then
 			return true
 		end
 		return false
 	end
-	function b.HasAbility(e, x)
-		for l = 0, 23 do
-			local q = e:GetAbilityInSlot(l)
-			if q ~= nil and q:GetName() == x then
-				return true, q
+	function Fu.HasAbility(unit, abilityName)
+		for slot = 0, 23 do
+			local ability = unit:GetAbilityInSlot(slot)
+			if ability ~= nil and ability:GetName() == abilityName then
+				return true, ability
 			end
 		end
 		return false, nil
 	end
-	function b.HasPowerTreads(e)
+	function Fu.HasPowerTreads(bot)
 		if
-			b.HasItem(e, "item_power_treads")
-			or b.HasItem(e, "item_power_treads_agi")
-			or b.HasItem(e, "item_power_treads_int")
-			or b.HasItem(e, "item_power_treads_str")
+			Fu.HasItem(bot, "item_power_treads")
+			or Fu.HasItem(bot, "item_power_treads_agi")
+			or Fu.HasItem(bot, "item_power_treads_int")
+			or Fu.HasItem(bot, "item_power_treads_str")
 		then
 			return true
 		end
 		return false
 	end
 end
-return a
+return installItemAbility

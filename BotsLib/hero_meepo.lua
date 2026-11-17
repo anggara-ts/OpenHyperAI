@@ -1,19 +1,19 @@
 -- Meepo: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 -- 7.41b moved +Poof Damage onto the level 15 pair.
-local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 6, 1, 2, 2, 2, 3, 3, 6, 3, 1, 1, 1, 6, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_1"] = {
+local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local tAllAbilityBuildList = { { 2, 3, 6, 1, 2, 2, 2, 3, 3, 6, 3, 1, 1, 1, 6, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -33,7 +33,7 @@ m["pos_1"] = {
 	"item_swift_blink",
 	"item_travel_boots_2",
 }
-m["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -52,7 +52,7 @@ m["pos_2"] = {
 	"item_swift_blink",
 	"item_travel_boots_2",
 }
-m["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -71,505 +71,545 @@ m["pos_3"] = {
 	"item_swift_blink",
 	"item_travel_boots_2",
 }
-m["pos_4"] = m["pos_3"]
-m["pos_5"] = m["pos_3"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_wraith_band", "item_quelling_blade", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_wraith_band", "item_quelling_blade", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local function o(p, q)
-	local r = GameTime()
-	local s = q * 1.5
-	for t, u in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+local function isNearRecentEarthbind(location, radius)
+	local now = GameTime()
+	local minDistance = radius * 1.5
+	for _, meepo in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
 		if
-			u ~= b
-			and c.IsValidHero(u)
-			and u:GetUnitName() == "npc_dota_hero_meepo"
-			and u.earth_bind_cast ~= nil
-			and r - u.earth_bind_cast.time < 2.0
+			meepo ~= bot
+			and Fu.IsValidHero(meepo)
+			and meepo:GetUnitName() == "npc_dota_hero_meepo"
+			and meepo.earth_bind_cast ~= nil
+			and now - meepo.earth_bind_cast.time < 2.0
 		then
-			local v = GetUnitToLocationDistance(b, u.earth_bind_cast.location)
-			local w = p.x - u.earth_bind_cast.location.x
-			local x = p.y - u.earth_bind_cast.location.y
-			local y = math.sqrt(w * w + x * x)
-			if y < s then
+			local distanceToCast = GetUnitToLocationDistance(bot, meepo.earth_bind_cast.location)
+			local dx = location.x - meepo.earth_bind_cast.location.x
+			local dy = location.y - meepo.earth_bind_cast.location.y
+			local distance = math.sqrt(dx * dx + dy * dy)
+			if distance < minDistance then
 				return true
 			end
 		end
 	end
 	return false
 end
-local function z(p)
-	b.earth_bind_cast = { time = GameTime(), location = p }
+local function rememberEarthbindCast(location)
+	bot.earth_bind_cast = { time = GameTime(), location = location }
 end
-local A = SafeAbility(b:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
-local B = SafeAbility(b:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
-local C = SafeAbility(b:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
-local D = SafeAbility(b:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
-local E = SafeAbility(b:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
-local F, G
-local H, I
-local J
-local K
-local L, M
-local N = {}
-local O
-local P
-local Q
-local R
-local S
-local T
-local U
-local V
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local earthbindAbility = SafeAbility(bot:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
+local poofAbility = SafeAbility(bot:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
+local digAbility = SafeAbility(bot:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
+local megaMeepoAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
+local megaMeepoFlingAbility =
+	SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
+local earthbindDesire, earthbindLocation
+local poofDesire, poofTarget
+local digDesire
+local megaMeepoDesire
+local flingDesire, flingTarget
+local meepos = {}
+local botTarget
+local hpRatio
+local isAttacking
+local isGoingOnSomeone
+local isRetreating
+local mpRatio
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local W = d.Build(b)
-	T = W.isEngaging
-	U = W.isRetreating
-	V = W.mp
-	A = SafeAbility(b:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
-	B = SafeAbility(b:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
-	C = SafeAbility(b:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
-	D = SafeAbility(b:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
-	E = SafeAbility(b:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
-	N = c.GetMeepos()
-	O = W.target
-	P = W.hp
-	Q = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-	R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	S = c.IsAttacking(b)
-	H, I = a.ConsiderPoof()
-	if H > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(B, I)
+	local context = AbilityContext.Build(bot)
+	isGoingOnSomeone = context.isEngaging
+	isRetreating = context.isRetreating
+	mpRatio = context.mp
+	earthbindAbility = SafeAbility(bot:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
+	poofAbility = SafeAbility(bot:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
+	digAbility = SafeAbility(bot:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
+	megaMeepoAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
+	megaMeepoFlingAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
+	meepos = Fu.GetMeepos()
+	botTarget = context.target
+	hpRatio = context.hp
+	isAttacking = Fu.IsAttacking(bot)
+	poofDesire, poofTarget = X.ConsiderPoof()
+	if poofDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnEntity(poofAbility, poofTarget)
 		return
 	end
-	J = a.ConsiderDig()
-	if J > 0 then
-		b:ActionQueue_UseAbility(C)
+	digDesire = X.ConsiderDig()
+	if digDesire > 0 then
+		bot:ActionQueue_UseAbility(digAbility)
 		return
 	end
-	K = a.ConsiderMegaMeepo()
-	if K > 0 then
-		b:ActionQueue_UseAbility(D)
+	megaMeepoDesire = X.ConsiderMegaMeepo()
+	if megaMeepoDesire > 0 then
+		bot:ActionQueue_UseAbility(megaMeepoAbility)
 		return
 	end
-	F, G = a.ConsiderEarthBind()
-	if F > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(A, G)
-		z(G)
+	earthbindDesire, earthbindLocation = X.ConsiderEarthBind()
+	if earthbindDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnLocation(earthbindAbility, earthbindLocation)
+		rememberEarthbindCast(earthbindLocation)
 		return
 	end
-	L, M = a.ConsiderMegaMeepoFling()
-	if L > 0 then
-		b:ActionQueue_UseAbilityOnEntity(E, M)
+	flingDesire, flingTarget = X.ConsiderMegaMeepoFling()
+	if flingDesire > 0 then
+		bot:ActionQueue_UseAbilityOnEntity(megaMeepoFlingAbility, flingTarget)
 		return
 	end
 end
-function a.ConsiderEarthBind()
-	if not A:IsFullyCastable() then
+function X.ConsiderEarthBind()
+	if not earthbindAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local X = c.GetProperCastRange(false, b, A:GetCastRange())
-	local Y = A:GetCastPoint()
-	local Z = A:GetSpecialValueInt("radius")
-	local _ = A:GetSpecialValueInt("speed")
-	local a0 = b:GetActiveModeDesire()
-	local a1 = c.GetNearbyHeroes(b, X, true, BOT_MODE_NONE)
-	for t, a2 in pairs(a1) do
+	local castRange = Fu.GetProperCastRange(false, bot, earthbindAbility:GetCastRange())
+	local castPoint = earthbindAbility:GetCastPoint()
+	local radius = earthbindAbility:GetSpecialValueInt("radius")
+	local speed = earthbindAbility:GetSpecialValueInt("speed")
+	local modeDesire = bot:GetActiveModeDesire()
+	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(enemyHeroes) do
 		if
-			c.IsValidHero(a2)
-			and c.CanCastOnNonMagicImmune(a2)
-			and c.IsInRange(b, a2, X)
-			and (a2:IsChanneling() or c.IsCastingUltimateAbility(a2))
-			and not c.IsSuspiciousIllusion(a2)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and (enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero))
+			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
-			local a3 = a2:GetLocation()
-			if not o(a3, Z) then
-				return BOT_ACTION_DESIRE_HIGH, a3
+			local castLocation = enemyHero:GetLocation()
+			if not isNearRecentEarthbind(castLocation, radius) then
+				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local a4 = b:FindAoELocation(true, true, b:GetLocation(), X, Z, Y, 0)
-		if a4.count >= 2 then
-			if not o(a4.targetloc, Z) then
-				return BOT_ACTION_DESIRE_HIGH, a4.targetloc
+	if Fu.IsInTeamFight(bot, 1200) then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		if aoe.count >= 2 then
+			if not isNearRecentEarthbind(aoe.targetloc, radius) then
+				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
 		end
 	end
-	if T then
-		local a5 = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
-		local a6 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		local allyHeroes = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		if
-			c.IsValidTarget(O)
-			and c.CanCastOnNonMagicImmune(O)
-			and c.IsInRange(b, O, X)
-			and not c.IsSuspiciousIllusion(O)
-			and not c.IsDisabled(O)
-			and not c.IsTaunted(O)
-			and not O:HasModifier("modifier_enigma_black_hole_pull")
-			and not O:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not O:HasModifier("modifier_meepo_earthbind")
-			and a5 ~= nil
-			and a6
-			and #a5 >= #a6
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not Fu.IsTaunted(botTarget)
+			and not botTarget:HasModifier("modifier_enigma_black_hole_pull")
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_meepo_earthbind")
+			and allyHeroes ~= nil
+			and nearbyEnemyHeroes
+			and #allyHeroes >= #nearbyEnemyHeroes
 		then
-			local a7 = GetUnitToUnitDistance(b, O) / _ + Y
-			local a3 = O:GetExtrapolatedLocation(a7)
-			if not o(a3, Z) then
-				return BOT_ACTION_DESIRE_HIGH, a3
+			local delay = GetUnitToUnitDistance(bot, botTarget) / speed + castPoint
+			local castLocation = botTarget:GetExtrapolatedLocation(delay)
+			if not isNearRecentEarthbind(castLocation, radius) then
+				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
 	end
-	if U and a0 > BOT_ACTION_DESIRE_HIGH then
-		local a5 = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		local a6 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
+	if isRetreating and modeDesire > BOT_ACTION_DESIRE_HIGH then
+		local allyHeroes = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		if
-			a5 ~= nil
-			and a6
-			and (#a6 > #a5 or P < 0.62 and b:WasRecentlyDamagedByAnyHero(2))
-			and c.IsValidHero(a6[1])
-			and c.CanCastOnNonMagicImmune(a6[1])
-			and c.IsInRange(b, a6[1], X)
-			and not c.IsSuspiciousIllusion(a6[1])
-			and not c.IsDisabled(a6[1])
-			and not a6[1]:HasModifier("modifier_meepo_earthbind")
+			allyHeroes ~= nil
+			and nearbyEnemyHeroes
+			and (#nearbyEnemyHeroes > #allyHeroes or hpRatio < 0.62 and bot:WasRecentlyDamagedByAnyHero(2))
+			and Fu.IsValidHero(nearbyEnemyHeroes[1])
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemyHeroes[1])
+			and Fu.IsInRange(bot, nearbyEnemyHeroes[1], castRange)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
+			and not Fu.IsDisabled(nearbyEnemyHeroes[1])
+			and not nearbyEnemyHeroes[1]:HasModifier("modifier_meepo_earthbind")
 		then
-			local a7 = GetUnitToUnitDistance(b, a6[1]) / _ + Y
-			local a3 = a6[1]:GetExtrapolatedLocation(a7)
-			if not o(a3, Z) then
-				return BOT_ACTION_DESIRE_HIGH, a3
+			local delay = GetUnitToUnitDistance(bot, nearbyEnemyHeroes[1]) / speed + castPoint
+			local castLocation = nearbyEnemyHeroes[1]:GetExtrapolatedLocation(delay)
+			if not isNearRecentEarthbind(castLocation, radius) then
+				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
 	end
-	local a8 = c.GetNearbyHeroes(b, X, false, BOT_MODE_NONE)
-	for t, a9 in pairs(a8) do
-		local aa = c.GetNearbyHeroes(a9, X, true, BOT_MODE_NONE)
-		if c.IsRetreating(a9) and a9:WasRecentlyDamagedByAnyHero(2.1) and not a9:IsIllusion() and V > 0.48 then
+	local allyHeroesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
+	for _, allyHero in pairs(allyHeroesInRange) do
+		local allyEnemies = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and mpRatio > 0.48
+		then
 			if
-				aa ~= nil
-				and #aa >= 1
-				and c.IsValidHero(aa[1])
-				and c.CanCastOnNonMagicImmune(aa[1])
-				and c.IsInRange(a9, aa[1], 400)
-				and c.IsInRange(b, aa[1], X)
-				and c.IsRunning(a9)
-				and aa[1]:IsFacingLocation(a9:GetLocation(), 30)
-				and not c.IsDisabled(aa[1])
-				and not c.IsTaunted(aa[1])
-				and not c.IsSuspiciousIllusion(aa[1])
-				and not aa[1]:HasModifier("modifier_enigma_black_hole_pull")
-				and not aa[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not aa[1]:HasModifier("modifier_meepo_earthbind")
+				allyEnemies ~= nil
+				and #allyEnemies >= 1
+				and Fu.IsValidHero(allyEnemies[1])
+				and Fu.CanCastOnNonMagicImmune(allyEnemies[1])
+				and Fu.IsInRange(allyHero, allyEnemies[1], 400)
+				and Fu.IsInRange(bot, allyEnemies[1], castRange)
+				and Fu.IsRunning(allyHero)
+				and allyEnemies[1]:IsFacingLocation(allyHero:GetLocation(), 30)
+				and not Fu.IsDisabled(allyEnemies[1])
+				and not Fu.IsTaunted(allyEnemies[1])
+				and not Fu.IsSuspiciousIllusion(allyEnemies[1])
+				and not allyEnemies[1]:HasModifier("modifier_enigma_black_hole_pull")
+				and not allyEnemies[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				and not allyEnemies[1]:HasModifier("modifier_meepo_earthbind")
 			then
-				local a7 = GetUnitToUnitDistance(b, aa[1]) / _ + Y
-				local a3 = aa[1]:GetExtrapolatedLocation(a7 + Y)
-				if not o(a3, Z) then
-					return BOT_ACTION_DESIRE_HIGH, a3
+				local delay = GetUnitToUnitDistance(bot, allyEnemies[1]) / speed + castPoint
+				local castLocation = allyEnemies[1]:GetExtrapolatedLocation(delay + castPoint)
+				if not isNearRecentEarthbind(castLocation, radius) then
+					return BOT_ACTION_DESIRE_HIGH, castLocation
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderPoof()
-	if not B:IsFullyCastable() then
+function X.ConsiderPoof()
+	if not poofAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local Z = B:GetSpecialValueInt("radius")
+	local radius = poofAbility:GetSpecialValueInt("radius")
 	-- Poof has no AbilityDamage in the game data; its damage is the special value "poof_damage"
 	-- (50/80/110/140). GetAbilityDamage() gave 0, so the lane last-hit Poofs never fired.
-	local ab = B:GetSpecialValueInt("poof_damage")
-	if P < 0.5 and U then
-		for t, ac in pairs(N) do
-			if ac ~= b and ac:DistanceFromFountain() < 800 and not c.IsStunProjectileIncoming(b, 400) then
-				return BOT_ACTION_DESIRE_ABSOLUTE, ac
+	local poofDamage = poofAbility:GetSpecialValueInt("poof_damage")
+	if hpRatio < 0.5 and isRetreating then
+		for _, meepo in pairs(meepos) do
+			if meepo ~= bot and meepo:DistanceFromFountain() < 800 and not Fu.IsStunProjectileIncoming(bot, 400) then
+				return BOT_ACTION_DESIRE_ABSOLUTE, meepo
 			end
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b)) and not U then
-		local ad = GetLaneFrontLocation(GetTeam(), b:GetAssignedLane(), 0)
-		for t, ac in pairs(N) do
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not isRetreating then
+		local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
+		for _, meepo in pairs(meepos) do
 			if
-				ac ~= b
-				and GetUnitToLocationDistance(ac, ad) < 1200
-				and GetUnitToLocationDistance(b, ad) > 3200
-				and P > 0.6
+				meepo ~= bot
+				and GetUnitToLocationDistance(meepo, laneFront) < 1200
+				and GetUnitToLocationDistance(bot, laneFront) > 3200
+				and hpRatio > 0.6
 			then
-				return BOT_ACTION_DESIRE_HIGH, ac
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
 	end
-	if P > 0.5 and not U then
-		for t, ac in pairs(N) do
+	if hpRatio > 0.5 and not isRetreating then
+		for _, meepo in pairs(meepos) do
 			if
-				ac ~= b
-				and c.IsRetreating(ac)
-				and ac:WasRecentlyDamagedByAnyHero(2.0)
-				and c.GetHP(ac) < 0.5
-				and GetUnitToUnitDistance(b, ac) > 1200
+				meepo ~= bot
+				and Fu.IsRetreating(meepo)
+				and meepo:WasRecentlyDamagedByAnyHero(2.0)
+				and Fu.GetHP(meepo) < 0.5
+				and GetUnitToUnitDistance(bot, meepo) > 1200
 			then
-				local ae = c.GetNearbyHeroes(ac, 1200, false, BOT_MODE_NONE)
-				local af = c.GetNearbyHeroes(ac, 1200, true, BOT_MODE_NONE)
-				if ae ~= nil and af ~= nil and #ae >= #af and #af >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, ac
+				local meepoAllies = Fu.GetNearbyHeroes(meepo, 1200, false, BOT_MODE_NONE)
+				local meepoEnemies = Fu.GetNearbyHeroes(meepo, 1200, true, BOT_MODE_NONE)
+				if
+					meepoAllies ~= nil
+					and meepoEnemies ~= nil
+					and #meepoAllies >= #meepoEnemies
+					and #meepoEnemies >= 1
+				then
+					return BOT_ACTION_DESIRE_HIGH, meepo
 				end
 			end
 		end
 	end
-	for t, ac in pairs(N) do
-		local ag = ac:GetAttackTarget()
-		if c.IsGoingOnSomeone(ac) then
-			local a5 = c.GetNearbyHeroes(ac, 1000, false, BOT_MODE_NONE)
-			local a6 = c.GetNearbyHeroes(ac, 800, true, BOT_MODE_NONE)
+	for _, meepo in pairs(meepos) do
+		local meepoTarget = meepo:GetAttackTarget()
+		if Fu.IsGoingOnSomeone(meepo) then
+			local meepoAllies = Fu.GetNearbyHeroes(meepo, 1000, false, BOT_MODE_NONE)
+			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 800, true, BOT_MODE_NONE)
 			if
-				c.IsValidTarget(ag)
-				and c.IsInRange(ac, ag, 800)
-				and not U
-				and not c.IsSuspiciousIllusion(ag)
-				and a5 ~= nil
-				and a6
-				and #a5 >= #a6
-				and GetUnitToUnitDistance(b, ac) > 1600
+				Fu.IsValidTarget(meepoTarget)
+				and Fu.IsInRange(meepo, meepoTarget, 800)
+				and not isRetreating
+				and not Fu.IsSuspiciousIllusion(meepoTarget)
+				and meepoAllies ~= nil
+				and meepoEnemies
+				and #meepoAllies >= #meepoEnemies
+				and GetUnitToUnitDistance(bot, meepo) > 1600
 			then
-				return BOT_ACTION_DESIRE_HIGH, ac
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
-		if c.IsLaning(b) and c.IsLaning(ac) and ac ~= b then
-			local ad = GetLaneFrontLocation(GetTeam(), b:GetAssignedLane(), 0)
-			if GetUnitToLocationDistance(b, ad) > 1600 and GetUnitToLocationDistance(ac, ad) < 600 then
-				return BOT_ACTION_DESIRE_HIGH, ac
+		if Fu.IsLaning(bot) and Fu.IsLaning(meepo) and meepo ~= bot then
+			local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
+			if
+				GetUnitToLocationDistance(bot, laneFront) > 1600
+				and GetUnitToLocationDistance(meepo, laneFront) < 600
+			then
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
-		if c.IsDoingRoshan(ac) then
-			local a6 = c.GetNearbyHeroes(ac, 800, true, BOT_MODE_NONE)
-			if c.IsRoshan(ag) and c.IsInRange(ac, ag, 400) and c.GetHP(ag) > 0.33 and a6 ~= nil and #a6 == 0 then
-				return BOT_ACTION_DESIRE_HIGH, ac
+		if Fu.IsDoingRoshan(meepo) then
+			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 800, true, BOT_MODE_NONE)
+			if
+				Fu.IsRoshan(meepoTarget)
+				and Fu.IsInRange(meepo, meepoTarget, 400)
+				and Fu.GetHP(meepoTarget) > 0.33
+				and meepoEnemies ~= nil
+				and #meepoEnemies == 0
+			then
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
-		if c.IsDoingTormentor(ac) then
-			local a6 = c.GetNearbyHeroes(ac, 800, true, BOT_MODE_NONE)
-			if c.IsTormentor(ag) and c.IsInRange(ac, ag, 400) and a6 ~= nil and #a6 == 0 then
-				return BOT_ACTION_DESIRE_HIGH, ac
+		if Fu.IsDoingTormentor(meepo) then
+			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 800, true, BOT_MODE_NONE)
+			if
+				Fu.IsTormentor(meepoTarget)
+				and Fu.IsInRange(meepo, meepoTarget, 400)
+				and meepoEnemies ~= nil
+				and #meepoEnemies == 0
+			then
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
-		if P < 0.3 and U and ac ~= b and ac:DistanceFromFountain() < 500 then
-			return BOT_ACTION_DESIRE_HIGH, ac
+		if hpRatio < 0.3 and isRetreating and meepo ~= bot and meepo:DistanceFromFountain() < 500 then
+			return BOT_ACTION_DESIRE_HIGH, meepo
 		end
 	end
-	if U then
-		local a5 = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		local a6 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
+	if isRetreating then
+		local allyHeroes = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		if
-			a5 ~= nil
-			and a6
-			and (#a6 > #a5 or P < 0.8 and b:WasRecentlyDamagedByAnyHero(1.3))
-			and c.IsValidHero(a6[1])
-			and c.CanCastOnNonMagicImmune(a6[1])
-			and c.IsInRange(b, a6[1], 1000)
-			and c.IsRunning(a6[1])
-			and a6[1]:IsFacingLocation(b:GetLocation(), 30)
-			and not c.IsSuspiciousIllusion(a6[1])
+			allyHeroes ~= nil
+			and nearbyEnemyHeroes
+			and (#nearbyEnemyHeroes > #allyHeroes or hpRatio < 0.8 and bot:WasRecentlyDamagedByAnyHero(1.3))
+			and Fu.IsValidHero(nearbyEnemyHeroes[1])
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemyHeroes[1])
+			and Fu.IsInRange(bot, nearbyEnemyHeroes[1], 1000)
+			and Fu.IsRunning(nearbyEnemyHeroes[1])
+			and nearbyEnemyHeroes[1]:IsFacingLocation(bot:GetLocation(), 30)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
 		then
-			local ah = nil
-			local v = 0
-			for t, ac in pairs(N) do
+			local farthestMeepo = nil
+			local farthestDistance = 0
+			for _, meepo in pairs(meepos) do
 				-- Was the farthest Meepo whatever its state: a Meepo fighting elsewhere is no escape.
 				-- Only a Meepo with no enemy hero within 1200 counts.
-				local near = c.GetNearbyHeroes(ac, 1200, true, BOT_MODE_NONE)
-				if (near == nil or #near == 0) and GetUnitToUnitDistance(b, ac) > v then
-					ah = ac
-					v = GetUnitToUnitDistance(b, ac)
+				local meepoEnemies = Fu.GetNearbyHeroes(meepo, 1200, true, BOT_MODE_NONE)
+				if
+					(meepoEnemies == nil or #meepoEnemies == 0)
+					and GetUnitToUnitDistance(bot, meepo) > farthestDistance
+				then
+					farthestMeepo = meepo
+					farthestDistance = GetUnitToUnitDistance(bot, meepo)
 				end
 			end
-			if ah ~= nil and ah ~= b then
-				return BOT_ACTION_DESIRE_HIGH, ah
+			if farthestMeepo ~= nil and farthestMeepo ~= bot then
+				return BOT_ACTION_DESIRE_HIGH, farthestMeepo
 			end
 		end
 	end
-	if c.IsFarming(b) then
-		if S then
-			local ai = b:GetNearbyLaneCreeps(Z, true)
-			if ai ~= nil and #ai >= 3 and V > 0.33 then
-				return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsFarming(bot) then
+		if isAttacking then
+			local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+			if laneCreeps ~= nil and #laneCreeps >= 3 and mpRatio > 0.33 then
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
-			local aj = b:GetNearbyNeutralCreeps(Z)
-			if aj ~= nil and #aj >= 2 and V > 0.26 then
-				return BOT_ACTION_DESIRE_HIGH, b
+			local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
+			if neutralCreeps ~= nil and #neutralCreeps >= 2 and mpRatio > 0.26 then
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
 	end
-	if c.IsLaning(b) and V > 0.29 then
-		local ak = b:GetNearbyLaneCreeps(Z, true)
-		local al = 0
-		for t, am in pairs(ak) do
-			if c.IsValid(am) and c.CanKillTarget(am, ab, DAMAGE_TYPE_MAGICAL) then
-				al = al + 1
+	if Fu.IsLaning(bot) and mpRatio > 0.29 then
+		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+		local killableCount = 0
+		for _, creep in pairs(laneCreeps) do
+			if Fu.IsValid(creep) and Fu.CanKillTarget(creep, poofDamage, DAMAGE_TYPE_MAGICAL) then
+				killableCount = killableCount + 1
 			end
 		end
-		if al >= 2 then
+		if killableCount >= 2 then
 			-- [OHA-MEEPO]: lane last-hit Poof (dead before the poof_damage fix), every 10s at most.
-			if DotaTime() >= (b._poofLaneLogAt or -999) then
-				b._poofLaneLogAt = DotaTime() + 10
-				pcall(print, string.format("[OHA-MEEPO] t=%.0f poof-lane-lasthit creeps=%d dmg=%d", DotaTime(), al, ab))
+			if DotaTime() >= (bot._poofLaneLogAt or -999) then
+				bot._poofLaneLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f poof-lane-lasthit creeps=%d dmg=%d",
+						DotaTime(),
+						killableCount,
+						poofDamage
+					)
+				)
 			end
-			return BOT_ACTION_DESIRE_HIGH, b
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
-		local a6 = c.GetNearbyHeroes(b, Z / 2.1, true, BOT_MODE_NONE)
-		for t, a2 in pairs(a6) do
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, radius / 2.1, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemyHeroes) do
 			if
-				c.IsValidHero(a2)
-				and c.CanCastOnNonMagicImmune(a2)
-				and not c.IsSuspiciousIllusion(a2)
-				and not a2:HasModifier("modifier_abaddon_borrowed_time")
-				and not a2:HasModifier("modifier_dazzle_shallow_grave")
-				and not a2:HasModifier("modifier_oracle_false_promise_timer")
-				and not a2:HasModifier("modifier_templar_assassin_refraction_absorb")
-				and V > 0.76
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+				and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
+				and mpRatio > 0.76
 			then
-				return BOT_ACTION_DESIRE_HIGH, b
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
-		for t, am in pairs(ak) do
+		for _, creep in pairs(laneCreeps) do
 			if
-				c.IsValid(am)
-				and (c.IsKeyWordUnit("ranged", am) or c.IsKeyWordUnit("siege", am) or c.IsKeyWordUnit("flagbearer", am))
-				and c.CanKillTarget(am, ab, DAMAGE_TYPE_MAGICAL)
+				Fu.IsValid(creep)
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
+				and Fu.CanKillTarget(creep, poofDamage, DAMAGE_TYPE_MAGICAL)
 			then
-				a6 = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
+				nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 				if
-					a6 ~= nil
-					and #a6 >= 1
-					and GetUnitToUnitDistance(am, a6[1]) <= 500
-					and P > 0.5
-					and not b:WasRecentlyDamagedByAnyHero(2.7)
+					nearbyEnemyHeroes ~= nil
+					and #nearbyEnemyHeroes >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemyHeroes[1]) <= 500
+					and hpRatio > 0.5
+					and not bot:WasRecentlyDamagedByAnyHero(2.7)
 				then
-					return BOT_ACTION_DESIRE_HIGH, b
+					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
 		end
 	end
-	if c.IsDefending(b) or c.IsPushing(b) then
-		local ai = b:GetNearbyLaneCreeps(Z, true)
-		if ai ~= nil and #ai >= 4 then
-			return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsDefending(bot) or Fu.IsPushing(bot) then
+		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+		if laneCreeps ~= nil and #laneCreeps >= 4 then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
-	if P and not U then
-		for t, ac in pairs(N) do
-			local a5 = c.GetNearbyHeroes(ac, 800, false, BOT_MODE_NONE)
-			local a6 = c.GetNearbyHeroes(ac, 1200, true, BOT_MODE_NONE)
+	if hpRatio and not isRetreating then
+		for _, meepo in pairs(meepos) do
+			local meepoAllies = Fu.GetNearbyHeroes(meepo, 800, false, BOT_MODE_NONE)
+			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 1200, true, BOT_MODE_NONE)
 			if
-				a5 ~= nil
-				and a6 ~= nil
-				and (#N >= #a6 or #a5 >= #a6)
-				and GetUnitToUnitDistance(b, ac) > 1600
-				and ac:WasRecentlyDamagedByAnyHero(1.1)
+				meepoAllies ~= nil
+				and meepoEnemies ~= nil
+				and (#meepos >= #meepoEnemies or #meepoAllies >= #meepoEnemies)
+				and GetUnitToUnitDistance(bot, meepo) > 1600
+				and meepo:WasRecentlyDamagedByAnyHero(1.1)
 			then
-				return BOT_ACTION_DESIRE_HIGH, ac
+				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
 	end
-	if P and not U then
-		for t, ac in pairs(N) do
-			local a5 = c.GetNearbyHeroes(ac, 800, false, BOT_MODE_NONE)
-			local a6 = c.GetNearbyHeroes(ac, 324, true, BOT_MODE_NONE)
-			if a6 ~= nil and P - c.GetHP(ac) > 0.2 then
+	if hpRatio and not isRetreating then
+		for _, meepo in pairs(meepos) do
+			local meepoAllies = Fu.GetNearbyHeroes(meepo, 800, false, BOT_MODE_NONE)
+			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 324, true, BOT_MODE_NONE)
+			if meepoEnemies ~= nil and hpRatio - Fu.GetHP(meepo) > 0.2 then
 				if
-					c.IsValidHero(a6[1])
-					and (#N >= #a6 or #a5 >= #a6)
-					and not c.IsSuspiciousIllusion(a6[1])
-					and not c.IsLaning(ac)
+					Fu.IsValidHero(meepoEnemies[1])
+					and (#meepos >= #meepoEnemies or #meepoAllies >= #meepoEnemies)
+					and not Fu.IsSuspiciousIllusion(meepoEnemies[1])
+					and not Fu.IsLaning(meepo)
 				then
-					return BOT_ACTION_DESIRE_HIGH, ac
+					return BOT_ACTION_DESIRE_HIGH, meepo
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderDig()
-	if not C:IsTrained() or not C:IsFullyCastable() then
+function X.ConsiderDig()
+	if not digAbility:IsTrained() or not digAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:HasModifier("modifier_doom_bringer_doom") then
+	if bot:HasModifier("modifier_doom_bringer_doom") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:HasModifier("modifier_oracle_false_promise_timer") then
+	if bot:HasModifier("modifier_oracle_false_promise_timer") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:HasModifier("modifier_ice_blast") then
-		if not b:WasRecentlyDamagedByAnyHero(1.5) then
+	if bot:HasModifier("modifier_ice_blast") then
+		if not bot:WasRecentlyDamagedByAnyHero(1.5) then
 			return BOT_ACTION_DESIRE_NONE
 		end
 	end
-	if P < 0.49 then
+	if hpRatio < 0.49 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderMegaMeepo()
-	if not D:IsTrained() or not D:IsFullyCastable() or b:HasModifier("modifier_meepo_petrify") then
+function X.ConsiderMegaMeepo()
+	if
+		not megaMeepoAbility:IsTrained()
+		or not megaMeepoAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_meepo_petrify")
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local Z = 600
-	if T then
-		local an = 0
-		for t, ac in pairs(N) do
+	local radius = 600
+	if isGoingOnSomeone then
+		local damagedCloneCount = 0
+		for _, meepo in pairs(meepos) do
 			if
-				ac:WasRecentlyDamagedByAnyHero(1.2)
-				and c.IsMeepoClone(ac)
-				and c.IsInRange(b, ac, Z)
-				and not ac:HasModifier("modifier_meepo_petrify")
+				meepo:WasRecentlyDamagedByAnyHero(1.2)
+				and Fu.IsMeepoClone(meepo)
+				and Fu.IsInRange(bot, meepo, radius)
+				and not meepo:HasModifier("modifier_meepo_petrify")
 			then
-				an = an + 1
+				damagedCloneCount = damagedCloneCount + 1
 			end
 		end
-		if an >= 2 then
+		if damagedCloneCount >= 2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderMegaMeepoFling()
-	if E:IsHidden() or not E:IsFullyCastable() then
+function X.ConsiderMegaMeepoFling()
+	if megaMeepoFlingAbility:IsHidden() or not megaMeepoFlingAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local X = E:GetCastRange()
-	local a5 = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
-	local a6 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-	if T then
-		local ao = c.GetAttackableWeakestUnit(b, X, true, true)
+	local castRange = megaMeepoFlingAbility:GetCastRange()
+	local allyHeroes = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
+	local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		local weakestTarget = Fu.GetAttackableWeakestUnit(bot, castRange, true, true)
 		if
-			ao ~= nil
-			and b:WasRecentlyDamagedByAnyHero(3.1)
-			and not c.IsMeepoClone(b)
-			and not ao:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and a5 ~= nil
-			and a6
-			and #a5 >= #a6
+			weakestTarget ~= nil
+			and bot:WasRecentlyDamagedByAnyHero(3.1)
+			and not Fu.IsMeepoClone(bot)
+			and not weakestTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and allyHeroes ~= nil
+			and nearbyEnemyHeroes
+			and #allyHeroes >= #nearbyEnemyHeroes
 		then
-			return BOT_ACTION_DESIRE_HIGH, ao
+			return BOT_ACTION_DESIRE_HIGH, weakestTarget
 		end
 	end
-	local ap = b:GetNearbyCreeps(X, true)
-	if ap ~= nil and #ap >= 1 and a6 ~= nil and #a6 == 0 then
-		if c.IsValid(ap[1]) and not c.IsMeepoClone(b) then
-			return BOT_ACTION_DESIRE_HIGH, ap[1]
+	local enemyCreeps = bot:GetNearbyCreeps(castRange, true)
+	if enemyCreeps ~= nil and #enemyCreeps >= 1 and nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes == 0 then
+		if Fu.IsValid(enemyCreeps[1]) and not Fu.IsMeepoClone(bot) then
+			return BOT_ACTION_DESIRE_HIGH, enemyCreeps[1]
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

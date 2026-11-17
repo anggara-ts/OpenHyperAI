@@ -1,19 +1,19 @@
 -- Dota API names and constants: index.
-local a = {}
+local Exports = {}
 do
-	local b = require(GetScriptDirectory() .. "/ts_libs/dota/interfaces")
-	for c, d in pairs(b) do
-		if c ~= "default" then
-			a[c] = d
+	local Interfaces = require(GetScriptDirectory() .. "/ts_libs/dota/interfaces")
+	for key, value in pairs(Interfaces) do
+		if key ~= "default" then
+			Exports[key] = value
 		end
 	end
 end
 do
-	local b = require(GetScriptDirectory() .. "/ts_libs/dota/enums")
-	for c, d in pairs(b) do
-		if c ~= "default" then
-			a[c] = d
+	local Enums = require(GetScriptDirectory() .. "/ts_libs/dota/enums")
+	for key, value in pairs(Enums) do
+		if key ~= "default" then
+			Exports[key] = value
 		end
 	end
 end
-return a
+return Exports

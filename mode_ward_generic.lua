@@ -7,36 +7,39 @@ if
 then
 	return
 end
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ward")
-local e = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local WardMode = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Ward = require(GetScriptDirectory() .. "/FuncLib/systems/ward")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
-local locOk, loc = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
-if not locOk then
-	loc = {
+local localizationOk, Localization = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
+if not localizationOk then
+	Localization = {
 		Get = function()
 			return nil
 		end,
 	}
 end
-e.ThinkLess = e.Enable and e.ThinkLess or 1
-local f = 500
-local g = 500
-local h = nil
-local i = nil
-local j = nil
-local k = -math.huge
+CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
+local observerCastRange = 500
+local sentryCastRange = 500
+local observerWard = nil
+local sentryWard = nil
+local wardSpot = nil
+local wardModeOffUntil = -math.huge
+-- Switched off on purpose: ping/chat when a ward is planted (user request) and per-try plant logging.
+local ANNOUNCE_WARD_PLANT = false
+local LOG_PLANT_TRIES = false
 local function DispenserSentryCharges(item)
 	if item == nil or item.GetSecondaryCharges == nil then
 		return 0
 	end
-	local ok, n = pcall(function()
+	local ok, charges = pcall(function()
 		return item:GetSecondaryCharges()
 	end)
-	if ok and type(n) == "number" then
-		return n
+	if ok and type(charges) == "number" then
+		return charges
 	end
 	return 0
 end
@@ -56,27 +59,30 @@ local function DispLog(step, item, loc, wantObs, obs, sen)
 	local okT, tog = pcall(function()
 		return item:GetToggleState()
 	end)
-	pcall(print, string.format(
-		"[OHA-WARD] t=%.1f %s dispenser %s want=%s obs=%d sen=%d toggle=%s dist=%.0f",
-		DotaTime(),
-		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-		step,
-		wantObs and "obs" or "sentry",
-		obs,
-		sen,
-		okT and tostring(tog) or "?",
-		GetUnitToLocationDistance(b, loc)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-WARD] t=%.1f %s dispenser %s want=%s obs=%d sen=%d toggle=%s dist=%.0f",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			step,
+			wantObs and "obs" or "sentry",
+			obs,
+			sen,
+			okT and tostring(tog) or "?",
+			GetUnitToLocationDistance(bot, loc)
+		)
+	)
 end
 local function DispenserPlant(item, loc, wantObs)
 	local now = DotaTime()
 	local obs = item:GetCurrentCharges() or 0
 	local sen = DispenserSentryCharges(item)
-	local t = b._dispTry
-	if t ~= nil and (t.loc ~= loc or t.wantObs ~= wantObs or now - t.at > 4) then
-		t = nil
+	local pendingTry = bot._dispTry
+	if pendingTry ~= nil and (pendingTry.loc ~= loc or pendingTry.wantObs ~= wantObs or now - pendingTry.at > 4) then
+		pendingTry = nil
 	end
-	if t == nil then
+	if pendingTry == nil then
 		-- Game 032: all 3 observer plants went in with GetToggleState() true and the first charge count
 		-- (observers) dropping, so true = observer active. Switch first when the state is the other one,
 		-- then cast 0.4s later; the old cast / watch / switch flow stays as the fallback.
@@ -84,43 +90,55 @@ local function DispenserPlant(item, loc, wantObs)
 			return item:GetToggleState()
 		end)
 		if okT and type(tog) == "boolean" and tog ~= wantObs then
-			b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = true, recast = true, castAt = now + 0.4 }
+			bot._dispTry = {
+				at = now,
+				loc = loc,
+				wantObs = wantObs,
+				obs = obs,
+				sen = sen,
+				toggled = true,
+				recast = true,
+				castAt = now + 0.4,
+			}
 			DispLog("pre-toggle", item, loc, wantObs, obs, sen)
-			b:Action_UseAbilityOnEntity(item, b)
+			bot:Action_UseAbilityOnEntity(item, bot)
 			return true
 		end
-		b._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = false, castAt = now }
+		bot._dispTry = { at = now, loc = loc, wantObs = wantObs, obs = obs, sen = sen, toggled = false, castAt = now }
 		DispLog("cast", item, loc, wantObs, obs, sen)
-		b:Action_UseAbilityOnLocation(item, loc)
+		bot:Action_UseAbilityOnLocation(item, loc)
 		return true
 	end
-	local gotWanted = wantObs and obs < t.obs or not wantObs and sen < t.sen
-	local gotOther = wantObs and sen < t.sen or not wantObs and obs < t.obs
+	local gotWanted = wantObs and obs < pendingTry.obs or not wantObs and sen < pendingTry.sen
+	local gotOther = wantObs and sen < pendingTry.sen or not wantObs and obs < pendingTry.obs
 	if gotWanted then
 		DispLog("planted", item, loc, wantObs, obs, sen)
-		b._dispTry = nil
+		bot._dispTry = nil
 		return false
 	end
 	if gotOther then
 		-- Planted the other kind: switch the dispenser for the next one.
-		b._dispTry = nil
-		b:Action_UseAbilityOnEntity(item, b)
-		pcall(print, string.format("[OHA-WARD] t=%.0f dispenser wrong-mode want=%s toggled", now, wantObs and "obs" or "sentry"))
+		bot._dispTry = nil
+		bot:Action_UseAbilityOnEntity(item, bot)
+		pcall(
+			print,
+			string.format("[OHA-WARD] t=%.0f dispenser wrong-mode want=%s toggled", now, wantObs and "obs" or "sentry")
+		)
 		return true
 	end
-	if now - t.castAt >= 1 and not t.toggled then
-		t.toggled = true
-		t.recast = true
-		t.castAt = now + 0.5
+	if now - pendingTry.castAt >= 1 and not pendingTry.toggled then
+		pendingTry.toggled = true
+		pendingTry.recast = true
+		pendingTry.castAt = now + 0.5
 		DispLog("toggle", item, loc, wantObs, obs, sen)
-		b:Action_UseAbilityOnEntity(item, b)
+		bot:Action_UseAbilityOnEntity(item, bot)
 		return true
 	end
-	if t.recast and now >= t.castAt then
-		t.recast = false
-		t.castAt = now
+	if pendingTry.recast and now >= pendingTry.castAt then
+		pendingTry.recast = false
+		pendingTry.castAt = now
 		DispLog("recast", item, loc, wantObs, obs, sen)
-		b:Action_UseAbilityOnLocation(item, loc)
+		bot:Action_UseAbilityOnLocation(item, loc)
 	end
 	return true
 end
@@ -129,7 +147,7 @@ end
 local planted = {}
 local dumped = false
 local function PickChat(key, fallback)
-	local msg = loc.Get(key)
+	local msg = Localization.Get(key)
 	if type(msg) == "table" and #msg > 0 then
 		return msg[RandomInt(1, #msg)]
 	end
@@ -139,17 +157,17 @@ local function PickChat(key, fallback)
 	return fallback
 end
 local function RememberWard(kind)
-	if j == nil or j.location == nil then
+	if wardSpot == nil or wardSpot.location == nil then
 		return
 	end
-	local x = math.floor(j.location.x)
-	local y = math.floor(j.location.y)
+	local x = math.floor(wardSpot.location.x)
+	local y = math.floor(wardSpot.location.y)
 	local now = DotaTime()
 	local last = planted[#planted]
 	if last and last.kind == kind and last.x == x and last.y == y and now - last.t < 20 then
 		return
 	end
-	planted[#planted + 1] = { t = now, kind = kind, role = j.role or "spot", x = x, y = y }
+	planted[#planted + 1] = { t = now, kind = kind, role = wardSpot.role or "spot", x = x, y = y }
 	if #planted > 40 then
 		table.remove(planted, 1)
 	end
@@ -159,19 +177,29 @@ local function DumpWards()
 		return
 	end
 	dumped = true
-	local name = string.gsub(b:GetUnitName() or "bot", "npc_dota_hero_", "")
+	local name = string.gsub(bot:GetUnitName() or "bot", "npc_dota_hero_", "")
 	print(string.format("[OHA-WARD] %s n=%d", name, #planted))
 	for idx = 1, #planted do
-		local p = planted[idx]
-		print(string.format("[OHA-WARD] %s %s t=%.0f role=%s %d,%d", name, p.kind, p.t, p.role, p.x, p.y))
+		local entry = planted[idx]
+		print(
+			string.format(
+				"[OHA-WARD] %s %s t=%.0f role=%s %d,%d",
+				name,
+				entry.kind,
+				entry.t,
+				entry.role,
+				entry.x,
+				entry.y
+			)
+		)
 	end
 end
 local function AnnounceWard(kind)
 	RememberWard(kind)
-	local role = j and j.role or nil
-	local wardLoc = j and j.location or nil
+	local role = wardSpot and wardSpot.role or nil
+	local wardLoc = wardSpot and wardSpot.location or nil
 	MatchTrace.Item(
-		b,
+		bot,
 		kind == "sentry" and "item_ward_sentry" or "item_ward_observer",
 		"plant",
 		string.format(
@@ -181,21 +209,21 @@ local function AnnounceWard(kind)
 		)
 	)
 	-- No ping and no team chat on a plant any more: warding is proven to work (user request).
-	if true then
+	if not ANNOUNCE_WARD_PLANT then
 		return
 	end
-	c.Utils.GameStates = c.Utils.GameStates or {}
+	Fu.Utils.GameStates = Fu.Utils.GameStates or {}
 	-- Bot API has no "Enemy Ward Here" wheel ping — danger ping (X) is the closest mark.
 	if kind == "sentry" and wardLoc ~= nil then
-		if DotaTime() - (c.Utils.GameStates.wardPingTime or -100) >= 8 then
-			c.Utils.GameStates.wardPingTime = DotaTime()
-			b:ActionImmediate_Ping(wardLoc.x, wardLoc.y, false)
+		if DotaTime() - (Fu.Utils.GameStates.wardPingTime or -100) >= 8 then
+			Fu.Utils.GameStates.wardPingTime = DotaTime()
+			bot:ActionImmediate_Ping(wardLoc.x, wardLoc.y, false)
 		end
 	end
-	if DotaTime() - (c.Utils.GameStates.wardChatTime or -100) < 12 then
+	if DotaTime() - (Fu.Utils.GameStates.wardChatTime or -100) < 12 then
 		return
 	end
-	c.Utils.GameStates.wardChatTime = DotaTime()
+	Fu.Utils.GameStates.wardChatTime = DotaTime()
 	local key = kind == "sentry" and "say_ward_sentry" or "say_ward_observer"
 	if role == "defend" then
 		key = kind == "sentry" and "say_ward_sentry_defend" or "say_ward_observer_defend"
@@ -203,16 +231,16 @@ local function AnnounceWard(kind)
 		key = kind == "sentry" and "say_ward_sentry_offense" or "say_ward_observer_offense"
 	end
 	local text = PickChat(key, kind == "sentry" and "Planting sentry." or "Planting observer.")
-	b:ActionImmediate_Chat(text, false)
-	if c.Utils.DebugMode or c.Utils.GameStates.verboseChat then
+	bot:ActionImmediate_Chat(text, false)
+	if Fu.Utils.DebugMode or Fu.Utils.GameStates.verboseChat then
 		local extra = string.format(
 			"[debug] ward %s role=%s at (%.0f, %.0f)",
 			kind,
 			tostring(role or "n/a"),
-			j and j.location.x or 0,
-			j and j.location.y or 0
+			wardSpot and wardSpot.location.x or 0,
+			wardSpot and wardSpot.location.y or 0
 		)
-		b:ActionImmediate_Chat(extra, false)
+		bot:ActionImmediate_Chat(extra, false)
 	end
 end
 function GetDesire()
@@ -220,101 +248,109 @@ function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	if c.GetPosition(b) <= 3 then
+	if Fu.GetPosition(bot) <= 3 then
 		return false
 	end
-	local l = GetDesireHelper()
-	return RemapValClamped(c.GetHP(b) * l, 0, 1, BOT_MODE_DESIRE_NONE, l)
+	local desire = GetDesireHelper()
+	return RemapValClamped(Fu.GetHP(bot) * desire, 0, 1, BOT_MODE_DESIRE_NONE, desire)
 end
 function GetDesireHelper()
-	if not a.IsSuitableToWard() then
+	if not WardMode.IsSuitableToWard() then
 		return BOT_MODE_DESIRE_NONE
 	end
 	-- One early ward (user call). Game 030, -0:17: right after Techies planted the Dire mid ward,
 	-- ward mode started a second early trip across the top river and he ended up fighting at the
 	-- top rune. No more ward trips until 0:20.
-	if b._earlyWardPlantedAt ~= nil and DotaTime() < 20 then
+	if bot._earlyWardPlantedAt ~= nil and DotaTime() < 20 then
 		return BOT_MODE_DESIRE_NONE
 	end
-	if c.Utils.IsTeamPushingSecondTierOrHighGround(b) then
+	if Fu.Utils.IsTeamPushingSecondTierOrHighGround(bot) then
 		return BOT_MODE_DESIRE_NONE
 	end
-	local m = c.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200)
-	if m >= 1 then
+	local enemiesNearAncient = Fu.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200)
+	if enemiesNearAncient >= 1 then
 		return BOT_MODE_DESIRE_NONE
 	end
-	local n = c.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
-	h = nil
-	i = nil
-	local I = false
-	local J = false
+	local isHighGroundThreatened = Fu.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2
+	observerWard = nil
+	sentryWard = nil
+	local observerInInventory = false
+	local sentryInInventory = false
 	-- Main inventory first, then backpack (human-gifted wards often land in bag).
-	for o = 0, 8 do
-		local p = b:GetItemInSlot(o)
-		if p then
-			local q = p:GetName()
+	for slot = 0, 8 do
+		local item = bot:GetItemInSlot(slot)
+		if item then
+			local itemName = item:GetName()
 			-- A dispenser with only sentries is not an observer. Toggling it
 			-- toward observer mode puts the sentry on cooldown.
-			local dispenserObs = q == "item_ward_dispenser" and DispenserHasObservers(p)
-			local dispenserSen = q == "item_ward_dispenser" and DispenserSentryCharges(p) > 0
-			if not I and (q == "item_ward_observer" or dispenserObs) then
-				h = p
-				I = o <= 5
+			local dispenserObs = itemName == "item_ward_dispenser" and DispenserHasObservers(item)
+			local dispenserSen = itemName == "item_ward_dispenser" and DispenserSentryCharges(item) > 0
+			if not observerInInventory and (itemName == "item_ward_observer" or dispenserObs) then
+				observerWard = item
+				observerInInventory = slot <= 5
 			end
-			if not J and (q == "item_ward_sentry" or dispenserSen) then
-				i = p
-				J = o <= 5
+			if not sentryInInventory and (itemName == "item_ward_sentry" or dispenserSen) then
+				sentryWard = item
+				sentryInInventory = slot <= 5
 			end
 		end
 	end
 	-- Enter ward mode even if wards are still in backpack so purchase can promote them.
 	-- Before the horn the observer is pos 5's (user call).
-	if h ~= nil and DotaTime() < 0 and c.GetPosition(b) ~= 5 then
-		h = nil
+	if observerWard ~= nil and DotaTime() < 0 and Fu.GetPosition(bot) ~= 5 then
+		observerWard = nil
 	end
 	-- Objective ward first (FuncLib/systems/ward.lua GetObjectiveWardSpot): a teammate heading for
 	-- Roshan or the enemy outpost gets the enemy-side spot next to it warded before he arrives.
-	if h ~= nil and (I and c.CanCastAbility(h) or not I) and DotaTime() > 0 and DotaTime() > k + 1.0 then
-		local obj, kind = d.GetObjectiveWardSpot(b)
-		if obj and (not a.IsEnemyCloserToWardLocation(obj.location) or c.IsRealInvisible(b)) then
-			j = obj
-			if DotaTime() >= (b._objWardLogAt or -999) + 20 then
-				b._objWardLogAt = DotaTime()
-				pcall(print, string.format(
-					"[OHA-WARD] t=%.0f %s objective-ward for=%s spot=%d,%d dist=%d",
-					DotaTime(),
-					(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-					tostring(kind),
-					math.floor(obj.location.x),
-					math.floor(obj.location.y),
-					math.floor(GetUnitToLocationDistance(b, obj.location))
-				))
+	if
+		observerWard ~= nil
+		and (observerInInventory and Fu.CanCastAbility(observerWard) or not observerInInventory)
+		and DotaTime() > 0
+		and DotaTime() > wardModeOffUntil + 1.0
+	then
+		local obj, kind = Ward.GetObjectiveWardSpot(bot)
+		if obj and (not WardMode.IsEnemyCloserToWardLocation(obj.location) or Fu.IsRealInvisible(bot)) then
+			wardSpot = obj
+			if DotaTime() >= (bot._objWardLogAt or -999) + 20 then
+				bot._objWardLogAt = DotaTime()
+				pcall(
+					print,
+					string.format(
+						"[OHA-WARD] t=%.0f %s objective-ward for=%s spot=%d,%d dist=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(kind),
+						math.floor(obj.location.x),
+						math.floor(obj.location.y),
+						math.floor(GetUnitToLocationDistance(bot, obj.location))
+					)
+				)
 			end
 			return BOT_MODE_DESIRE_VERYHIGH
 		end
 	end
-	if h ~= nil and (I and c.CanCastAbility(h) or not I) then
-		local r = d.GetAvailabeObserverWardSpots(b)
-		j = d.GetClosestObserverWardSpot(b, r)
-		if j and (not a.IsEnemyCloserToWardLocation(j.location) or c.IsRealInvisible(b)) then
-			local s = n and not a.IsWardSpotDefensiveOrNearby(j.location)
-			if s then
-			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > d.WalkLimit(j) then
-			elseif DotaTime() < 0 and DotaTime() > (c.IsModeTurbo() and -45 or -60) then
+	if observerWard ~= nil and (observerInInventory and Fu.CanCastAbility(observerWard) or not observerInInventory) then
+		local observerSpots = Ward.GetAvailabeObserverWardSpots(bot)
+		wardSpot = Ward.GetClosestObserverWardSpot(bot, observerSpots)
+		if wardSpot and (not WardMode.IsEnemyCloserToWardLocation(wardSpot.location) or Fu.IsRealInvisible(bot)) then
+			local skipSpot = isHighGroundThreatened and not WardMode.IsWardSpotDefensiveOrNearby(wardSpot.location)
+			if skipSpot then
+			elseif DotaTime() > 0 and GetUnitToLocationDistance(bot, wardSpot.location) > Ward.WalkLimit(wardSpot) then
+			elseif DotaTime() < 0 and DotaTime() > (Fu.IsModeTurbo() and -45 or -60) then
 				return BOT_MODE_DESIRE_ABSOLUTE
-			elseif DotaTime() > k + 1.0 then
+			elseif DotaTime() > wardModeOffUntil + 1.0 then
 				return BOT_MODE_DESIRE_VERYHIGH
 			end
 		end
 	end
-	if i ~= nil and (J and c.CanCastAbility(i) or not J) then
-		local t = d.GetPossibleSentryWardSpots(b)
-		j = d.GetClosestSentryWardSpot(b, t)
-		if j and (not a.IsEnemyCloserToWardLocation(j.location) or c.IsRealInvisible(b)) then
-			local s = n and not a.IsWardSpotDefensiveOrNearby(j.location)
-			if s then
-			elseif DotaTime() > 0 and GetUnitToLocationDistance(b, j.location) > d.WalkLimit(j) then
-			elseif DotaTime() > k + 1.0 then
+	if sentryWard ~= nil and (sentryInInventory and Fu.CanCastAbility(sentryWard) or not sentryInInventory) then
+		local sentrySpots = Ward.GetPossibleSentryWardSpots(bot)
+		wardSpot = Ward.GetClosestSentryWardSpot(bot, sentrySpots)
+		if wardSpot and (not WardMode.IsEnemyCloserToWardLocation(wardSpot.location) or Fu.IsRealInvisible(bot)) then
+			local skipSpot = isHighGroundThreatened and not WardMode.IsWardSpotDefensiveOrNearby(wardSpot.location)
+			if skipSpot then
+			elseif DotaTime() > 0 and GetUnitToLocationDistance(bot, wardSpot.location) > Ward.WalkLimit(wardSpot) then
+			elseif DotaTime() > wardModeOffUntil + 1.0 then
 				return BOT_MODE_DESIRE_VERYHIGH
 			end
 		end
@@ -332,16 +368,16 @@ end
 local function WardCharges()
 	local obs, sen = 0, 0
 	for slot = 0, 8 do
-		local it = b:GetItemInSlot(slot)
-		if it ~= nil then
-			local n0 = it:GetName()
-			if n0 == "item_ward_observer" then
-				obs = obs + (it:GetCurrentCharges() or 0)
-			elseif n0 == "item_ward_sentry" then
-				sen = sen + (it:GetCurrentCharges() or 0)
-			elseif n0 == "item_ward_dispenser" then
-				obs = obs + (it:GetCurrentCharges() or 0)
-				sen = sen + DispenserSentryCharges(it)
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil then
+			local itemName = item:GetName()
+			if itemName == "item_ward_observer" then
+				obs = obs + (item:GetCurrentCharges() or 0)
+			elseif itemName == "item_ward_sentry" then
+				sen = sen + (item:GetCurrentCharges() or 0)
+			elseif itemName == "item_ward_dispenser" then
+				obs = obs + (item:GetCurrentCharges() or 0)
+				sen = sen + DispenserSentryCharges(item)
 			end
 		end
 	end
@@ -349,116 +385,142 @@ local function WardCharges()
 end
 -- Plant tries are no longer printed (ward planting works); kept as a no-op for the call sites.
 local function LogPlantTry(kind, item, loc)
-	if true then
+	if not LOG_PLANT_TRIES then
 		return
 	end
 	local now = DotaTime()
 	local obs, sen = WardCharges()
-	b._wardTry = { at = now, kind = kind, loc = loc, obs = obs, sen = sen }
-	if now < (b._wardTryLogAt or -999) then
+	bot._wardTry = { at = now, kind = kind, loc = loc, obs = obs, sen = sen }
+	if now < (bot._wardTryLogAt or -999) then
 		return
 	end
-	b._wardTryLogAt = now + 1
-	local me = b:GetLocation()
-	pcall(print, string.format(
-		"[OHA-WARD] t=%.0f %s plant-try %s item=%s spot=%.0f,%.0f dist=%d spotPassable=%s me=%.0f,%.0f obs=%d sen=%d",
-		now,
-		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-		kind,
-		item ~= nil and item:GetName() or "?",
-		loc.x,
-		loc.y,
-		GetUnitToLocationDistance(b, loc),
-		tostring(IsLocationPassable(loc)),
-		me.x,
-		me.y,
-		obs,
-		sen
-	))
+	bot._wardTryLogAt = now + 1
+	local myLocation = bot:GetLocation()
+	pcall(
+		print,
+		string.format(
+			"[OHA-WARD] t=%.0f %s plant-try %s item=%s spot=%.0f,%.0f dist=%d spotPassable=%s me=%.0f,%.0f obs=%d sen=%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			kind,
+			item ~= nil and item:GetName() or "?",
+			loc.x,
+			loc.y,
+			GetUnitToLocationDistance(bot, loc),
+			tostring(IsLocationPassable(loc)),
+			myLocation.x,
+			myLocation.y,
+			obs,
+			sen
+		)
+	)
 end
 local function WatchPlant()
-	local t0 = b._wardTry
-	if t0 == nil then
+	local pendingTry = bot._wardTry
+	if pendingTry == nil then
 		return
 	end
-	if DotaTime() - t0.at > 3 then
-		b._wardTry = nil
+	if DotaTime() - pendingTry.at > 3 then
+		bot._wardTry = nil
 		return
 	end
 	local obs, sen = WardCharges()
-	if obs < t0.obs or sen < t0.sen then
-		pcall(print, string.format(
-			"[OHA-WARD] t=%.0f %s planted %s at=%.0f,%.0f",
-			DotaTime(),
-			(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-			obs < t0.obs and "observer" or "sentry",
-			t0.loc.x,
-			t0.loc.y
-		))
-		b._wardTry = nil
+	if obs < pendingTry.obs or sen < pendingTry.sen then
+		pcall(
+			print,
+			string.format(
+				"[OHA-WARD] t=%.0f %s planted %s at=%.0f,%.0f",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				obs < pendingTry.obs and "observer" or "sentry",
+				pendingTry.loc.x,
+				pendingTry.loc.y
+			)
+		)
+		bot._wardTry = nil
 	end
 end
 local function GiveUpWardSpot(why)
 	local now = DotaTime()
-	if j ~= nil then
-		j.plant_time_obs = now
-		j.plant_time_sentry = now
+	if wardSpot ~= nil then
+		wardSpot.plant_time_obs = now
+		wardSpot.plant_time_sentry = now
 	end
-	k = now + 15
-	b._wardAtSpotSince = nil
-	b._wardIdleSince = nil
-	pcall(print, string.format(
-		"[OHA-WARD] t=%.0f %s give-up why=%s spot=%s obs=%s sentry=%s",
-		now,
-		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-		why,
-		j ~= nil and string.format("%.0f,%.0f", j.location.x, j.location.y) or "-",
-		h ~= nil and string.format("%s/slot%d/%s", h:GetName(), b:FindItemSlot(h:GetName()), tostring(c.CanCastAbility(h))) or "-",
-		i ~= nil and string.format("%s/slot%d/%s", i:GetName(), b:FindItemSlot(i:GetName()), tostring(c.CanCastAbility(i))) or "-"
-	))
+	wardModeOffUntil = now + 15
+	bot._wardAtSpotSince = nil
+	bot._wardIdleSince = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-WARD] t=%.0f %s give-up why=%s spot=%s obs=%s sentry=%s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			why,
+			wardSpot ~= nil and string.format("%.0f,%.0f", wardSpot.location.x, wardSpot.location.y) or "-",
+			observerWard ~= nil
+					and string.format(
+						"%s/slot%d/%s",
+						observerWard:GetName(),
+						bot:FindItemSlot(observerWard:GetName()),
+						tostring(Fu.CanCastAbility(observerWard))
+					)
+				or "-",
+			sentryWard ~= nil
+					and string.format(
+						"%s/slot%d/%s",
+						sentryWard:GetName(),
+						bot:FindItemSlot(sentryWard:GetName()),
+						tostring(Fu.CanCastAbility(sentryWard))
+					)
+				or "-"
+		)
+	)
 end
 function Think()
 	if OhaCastGuard ~= nil and OhaCastGuard(GetBot()) then
 		return
 	end
 	DumpWards()
-	if c.CanNotUseAction(b) then
+	if Fu.CanNotUseAction(bot) then
 		return
 	end
-	if j and GetUnitToLocationDistance(b, j.location) <= math.max(f, g) then
-		b._wardAtSpotSince = b._wardAtSpotSince or DotaTime()
-		if DotaTime() - b._wardAtSpotSince >= 5 then
+	if
+		wardSpot
+		and GetUnitToLocationDistance(bot, wardSpot.location) <= math.max(observerCastRange, sentryCastRange)
+	then
+		bot._wardAtSpotSince = bot._wardAtSpotSince or DotaTime()
+		if DotaTime() - bot._wardAtSpotSince >= 5 then
 			GiveUpWardSpot("in-range-no-plant")
 			return
 		end
 	else
-		b._wardAtSpotSince = nil
+		bot._wardAtSpotSince = nil
 	end
 	-- No progress toward the spot for 4s (the path keeps turning back): game 031, -0:16 to -0:03,
 	-- Techies paced 650-700 from the Dire mid spot in sight of the enemy and drew an attack. Within
 	-- 700: plant from here toward it. Farther: give the spot up.
-	if j and j.location then
+	if wardSpot and wardSpot.location then
 		local now = DotaTime()
-		local dist = GetUnitToLocationDistance(b, j.location)
-		local pr = b._wardProgress
-		if pr == nil or pr.spot ~= j or dist < pr.best - 40 then
-			b._wardProgress = { spot = j, best = dist, at = now }
-		elseif now - pr.at >= 4 and dist > math.max(f, g) then
-			b._wardProgress = nil
-			if dist <= 700 and a.PlantShort() then
+		local dist = GetUnitToLocationDistance(bot, wardSpot.location)
+		local progress = bot._wardProgress
+		if progress == nil or progress.spot ~= wardSpot or dist < progress.best - 40 then
+			bot._wardProgress = { spot = wardSpot, best = dist, at = now }
+		elseif now - progress.at >= 4 and dist > math.max(observerCastRange, sentryCastRange) then
+			bot._wardProgress = nil
+			if dist <= 700 and WardMode.PlantShort() then
 				return
 			end
 			GiveUpWardSpot("no-progress")
 			return
 		end
 	end
-	a.WardThinkActed = false
-	a.WardThink()
-	if a.WardThinkActed then
-		b._wardIdleSince = nil
+	WardMode.WardThinkActed = false
+	WardMode.WardThink()
+	if WardMode.WardThinkActed then
+		bot._wardIdleSince = nil
 	else
-		b._wardIdleSince = b._wardIdleSince or DotaTime()
-		if DotaTime() - b._wardIdleSince >= 3 then
+		bot._wardIdleSince = bot._wardIdleSince or DotaTime()
+		if DotaTime() - bot._wardIdleSince >= 3 then
 			GiveUpWardSpot("nothing-to-do")
 		end
 	end
@@ -476,20 +538,23 @@ local function ValidateSpot(spot)
 	if IsLocationPassable(loc) then
 		return
 	end
-	for r = 50, 250, 50 do
-		for k = 0, 11 do
-			local ang = k * math.pi / 6
-			local p0 = Vector(loc.x + math.cos(ang) * r, loc.y + math.sin(ang) * r, loc.z)
-			if IsLocationPassable(p0) then
-				pcall(print, string.format(
-					"[OHA-WARD] t=%.0f spot-moved from=%.0f,%.0f to=%.0f,%.0f (not walkable)",
-					DotaTime(),
-					loc.x,
-					loc.y,
-					p0.x,
-					p0.y
-				))
-				spot.location = p0
+	for radius = 50, 250, 50 do
+		for step = 0, 11 do
+			local angle = step * math.pi / 6
+			local candidate = Vector(loc.x + math.cos(angle) * radius, loc.y + math.sin(angle) * radius, loc.z)
+			if IsLocationPassable(candidate) then
+				pcall(
+					print,
+					string.format(
+						"[OHA-WARD] t=%.0f spot-moved from=%.0f,%.0f to=%.0f,%.0f (not walkable)",
+						DotaTime(),
+						loc.x,
+						loc.y,
+						candidate.x,
+						candidate.y
+					)
+				)
+				spot.location = candidate
 				return
 			end
 		end
@@ -503,22 +568,22 @@ local function MarkEarlyWard(spot)
 	if spot == nil or spot.role ~= "early" or spot.location == nil then
 		return
 	end
-	local t1 = GetTower(GetTeam(), TOWER_MID_1)
-	if t1 == nil or GetUnitToLocationDistance(t1, spot.location) > 3000 then
+	local midTower = GetTower(GetTeam(), TOWER_MID_1)
+	if midTower == nil or GetUnitToLocationDistance(midTower, spot.location) > 3000 then
 		return
 	end
-	local p = b._earlyWardPending
-	if p ~= nil and DotaTime() - p.at < 4 then
+	local pending = bot._earlyWardPending
+	if pending ~= nil and DotaTime() - pending.at < 4 then
 		return
 	end
 	-- Pos 5 only (user call): after the mid observer he walks to our own jungle's bounty spot
 	-- (Radiant's jungle holds the bottom bounty, Dire's the top one), up to 40s. No walk back
 	-- behind the mid T1 any more, for anyone.
-	if c.GetPosition(b) ~= 5 then
+	if Fu.GetPosition(bot) ~= 5 then
 		return
 	end
 	local obs = WardCharges()
-	b._earlyWardPending = {
+	bot._earlyWardPending = {
 		at = DotaTime(),
 		obs = obs,
 		to = GetRuneSpawnLocation(GetTeam() == TEAM_RADIANT and RUNE_BOUNTY_2 or RUNE_BOUNTY_1),
@@ -526,109 +591,121 @@ local function MarkEarlyWard(spot)
 	}
 end
 -- Plant the observer from where he stands, as far toward the spot as the cast range allows.
-function a.PlantShort()
-	if j == nil or h == nil or not c.CanCastAbility(h) then
+function WardMode.PlantShort()
+	if wardSpot == nil or observerWard == nil or not Fu.CanCastAbility(observerWard) then
 		return false
 	end
-	if h:GetName() == "item_ward_dispenser" and not DispenserHasObservers(h) then
+	if observerWard:GetName() == "item_ward_dispenser" and not DispenserHasObservers(observerWard) then
 		return false
 	end
-	local loc = c.Utils.GetOffsetLocationTowardsTargetLocation(b:GetLocation(), j.location, f - 30)
-	pcall(print, string.format(
-		"[OHA-WARD] t=%.0f %s plant-short spot=%.0f,%.0f at=%.0f,%.0f dist=%d",
-		DotaTime(),
-		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
-		j.location.x,
-		j.location.y,
-		loc.x,
-		loc.y,
-		GetUnitToLocationDistance(b, j.location)
-	))
-	pcall(MarkEarlyWard, j)
-	if h:GetName() == "item_ward_observer" then
-		b:Action_UseAbilityOnLocation(h, loc)
+	local loc =
+		Fu.Utils.GetOffsetLocationTowardsTargetLocation(bot:GetLocation(), wardSpot.location, observerCastRange - 30)
+	pcall(
+		print,
+		string.format(
+			"[OHA-WARD] t=%.0f %s plant-short spot=%.0f,%.0f at=%.0f,%.0f dist=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			wardSpot.location.x,
+			wardSpot.location.y,
+			loc.x,
+			loc.y,
+			GetUnitToLocationDistance(bot, wardSpot.location)
+		)
+	)
+	pcall(MarkEarlyWard, wardSpot)
+	if observerWard:GetName() == "item_ward_observer" then
+		bot:Action_UseAbilityOnLocation(observerWard, loc)
 	else
-		DispenserPlant(h, loc, true)
+		DispenserPlant(observerWard, loc, true)
 	end
-	j.plant_time_obs = DotaTime()
+	wardSpot.plant_time_obs = DotaTime()
 	return true
 end
-function a.WardThink()
-	pcall(ValidateSpot, j)
-	if j then
-		if h and c.CanCastAbility(h) and (h:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(h)) then
-			if GetUnitToLocationDistance(b, j.location) <= f then
-				if h:GetName() == "item_ward_observer" then
+function WardMode.WardThink()
+	pcall(ValidateSpot, wardSpot)
+	if wardSpot then
+		if
+			observerWard
+			and Fu.CanCastAbility(observerWard)
+			and (observerWard:GetName() ~= "item_ward_dispenser" or DispenserHasObservers(observerWard))
+		then
+			if GetUnitToLocationDistance(bot, wardSpot.location) <= observerCastRange then
+				if observerWard:GetName() == "item_ward_observer" then
 					AnnounceWard("observer")
-					a.WardThinkActed = true
-					LogPlantTry("observer", h, j.location)
-					pcall(MarkEarlyWard, j)
-					b:Action_UseAbilityOnLocation(h, j.location)
+					WardMode.WardThinkActed = true
+					LogPlantTry("observer", observerWard, wardSpot.location)
+					pcall(MarkEarlyWard, wardSpot)
+					bot:Action_UseAbilityOnLocation(observerWard, wardSpot.location)
 				else
-					a.WardThinkActed = true
-					LogPlantTry("observer", h, j.location)
-					pcall(MarkEarlyWard, j)
-					if DispenserPlant(h, j.location, true) then
+					WardMode.WardThinkActed = true
+					LogPlantTry("observer", observerWard, wardSpot.location)
+					pcall(MarkEarlyWard, wardSpot)
+					if DispenserPlant(observerWard, wardSpot.location, true) then
 						return
 					end
 					AnnounceWard("observer")
 				end
-				j.plant_time_obs = DotaTime()
+				wardSpot.plant_time_obs = DotaTime()
 				return
 			else
-				a.WardThinkActed = true
-				b:Action_MoveToLocation(j.location)
+				WardMode.WardThinkActed = true
+				bot:Action_MoveToLocation(wardSpot.location)
 				return
 			end
 		end
-		if i and c.CanCastAbility(i) and (i:GetName() ~= "item_ward_dispenser" or DispenserSentryCharges(i) > 0) then
-			if GetUnitToLocationDistance(b, j.location) <= g then
-				local u = 0
-				if d.IsOtherWardClose(j.location, "npc_dota_observer_wards", 300, true, false) then
-					u = 30
+		if
+			sentryWard
+			and Fu.CanCastAbility(sentryWard)
+			and (sentryWard:GetName() ~= "item_ward_dispenser" or DispenserSentryCharges(sentryWard) > 0)
+		then
+			if GetUnitToLocationDistance(bot, wardSpot.location) <= sentryCastRange then
+				local scatterRadius = 0
+				if Ward.IsOtherWardClose(wardSpot.location, "npc_dota_observer_wards", 300, true, false) then
+					scatterRadius = 30
 				end
 				-- A dispenser: plant through DispenserPlant (cast, watch the charges, toggle only
 				-- when the cast did nothing or planted the wrong kind). The old rule took toggle
 				-- state true as observer mode, toggled, waited 0.8s and gave the spot up: game 019,
 				-- 14:48-15:26, Techies kept switching a dispenser that held 0 observers and 2
 				-- sentries. Which state means which mode is not documented.
-				if i:GetName() == "item_ward_dispenser" then
-					a.WardThinkActed = true
-					LogPlantTry("sentry", i, j.location)
-					if DispenserPlant(i, j.location, false) then
+				if sentryWard:GetName() == "item_ward_dispenser" then
+					WardMode.WardThinkActed = true
+					LogPlantTry("sentry", sentryWard, wardSpot.location)
+					if DispenserPlant(sentryWard, wardSpot.location, false) then
 						return
 					end
 					AnnounceWard("sentry")
-					j.plant_time_sentry = DotaTime()
+					wardSpot.plant_time_sentry = DotaTime()
 					return
 				end
-				b._wardToggleAt = nil
+				bot._wardToggleAt = nil
 				AnnounceWard("sentry")
-				a.WardThinkActed = true
-				LogPlantTry("sentry", i, j.location)
-				b:Action_UseAbilityOnLocation(i, j.location + RandomVector(u))
-				j.plant_time_sentry = DotaTime()
+				WardMode.WardThinkActed = true
+				LogPlantTry("sentry", sentryWard, wardSpot.location)
+				bot:Action_UseAbilityOnLocation(sentryWard, wardSpot.location + RandomVector(scatterRadius))
+				wardSpot.plant_time_sentry = DotaTime()
 				return
 			else
-				a.WardThinkActed = true
-				b:Action_MoveToLocation(j.location)
+				WardMode.WardThinkActed = true
+				bot:Action_MoveToLocation(wardSpot.location)
 				return
 			end
 		end
 	end
 end
-function a.IsSuitableToWard()
-	local v = b:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
-	local w = b:GetActiveMode()
-	local x = b:GetActiveModeDesire()
+function WardMode.IsSuitableToWard()
+	local enemyHeroes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
+	local botMode = bot:GetActiveMode()
+	local modeDesire = bot:GetActiveModeDesire()
 	if
-		c.IsRetreating(b) and x > 0.75
-		or w == BOT_MODE_RUNE and DotaTime() > 0
-		or w == BOT_MODE_DEFEND_ALLY
-		or v ~= nil and #v >= 1 and a.IsIBecameTheTarget(v)
-		or c.IsDefending(b)
-		or c.IsGoingOnSomeone(b)
-		or b:WasRecentlyDamagedByAnyHero(5.0)
+		Fu.IsRetreating(bot) and modeDesire > 0.75
+		or botMode == BOT_MODE_RUNE and DotaTime() > 0
+		or botMode == BOT_MODE_DEFEND_ALLY
+		or enemyHeroes ~= nil and #enemyHeroes >= 1 and WardMode.IsIBecameTheTarget(enemyHeroes)
+		or Fu.IsDefending(bot)
+		or Fu.IsGoingOnSomeone(bot)
+		or bot:WasRecentlyDamagedByAnyHero(5.0)
 	then
 		return false
 	end
@@ -638,21 +715,25 @@ function a.IsSuitableToWard()
 	-- heroes within 1200, or toward a spot on the enemy's side of the river with an enemy hero
 	-- within 1000 of it.
 	local foes = 0
-	for _, e0 in pairs(v or {}) do
-		if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) then
+	for _, enemyHero in pairs(enemyHeroes or {}) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
 			foes = foes + 1
 		end
 	end
-	local friends = #(b:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
+	local friends = #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
 	if foes >= 1 and foes > friends then
 		return false
 	end
-	local spot = j
+	local spot = wardSpot
 	if spot ~= nil and spot.location ~= nil then
-		local ours = GetTeam() == TEAM_RADIANT and "radiant" or "dire"
-		if spot.side ~= nil and spot.side ~= ours then
-			for _, e0 in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
-				if c.IsValidHero(e0) and e0:CanBeSeen() and GetUnitToLocationDistance(e0, spot.location) <= 1000 then
+		local ourSide = GetTeam() == TEAM_RADIANT and "radiant" or "dire"
+		if spot.side ~= nil and spot.side ~= ourSide then
+			for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+				if
+					Fu.IsValidHero(enemyHero)
+					and enemyHero:CanBeSeen()
+					and GetUnitToLocationDistance(enemyHero, spot.location) <= 1000
+				then
 					return false
 				end
 			end
@@ -660,41 +741,41 @@ function a.IsSuitableToWard()
 	end
 	return true
 end
-function a.IsIBecameTheTarget(y)
-	for z, A in pairs(y) do
-		if c.IsValid(A) and not c.IsSuspiciousIllusion(A) and A:GetAttackTarget() == b then
+function WardMode.IsIBecameTheTarget(enemyHeroes)
+	for _, enemyHero in pairs(enemyHeroes) do
+		if Fu.IsValid(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and enemyHero:GetAttackTarget() == bot then
 			return true
 		end
 	end
 	return false
 end
-function a.IsWardSpotDefensiveOrNearby(B)
-	if GetUnitToLocationDistance(b, B) <= 1500 then
+function WardMode.IsWardSpotDefensiveOrNearby(location)
+	if GetUnitToLocationDistance(bot, location) <= 1500 then
 		return true
 	end
-	local C = GetAncient(GetTeam())
-	if C and C:IsAlive() then
-		local D = c.GetDistance(C:GetLocation(), B)
-		if D <= 3500 then
+	local ancient = GetAncient(GetTeam())
+	if ancient and ancient:IsAlive() then
+		local distance = Fu.GetDistance(ancient:GetLocation(), location)
+		if distance <= 3500 then
 			return true
 		end
 	end
 	return false
 end
-function a.IsEnemyCloserToWardLocation(B)
-	for z, E in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		if IsHeroAlive(E) then
-			local F = GetHeroLastSeenInfo(E)
-			if F ~= nil then
-				local G = F[1]
+function WardMode.IsEnemyCloserToWardLocation(location)
+	for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+		if IsHeroAlive(playerId) then
+			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+			if lastSeenInfo ~= nil then
+				local lastSeen = lastSeenInfo[1]
 				if
-					G ~= nil
-					and G.time_since_seen < 3.0
-					and c.GetDistance(G.location, B) < GetUnitToLocationDistance(b, B)
+					lastSeen ~= nil
+					and lastSeen.time_since_seen < 3.0
+					and Fu.GetDistance(lastSeen.location, location) < GetUnitToLocationDistance(bot, location)
 				then
-					local H = c.GetAlliesNearLoc(B, 1200)
-					local v = c.GetEnemiesNearLoc(B, 1200)
-					if #v > #H then
+					local alliesNear = Fu.GetAlliesNearLoc(location, 1200)
+					local enemiesNear = Fu.GetEnemiesNearLoc(location, 1200)
+					if #enemiesNear > #alliesNear then
 						return true
 					end
 				end
@@ -704,12 +785,12 @@ function a.IsEnemyCloserToWardLocation(B)
 	return false
 end
 if SafeCall then
-	local I = GetDesire
-	local J = Think
-	if I then
-		GetDesire = SafeCall(I, 0, "WARD_GetDesire")
+	local originalGetDesire = GetDesire
+	local originalThink = Think
+	if originalGetDesire then
+		GetDesire = SafeCall(originalGetDesire, 0, "WARD_GetDesire")
 	end
-	if J then
-		Think = SafeCall(J, nil, "WARD_Think")
+	if originalThink then
+		Think = SafeCall(originalThink, nil, "WARD_Think")
 	end
 end

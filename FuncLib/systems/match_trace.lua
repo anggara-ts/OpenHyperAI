@@ -168,15 +168,15 @@ function MatchTrace.PerfSample(label, elapsedSec)
 		return
 	end
 	local ms = elapsedSec * 1000.0
-	local s = perfStats[label]
-	if s == nil then
-		s = { n = 0, sum = 0, max = 0 }
-		perfStats[label] = s
+	local stats = perfStats[label]
+	if stats == nil then
+		stats = { n = 0, sum = 0, max = 0 }
+		perfStats[label] = stats
 	end
-	s.n = s.n + 1
-	s.sum = s.sum + ms
-	if ms > s.max then
-		s.max = ms
+	stats.n = stats.n + 1
+	stats.sum = stats.sum + ms
+	if ms > stats.max then
+		stats.max = ms
 	end
 	if ms >= PERF_SPIKE_MS then
 		print(string.format("[OHA-PERF spike] %s %.2fms t=%.1f", tostring(label), ms, DotaTime()))
@@ -185,34 +185,33 @@ function MatchTrace.PerfSample(label, elapsedSec)
 	if now >= perfNextReport then
 		perfNextReport = now + PERF_REPORT_EVERY
 		local rows = {}
-		for name, st in pairs(perfStats) do
-			if st.n > 0 then
+		for name, stat in pairs(perfStats) do
+			if stat.n > 0 then
 				rows[#rows + 1] = {
 					name = name,
-					avg = st.sum / st.n,
-					max = st.max,
-					n = st.n,
-					sum = st.sum,
+					avg = stat.sum / stat.n,
+					max = stat.max,
+					n = stat.n,
+					sum = stat.sum,
 				}
 			end
 		end
-		table.sort(rows, function(a, b)
-			return a.sum > b.sum
+		table.sort(rows, function(rowA, rowB)
+			return rowA.sum > rowB.sum
 		end)
 		local parts = {}
 		for i = 1, math.min(8, #rows) do
-			local r = rows[i]
-			parts[#parts + 1] =
-				string.format("%s avg=%.2f max=%.2f n=%d", r.name, r.avg, r.max, r.n)
+			local row = rows[i]
+			parts[#parts + 1] = string.format("%s avg=%.2f max=%.2f n=%d", row.name, row.avg, row.max, row.n)
 		end
 		if #parts > 0 then
 			print(string.format("[OHA-PERF top] t=%.1f %s", DotaTime(), table.concat(parts, " | ")))
 		end
 		-- Soft reset max so spikes stay meaningful; keep avg over window via sum/n reset.
-		for _, st in pairs(perfStats) do
-			st.n = 0
-			st.sum = 0
-			st.max = 0
+		for _, stat in pairs(perfStats) do
+			stat.n = 0
+			stat.sum = 0
+			stat.max = 0
 		end
 	end
 end
@@ -222,15 +221,15 @@ function MatchTrace.PerfWrap(label, fn, fallback)
 		return fn
 	end
 	return function(...)
-		local t0 = RealTime and RealTime() or nil
-		local ok, a, b, c = pcall(fn, ...)
-		if t0 ~= nil then
-			MatchTrace.PerfSample(label, (RealTime() - t0))
+		local startTime = RealTime and RealTime() or nil
+		local ok, result1, result2, result3 = pcall(fn, ...)
+		if startTime ~= nil then
+			MatchTrace.PerfSample(label, (RealTime() - startTime))
 		end
 		if ok then
-			return a, b, c
+			return result1, result2, result3
 		end
-		print(string.format("[OHA-PERF err] %s %s", tostring(label), tostring(a)))
+		print(string.format("[OHA-PERF err] %s %s", tostring(label), tostring(result1)))
 		return fallback
 	end
 end
@@ -239,13 +238,7 @@ function MatchTrace.Event(bot, kind, detail)
 	if not enabled or bot == nil then
 		return
 	end
-	local line = string.format(
-		"[OHA-DEV %s] t=%.1f %s %s",
-		kind,
-		DotaTime(),
-		HeroTag(bot),
-		detail or ""
-	)
+	local line = string.format("[OHA-DEV %s] t=%.1f %s %s", kind, DotaTime(), HeroTag(bot), detail or "")
 	print(line)
 	WriteFile(bot, line)
 end
@@ -278,13 +271,7 @@ function MatchTrace.Item(bot, itemName, reason, detail)
 end
 
 function MatchTrace.Buy(bot, itemName, detail)
-	MatchTrace.Decide(
-		bot,
-		"buy",
-		itemName,
-		string.format("%s %s", tostring(itemName), detail or ""),
-		0.5
-	)
+	MatchTrace.Decide(bot, "buy", itemName, string.format("%s %s", tostring(itemName), detail or ""), 0.5)
 end
 
 local function StandingStillOk(bot, mode)
@@ -308,8 +295,8 @@ end
 
 local function Lineup(team)
 	local names = {}
-	for _, pid in ipairs(GetTeamPlayers(team) or {}) do
-		local name = string.gsub(GetSelectedHeroName(pid) or "", "npc_dota_hero_", "")
+	for _, playerId in ipairs(GetTeamPlayers(team) or {}) do
+		local name = string.gsub(GetSelectedHeroName(playerId) or "", "npc_dota_hero_", "")
 		names[#names + 1] = name ~= "" and name or "?"
 	end
 	return table.concat(names, ",")
@@ -320,14 +307,16 @@ function MatchTrace.MatchMarker(phase, detail)
 		return
 	end
 	markerSent[phase] = true
-	print(string.format(
-		"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
-		phase,
-		TeamTag(GetTeam()),
-		DotaTime(),
-		version,
-		detail or ""
-	))
+	print(
+		string.format(
+			"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
+			phase,
+			TeamTag(GetTeam()),
+			DotaTime(),
+			version,
+			detail or ""
+		)
+	)
 end
 
 local function AncientDead(team)
@@ -336,21 +325,18 @@ local function AncientDead(team)
 end
 
 function MatchTrace.Markers()
-	MatchTrace.MatchMarker(
-		"game",
-		string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE))
-	)
+	MatchTrace.MatchMarker("game", string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE)))
 	if markerSent["end"] or DotaTime() < nextEndCheck then
 		return
 	end
 	nextEndCheck = DotaTime() + 1
-	local gs = GetGameState()
-	if gs ~= GAME_STATE_GAME_IN_PROGRESS and gs ~= GAME_STATE_POST_GAME then
+	local gameState = GetGameState()
+	if gameState ~= GAME_STATE_GAME_IN_PROGRESS and gameState ~= GAME_STATE_POST_GAME then
 		return
 	end
 	local radiantDead = AncientDead(TEAM_RADIANT)
 	local direDead = AncientDead(TEAM_DIRE)
-	if gs ~= GAME_STATE_POST_GAME and not radiantDead and not direDead then
+	if gameState ~= GAME_STATE_POST_GAME and not radiantDead and not direDead then
 		return
 	end
 	local winner = "unknown"
@@ -371,9 +357,9 @@ end
 local function DeathSnap(bot, now)
 	local enemies = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
 	local names = {}
-	for _, e in ipairs(enemies) do
-		if e ~= nil and e:IsHero() and not e:IsIllusion() then
-			names[#names + 1] = (string.gsub(e:GetUnitName(), "npc_dota_hero_", ""))
+	for _, enemy in ipairs(enemies) do
+		if enemy ~= nil and enemy:IsHero() and not enemy:IsIllusion() then
+			names[#names + 1] = (string.gsub(enemy:GetUnitName(), "npc_dota_hero_", ""))
 		end
 	end
 	local loc = bot:GetLocation()
@@ -390,35 +376,35 @@ local function DeathSnap(bot, now)
 		hit = bot:WasRecentlyDamagedByAnyHero(1.0),
 	}
 end
-local function SnapText(s, now)
-	if s == nil then
+local function SnapText(snap, now)
+	if snap == nil then
 		return "-"
 	end
 	return string.format(
 		"%.1fs-ago mode=%s/%.2f hp=%.2f xy=%d,%d fountain=%d allies=%d enemies=%d(%s)%s",
-		now - s.t,
-		ModeName(s.mode),
-		s.desire,
-		s.hp,
-		s.x,
-		s.y,
-		s.fountain,
-		s.allies,
-		#s.enemies,
-		table.concat(s.enemies, ","),
-		s.hit and " hit" or ""
+		now - snap.t,
+		ModeName(snap.mode),
+		snap.desire,
+		snap.hp,
+		snap.x,
+		snap.y,
+		snap.fountain,
+		snap.allies,
+		#snap.enemies,
+		table.concat(snap.enemies, ","),
+		snap.hit and " hit" or ""
 	)
 end
 local function DeathWatch(bot)
 	local now = DotaTime()
-	local w = bot._deathWatch
-	if w == nil then
-		w = { count = GetHeroDeaths(bot:GetPlayerID()) or 0, snaps = {}, nextSnap = now }
-		bot._deathWatch = w
+	local watch = bot._deathWatch
+	if watch == nil then
+		watch = { count = GetHeroDeaths(bot:GetPlayerID()) or 0, snaps = {}, nextSnap = now }
+		bot._deathWatch = watch
 	end
 	local count = GetHeroDeaths(bot:GetPlayerID()) or 0
-	if count > w.count then
-		local snaps = w.snaps
+	if count > watch.count then
+		local snaps = watch.snaps
 		local last = snaps[#snaps]
 		local before = nil
 		for i = #snaps, 1, -1 do
@@ -431,21 +417,24 @@ local function DeathWatch(bot)
 		-- 12-18s late). t= is the last snapshot taken alive (within 0.5s of the death), and the
 		-- snapshot ages are counted from there.
 		local diedAt = last ~= nil and last.t or now
-		pcall(print, string.format(
-			"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
-			diedAt,
-			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-			count,
-			now,
-			SnapText(last, diedAt),
-			SnapText(before, diedAt)
-		))
-		w.count = count
-		w.snaps = {}
+		pcall(
+			print,
+			string.format(
+				"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
+				diedAt,
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				count,
+				now,
+				SnapText(last, diedAt),
+				SnapText(before, diedAt)
+			)
+		)
+		watch.count = count
+		watch.snaps = {}
 	end
-	if bot:IsAlive() and now >= w.nextSnap then
-		w.nextSnap = now + 0.5
-		local snaps = w.snaps
+	if bot:IsAlive() and now >= watch.nextSnap then
+		watch.nextSnap = now + 0.5
+		local snaps = watch.snaps
 		snaps[#snaps + 1] = DeathSnap(bot, now)
 		if #snaps > 12 then
 			table.remove(snaps, 1)
@@ -486,20 +475,11 @@ function MatchTrace.Tick(bot)
 	if not state.started then
 		state.started = true
 		local path = MatchTrace.LogPath(bot)
-		MatchTrace.Event(
-			bot,
-			"start",
-			string.format(
-				"version=%s verbose=%s file=%s",
-				version,
-				tostring(verbose),
-				path
-			)
-		)
+		MatchTrace.Event(bot, "start", string.format("version=%s verbose=%s file=%s", version, tostring(verbose), path))
 	end
 	-- Post-game end marker (once).
-	local gs = GetGameState()
-	if gs == GAME_STATE_POST_GAME and not state.ended then
+	local gameState = GetGameState()
+	if gameState == GAME_STATE_POST_GAME and not state.ended then
 		state.ended = true
 		MatchTrace.Event(bot, "end", "game_over")
 		return

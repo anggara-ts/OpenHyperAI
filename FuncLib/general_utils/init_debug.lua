@@ -1,206 +1,210 @@
 -- Shared helper: init debug.
-local function a(b)
-	local c = 1 == 10
-	function b.SetUserHeroInit(d, e, f, g)
-		local h = GetBot()
-		local i = h:GetUnitName()
-		local j, k = "game/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", ""), nil
+local function installDebugHelpers(Fu)
+	local isDebugEnabled = 1 == 10
+	function Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, sBuyList, sSellList)
+		local bot = GetBot()
+		local heroName = bot:GetUnitName()
+		local modulePath, heroConfig = "game/Customize/hero/" .. string.gsub(heroName, "npc_dota_hero_", ""), nil
 		-- The handlers only keep the message. Logging from inside them showed up as
 		-- "Script Runtime Error: error in error handling" for every bot at -89s (a per-hero
 		-- Customize file is optional, so a failed require is normal).
 		local loadErr = nil
-		local l, m = xpcall(function()
-			k = require(j)
-		end, function(n)
-			loadErr = n
-			return n
+		local loaded = xpcall(function()
+			heroConfig = require(modulePath)
+		end, function(err)
+			loadErr = err
+			return err
 		end)
-		if not (l and k) then
-			j = GetScriptDirectory() .. "/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", "")
-			l, m = xpcall(function()
-				k = require(j)
-			end, function(n)
-				loadErr = n
-				return n
+		if not (loaded and heroConfig) then
+			modulePath = GetScriptDirectory() .. "/Customize/hero/" .. string.gsub(heroName, "npc_dota_hero_", "")
+			loaded = xpcall(function()
+				heroConfig = require(modulePath)
+			end, function(err)
+				loadErr = err
+				return err
 			end)
 		end
-		if not (l and k) and loadErr ~= nil then
-			pcall(log, "[WARN] No customized hero file for %s: %s", i, tostring(loadErr))
+		if not (loaded and heroConfig) and loadErr ~= nil then
+			pcall(log, "[WARN] No customized hero file for %s: %s", heroName, tostring(loadErr))
 		end
-		if l and k and k.Enable then
-			d = k.AbilityUpgrade
-			e = b.GetTalentBuildList(k.Talent)
-			f = k.PurchaseList
-			g = k.SellList
-		elseif type(f) == "table" then
+		if loaded and heroConfig and heroConfig.Enable then
+			nAbilityBuildList = heroConfig.AbilityUpgrade
+			nTalentBuildList = Fu.GetTalentBuildList(heroConfig.Talent)
+			sBuyList = heroConfig.PurchaseList
+			sSellList = heroConfig.SellList
+		elseif type(sBuyList) == "table" then
 			local ok, applied = pcall(function()
-				return require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").ApplyTeamItems(h, f)
+				return require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").ApplyTeamItems(bot, sBuyList)
 			end)
 			if ok and type(applied) == "table" then
-				f = applied
+				sBuyList = applied
 			else
-				log("[WARN] Team item plan failed for %s: %s", i, tostring(applied))
+				log("[WARN] Team item plan failed for %s: %s", heroName, tostring(applied))
 				local kept = {}
-				for q = 1, #f do
-					if f[q] ~= "item_team_aura" then
-						kept[#kept + 1] = f[q]
+				for i = 1, #sBuyList do
+					if sBuyList[i] ~= "item_team_aura" then
+						kept[#kept + 1] = sBuyList[i]
 					end
 				end
-				f = kept
+				sBuyList = kept
 			end
 		end
-		return d, e, f, g
+		return nAbilityBuildList, nTalentBuildList, sBuyList, sSellList
 	end
-	function b.GetTalentBuildList(o)
-		local p = {}
-		for q = 1, #o do
-			local r = o[q] == "l" and 10 or 0
-			if r == 10 then
-				p[#p + 1] = q * 2
+	function Fu.GetTalentBuildList(talentList)
+		local talentBuild = {}
+		for i = 1, #talentList do
+			local talentChoice = talentList[i] == "l" and 10 or 0
+			if talentChoice == 10 then
+				talentBuild[#talentBuild + 1] = i * 2
 			else
-				p[#p + 1] = q * 2 - 1
+				talentBuild[#talentBuild + 1] = i * 2 - 1
 			end
 		end
-		for q = 1, #o do
-			local r = o[q] == "r" and 10 or 0
-			if r ~= 10 then
-				p[#p + 1] = q * 2
+		for i = 1, #talentList do
+			local talentChoice = talentList[i] == "r" and 10 or 0
+			if talentChoice ~= 10 then
+				talentBuild[#talentBuild + 1] = i * 2
 			else
-				p[#p + 1] = q * 2 - 1
+				talentBuild[#talentBuild + 1] = i * 2 - 1
 			end
 		end
-		return p
+		return talentBuild
 	end
-	function b.SetBotPrint(s, t, u, v)
-		local h = GetBot()
-		local w = b.GetOne(DotaTime() / 10) * 10
-		local x = b.GetOne(w / 600) * 10 .. ":" .. w % 60
-		local y = GetTeam() == TEAM_DIRE and "夜魇" or "天辉"
-		if c then
-			log("%s%s %s %s", y, x, b.Chat.GetNormName(h), s)
-			if u then
-				h:ActionImmediate_Chat(x .. "_" .. s, true)
+	function Fu.SetBotPrint(message, location, shouldChat, shouldPing)
+		local bot = GetBot()
+		local roundedTime = Fu.GetOne(DotaTime() / 10) * 10
+		local clockText = Fu.GetOne(roundedTime / 600) * 10 .. ":" .. roundedTime % 60
+		local teamName = GetTeam() == TEAM_DIRE and "夜魇" or "天辉"
+		if isDebugEnabled then
+			log("%s%s %s %s", teamName, clockText, Fu.Chat.GetNormName(bot), message)
+			if shouldChat then
+				bot:ActionImmediate_Chat(clockText .. "_" .. message, true)
 			end
-			if v then
-				h:ActionImmediate_Ping(t.x, t.y, false)
+			if shouldPing then
+				bot:ActionImmediate_Ping(location.x, location.y, false)
 			end
 		end
 	end
-	function b.SetReportMotive(z, A)
-		if c and z and A ~= nil then
-			local w = b.GetOne(DotaTime() / 10) * 10
-			local x = b.GetOne(w / 600) * 10 .. ":" .. w % 60
-			local y = GetTeam() == TEAM_DIRE and "夜魇 " or "天辉 "
-			GetBot():ActionImmediate_Chat(x .. "_" .. A, true)
-			log("%s%s %s %s", y, x, b.Chat.GetNormName(GetBot()), A)
+	function Fu.SetReportMotive(shouldReport, motive)
+		if isDebugEnabled and shouldReport and motive ~= nil then
+			local roundedTime = Fu.GetOne(DotaTime() / 10) * 10
+			local clockText = Fu.GetOne(roundedTime / 600) * 10 .. ":" .. roundedTime % 60
+			local teamName = GetTeam() == TEAM_DIRE and "夜魇 " or "天辉 "
+			GetBot():ActionImmediate_Chat(clockText .. "_" .. motive, true)
+			log("%s%s %s %s", teamName, clockText, Fu.Chat.GetNormName(GetBot()), motive)
 		end
 	end
-	function b.IsStuck(h)
-		if h.stuckLoc ~= nil and h.stuckTime ~= nil and h:CanBeSeen() then
-			local B = h:GetAttackTarget()
-			local C = GetUnitToUnitDistance(h, GetAncient(GetOpposingTeam()))
-			local D = GetUnitToUnitDistance(h, GetAncient(GetTeam()))
-			local E = h:GetNearbyTowers(450, true)
-			local F = h:GetNearbyTowers(450, false)
+	function Fu.IsStuck(bot)
+		if bot.stuckLoc ~= nil and bot.stuckTime ~= nil and bot:CanBeSeen() then
+			local attackTarget = bot:GetAttackTarget()
+			local distanceToEnemyAncient = GetUnitToUnitDistance(bot, GetAncient(GetOpposingTeam()))
+			local distanceToOurAncient = GetUnitToUnitDistance(bot, GetAncient(GetTeam()))
+			local enemyTowers = bot:GetNearbyTowers(450, true)
+			local allyTowers = bot:GetNearbyTowers(450, false)
 			if
-				h:GetCurrentActionType() == BOT_ACTION_TYPE_MOVE_TO
-				and B == nil
-				and C > 2200
-				and D > 2200
-				and #E == 0
-				and #F == 0
-				and DotaTime() > h.stuckTime + 5.0
-				and GetUnitToLocationDistance(h, h.stuckLoc) < 25
+				bot:GetCurrentActionType() == BOT_ACTION_TYPE_MOVE_TO
+				and attackTarget == nil
+				and distanceToEnemyAncient > 2200
+				and distanceToOurAncient > 2200
+				and #enemyTowers == 0
+				and #allyTowers == 0
+				and DotaTime() > bot.stuckTime + 5.0
+				and GetUnitToLocationDistance(bot, bot.stuckLoc) < 25
 			then
-				log("%s is stuck", h:GetUnitName())
+				log("%s is stuck", bot:GetUnitName())
 				return true
 			end
 		end
 		return false
 	end
-	local G = 5
-	local H = 30
-	local I = {}
-	function b.CheckBotIdleState()
+	local idleCheckInterval = 5
+	local idleDistance = 30
+	local idleStates = {}
+	function Fu.CheckBotIdleState()
 		if DotaTime() <= 0 then
 			return false
 		end
-		local h = GetBot()
-		if not h:IsAlive() then
+		local bot = GetBot()
+		if not bot:IsAlive() then
 			return false
 		end
-		local i = h:GetUnitName()
-		local J = h:GetPlayerID()
-		local K = h:GetActiveMode()
-		local L = I[J]
-		if L then
-			if DotaTime() - L.lastCheckTime >= G then
-				local M = b.GetLocationToLocationDistance(L.botLocation, h:GetLocation())
-				if not b.IsTryingtoUseAbility(h) and not b.IsAttacking(h) and M <= H then
-					L.idleCount = L.idleCount + 1
-					if h:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE or K == BOT_MODE_ITEM or K == BOT_MODE_FARM then
-						local N = h:NumQueuedActions()
-						if N > 0 then
-							for q = 1, N do
-								local O = h:GetQueuedActionType(q)
-								log("Bot %s has enqueued actions i=%s, type=%s", i, q, O)
+		local heroName = bot:GetUnitName()
+		local playerId = bot:GetPlayerID()
+		local activeMode = bot:GetActiveMode()
+		local idleState = idleStates[playerId]
+		if idleState then
+			if DotaTime() - idleState.lastCheckTime >= idleCheckInterval then
+				local movedDistance = Fu.GetLocationToLocationDistance(idleState.botLocation, bot:GetLocation())
+				if not Fu.IsTryingtoUseAbility(bot) and not Fu.IsAttacking(bot) and movedDistance <= idleDistance then
+					idleState.idleCount = idleState.idleCount + 1
+					if
+						bot:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE
+						or activeMode == BOT_MODE_ITEM
+						or activeMode == BOT_MODE_FARM
+					then
+						local queuedCount = bot:NumQueuedActions()
+						if queuedCount > 0 then
+							for i = 1, queuedCount do
+								local actionType = bot:GetQueuedActionType(i)
+								log("Bot %s has enqueued actions i=%s, type=%s", heroName, i, actionType)
 							end
 						end
-						h:Action_ClearActions(true)
-						local P = GetLaneFrontLocation(GetTeam(), h:GetAssignedLane(), 0)
-						h:ActionQueue_AttackMove(P)
+						bot:Action_ClearActions(true)
+						local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
+						bot:ActionQueue_AttackMove(laneFront)
 						log(
 							"[ERROR] Relocating the idle bot: %s. Sending it to the lane# it was originally assigned: %s",
-							i,
-							h:GetAssignedLane()
+							heroName,
+							bot:GetAssignedLane()
 						)
 					else
-						log("Bot %s is in idle state for unknown reasons. N/A.", i)
+						log("Bot %s is in idle state for unknown reasons. N/A.", heroName)
 					end
 					return true
 				else
-					L.idleCount = 0
+					idleState.idleCount = 0
 				end
-				L.botLocation = h:GetLocation()
-				L.lastCheckTime = DotaTime()
+				idleState.botLocation = bot:GetLocation()
+				idleState.lastCheckTime = DotaTime()
 			end
 		else
-			local Q = { botLocation = h:GetLocation(), lastCheckTime = DotaTime(), idleCount = 0 }
-			I[J] = Q
+			local newState = { botLocation = bot:GetLocation(), lastCheckTime = DotaTime(), idleCount = 0 }
+			idleStates[playerId] = newState
 		end
 		return false
 	end
-	function b.IsStaleARDMHero(R, S)
+	function Fu.IsStaleARDMHero(hero, heroName)
 		if GetGameMode() ~= GAMEMODE_ARDM then
-			return false, R, S
+			return false, hero, heroName
 		end
-		local T = GetBot()
-		local U = T:GetUnitName()
-		local V = R:GetPlayerID()
-		if U ~= S and T ~= R then
-			return true, T, U
+		local bot = GetBot()
+		local currentName = bot:GetUnitName()
+		local playerId = hero:GetPlayerID()
+		if currentName ~= heroName and bot ~= hero then
+			return true, bot, currentName
 		end
-		if V >= 0 and IsHeroAlive(V) and not R:IsAlive() then
-			if U ~= S then
-				return true, T, U
+		if playerId >= 0 and IsHeroAlive(playerId) and not hero:IsAlive() then
+			if currentName ~= heroName then
+				return true, bot, currentName
 			end
 		end
-		return false, T, U
+		return false, bot, currentName
 	end
-	function b.ModeAnnounce(h, W, X)
-		local Y = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
-		if h.lastModeChatTime == nil then
-			h.lastModeChatTime = {}
+	function Fu.ModeAnnounce(bot, modeKey, cooldown)
+		local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+		if bot.lastModeChatTime == nil then
+			bot.lastModeChatTime = {}
 		end
-		local Z = h.lastModeChatTime[W] or -999
-		if GameTime() - Z < (X or 30) then
+		local lastChatTime = bot.lastModeChatTime[modeKey] or -999
+		if GameTime() - lastChatTime < (cooldown or 30) then
 			return
 		end
-		h.lastModeChatTime[W] = GameTime()
-		local _ = Y.Get(W)
-		if _ ~= nil and #_ > 0 then
-			h:ActionImmediate_Chat(_[RandomInt(1, #_)], false)
+		bot.lastModeChatTime[modeKey] = GameTime()
+		local lines = Localization.Get(modeKey)
+		if lines ~= nil and #lines > 0 then
+			bot:ActionImmediate_Chat(lines[RandomInt(1, #lines)], false)
 		end
 	end
 end
-return a
+return installDebugHelpers

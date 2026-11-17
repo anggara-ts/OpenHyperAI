@@ -1,6 +1,6 @@
 -- Lookup table: spell prob list.
-local a = {}
-local b = {
+local SpellProbList = {}
+local spellReplaceWeights = {
 	abaddon_death_coil = 0.8,
 	abaddon_aphotic_shield = 0.8,
 	abyssal_underlord_firestorm = 0.5,
@@ -107,7 +107,7 @@ local b = {
 	monkey_king_transfiguration = 0.9,
 	faceless_void_time_zone = 0.4,
 }
-function a.GetSpellReplaceWeight(c)
-	return b[c] or 1
+function SpellProbList.GetSpellReplaceWeight(abilityName)
+	return spellReplaceWeights[abilityName] or 1
 end
-return a
+return SpellProbList

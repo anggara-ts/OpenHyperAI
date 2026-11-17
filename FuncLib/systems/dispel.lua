@@ -1,76 +1,76 @@
 -- Shared bot system: dispel.
-local function a(b)
-	local c = {}
-	local d = 0
-	for e in pairs(b) do
-		d = d + 1
-		c[d] = { e, b[e] }
+local function objectEntries(object)
+	local result = {}
+	local count = 0
+	for key in pairs(object) do
+		count = count + 1
+		result[count] = { key, object[key] }
 	end
-	return c
+	return result
 end
-local f, g
+local createSymbol, Symbol
 do
-	local h = {
+	local symbolMetatable = {
 		__tostring = function(self)
 			return ("Symbol(" .. (self.description or "")) .. ")"
 		end,
 	}
-	function f(i)
-		return setmetatable({ description = i }, h)
+	function createSymbol(description)
+		return setmetatable({ description = description }, symbolMetatable)
 	end
-	g = {
-		asyncDispose = f("Symbol.asyncDispose"),
-		dispose = f("Symbol.dispose"),
-		iterator = f("Symbol.iterator"),
-		hasInstance = f("Symbol.hasInstance"),
-		species = f("Symbol.species"),
-		toStringTag = f("Symbol.toStringTag"),
+	Symbol = {
+		asyncDispose = createSymbol("Symbol.asyncDispose"),
+		dispose = createSymbol("Symbol.dispose"),
+		iterator = createSymbol("Symbol.iterator"),
+		hasInstance = createSymbol("Symbol.hasInstance"),
+		species = createSymbol("Symbol.species"),
+		toStringTag = createSymbol("Symbol.toStringTag"),
 	}
 end
-local j
+local iterate
 do
-	local function k(self)
-		local l = self.____coroutine
-		local m, n = coroutine.resume(l)
-		if not m then
-			error(n, 0)
+	local function iteratorGeneratorStep(self)
+		local coroutineObject = self.____coroutine
+		local ok, value = coroutine.resume(coroutineObject)
+		if not ok then
+			error(value, 0)
 		end
-		if coroutine.status(l) == "dead" then
+		if coroutine.status(coroutineObject) == "dead" then
 			return
 		end
-		return true, n
+		return true, value
 	end
-	local function o(self)
-		local c = self:next()
-		if c.done then
+	local function iteratorIteratorStep(self)
+		local result = self:next()
+		if result.done then
 			return
 		end
-		return true, c.value
+		return true, result.value
 	end
-	local function p(self, q)
-		q = q + 1
-		if q > #self then
+	local function iteratorStringStep(self, index)
+		index = index + 1
+		if index > #self then
 			return
 		end
-		return q, string.sub(self, q, q)
+		return index, string.sub(self, index, index)
 	end
-	function j(r)
-		if type(r) == "string" then
-			return p, r, 0
-		elseif r.____coroutine ~= nil then
-			return k, r
-		elseif r[g.iterator] then
-			local s = r[g.iterator](r)
-			return o, s
+	function iterate(iterable)
+		if type(iterable) == "string" then
+			return iteratorStringStep, iterable, 0
+		elseif iterable.____coroutine ~= nil then
+			return iteratorGeneratorStep, iterable
+		elseif iterable[Symbol.iterator] then
+			local iterator = iterable[Symbol.iterator](iterable)
+			return iteratorIteratorStep, iterator
 		else
-			return ipairs(r)
+			return ipairs(iterable)
 		end
 	end
 end
-local t = {}
-local u = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local v = u.BotMode
-local w = {
+local Dispel = {}
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local BotMode = Dota.BotMode
+local debuffInfo = {
 	modifier_stunned = {
 		severity = 9,
 		isDisable = true,
@@ -392,7 +392,7 @@ local w = {
 		strongDispel = false,
 	},
 }
-local x = {
+local strippableBuffs = {
 	"modifier_ghost_state",
 	"modifier_item_ghost",
 	"modifier_windrunner_windrun",
@@ -405,143 +405,151 @@ local x = {
 	"modifier_ember_spirit_flame_guard",
 	"modifier_abaddon_aphotic_shield",
 }
-local y = {
+local protectionModifiers = {
 	"modifier_dazzle_shallow_grave",
 	"modifier_oracle_false_promise_timer",
 	"modifier_abaddon_borrowed_time",
 	"modifier_skeleton_king_reincarnation_scepter_active",
 	"modifier_item_aeon_disk_buff",
 }
-function t.AnalyzeDebuffs(z)
-	local A = 0
-	local B = 0
-	local C = false
-	local D = false
-	local E = false
-	local F = false
-	local G = false
-	for H, I in ipairs(a(w)) do
-		local J = I[1]
-		local K = I[2]
+function Dispel.AnalyzeDebuffs(unit)
+	local score = 0
+	local worstSeverity = 0
+	local hasSilence = false
+	local hasDisable = false
+	local hasRoot = false
+	local canBasicDispel = false
+	local canStrongDispel = false
+	for _, entry in ipairs(objectEntries(debuffInfo)) do
+		local modifierName = entry[1]
+		local info = entry[2]
 		do
-			local L
+			local continueLoop
 			repeat
-				if z:HasModifier(J) then
-					local M
-					-- Was z.GetModifierRemainingDuration(J): a dot call with a modifier name
+				if unit:HasModifier(modifierName) then
+					local remaining
+					-- Was unit.GetModifierRemainingDuration(modifierName): a dot call with a modifier name
 					-- ("called with 1 arguments - expected 2", game 015). The API takes the
 					-- modifier index from GetModifierByName.
-					M = 999
+					remaining = 999
 					local okIdx, idx = pcall(function()
-						return z:GetModifierByName(J)
+						return unit:GetModifierByName(modifierName)
 					end)
 					if okIdx and type(idx) == "number" and idx >= 0 then
 						local okDur, dur = pcall(function()
-							return z:GetModifierRemainingDuration(idx)
+							return unit:GetModifierRemainingDuration(idx)
 						end)
 						if okDur and type(dur) == "number" then
-							M = dur
+							remaining = dur
 						end
 					end
-					local N = M
-					if N < 0.5 then
-						L = true
+					local remainingDuration = remaining
+					if remainingDuration < 0.5 then
+						continueLoop = true
 						break
 					end
-					A = A + K.severity
-					if K.severity > B then
-						B = K.severity
+					score = score + info.severity
+					if info.severity > worstSeverity then
+						worstSeverity = info.severity
 					end
-					if K.isSilence then
-						C = true
+					if info.isSilence then
+						hasSilence = true
 					end
-					if K.isDisable then
-						D = true
+					if info.isDisable then
+						hasDisable = true
 					end
-					if K.isRoot then
-						E = true
+					if info.isRoot then
+						hasRoot = true
 					end
-					if K.basicDispel then
-						F = true
+					if info.basicDispel then
+						canBasicDispel = true
 					end
-					if K.strongDispel then
-						G = true
+					if info.strongDispel then
+						canStrongDispel = true
 					end
 				end
-				L = true
+				continueLoop = true
 			until true
-			if not L then
+			if not continueLoop then
 				break
 			end
 		end
 	end
-	return { score = A, worstSeverity = B, hasSilence = C, hasDisable = D, hasRoot = E, canBasicDispel = F, canStrongDispel = G }
+	return {
+		score = score,
+		worstSeverity = worstSeverity,
+		hasSilence = hasSilence,
+		hasDisable = hasDisable,
+		hasRoot = hasRoot,
+		canBasicDispel = canBasicDispel,
+		canStrongDispel = canStrongDispel,
+	}
 end
-function t.IsProtected(z)
-	for H, J in ipairs(y) do
-		if z:HasModifier(J) then
+function Dispel.IsProtected(unit)
+	for _, modifierName in ipairs(protectionModifiers) do
+		if unit:HasModifier(modifierName) then
 			return true
 		end
 	end
 	return false
 end
-local function O(P)
+local function hasReadyAbility(bot)
 	do
-		local Q = 0
-		while Q < 6 do
-			local R = P:GetAbilityInSlot(Q)
-			if R and R:IsTrained() and not R:IsPassive() and R:IsCooldownReady() then
+		local slot = 0
+		while slot < 6 do
+			local ability = bot:GetAbilityInSlot(slot)
+			if ability and ability:IsTrained() and not ability:IsPassive() and ability:IsCooldownReady() then
 				return true
 			end
-			Q = Q + 1
+			slot = slot + 1
 		end
 	end
 	return false
 end
 -- Worth a self-dispel: humans and cores (pos 1-2) always; others not when the fight is hopeless.
--- Was P.IsBot() / P.GetHealth() (dot calls): "IsBot called with 0 arguments" aborted
+-- Was bot.IsBot() / bot.GetHealth() (dot calls): "IsBot called with 0 arguments" aborted
 -- ItemUsageThink every time this ran (game 014).
 local func_utils = nil
-local function S(P)
-	if not P:IsBot() then
+local function isWorthSelfDispel(bot)
+	if not bot:IsBot() then
 		return true
 	end
 	if func_utils == nil then
-		local ok, m = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
-		func_utils = ok and m or false
+		local ok, loadedModule = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
+		func_utils = ok and loadedModule or false
 	end
 	local okPos, pos = pcall(function()
-		return func_utils and func_utils.GetPosition(P) or nil
+		return func_utils and func_utils.GetPosition(bot) or nil
 	end)
 	if okPos and type(pos) == "number" and pos <= 2 then
 		return true
 	end
-	local T = P:GetHealth() / P:GetMaxHealth()
-	local U = P:GetNearbyHeroes(1200, true, v.None)
-	local V = P:GetNearbyHeroes(1200, false, v.None)
-	if T < 0.1 and U and #U >= 3 and (not V or #V <= 1) then
+	local hpRatio = bot:GetHealth() / bot:GetMaxHealth()
+	local nearbyEnemies = bot:GetNearbyHeroes(1200, true, BotMode.None)
+	local nearbyAllies = bot:GetNearbyHeroes(1200, false, BotMode.None)
+	if hpRatio < 0.1 and nearbyEnemies and #nearbyEnemies >= 3 and (not nearbyAllies or #nearbyAllies <= 1) then
 		return false
 	end
 	return true
 end
-function t.ShouldUseSelfDispelItem(P)
-	if t.IsProtected(P) then
+function Dispel.ShouldUseSelfDispelItem(bot)
+	if Dispel.IsProtected(bot) then
 		return -1
 	end
-	if not S(P) then
+	if not isWorthSelfDispel(bot) then
 		return -1
 	end
-	local W = t.AnalyzeDebuffs(P)
-	if W.score < 4 then
+	local analysis = Dispel.AnalyzeDebuffs(bot)
+	if analysis.score < 4 then
 		return -1
 	end
-	if W.hasSilence and not W.hasDisable and not O(P) then
-		if W.score < 7 then
+	if analysis.hasSilence and not analysis.hasDisable and not hasReadyAbility(bot) then
+		if analysis.score < 7 then
 			return -1
 		end
 	end
-	local X = W.hasDisable or not W.canBasicDispel
-	local Y = X
+	local needsStrong = analysis.hasDisable or not analysis.canBasicDispel
+	local itemNames = needsStrong
 			and {
 				"item_black_king_bar",
 				"item_satanic",
@@ -551,208 +559,208 @@ function t.ShouldUseSelfDispelItem(P)
 				"item_guardian_greaves",
 			}
 		or { "item_manta", "item_cyclone", "item_guardian_greaves", "item_lotus_orb", "item_black_king_bar" }
-	for H, Z in ipairs(Y) do
+	for _, itemName in ipairs(itemNames) do
 		do
-			local _
+			local continueLoop
 			repeat
-				local a0 = P:FindItemSlot(Z)
-				if a0 >= 0 then
-					local a1 = P:GetItemInSlot(a0)
-					if a1 and a1:IsFullyCastable() then
-						if Z == "item_black_king_bar" and W.worstSeverity < 6 then
-							_ = true
+				local slot = bot:FindItemSlot(itemName)
+				if slot >= 0 then
+					local item = bot:GetItemInSlot(slot)
+					if item and item:IsFullyCastable() then
+						if itemName == "item_black_king_bar" and analysis.worstSeverity < 6 then
+							continueLoop = true
 							break
 						end
-						if Z == "item_cyclone" then
-							local U = P:GetNearbyHeroes(900, true, v.None)
-							if U and #U >= 2 then
-								_ = true
+						if itemName == "item_cyclone" then
+							local nearbyEnemies = bot:GetNearbyHeroes(900, true, BotMode.None)
+							if nearbyEnemies and #nearbyEnemies >= 2 then
+								continueLoop = true
 								break
 							end
 						end
-						return a0
+						return slot
 					end
 				end
-				_ = true
+				continueLoop = true
 			until true
-			if not _ then
+			if not continueLoop then
 				break
 			end
 		end
 	end
 	return -1
 end
-function t.ShouldUseAllyDispelItem(P)
-	local a2 = P:FindItemSlot("item_lotus_orb")
-	if a2 < 0 then
+function Dispel.ShouldUseAllyDispelItem(bot)
+	local lotusSlot = bot:FindItemSlot("item_lotus_orb")
+	if lotusSlot < 0 then
 		return -1, nil
 	end
-	local a3 = P:GetItemInSlot(a2)
-	if not a3 or not a3:IsFullyCastable() then
+	local lotusOrb = bot:GetItemInSlot(lotusSlot)
+	if not lotusOrb or not lotusOrb:IsFullyCastable() then
 		return -1, nil
 	end
-	local V = P:GetNearbyHeroes(900, false, v.None)
-	if not V then
+	local nearbyAllies = bot:GetNearbyHeroes(900, false, BotMode.None)
+	if not nearbyAllies then
 		return -1, nil
 	end
-	local a4 = nil
-	local a5 = 0
-	for H, a6 in ipairs(V) do
+	local bestAlly = nil
+	local bestScore = 0
+	for _, ally in ipairs(nearbyAllies) do
 		do
-			local a7
+			local continueLoop
 			repeat
-				if a6 == P or not a6:IsAlive() or t.IsProtected(a6) then
-					a7 = true
+				if ally == bot or not ally:IsAlive() or Dispel.IsProtected(ally) then
+					continueLoop = true
 					break
 				end
-				local W = t.AnalyzeDebuffs(a6)
-				if W.score > a5 and W.score >= 5 then
-					a5 = W.score
-					a4 = a6
+				local analysis = Dispel.AnalyzeDebuffs(ally)
+				if analysis.score > bestScore and analysis.score >= 5 then
+					bestScore = analysis.score
+					bestAlly = ally
 				end
-				if not a6:HasModifier("modifier_item_lotus_orb_active") then
-					local a8 = a6:GetNearbyHeroes(800, true, v.None)
-					if a8 ~= nil and a8 ~= nil then
-						for H, a9 in ipairs(a8) do
-							if a9 and not a9:IsNull() and a9:IsAlive() then
-								local aa = a9:GetUnitName()
+				if not ally:HasModifier("modifier_item_lotus_orb_active") then
+					local allyNearbyEnemies = ally:GetNearbyHeroes(800, true, BotMode.None)
+					if allyNearbyEnemies ~= nil and allyNearbyEnemies ~= nil then
+						for _, enemyHero in ipairs(allyNearbyEnemies) do
+							if enemyHero and not enemyHero:IsNull() and enemyHero:IsAlive() then
+								local enemyName = enemyHero:GetUnitName()
 								if
-									aa == "npc_dota_hero_doom_bringer"
-									or aa == "npc_dota_hero_lion"
-									or aa == "npc_dota_hero_lina"
-									or aa == "npc_dota_hero_necrolyte"
-									or aa == "npc_dota_hero_bane"
+									enemyName == "npc_dota_hero_doom_bringer"
+									or enemyName == "npc_dota_hero_lion"
+									or enemyName == "npc_dota_hero_lina"
+									or enemyName == "npc_dota_hero_necrolyte"
+									or enemyName == "npc_dota_hero_bane"
 								then
-									if a9:IsFacingLocation(a6:GetLocation(), 30) then
-										a4 = a6
-										a5 = 10
+									if enemyHero:IsFacingLocation(ally:GetLocation(), 30) then
+										bestAlly = ally
+										bestScore = 10
 									end
 								end
 							end
 						end
 					end
 				end
-				a7 = true
+				continueLoop = true
 			until true
-			if not a7 then
+			if not continueLoop then
 				break
 			end
 		end
 	end
-	if a4 then
-		return a2, a4
+	if bestAlly then
+		return lotusSlot, bestAlly
 	end
 	return -1, nil
 end
-function t.ShouldMantaDodge(P)
-	local ab = P:FindItemSlot("item_manta")
-	if ab < 0 then
+function Dispel.ShouldMantaDodge(bot)
+	local mantaSlot = bot:FindItemSlot("item_manta")
+	if mantaSlot < 0 then
 		return -1
 	end
-	local a1 = P:GetItemInSlot(ab)
-	if not a1 or not a1:IsFullyCastable() then
+	local manta = bot:GetItemInSlot(mantaSlot)
+	if not manta or not manta:IsFullyCastable() then
 		return -1
 	end
-	local ac = P:GetIncomingTrackingProjectiles()
-	if ac then
-		for H, ad in j(ac) do
-			if ad and ad.is_attack == false and ad.is_dodgeable then
-				local ae = GetUnitToLocationDistance(P, ad.location)
-				local af = ad.speed or 1000
-				local ag = ae / af
-				if ag < 0.3 and ag > 0.05 then
-					return ab
+	local projectiles = bot:GetIncomingTrackingProjectiles()
+	if projectiles then
+		for _, projectile in iterate(projectiles) do
+			if projectile and projectile.is_attack == false and projectile.is_dodgeable then
+				local distance = GetUnitToLocationDistance(bot, projectile.location)
+				local speed = projectile.speed or 1000
+				local timeToHit = distance / speed
+				if timeToHit < 0.3 and timeToHit > 0.05 then
+					return mantaSlot
 				end
 			end
 		end
 	end
 	return -1
 end
-function t.HasStrippableBuff(a9)
-	for H, J in ipairs(x) do
-		if a9:HasModifier(J) then
+function Dispel.HasStrippableBuff(enemyHero)
+	for _, modifierName in ipairs(strippableBuffs) do
+		if enemyHero:HasModifier(modifierName) then
 			return true
 		end
 	end
 	return false
 end
-function t.GetBestEnemyToPurge(P, ah)
-	local U = P:GetNearbyHeroes(ah, true, v.None)
-	if not U then
+function Dispel.GetBestEnemyToPurge(bot, radius)
+	local nearbyEnemies = bot:GetNearbyHeroes(radius, true, BotMode.None)
+	if not nearbyEnemies then
 		return nil
 	end
-	for H, a9 in ipairs(U) do
-		if a9 and not a9:IsNull() and a9:IsAlive() and not a9:IsMagicImmune() then
-			if t.HasStrippableBuff(a9) then
-				return a9
+	for _, enemyHero in ipairs(nearbyEnemies) do
+		if enemyHero and not enemyHero:IsNull() and enemyHero:IsAlive() and not enemyHero:IsMagicImmune() then
+			if Dispel.HasStrippableBuff(enemyHero) then
+				return enemyHero
 			end
 		end
 	end
 	return nil
 end
-function t.GetBestAllyToDispel(P, ai, aj)
-	if aj == nil then
-		aj = false
+function Dispel.GetBestAllyToDispel(bot, radius, allowStrong)
+	if allowStrong == nil then
+		allowStrong = false
 	end
-	local V = P:GetNearbyHeroes(ai, false, v.None)
-	if not V then
+	local nearbyAllies = bot:GetNearbyHeroes(radius, false, BotMode.None)
+	if not nearbyAllies then
 		return nil
 	end
-	local a4 = nil
-	local a5 = 0
-	for H, a6 in ipairs(V) do
+	local bestAlly = nil
+	local bestScore = 0
+	for _, ally in ipairs(nearbyAllies) do
 		do
-			local ak
+			local continueLoop
 			repeat
-				if a6 == P or not a6:IsAlive() or t.IsProtected(a6) then
-					ak = true
+				if ally == bot or not ally:IsAlive() or Dispel.IsProtected(ally) then
+					continueLoop = true
 					break
 				end
-				local W = t.AnalyzeDebuffs(a6)
-				if W.score < 4 then
-					ak = true
+				local analysis = Dispel.AnalyzeDebuffs(ally)
+				if analysis.score < 4 then
+					continueLoop = true
 					break
 				end
-				if not aj and not W.canBasicDispel then
-					ak = true
+				if not allowStrong and not analysis.canBasicDispel then
+					continueLoop = true
 					break
 				end
-				if W.score > a5 then
-					a5 = W.score
-					a4 = a6
+				if analysis.score > bestScore then
+					bestScore = analysis.score
+					bestAlly = ally
 				end
-				ak = true
+				continueLoop = true
 			until true
-			if not ak then
+			if not continueLoop then
 				break
 			end
 		end
 	end
-	return a4
+	return bestAlly
 end
-function t.ShouldSelfDispel(P, aj)
-	if t.IsProtected(P) then
+function Dispel.ShouldSelfDispel(bot, allowStrong)
+	if Dispel.IsProtected(bot) then
 		return false
 	end
-	local W = t.AnalyzeDebuffs(P)
-	if aj then
-		return W.hasDisable or W.worstSeverity >= 9
+	local analysis = Dispel.AnalyzeDebuffs(bot)
+	if allowStrong then
+		return analysis.hasDisable or analysis.worstSeverity >= 9
 	end
-	if W.hasSilence and O(P) then
+	if analysis.hasSilence and hasReadyAbility(bot) then
 		return true
 	end
-	return W.score >= 5 and W.canBasicDispel
+	return analysis.score >= 5 and analysis.canBasicDispel
 end
-function t.GetDebuffSeverity(z)
-	return t.AnalyzeDebuffs(z).score
+function Dispel.GetDebuffSeverity(unit)
+	return Dispel.AnalyzeDebuffs(unit).score
 end
-function t.HasDispellableDebuff(z, al)
-	if al == nil then
-		al = 1
+function Dispel.HasDispellableDebuff(unit, minSeverity)
+	if minSeverity == nil then
+		minSeverity = 1
 	end
-	return t.GetDebuffSeverity(z) >= al
+	return Dispel.GetDebuffSeverity(unit) >= minSeverity
 end
-function t.NeedsStrongDispel(z)
-	return t.AnalyzeDebuffs(z).hasDisable
+function Dispel.NeedsStrongDispel(unit)
+	return Dispel.AnalyzeDebuffs(unit).hasDisable
 end
-return t
+return Dispel

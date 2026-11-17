@@ -1,21 +1,21 @@
 -- Dark Seer: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
 -- Wall of Replica moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
-local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-local n = { "item_crimson_guard", "item_lotus_orb", "item_heavens_halberd" }
-local o = n[RandomInt(1, #n)]
-m["pos_3"] = {
+local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+local sUtilityList = { "item_crimson_guard", "item_lotus_orb", "item_heavens_halberd" }
+local sUtility = sUtilityList[RandomInt(1, #sUtilityList)]
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -37,9 +37,9 @@ m["pos_3"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-m["pos_1"] = m["pos_3"]
-m["pos_2"] = m["pos_3"]
-m["pos_4"] = {
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -50,7 +50,7 @@ m["pos_4"] = {
 	"item_veil_of_discord",
 	"item_guardian_greaves",
 	"item_blink",
-	o,
+	sUtility,
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_shivas_guard",
@@ -60,7 +60,7 @@ m["pos_4"] = {
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -71,7 +71,7 @@ m["pos_5"] = {
 	"item_veil_of_discord",
 	"item_pipe",
 	"item_blink",
-	o,
+	sUtility,
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_shivas_guard",
@@ -81,463 +81,513 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
-a["LastStandSpells"] = { { name = "dark_seer_wall_of_replica", kind = "point" } }
-a["bDeafaultItem"] = false
-function a.MinionThink(p)
-	e.MinionThink(p)
+X["LastStandSpells"] = { { name = "dark_seer_wall_of_replica", kind = "point" } }
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local q = SafeAbility(b:GetAbilityByName("dark_seer_vacuum"), "dark_seer_vacuum", "dark_seer")
-local r = SafeAbility(b:GetAbilityByName("dark_seer_ion_shell"), "dark_seer_ion_shell", "dark_seer")
-local s = SafeAbility(b:GetAbilityByName("dark_seer_surge"), "dark_seer_surge", "dark_seer")
-local t = SafeAbility(b:GetAbilityByName("dark_seer_wall_of_replica"), "dark_seer_wall_of_replica", "dark_seer")
-local u, v
-local w, x
-local y, z
-local A, B
-local C, D
-local E
-local F
-if b.shouldBlink == nil then
-	b.shouldBlink = false
+local vacuumAbility = SafeAbility(bot:GetAbilityByName("dark_seer_vacuum"), "dark_seer_vacuum", "dark_seer")
+local ionShellAbility = SafeAbility(bot:GetAbilityByName("dark_seer_ion_shell"), "dark_seer_ion_shell", "dark_seer")
+local surgeAbility = SafeAbility(bot:GetAbilityByName("dark_seer_surge"), "dark_seer_surge", "dark_seer")
+local wallOfReplicaAbility =
+	SafeAbility(bot:GetAbilityByName("dark_seer_wall_of_replica"), "dark_seer_wall_of_replica", "dark_seer")
+local vacuumDesire, vacuumLocation
+local ionShellDesire, ionShellTarget
+local surgeDesire, surgeTarget
+local wallOfReplicaDesire, wallOfReplicaLocation
+local vacuumWallDesire, vacuumWallLocation
+local blinkItem
+local botTarget
+if bot.shouldBlink == nil then
+	bot.shouldBlink = false
 end
-local G
-local H
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local isEngaging
+local isInTeamFight
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local I = d.Build(b)
-	G = I.isEngaging
-	H = I.isTeamFight
-	F = I.target
-	C, D = a.ConsiderVacuumWall()
-	if C > 0 then
-		if DotaTime() >= (b._vacWallLogAt or -999) then
-			b._vacWallLogAt = DotaTime() + 5
-			pcall(print, string.format("[OHA-DARK_SEER] t=%.0f blink-vacuum-wall dist=%d", DotaTime(), GetUnitToLocationDistance(b, D)))
+	local context = AbilityContext.Build(bot)
+	isEngaging = context.isEngaging
+	isInTeamFight = context.isTeamFight
+	botTarget = context.target
+	vacuumWallDesire, vacuumWallLocation = X.ConsiderVacuumWall()
+	if vacuumWallDesire > 0 then
+		if DotaTime() >= (bot._vacWallLogAt or -999) then
+			bot._vacWallLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-DARK_SEER] t=%.0f blink-vacuum-wall dist=%d",
+					DotaTime(),
+					GetUnitToLocationDistance(bot, vacuumWallLocation)
+				)
+			)
 		end
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnLocation(E, D)
-		b:ActionQueue_Delay(0.1)
-		b:ActionQueue_UseAbilityOnLocation(q, D)
-		b:ActionQueue_Delay(0.8)
-		b:ActionQueue_UseAbilityOnLocation(t, D)
-		b:ActionQueue_Delay(0.93)
+		bot:Action_ClearActions(false)
+		bot:ActionQueue_UseAbilityOnLocation(blinkItem, vacuumWallLocation)
+		bot:ActionQueue_Delay(0.1)
+		bot:ActionQueue_UseAbilityOnLocation(vacuumAbility, vacuumWallLocation)
+		bot:ActionQueue_Delay(0.8)
+		bot:ActionQueue_UseAbilityOnLocation(wallOfReplicaAbility, vacuumWallLocation)
+		bot:ActionQueue_Delay(0.93)
 		return
 	end
-	u, v = a.ConsiderVacuum()
-	if u > 0 then
-		b:Action_UseAbilityOnLocation(q, v)
+	vacuumDesire, vacuumLocation = X.ConsiderVacuum()
+	if vacuumDesire > 0 then
+		bot:Action_UseAbilityOnLocation(vacuumAbility, vacuumLocation)
 		return
 	end
-	A, B = a.ConsiderWallOfReplica()
-	if A > 0 then
-		b:Action_UseAbilityOnLocation(t, B)
+	wallOfReplicaDesire, wallOfReplicaLocation = X.ConsiderWallOfReplica()
+	if wallOfReplicaDesire > 0 then
+		bot:Action_UseAbilityOnLocation(wallOfReplicaAbility, wallOfReplicaLocation)
 		return
 	end
-	y, z = a.ConsiderSurge()
-	if y > 0 then
-		b:Action_UseAbilityOnEntity(s, z)
+	surgeDesire, surgeTarget = X.ConsiderSurge()
+	if surgeDesire > 0 then
+		bot:Action_UseAbilityOnEntity(surgeAbility, surgeTarget)
 		return
 	end
-	w, x = a.ConsiderIonShell()
-	if w > 0 then
-		b:Action_UseAbilityOnEntity(r, x)
+	ionShellDesire, ionShellTarget = X.ConsiderIonShell()
+	if ionShellDesire > 0 then
+		bot:Action_UseAbilityOnEntity(ionShellAbility, ionShellTarget)
 		return
 	end
 end
-function a.ConsiderVacuum()
-	if not q:IsFullyCastable() then
+function X.ConsiderVacuum()
+	if not vacuumAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local J = c.GetProperCastRange(false, b, q:GetCastRange())
-	local K = q:GetCastPoint()
-	local L = q:GetSpecialValueInt("radius")
-	local M = q:GetSpecialValueInt("damage")
-	local N = c.GetNearbyHeroes(b, J, true, BOT_MODE_NONE)
-	for O, P in pairs(N) do
+	local castRange = Fu.GetProperCastRange(false, bot, vacuumAbility:GetCastRange())
+	local castPoint = vacuumAbility:GetCastPoint()
+	local radius = vacuumAbility:GetSpecialValueInt("radius")
+	local damage = vacuumAbility:GetSpecialValueInt("damage")
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	for _, enemyHero in pairs(enemiesInRange) do
 		if
-			c.IsValidHero(P)
-			and c.CanCastOnNonMagicImmune(P)
-			and c.CanKillTarget(P, M, DAMAGE_TYPE_MAGICAL)
-			and not H
-			and not c.IsSuspiciousIllusion(P)
-			and not P:HasModifier("modifier_abaddon_borrowed_time")
-			and not P:HasModifier("modifier_dazzle_shallow_grave")
-			and not P:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not P:HasModifier("modifier_oracle_false_promise_timer")
-			and not P:HasModifier("modifier_templar_assassin_refraction_absorb")
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
+			and not isInTeamFight
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			return BOT_ACTION_DESIRE_HIGH, P:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 		end
 	end
-	if H and not CanDoVacuumWall() then
-		local Q = b:FindAoELocation(true, true, b:GetLocation(), J, L, K, 0)
-		local R = c.GetEnemiesNearLoc(Q.targetloc, L)
-		if R ~= nil and #R >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(R)
+	if isInTeamFight and not CanDoVacuumWall() then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		local enemiesInAoe = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
+		if enemiesInAoe ~= nil and #enemiesInAoe >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesInAoe)
 		end
 	end
-	if G then
+	if isEngaging then
 		if
-			c.IsValidTarget(F)
-			and c.CanCastOnNonMagicImmune(F)
-			and c.IsInRange(b, F, J + L)
-			and not c.IsSuspiciousIllusion(F)
-			and not F:HasModifier("modifier_enigma_black_hole_pull")
-			and not F:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not F:HasModifier("modifier_legion_commander_duel")
-			and not F:HasModifier("modifier_necrolyte_reapers_scythe")
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + radius)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_enigma_black_hole_pull")
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_legion_commander_duel")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			local S = c.GetNearbyHeroes(F, 1200, true, BOT_MODE_NONE)
-			local R = c.GetNearbyHeroes(F, 1200, false, BOT_MODE_NONE)
-			if S ~= nil and R ~= nil and #S >= #R then
-				if not c.IsInRange(b, F, J) then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, F:GetLocation(), J)
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+				if not Fu.IsInRange(bot, botTarget, castRange) then
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				else
-					return BOT_ACTION_DESIRE_HIGH, F:GetLocation()
+					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderIonShell()
-	if not r:IsFullyCastable() then
+function X.ConsiderIonShell()
+	if not ionShellAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local J = c.GetProperCastRange(false, b, r:GetCastRange())
-	local L = r:GetSpecialValueInt("radius")
-	local T = r:GetLevel()
-	if G then
-		local U = nil
-		local V = 1
-		local W = c.GetNearbyHeroes(b, J, false, BOT_MODE_NONE)
-		if W ~= nil and #W >= 1 then
-			for O, X in pairs(W) do
+	local castRange = Fu.GetProperCastRange(false, bot, ionShellAbility:GetCastRange())
+	local radius = ionShellAbility:GetSpecialValueInt("radius")
+	local abilityLevel = ionShellAbility:GetLevel()
+	if isEngaging then
+		local shellTarget = nil
+		local mostAttackers = 1
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
+		if nearbyAllies ~= nil and #nearbyAllies >= 1 then
+			for _, allyHero in pairs(nearbyAllies) do
 				if
-					c.IsValid(X)
-					and not X:IsIllusion()
-					and not X:HasModifier("modifier_dark_seer_ion_shell")
-					and not X:HasModifier("modifier_necrolyte_reapers_scythe")
+					Fu.IsValid(allyHero)
+					and not allyHero:IsIllusion()
+					and not allyHero:HasModifier("modifier_dark_seer_ion_shell")
+					and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 				then
-					local Y = 0
-					local Z = c.GetNearbyHeroes(X, 1200, true, BOT_MODE_NONE)
-					local _ = X:GetNearbyCreeps(1200, true)
-					for O, a0 in pairs(Z) do
+					local attackerCount = 0
+					local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
+					local enemyCreepsNearAlly = allyHero:GetNearbyCreeps(1200, true)
+					for _, enemyHero in pairs(enemiesNearAlly) do
 						if
-							a0 ~= nil
-							and a0:IsAlive()
-							and a0:GetAttackTarget() == X
-							and not c.IsSuspiciousIllusion(a0)
-							and X:GetAttackRange() <= 326
+							enemyHero ~= nil
+							and enemyHero:IsAlive()
+							and enemyHero:GetAttackTarget() == allyHero
+							and not Fu.IsSuspiciousIllusion(enemyHero)
+							and allyHero:GetAttackRange() <= 326
 						then
-							Y = Y + 1
+							attackerCount = attackerCount + 1
 						end
 					end
-					for O, a1 in pairs(_) do
-						if a1 ~= nil and a1:IsAlive() and a1:GetAttackTarget() == X and a1:GetAttackRange() <= 326 then
-							Y = Y + 1
+					for _, creep in pairs(enemyCreepsNearAlly) do
+						if
+							creep ~= nil
+							and creep:IsAlive()
+							and creep:GetAttackTarget() == allyHero
+							and creep:GetAttackRange() <= 326
+						then
+							attackerCount = attackerCount + 1
 						end
 					end
-					if Y > V then
-						V = Y
-						U = X
+					if attackerCount > mostAttackers then
+						mostAttackers = attackerCount
+						shellTarget = allyHero
 					end
 				end
 			end
 		else
 			if
-				c.IsValidTarget(F)
-				and c.IsInRange(b, F, L)
-				and not c.IsSuspiciousIllusion(F)
-				and not b:HasModifier("modifier_dark_seer_ion_shell")
+				Fu.IsValidTarget(botTarget)
+				and Fu.IsInRange(bot, botTarget, radius)
+				and not Fu.IsSuspiciousIllusion(botTarget)
+				and not bot:HasModifier("modifier_dark_seer_ion_shell")
 			then
-				U = b
+				shellTarget = bot
 			end
 		end
-		-- W always holds Dark Seer himself, so the "no allies: shell myself" branch above never ran
+		-- nearbyAllies always holds Dark Seer himself, so the "no allies: shell myself" branch above never ran
 		-- and in a fight the shell went out only on a melee ally hit by 2+ units. Fall back to the
 		-- unshelled ally hero (self included) closest to the target, once within shell radius +150.
-		if U == nil and c.IsValidTarget(F) and not c.IsSuspiciousIllusion(F) then
+		if shellTarget == nil and Fu.IsValidTarget(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
 			local best = nil
-			for O, X in pairs(W or {}) do
+			for _, allyHero in pairs(nearbyAllies or {}) do
 				if
-					c.IsValidHero(X)
-					and not X:IsIllusion()
-					and not X:HasModifier("modifier_dark_seer_ion_shell")
-					and not X:HasModifier("modifier_necrolyte_reapers_scythe")
-					and GetUnitToUnitDistance(X, F) <= L + 150
-					and (best == nil or GetUnitToUnitDistance(X, F) < GetUnitToUnitDistance(best, F))
+					Fu.IsValidHero(allyHero)
+					and not allyHero:IsIllusion()
+					and not allyHero:HasModifier("modifier_dark_seer_ion_shell")
+					and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+					and GetUnitToUnitDistance(allyHero, botTarget) <= radius + 150
+					and (
+						best == nil
+						or GetUnitToUnitDistance(allyHero, botTarget) < GetUnitToUnitDistance(best, botTarget)
+					)
 				then
-					best = X
+					best = allyHero
 				end
 			end
-			U = best
-			if U ~= nil and DotaTime() >= (b._shellFallbackLogAt or -999) then
-				b._shellFallbackLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-DARK_SEER] t=%.0f ion shell fight fallback on=%s", DotaTime(), U:GetUnitName()))
+			shellTarget = best
+			if shellTarget ~= nil and DotaTime() >= (bot._shellFallbackLogAt or -999) then
+				bot._shellFallbackLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-DARK_SEER] t=%.0f ion shell fight fallback on=%s",
+						DotaTime(),
+						shellTarget:GetUnitName()
+					)
+				)
 			end
 		end
-		if U ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, U
+		if shellTarget ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, shellTarget
 		end
 	end
-	if c.IsRetreating(b) and b:GetActiveModeDesire() > 0.75 and not q:IsFullyCastable() then
-		local R = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
-		for O, P in pairs(R) do
+	if Fu.IsRetreating(bot) and bot:GetActiveModeDesire() > 0.75 and not vacuumAbility:IsFullyCastable() then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(P)
-				and c.CanCastOnNonMagicImmune(P)
-				and c.IsChasingTarget(P, b)
-				and not b:HasModifier("modifier_dark_seer_ion_shell")
-				and not c.IsSuspiciousIllusion(P)
-				and not c.IsDisabled(P)
-				and not c.IsRealInvisible(b)
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
+				and not bot:HasModifier("modifier_dark_seer_ion_shell")
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and not Fu.IsRealInvisible(bot)
 			then
-				local S = c.GetNearbyHeroes(P, 1200, true, BOT_MODE_NONE)
-				local a2 = c.GetNearbyHeroes(P, 1200, false, BOT_MODE_NONE)
-				if S ~= nil and a2 ~= nil and (#a2 > #S or b:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH, b
+				local chaserEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local chaserAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				if
+					chaserEnemies ~= nil
+					and chaserAllies ~= nil
+					and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
+					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		if R ~= nil and #R == 0 then
-			local a3 = b:GetNearbyLaneCreeps(J, false)
-			if a3 ~= nil and #a3 >= 1 then
-				local a4 = nil
-				local a5 = 0
-				for O, a1 in pairs(a3) do
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		if nearbyEnemies ~= nil and #nearbyEnemies == 0 then
+			local allyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, false)
+			if allyLaneCreeps ~= nil and #allyLaneCreeps >= 1 then
+				local frontCreep = nil
+				local farthestFromFountain = 0
+				for _, creep in pairs(allyLaneCreeps) do
 					if
-						c.IsValid(a1)
-						and c.GetHP(a1) > 0.75
-						and a1:DistanceFromFountain() > a5
-						and a1:GetAttackRange() <= 326
-						and not a1:HasModifier("modifier_dark_seer_ion_shell")
+						Fu.IsValid(creep)
+						and Fu.GetHP(creep) > 0.75
+						and creep:DistanceFromFountain() > farthestFromFountain
+						and creep:GetAttackRange() <= 326
+						and not creep:HasModifier("modifier_dark_seer_ion_shell")
 					then
-						a4 = a1
-						a5 = a1:DistanceFromFountain()
+						frontCreep = creep
+						farthestFromFountain = creep:DistanceFromFountain()
 					end
 				end
-				if a4 ~= nil then
-					return BOT_ACTION_DESIRE_HIGH, a4
+				if frontCreep ~= nil then
+					return BOT_ACTION_DESIRE_HIGH, frontCreep
 				end
 			end
 		end
 	end
-	if c.IsFarming(b) then
-		local a6 = b:GetAttackTarget()
-		local a7 = b:GetNearbyNeutralCreeps(L + b:GetAttackRange())
-		if c.IsValid(a6) and a6:IsCreep() and a7 ~= nil and #a7 >= 2 then
-			if not b:HasModifier("modifier_dark_seer_ion_shell") then
-				return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsFarming(bot) then
+		local attackTarget = bot:GetAttackTarget()
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius + bot:GetAttackRange())
+		if Fu.IsValid(attackTarget) and attackTarget:IsCreep() and neutralCreeps ~= nil and #neutralCreeps >= 2 then
+			if not bot:HasModifier("modifier_dark_seer_ion_shell") then
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
 	end
-	if c.IsLaning(b) then
-		local a8 = b:GetNearbyLaneCreeps(L, true)
-		local R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		local a9 = b:GetNearbyTowers(700, true)
-		-- #a9 == 0: the tower list was fetched but #R was tested twice, so he shelled under towers.
-		if a8 ~= nil and #a8 >= 3 and R ~= nil and #R == 0 and a9 ~= nil and #a9 == 0 and T >= 2 then
-			if c.IsAttacking(b) and c.CanBeAttacked(a8[1]) and not b:HasModifier("modifier_dark_seer_ion_shell") then
-				return BOT_ACTION_DESIRE_HIGH, b
-			end
-		end
-	end
-	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
+	if Fu.IsLaning(bot) then
+		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		local enemyTowers = bot:GetNearbyTowers(700, true)
+		-- #enemyTowers == 0: the tower list was fetched but #nearbyEnemies was tested twice, so he shelled under towers.
 		if
-			(c.IsRoshan(F) or c.IsTormentor(F))
-			and c.IsInRange(b, F, L)
-			and c.IsAttacking(b)
-			and not b:HasModifier("modifier_dark_seer_ion_shell")
+			laneCreeps ~= nil
+			and #laneCreeps >= 3
+			and nearbyEnemies ~= nil
+			and #nearbyEnemies == 0
+			and enemyTowers ~= nil
+			and #enemyTowers == 0
+			and abilityLevel >= 2
 		then
-			return BOT_ACTION_DESIRE_HIGH, b
+			if
+				Fu.IsAttacking(bot)
+				and Fu.CanBeAttacked(laneCreeps[1])
+				and not bot:HasModifier("modifier_dark_seer_ion_shell")
+			then
+				return BOT_ACTION_DESIRE_HIGH, bot
+			end
+		end
+	end
+	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.IsAttacking(bot)
+			and not bot:HasModifier("modifier_dark_seer_ion_shell")
+		then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderSurge()
-	if not s:IsFullyCastable() then
+function X.ConsiderSurge()
+	if not surgeAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local J = c.GetProperCastRange(false, b, s:GetCastRange())
-	local T = s:GetLevel()
-	local aa = c.GetCurrentRoshanLocation()
-	local ab = c.GetTormentorLocation(GetTeam())
-	if G then
+	local castRange = Fu.GetProperCastRange(false, bot, surgeAbility:GetCastRange())
+	local abilityLevel = surgeAbility:GetLevel()
+	local roshanLocation = Fu.GetCurrentRoshanLocation()
+	local tormentorLocation = Fu.GetTormentorLocation(GetTeam())
+	if isEngaging then
 		if
-			c.IsValidTarget(F)
-			and c.IsInRange(b, F, 1200)
-			and not c.IsSuspiciousIllusion(F)
-			and not F:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not F:HasModifier("modifier_necrolyte_reapers_scythe")
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1200)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			local W = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-			local ac = GetUnitToUnitDistance(b, F)
-			local ad = b
-			for O, X in pairs(W) do
-				local ae = c.GetProperTarget(X)
-				local af = GetUnitToUnitDistance(X, F)
+			local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+			local closestDistance = GetUnitToUnitDistance(bot, botTarget)
+			local bestAlly = bot
+			for _, allyHero in pairs(nearbyAllies) do
+				local allyTarget = Fu.GetProperTarget(allyHero)
+				local allyDistance = GetUnitToUnitDistance(allyHero, botTarget)
 				if
-					af < ac
-					and af < J
-					and c.IsValidTarget(ae)
-					and not c.IsSuspiciousIllusion(ae)
-					and not ae:HasModifier("modifier_faceless_void_chronosphere_freeze")
-					and not ae:HasModifier("modifier_necrolyte_reapers_scythe")
-					and X:IsFacingLocation(ae:GetLocation(), 30)
+					allyDistance < closestDistance
+					and allyDistance < castRange
+					and Fu.IsValidTarget(allyTarget)
+					and not Fu.IsSuspiciousIllusion(allyTarget)
+					and not allyTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+					and not allyTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+					and allyHero:IsFacingLocation(allyTarget:GetLocation(), 30)
 				then
-					ac = af
-					ad = X
+					closestDistance = allyDistance
+					bestAlly = allyHero
 				end
 			end
-			return BOT_ACTION_DESIRE_HIGH, ad
+			return BOT_ACTION_DESIRE_HIGH, bestAlly
 		end
 	end
-	if c.IsRetreating(b) and b:GetActiveModeDesire() > 0.75 then
-		local R = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		for O, P in pairs(R) do
+	if Fu.IsRetreating(bot) and bot:GetActiveModeDesire() > 0.75 then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			-- Surge is self-cast here: the chaser being magic immune and Dark Seer wearing his own Ion
 			-- Shell (both copied from the shell branch) have nothing to do with it, and the shell check
 			-- stopped the escape whenever he had shelled himself.
 			if
-				c.IsValidHero(P)
-				and c.IsChasingTarget(P, b)
-				and c.IsInRange(b, P, 600)
-				and not c.IsSuspiciousIllusion(P)
-				and not c.IsDisabled(P)
-				and not c.IsRealInvisible(b)
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
+				and Fu.IsInRange(bot, enemyHero, 600)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and not Fu.IsRealInvisible(bot)
 			then
-				local S = c.GetNearbyHeroes(P, 1200, true, BOT_MODE_NONE)
-				local a2 = c.GetNearbyHeroes(P, 1200, false, BOT_MODE_NONE)
-				if S ~= nil and a2 ~= nil and (#a2 > #S or b:WasRecentlyDamagedByAnyHero(1.5)) then
-					return BOT_ACTION_DESIRE_HIGH, b
+				local chaserEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local chaserAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				if
+					chaserEnemies ~= nil
+					and chaserAllies ~= nil
+					and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
+					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
+	if Fu.IsDoingRoshan(bot) then
 		if
-			GetUnitToLocationDistance(b, aa) > 1600
-			and c.GetManaAfter(s:GetManaCost()) * b:GetMana() > q:GetManaCost()
-			and c.GetManaAfter(s:GetManaCost()) * b:GetMana() > t:GetManaCost()
-			and T >= 3
+			GetUnitToLocationDistance(bot, roshanLocation) > 1600
+			and Fu.GetManaAfter(surgeAbility:GetManaCost()) * bot:GetMana() > vacuumAbility:GetManaCost()
+			and Fu.GetManaAfter(surgeAbility:GetManaCost()) * bot:GetMana() > wallOfReplicaAbility:GetManaCost()
+			and abilityLevel >= 3
 		then
-			return BOT_ACTION_DESIRE_HIGH, b
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
-	if c.IsDoingTormentor(b) then
+	if Fu.IsDoingTormentor(bot) then
 		if
-			GetUnitToLocationDistance(b, ab) > 1600
-			and c.GetManaAfter(s:GetManaCost()) * b:GetMana() > q:GetManaCost()
-			and c.GetManaAfter(s:GetManaCost()) * b:GetMana() > t:GetManaCost()
-			and T >= 2
+			GetUnitToLocationDistance(bot, tormentorLocation) > 1600
+			and Fu.GetManaAfter(surgeAbility:GetManaCost()) * bot:GetMana() > vacuumAbility:GetManaCost()
+			and Fu.GetManaAfter(surgeAbility:GetManaCost()) * bot:GetMana() > wallOfReplicaAbility:GetManaCost()
+			and abilityLevel >= 2
 		then
-			return BOT_ACTION_DESIRE_HIGH, b
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
-	local W = c.GetNearbyHeroes(b, J, false, BOT_MODE_NONE)
-	for O, X in pairs(W) do
-		local ag = c.GetNearbyHeroes(X, 1200, true, BOT_MODE_NONE)
-		if c.IsValidHero(X) and c.IsRetreating(X) and X:WasRecentlyDamagedByAnyHero(1.5) and not X:IsIllusion() then
+	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
+	for _, allyHero in pairs(alliesInRange) do
+		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
-				ag ~= nil
-				and #ag >= 1
-				and c.IsValidHero(ag[1])
-				and c.IsInRange(b, ag[1], J)
-				and c.IsChasingTarget(ag[1], X)
-				and X:GetCurrentMovementSpeed() < ag[1]:GetCurrentMovementSpeed()
-				and X:IsFacingLocation(c.GetTeamFountain(), 30)
-				and not c.IsDisabled(ag[1])
-				and not c.IsTaunted(ag[1])
-				and not c.IsSuspiciousIllusion(ag[1])
-				and not ag[1]:HasModifier("modifier_necrolyte_reapers_scythe")
+				enemiesNearAlly ~= nil
+				and #enemiesNearAlly >= 1
+				and Fu.IsValidHero(enemiesNearAlly[1])
+				and Fu.IsInRange(bot, enemiesNearAlly[1], castRange)
+				and Fu.IsChasingTarget(enemiesNearAlly[1], allyHero)
+				and allyHero:GetCurrentMovementSpeed() < enemiesNearAlly[1]:GetCurrentMovementSpeed()
+				and allyHero:IsFacingLocation(Fu.GetTeamFountain(), 30)
+				and not Fu.IsDisabled(enemiesNearAlly[1])
+				and not Fu.IsTaunted(enemiesNearAlly[1])
+				and not Fu.IsSuspiciousIllusion(enemiesNearAlly[1])
+				and not enemiesNearAlly[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				return BOT_ACTION_DESIRE_HIGH, X
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderWallOfReplica()
-	if not t:IsFullyCastable() or CanDoVacuumWall() then
+function X.ConsiderWallOfReplica()
+	if not wallOfReplicaAbility:IsFullyCastable() or CanDoVacuumWall() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local J = c.GetProperCastRange(false, b, t:GetCastRange())
-	local K = t:GetCastPoint() + 0.73
-	local L = q:GetSpecialValueInt("radius")
-	if H then
-		local Q = b:FindAoELocation(true, true, b:GetLocation(), J, L, K, 0)
-		local R = c.GetEnemiesNearLoc(Q.targetloc, L)
-		if R ~= nil and #R >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(R)
+	local castRange = Fu.GetProperCastRange(false, bot, wallOfReplicaAbility:GetCastRange())
+	local castPoint = wallOfReplicaAbility:GetCastPoint() + 0.73
+	local radius = vacuumAbility:GetSpecialValueInt("radius")
+	if isInTeamFight then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		local enemiesInAoe = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
+		if enemiesInAoe ~= nil and #enemiesInAoe >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesInAoe)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderVacuumWall()
+function X.ConsiderVacuumWall()
 	if CanDoVacuumWall() then
-		local ah = t:GetCastPoint() + 0.73
+		local castPoint = wallOfReplicaAbility:GetCastPoint() + 0.73
 		-- The combo blinks onto the spot first, so search within Blink range (1200), not Vacuum's
 		-- 450-600: with Vacuum range the Blink only fired on fights already next to Dark Seer.
-		local ai = math.max(c.GetProperCastRange(false, b, q:GetCastRange()), 1150)
-		local aj = q:GetSpecialValueInt("radius")
-		if c.IsInTeamFight(b, 1600) then
-			local Q = b:FindAoELocation(true, true, b:GetLocation(), ai, aj, ah, 0)
-			local R = c.GetEnemiesNearLoc(Q.targetloc, aj)
-			if R ~= nil and #R >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(R)
+		local searchRange = math.max(Fu.GetProperCastRange(false, bot, vacuumAbility:GetCastRange()), 1150)
+		local radius = vacuumAbility:GetSpecialValueInt("radius")
+		if Fu.IsInTeamFight(bot, 1600) then
+			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), searchRange, radius, castPoint, 0)
+			local enemiesInAoe = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
+			if enemiesInAoe ~= nil and #enemiesInAoe >= 2 then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesInAoe)
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function CanDoVacuumWall()
-	if q:IsFullyCastable() and t:IsFullyCastable() and HasBlink() then
-		local ak = q:GetManaCost() + t:GetManaCost()
-		if b:GetMana() >= ak then
-			b.shouldBlink = true
+	if vacuumAbility:IsFullyCastable() and wallOfReplicaAbility:IsFullyCastable() and HasBlink() then
+		local comboManaCost = vacuumAbility:GetManaCost() + wallOfReplicaAbility:GetManaCost()
+		if bot:GetMana() >= comboManaCost then
+			bot.shouldBlink = true
 			return true
 		end
 	end
 	-- was true here too, which left shouldBlink stuck on and blocked the generic engage blink for Dark Seer
-	b.shouldBlink = false
+	bot.shouldBlink = false
 	return false
 end
 function HasBlink()
-	local al = nil
-	for am = 0, 5 do
-		local an = b:GetItemInSlot(am)
+	local blink = nil
+	for slot = 0, 5 do
+		local item = bot:GetItemInSlot(slot)
 		if
-			an ~= nil
+			item ~= nil
 			and (
-				an:GetName() == "item_blink"
-				or an:GetName() == "item_overwhelming_blink"
-				or an:GetName() == "item_arcane_blink"
-				or an:GetName() == "item_swift_blink"
+				item:GetName() == "item_blink"
+				or item:GetName() == "item_overwhelming_blink"
+				or item:GetName() == "item_arcane_blink"
+				or item:GetName() == "item_swift_blink"
 			)
 		then
-			al = an
+			blink = item
 			break
 		end
 	end
-	if al ~= nil and al:IsFullyCastable() then
-		E = al
+	if blink ~= nil and blink:IsFullyCastable() then
+		blinkItem = blink
 		return true
 	end
 	return false
 end
-return a
+return X

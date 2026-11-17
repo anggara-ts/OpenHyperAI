@@ -1,306 +1,323 @@
 -- How Rubick plays after stealing a spell from Bounty Hunter.
-local a = GetBot()
-local b = {}
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d
-local e
-local f
-local g
-local h
-local i
-local j, k, l, m, n
-function b.ConsiderStolenSpell(o)
-	a = GetBot()
-	if c.CanNotUseAbility(a) then
+local bot = GetBot()
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local shurikenTossAbility
+local jinadaAbility
+local shadowWalkAbility
+local friendlyShadowAbility
+local trackAbility
+local botTarget
+local mpRatio, hpRatio, botLevel, nearbyEnemies, nearbyAllies
+function X.ConsiderStolenSpell(ability)
+	bot = GetBot()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	i = c.GetProperTarget(a)
-	local p = o:GetName()
-	l = a:GetLevel()
-	j = a:GetMana() / a:GetMaxMana()
-	k = a:GetHealth() / a:GetMaxHealth()
-	m = c.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
-	n = c.GetAlliesNearLoc(a:GetLocation(), 1600)
-	if p == "bounty_hunter_wind_walk" then
-		f = o
-		ShadowWalkDesire = b.ConsiderShadowWalk()
+	botTarget = Fu.GetProperTarget(bot)
+	local abilityName = ability:GetName()
+	botLevel = bot:GetLevel()
+	mpRatio = bot:GetMana() / bot:GetMaxMana()
+	hpRatio = bot:GetHealth() / bot:GetMaxHealth()
+	nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+	nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
+	if abilityName == "bounty_hunter_wind_walk" then
+		shadowWalkAbility = ability
+		ShadowWalkDesire = X.ConsiderShadowWalk()
 		if ShadowWalkDesire > 0 then
-			a:Action_UseAbility(f)
+			bot:Action_UseAbility(shadowWalkAbility)
 			return
 		end
 	end
-	if p == "bounty_hunter_wind_walk_ally" then
-		g = o
-		FriendlyShadowDesire, FriendlyShadowTarget = b.ConsiderFriendlyShadow()
+	if abilityName == "bounty_hunter_wind_walk_ally" then
+		friendlyShadowAbility = ability
+		FriendlyShadowDesire, FriendlyShadowTarget = X.ConsiderFriendlyShadow()
 		if FriendlyShadowDesire > 0 then
-			a:Action_UseAbilityOnEntity(g, FriendlyShadowTarget)
+			bot:Action_UseAbilityOnEntity(friendlyShadowAbility, FriendlyShadowTarget)
 			return
 		end
 	end
-	if p == "bounty_hunter_track" then
-		h = o
-		TrackDesire, TrackTarget = b.ConsiderTrack()
+	if abilityName == "bounty_hunter_track" then
+		trackAbility = ability
+		TrackDesire, TrackTarget = X.ConsiderTrack()
 		if TrackDesire > 0 then
-			a:Action_UseAbilityOnEntity(h, TrackTarget)
+			bot:Action_UseAbilityOnEntity(trackAbility, TrackTarget)
 			return
 		end
 	end
-	if p == "bounty_hunter_shuriken_toss" then
-		d = o
-		ShurikenTossDesire, ShurikenTossTarget = b.ConsiderShurikenToss()
+	if abilityName == "bounty_hunter_shuriken_toss" then
+		shurikenTossAbility = ability
+		ShurikenTossDesire, ShurikenTossTarget = X.ConsiderShurikenToss()
 		if ShurikenTossDesire > 0 then
-			a:ActionQueue_UseAbilityOnEntity(d, d)
+			bot:ActionQueue_UseAbilityOnEntity(shurikenTossAbility, shurikenTossAbility)
 			return
 		end
 	end
 end
-function b.ConsiderShurikenToss()
-	if not d:IsFullyCastable() then
+function X.ConsiderShurikenToss()
+	if not shurikenTossAbility:IsFullyCastable() then
 		return 0
 	end
-	local q = d:GetLevel()
-	local r = c.GetProperCastRange(false, a, d:GetCastRange())
-	local s = d:GetCastPoint()
-	local t = d:GetManaCost()
-	local u = d:GetSpecialValueInt("bonus_damage")
-	local v = DAMAGE_TYPE_MAGICAL
-	local w = d:GetSpecialValueInt("bounce_aoe")
-	local x = c.GetAroundBotUnitList(a, r + 100, true)
-	local y = {}
-	for z, npcEnemy in pairs(m) do
+	local abilityLevel = shurikenTossAbility:GetLevel()
+	local castRange = Fu.GetProperCastRange(false, bot, shurikenTossAbility:GetCastRange())
+	local castPoint = shurikenTossAbility:GetCastPoint()
+	local manaCost = shurikenTossAbility:GetManaCost()
+	local damage = shurikenTossAbility:GetSpecialValueInt("bonus_damage")
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local bounceRadius = shurikenTossAbility:GetSpecialValueInt("bounce_aoe")
+	local nearbyEnemyUnits = Fu.GetAroundBotUnitList(bot, castRange + 100, true)
+	local trackedEnemies = {}
+	for _, npcEnemy in pairs(nearbyEnemies) do
 		if npcEnemy:HasModifier("modifier_bounty_hunter_track") then
-			y[#y + 1] = npcEnemy
+			trackedEnemies[#trackedEnemies + 1] = npcEnemy
 		end
 		if npcEnemy:IsChanneling() and not npcEnemy:IsMagicImmune() then
 			if npcEnemy:HasModifier("modifier_bounty_hunter_track") then
-				for z, A in pairs(x) do
-					if c.IsValid(A) and c.CanCastOnTargetAdvanced(A) and not A:IsMagicImmune() then
-						return BOT_ACTION_DESIRE_HIGH, A
+				for _, enemyUnit in pairs(nearbyEnemyUnits) do
+					if
+						Fu.IsValid(enemyUnit)
+						and Fu.CanCastOnTargetAdvanced(enemyUnit)
+						and not enemyUnit:IsMagicImmune()
+					then
+						return BOT_ACTION_DESIRE_HIGH, enemyUnit
 					end
 				end
 			end
-			if c.IsInRange(a, npcEnemy, r + 200) and c.CanCastOnTargetAdvanced(npcEnemy) then
+			if Fu.IsInRange(bot, npcEnemy, castRange + 200) and Fu.CanCastOnTargetAdvanced(npcEnemy) then
 				return BOT_ACTION_DESIRE_HIGH, npcEnemy
 			end
 		end
 		if
-			c.CanCastOnNonMagicImmune(npcEnemy)
-			and c.WillMagicKillTarget(a, npcEnemy, u, s + GetUnitToUnitDistance(a, npcEnemy) / 1000)
+			Fu.CanCastOnNonMagicImmune(npcEnemy)
+			and Fu.WillMagicKillTarget(bot, npcEnemy, damage, castPoint + GetUnitToUnitDistance(bot, npcEnemy) / 1000)
 		then
 			if npcEnemy:HasModifier("modifier_bounty_hunter_track") then
-				for z, A in pairs(x) do
-					if c.IsValid(A) and c.CanCastOnTargetAdvanced(A) and not A:IsMagicImmune() then
-						return BOT_ACTION_DESIRE_HIGH, A
+				for _, enemyUnit in pairs(nearbyEnemyUnits) do
+					if
+						Fu.IsValid(enemyUnit)
+						and Fu.CanCastOnTargetAdvanced(enemyUnit)
+						and not enemyUnit:IsMagicImmune()
+					then
+						return BOT_ACTION_DESIRE_HIGH, enemyUnit
 					end
 				end
 			end
-			if c.IsInRange(a, npcEnemy, r + 200) and c.CanCastOnTargetAdvanced(npcEnemy) then
+			if Fu.IsInRange(bot, npcEnemy, castRange + 200) and Fu.CanCastOnTargetAdvanced(npcEnemy) then
 				return BOT_ACTION_DESIRE_HIGH, npcEnemy
 			end
 		end
 	end
-	if #y >= 2 then
-		local B = nil
-		local C = 1.2
-		for z, A in pairs(x) do
-			if c.IsValid(A) and not A:IsMagicImmune() and c.CanCastOnTargetAdvanced(A) then
-				local D = 0
-				if not A:HasModifier("modifier_bounty_hunter_track") then
-					if A:IsHero() then
-						D = D + 1
+	if #trackedEnemies >= 2 then
+		local bestBounceUnit = nil
+		local bestBounceScore = 1.2
+		for _, enemyUnit in pairs(nearbyEnemyUnits) do
+			if Fu.IsValid(enemyUnit) and not enemyUnit:IsMagicImmune() and Fu.CanCastOnTargetAdvanced(enemyUnit) then
+				local bounceScore = 0
+				if not enemyUnit:HasModifier("modifier_bounty_hunter_track") then
+					if enemyUnit:IsHero() then
+						bounceScore = bounceScore + 1
 					else
-						D = D + 0.1
+						bounceScore = bounceScore + 0.1
 					end
 				end
-				for z, npcEnemy in pairs(y) do
-					if c.IsInRange(A, npcEnemy, w - 80) then
-						D = D + 1
+				for _, npcEnemy in pairs(trackedEnemies) do
+					if Fu.IsInRange(enemyUnit, npcEnemy, bounceRadius - 80) then
+						bounceScore = bounceScore + 1
 					end
 				end
-				if D > C then
-					B = A
-					C = D
+				if bounceScore > bestBounceScore then
+					bestBounceUnit = enemyUnit
+					bestBounceScore = bounceScore
 				end
 			end
 		end
-		if B ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, B
+		if bestBounceUnit ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, bestBounceUnit
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		if c.IsValidHero(i) and c.IsInRange(a, i, r + w + 100) and c.CanCastOnNonMagicImmune(i) then
-			if i:HasModifier("modifier_bounty_hunter_track") then
-				for z, A in pairs(x) do
+	if Fu.IsGoingOnSomeone(bot) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + bounceRadius + 100)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
+			if botTarget:HasModifier("modifier_bounty_hunter_track") then
+				for _, enemyUnit in pairs(nearbyEnemyUnits) do
 					if
-						c.IsInRange(A, npcEnemy, w - 100)
-						and not A:IsMagicImmune()
-						and c.CanCastOnTargetAdvanced(A)
-						and not A:HasModifier("modifier_bounty_hunter_track")
+						Fu.IsInRange(enemyUnit, npcEnemy, bounceRadius - 100)
+						and not enemyUnit:IsMagicImmune()
+						and Fu.CanCastOnTargetAdvanced(enemyUnit)
+						and not enemyUnit:HasModifier("modifier_bounty_hunter_track")
 					then
-						return BOT_ACTION_DESIRE_HIGH, A
+						return BOT_ACTION_DESIRE_HIGH, enemyUnit
 					end
 				end
 			end
-			if c.IsInRange(a, i, r) and c.CanCastOnTargetAdvanced(i) then
-				return BOT_ACTION_DESIRE_HIGH, i
+			if Fu.IsInRange(bot, botTarget, castRange) and Fu.CanCastOnTargetAdvanced(botTarget) then
+				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end
 	end
-	if (a:GetActiveMode() == BOT_MODE_LANING or l <= 7 and #n <= 2) and a:GetMana() >= 150 then
-		local E = a:GetNearbyLaneCreeps(r + 300, true)
-		local F = "ranged"
-		for z, G in pairs(E) do
+	if (bot:GetActiveMode() == BOT_MODE_LANING or botLevel <= 7 and #nearbyAllies <= 2) and bot:GetMana() >= 150 then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange + 300, true)
+		local creepKeyword = "ranged"
+		for _, creep in pairs(nearbyLaneCreeps) do
 			if
-				c.IsValid(G)
-				and not G:HasModifier("modifier_fountain_glyph")
-				and c.IsKeyWordUnit(F, G)
-				and c.WillKillTarget(G, u, v, s + GetUnitToUnitDistance(a, G) / 1100)
-				and GetUnitToUnitDistance(G, a) > 300
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.IsKeyWordUnit(creepKeyword, creep)
+				and Fu.WillKillTarget(creep, damage, damageType, castPoint + GetUnitToUnitDistance(bot, creep) / 1100)
+				and GetUnitToUnitDistance(creep, bot) > 300
 			then
-				return BOT_ACTION_DESIRE_HIGH, G
+				return BOT_ACTION_DESIRE_HIGH, creep
 			end
 		end
 	end
 	if
-		(c.IsPushing(a) or c.IsDefending(a) or c.IsFarming(a))
-		and c.IsAllowedToSpam(a, t * 0.52)
-		and (a:GetAttackDamage() < 300 or j > 0.7)
-		and q >= 2
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost * 0.52)
+		and (bot:GetAttackDamage() < 300 or mpRatio > 0.7)
+		and abilityLevel >= 2
 		and DotaTime() > 7 * 60
-		and #n <= 2
-		and #m == 0
+		and #nearbyAllies <= 2
+		and #nearbyEnemies == 0
 	then
-		local E = a:GetNearbyLaneCreeps(r + 350, true)
-		local F = "ranged"
-		for z, G in pairs(E) do
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange + 350, true)
+		local creepKeyword = "ranged"
+		for _, creep in pairs(nearbyLaneCreeps) do
 			if
-				c.IsValid(G)
-				and c.IsKeyWordUnit(F, G)
-				and not G:HasModifier("modifier_fountain_glyph")
-				and c.WillKillTarget(G, u, v, s + GetUnitToUnitDistance(a, G) / 1100)
-				and not c.CanKillTarget(G, a:GetAttackDamage() * 1.2, DAMAGE_TYPE_PHYSICAL)
+				Fu.IsValid(creep)
+				and Fu.IsKeyWordUnit(creepKeyword, creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.WillKillTarget(creep, damage, damageType, castPoint + GetUnitToUnitDistance(bot, creep) / 1100)
+				and not Fu.CanKillTarget(creep, bot:GetAttackDamage() * 1.2, DAMAGE_TYPE_PHYSICAL)
 			then
-				return BOT_ACTION_DESIRE_HIGH, G
+				return BOT_ACTION_DESIRE_HIGH, creep
 			end
 		end
 	end
-	if c.IsFarming(a) and q >= 3 and c.IsAllowedToSpam(a, t) then
-		local H = a:GetNearbyNeutralCreeps(r + 200)
-		local I = c.GetMostHpUnit(H)
+	if Fu.IsFarming(bot) and abilityLevel >= 3 and Fu.IsAllowedToSpam(bot, manaCost) then
+		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(castRange + 200)
+		local strongestCreep = Fu.GetMostHpUnit(nearbyNeutrals)
 		if
-			c.IsValid(I)
-			and not c.IsRoshan(I)
-			and (#H >= 2 or GetUnitToUnitDistance(I, a) <= 400)
-			and a:IsFacingLocation(I:GetLocation(), 40)
-			and (I:GetMagicResist() < 0.3 or j > 0.9)
-			and not c.CanKillTarget(I, a:GetAttackDamage() * 1.68, DAMAGE_TYPE_PHYSICAL)
-			and not c.CanKillTarget(I, u - 50, v)
+			Fu.IsValid(strongestCreep)
+			and not Fu.IsRoshan(strongestCreep)
+			and (#nearbyNeutrals >= 2 or GetUnitToUnitDistance(strongestCreep, bot) <= 400)
+			and bot:IsFacingLocation(strongestCreep:GetLocation(), 40)
+			and (strongestCreep:GetMagicResist() < 0.3 or mpRatio > 0.9)
+			and not Fu.CanKillTarget(strongestCreep, bot:GetAttackDamage() * 1.68, DAMAGE_TYPE_PHYSICAL)
+			and not Fu.CanKillTarget(strongestCreep, damage - 50, damageType)
 		then
-			return BOT_ACTION_DESIRE_HIGH, I
+			return BOT_ACTION_DESIRE_HIGH, strongestCreep
 		end
 	end
-	if a:GetActiveMode() == BOT_MODE_ROSHAN and a:GetMana() >= 460 then
-		if c.IsRoshan(i) and c.GetHP(i) > 0.2 and c.IsInRange(i, a, r) then
-			return BOT_ACTION_DESIRE_HIGH, i
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() >= 460 then
+		if Fu.IsRoshan(botTarget) and Fu.GetHP(botTarget) > 0.2 and Fu.IsInRange(botTarget, bot, castRange) then
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function b.ConsiderShadowWalk()
-	if not f:IsFullyCastable() then
+function X.ConsiderShadowWalk()
+	if not shadowWalkAbility:IsFullyCastable() then
 		return 0
 	end
-	local q = f:GetLevel()
-	if c.IsGoingOnSomeone(a) and (l >= 7 or DotaTime() > 6 * 60 or q >= 2) then
+	local abilityLevel = shadowWalkAbility:GetLevel()
+	if Fu.IsGoingOnSomeone(bot) and (botLevel >= 7 or DotaTime() > 6 * 60 or abilityLevel >= 2) then
 		if
-			c.IsValidHero(i)
-			and c.CanCastOnMagicImmune(i)
-			and c.IsInRange(a, i, 2500)
-			and (not c.IsInRange(a, i, 1000) or c.IsChasingTarget(a, i))
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 2500)
+			and (not Fu.IsInRange(bot, botTarget, 1000) or Fu.IsChasingTarget(bot, botTarget))
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if
-		c.IsRetreating(a)
-		and a:WasRecentlyDamagedByAnyHero(3.0)
-		and (#m >= 1 or k < 0.2)
-		and a:DistanceFromFountain() > 800
+		Fu.IsRetreating(bot)
+		and bot:WasRecentlyDamagedByAnyHero(3.0)
+		and (#nearbyEnemies >= 1 or hpRatio < 0.2)
+		and bot:DistanceFromFountain() > 800
 	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if c.IsInEnemyArea(a) and l >= 7 and j >= 280 then
-		local J = c.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
-		local K = a:GetNearbyTowers(1600, true)
-		if #J == 0 and K == 0 then
+	if Fu.IsInEnemyArea(bot) and botLevel >= 7 and mpRatio >= 280 then
+		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		local enemyTowers = bot:GetNearbyTowers(1600, true)
+		if #enemyHeroes == 0 and enemyTowers == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function b.ConsiderTrack()
-	if not h:IsFullyCastable() then
+function X.ConsiderTrack()
+	if not trackAbility:IsFullyCastable() then
 		return 0
 	end
-	local r = c.GetProperCastRange(false, a, h:GetCastRange())
-	local L = c.GetAroundEnemyHeroList(r + 100)
-	local M = nil
-	local N = 999999
-	for z, npcEnemy in pairs(L) do
+	local castRange = Fu.GetProperCastRange(false, bot, trackAbility:GetCastRange())
+	local enemiesInRange = Fu.GetAroundEnemyHeroList(castRange + 100)
+	local trackTarget = nil
+	local lowestHealth = 999999
+	for _, npcEnemy in pairs(enemiesInRange) do
 		if
-			c.IsValidHero(npcEnemy)
+			Fu.IsValidHero(npcEnemy)
 			and not npcEnemy:HasModifier("modifier_bounty_hunter_track")
 			and not npcEnemy:HasModifier("modifier_arc_warden_tempest_double")
-			and c.CanCastAbilityOnTarget(npcEnemy, false)
-			and c.CanCastOnTargetAdvanced(npcEnemy)
-			and npcEnemy:GetHealth() < N
+			and Fu.CanCastAbilityOnTarget(npcEnemy, false)
+			and Fu.CanCastOnTargetAdvanced(npcEnemy)
+			and npcEnemy:GetHealth() < lowestHealth
 		then
-			M = npcEnemy
-			N = npcEnemy:GetHealth()
+			trackTarget = npcEnemy
+			lowestHealth = npcEnemy:GetHealth()
 		end
 	end
-	if M ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, M
+	if trackTarget ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, trackTarget
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function b.ConsiderFriendlyShadow()
-	if not g:IsTrained() or not g:IsFullyCastable() then
+function X.ConsiderFriendlyShadow()
+	if not friendlyShadowAbility:IsTrained() or not friendlyShadowAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local r = c.GetProperCastRange(false, a, g:GetCastRange())
-	local O = c.GetNearbyHeroes(a, r, false, BOT_MODE_NONE)
-	for z, P in pairs(O) do
-		if c.IsGoingOnSomeone(P) and c.IsInRange(a, P, r) and c.IsNotSelf(a, P) and not c.IsRealInvisible(P) then
-			return BOT_ACTION_DESIRE_HIGH, P
+	local castRange = Fu.GetProperCastRange(false, bot, friendlyShadowAbility:GetCastRange())
+	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
+	for _, allyHero in pairs(alliesInRange) do
+		if
+			Fu.IsGoingOnSomeone(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.IsNotSelf(bot, allyHero)
+			and not Fu.IsRealInvisible(allyHero)
+		then
+			return BOT_ACTION_DESIRE_HIGH, allyHero
 		end
 		if
-			c.IsRetreating(P)
-			and P:WasRecentlyDamagedByAnyHero(3.0)
-			and P:DistanceFromFountain() > 800
-			and c.IsInRange(a, P, r)
-			and c.IsNotSelf(a, P)
-			and not c.IsRealInvisible(P)
-			and #m >= 1
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(3.0)
+			and allyHero:DistanceFromFountain() > 800
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.IsNotSelf(bot, allyHero)
+			and not Fu.IsRealInvisible(allyHero)
+			and #nearbyEnemies >= 1
 		then
-			return BOT_ACTION_DESIRE_HIGH, P
+			return BOT_ACTION_DESIRE_HIGH, allyHero
 		end
-		if c.IsInEnemyArea(a) then
-			local J = c.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
-			local K = a:GetNearbyTowers(1600, true)
+		if Fu.IsInEnemyArea(bot) then
+			local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+			local enemyTowers = bot:GetNearbyTowers(1600, true)
 			if
-				J ~= nil
-				and K ~= nil
-				and #J == 0
-				and #K == 0
-				and c.IsInRange(a, P, r)
-				and c.IsNotSelf(a, P)
-				and not c.IsRealInvisible(P)
+				enemyHeroes ~= nil
+				and enemyTowers ~= nil
+				and #enemyHeroes == 0
+				and #enemyTowers == 0
+				and Fu.IsInRange(bot, allyHero, castRange)
+				and Fu.IsNotSelf(bot, allyHero)
+				and not Fu.IsRealInvisible(allyHero)
 			then
-				return BOT_ACTION_DESIRE_HIGH, P
+				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-return b
+return X

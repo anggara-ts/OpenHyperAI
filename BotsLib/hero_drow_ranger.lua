@@ -1,19 +1,19 @@
 -- Drow Ranger: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 1, 2, 3, 6, 3, 3, 1, 1, 6, 2, 2, 2, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = RandomInt(1, 2) == 1 and "item_black_king_bar" or "item_sphere"
-local n = {}
-n["pos_1"] = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local tAllAbilityBuildList = { { 1, 3, 1, 2, 3, 6, 3, 3, 1, 1, 6, 2, 2, 2, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sUtility = RandomInt(1, 2) == 1 and "item_black_king_bar" or "item_sphere"
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_slippers",
@@ -27,7 +27,7 @@ n["pos_1"] = {
 	"item_ultimate_scepter",
 	"item_force_staff",
 	"item_hurricane_pike",
-	m,
+	sUtility,
 	"item_butterfly",
 	"item_hydras_breath",
 	"item_aghanims_shard",
@@ -38,473 +38,508 @@ n["pos_1"] = {
 	"item_travel_boots",
 	"item_travel_boots_2",
 }
-n["pos_2"] = n["pos_1"]
-n["pos_4"] = n["pos_1"]
-n["pos_5"] = n["pos_1"]
-n["pos_3"] = n["pos_1"]
-a["sBuyList"] = n[h]
-a["sSellList"] = { "item_satanic", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_ranged_carry" }, {}
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_satanic", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(o)
-	e.MinionThink(o)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local p = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "drow_ranger")
-local q = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "drow_ranger")
-local r = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "drow_ranger")
-local s = SafeAbility(b:GetAbilityByName("drow_ranger_glacier"), "drow_ranger_glacier", "drow_ranger")
-local t = nil
-local u, v
-local w, x
-local y, z
-local A
-local B
-local C, D
-local E, F, G, H, I, J
-function a.SkillsComplement()
-	c.ConsiderForMkbDisassembleMask(b)
-	if c.CanNotUseAbility(b) or b:IsInvisible() then
+local frostArrowsAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "drow_ranger")
+local gustAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "drow_ranger")
+local multishotAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "drow_ranger")
+local glacierAbility = SafeAbility(bot:GetAbilityByName("drow_ranger_glacier"), "drow_ranger_glacier", "drow_ranger")
+local maskOfMadnessItem = nil
+local frostArrowsDesire, frostArrowsTarget
+local gustDesire, gustLocation
+local multishotDesire, multishotLocation
+local glacierDesire
+local maskOfMadnessDesire
+local unusedDesire, unusedTarget
+local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
+function X.SkillsComplement()
+	Fu.ConsiderForMkbDisassembleMask(bot)
+	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
-	local K = d.Build(b)
-	F = 90
-	aetherRange = K.aetherRange
-	E = K.level
-	G = K.mp
-	H = K.hp
-	botTarget = K.target
-	I = K.enemies
-	J = K.allies
-	t = c.IsItemAvailable("item_mask_of_madness")
-	w, x = a.ConsiderW()
-	if w > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(q, x)
+	local context = AbilityContext.Build(bot)
+	aetherRange = context.aetherRange
+	botLevel = context.level
+	mpRatio = context.mp
+	hpRatio = context.hp
+	botTarget = context.target
+	nearbyEnemies = context.enemies
+	nearbyAllies = context.allies
+	maskOfMadnessItem = Fu.IsItemAvailable("item_mask_of_madness")
+	gustDesire, gustLocation = X.ConsiderW()
+	if gustDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(gustAbility, gustLocation)
 		return
 	end
-	A = a.ConsiderGlacier()
-	if A > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(s)
+	glacierDesire = X.ConsiderGlacier()
+	if glacierDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(glacierAbility)
 		return
 	end
-	y, z = a.ConsiderE()
-	if y > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(r, z)
+	multishotDesire, multishotLocation = X.ConsiderE()
+	if multishotDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(multishotAbility, multishotLocation)
 		return
 	end
-	B = a.ConsiderM()
-	if B > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(t)
+	maskOfMadnessDesire = X.ConsiderM()
+	if maskOfMadnessDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(maskOfMadnessItem)
 		return
 	end
-	u, v = a.ConsiderQ()
-	if u > 0 then
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnEntity(p, v)
+	frostArrowsDesire, frostArrowsTarget = X.ConsiderQ()
+	if frostArrowsDesire > 0 then
+		bot:Action_ClearActions(false)
+		bot:ActionQueue_UseAbilityOnEntity(frostArrowsAbility, frostArrowsTarget)
 		return
 	end
 end
-function a.ConsiderE()
-	if not r:IsFullyCastable() then
+function X.ConsiderE()
+	if not multishotAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local L = 850
-	local M = 200
-	local N = 0
-	local O = r:GetCastPoint()
-	local P = r:GetLevel()
-	local Q = r:GetManaCost()
+	local castRange = 850
+	local radius = 200
+	local damage = 0
+	local castPoint = multishotAbility:GetCastPoint()
+	local abilityLevel = multishotAbility:GetLevel()
+	local manaCost = multishotAbility:GetManaCost()
 	local nTargetLocation = nil
-	local R = c.GetNearbyHeroes(b, L + 100, true, BOT_MODE_NONE)
-	if c.IsGoingOnSomeone(b) then
-		local S = c.GetProperTarget(b)
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 100, true, BOT_MODE_NONE)
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
 		if
-			c.IsValidHero(S)
-			and c.CanCastOnNonMagicImmune(S)
-			and c.IsInRange(S, b, L)
-			and (S:IsFacingLocation(b:GetLocation(), 120) or S:GetAttackTarget() ~= nil)
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and Fu.IsInRange(target, bot, castRange)
+			and (target:IsFacingLocation(bot:GetLocation(), 120) or target:GetAttackTarget() ~= nil)
 		then
-			nTargetLocation = S:GetExtrapolatedLocation(O)
+			nTargetLocation = target:GetExtrapolatedLocation(castPoint)
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
-		local T = b:FindAoELocation(true, true, b:GetLocation(), 780, M, O, 0)
-		if T.count >= 2 then
-			nTargetLocation = T.targetloc
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), 780, radius, castPoint, 0)
+		if aoe.count >= 2 then
+			nTargetLocation = aoe.targetloc
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
 	end
 	if
-		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
-		and c.IsAllowedToSpam(b, 90)
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, 90)
 		and DotaTime() > 8 * 60
-		and #J <= 2
-		and #I == 0
+		and #nearbyAllies <= 2
+		and #nearbyEnemies == 0
 	then
-		local U = b:GetNearbyLaneCreeps(1400, true)
-		if #U >= 4 and c.IsValid(U[1]) and not U[1]:HasModifier("modifier_fountain_glyph") then
-			local V = b:FindAoELocation(true, false, b:GetLocation(), 700, M + 50, 0, 0)
-			if V.count >= 3 then
-				nTargetLocation = V.targetloc
-				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "E-带线" .. V.count
+		local enemyLaneCreeps = bot:GetNearbyLaneCreeps(1400, true)
+		if
+			#enemyLaneCreeps >= 4
+			and Fu.IsValid(enemyLaneCreeps[1])
+			and not enemyLaneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
+			local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), 700, radius + 50, 0, 0)
+			if aoe.count >= 3 then
+				nTargetLocation = aoe.targetloc
+				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "E-带线" .. aoe.count
 			end
 		end
 	end
-	if c.IsFarming(b) and c.IsAllowedToSpam(b, Q) then
-		if c.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL and c.IsInRange(b, botTarget, 1000) then
-			local W = G > 0.6 and 2 or 3
-			local T = b:FindAoELocation(true, false, b:GetLocation(), 750, 300, 0, 0)
-			if T.count >= W then
-				nTargetLocation = T.targetloc
-				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "E-打钱" .. T.count
+	if Fu.IsFarming(bot) and Fu.IsAllowedToSpam(bot, manaCost) then
+		if Fu.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL and Fu.IsInRange(bot, botTarget, 1000) then
+			local requiredCount = mpRatio > 0.6 and 2 or 3
+			local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), 750, 300, 0, 0)
+			if aoe.count >= requiredCount then
+				nTargetLocation = aoe.targetloc
+				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "E-打钱" .. aoe.count
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderWM()
-	if E < 15 or t == nil or not t:IsFullyCastable() or not q:IsFullyCastable() or not p:GetAutoCastState() then
+function X.ConsiderWM()
+	if
+		botLevel < 15
+		or maskOfMadnessItem == nil
+		or not maskOfMadnessItem:IsFullyCastable()
+		or not gustAbility:IsFullyCastable()
+		or not frostArrowsAbility:GetAutoCastState()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local X = q:GetManaCost()
-	local Y = t:GetManaCost()
-	if Y + X > b:GetMana() then
+	local gustManaCost = gustAbility:GetManaCost()
+	local maskManaCost = maskOfMadnessItem:GetManaCost()
+	if maskManaCost + gustManaCost > bot:GetMana() then
 		return 0
 	end
-	local L = q:GetCastRange()
-	local O = q:GetCastPoint()
-	local M = q:GetAOERadius()
-	local Z = I
-	local _ = c.GetNearbyHeroes(b, 500, true, BOT_MODE_NONE)
-	local S = c.GetProperTarget(b)
-	if c.IsGoingOnSomeone(b) and #_ == 0 and not c.IsEnemyTargetUnit(b, 1600) and c.GetAllyCount(b, 1000) >= 3 then
+	local castRange = gustAbility:GetCastRange()
+	local castPoint = gustAbility:GetCastPoint()
+	local radius = gustAbility:GetAOERadius()
+	local enemyList = nearbyEnemies
+	local closeEnemies = Fu.GetNearbyHeroes(bot, 500, true, BOT_MODE_NONE)
+	local target = Fu.GetProperTarget(bot)
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and #closeEnemies == 0
+		and not Fu.IsEnemyTargetUnit(bot, 1600)
+		and Fu.GetAllyCount(bot, 1000) >= 3
+	then
 		if
-			c.IsValidHero(S)
-			and not S:IsSilenced()
-			and not c.IsDisabled(S)
-			and c.CanCastOnNonMagicImmune(S)
-			and c.IsInRange(S, b, L)
-			and S:IsFacingLocation(b:GetLocation(), 150)
-			and c.IsAllyHeroBetweenAllyAndEnemy(b, S, S:GetLocation(), 500)
+			Fu.IsValidHero(target)
+			and not target:IsSilenced()
+			and not Fu.IsDisabled(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and Fu.IsInRange(target, bot, castRange)
+			and target:IsFacingLocation(bot:GetLocation(), 150)
+			and Fu.IsAllyHeroBetweenAllyAndEnemy(bot, target, target:GetLocation(), 500)
 		then
-			nTargetLocation = S:GetExtrapolatedLocation(O)
+			nTargetLocation = target:GetExtrapolatedLocation(castPoint)
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
-		local T = b:FindAoELocation(true, true, b:GetLocation(), L, M, O, 0)
-		if T.count >= 2 then
-			nTargetLocation = T.targetloc
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		if aoe.count >= 2 then
+			nTargetLocation = aoe.targetloc
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderW()
-	if not q:IsFullyCastable() then
+function X.ConsiderW()
+	if not gustAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local L = q:GetCastRange()
-	local M = q:GetAOERadius()
-	local N = 0
-	local O = q:GetCastPoint()
+	local castRange = gustAbility:GetCastRange()
+	local radius = gustAbility:GetAOERadius()
+	local damage = 0
+	local castPoint = gustAbility:GetCastPoint()
 	local nTargetLocation = nil
-	local R = c.GetNearbyHeroes(b, L + 100, true, BOT_MODE_NONE)
-	for a0, a1 in pairs(R) do
-		if c.IsValid(a1) and a1:IsChanneling() and not a1:HasModifier("modifier_teleporting") then
-			nTargetLocation = a1:GetLocation()
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 100, true, BOT_MODE_NONE)
+	for _, enemy in pairs(enemiesInRange) do
+		if Fu.IsValid(enemy) and enemy:IsChanneling() and not enemy:HasModifier("modifier_teleporting") then
+			nTargetLocation = enemy:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
 	end
-	if c.IsRetreating(b) and not b:IsInvisible() then
-		for a0, a1 in pairs(R) do
+	if Fu.IsRetreating(bot) and not bot:IsInvisible() then
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(a1)
-				and c.CanBeAttacked(a1)
-				and c.IsInRange(b, a1, L)
-				and c.CanCastOnNonMagicImmune(a1)
-				and not c.IsDisabled(a1)
-				and not a1:IsDisarmed()
-				and not a1:IsSilenced()
-				and b:WasRecentlyDamagedByHero(a1, 2.0)
+				Fu.IsValidHero(enemy)
+				and Fu.CanBeAttacked(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not enemy:IsDisarmed()
+				and not enemy:IsSilenced()
+				and bot:WasRecentlyDamagedByHero(enemy, 2.0)
 			then
-				nTargetLocation = a1:GetLocation()
+				nTargetLocation = enemy:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
-		local S = c.GetProperTarget(b)
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
 		if
-			c.IsValidHero(S)
-			and c.CanBeAttacked(S)
-			and c.IsInRange(S, b, L)
-			and c.CanCastOnNonMagicImmune(S)
-			and not c.IsDisabled(S)
-			and not S:IsSilenced()
+			Fu.IsValidHero(target)
+			and Fu.CanBeAttacked(target)
+			and Fu.IsInRange(target, bot, castRange)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and not Fu.IsDisabled(target)
+			and not target:IsSilenced()
 		then
-			nTargetLocation = S:GetLocation()
+			nTargetLocation = target:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, nTargetLocation
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderM()
-	if t == nil or not t:IsFullyCastable() then
+function X.ConsiderM()
+	if maskOfMadnessItem == nil or not maskOfMadnessItem:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local L = b:GetAttackRange()
-	local a2 = b:GetAttackDamage()
-	local N = a2
-	local a3 = DAMAGE_TYPE_PHYSICAL
-	local S = c.GetProperTarget(b)
-	if c.IsGoingOnSomeone(b) and #I == 1 then
+	local attackRange = bot:GetAttackRange()
+	local attackDamage = bot:GetAttackDamage()
+	local damage = attackDamage
+	local damageType = DAMAGE_TYPE_PHYSICAL
+	local target = Fu.GetProperTarget(bot)
+	if Fu.IsGoingOnSomeone(bot) and #nearbyEnemies == 1 then
 		if
-			c.IsValidHero(S)
-			and c.CanBeAttacked(S)
-			and c.CanCastOnNonMagicImmune(S)
-			and not c.IsInRange(S, b, 400)
-			and c.IsInRange(S, b, L + 300)
-			and b:IsFacingLocation(S:GetLocation(), 30)
-			and not S:IsFacingLocation(b:GetLocation(), 30)
-			and p:GetAutoCastState() == true
-			and q:GetCooldownTimeRemaining() > 5.0
+			Fu.IsValidHero(target)
+			and Fu.CanBeAttacked(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and not Fu.IsInRange(target, bot, 400)
+			and Fu.IsInRange(target, bot, attackRange + 300)
+			and bot:IsFacingLocation(target:GetLocation(), 30)
+			and not target:IsFacingLocation(bot:GetLocation(), 30)
+			and frostArrowsAbility:GetAutoCastState() == true
+			and gustAbility:GetCooldownTimeRemaining() > 5.0
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsRunning(b) or #I > 0 then
+	if Fu.IsRunning(bot) or #nearbyEnemies > 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b:GetActiveMode() == BOT_MODE_ROSHAN then
-		if c.IsRoshan(S) and c.IsInRange(S, b, L + 99) then
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
+		if Fu.IsRoshan(target) and Fu.IsInRange(target, bot, attackRange + 99) then
 			return BOT_ACTION_DESIRE_LOW
 		end
 	end
-	if c.IsValidBuilding(S) and c.IsInRange(S, b, L + 199) then
+	if Fu.IsValidBuilding(target) and Fu.IsInRange(target, bot, attackRange + 199) then
 		return BOT_ACTION_DESIRE_LOW
 	end
-	if c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b) then
-		local a4 = b:GetNearbyCreeps(800, true)
-		if c.IsValid(S) and c.IsInRange(S, b, L + 99) and (#a4 >= 2 or S:GetHealth() > a2 * 2.28) then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot) then
+		local nearbyCreeps = bot:GetNearbyCreeps(800, true)
+		if
+			Fu.IsValid(target)
+			and Fu.IsInRange(target, bot, attackRange + 99)
+			and (#nearbyCreeps >= 2 or target:GetHealth() > attackDamage * 2.28)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-local a5 = 0
-function a.ConsiderQ()
-	if not p:IsFullyCastable() or b:IsDisarmed() or c.GetDistanceFromEnemyFountain(b) < 800 then
+local lastAutoCastOnTime = 0
+function X.ConsiderQ()
+	if not frostArrowsAbility:IsFullyCastable() or bot:IsDisarmed() or Fu.GetDistanceFromEnemyFountain(bot) < 800 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a6 = b:GetAttackRange() + 40
-	local a2 = b:GetAttackDamage() + p:GetSpecialValueInt("damage")
-	local a3 = DAMAGE_TYPE_PHYSICAL
-	local a7 = b:GetNearbyTowers(900, true)
-	local a8 = b:GetNearbyLaneCreeps(a6 + 30, true)
-	local a9 = b:GetNearbyLaneCreeps(400, true)
-	local aa = c.GetAttackableWeakestUnit(b, a6 + 30, false, true)
-	local ab = 10000
-	if aa ~= nil then
-		ab = aa:GetHealth()
+	local attackRange = bot:GetAttackRange() + 40
+	local attackDamage = bot:GetAttackDamage() + frostArrowsAbility:GetSpecialValueInt("damage")
+	local damageType = DAMAGE_TYPE_PHYSICAL
+	local nearbyEnemyTowers = bot:GetNearbyTowers(900, true)
+	local laneCreepsInRange = bot:GetNearbyLaneCreeps(attackRange + 30, true)
+	local closeLaneCreeps = bot:GetNearbyLaneCreeps(400, true)
+	local weakestCreep = Fu.GetAttackableWeakestUnit(bot, attackRange + 30, false, true)
+	local weakestCreepHealth = 10000
+	if weakestCreep ~= nil then
+		weakestCreepHealth = weakestCreep:GetHealth()
 	end
-	local ac = c.GetNearbyHeroes(b, a6, true, BOT_MODE_NONE)
-	local ad = c.GetAttackableWeakestUnit(b, a6, true, true)
-	local ae = c.GetAttackableWeakestUnit(b, 800, true, true)
-	local af = b:GetNearbyLaneCreeps(330, false)
-	local S = c.GetProperTarget(b)
-	local ag = nil
-	local ah = b:GetActiveMode()
-	if E >= 8 then
-		if (I[1] ~= nil or G > 0.76) and not p:GetAutoCastState() then
-			a5 = DotaTime()
-			p:ToggleAutoCast()
-		elseif I[1] == nil and G < 0.7 and a5 + 3.0 < DotaTime() and p:GetAutoCastState() then
-			p:ToggleAutoCast()
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, attackRange, true, BOT_MODE_NONE)
+	local weakestHeroInRange = Fu.GetAttackableWeakestUnit(bot, attackRange, true, true)
+	local weakestHeroNearby = Fu.GetAttackableWeakestUnit(bot, 800, true, true)
+	local allyLaneCreeps = bot:GetNearbyLaneCreeps(330, false)
+	local target = Fu.GetProperTarget(bot)
+	local frostTarget = nil
+	local botMode = bot:GetActiveMode()
+	if botLevel >= 8 then
+		if (nearbyEnemies[1] ~= nil or mpRatio > 0.76) and not frostArrowsAbility:GetAutoCastState() then
+			lastAutoCastOnTime = DotaTime()
+			frostArrowsAbility:ToggleAutoCast()
+		elseif
+			nearbyEnemies[1] == nil
+			and mpRatio < 0.7
+			and lastAutoCastOnTime + 3.0 < DotaTime()
+			and frostArrowsAbility:GetAutoCastState()
+		then
+			frostArrowsAbility:ToggleAutoCast()
 		end
 	else
-		if p:GetAutoCastState() then
-			p:ToggleAutoCast()
+		if frostArrowsAbility:GetAutoCastState() then
+			frostArrowsAbility:ToggleAutoCast()
 		end
 	end
-	if E <= 7 and H > 0.55 and c.IsValidHero(S) and (not c.IsRunning(b) or c.IsInRange(b, S, a6 + 18)) then
-		if not S:IsAttackImmune() and c.IsInRange(b, S, a6 + 99) then
-			ag = S
-			return BOT_ACTION_DESIRE_HIGH, ag
+	if
+		botLevel <= 7
+		and hpRatio > 0.55
+		and Fu.IsValidHero(target)
+		and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, target, attackRange + 18))
+	then
+		if not target:IsAttackImmune() and Fu.IsInRange(bot, target, attackRange + 99) then
+			frostTarget = target
+			return BOT_ACTION_DESIRE_HIGH, frostTarget
 		end
 	end
-	if ah == BOT_MODE_LANING and #a7 == 0 then
-		if c.IsValid(ad) then
+	if botMode == BOT_MODE_LANING and #nearbyEnemyTowers == 0 then
+		if Fu.IsValid(weakestHeroInRange) then
 			if
-				ab > 130
-				and H >= 0.6
-				and #a9 <= 3
-				and #af >= 2
-				and not b:WasRecentlyDamagedByCreep(1.5)
-				and not b:WasRecentlyDamagedByAnyHero(1.5)
+				weakestCreepHealth > 130
+				and hpRatio >= 0.6
+				and #closeLaneCreeps <= 3
+				and #allyLaneCreeps >= 2
+				and not bot:WasRecentlyDamagedByCreep(1.5)
+				and not bot:WasRecentlyDamagedByAnyHero(1.5)
 			then
-				ag = ad
-				return BOT_ACTION_DESIRE_HIGH, ag
+				frostTarget = weakestHeroInRange
+				return BOT_ACTION_DESIRE_HIGH, frostTarget
 			end
 		end
-		if c.IsValid(ae) then
+		if Fu.IsValid(weakestHeroNearby) then
 			if
-				ab > 180
-				and H >= 0.7
-				and #a9 <= 2
-				and #af >= 3
-				and not b:WasRecentlyDamagedByCreep(1.5)
-				and not b:WasRecentlyDamagedByAnyHero(1.5)
-				and not b:WasRecentlyDamagedByTower(1.5)
+				weakestCreepHealth > 180
+				and hpRatio >= 0.7
+				and #closeLaneCreeps <= 2
+				and #allyLaneCreeps >= 3
+				and not bot:WasRecentlyDamagedByCreep(1.5)
+				and not bot:WasRecentlyDamagedByAnyHero(1.5)
+				and not bot:WasRecentlyDamagedByTower(1.5)
 			then
-				ag = ae
-				return BOT_ACTION_DESIRE_HIGH, ag
+				frostTarget = weakestHeroNearby
+				return BOT_ACTION_DESIRE_HIGH, frostTarget
 			end
 			if
-				c.GetUnitAllyCountAroundEnemyTarget(ae, 500) >= 4
-				and not b:WasRecentlyDamagedByCreep(1.5)
-				and not b:WasRecentlyDamagedByAnyHero(1.5)
-				and not b:WasRecentlyDamagedByTower(1.5)
-				and H >= 0.6
+				Fu.GetUnitAllyCountAroundEnemyTarget(weakestHeroNearby, 500) >= 4
+				and not bot:WasRecentlyDamagedByCreep(1.5)
+				and not bot:WasRecentlyDamagedByAnyHero(1.5)
+				and not bot:WasRecentlyDamagedByTower(1.5)
+				and hpRatio >= 0.6
 			then
-				ag = ae
-				return BOT_ACTION_DESIRE_HIGH, ag
+				frostTarget = weakestHeroNearby
+				return BOT_ACTION_DESIRE_HIGH, frostTarget
 			end
 		end
-		if c.IsWithoutTarget(b) and not c.IsAttacking(b) then
-			local ai = b:GetNearbyLaneCreeps(1100, true)
-			for a0, aj in pairs(ai) do
+		if Fu.IsWithoutTarget(bot) and not Fu.IsAttacking(bot) then
+			local enemyLaneCreeps = bot:GetNearbyLaneCreeps(1100, true)
+			for _, creep in pairs(enemyLaneCreeps) do
 				if
-					c.IsValid(aj)
-					and not aj:HasModifier("modifier_fountain_glyph")
-					and aj:GetHealth() < a2 + 180
-					and not c.IsAllysTarget(aj)
+					Fu.IsValid(creep)
+					and not creep:HasModifier("modifier_fountain_glyph")
+					and creep:GetHealth() < attackDamage + 180
+					and not Fu.IsAllysTarget(creep)
 				then
-					local ak = c.GetAttackProDelayTime(b, aj) * 1.08 + 0.08
-					local al = a2 * 1.0
-					if c.WillKillTarget(aj, al, a3, ak) then
-						return BOT_ACTION_DESIRE_HIGH, aj
+					local attackDelay = Fu.GetAttackProDelayTime(bot, creep) * 1.08 + 0.08
+					local expectedDamage = attackDamage * 1.0
+					if Fu.WillKillTarget(creep, expectedDamage, damageType, attackDelay) then
+						return BOT_ACTION_DESIRE_HIGH, creep
 					end
 				end
 			end
 		end
 	end
 	if
-		S ~= nil
-		and S:IsHero()
-		and GetUnitToUnitDistance(S, b) > a6 + 160
-		and c.IsValid(ad)
-		and not ad:IsAttackImmune()
+		target ~= nil
+		and target:IsHero()
+		and GetUnitToUnitDistance(target, bot) > attackRange + 160
+		and Fu.IsValid(weakestHeroInRange)
+		and not weakestHeroInRange:IsAttackImmune()
 	then
-		ag = ad
-		b:SetTarget(ag)
-		return BOT_ACTION_DESIRE_HIGH, ag
+		frostTarget = weakestHeroInRange
+		bot:SetTarget(frostTarget)
+		return BOT_ACTION_DESIRE_HIGH, frostTarget
 	end
-	if b:HasModifier("modifier_item_hurricane_pike_range") and c.IsValid(S) then
-		ag = S
-		return BOT_ACTION_DESIRE_HIGH, ag
+	if bot:HasModifier("modifier_item_hurricane_pike_range") and Fu.IsValid(target) then
+		frostTarget = target
+		return BOT_ACTION_DESIRE_HIGH, frostTarget
 	end
 	if
-		b:GetAttackTarget() == nil
-		and b:GetTarget() == nil
-		and #I == 0
-		and ah ~= BOT_MODE_RETREAT
-		and ah ~= BOT_MODE_ATTACK
-		and ah ~= BOT_MODE_ASSEMBLE
-		and ah ~= BOT_MODE_FARM
-		and ah ~= BOT_MODE_TEAM_ROAM
-		and c.GetTeamFightAlliesCount(b) < 3
-		and b:GetMana() >= 180
-		and not b:WasRecentlyDamagedByAnyHero(3.0)
+		bot:GetAttackTarget() == nil
+		and bot:GetTarget() == nil
+		and #nearbyEnemies == 0
+		and botMode ~= BOT_MODE_RETREAT
+		and botMode ~= BOT_MODE_ATTACK
+		and botMode ~= BOT_MODE_ASSEMBLE
+		and botMode ~= BOT_MODE_FARM
+		and botMode ~= BOT_MODE_TEAM_ROAM
+		and Fu.GetTeamFightAlliesCount(bot) < 3
+		and bot:GetMana() >= 180
+		and not bot:WasRecentlyDamagedByAnyHero(3.0)
 	then
-		if b:HasScepter() then
-			local am = b:GetNearbyCreeps(1600, true)
-			if c.IsValid(am[1]) then
-				ag = am[1]
-				return BOT_ACTION_DESIRE_HIGH, ag
+		if bot:HasScepter() then
+			local nearbyCreeps = bot:GetNearbyCreeps(1600, true)
+			if Fu.IsValid(nearbyCreeps[1]) then
+				frostTarget = nearbyCreeps[1]
+				return BOT_ACTION_DESIRE_HIGH, frostTarget
 			end
 		end
-		local an = b:GetNearbyNeutralCreeps(1600)
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(1600)
 		if
-			ah ~= BOT_MODE_LANING
-			and E >= 6
-			and H > 0.25
-			and c.IsValid(an[1])
-			and not c.IsRoshan(an[1])
-			and (an[1]:IsAncientCreep() == false or E >= 12)
+			botMode ~= BOT_MODE_LANING
+			and botLevel >= 6
+			and hpRatio > 0.25
+			and Fu.IsValid(neutralCreeps[1])
+			and not Fu.IsRoshan(neutralCreeps[1])
+			and (neutralCreeps[1]:IsAncientCreep() == false or botLevel >= 12)
 		then
-			ag = an[1]
-			return BOT_ACTION_DESIRE_HIGH, ag
+			frostTarget = neutralCreeps[1]
+			return BOT_ACTION_DESIRE_HIGH, frostTarget
 		end
-		local ao = b:GetNearbyLaneCreeps(1600, true)
-		if ah ~= BOT_MODE_LANING and E >= 6 and H > 0.25 and c.IsValid(ao[1]) and b:GetAttackDamage() > 130 then
-			ag = ao[1]
-			return BOT_ACTION_DESIRE_HIGH, ag
+		local farLaneCreeps = bot:GetNearbyLaneCreeps(1600, true)
+		if
+			botMode ~= BOT_MODE_LANING
+			and botLevel >= 6
+			and hpRatio > 0.25
+			and Fu.IsValid(farLaneCreeps[1])
+			and bot:GetAttackDamage() > 130
+		then
+			frostTarget = farLaneCreeps[1]
+			return BOT_ACTION_DESIRE_HIGH, frostTarget
 		end
 	end
-	if ah == BOT_MODE_RETREAT then
+	if botMode == BOT_MODE_RETREAT then
 		nDistance = 999
-		local ag = nil
-		for a0, a1 in pairs(ac) do
+		local slowTarget = nil
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValid(a1)
-				and a1:HasModifier("modifier_drowranger_wave_of_silence_knockback")
-				and GetUnitToUnitDistance(a1, b) < nDistance
+				Fu.IsValid(enemy)
+				and enemy:HasModifier("modifier_drowranger_wave_of_silence_knockback")
+				and GetUnitToUnitDistance(enemy, bot) < nDistance
 			then
-				ag = a1
-				nDistance = GetUnitToUnitDistance(a1, b)
+				slowTarget = enemy
+				nDistance = GetUnitToUnitDistance(enemy, bot)
 			end
 		end
-		if ag ~= nil and not ag:HasModifier("modifier_drow_ranger_frost_arrows_slow") then
-			return BOT_ACTION_DESIRE_HIGH, ag
+		if slowTarget ~= nil and not slowTarget:HasModifier("modifier_drow_ranger_frost_arrows_slow") then
+			return BOT_ACTION_DESIRE_HIGH, slowTarget
 		end
 	end
-	if c.IsFarming(b) and G > 0.55 and not p:GetAutoCastState() then
+	if Fu.IsFarming(bot) and mpRatio > 0.55 and not frostArrowsAbility:GetAutoCastState() then
 		if
-			c.IsValid(botTarget)
+			Fu.IsValid(botTarget)
 			and botTarget:GetTeam() == TEAM_NEUTRAL
-			and c.IsInRange(b, botTarget, 1000)
-			and botTarget:GetHealth() > a2
+			and Fu.IsInRange(bot, botTarget, 1000)
+			and botTarget:GetHealth() > attackDamage
 		then
 			return BOT_ACTION_DESIRE_LOW, botTarget, "Q-打野"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderGlacier()
-	if not s:IsTrained() or not s:IsFullyCastable() then
+function X.ConsiderGlacier()
+	if not glacierAbility:IsTrained() or not glacierAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local a6 = b:GetAttackRange()
-	local R = c.GetNearbyHeroes(b, a6, true, BOT_MODE_NONE)
-	local ap = c.GetNearbyHeroes(b, a6, true, BOT_MODE_ATTACK)
-	botTarget = c.GetProperTarget(b)
-	local aq = c.GetAlliesNearLoc(b:GetLocation(), 500)
-	-- #R >= 1: an ally within 500 alone cast it (any desire above 0 casts), so Glacier went out every
+	local attackRange = bot:GetAttackRange()
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, attackRange, true, BOT_MODE_NONE)
+	local attackingEnemies = Fu.GetNearbyHeroes(bot, attackRange, true, BOT_MODE_ATTACK)
+	botTarget = Fu.GetProperTarget(bot)
+	local nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 500)
+	-- #enemiesInRange >= 1: an ally within 500 alone cast it (any desire above 0 casts), so Glacier went out every
 	-- 25s in lane or while farming with no enemy hero near. Now only with an enemy hero in range.
-	if #aq > 1 and #R >= 1 then
+	if #nearbyAllies > 1 and #enemiesInRange >= 1 then
 		return BOT_ACTION_DESIRE_LOW
 	end
-	if c.IsRetreating(b) and (#R ~= nil and #R >= 2 or c.GetHP(b) < 0.3) then
-		if ap ~= nil and #ap >= 1 then
+	if Fu.IsRetreating(bot) and (#enemiesInRange ~= nil and #enemiesInRange >= 2 or Fu.GetHP(bot) < 0.3) then
+		if attackingEnemies ~= nil and #attackingEnemies >= 1 then
 			return BOT_ACTION_DESIRE_LOW
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidTarget(botTarget)
-			and (r:IsFullyCastable() and c.CanCastOnNonMagicImmune(botTarget))
-			and c.IsInRange(b, botTarget, r:GetCastRange() + 200)
+			Fu.IsValidTarget(botTarget)
+			and (multishotAbility:IsFullyCastable() and Fu.CanCastOnNonMagicImmune(botTarget))
+			and Fu.IsInRange(bot, botTarget, multishotAbility:GetCastRange() + 200)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

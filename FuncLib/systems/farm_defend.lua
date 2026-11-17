@@ -1,5 +1,5 @@
 -- Decides whether a farming bot should answer a tower/rax/ancient defense call.
-local Utils = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 
 local FarmDefend = {}
 
@@ -27,14 +27,14 @@ local BARRACKS_BY_LANE = {
 local DECISION_CHAT_COOLDOWN = 18
 
 local function DefendPing()
-	local states = Utils.Utils and Utils.Utils.GameStates
+	local states = Fu.Utils and Fu.Utils.GameStates
 	return states and states.defendPings or nil
 end
 
 local function GameStates()
-	Utils.Utils = Utils.Utils or {}
-	Utils.Utils.GameStates = Utils.Utils.GameStates or {}
-	return Utils.Utils.GameStates
+	Fu.Utils = Fu.Utils or {}
+	Fu.Utils.GameStates = Fu.Utils.GameStates or {}
+	return Fu.Utils.GameStates
 end
 
 local function EnemyCreepsNear(location, radius)
@@ -106,7 +106,7 @@ end
 
 local function ObjectiveThreatened(objective, tier)
 	local hp = objective:GetHealth() / math.max(1, objective:GetMaxHealth())
-	local heroes = #Utils.GetEnemiesNearLoc(objective:GetLocation(), 1600)
+	local heroes = #Fu.GetEnemiesNearLoc(objective:GetLocation(), 1600)
 	local creeps = EnemyCreepsNear(objective:GetLocation(), 800)
 	return hp < 0.55
 		or (heroes >= 1 and (tier >= 2 or hp < 0.75 or creeps >= 2))
@@ -125,14 +125,14 @@ function FarmDefend.ShouldLeaveFarm(bot)
 	local team = GetTeam()
 	for _, id in pairs(INNER_TOWERS) do
 		local tower = GetTower(team, id)
-		if tower ~= nil and tower:IsAlive() and #Utils.GetEnemiesNearLoc(tower:GetLocation(), 1200) >= 2 then
+		if tower ~= nil and tower:IsAlive() and #Fu.GetEnemiesNearLoc(tower:GetLocation(), 1200) >= 2 then
 			return true
 		end
 	end
 
 	local ancient = GetAncient(team)
 	if ancient ~= nil and ancient:IsAlive() then
-		local nearAncient = #Utils.GetEnemiesNearLoc(ancient:GetLocation(), 1600)
+		local nearAncient = #Fu.GetEnemiesNearLoc(ancient:GetLocation(), 1600)
 		if nearAncient >= 1 then
 			return true
 		end
@@ -147,11 +147,11 @@ function FarmDefend.ShouldLeaveFarm(bot)
 		return false
 	end
 
-	local position = Utils.GetPosition(bot)
-	local hasTp = Utils.Item.GetItemCharges(bot, "item_tpscroll") >= 1
+	local position = Fu.GetPosition(bot)
+	local hasTp = Fu.Item.GetItemCharges(bot, "item_tpscroll") >= 1
 	local distance = GetUnitToLocationDistance(bot, objective:GetLocation())
 	local hp = objective:GetHealth() / math.max(1, objective:GetMaxHealth())
-	local heroes = #Utils.GetEnemiesNearLoc(objective:GetLocation(), 1600)
+	local heroes = #Fu.GetEnemiesNearLoc(objective:GetLocation(), 1600)
 
 	if position == 1 then
 		return tier >= 2 or hp < 0.4 or heroes >= 2

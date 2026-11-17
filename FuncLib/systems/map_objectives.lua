@@ -1,7 +1,7 @@
 -- Shared timing/discovery for lotus pools and wisdom shrines.
 local MapObjectives = {}
 
-local U = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 
 local cachedLotus = { at = -999, units = {} }
 local cachedWisdom = { at = -999, units = {} }
@@ -10,26 +10,26 @@ local function IsTurbo()
 	if GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23 then
 		return true
 	end
-	return U.IsModeTurbo and U.IsModeTurbo() or false
+	return Utils.IsModeTurbo and Utils.IsModeTurbo() or false
 end
 
 -- Seconds until the next clock mark for a fixed interval (first spawn == interval).
 function MapObjectives.SecondsToNextMark(intervalSeconds)
-	local t = DotaTime()
-	if t < 0 then
-		return intervalSeconds - t
+	local now = DotaTime()
+	if now < 0 then
+		return intervalSeconds - now
 	end
-	local nextMark = math.ceil(t / intervalSeconds) * intervalSeconds
+	local nextMark = math.ceil(now / intervalSeconds) * intervalSeconds
 	if nextMark < intervalSeconds then
 		nextMark = intervalSeconds
 	end
-	if math.abs(t - nextMark) < 0.05 then
+	if math.abs(now - nextMark) < 0.05 then
 		return 0
 	end
-	if nextMark <= t then
+	if nextMark <= now then
 		nextMark = nextMark + intervalSeconds
 	end
-	return nextMark - t
+	return nextMark - now
 end
 
 function MapObjectives.LotusInterval()
@@ -44,8 +44,8 @@ end
 -- arriveEarly: start walking this many seconds before the mark
 -- stayAfter: keep desire this many seconds after the mark
 function MapObjectives.InMarkWindow(intervalSeconds, arriveEarly, stayAfter)
-	local t = DotaTime()
-	if t < -5 then
+	local now = DotaTime()
+	if now < -5 then
 		return false, 9999
 	end
 	arriveEarly = arriveEarly or 35
@@ -55,7 +55,7 @@ function MapObjectives.InMarkWindow(intervalSeconds, arriveEarly, stayAfter)
 	if toNext <= arriveEarly then
 		return true, toNext
 	end
-	if sinceLast <= stayAfter and t >= intervalSeconds - 1 then
+	if sinceLast <= stayAfter and now >= intervalSeconds - 1 then
 		return true, -sinceLast
 	end
 	return false, toNext
@@ -65,15 +65,15 @@ end
 -- Nearby → ~8s early; far (~6k) → ~25s; hard cap so they never camp minutes early.
 function MapObjectives.ArriveEarlyForDistance(dist, bot)
 	dist = dist or 0
-	local ms = 320
+	local moveSpeed = 320
 	if bot ~= nil and bot.GetCurrentMovementSpeed then
 		local speed = bot:GetCurrentMovementSpeed()
 		if type(speed) == "number" and speed > 200 then
-			ms = speed
+			moveSpeed = speed
 		end
 	end
 	-- travel time + small pathing buffer
-	local early = dist / ms + 5
+	local early = dist / moveSpeed + 5
 	if early < 8 then
 		return 8
 	end
@@ -88,9 +88,9 @@ local function ScanUnits(cache, unitName)
 		return cache.units
 	end
 	local found = {}
-	for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
-		if u ~= nil and u.GetUnitName and u:GetUnitName() == unitName then
-			found[#found + 1] = u
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+		if unit ~= nil and unit.GetUnitName and unit:GetUnitName() == unitName then
+			found[#found + 1] = unit
 		end
 	end
 	cache.at = DotaTime()
@@ -107,7 +107,7 @@ function MapObjectives.GetLotusPoolLocations()
 		end
 		return locs, units
 	end
-	local pools = U.LotusPools or {}
+	local pools = Utils.LotusPools or {}
 	return {
 		pools.top or Vector(-7264, 4493, 256),
 		pools.bottom or Vector(7788, -4121, 256),
@@ -123,7 +123,7 @@ function MapObjectives.GetWisdomShrineLocations()
 		end
 		return locs, units
 	end
-	local runes = U.WisdomRunes or {}
+	local runes = Utils.WisdomRunes or {}
 	return {
 		runes[TEAM_RADIANT] or Vector(-8126, -320, 256),
 		runes[TEAM_DIRE] or Vector(8319, 266, 256),
@@ -136,9 +136,9 @@ function MapObjectives.PickClosestLocation(bot, locations)
 	for i = 1, #locations do
 		local loc = locations[i]
 		if loc ~= nil then
-			local d = GetUnitToLocationDistance(bot, loc)
-			if d < bestDist then
-				bestDist = d
+			local distance = GetUnitToLocationDistance(bot, loc)
+			if distance < bestDist then
+				bestDist = distance
 				best = loc
 			end
 		end
@@ -247,10 +247,14 @@ end
 
 function MapObjectives.TeamInCrisis(bot)
 	local ancient = GetAncient(GetTeam())
-	if ancient ~= nil and U.CountEnemyHeroesNear and U.CountEnemyHeroesNear(ancient:GetLocation(), 2800) >= 1 then
+	if
+		ancient ~= nil
+		and Utils.CountEnemyHeroesNear
+		and Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2800) >= 1
+	then
 		return true
 	end
-	if U.CountEnemyHeroesOnHighGround and U.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
+	if Utils.CountEnemyHeroesOnHighGround and Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
 		return true
 	end
 	return false
@@ -346,9 +350,9 @@ function MapObjectives.EnsureInventorySlot(bot)
 	end
 	local best, bestCost = nil, 999999
 	for slot = 0, 5 do
-		local it = bot:GetItemInSlot(slot)
-		if it ~= nil and not it:IsNull() then
-			local name = it:GetName()
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil and not item:IsNull() then
+			local name = item:GetName()
 			if not keep[name] and not string.find(name, "token", 1, true) then
 				local cost = GetItemCost(name) or 0
 				if cost < bestCost then
@@ -407,12 +411,12 @@ end
 function MapObjectives.LotusCheckedThisMark(loc)
 	local mark = math.floor(math.max(0, DotaTime()) / MapObjectives.LotusInterval()) * MapObjectives.LotusInterval()
 	for i = 1, 5 do
-		local m = GetTeamMember(i)
+		local member = GetTeamMember(i)
 		if
-			m ~= nil
-			and m._lotusSkipMark == mark
-			and m._lotusSkipPool ~= nil
-			and (m._lotusSkipPool - loc):Length2D() < 1000
+			member ~= nil
+			and member._lotusSkipMark == mark
+			and member._lotusSkipPool ~= nil
+			and (member._lotusSkipPool - loc):Length2D() < 1000
 		then
 			return true
 		end
@@ -512,24 +516,24 @@ function MapObjectives.WisdomScore(hero, loc)
 end
 
 local function LotusCharges(bot)
-	local n = 0
+	local totalCharges = 0
 	for slot = 0, 16 do
-		local it = bot:GetItemInSlot(slot)
-		if it ~= nil and it.GetName ~= nil then
-			local name = it:GetName()
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil and item.GetName ~= nil then
+			local name = item:GetName()
 			if name == "item_famango" or name == "item_great_famango" or name == "item_greater_famango" then
 				local charges = 1
-				if it.GetCurrentCharges ~= nil then
-					local c = it:GetCurrentCharges()
-					if type(c) == "number" and c > charges then
-						charges = c
+				if item.GetCurrentCharges ~= nil then
+					local currentCharges = item:GetCurrentCharges()
+					if type(currentCharges) == "number" and currentCharges > charges then
+						charges = currentCharges
 					end
 				end
-				n = n + charges
+				totalCharges = totalCharges + charges
 			end
 		end
 	end
-	return n
+	return totalCharges
 end
 
 function MapObjectives.LotusCountOnUnit(pool)
@@ -564,12 +568,12 @@ end
 -- True once this spawn's lotus should already be in the pool.
 function MapObjectives.LotusSpawnOpen()
 	local interval = MapObjectives.LotusInterval()
-	local t = DotaTime()
-	if t < interval - 1 then
+	local now = DotaTime()
+	if now < interval - 1 then
 		return false
 	end
-	local mark = math.floor(t / interval) * interval
-	return mark >= interval and t >= mark
+	local mark = math.floor(now / interval) * interval
+	return mark >= interval and now >= mark
 end
 
 -- Inside the ring: a lotus that never arrives was taken or the pool is empty.
@@ -632,10 +636,7 @@ local function MarkLotusDo(bot, name)
 		local pos = bot:GetLocation()
 		local hero = string.gsub(bot:GetUnitName() or "?", "npc_dota_hero_", "")
 		local team = GetTeam() == TEAM_RADIANT and "r" or "d"
-		print(string.format(
-			"[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f",
-			hero, team, DotaTime(), name, pos.x, pos.y
-		))
+		print(string.format("[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f", hero, team, DotaTime(), name, pos.x, pos.y))
 	end)
 	if not ok then
 		print("[OHA-LOTUS] err " .. tostring(err))
@@ -699,7 +700,7 @@ local function CreepsPushingTower(tower)
 	if creeps == nil then
 		return false
 	end
-	local n = 0
+	local creepCount = 0
 	for _, creep in pairs(creeps) do
 		if
 			creep ~= nil
@@ -707,8 +708,8 @@ local function CreepsPushingTower(tower)
 			and not creep:IsIllusion()
 			and GetUnitToUnitDistance(creep, tower) <= 1100
 		then
-			n = n + 1
-			if n >= 2 then
+			creepCount = creepCount + 1
+			if creepCount >= 2 then
 				return true
 			end
 		end
@@ -721,26 +722,21 @@ local function HeroesNearLoc(loc, radius)
 		return 0
 	end
 	local radiusSq = radius * radius
-	local n = 0
+	local enemyCount = 0
 	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam())) do
 		if IsHeroAlive(pid) then
 			local info = GetHeroLastSeenInfo(pid)
 			local seen = info and info[1]
-			if
-				seen ~= nil
-				and seen.location ~= nil
-				and seen.time_since_seen ~= nil
-				and seen.time_since_seen <= 1.0
-			then
+			if seen ~= nil and seen.location ~= nil and seen.time_since_seen ~= nil and seen.time_since_seen <= 1.0 then
 				local dx = seen.location.x - loc.x
 				local dy = seen.location.y - loc.y
 				if dx * dx + dy * dy <= radiusSq then
-					n = n + 1
+					enemyCount = enemyCount + 1
 				end
 			end
 		end
 	end
-	return n
+	return enemyCount
 end
 
 -- A lotus trip while a T1 is being hit, or while heroes are already at the pool.
@@ -754,9 +750,9 @@ local function LotusTripBlock(bot, loc, dist, foes, friends)
 	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
 		local tower = LivingT1(lane)
 		if tower ~= nil then
-			local d = GetUnitToLocationDistance(tower, loc)
-			if d < poolDist then
-				poolTower, poolDist = tower, d
+			local distance = GetUnitToLocationDistance(tower, loc)
+			if distance < poolDist then
+				poolTower, poolDist = tower, distance
 			end
 		end
 	end
@@ -787,27 +783,27 @@ end
 -- logs each pool / shrine's modifiers with stack counts, at most once a minute and only when
 -- they changed.
 local probeSeen = {}
-local function ProbeUnit(kind, u)
-	if u == nil or u:IsNull() or not IsLocationVisible(u:GetLocation()) then
+local function ProbeUnit(kind, unit)
+	if unit == nil or unit:IsNull() or not IsLocationVisible(unit:GetLocation()) then
 		return
 	end
-	local key = kind .. ":" .. string.format("%.0f,%.0f", u:GetLocation().x, u:GetLocation().y)
+	local key = kind .. ":" .. string.format("%.0f,%.0f", unit:GetLocation().x, unit:GetLocation().y)
 	local now = DotaTime()
 	local prev = probeSeen[key]
 	if prev ~= nil and now - prev.at < 60 then
 		return
 	end
-	local okN, n = pcall(function()
-		return u:NumModifiers()
+	local okN, modifierCount = pcall(function()
+		return unit:NumModifiers()
 	end)
 	local parts = {}
-	if okN and type(n) == "number" then
-		for i = 0, n - 1 do
+	if okN and type(modifierCount) == "number" then
+		for i = 0, modifierCount - 1 do
 			local okM, name = pcall(function()
-				return u:GetModifierName(i)
+				return unit:GetModifierName(i)
 			end)
 			local okS, stack = pcall(function()
-				return u:GetModifierStackCount(i)
+				return unit:GetModifierStackCount(i)
 			end)
 			parts[#parts + 1] = string.format("%s/%s", okM and tostring(name) or "?", okS and tostring(stack) or "?")
 		end
@@ -818,32 +814,35 @@ local function ProbeUnit(kind, u)
 		return
 	end
 	probeSeen[key] = { at = now, sig = sig }
-	pcall(print, string.format(
-		"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
-		now,
-		kind,
-		key,
-		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
-		#parts > 0 and sig or (okN and "none" or "unreadable")
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
+			now,
+			kind,
+			key,
+			GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+			#parts > 0 and sig or (okN and "none" or "unreadable")
+		)
+	)
 end
 local function ProbeObjectives(bot)
 	local first = nil
 	for i = 1, 5 do
-		local m0 = GetTeamMember(i)
-		if m0 ~= nil and m0:IsBot() then
-			first = m0
+		local member = GetTeamMember(i)
+		if member ~= nil and member:IsBot() then
+			first = member
 			break
 		end
 	end
 	if first ~= bot then
 		return
 	end
-	for _, u in ipairs(ScanUnits(cachedLotus, "npc_dota_lotus_pool")) do
-		ProbeUnit("lotus", u)
+	for _, unit in ipairs(ScanUnits(cachedLotus, "npc_dota_lotus_pool")) do
+		ProbeUnit("lotus", unit)
 	end
-	for _, u in ipairs(ScanUnits(cachedWisdom, "npc_dota_xp_fountain")) do
-		ProbeUnit("wisdom", u)
+	for _, unit in ipairs(ScanUnits(cachedWisdom, "npc_dota_xp_fountain")) do
+		ProbeUnit("wisdom", unit)
 	end
 end
 function MapObjectives.ConsiderObjectiveDesire(bot)
@@ -984,7 +983,16 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			-- 1200 of him, so a laner who said "Taking lotus" turned back a second later (6:05).
 			-- Near the bot only being outnumbered stops it.
 			local foesAtPool = HeroesNearLoc(loc, 1200)
-			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and foesAtPool == 0 and #foes <= #friends and bot._lotusSkipMark ~= mark then
+			if
+				count ~= nil
+				and count > 0
+				and spawnOpen
+				and sinceLast >= 0
+				and sinceLast <= 45
+				and foesAtPool == 0
+				and #foes <= #friends
+				and bot._lotusSkipMark ~= mark
+			then
 				inLotus = true
 				etaL = -sinceLast
 			end
@@ -1017,20 +1025,23 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				-- bot went for the 3:00 lotus beside Doom.
 				if why ~= bot._lotusWhyLogged then
 					bot._lotusWhyLogged = why
-					pcall(print, string.format(
-						"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						why,
-						loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
-						type(dist) == "number" and string.format("%.0f", dist) or "?",
-						#foes,
-						#friends,
-						loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
-						bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
-						sinceLast,
-						toNext
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							why,
+							loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
+							type(dist) == "number" and string.format("%.0f", dist) or "?",
+							#foes,
+							#friends,
+							loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
+							bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+							sinceLast,
+							toNext
+						)
+					)
 				end
 				bot._lotusWhy = why
 				bot._lotusDist = dist
@@ -1077,14 +1088,17 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 					if logNow then
 						bot._lotusRoomLogAt = DotaTime() + 5
 					end
-					pcall(logNow and print or function() end, string.format(
-						"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						tostring(okR and made),
-						hp,
-						bot:GetMana() / math.max(1, bot:GetMaxMana())
-					))
+					pcall(
+						logNow and print or function() end,
+						string.format(
+							"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(okR and made),
+							hp,
+							bot:GetMana() / math.max(1, bot:GetMaxMana())
+						)
+					)
 				end
 			elseif loc == nil then
 				failWhy = "no-pool"
@@ -1104,7 +1118,11 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and dist <= maxWalk
 				and hp >= 0.28
 				and not (danger and dist > 700)
-				and (beside or contester or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
+				and (
+					beside
+					or contester
+					or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true)
+				)
 			then
 				note(passBy and "pass-by" or (beside and "beside" or (contester and "contest" or "walk")))
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
@@ -1280,7 +1298,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			MarkLotusDo(bot, "empty")
 			return false
 		end
-		if (MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0)) then
+		if MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0) then
 			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
 				local interval = MapObjectives.LotusInterval()
 				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval

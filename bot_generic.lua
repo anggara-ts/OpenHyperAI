@@ -1,27 +1,27 @@
 -- Runs once per bot. Loads that hero file from BotsLib and thinks for the bot summons.
-local a = GetBot()
-local b = a:GetUnitName()
-if a == nil or a:IsInvulnerable() or not a:IsHero() or not string.find(b, "hero") or a:IsIllusion() then
+local bot = GetBot()
+local botName = bot:GetUnitName()
+if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(botName, "hero") or bot:IsIllusion() then
 	return
 end
-local c = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local d = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(b, "npc_dota_", ""))
-if d == nil then
-	log("[ERROR] No build config file found for bot: %s", b)
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local BotBuild = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botName, "npc_dota_", ""))
+if BotBuild == nil then
+	log("[ERROR] No build config file found for bot: %s", botName)
 	return
 end
-function MinionThink(e)
-	if not c.IsValidUnit(e) then
+function MinionThink(minion)
+	if not Utils.IsValidUnit(minion) then
 		return
 	end
-	if e.lastMinionFrameProcessTime == nil then
-		e.lastMinionFrameProcessTime = DotaTime()
+	if minion.lastMinionFrameProcessTime == nil then
+		minion.lastMinionFrameProcessTime = DotaTime()
 	end
-	if DotaTime() - e.lastMinionFrameProcessTime < 0.3 then
+	if DotaTime() - minion.lastMinionFrameProcessTime < 0.3 then
 		return
 	end
-	e.lastMinionFrameProcessTime = DotaTime()
-	d.MinionThink(e)
+	minion.lastMinionFrameProcessTime = DotaTime()
+	BotBuild.MinionThink(minion)
 end
 
 -- [OHA-ERROR] trap (minions). From ~11:20 every game an unwrapped entry point fails and the engine only
@@ -38,9 +38,9 @@ local function OHA_Trap(name, fn, fallback)
 		if res[1] then
 			return unpack(res, 2)
 		end
-		local n = (OHA_TRAP_COUNT[name] or 0) + 1
-		OHA_TRAP_COUNT[name] = n
-		if n <= 3 then
+		local failCount = (OHA_TRAP_COUNT[name] or 0) + 1
+		OHA_TRAP_COUNT[name] = failCount
+		if failCount <= 3 then
 			local hero = "?"
 			pcall(function()
 				hero = GetBot():GetUnitName()

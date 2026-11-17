@@ -1,45 +1,51 @@
 -- Hero-specific helper: hero builder.
-local a = {}
-local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local c = { t25 = { 0, 10 }, t20 = { 10, 0 }, t15 = { 0, 10 }, t10 = { 10, 0 } }
-function a.buildHeroConfig(d, e)
-	local f = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-	local g = f.GetRoleItemsBuyList(d)
-	local h = b.Skill.GetAbilityList(d)
-	local i = b.Skill.GetTalentList(d)
-	local j = {}
-	local k = e.skills or {}
-	if k.default then
-		j = k.default
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local defaultTalentTree = { t25 = { 0, 10 }, t20 = { 10, 0 }, t15 = { 0, 10 }, t10 = { 10, 0 } }
+function X.buildHeroConfig(bot, heroConfig)
+	local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+	local sRole = Item.GetRoleItemsBuyList(bot)
+	local sAbilityList = Fu.Skill.GetAbilityList(bot)
+	local sTalentList = Fu.Skill.GetTalentList(bot)
+	local defaultSkillBuild = {}
+	local skillBuilds = heroConfig.skills or {}
+	if skillBuilds.default then
+		defaultSkillBuild = skillBuilds.default
 	else
-		for l in pairs(k) do
-			if l ~= "default" then
-				j = k[l]
+		for roleKey in pairs(skillBuilds) do
+			if roleKey ~= "default" then
+				defaultSkillBuild = skillBuilds[roleKey]
 				break
 			end
 		end
 	end
-	local m = k[g] or j
-	local n = e.talents or {}
-	local o = n[g] or n.default or c
-	local p = b.Skill.GetTalentBuild(o)
-	local q = {}
-	local r = e.items or {}
-	if r.default then
-		q = r.default
+	local nAbilityBuildList = skillBuilds[sRole] or defaultSkillBuild
+	local talentTrees = heroConfig.talents or {}
+	local tTalentTreeList = talentTrees[sRole] or talentTrees.default or defaultTalentTree
+	local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+	local defaultItemBuild = {}
+	local itemBuilds = heroConfig.items or {}
+	if itemBuilds.default then
+		defaultItemBuild = itemBuilds.default
 	else
-		for l in pairs(r) do
-			if l ~= "default" then
-				q = r[l]
+		for roleKey in pairs(itemBuilds) do
+			if roleKey ~= "default" then
+				defaultItemBuild = itemBuilds[roleKey]
 				break
 			end
 		end
 	end
-	local s = r[g] or q
-	local t = b.Skill.GetSkillList(h, m, i, p)
-	return { role = g, skillBuild = t, itemBuild = s, sellList = e.sell or {} }
+	local sRoleItemsBuyList = itemBuilds[sRole] or defaultItemBuild
+	local sSkillList = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+	return { role = sRole, skillBuild = sSkillList, itemBuild = sRoleItemsBuyList, sellList = heroConfig.sell or {} }
 end
-function a.buildHeroExport(u, v, w)
-	return { sSkillList = u.skillBuild, sBuyList = u.itemBuild, sSellList = u.sellList, SkillsComplement = v, MinionThink = w }
+function X.buildHeroExport(heroConfig, skillsComplement, minionThink)
+	return {
+		sSkillList = heroConfig.skillBuild,
+		sBuyList = heroConfig.itemBuild,
+		sSellList = heroConfig.sellList,
+		SkillsComplement = skillsComplement,
+		MinionThink = minionThink,
+	}
 end
-return a
+return X

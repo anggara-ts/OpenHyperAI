@@ -37,95 +37,96 @@ if _G.OHA_RAW_PRINT == nil then
 	end
 end
 if package and package.path then
-	local a = GetScriptDirectory()
-	if not string.find(package.path, a, 1, true) then
-		package.path = package.path .. ";" .. a .. "/?.lua"
-		package.path = package.path .. ";" .. a .. "/?/init.lua"
+	local scriptDirectory = GetScriptDirectory()
+	if not string.find(package.path, scriptDirectory, 1, true) then
+		package.path = package.path .. ";" .. scriptDirectory .. "/?.lua"
+		package.path = package.path .. ";" .. scriptDirectory .. "/?/init.lua"
 	end
 end
-local b = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 require(GetScriptDirectory() .. "/FuncLib/systems/log")
-local c = type(debug) == "table" and type(debug.getinfo) == "function"
-local d = type(debug) == "table" and type(debug.traceback) == "function"
-local function e(f)
-	f = f or 2
-	if d then
-		return tostring(debug.traceback("", 1 + f))
+local hasGetInfo = type(debug) == "table" and type(debug.getinfo) == "function"
+local hasTraceback = type(debug) == "table" and type(debug.traceback) == "function"
+local function getStackTrace(level)
+	level = level or 2
+	if hasTraceback then
+		return tostring(debug.traceback("", 1 + level))
 	end
-	if c then
-		local g = {}
-		local h = 1 + f
-		for i = h, h + 8 do
-			local j = debug.getinfo(i, "Sl")
-			if not j then
+	if hasGetInfo then
+		local frames = {}
+		local firstLevel = 1 + level
+		for i = firstLevel, firstLevel + 8 do
+			local info = debug.getinfo(i, "Sl")
+			if not info then
 				break
 			end
-			g[#g + 1] = string.format("  %s:%d", tostring(j.short_src or j.source), j.currentline or -1)
+			frames[#frames + 1] =
+				string.format("  %s:%d", tostring(info.short_src or info.source), info.currentline or -1)
 		end
-		if #g == 0 then
+		if #frames == 0 then
 			return "<no frames>"
 		end
-		return "\n" .. table.concat(g, "\n")
+		return "\n" .. table.concat(frames, "\n")
 	end
-	local k, l = pcall(error, "@", 2 + f)
-	return tostring(l or "<no trace>")
+	local _, errorMessage = pcall(error, "@", 2 + level)
+	return tostring(errorMessage or "<no trace>")
 end
-function ShouldSkipBotThink(m)
-	return m:IsInvulnerable() or not m:IsHero() or not m:IsAlive() or m:IsIllusion()
+function ShouldSkipBotThink(bot)
+	return bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() or bot:IsIllusion()
 end
-function HandleIdleBotState(m)
-	local n, o = pcall(function()
-		return _HandleIdleBotStateInner(m)
+function HandleIdleBotState(bot)
+	local ok, result = pcall(function()
+		return _HandleIdleBotStateInner(bot)
 	end)
-	if n then
-		return o
+	if ok then
+		return result
 	end
 	return false
 end
-function _HandleIdleBotStateInner(m)
-	if not m:IsHero() or not m:IsAlive() or m:IsIllusion() then
+function _HandleIdleBotStateInner(bot)
+	if not bot:IsHero() or not bot:IsAlive() or bot:IsIllusion() then
 		return false
 	end
-	if m._idleCheck == nil then
-		m._idleCheck = { lastTime = DotaTime(), lastPos = m:GetLocation(), idleSince = 0 }
+	if bot._idleCheck == nil then
+		bot._idleCheck = { lastTime = DotaTime(), lastPos = bot:GetLocation(), idleSince = 0 }
 	end
-	local p = m._idleCheck
-	local q = DotaTime()
-	if q - p.lastTime < 1.0 then
+	local idleCheck = bot._idleCheck
+	local now = DotaTime()
+	if now - idleCheck.lastTime < 1.0 then
 		return false
 	end
-	p.lastTime = q
-	local r = m:GetLocation()
-	if not r then
+	idleCheck.lastTime = now
+	local location = bot:GetLocation()
+	if not location then
 		return false
 	end
-	local s = GetUnitToLocationDistance(m, p.lastPos)
-	p.lastPos = r
-	if s < 50 and m:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE then
-		if p.idleSince == 0 then
-			p.idleSince = q
+	local movedDistance = GetUnitToLocationDistance(bot, idleCheck.lastPos)
+	idleCheck.lastPos = location
+	if movedDistance < 50 and bot:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE then
+		if idleCheck.idleSince == 0 then
+			idleCheck.idleSince = now
 		end
-		local t = q - p.idleSince
-		if m:IsInvulnerable() and m:DistanceFromFountain() < 500 and t > 3 then
-			local u = m:GetAssignedLane() or LANE_MID
-			local v = GetLaneFrontLocation(GetTeam(), u, 0)
-			m:Action_MoveToLocation(v)
-			p.idleSince = 0
+		local idleTime = now - idleCheck.idleSince
+		if bot:IsInvulnerable() and bot:DistanceFromFountain() < 500 and idleTime > 3 then
+			local lane = bot:GetAssignedLane() or LANE_MID
+			local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
+			bot:Action_MoveToLocation(laneFront)
+			idleCheck.idleSince = 0
 			return true
 		end
-		if t > 5 and not m:IsInvulnerable() then
-			local u = m:GetAssignedLane() or LANE_MID
-			local v = GetLaneFrontLocation(GetTeam(), u, 0)
-			m:Action_MoveToLocation(v)
-			p.idleSince = 0
+		if idleTime > 5 and not bot:IsInvulnerable() then
+			local lane = bot:GetAssignedLane() or LANE_MID
+			local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
+			bot:Action_MoveToLocation(laneFront)
+			idleCheck.idleSince = 0
 			local traceOk, trace = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 			if traceOk and trace.Event then
-				trace.Event(m, "idle", string.format("nudged after standing idle for %.0fs", t))
+				trace.Event(bot, "idle", string.format("nudged after standing idle for %.0fs", idleTime))
 			end
 			return true
 		end
 	else
-		p.idleSince = 0
+		idleCheck.idleSince = 0
 	end
 	return false
 end
@@ -146,16 +147,16 @@ BOT_MODE_DESIRE_HIGH = 0.525
 BOT_MODE_DESIRE_VERYHIGH = 0.6
 BOT_MODE_DESIRE_ABSOLUTE = 0.7
 BOT_DESIRE_OVERRIDE = 1.0
-function GetAdjustedDesireValue(w)
-	if w < 1 then
-		return RemapValClamped(w, 0, 1, 0, BOT_MODE_DESIRE_ABSOLUTE)
+function GetAdjustedDesireValue(desire)
+	if desire < 1 then
+		return RemapValClamped(desire, 0, 1, 0, BOT_MODE_DESIRE_ABSOLUTE)
 	end
-	return w
+	return desire
 end
 _G.NIL_ABILITY = {}
 setmetatable(_G.NIL_ABILITY, {
-	__index = function(k, x)
-		local y = {
+	__index = function(proxy, key)
+		local falseMethods = {
 			IsFullyCastable = true,
 			IsTrained = true,
 			IsHidden = true,
@@ -165,12 +166,12 @@ setmetatable(_G.NIL_ABILITY, {
 			IsChanneling = true,
 			IsUltimate = true,
 		}
-		if y[x] then
+		if falseMethods[key] then
 			return function()
 				return false
 			end
 		end
-		local z = {
+		local zeroMethods = {
 			GetLevel = true,
 			GetCastRange = true,
 			GetCastPoint = true,
@@ -185,7 +186,7 @@ setmetatable(_G.NIL_ABILITY, {
 			GetToggleState = true,
 			GetAutoCastState = true,
 		}
-		if z[x] then
+		if zeroMethods[key] then
 			return function()
 				return 0
 			end
@@ -195,71 +196,75 @@ setmetatable(_G.NIL_ABILITY, {
 		end
 	end,
 })
-function SafeAbility(A, B, C)
-	if A == nil then
-		if B then
-			log('[WARN] %s ability "%s" is nil (removed/renamed/innate?) — using safe proxy', C or "unknown", B)
+function SafeAbility(ability, abilityName, heroName)
+	if ability == nil then
+		if abilityName then
+			log(
+				'[WARN] %s ability "%s" is nil (removed/renamed/innate?) — using safe proxy',
+				heroName or "unknown",
+				abilityName
+			)
 		end
 		return _G.NIL_ABILITY
 	end
-	return A
+	return ability
 end
-local D = GetTeamPlayers
-local E = nil
-function GetTeamPlayers(F, G)
-	if G then
-		return D(F)
+local originalGetTeamPlayers = GetTeamPlayers
+local cachedDirePlayers = nil
+function GetTeamPlayers(team, useOriginal)
+	if useOriginal then
+		return originalGetTeamPlayers(team)
 	end
-	local H = D(F)
-	if F == TEAM_DIRE then
-		if E ~= nil then
-			return E
+	local players = originalGetTeamPlayers(team)
+	if team == TEAM_DIRE then
+		if cachedDirePlayers ~= nil then
+			return cachedDirePlayers
 		end
-		local I = {}
-		for J, K in pairs(H) do
-			if not IsPlayerBot(K) then
-				table.insert(I, K)
+		local humanPlayers = {}
+		for _, playerId in pairs(players) do
+			if not IsPlayerBot(playerId) then
+				table.insert(humanPlayers, playerId)
 			end
 		end
-		if #I > 0 then
-			local L = { 5, 6, 7, 8, 9 }
-			H = {}
-			for i = 1, #L do
-				table.insert(H, L[i])
+		if #humanPlayers > 0 then
+			local direSlots = { 5, 6, 7, 8, 9 }
+			players = {}
+			for i = 1, #direSlots do
+				table.insert(players, direSlots[i])
 			end
-			for i = 1, #I do
-				for M = 1, 5 do
-					if I[i] + 5 == L[M] then
-						H[M] = I[i]
+			for i = 1, #humanPlayers do
+				for j = 1, 5 do
+					if humanPlayers[i] + 5 == direSlots[j] then
+						players[j] = humanPlayers[i]
 					end
 				end
 			end
-			for i = #H, 1, -1 do
-				local N = 0
-				if H[i] > 4 then
-					for M = 1, #H do
-						if H[M + i] ~= nil and H[M + i] < 5 then
-							N = N + 1
+			for i = #players, 1, -1 do
+				local offset = 0
+				if players[i] > 4 then
+					for j = 1, #players do
+						if players[j + i] ~= nil and players[j + i] < 5 then
+							offset = offset + 1
 						end
 					end
-					H[i] = H[i] + N
+					players[i] = players[i] + offset
 				end
 			end
 		end
-		E = H
+		cachedDirePlayers = players
 	end
-	return H
+	return players
 end
-IsDebug = b.DebugMode
+IsDebug = Utils.DebugMode
 local SafeCallPerf = nil
 local function LoadSafeCallPerf()
 	if SafeCallPerf ~= nil then
 		return SafeCallPerf
 	end
 	SafeCallPerf = false
-	local ok, mt = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/match_trace")
-	if ok and mt and mt.PerfEnabled and mt.PerfEnabled() and mt.PerfSample then
-		SafeCallPerf = mt
+	local ok, MatchTrace = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+	if ok and MatchTrace and MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and MatchTrace.PerfSample then
+		SafeCallPerf = MatchTrace
 	end
 	return SafeCallPerf
 end
@@ -273,121 +278,121 @@ function OhaCastGuard(bot)
 	end
 	return bot:IsCastingAbility() or bot:IsChanneling()
 end
-function SafeCall(O, P, Q)
-	local isThink = type(Q) == "string" and string.sub(Q, -6) == "_Think"
+function SafeCall(fn, fallback, name)
+	local isThink = type(name) == "string" and string.sub(name, -6) == "_Think"
 	return function(...)
 		if isThink then
-			local okG, guarded = pcall(function()
+			local guardOk, guarded = pcall(function()
 				return OhaCastGuard(GetBot())
 			end)
-			if okG and guarded then
-				return P
+			if guardOk and guarded then
+				return fallback
 			end
 		end
 		local perf = LoadSafeCallPerf()
-		local t0 = nil
+		local startTime = nil
 		if perf and RealTime then
-			t0 = RealTime()
+			startTime = RealTime()
 		end
-		local n, R, S, T = pcall(O, ...)
-		if t0 ~= nil and perf then
-			perf.PerfSample(Q or "SafeCall", RealTime() - t0)
+		local ok, result1, result2, result3 = pcall(fn, ...)
+		if startTime ~= nil and perf then
+			perf.PerfSample(name or "SafeCall", RealTime() - startTime)
 		end
-		if n then
-			return R, S, T
+		if ok then
+			return result1, result2, result3
 		end
-		local U = ""
+		local heroPrefix = ""
 		pcall(function()
-			U = GetBot():GetUnitName() .. " "
+			heroPrefix = GetBot():GetUnitName() .. " "
 		end)
-		log("[ERROR] %s%s: %s", U, Q or "unknown", tostring(R))
+		log("[ERROR] %s%s: %s", heroPrefix, name or "unknown", tostring(result1))
 		-- log() is silent unless debug is on, so these errors were never seen. Print the first 3
 		-- per wrapped function as [OHA-ERROR].
 		_G.OHA_SAFECALL_ERRS = _G.OHA_SAFECALL_ERRS or {}
-		local key = Q or "unknown"
-		local n = (_G.OHA_SAFECALL_ERRS[key] or 0) + 1
-		_G.OHA_SAFECALL_ERRS[key] = n
-		if n <= 3 then
-			pcall(print, string.format("[OHA-ERROR] t=%.1f %s%s: %s", DotaTime(), U, key, tostring(R)))
+		local key = name or "unknown"
+		local errorCount = (_G.OHA_SAFECALL_ERRS[key] or 0) + 1
+		_G.OHA_SAFECALL_ERRS[key] = errorCount
+		if errorCount <= 3 then
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s%s: %s", DotaTime(), heroPrefix, key, tostring(result1)))
 		end
 		-- First error only: run it once more under xpcall to print the stack trace (the line
 		-- above names only the innermost line, e.g. utils.lua:525). Kept off the hot path.
-		if n == 1 and debug ~= nil and debug.traceback ~= nil then
+		if errorCount == 1 and debug ~= nil and debug.traceback ~= nil then
 			local args = { ... }
-			local nargs = select("#", ...)
+			local argCount = select("#", ...)
 			local unpackFn = unpack or table.unpack
-			local okTb, tb = xpcall(function()
-				return O(unpackFn(args, 1, nargs))
-			end, function(e)
-				local ok, t = pcall(debug.traceback, tostring(e), 2)
-				return ok and t or tostring(e)
+			local retryOk, retryError = xpcall(function()
+				return fn(unpackFn(args, 1, argCount))
+			end, function(err)
+				local tracebackOk, traceText = pcall(debug.traceback, tostring(err), 2)
+				return tracebackOk and traceText or tostring(err)
 			end)
-			if not okTb then
-				pcall(print, "[OHA-ERROR] trace " .. key .. ": " .. (string.gsub(tostring(tb), "\n", " | ")))
+			if not retryOk then
+				pcall(print, "[OHA-ERROR] trace " .. key .. ": " .. (string.gsub(tostring(retryError), "\n", " | ")))
 			end
 		end
-		return P
+		return fallback
 	end
 end
-local V = nil
+local cachedIsLanMode = nil
 function IsLanMode()
-	if V ~= nil then
-		return V
+	if cachedIsLanMode ~= nil then
+		return cachedIsLanMode
 	end
-	local n, W = pcall(function()
+	local ok, lanValue = pcall(function()
 		return Convars:GetInt("sv_lan")
 	end)
-	if n and W ~= nil then
-		V = W == 1
+	if ok and lanValue ~= nil then
+		cachedIsLanMode = lanValue == 1
 	else
-		V = false
+		cachedIsLanMode = false
 	end
-	return V
+	return cachedIsLanMode
 end
-local X = GetUnitToUnitDistance
-function GetUnitToUnitDistance(Y, Z)
-	if not Y then
+local originalGetUnitToUnitDistance = GetUnitToUnitDistance
+function GetUnitToUnitDistance(unit, target)
+	if not unit then
 		return 1000
 	end
-	if Z == nil or pcall(function()
-		return Z:GetLocation()
+	if target == nil or pcall(function()
+		return target:GetLocation()
 	end) == false then
 		return 1000
 	end
-	return X(Y, Z)
+	return originalGetUnitToUnitDistance(unit, target)
 end
-local _ = GetUnitToLocationDistance
-function GetUnitToLocationDistance(a0, a1)
-	if a0 == nil then
-		log("[OVERRIDE] GetUnitToLocationDistance nil unit\n%s", e(2))
+local originalGetUnitToLocationDistance = GetUnitToLocationDistance
+function GetUnitToLocationDistance(unit, location)
+	if unit == nil then
+		log("[OVERRIDE] GetUnitToLocationDistance nil unit\n%s", getStackTrace(2))
 		return 1000
 	end
-	if a1 == nil or type(a1) ~= "userdata" then
+	if location == nil or type(location) ~= "userdata" then
 		log(
 			"[OVERRIDE] GetUnitToLocationDistance bad location (type=%s) for %s\n%s",
-			type(a1),
-			tostring(a0 and a0.GetUnitName and a0:GetUnitName()),
-			e(2)
+			type(location),
+			tostring(unit and unit.GetUnitName and unit:GetUnitName()),
+			getStackTrace(2)
 		)
 		return 1000
 	end
-	return _(a0, a1)
+	return originalGetUnitToLocationDistance(unit, location)
 end
-local a2 = CDOTA_Bot_Script.WasRecentlyDamagedByAnyHero
-function CDOTA_Bot_Script:WasRecentlyDamagedByAnyHero(a3)
+local originalWasRecentlyDamagedByAnyHero = CDOTA_Bot_Script.WasRecentlyDamagedByAnyHero
+function CDOTA_Bot_Script:WasRecentlyDamagedByAnyHero(interval)
 	if not self:IsHero() then
 		return nil
 	end
-	return a2(self, a3)
+	return originalWasRecentlyDamagedByAnyHero(self, interval)
 end
-local a4 = CDOTA_Bot_Script.GetNearbyTowers
-function CDOTA_Bot_Script:GetNearbyTowers(a5, a6)
+local originalGetNearbyTowers = CDOTA_Bot_Script.GetNearbyTowers
+function CDOTA_Bot_Script:GetNearbyTowers(radius, isEnemy)
 	if not self:IsHero() then
 		return nil
 	end
-	return a4(self, math.min(a5, 1600), a6)
+	return originalGetNearbyTowers(self, math.min(radius, 1600), isEnemy)
 end
-local a7 = CDOTA_Bot_Script.IsIllusion
+local originalIsIllusion = CDOTA_Bot_Script.IsIllusion
 function CDOTA_Bot_Script:IsIllusion()
 	if not self:IsHero() then
 		return nil
@@ -399,14 +404,14 @@ function CDOTA_Bot_Script:IsIllusion()
 	if self:GetTeam() ~= GetTeam() then
 		return self:HasModifier("modifier_illusion")
 	end
-	return a7(self)
+	return originalIsIllusion(self)
 end
-local a8 = CDOTA_Bot_Script.HasModifier
-function CDOTA_Bot_Script:HasModifier(a9)
+local originalHasModifier = CDOTA_Bot_Script.HasModifier
+function CDOTA_Bot_Script:HasModifier(modifierName)
 	if not self:CanBeSeen() then
 		return false
 	end
-	return a8(self, a9)
+	return originalHasModifier(self, modifierName)
 end
 -- Lotus pools report CanBeSeen() while fogged, then NumModifiers logs a warning.
 local lotusPoolNumModifiers = CDOTA_Bot_Script.NumModifiers
@@ -416,21 +421,21 @@ function CDOTA_Bot_Script:NumModifiers()
 	end
 	return lotusPoolNumModifiers(self)
 end
-local aa = CDOTA_Bot_Script.GetLocation
+local originalGetLocation = CDOTA_Bot_Script.GetLocation
 function CDOTA_Bot_Script:GetLocation()
 	if self == nil or not self:IsBuilding() and not self:CanBeSeen() then
 		return nil
 	end
-	return aa(self)
+	return originalGetLocation(self)
 end
-local ab = CDOTA_Bot_Script.GetMagicResist
+local originalGetMagicResist = CDOTA_Bot_Script.GetMagicResist
 function CDOTA_Bot_Script:GetMagicResist()
 	if self == nil or not self:CanBeSeen() then
 		return 1
 	end
-	return ab(self)
+	return originalGetMagicResist(self)
 end
-local ac = CDOTA_Bot_Script.IsInvulnerable
+local originalIsInvulnerable = CDOTA_Bot_Script.IsInvulnerable
 function CDOTA_Bot_Script:IsInvulnerable()
 	if not self:CanBeSeen() then
 		return false
@@ -438,51 +443,51 @@ function CDOTA_Bot_Script:IsInvulnerable()
 	if self:HasModifier("modifier_dazzle_nothl_projection_soul_debuff") then
 		return false
 	end
-	return ac(self)
+	return originalIsInvulnerable(self)
 end
-local ad = CDOTA_Bot_Script.IsAttackImmune
+local originalIsAttackImmune = CDOTA_Bot_Script.IsAttackImmune
 function CDOTA_Bot_Script:IsAttackImmune()
 	if not self:CanBeSeen() then
 		return false
 	end
-	return ad(self)
+	return originalIsAttackImmune(self)
 end
-local ae = CDOTA_Bot_Script.IsUsingAbility
+local originalIsUsingAbility = CDOTA_Bot_Script.IsUsingAbility
 function CDOTA_Bot_Script:IsUsingAbility()
 	if not self:CanBeSeen() or not self:IsHero() then
 		return false
 	end
-	return ae(self)
+	return originalIsUsingAbility(self)
 end
-local af = CDOTA_Bot_Script.IsChanneling
+local originalIsChanneling = CDOTA_Bot_Script.IsChanneling
 function CDOTA_Bot_Script:IsChanneling()
 	if not self:CanBeSeen() then
 		return false
 	end
-	return af(self)
+	return originalIsChanneling(self)
 end
-local ag = CDOTA_Bot_Script.GetAttackTarget
+local originalGetAttackTarget = CDOTA_Bot_Script.GetAttackTarget
 function CDOTA_Bot_Script:GetAttackTarget()
 	if not self:CanBeSeen() then
 		return nil
 	end
-	return ag(self)
+	return originalGetAttackTarget(self)
 end
-local ah = CDOTA_Bot_Script.GetNearbyHeroes
-function CDOTA_Bot_Script:GetNearbyHeroes(a5, a6, ai)
+local originalGetNearbyHeroes = CDOTA_Bot_Script.GetNearbyHeroes
+function CDOTA_Bot_Script:GetNearbyHeroes(radius, isEnemy, botMode)
 	if not self:CanBeSeen() then
 		return nil
 	end
-	return ah(self, math.min(a5, 1600), a6, ai)
+	return originalGetNearbyHeroes(self, math.min(radius, 1600), isEnemy, botMode)
 end
-local aj = CDOTA_Bot_Script.IsMagicImmune
+local originalIsMagicImmune = CDOTA_Bot_Script.IsMagicImmune
 function CDOTA_Bot_Script:IsMagicImmune()
 	if not self then
 		return false
 	end
 	if self:CanBeSeen() then
 		if
-			aj(self)
+			originalIsMagicImmune(self)
 			or self:HasModifier("modifier_magic_immune")
 			or self:HasModifier("modifier_juggernaut_blade_fury")
 			or self:HasModifier("modifier_life_stealer_rage")
@@ -500,112 +505,116 @@ function CDOTA_Bot_Script:IsMagicImmune()
 	end
 	return false
 end
-local ak = RandomFloat
-local al = 0.00000001
-function RandomFloat(am, an)
-	return am + math.random() * (an - am + al)
+local originalRandomFloat = RandomFloat
+local epsilon = 0.00000001
+function RandomFloat(min, max)
+	return min + math.random() * (max - min + epsilon)
 end
-local ao = CDOTA_Bot_Script.GetNearbyNeutralCreeps
-function CDOTA_Bot_Script:GetNearbyNeutralCreeps(a5)
-	return ao(self, math.min(a5, 1600))
+local originalGetNearbyNeutralCreeps = CDOTA_Bot_Script.GetNearbyNeutralCreeps
+function CDOTA_Bot_Script:GetNearbyNeutralCreeps(radius)
+	return originalGetNearbyNeutralCreeps(self, math.min(radius, 1600))
 end
-local ap = CDOTA_Bot_Script.GetNearbyLaneCreeps
-function CDOTA_Bot_Script:GetNearbyLaneCreeps(a5, a6)
-	return ap(self, math.min(a5, 1600), a6)
+local originalGetNearbyLaneCreeps = CDOTA_Bot_Script.GetNearbyLaneCreeps
+function CDOTA_Bot_Script:GetNearbyLaneCreeps(radius, isEnemy)
+	return originalGetNearbyLaneCreeps(self, math.min(radius, 1600), isEnemy)
 end
-local aq = CDOTA_Bot_Script.GetNearbyCreeps
-function CDOTA_Bot_Script:GetNearbyCreeps(a5, a6)
-	return aq(self, math.min(a5, 1600), a6)
+local originalGetNearbyCreeps = CDOTA_Bot_Script.GetNearbyCreeps
+function CDOTA_Bot_Script:GetNearbyCreeps(radius, isEnemy)
+	return originalGetNearbyCreeps(self, math.min(radius, 1600), isEnemy)
 end
-local ar = CDOTA_Bot_Script.GetUnitName
+local originalGetUnitName = CDOTA_Bot_Script.GetUnitName
 function CDOTA_Bot_Script:GetUnitName()
-	local as = ar(self)
-	if string.find(as, "lone_druid_bear") then
-		as = "npc_dota_hero_lone_druid_bear"
+	local unitName = originalGetUnitName(self)
+	if string.find(unitName, "lone_druid_bear") then
+		unitName = "npc_dota_hero_lone_druid_bear"
 	end
-	return as
+	return unitName
 end
-local at = CDOTABaseAbility_BotScript.GetCastRange
+local originalGetCastRange = CDOTABaseAbility_BotScript.GetCastRange
 function CDOTABaseAbility_BotScript:GetCastRange()
-	local m = GetBot()
+	local bot = GetBot()
 	if self then
-		local au = self:GetSpecialValueInt("AbilityCastRange")
-		if au == 0 then
-			au = at(self)
+		local castRange = self:GetSpecialValueInt("AbilityCastRange")
+		if castRange == 0 then
+			castRange = originalGetCastRange(self)
 		end
-		if m then
+		if bot then
 			for i = 0, 7 do
-				local av = m:GetAbilityInSlot(i)
-				if av and av:IsTrained() then
-					local aw = av:GetName()
-					if aw == "keeper_of_the_light_spirit_form" then
-						if m:HasModifier("modifier_keeper_of_the_light_spirit_form") then
-							au = au + av:GetSpecialValueInt("cast_range")
+				local ability = bot:GetAbilityInSlot(i)
+				if ability and ability:IsTrained() then
+					local abilityName = ability:GetName()
+					if abilityName == "keeper_of_the_light_spirit_form" then
+						if bot:HasModifier("modifier_keeper_of_the_light_spirit_form") then
+							castRange = castRange + ability:GetSpecialValueInt("cast_range")
 						end
-					elseif aw == "rubick_arcane_supremacy" then
-						au = au + av:GetSpecialValueInt("cast_range")
+					elseif abilityName == "rubick_arcane_supremacy" then
+						castRange = castRange + ability:GetSpecialValueInt("cast_range")
 					end
 				end
 			end
-			local ax = { 0, 1, 2, 3, 4, 5, 16, 17 }
-			for i = 1, #ax do
-				local ay = m:GetItemInSlot(ax[i])
-				if ay then
-					local az = ay:GetName()
-					if az == "item_aether_lens" then
-						au = au + ay:GetSpecialValueInt("cast_range_bonus")
-					elseif az == "item_ethereal_blade" then
-						au = au + ay:GetSpecialValueInt("bonus_cast_range")
-					elseif az == "item_magnifying_monocle" then
-						au = au + ay:GetSpecialValueInt("bonus_cast_range")
-					elseif az == "item_enhancement_keen_eyed" then
-						au = au + ay:GetSpecialValueInt("cast_range_bonus")
-					elseif az == "item_enhancement_mystical" then
-						au = au + ay:GetSpecialValueInt("bonus_cast_range")
-					elseif az == "item_enhancement_boundless" then
-						au = au + ay:GetSpecialValueInt("bonus_cast_range")
-					elseif string.find(az, "item_dagon") then
-						local aA = false
-						for M = 0, 5 do
-							local aB = m:GetItemInSlot(M)
-							if aB and aB ~= ay and string.find(aB:GetName(), "item_aether_lens") then
-								aA = true
+			local itemSlots = { 0, 1, 2, 3, 4, 5, 16, 17 }
+			for i = 1, #itemSlots do
+				local item = bot:GetItemInSlot(itemSlots[i])
+				if item then
+					local itemName = item:GetName()
+					if itemName == "item_aether_lens" then
+						castRange = castRange + item:GetSpecialValueInt("cast_range_bonus")
+					elseif itemName == "item_ethereal_blade" then
+						castRange = castRange + item:GetSpecialValueInt("bonus_cast_range")
+					elseif itemName == "item_magnifying_monocle" then
+						castRange = castRange + item:GetSpecialValueInt("bonus_cast_range")
+					elseif itemName == "item_enhancement_keen_eyed" then
+						castRange = castRange + item:GetSpecialValueInt("cast_range_bonus")
+					elseif itemName == "item_enhancement_mystical" then
+						castRange = castRange + item:GetSpecialValueInt("bonus_cast_range")
+					elseif itemName == "item_enhancement_boundless" then
+						castRange = castRange + item:GetSpecialValueInt("bonus_cast_range")
+					elseif string.find(itemName, "item_dagon") then
+						local hasAetherLens = false
+						for slot = 0, 5 do
+							local otherItem = bot:GetItemInSlot(slot)
+							if
+								otherItem
+								and otherItem ~= item
+								and string.find(otherItem:GetName(), "item_aether_lens")
+							then
+								hasAetherLens = true
 								break
 							end
 						end
-						if not aA then
-							au = au + ay:GetSpecialValueInt("cast_range_bonus")
+						if not hasAetherLens then
+							castRange = castRange + item:GetSpecialValueInt("cast_range_bonus")
 						end
 					end
 				end
 			end
 		end
-		return au
+		return castRange
 	end
-	return at(self)
+	return originalGetCastRange(self)
 end
-local aC = CDOTA_Bot_Script.GetAbilityByName
-function CDOTA_Bot_Script:GetAbilityByName(aw)
-	if aw == nil or aw == "" then
+local originalGetAbilityByName = CDOTA_Bot_Script.GetAbilityByName
+function CDOTA_Bot_Script:GetAbilityByName(abilityName)
+	if abilityName == nil or abilityName == "" then
 		return nil
 	end
-	return aC(self, aw)
+	return originalGetAbilityByName(self, abilityName)
 end
-local aD = FindAbilityByName
-if aD then
-	function FindAbilityByName(aw)
-		if aw == nil or aw == "" then
+local originalFindAbilityByName = FindAbilityByName
+if originalFindAbilityByName then
+	function FindAbilityByName(abilityName)
+		if abilityName == nil or abilityName == "" then
 			return nil
 		end
-		return aD(aw)
+		return originalFindAbilityByName(abilityName)
 	end
 end
 -- Map and system abilities every hero carries hidden: outpost capture (ability_capture),
 -- lamps, Twin Gates (twin_gate_portal_warp), Underlord portals, plus/seasonal. They are
 -- meant to be cast while hidden; refusing them left heroes standing at an outpost forever.
-local function IsHiddenByDesign(av)
+local function IsHiddenByDesign(ability)
 	local ok, name = pcall(function()
-		return av:GetName()
+		return ability:GetName()
 	end)
 	if not ok or type(name) ~= "string" then
 		return false
@@ -617,33 +626,33 @@ local function IsHiddenByDesign(av)
 end
 -- Filled in below, once CastRefused exists.
 local CastRefusedEarly = function() end
-local aE = CDOTA_Bot_Script.Action_UseAbility
-function CDOTA_Bot_Script:Action_UseAbility(av)
-	if av == nil or av:IsHidden() and not IsHiddenByDesign(av) then
-		CastRefusedEarly(self, av, "Action_UseAbility")
+local originalActionUseAbility = CDOTA_Bot_Script.Action_UseAbility
+function CDOTA_Bot_Script:Action_UseAbility(ability)
+	if ability == nil or ability:IsHidden() and not IsHiddenByDesign(ability) then
+		CastRefusedEarly(self, ability, "Action_UseAbility")
 		return nil
 	end
-	return aE(self, av)
+	return originalActionUseAbility(self, ability)
 end
-local aF = CDOTA_Bot_Script.ActionPush_UseAbility
-function CDOTA_Bot_Script:ActionPush_UseAbility(av)
-	if av == nil or av:IsHidden() and not IsHiddenByDesign(av) then
-		CastRefusedEarly(self, av, "ActionPush_UseAbility")
+local originalActionPushUseAbility = CDOTA_Bot_Script.ActionPush_UseAbility
+function CDOTA_Bot_Script:ActionPush_UseAbility(ability)
+	if ability == nil or ability:IsHidden() and not IsHiddenByDesign(ability) then
+		CastRefusedEarly(self, ability, "ActionPush_UseAbility")
 		return nil
 	end
-	return aF(self, av)
+	return originalActionPushUseAbility(self, ability)
 end
 -- Every targeted or queued cast refuses a hidden ability or a missing/wrong target before it
 -- reaches the server. A hidden ability (Minefield Sign without Scepter) still reports
 -- IsFullyCastable, so a hero kept ordering it every think and stood still.
 local castRefusedAt = {}
-local function CastRefused(self, av, method, why)
+local function CastRefused(self, ability, method, why)
 	local name = "nil"
-	if av ~= nil then
-		local ok, n = pcall(function()
-			return av:GetName()
+	if ability ~= nil then
+		local ok, rawName = pcall(function()
+			return ability:GetName()
 		end)
-		name = ok and tostring(n) or "?"
+		name = ok and tostring(rawName) or "?"
 	end
 	local hero = (string.gsub(tostring(self:GetUnitName()), "npc_dota_hero_", ""))
 	local key = hero .. "|" .. name .. "|" .. why
@@ -653,15 +662,15 @@ local function CastRefused(self, av, method, why)
 	castRefusedAt[key] = DotaTime() + 30
 	pcall(print, string.format("[OHA-CAST] t=%.0f %s %s %s refused=%s", DotaTime(), hero, method, name, why))
 end
-CastRefusedEarly = function(self, av, method)
-	CastRefused(self, av, method, av == nil and "nil-ability" or "hidden")
+CastRefusedEarly = function(self, ability, method)
+	CastRefused(self, ability, method, ability == nil and "nil-ability" or "hidden")
 end
-local function IsVector(v)
-	if v == nil then
+local function IsVector(value)
+	if value == nil then
 		return false
 	end
 	local ok, x = pcall(function()
-		return v.x
+		return value.x
 	end)
 	return ok and type(x) == "number"
 end
@@ -670,35 +679,35 @@ local function GuardCast(method, targetKind)
 	if original == nil then
 		return
 	end
-	CDOTA_Bot_Script[method] = function(self, av, target, ...)
-		if av == nil then
-			CastRefused(self, av, method, "nil-ability")
+	CDOTA_Bot_Script[method] = function(self, ability, target, ...)
+		if ability == nil then
+			CastRefused(self, ability, method, "nil-ability")
 			return nil
 		end
 		local okHidden, hidden = pcall(function()
-			return av:IsHidden()
+			return ability:IsHidden()
 		end)
-		if okHidden and hidden and not IsHiddenByDesign(av) then
-			CastRefused(self, av, method, "hidden")
+		if okHidden and hidden and not IsHiddenByDesign(ability) then
+			CastRefused(self, ability, method, "hidden")
 			return nil
 		end
 		if targetKind == "location" and not IsVector(target) then
-			CastRefused(self, av, method, target == nil and "nil-location" or "not-a-location")
+			CastRefused(self, ability, method, target == nil and "nil-location" or "not-a-location")
 			return nil
 		end
 		if targetKind == "entity" and (target == nil or IsVector(target)) then
-			CastRefused(self, av, method, target == nil and "nil-target" or "location-as-target")
+			CastRefused(self, ability, method, target == nil and "nil-target" or "location-as-target")
 			return nil
 		end
 		if targetKind == "tree" and target == nil then
-			CastRefused(self, av, method, "nil-tree")
+			CastRefused(self, ability, method, "nil-tree")
 			return nil
 		end
 		-- A no-target cast takes only the ability. Do not hand the engine an extra nil.
 		if targetKind == "none" then
-			return original(self, av)
+			return original(self, ability)
 		end
-		return original(self, av, target, ...)
+		return original(self, ability, target, ...)
 	end
 end
 for _, spec in ipairs({
@@ -715,15 +724,19 @@ for _, spec in ipairs({
 }) do
 	GuardCast(spec[1], spec[2])
 end
-local aG = CDOTA_Bot_Script.Action_AttackUnit
-function CDOTA_Bot_Script:Action_AttackUnit(aH, aI)
-	if aH == nil then
-		log("[OVERRIDE] Action_AttackUnit nil target for %s\n%s", tostring(self and self:GetUnitName()), e(2))
+local originalActionAttackUnit = CDOTA_Bot_Script.Action_AttackUnit
+function CDOTA_Bot_Script:Action_AttackUnit(target, isOnce)
+	if target == nil then
+		log(
+			"[OVERRIDE] Action_AttackUnit nil target for %s\n%s",
+			tostring(self and self:GetUnitName()),
+			getStackTrace(2)
+		)
 		return
 	end
-	return aG(self, aH, aI)
+	return originalActionAttackUnit(self, target, isOnce)
 end
-local aJ = CDOTA_Bot_Script.GetAssignedLane
+local originalGetAssignedLane = CDOTA_Bot_Script.GetAssignedLane
 function CDOTA_Bot_Script:GetAssignedLane()
 	if not self or self:GetTeam() ~= GetTeam() then
 		log(
@@ -731,31 +744,31 @@ function CDOTA_Bot_Script:GetAssignedLane()
 			tostring(self and self:GetUnitName()),
 			tostring(self and self:GetTeam()),
 			tostring(GetTeam()),
-			e(2)
+			getStackTrace(2)
 		)
 		return LANE_NONE
 	end
-	return aJ(self)
+	return originalGetAssignedLane(self)
 end
-local aK = CDOTA_Bot_Script.GetTarget
+local originalGetTarget = CDOTA_Bot_Script.GetTarget
 function CDOTA_Bot_Script:GetTarget()
 	if not self or not self:IsBot() then
 		return nil
 	end
-	return aK(self)
+	return originalGetTarget(self)
 end
-local aL = CDOTA_Bot_Script.GetAttackRange
+local originalGetAttackRange = CDOTA_Bot_Script.GetAttackRange
 function CDOTA_Bot_Script:GetAttackRange()
 	if not self:CanBeSeen() then
 		return 200
 	end
-	return aL(self)
+	return originalGetAttackRange(self)
 end
-local aM = CDOTA_Bot_Script.ActionImmediate_SwapItems
+local originalSwapItems = CDOTA_Bot_Script.ActionImmediate_SwapItems
 -- Gap between two swaps of the same pair of items: the game puts an item moved out of the
 -- backpack on a 6s cooldown, plus 5s, so two routines that want opposite slots for the same
 -- items cannot ping-pong them and keep both on cooldown.
-local aN = 6 + 5
+local swapPairGap = 6 + 5
 -- Backpack items allowed into the main inventory during a fight (names without "item_").
 local SWAP_IN_DURING_FIGHT = {
 	dust = true,
@@ -775,8 +788,8 @@ local function SwapMovesBranchToBackpack(self, fromSlot, toSlot)
 	if toSlot < 6 or toSlot > 8 then
 		return false
 	end
-	local it = self:GetItemInSlot(fromSlot)
-	if it == nil or it:GetName() ~= "item_branches" then
+	local item = self:GetItemInSlot(fromSlot)
+	if item == nil or item:GetName() ~= "item_branches" then
 		return false
 	end
 	local other = self:GetItemInSlot(toSlot)
@@ -787,8 +800,8 @@ local function SwapMovesBranchToBackpack(self, fromSlot, toSlot)
 	return true
 end
 local function SlotName(unit, slot)
-	local it = unit:GetItemInSlot(slot)
-	return it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
+	local item = unit:GetItemInSlot(slot)
+	return item ~= nil and (string.gsub(item:GetName(), "^item_", "")) or "-"
 end
 -- [OHA-ITEM]: every swap that touches the blood grenade, and why a blocked one was refused.
 -- Swaps logged: the grenade, and (game 031: the banner never left the backpack in 24 tries, with
@@ -807,29 +820,32 @@ local SWAP_WATCH = {
 	refresher_shard = true,
 	gem = true,
 }
-local function LogGrenadeSwap(self, aO, aP, result)
-	local a, b = SlotName(self, aO), SlotName(self, aP)
-	if not SWAP_WATCH[a] and not SWAP_WATCH[b] then
+local function LogGrenadeSwap(self, slotA, slotB, result)
+	local nameA, nameB = SlotName(self, slotA), SlotName(self, slotB)
+	if not SWAP_WATCH[nameA] and not SWAP_WATCH[nameB] then
 		return
 	end
 	if result ~= "ok" then
-		local key = result .. aO .. ":" .. aP
+		local key = result .. slotA .. ":" .. slotB
 		if self._grenadeSwapLogKey == key and DotaTime() < (self._grenadeSwapLogAt or -999) then
 			return
 		end
 		self._grenadeSwapLogKey = key
 		self._grenadeSwapLogAt = DotaTime() + 5
 	end
-	pcall(print, string.format(
-		"[OHA-ITEM] t=%.0f %s swap %d(%s)<->%d(%s) %s",
-		DotaTime(),
-		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
-		aO,
-		a,
-		aP,
-		b,
-		result
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s swap %d(%s)<->%d(%s) %s",
+			DotaTime(),
+			(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+			slotA,
+			nameA,
+			slotB,
+			nameB,
+			result
+		)
+	)
 end
 -- Checks the last swap half a second later: did the two items actually trade places?
 -- Logged for every swap that touched the grenade, and for the first 6 other swaps per bot,
@@ -855,21 +871,24 @@ function VerifyLastSwap(self)
 		end
 		self._swapChecksLogged = self._swapChecksLogged + 1
 	end
-	pcall(print, string.format(
-		"[OHA-ITEM] t=%.0f %s %s %d(%s)<->%d(%s)%s now=%s,%s",
-		DotaTime(),
-		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
-		done and "swap-done" or "swap-noop",
-		check.a,
-		check.nameA,
-		check.b,
-		check.nameB,
-		check.reversed and " reversed" or "",
-		SlotName(self, check.a),
-		SlotName(self, check.b)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s %s %d(%s)<->%d(%s)%s now=%s,%s",
+			DotaTime(),
+			(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+			done and "swap-done" or "swap-noop",
+			check.a,
+			check.nameA,
+			check.b,
+			check.nameB,
+			check.reversed and " reversed" or "",
+			SlotName(self, check.a),
+			SlotName(self, check.b)
+		)
+	)
 end
-function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
+function CDOTA_Bot_Script:ActionImmediate_SwapItems(slotA, slotB)
 	local forced = self._swapDespiteEnemies
 	self._swapDespiteEnemies = nil
 	-- A swap that must not wait for the 11s gap (the banner at the enemy base).
@@ -877,15 +896,15 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 	self._swapDespiteCooldown = nil
 	-- A branch parked for any other item gets pulled straight back, and that round trip
 	-- leaves it on cooldown. The grenade is the exception: it has to stay throwable.
-	if SwapMovesBranchToBackpack(self, aO, aP) or SwapMovesBranchToBackpack(self, aP, aO) then
-		LogGrenadeSwap(self, aO, aP, "blocked-branch-rule")
+	if SwapMovesBranchToBackpack(self, slotA, slotB) or SwapMovesBranchToBackpack(self, slotB, slotA) then
+		LogGrenadeSwap(self, slotA, slotB, "blocked-branch-rule")
 		return nil
 	end
 	-- The gap is per pair of items. It used to be one timer for every swap, so a routine that kept
 	-- retrying one pair held up all the others (game 033: a Clarity/Dust swap that never took
 	-- effect restarted it every 6-13s for 26 minutes). A pair that has not swapped yet starts in
 	-- the past, so the pregame swap of a grenade bought into a full bag goes through at once.
-	local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
+	local nameA, nameB = SlotName(self, slotA), SlotName(self, slotB)
 	local pairKey = nameA < nameB and (nameA .. "|" .. nameB) or (nameB .. "|" .. nameA)
 	self._swapPairTime = self._swapPairTime or {}
 	-- Hold swaps only during a fight. An item that comes out of the backpack cannot be used for 6s
@@ -899,86 +918,92 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
 			and (mode == BOT_MODE_ATTACK or mode == BOT_MODE_RETREAT or mode == BOT_MODE_TEAM_ROAM or mode == BOT_MODE_DEFEND_ALLY)
 	-- Items that are worth bringing in mid-fight: used once and soon, and never moved back out
 	-- (they are all in sCanNotSwitchItems, so no other routine picks them to make room).
-	local incoming = (aO >= 6 and aO <= 8 and aP <= 5) and nameA or ((aP >= 6 and aP <= 8 and aO <= 5) and nameB or nil)
+	local incoming = (slotA >= 6 and slotA <= 8 and slotB <= 5) and nameA
+		or ((slotB >= 6 and slotB <= 8 and slotA <= 5) and nameB or nil)
 	local fightOk = fighting and incoming ~= nil and SWAP_IN_DURING_FIGHT[incoming] == true
-	local cooldown = aN - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
+	local cooldown = swapPairGap - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
 	if (forced or not fighting or fightOk) and (cooldown < 0 or urgent) then
 		self._swapPairTime[pairKey] = DotaTime()
 		-- After a swap the engine ignored, try the slots the other way round once.
 		local reversed = self._swapTryReverse == true
 		self._swapTryReverse = nil
-		LogGrenadeSwap(self, aO, aP, (forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or ""))
-		self._swapCheck = { a = aO, b = aP, nameA = nameA, nameB = nameB, at = DotaTime(), reversed = reversed }
+		LogGrenadeSwap(
+			self,
+			slotA,
+			slotB,
+			(forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or "")
+		)
+		self._swapCheck = { a = slotA, b = slotB, nameA = nameA, nameB = nameB, at = DotaTime(), reversed = reversed }
 		if reversed then
-			return aM(self, aP, aO)
+			return originalSwapItems(self, slotB, slotA)
 		end
-		return aM(self, aO, aP)
+		return originalSwapItems(self, slotA, slotB)
 	end
 	if cooldown >= 0 then
-		LogGrenadeSwap(self, aO, aP, string.format("blocked-cooldown(%.0fs)", cooldown))
+		LogGrenadeSwap(self, slotA, slotB, string.format("blocked-cooldown(%.0fs)", cooldown))
 	else
-		LogGrenadeSwap(self, aO, aP, string.format("blocked-fight(enemies=%d)", enemies))
+		LogGrenadeSwap(self, slotA, slotB, string.format("blocked-fight(enemies=%d)", enemies))
 	end
 	return nil
 end
-local aR = CDOTA_Bot_Script.GetUnitToLocationDistance
-function CDOTA_Bot_Script:GetUnitToLocationDistance(a0, a1)
-	if a1 == nil then
+local originalMethodGetUnitToLocationDistance = CDOTA_Bot_Script.GetUnitToLocationDistance
+function CDOTA_Bot_Script:GetUnitToLocationDistance(unit, location)
+	if location == nil then
 		log("[WARN] GetUnitToLocationDistance nil location for %s", self:GetUnitName())
 		return 200
 	end
-	return aR(self, a0, a1)
+	return originalMethodGetUnitToLocationDistance(self, unit, location)
 end
-local aS = CDOTA_Bot_Script.GetHealth
+local originalGetHealth = CDOTA_Bot_Script.GetHealth
 function CDOTA_Bot_Script:GetHealth()
 	if self == nil or not self:CanBeSeen() then
 		return 666
 	end
-	local aT = aS(self)
-	if self ~= nil and self:GetUnitName() == "npc_dota_hero_medusa" and aT > 0 then
-		local aU = self:GetMana()
-		local aV = 0.95
+	local health = originalGetHealth(self)
+	if self ~= nil and self:GetUnitName() == "npc_dota_hero_medusa" and health > 0 then
+		local mana = self:GetMana()
+		local absorbRatio = 0.95
 		if self:GetLevel() < 12 then
-			aV = 0.5
+			absorbRatio = 0.5
 		end
-		local aW = 2.6
-		local aX = aU * aW * aV
-		return aT + aX
+		local damagePerMana = 2.6
+		local bonusHealth = mana * damagePerMana * absorbRatio
+		return health + bonusHealth
 	end
-	return aT
+	return health
 end
-local aY = CDOTA_Bot_Script.GetMaxHealth
+local originalGetMaxHealth = CDOTA_Bot_Script.GetMaxHealth
 function CDOTA_Bot_Script:GetMaxHealth()
 	if self ~= nil and self:GetUnitName() == "npc_dota_hero_medusa" then
-		local aV = 0.95
+		local absorbRatio = 0.95
 		if self:GetLevel() < 12 then
-			aV = 0.5
+			absorbRatio = 0.5
 		end
-		local aW = 2.6
-		local aZ = self:GetMaxMana() * aW * aV
-		return aY(self) + aZ
+		local damagePerMana = 2.6
+		local bonusMaxHealth = self:GetMaxMana() * damagePerMana * absorbRatio
+		return originalGetMaxHealth(self) + bonusMaxHealth
 	end
-	return aY(self)
+	return originalGetMaxHealth(self)
 end
 function CDOTA_Bot_Script:OriginalGetHealth()
-	return aS(self)
+	return originalGetHealth(self)
 end
 function CDOTA_Bot_Script:OriginalGetMaxHealth()
-	return aY(self)
+	return originalGetMaxHealth(self)
 end
-local a_ = CDOTA_Bot_Script.GetMana
+local originalGetMana = CDOTA_Bot_Script.GetMana
 function CDOTA_Bot_Script:GetMana()
 	if self ~= nil and self:GetUnitName() == "npc_dota_hero_huskar" then
 		return 0
 	end
-	return a_(self)
+	return originalGetMana(self)
 end
-local b0 = CDOTA_Bot_Script.GetMaxMana
+local originalGetMaxMana = CDOTA_Bot_Script.GetMaxMana
 function CDOTA_Bot_Script:GetMaxMana()
 	if self ~= nil and self:GetUnitName() == "npc_dota_hero_huskar" then
 		return 0
 	end
-	return b0(self)
+	return originalGetMaxMana(self)
 end
-local b1 = { orig_GetTeamPlayers = D, GetTeamPlayers = GetTeamPlayers }
-return b1
+local GlobalOverrides = { orig_GetTeamPlayers = originalGetTeamPlayers, GetTeamPlayers = GetTeamPlayers }
+return GlobalOverrides

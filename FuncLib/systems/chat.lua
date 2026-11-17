@@ -1,111 +1,115 @@
 -- Shared bot system: chat.
-local a = {}
-local b = "sRawName"
-local c = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
-a["tItemNameList"] = require(GetScriptDirectory() .. "/FuncLib/data/item_names")
-a["tHeroNameList"] = require(GetScriptDirectory() .. "/FuncLib/data/hero_names")
-local e = {}
-for f, g in pairs(a["tItemNameList"]) do
-	e[g["sRawName"]] = g["sCnName"]
+local Chat = {}
+local sNameField = "sRawName"
+local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+Chat["tItemNameList"] = require(GetScriptDirectory() .. "/FuncLib/data/item_names")
+Chat["tHeroNameList"] = require(GetScriptDirectory() .. "/FuncLib/data/hero_names")
+local itemCnNames = {}
+for _, itemInfo in pairs(Chat["tItemNameList"]) do
+	itemCnNames[itemInfo["sRawName"]] = itemInfo["sCnName"]
 end
-function a.GetItemCnName(h)
-	return e[h] or "未定义:" .. h
+function Chat.GetItemCnName(itemName)
+	return itemCnNames[itemName] or "未定义:" .. itemName
 end
-function a.GetLocalName(i)
-	local j = a["tHeroNameList"][i:GetUnitName()]
-	if j ~= nil then
-		return j[b]
+function Chat.GetLocalName(hero)
+	local heroInfo = Chat["tHeroNameList"][hero:GetUnitName()]
+	if heroInfo ~= nil then
+		return heroInfo[sNameField]
 	end
 end
-function a.GetNormName(i)
-	local j = a["tHeroNameList"][i:GetUnitName()]
-	return j ~= nil and j["sNormName"] or string.sub(i:GetUnitName(), 10)
+function Chat.GetNormName(hero)
+	local heroInfo = Chat["tHeroNameList"][hero:GetUnitName()]
+	return heroInfo ~= nil and heroInfo["sNormName"] or string.sub(hero:GetUnitName(), 10)
 end
-local k = require(GetScriptDirectory() .. "/FuncLib/data/chat_table")
-local l = {}
-for m = 1, #k do
-	local n = k[m][1]
-	for f, o in pairs(n) do
-		local p = l[o]
-		if p == nil then
-			l[o] = m
+local chatTable = require(GetScriptDirectory() .. "/FuncLib/data/chat_table")
+local keywordToIndex = {}
+for index = 1, #chatTable do
+	local keywords = chatTable[index][1]
+	for _, keyword in pairs(keywords) do
+		local existingIndex = keywordToIndex[keyword]
+		if existingIndex == nil then
+			keywordToIndex[keyword] = index
 		else
-			for f, q in pairs(k[m][2]) do
-				table.insert(k[p][2], q)
+			for _, line in pairs(chatTable[index][2]) do
+				table.insert(chatTable[existingIndex][2], line)
 			end
-			for f, q in pairs(k[m][3]) do
-				table.insert(k[p][3], q)
+			for _, line in pairs(chatTable[index][3]) do
+				table.insert(chatTable[existingIndex][3], line)
 			end
 		end
 	end
 end
-function a.GetChatStringTableIndex(r)
-	return l[r] or -1
+function Chat.GetChatStringTableIndex(message)
+	return keywordToIndex[message] or -1
 end
-function a.GetChatTableString(s, t)
-	local u = k[s][t and 3 or 2]
-	return u[RandomInt(1, #u)]
+function Chat.GetChatTableString(index, isAllChat)
+	local replies = chatTable[index][isAllChat and 3 or 2]
+	return replies[RandomInt(1, #replies)]
 end
-function a.GetReplyString(r, t)
-	if not a.AllowTrashTalk(t) then
+function Chat.GetReplyString(message, isAllChat)
+	if not Chat.AllowTrashTalk(isAllChat) then
 		return nil
 	end
-	local v = nil
-	if d.Localization == "zh" then
-		local s = a.GetChatStringTableIndex(r)
-		if s ~= -1 then
-			v = a.GetChatTableString(s, t)
+	local reply = nil
+	if CustomLoader.Localization == "zh" then
+		local index = Chat.GetChatStringTableIndex(message)
+		if index ~= -1 then
+			reply = Chat.GetChatTableString(index, isAllChat)
 		else
-			v = a.GetCheaterReplyString(r)
-			if v == nil then
-				v = a.GetRepeatString(r)
+			reply = Chat.GetCheaterReplyString(message)
+			if reply == nil then
+				reply = Chat.GetRepeatString(message)
 			end
 		end
 	end
-	if v == nil or RandomInt(1, 100) > 90 then
-		local w = c.Get("random_responses")
-		v = w[RandomInt(1, #w)]
+	if reply == nil or RandomInt(1, 100) > 90 then
+		local randomResponses = Localization.Get("random_responses")
+		reply = randomResponses[RandomInt(1, #randomResponses)]
 	end
-	return v
+	return reply
 end
-function a.AllowTrashTalk(t)
-	local x = d.Trash_Talk_Level
-	return d.Allow_Trash_Talk and (not t and (x == nil or x >= 2) or t and (x == nil or x >= 1))
+function Chat.AllowTrashTalk(isAllChat)
+	local trashTalkLevel = CustomLoader.Trash_Talk_Level
+	return CustomLoader.Allow_Trash_Talk
+		and (
+			not isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 2)
+			or isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 1)
+		)
 end
-function a.GetCheaterReplyString(r)
-	return string.byte(r, 1) == string.byte("-", 1) and "cheater" or nil
+function Chat.GetCheaterReplyString(message)
+	return string.byte(message, 1) == string.byte("-", 1) and "cheater" or nil
 end
-function a.GetRepeatString(r)
-	local y = { "你们", "你", "我", "吗？", "吗", "吧", "？" }
-	for f, z in ipairs(y) do
-		if r == z then
+function Chat.GetRepeatString(message)
+	local skipWords = { "你们", "你", "我", "吗？", "吗", "吧", "？" }
+	for _, word in ipairs(skipWords) do
+		if message == word then
 			return nil
 		end
 	end
-	local A = r
-	if r:find("我是你") then
-		return r:gsub("我是你", "我才是你")
+	local originalMessage = message
+	if message:find("我是你") then
+		return message:gsub("我是你", "我才是你")
 	end
-	local B = { "sb", "SB", "智障", "弱智", "脑残", "脑瘫", "猪", "傻", "菜", "笨", "蠢" }
-	for f, z in ipairs(B) do
-		if r:find(z) then
-			return a.GetReplyTauntString()
+	local insultWords = { "sb", "SB", "智障", "弱智", "脑残", "脑瘫", "猪", "傻", "菜", "笨", "蠢" }
+	for _, word in ipairs(insultWords) do
+		if message:find(word) then
+			return Chat.GetReplyTauntString()
 		end
 	end
-	local C = { "呀", "哦", "呀！", "哦！", "！", "" }
-	local D = C[RandomInt(1, #C)]
-	r = string.gsub(r, "你们", "")
-	r = string.gsub(r, "你", "")
-	r = string.gsub(r, "吗？", D)
-	r = string.gsub(r, "吗", D)
-	r = string.gsub(r, "吧", "啊")
-	r = string.gsub(r, "？", "！")
-	r = string.gsub(r, "?", "!")
-	r = string.gsub(r, "我", "你")
-	return r ~= A and r or nil
+	local endings = { "呀", "哦", "呀！", "哦！", "！", "" }
+	local ending = endings[RandomInt(1, #endings)]
+	message = string.gsub(message, "你们", "")
+	message = string.gsub(message, "你", "")
+	message = string.gsub(message, "吗？", ending)
+	message = string.gsub(message, "吗", ending)
+	message = string.gsub(message, "吧", "啊")
+	message = string.gsub(message, "？", "！")
+	message = string.gsub(message, "?", "!")
+	message = string.gsub(message, "我", "你")
+	return message ~= originalMessage and message or nil
 end
-local E = {
+local tauntReplies = {
 	"你是在说你自己吗?",
 	"你就只会说这个而已吗?",
 	"我不允许你这么说你自己!",
@@ -117,11 +121,11 @@ local E = {
 	"反弹biubiubiu.",
 	"给爷爬~~~",
 }
-function a.GetReplyTauntString()
-	return E[RandomInt(1, #E)]
+function Chat.GetReplyTauntString()
+	return tauntReplies[RandomInt(1, #tauntReplies)]
 end
-function a.GetStopReplyString()
-	local F = c.Get("no_more_talking")
-	return F[RandomInt(1, #F)]
+function Chat.GetStopReplyString()
+	local noMoreTalking = Localization.Get("no_more_talking")
+	return noMoreTalking[RandomInt(1, #noMoreTalking)]
 end
-return a
+return Chat

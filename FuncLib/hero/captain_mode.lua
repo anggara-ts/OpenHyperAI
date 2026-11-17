@@ -1,362 +1,371 @@
 -- Hero-specific helper: captain mode.
-local function a(...)
+local function countArgs(...)
 	return select("#", ...)
 end
-local function b(self, ...)
-	local c = { ... }
-	local d = #self
-	local e = a(...)
-	local f = c[1]
-	local g = c[2]
-	if f < 0 then
-		f = d + f
-		if f < 0 then
-			f = 0
+local function tableSplice(self, ...)
+	local args = { ... }
+	local length = #self
+	local argCount = countArgs(...)
+	local start = args[1]
+	local deleteCountArg = args[2]
+	if start < 0 then
+		start = length + start
+		if start < 0 then
+			start = 0
 		end
-	elseif f > d then
-		f = d
+	elseif start > length then
+		start = length
 	end
-	local h = e - 2
-	if h < 0 then
-		h = 0
+	local insertCount = argCount - 2
+	if insertCount < 0 then
+		insertCount = 0
 	end
-	local i
-	if e == 0 then
-		i = 0
-	elseif e == 1 then
-		i = d - f
+	local deleteCount
+	if argCount == 0 then
+		deleteCount = 0
+	elseif argCount == 1 then
+		deleteCount = length - start
 	else
-		i = g or 0
-		if i < 0 then
-			i = 0
+		deleteCount = deleteCountArg or 0
+		if deleteCount < 0 then
+			deleteCount = 0
 		end
-		if i > d - f then
-			i = d - f
-		end
-	end
-	local j = {}
-	for k = 1, i do
-		local l = f + k
-		if self[l] ~= nil then
-			j[k] = self[l]
+		if deleteCount > length - start then
+			deleteCount = length - start
 		end
 	end
-	if h < i then
-		for k = f + 1, d - i do
-			local l = k + i
-			local m = k + h
-			if self[l] then
-				self[m] = self[l]
+	local removed = {}
+	for i = 1, deleteCount do
+		local fromIndex = start + i
+		if self[fromIndex] ~= nil then
+			removed[i] = self[fromIndex]
+		end
+	end
+	if insertCount < deleteCount then
+		for i = start + 1, length - deleteCount do
+			local fromIndex = i + deleteCount
+			local toIndex = i + insertCount
+			if self[fromIndex] then
+				self[toIndex] = self[fromIndex]
 			else
-				self[m] = nil
+				self[toIndex] = nil
 			end
 		end
-		for k = d - i + h + 1, d do
-			self[k] = nil
+		for i = length - deleteCount + insertCount + 1, length do
+			self[i] = nil
 		end
-	elseif h > i then
-		for k = d - i, f + 1, -1 do
-			local l = k + i
-			local m = k + h
-			if self[l] then
-				self[m] = self[l]
+	elseif insertCount > deleteCount then
+		for i = length - deleteCount, start + 1, -1 do
+			local fromIndex = i + deleteCount
+			local toIndex = i + insertCount
+			if self[fromIndex] then
+				self[toIndex] = self[fromIndex]
 			else
-				self[m] = nil
+				self[toIndex] = nil
 			end
 		end
 	end
-	local n = f + 1
-	for o = 3, e do
-		self[n] = c[o]
-		n = n + 1
+	local insertIndex = start + 1
+	for argIndex = 3, argCount do
+		self[insertIndex] = args[argIndex]
+		insertIndex = insertIndex + 1
 	end
-	for k = #self, d - i + h + 1, -1 do
-		self[k] = nil
+	for i = #self, length - deleteCount + insertCount + 1, -1 do
+		self[i] = nil
 	end
-	return j
+	return removed
 end
-local p = {}
-local q, r, s, t, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J
-local K = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local L = K.GameState
-local M = K.HeroPickState
-local N = K.Lane
-local O = K.Team
-local P = require(GetScriptDirectory() .. "/FuncLib/systems/role")
-local Q = P.CanBeOfflaner
-local R = P.CanBeMidlaner
-local S = P.CanBeSupport
-local T = P.CanBeSafeLaneCarry
-function p.PickCaptain()
-	if not p.IsHumanPlayerExist() or DotaTime() > -1 then
+local X = {}
+local banHero, pickHero, isHumanPicked, isExcludedHero, randomAvailableHero, allHumansSelected, selectHeroes, collectPickedHeroes, removeFromPicked, assignLanes, extraHeroPool, pickedHeroes, heroesSelected, banCount, pickCount, excludedHeroes, laneAssignments, heroPool, humanPickedHeroes, positionAssignments
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local GameState = Dota.GameState
+local HeroPickState = Dota.HeroPickState
+local Lane = Dota.Lane
+local Team = Dota.Team
+local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local CanBeOfflaner = Role.CanBeOfflaner
+local CanBeMidlaner = Role.CanBeMidlaner
+local CanBeSupport = Role.CanBeSupport
+local CanBeSafeLaneCarry = Role.CanBeSafeLaneCarry
+function X.PickCaptain()
+	if not X.IsHumanPlayerExist() or DotaTime() > -1 then
 		if GetCMCaptain() == -1 then
-			local U = p.GetFirstBot()
-			if U ~= nil and U ~= nil then
-				log("CAPTAIN PID : %s", U)
-				SetCMCaptain(U)
+			local firstBot = X.GetFirstBot()
+			if firstBot ~= nil and firstBot ~= nil then
+				log("CAPTAIN PID : %s", firstBot)
+				SetCMCaptain(firstBot)
 			end
 		end
 	end
 end
-function p.IsHumanPlayerExist()
-	local V = GetTeamPlayers(GetTeam())
-	for W, X in ipairs(V) do
-		if not IsPlayerBot(X) then
+function X.IsHumanPlayerExist()
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	for _, playerId in ipairs(teamPlayers) do
+		if not IsPlayerBot(playerId) then
 			return true
 		end
 	end
 	return false
 end
-function p.GetFirstBot()
-	local Y = nil
-	local V = GetTeamPlayers(GetTeam())
-	for W, X in ipairs(V) do
-		if IsPlayerBot(X) then
-			Y = X
-			return Y
+function X.GetFirstBot()
+	local firstBot = nil
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	for _, playerId in ipairs(teamPlayers) do
+		if IsPlayerBot(playerId) then
+			firstBot = playerId
+			return firstBot
 		end
 	end
-	return Y
+	return firstBot
 end
-function q()
+function banHero()
 	if not IsPlayerBot(GetCMCaptain()) or not IsPlayerInHeroSelectionControl(GetCMCaptain()) then
 		return
 	end
-	local Z = u()
-	log("%s is banned", Z)
-	CMBanHero(Z)
-	D = D + 1
+	local heroName = randomAvailableHero()
+	log("%s is banned", heroName)
+	CMBanHero(heroName)
+	banCount = banCount + 1
 end
-function r()
+function pickHero()
 	if not IsPlayerBot(GetCMCaptain()) or not IsPlayerInHeroSelectionControl(GetCMCaptain()) then
 		return
 	end
-	local _ = GetTeam() == O.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
-	local a0 = u()
-	if E == 1 then
-		while not Q(a0) do
-			a0 = u()
+	local teamKey = GetTeam() == Team.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
+	local heroName = randomAvailableHero()
+	if pickCount == 1 then
+		while not CanBeOfflaner(heroName) do
+			heroName = randomAvailableHero()
 		end
-		p.PairsHeroNameNRole[_][a0] = "offlaner"
-	elseif E == 2 then
-		while not S(a0) do
-			a0 = u()
+		X.PairsHeroNameNRole[teamKey][heroName] = "offlaner"
+	elseif pickCount == 2 then
+		while not CanBeSupport(heroName) do
+			heroName = randomAvailableHero()
 		end
-		p.PairsHeroNameNRole[_][a0] = "support"
-	elseif E == 3 then
-		while not R(a0) do
-			a0 = u()
+		X.PairsHeroNameNRole[teamKey][heroName] = "support"
+	elseif pickCount == 3 then
+		while not CanBeMidlaner(heroName) do
+			heroName = randomAvailableHero()
 		end
-		p.PairsHeroNameNRole[_][a0] = "midlaner"
-	elseif E == 4 then
-		while not S(a0) do
-			a0 = u()
+		X.PairsHeroNameNRole[teamKey][heroName] = "midlaner"
+	elseif pickCount == 4 then
+		while not CanBeSupport(heroName) do
+			heroName = randomAvailableHero()
 		end
-		p.PairsHeroNameNRole[_][a0] = "support"
-	elseif E == 5 then
-		while not T(a0) do
-			a0 = u()
+		X.PairsHeroNameNRole[teamKey][heroName] = "support"
+	elseif pickCount == 5 then
+		while not CanBeSafeLaneCarry(heroName) do
+			heroName = randomAvailableHero()
 		end
-		p.PairsHeroNameNRole[_][a0] = "carry"
+		X.PairsHeroNameNRole[teamKey][heroName] = "carry"
 	end
-	log("%s is picked", a0)
-	CMPickHero(a0)
-	E = E + 1
+	log("%s is picked", heroName)
+	CMPickHero(heroName)
+	pickCount = pickCount + 1
 end
-function s(a1)
-	for W, a2 in ipairs(I) do
-		if a1 == a2 then
+function isHumanPicked(heroName)
+	for _, pickedHero in ipairs(humanPickedHeroes) do
+		if heroName == pickedHero then
 			return true
 		end
 	end
 	return false
 end
-function t(a3)
-	for W, a4 in ipairs(F) do
-		if a3 == a4 then
+function isExcludedHero(heroName)
+	for _, excludedHero in ipairs(excludedHeroes) do
+		if heroName == excludedHero then
 			return true
 		end
 	end
 	return false
 end
-function u()
-	local a5 = H[RandomInt(1, #H)]
-	while t(a5) or IsCMPickedHero(GetTeam(), a5) or IsCMPickedHero(GetOpposingTeam(), a5) or IsCMBannedHero(a5) do
-		a5 = H[RandomInt(1, #H)]
+function randomAvailableHero()
+	local heroName = heroPool[RandomInt(1, #heroPool)]
+	while
+		isExcludedHero(heroName)
+		or IsCMPickedHero(GetTeam(), heroName)
+		or IsCMPickedHero(GetOpposingTeam(), heroName)
+		or IsCMBannedHero(heroName)
+	do
+		heroName = heroPool[RandomInt(1, #heroPool)]
 	end
-	return a5
+	return heroName
 end
-function v()
-	local V = GetTeamPlayers(GetTeam())
-	for W, X in ipairs(V) do
-		if not IsPlayerBot(X) then
-			local a6 = GetSelectedHeroName(X)
-			if a6 == nil or a6 == "" then
+function allHumansSelected()
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	for _, playerId in ipairs(teamPlayers) do
+		if not IsPlayerBot(playerId) then
+			local selectedName = GetSelectedHeroName(playerId)
+			if selectedName == nil or selectedName == "" then
 				return false
 			end
 		end
 	end
 	return true
 end
-function w()
-	if not C and (v() or GetCMPhaseTimeRemaining() < 1) then
-		local V = GetTeamPlayers(GetTeam())
-		local a7 = {}
-		x()
-		for W, X in ipairs(V) do
-			local a1 = GetSelectedHeroName(X)
-			if a1 ~= nil and a1 ~= "" then
-				y(a1)
-				log("%s Removed", a1)
+function selectHeroes()
+	if not heroesSelected and (allHumansSelected() or GetCMPhaseTimeRemaining() < 1) then
+		local teamPlayers = GetTeamPlayers(GetTeam())
+		local unselectedPlayers = {}
+		collectPickedHeroes()
+		for _, playerId in ipairs(teamPlayers) do
+			local heroName = GetSelectedHeroName(playerId)
+			if heroName ~= nil and heroName ~= "" then
+				removeFromPicked(heroName)
+				log("%s Removed", heroName)
 			else
-				a7[#a7 + 1] = X
+				unselectedPlayers[#unselectedPlayers + 1] = playerId
 			end
 		end
 		do
-			local o = 0
-			while o < #a7 do
-				SelectHero(a7[o + 1], B[o + 1])
-				o = o + 1
+			local i = 0
+			while i < #unselectedPlayers do
+				SelectHero(unselectedPlayers[i + 1], pickedHeroes[i + 1])
+				i = i + 1
 			end
 		end
-		C = true
+		heroesSelected = true
 	end
 end
-function x()
-	for W, a8 in ipairs(H) do
-		if IsCMPickedHero(GetTeam(), a8) then
-			B[#B + 1] = a8
+function collectPickedHeroes()
+	for _, heroName in ipairs(heroPool) do
+		if IsCMPickedHero(GetTeam(), heroName) then
+			pickedHeroes[#pickedHeroes + 1] = heroName
 		end
 	end
-	for W, a8 in ipairs(A) do
-		if IsCMPickedHero(GetTeam(), a8) then
-			B[#B + 1] = a8
+	for _, heroName in ipairs(extraHeroPool) do
+		if IsCMPickedHero(GetTeam(), heroName) then
+			pickedHeroes[#pickedHeroes + 1] = heroName
 		end
 	end
 end
-function y(a6)
+function removeFromPicked(heroName)
 	do
-		local o = 0
-		while o < #B do
-			if B[o + 1] == a6 then
-				b(B, o, 1)
+		local i = 0
+		while i < #pickedHeroes do
+			if pickedHeroes[i + 1] == heroName then
+				tableSplice(pickedHeroes, i, 1)
 				break
 			end
-			o = o + 1
+			i = i + 1
 		end
 	end
 end
-function z()
-	local a9 = GetTeamPlayers(GetTeam())
-	local _ = GetTeam() == O.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
-	local aa = { TEAM_RADIANT = false, TEAM_DIRE = false }
+function assignLanes()
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	local teamKey = GetTeam() == Team.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
+	local supportAssigned = { TEAM_RADIANT = false, TEAM_DIRE = false }
 	do
-		local o = 0
-		while o < #a9 do
-			local ab = GetTeamMember(o + 1)
-			if ab ~= nil and ab:IsHero() then
-				local ac = ab:GetUnitName()
-				local ad = p.PairsHeroNameNRole[_][ac]
-				if ad == "support" then
-					if GetTeam() == O.Radiant then
-						if not aa.TEAM_RADIANT then
-							G[_][o + 1] = N.Bot
-							aa.TEAM_RADIANT = true
-							J[_][o + 1] = 5
+		local i = 0
+		while i < #teamPlayers do
+			local member = GetTeamMember(i + 1)
+			if member ~= nil and member:IsHero() then
+				local unitName = member:GetUnitName()
+				local role = X.PairsHeroNameNRole[teamKey][unitName]
+				if role == "support" then
+					if GetTeam() == Team.Radiant then
+						if not supportAssigned.TEAM_RADIANT then
+							laneAssignments[teamKey][i + 1] = Lane.Bot
+							supportAssigned.TEAM_RADIANT = true
+							positionAssignments[teamKey][i + 1] = 5
 						else
-							G[_][o + 1] = N.Top
-							J[_][o + 1] = 4
+							laneAssignments[teamKey][i + 1] = Lane.Top
+							positionAssignments[teamKey][i + 1] = 4
 						end
 					else
-						if not aa.TEAM_DIRE then
-							G[_][o + 1] = N.Top
-							aa.TEAM_DIRE = true
-							J[_][o + 1] = 5
+						if not supportAssigned.TEAM_DIRE then
+							laneAssignments[teamKey][i + 1] = Lane.Top
+							supportAssigned.TEAM_DIRE = true
+							positionAssignments[teamKey][i + 1] = 5
 						else
-							G[_][o + 1] = N.Bot
-							J[_][o + 1] = 4
+							laneAssignments[teamKey][i + 1] = Lane.Bot
+							positionAssignments[teamKey][i + 1] = 4
 						end
 					end
-				elseif ad == "midlaner" then
-					G[_][o + 1] = N.Mid
-					J[_][o + 1] = 2
-				elseif ad == "offlaner" then
-					if GetTeam() == O.Radiant then
-						G[_][o + 1] = N.Top
+				elseif role == "midlaner" then
+					laneAssignments[teamKey][i + 1] = Lane.Mid
+					positionAssignments[teamKey][i + 1] = 2
+				elseif role == "offlaner" then
+					if GetTeam() == Team.Radiant then
+						laneAssignments[teamKey][i + 1] = Lane.Top
 					else
-						G[_][o + 1] = N.Bot
+						laneAssignments[teamKey][i + 1] = Lane.Bot
 					end
-					J[_][o + 1] = 3
-				elseif ad == "carry" then
-					if GetTeam() == O.Radiant then
-						G[_][o + 1] = N.Bot
+					positionAssignments[teamKey][i + 1] = 3
+				elseif role == "carry" then
+					if GetTeam() == Team.Radiant then
+						laneAssignments[teamKey][i + 1] = Lane.Bot
 					else
-						G[_][o + 1] = N.Top
+						laneAssignments[teamKey][i + 1] = Lane.Top
 					end
-					J[_][o + 1] = 1
+					positionAssignments[teamKey][i + 1] = 1
 				end
 			end
-			o = o + 1
+			i = i + 1
 		end
 	end
 end
-A = {}
-B = {}
-C = false
-D = 1
-E = 1
-local ae = 28
-local af = 15
-local ag = 20
-local ah = true
-F = { "npc_dota_hero_techies" }
-G = {
-	TEAM_RADIANT = { [1] = N.Bot, [2] = N.Mid, [3] = N.Top, [4] = N.Top, [5] = N.Bot },
-	TEAM_DIRE = { [1] = N.Top, [2] = N.Mid, [3] = N.Bot, [4] = N.Bot, [5] = N.Top },
+extraHeroPool = {}
+pickedHeroes = {}
+heroesSelected = false
+banCount = 1
+pickCount = 1
+local pickDelay = 28
+local minPickDelay = 15
+local maxPickDelay = 20
+local useFixedPickDelay = true
+excludedHeroes = { "npc_dota_hero_techies" }
+laneAssignments = {
+	TEAM_RADIANT = { [1] = Lane.Bot, [2] = Lane.Mid, [3] = Lane.Top, [4] = Lane.Top, [5] = Lane.Bot },
+	TEAM_DIRE = { [1] = Lane.Top, [2] = Lane.Mid, [3] = Lane.Bot, [4] = Lane.Bot, [5] = Lane.Top },
 }
-H = {}
-p.PairsHeroNameNRole = { TEAM_RADIANT = {}, TEAM_DIRE = {} }
-I = {}
-function p.CaptainModeLogic(ai)
-	H = ai
-	if GetGameState() ~= L.HeroSelection then
+heroPool = {}
+X.PairsHeroNameNRole = { TEAM_RADIANT = {}, TEAM_DIRE = {} }
+humanPickedHeroes = {}
+function X.CaptainModeLogic(heroList)
+	heroPool = heroList
+	if GetGameState() ~= GameState.HeroSelection then
 		return
 	end
-	if not ah then
-		ae = RandomInt(af, ag)
-	elseif ah then
-		ae = 25
+	if not useFixedPickDelay then
+		pickDelay = RandomInt(minPickDelay, maxPickDelay)
+	elseif useFixedPickDelay then
+		pickDelay = 25
 	end
-	local aj = GetHeroPickState()
-	if aj == M.CmCaptainPick then
-		p.PickCaptain()
-	elseif aj >= M.CmBan1 and aj <= 20 and GetCMPhaseTimeRemaining() <= ae then
-		q()
-		ae = 0
-	elseif aj >= M.CmSelect1 and aj <= M.CmSelect10 and GetCMPhaseTimeRemaining() <= ae then
-		r()
-		ae = 0
-	elseif aj == M.CmPick then
-		w()
+	local pickState = GetHeroPickState()
+	if pickState == HeroPickState.CmCaptainPick then
+		X.PickCaptain()
+	elseif pickState >= HeroPickState.CmBan1 and pickState <= 20 and GetCMPhaseTimeRemaining() <= pickDelay then
+		banHero()
+		pickDelay = 0
+	elseif
+		pickState >= HeroPickState.CmSelect1
+		and pickState <= HeroPickState.CmSelect10
+		and GetCMPhaseTimeRemaining() <= pickDelay
+	then
+		pickHero()
+		pickDelay = 0
+	elseif pickState == HeroPickState.CmPick then
+		selectHeroes()
 	end
 end
-function p.AddToList()
+function X.AddToList()
 	if not IsPlayerBot(GetCMCaptain()) then
-		for W, a2 in ipairs(H) do
-			if IsCMPickedHero(GetTeam(), a2) and not s(a2) then
-				I[#I + 1] = a2
+		for _, heroName in ipairs(heroPool) do
+			if IsCMPickedHero(GetTeam(), heroName) and not isHumanPicked(heroName) then
+				humanPickedHeroes[#humanPickedHeroes + 1] = heroName
 			end
 		end
 	end
 end
-J = { TEAM_RADIANT = {}, TEAM_DIRE = {} }
-function p.CMLaneAssignment(ak)
-	local _ = GetTeam() == O.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
-	J = ak
+-- positionAssignments is the caller's role table, set in CMLaneAssignment; assignLanes fills it in.
+function X.CMLaneAssignment(roleAssignment)
+	local teamKey = GetTeam() == Team.Radiant and "TEAM_RADIANT" or "TEAM_DIRE"
+	positionAssignments = roleAssignment
 	if IsPlayerBot(GetCMCaptain()) then
-		z()
+		assignLanes()
 	else
 	end
-	return G[_]
+	return laneAssignments[teamKey]
 end
-return p
+return X

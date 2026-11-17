@@ -1,182 +1,194 @@
 -- Gather the team before a push or fight.
-local a = GetBot()
-if a == nil or a:IsInvulnerable() or not a:IsHero() or not string.find(a:GetUnitName(), "hero") or a:IsIllusion() then
+local bot = GetBot()
+if
+	bot == nil
+	or bot:IsInvulnerable()
+	or not bot:IsHero()
+	or not string.find(bot:GetUnitName(), "hero")
+	or bot:IsIllusion()
+then
 	return
 end
-local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local c = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
-local d = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
-local function e(f)
-	if f == nil then
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+local HeroDisplayNames = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
+local function getHeroDisplayName(unit)
+	if unit == nil then
 		return ""
 	end
-	local g = f:GetUnitName()
-	local h = c.GetLocale()
-	local i = d[h] or d["en"]
-	return i[g] or d["en"][g] or g
+	local unitName = unit:GetUnitName()
+	local locale = Localization.GetLocale()
+	local localizedNames = HeroDisplayNames[locale] or HeroDisplayNames["en"]
+	return localizedNames[unitName] or HeroDisplayNames["en"][unitName] or unitName
 end
-local function j(k, l, m)
-	if a.lastModeChatTime == nil then
-		a.lastModeChatTime = {}
+local function sayModeChat(chatKey, target, cooldown)
+	if bot.lastModeChatTime == nil then
+		bot.lastModeChatTime = {}
 	end
-	local n = a.lastModeChatTime[k] or -999
-	if GameTime() - n < (m or 30) then
+	local lastChatTime = bot.lastModeChatTime[chatKey] or -999
+	if GameTime() - lastChatTime < (cooldown or 30) then
 		return
 	end
-	a.lastModeChatTime[k] = GameTime()
-	local o = c.Get(k)
-	if o ~= nil and #o > 0 then
-		local p = o[RandomInt(1, #o)]
-		if l then
-			p = string.gsub(p, "{target}", e(l))
+	bot.lastModeChatTime[chatKey] = GameTime()
+	local lines = Localization.Get(chatKey)
+	if lines ~= nil and #lines > 0 then
+		local line = lines[RandomInt(1, #lines)]
+		if target then
+			line = string.gsub(line, "{target}", getHeroDisplayName(target))
 		end
-		a:ActionImmediate_Chat(p, false)
+		bot:ActionImmediate_Chat(line, false)
 	end
 end
-local q = 8
-local r = 5
-local s = 6
-local t = 0.8
-local u = 0.4
-local v = 0.7
-local w = 0.4
-local x = 50
-local y = 2500
-local z = 500
-local A = 3000
-local B = nil
-local C = 0
-local D = nil
-local E = nil
-local F = nil
+local PING_MAX_AGE = 8
+local ASSEMBLE_HOLD_SECONDS = 5
+local ATTACK_HOLD_SECONDS = 6
+local PING_DESIRE = 0.8
+local HOLD_DESIRE = 0.4
+local PING_ATTACK_DESIRE = 0.7
+local HOLD_ATTACK_DESIRE = 0.4
+local ARRIVE_DISTANCE = 50
+local MAX_PING_DISTANCE = 2500
+local PING_ENEMY_RADIUS = 500
+local TARGET_LEASH_DISTANCE = 3000
+local assembleLocation = nil
+local holdUntil = 0
+local pingTarget = nil
+local pingLocation = nil
+local groupUpAlly = nil
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	if not a:IsAlive() then
+	if not bot:IsAlive() then
 		return BOT_MODE_DESIRE_NONE
 	end
-	local G, H = b.GetHumanPing()
-	if G ~= nil and H ~= nil and H.normal_ping and H.time ~= 0 and GameTime() - H.time < q then
-		local I = GetUnitToLocationDistance(a, H.location)
-		if I > x and I < y then
-			B = H.location
-			E = H.location
-			D = FindEnemyAtPing()
-			if D ~= nil then
-				C = GameTime() + s
-				j("say_assemble_attack", D, r)
+	local pingingHuman, ping = Fu.GetHumanPing()
+	if
+		pingingHuman ~= nil
+		and ping ~= nil
+		and ping.normal_ping
+		and ping.time ~= 0
+		and GameTime() - ping.time < PING_MAX_AGE
+	then
+		local distanceToPing = GetUnitToLocationDistance(bot, ping.location)
+		if distanceToPing > ARRIVE_DISTANCE and distanceToPing < MAX_PING_DISTANCE then
+			assembleLocation = ping.location
+			pingLocation = ping.location
+			pingTarget = FindEnemyAtPing()
+			if pingTarget ~= nil then
+				holdUntil = GameTime() + ATTACK_HOLD_SECONDS
+				sayModeChat("say_assemble_attack", pingTarget, ASSEMBLE_HOLD_SECONDS)
 			else
-				C = GameTime() + r
-				b.ModeAnnounce(a, "say_assemble", r)
+				holdUntil = GameTime() + ASSEMBLE_HOLD_SECONDS
+				Fu.ModeAnnounce(bot, "say_assemble", ASSEMBLE_HOLD_SECONDS)
 			end
-			if a:GetLevel() < 6 then
-				local J = a:GetNearbyTowers(1000, true)
-				if J and #J >= 1 then
+			if bot:GetLevel() < 6 then
+				local enemyTowers = bot:GetNearbyTowers(1000, true)
+				if enemyTowers and #enemyTowers >= 1 then
 					return BOT_MODE_DESIRE_NONE
 				end
 			end
-			local K = D ~= nil and v or t
-			return K * RemapValClamped(b.GetHP(a), 0, 0.6, 0, 1)
+			local baseDesire = pingTarget ~= nil and PING_ATTACK_DESIRE or PING_DESIRE
+			return baseDesire * RemapValClamped(Fu.GetHP(bot), 0, 0.6, 0, 1)
 		end
 	end
-	if B ~= nil and GameTime() < C then
-		if D ~= nil then
-			if not b.IsValidHero(D) or not b.CanBeAttacked(D) then
-				D = nil
-				C = math.min(C, GameTime() + 2)
+	if assembleLocation ~= nil and GameTime() < holdUntil then
+		if pingTarget ~= nil then
+			if not Fu.IsValidHero(pingTarget) or not Fu.CanBeAttacked(pingTarget) then
+				pingTarget = nil
+				holdUntil = math.min(holdUntil, GameTime() + 2)
 			else
-				local L = E and GetUnitToLocationDistance(D, E) or 0
-				if L < A then
-					C = math.max(C, GameTime() + 3)
+				local targetDistanceFromPing = pingLocation and GetUnitToLocationDistance(pingTarget, pingLocation) or 0
+				if targetDistanceFromPing < TARGET_LEASH_DISTANCE then
+					holdUntil = math.max(holdUntil, GameTime() + 3)
 				end
 			end
 		end
-		if a:WasRecentlyDamagedByAnyHero(2.0) and b.GetHP(a) < 0.3 then
-			B = nil
-			D = nil
+		if bot:WasRecentlyDamagedByAnyHero(2.0) and Fu.GetHP(bot) < 0.3 then
+			assembleLocation = nil
+			pingTarget = nil
 			return BOT_MODE_DESIRE_NONE
 		end
-		if F ~= nil then
+		if groupUpAlly ~= nil then
 			return 0.1
 		end
-		if a:GetLevel() < 6 then
-			local J = a:GetNearbyTowers(1000, true)
-			if J and #J >= 1 then
+		if bot:GetLevel() < 6 then
+			local enemyTowers = bot:GetNearbyTowers(1000, true)
+			if enemyTowers and #enemyTowers >= 1 then
 				return BOT_MODE_DESIRE_NONE
 			end
 		end
-		local M = D ~= nil and w or u
-		return M * RemapValClamped(b.GetHP(a), 0, 0.6, 0, 1)
+		local baseDesire = pingTarget ~= nil and HOLD_ATTACK_DESIRE or HOLD_DESIRE
+		return baseDesire * RemapValClamped(Fu.GetHP(bot), 0, 0.6, 0, 1)
 	end
-	B = nil
-	D = nil
-	E = nil
+	assembleLocation = nil
+	pingTarget = nil
+	pingLocation = nil
 	if
-		not b.IsInLaningPhase()
+		not Fu.IsInLaningPhase()
 		and DotaTime() > 15 * 60
-		and a:GetActiveModeDesire() < 0.15
-		and b.GetHP(a) > 0.5
-		and a:DistanceFromFountain() > 3000
+		and bot:GetActiveModeDesire() < 0.15
+		and Fu.GetHP(bot) > 0.5
+		and bot:DistanceFromFountain() > 3000
 	then
-		local N = nil
-		local O = 99999
-		local P = 0
-		for Q = 1, #GetTeamPlayers(GetTeam()) do
-			local R = GetTeamMember(Q)
-			if R ~= nil and R:IsAlive() and R ~= a and not R:IsIllusion() then
-				local I = GetUnitToLocationDistance(a, R:GetLocation())
-				local S = b.GetAlliesNearLoc(R:GetLocation(), 1600)
-				local T = 0
-				for U, V in pairs(S) do
-					if b.IsValidHero(V) and V ~= a then
-						T = T + 1
+		local bestAlly = nil
+		local bestDistance = 99999
+		local bestAllyGroupSize = 0
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local teamMember = GetTeamMember(i)
+			if teamMember ~= nil and teamMember:IsAlive() and teamMember ~= bot and not teamMember:IsIllusion() then
+				local distanceToMember = GetUnitToLocationDistance(bot, teamMember:GetLocation())
+				local alliesNearMember = Fu.GetAlliesNearLoc(teamMember:GetLocation(), 1600)
+				local allyCount = 0
+				for _, ally in pairs(alliesNearMember) do
+					if Fu.IsValidHero(ally) and ally ~= bot then
+						allyCount = allyCount + 1
 					end
 				end
-				local W = R:GetActiveModeDesire()
-				if T >= 2 and I < O then
-					N = R
-					O = I
-					P = T
-				elseif P < 2 and W > 0.15 and I < O then
-					N = R
-					O = I
+				local memberDesire = teamMember:GetActiveModeDesire()
+				if allyCount >= 2 and distanceToMember < bestDistance then
+					bestAlly = teamMember
+					bestDistance = distanceToMember
+					bestAllyGroupSize = allyCount
+				elseif bestAllyGroupSize < 2 and memberDesire > 0.15 and distanceToMember < bestDistance then
+					bestAlly = teamMember
+					bestDistance = distanceToMember
 				end
 			end
 		end
-		if N ~= nil and O > 600 and O < 8000 then
-			F = N
-			B = N:GetLocation()
-			C = GameTime() + 8
+		if bestAlly ~= nil and bestDistance > 600 and bestDistance < 8000 then
+			groupUpAlly = bestAlly
+			assembleLocation = bestAlly:GetLocation()
+			holdUntil = GameTime() + 8
 			return 0.1
 		end
 	end
-	F = nil
+	groupUpAlly = nil
 	if
-		b.GetHP(a) > 0.5
-		and b.IsLaning(a)
-		and not b.IsRetreating(a)
-		and not a:WasRecentlyDamagedByAnyHero(2.0)
-		and not b.IsGoingOnSomeone(a)
-		and not (b.IsValidHero(b.GetProperTarget(a)) and a:GetActiveMode() == BOT_MODE_ATTACK)
-		and not b.IsInTeamFight(a, 1200)
+		Fu.GetHP(bot) > 0.5
+		and Fu.IsLaning(bot)
+		and not Fu.IsRetreating(bot)
+		and not bot:WasRecentlyDamagedByAnyHero(2.0)
+		and not Fu.IsGoingOnSomeone(bot)
+		and not (Fu.IsValidHero(Fu.GetProperTarget(bot)) and bot:GetActiveMode() == BOT_MODE_ATTACK)
+		and not Fu.IsInTeamFight(bot, 1200)
 	then
-		local S = a:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}
-		for U, X in pairs(S) do
-			if X ~= a and b.IsValidHero(X) and b.IsGoingOnSomeone(X) then
-				local Y = b.GetProperTarget(X)
+		local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}
+		for _, ally in pairs(nearbyAllies) do
+			if ally ~= bot and Fu.IsValidHero(ally) and Fu.IsGoingOnSomeone(ally) then
+				local allyTarget = Fu.GetProperTarget(ally)
 				if
-					b.IsValidHero(Y)
-					and b.CanBeAttacked(Y)
-					and not b.IsSuspiciousIllusion(Y)
-					and GetUnitToUnitDistance(a, Y) < 1200
-					and b.WeAreStronger(a, 1200)
+					Fu.IsValidHero(allyTarget)
+					and Fu.CanBeAttacked(allyTarget)
+					and not Fu.IsSuspiciousIllusion(allyTarget)
+					and GetUnitToUnitDistance(bot, allyTarget) < 1200
+					and Fu.WeAreStronger(bot, 1200)
 				then
-					D = Y
-					B = Y:GetLocation()
-					C = GameTime() + 3
-					a:SetTarget(Y)
-					return RemapValClamped(b.GetHP(a), 0.2, 0.8, 0, w)
+					pingTarget = allyTarget
+					assembleLocation = allyTarget:GetLocation()
+					holdUntil = GameTime() + 3
+					bot:SetTarget(allyTarget)
+					return RemapValClamped(Fu.GetHP(bot), 0.2, 0.8, 0, HOLD_ATTACK_DESIRE)
 				end
 			end
 		end
@@ -184,78 +196,78 @@ function GetDesire()
 	return BOT_MODE_DESIRE_NONE
 end
 function OnEnd()
-	B = nil
-	C = 0
-	D = nil
-	E = nil
-	F = nil
+	assembleLocation = nil
+	holdUntil = 0
+	pingTarget = nil
+	pingLocation = nil
+	groupUpAlly = nil
 end
 function FindEnemyAtPing()
-	if B == nil then
+	if assembleLocation == nil then
 		return nil
 	end
-	local Z = b.GetEnemiesNearLoc(B, z)
-	for U, _ in pairs(Z) do
-		if b.IsValidHero(_) and b.CanBeAttacked(_) then
-			return _
+	local nearbyEnemies = Fu.GetEnemiesNearLoc(assembleLocation, PING_ENEMY_RADIUS)
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) then
+			return enemyHero
 		end
 	end
 	return nil
 end
 function Think()
-	if b.CanNotUseAction(a) then
+	if Fu.CanNotUseAction(bot) then
 		return
 	end
-	if B == nil then
+	if assembleLocation == nil then
 		return
 	end
-	if D ~= nil and b.IsValidHero(D) and b.CanBeAttacked(D) then
-		B = D:GetLocation()
-		local a0 = GetUnitToUnitDistance(a, D)
-		if a0 <= a:GetAttackRange() + 200 then
-			a:Action_AttackUnit(D, true)
+	if pingTarget ~= nil and Fu.IsValidHero(pingTarget) and Fu.CanBeAttacked(pingTarget) then
+		assembleLocation = pingTarget:GetLocation()
+		local targetDistance = GetUnitToUnitDistance(bot, pingTarget)
+		if targetDistance <= bot:GetAttackRange() + 200 then
+			bot:Action_AttackUnit(pingTarget, true)
 		else
-			a:Action_MoveToLocation(D:GetLocation() + RandomVector(50))
+			bot:Action_MoveToLocation(pingTarget:GetLocation() + RandomVector(50))
 		end
 		return
 	end
-	D = nil
-	if F ~= nil then
-		if not b.IsValidHero(F) or not F:IsAlive() then
-			F = nil
-			B = nil
+	pingTarget = nil
+	if groupUpAlly ~= nil then
+		if not Fu.IsValidHero(groupUpAlly) or not groupUpAlly:IsAlive() then
+			groupUpAlly = nil
+			assembleLocation = nil
 			return
 		end
-		B = F:GetLocation()
-		local I = GetUnitToUnitDistance(a, F)
-		if I <= 600 then
-			F = nil
-			B = nil
+		assembleLocation = groupUpAlly:GetLocation()
+		local distanceToAlly = GetUnitToUnitDistance(bot, groupUpAlly)
+		if distanceToAlly <= 600 then
+			groupUpAlly = nil
+			assembleLocation = nil
 			return
 		end
-		local a1 = a:GetNearbyLaneCreeps(a:GetAttackRange() + 200, true)
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(bot:GetAttackRange() + 200, true)
 		if
-			b.IsValid(a1[1])
-			and b.CanBeAttacked(a1[1])
-			and b.CanKillTarget(a1[1], a:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+			Fu.IsValid(nearbyLaneCreeps[1])
+			and Fu.CanBeAttacked(nearbyLaneCreeps[1])
+			and Fu.CanKillTarget(nearbyLaneCreeps[1], bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 		then
-			a:Action_AttackUnit(a1[1], true)
+			bot:Action_AttackUnit(nearbyLaneCreeps[1], true)
 			return
 		end
-		a:Action_MoveToLocation(B + RandomVector(50))
+		bot:Action_MoveToLocation(assembleLocation + RandomVector(50))
 		return
 	end
-	local I = GetUnitToLocationDistance(a, B)
-	if I <= x then
-		B = nil
+	local distanceToTarget = GetUnitToLocationDistance(bot, assembleLocation)
+	if distanceToTarget <= ARRIVE_DISTANCE then
+		assembleLocation = nil
 		return
 	end
-	if I > 4000 and not a:IsChanneling() then
-		local a2 = b.IsItemAvailable("item_tpscroll")
-		if b.CanCastAbility(a2) then
-			local a3 = nil
-			local O = 99999
-			for U, a4 in pairs({
+	if distanceToTarget > 4000 and not bot:IsChanneling() then
+		local tpScroll = Fu.IsItemAvailable("item_tpscroll")
+		if Fu.CanCastAbility(tpScroll) then
+			local nearestTower = nil
+			local nearestDistance = 99999
+			for _, towerId in pairs({
 				TOWER_TOP_1,
 				TOWER_TOP_2,
 				TOWER_TOP_3,
@@ -266,39 +278,39 @@ function Think()
 				TOWER_BOT_2,
 				TOWER_BOT_3,
 			}) do
-				local a5 = GetTower(GetTeam(), a4)
-				if a5 ~= nil and a5:IsAlive() then
-					local a6 = GetUnitToLocationDistance(a5, B)
-					if a6 < O then
-						O = a6
-						a3 = a5
+				local tower = GetTower(GetTeam(), towerId)
+				if tower ~= nil and tower:IsAlive() then
+					local towerDistance = GetUnitToLocationDistance(tower, assembleLocation)
+					if towerDistance < nearestDistance then
+						nearestDistance = towerDistance
+						nearestTower = tower
 					end
 				end
 			end
-			if a3 ~= nil and O < 3000 then
+			if nearestTower ~= nil and nearestDistance < 3000 then
 				log(
 					"[TP] %s t=%.0f ASSEMBLE tp to building at (%.0f,%.0f)",
-					a:GetUnitName(),
+					bot:GetUnitName(),
 					DotaTime(),
-					a3:GetLocation().x,
-					a3:GetLocation().y
+					nearestTower:GetLocation().x,
+					nearestTower:GetLocation().y
 				)
-				a:Action_UseAbilityOnLocation(a2, a3:GetLocation())
+				bot:Action_UseAbilityOnLocation(tpScroll, nearestTower:GetLocation())
 				return
 			end
 		end
 	end
-	a:Action_MoveToLocation(B + RandomVector(50))
+	bot:Action_MoveToLocation(assembleLocation + RandomVector(50))
 end
 -- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
 GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "assemble", BOT_MODE_ASSEMBLE)
 if SafeCall then
-	local a7 = GetDesire
-	local a8 = Think
-	if a7 then
-		GetDesire = SafeCall(a7, 0, "ASSEMBLE_GetDesire")
+	local originalGetDesire = GetDesire
+	local originalThink = Think
+	if originalGetDesire then
+		GetDesire = SafeCall(originalGetDesire, 0, "ASSEMBLE_GetDesire")
 	end
-	if a8 then
-		Think = SafeCall(a8, nil, "ASSEMBLE_Think")
+	if originalThink then
+		Think = SafeCall(originalThink, nil, "ASSEMBLE_Think")
 	end
 end

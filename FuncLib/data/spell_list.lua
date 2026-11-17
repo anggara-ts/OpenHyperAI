@@ -1,7 +1,10 @@
 -- Lookup table: spell list.
-local a = {}
-a["spells"] = {
-	["npc_dota_hero_abaddon"] = { ["abaddon_death_coil"] = { weight = 0.8 }, ["abaddon_aphotic_shield"] = { weight = 0.8 } },
+local SpellList = {}
+SpellList["spells"] = {
+	["npc_dota_hero_abaddon"] = {
+		["abaddon_death_coil"] = { weight = 0.8 },
+		["abaddon_aphotic_shield"] = { weight = 0.8 },
+	},
 	["npc_dota_hero_abyssal_underlord"] = {
 		["abyssal_underlord_firestorm"] = { weight = 0.5 },
 		["abyssal_underlord_pit_of_malice"] = { weight = 0.5 },
@@ -877,20 +880,20 @@ a["spells"] = {
 		["zuus_thundergods_wrath"] = { weight = 0.4 },
 	},
 }
-function a.GetSpellReplaceWeight(b)
-	for c, d in pairs(a["spells"]) do
-		if a["spells"][c] and a["spells"][c][b] then
-			return a["spells"][c][b].weight
+function SpellList.GetSpellReplaceWeight(abilityName)
+	for heroName, _ in pairs(SpellList["spells"]) do
+		if SpellList["spells"][heroName] and SpellList["spells"][heroName][abilityName] then
+			return SpellList["spells"][heroName][abilityName].weight
 		end
 	end
 	return 1
 end
-function a.GetSpellHeroName(b)
-	for c, d in pairs(a["spells"]) do
-		if a["spells"][c] and a["spells"][c][b] then
-			return c
+function SpellList.GetSpellHeroName(abilityName)
+	for heroName, _ in pairs(SpellList["spells"]) do
+		if SpellList["spells"][heroName] and SpellList["spells"][heroName][abilityName] then
+			return heroName
 		end
 	end
 	return nil
 end
-return a
+return SpellList

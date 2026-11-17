@@ -1,144 +1,148 @@
 -- Shared helper: map info.
-local function a(b)
-	local c = Vector(-6619, -6336, 384)
-	local d = Vector(6928, 6372, 392)
-	local e = Vector(7714, -6016, 392)
-	local f = Vector(-7678, 6337, 392)
-	function b.GetTeamFountain()
-		local g = GetTeam()
-		if g == TEAM_DIRE then
-			return d
+local function installMapInfo(Fu)
+	local radiantFountain = Vector(-6619, -6336, 384)
+	local direFountain = Vector(6928, 6372, 392)
+	local tormentorDayLocation = Vector(7714, -6016, 392)
+	local tormentorNightLocation = Vector(-7678, 6337, 392)
+	function Fu.GetTeamFountain()
+		local team = GetTeam()
+		if team == TEAM_DIRE then
+			return direFountain
 		else
-			return c
+			return radiantFountain
 		end
 	end
-	function b.GetEnemyFountain()
-		local g = GetTeam()
-		if g == TEAM_DIRE then
-			return c
+	function Fu.GetEnemyFountain()
+		local team = GetTeam()
+		if team == TEAM_DIRE then
+			return radiantFountain
 		else
-			return d
+			return direFountain
 		end
 	end
-	function b.GetEscapeLoc()
-		local h = GetBot()
-		local i = GetTeam()
-		if h:DistanceFromFountain() > 2500 then
-			return GetAncient(i):GetLocation()
+	function Fu.GetEscapeLoc()
+		local bot = GetBot()
+		local team = GetTeam()
+		if bot:DistanceFromFountain() > 2500 then
+			return GetAncient(team):GetLocation()
 		else
-			if i == TEAM_DIRE then
-				return d
+			if team == TEAM_DIRE then
+				return direFountain
 			else
-				return c
+				return radiantFountain
 			end
 		end
 	end
-	function b.GetDistanceFromEnemyFountain(h)
-		local j = b.GetEnemyFountain()
-		local k = GetUnitToLocationDistance(h, j)
-		return k
+	function Fu.GetDistanceFromEnemyFountain(unit)
+		local enemyFountain = Fu.GetEnemyFountain()
+		local distance = GetUnitToLocationDistance(unit, enemyFountain)
+		return distance
 	end
-	function b.GetDistanceFromAllyFountain(h)
-		local l = b.GetTeamFountain()
-		local k = GetUnitToLocationDistance(h, l)
-		return k
+	function Fu.GetDistanceFromAllyFountain(unit)
+		local allyFountain = Fu.GetTeamFountain()
+		local distance = GetUnitToLocationDistance(unit, allyFountain)
+		return distance
 	end
-	function b.GetDistanceFromAncient(h, m)
-		local n = GetAncient(GetTeam())
-		if m then
-			n = GetAncient(GetOpposingTeam())
+	function Fu.GetDistanceFromAncient(unit, isEnemy)
+		local ancient = GetAncient(GetTeam())
+		if isEnemy then
+			ancient = GetAncient(GetOpposingTeam())
 		end
-		return GetUnitToUnitDistance(h, n)
+		return GetUnitToUnitDistance(unit, ancient)
 	end
-	function b.IsRoshanCloseToChangingSides()
+	function Fu.IsRoshanCloseToChangingSides()
 		return DotaTime() % 300 >= 300 - 30
 	end
-	function b.IsLocHaveTower(o, m, p)
-		local q = GetTeam()
-		if m then
-			q = GetOpposingTeam()
+	function Fu.IsLocHaveTower(radius, isEnemy, location)
+		local team = GetTeam()
+		if isEnemy then
+			team = GetOpposingTeam()
 		end
 		if
-			not m and b.GetLocationToLocationDistance(p, b.GetTeamFountain()) < 2500
-			or m and b.GetLocationToLocationDistance(p, b.GetEnemyFountain()) < 2500
+			not isEnemy and Fu.GetLocationToLocationDistance(location, Fu.GetTeamFountain()) < 2500
+			or isEnemy and Fu.GetLocationToLocationDistance(location, Fu.GetEnemyFountain()) < 2500
 		then
 			return true
 		end
-		for r = 0, 10 do
-			local s = GetTower(q, r)
-			if s ~= nil and GetUnitToLocationDistance(s, p) <= o then
+		for towerId = 0, 10 do
+			local tower = GetTower(team, towerId)
+			if tower ~= nil and GetUnitToLocationDistance(tower, location) <= radius then
 				return true
 			end
 		end
 		return false
 	end
-	function b.GetNearbyLocationToTp(p)
-		local q = GetTeam()
-		local t = b.GetTeamFountain()
-		if b.GetLocationToLocationDistance(p, t) <= 2500 then
-			return p
+	function Fu.GetNearbyLocationToTp(location)
+		local team = GetTeam()
+		local fountain = Fu.GetTeamFountain()
+		if Fu.GetLocationToLocationDistance(location, fountain) <= 2500 then
+			return location
 		end
-		local u = nil
-		local v = 99999
-		for r = 0, 10, 1 do
-			local s = GetTower(q, r)
-			if s ~= nil and GetUnitToLocationDistance(s, p) < v then
-				u = s
-				v = GetUnitToLocationDistance(s, p)
+		local bestBuilding = nil
+		local bestDistance = 99999
+		for towerId = 0, 10, 1 do
+			local tower = GetTower(team, towerId)
+			if tower ~= nil and GetUnitToLocationDistance(tower, location) < bestDistance then
+				bestBuilding = tower
+				bestDistance = GetUnitToLocationDistance(tower, location)
 			end
 		end
-		local w = b.Site.GetAllWatchTower()
-		for x, y in pairs(w) do
+		local watchTowers = Fu.Site.GetAllWatchTower()
+		for _, watchTower in pairs(watchTowers) do
 			if
-				y ~= nil
-				and y:GetTeam() == q
-				and GetUnitToLocationDistance(y, p) < v - 1300
+				watchTower ~= nil
+				and watchTower:GetTeam() == team
+				and GetUnitToLocationDistance(watchTower, location) < bestDistance - 1300
 				and (
-					not b.IsEnemyHeroAroundLocation(y:GetLocation(), 600)
-					or b.IsAllyHeroAroundLocation(y:GetLocation(), 600)
+					not Fu.IsEnemyHeroAroundLocation(watchTower:GetLocation(), 600)
+					or Fu.IsAllyHeroAroundLocation(watchTower:GetLocation(), 600)
 				)
 			then
-				u = y
-				v = GetUnitToLocationDistance(y, p) + 1300
+				bestBuilding = watchTower
+				bestDistance = GetUnitToLocationDistance(watchTower, location) + 1300
 			end
 		end
-		if u ~= nil then
-			return b.GetLocationTowardDistanceLocation(u, p, 575)
+		if bestBuilding ~= nil then
+			return Fu.GetLocationTowardDistanceLocation(bestBuilding, location, 575)
 		end
-		return t
+		return fountain
 	end
-	function b.IsInAllyArea(h)
-		local z = GetAncient(GetTeam())
-		local A = GetAncient(GetOpposingTeam())
-		if GetUnitToUnitDistance(h, z) + 768 < GetUnitToUnitDistance(h, A) then
+	function Fu.IsInAllyArea(unit)
+		local allyAncient = GetAncient(GetTeam())
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		if GetUnitToUnitDistance(unit, allyAncient) + 768 < GetUnitToUnitDistance(unit, enemyAncient) then
 			return true
 		end
 		return false
 	end
-	function b.IsInEnemyArea(h)
-		local z = GetAncient(GetTeam())
-		local A = GetAncient(GetOpposingTeam())
-		if GetUnitToUnitDistance(h, A) + 1280 < GetUnitToUnitDistance(h, z) then
+	function Fu.IsInEnemyArea(unit)
+		local allyAncient = GetAncient(GetTeam())
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		if GetUnitToUnitDistance(unit, enemyAncient) + 1280 < GetUnitToUnitDistance(unit, allyAncient) then
 			return true
 		end
 		return false
 	end
-	function b.IsAllyHeroAroundLocation(B, o)
-		for r = 1, #GetTeamPlayers(GetTeam()) do
-			local C = GetTeamMember(r)
-			if C ~= nil and C:IsAlive() and GetUnitToLocationDistance(C, B) <= o then
+	function Fu.IsAllyHeroAroundLocation(location, radius)
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
+			if member ~= nil and member:IsAlive() and GetUnitToLocationDistance(member, location) <= radius then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsEnemyHeroAroundLocation(B, o)
-		for r, D in pairs(GetTeamPlayers(GetOpposingTeam())) do
-			if IsHeroAlive(D) then
-				local E = GetHeroLastSeenInfo(D)
-				if E ~= nil then
-					local F = E[1]
-					if F ~= nil and b.GetLocationToLocationDistance(B, F.location) <= o and F.time_since_seen < 2.0 then
+	function Fu.IsEnemyHeroAroundLocation(location, radius)
+		for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(playerId) then
+				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+				if lastSeenInfo ~= nil then
+					local lastSeen = lastSeenInfo[1]
+					if
+						lastSeen ~= nil
+						and Fu.GetLocationToLocationDistance(location, lastSeen.location) <= radius
+						and lastSeen.time_since_seen < 2.0
+					then
 						return true
 					end
 				end
@@ -146,87 +150,87 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsEarlyGame()
-		return DotaTime() < (b.IsModeTurbo() and 7 * 60 or 12 * 60)
+	function Fu.IsEarlyGame()
+		return DotaTime() < (Fu.IsModeTurbo() and 7 * 60 or 12 * 60)
 	end
-	function b.IsMidGame()
-		local G = DotaTime()
-		local H = b.IsModeTurbo() and 7 * 60 or 12 * 60
-		local I = b.IsModeTurbo() and 20 * 60 or 26 * 60
-		return G >= H and G < I
+	function Fu.IsMidGame()
+		local time = DotaTime()
+		local midGameStart = Fu.IsModeTurbo() and 7 * 60 or 12 * 60
+		local lateGameStart = Fu.IsModeTurbo() and 20 * 60 or 26 * 60
+		return time >= midGameStart and time < lateGameStart
 	end
-	function b.IsLateGame()
-		return DotaTime() >= (b.IsModeTurbo() and 20 * 60 or 26 * 60)
+	function Fu.IsLateGame()
+		return DotaTime() >= (Fu.IsModeTurbo() and 20 * 60 or 26 * 60)
 	end
-	function b.IsModeTurbo()
-		for x, J in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-			if J ~= nil and J:GetUnitName() == "npc_dota_courier" then
-				if J:GetCurrentMovementSpeed() == 1100 then
+	function Fu.IsModeTurbo()
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+			if unit ~= nil and unit:GetUnitName() == "npc_dota_courier" then
+				if unit:GetCurrentMovementSpeed() == 1100 then
 					return true
 				end
 			end
 		end
 		return false
 	end
-	function b.CheckTimeOfDay()
-		local K = 600
-		local L = DotaTime() % K
-		local M = 300
-		if L < M then
-			return "day", L
+	function Fu.CheckTimeOfDay()
+		local dayNightCycle = 600
+		local cycleTime = DotaTime() % dayNightCycle
+		local dayLength = 300
+		if cycleTime < dayLength then
+			return "day", cycleTime
 		else
-			return "night", L
+			return "night", cycleTime
 		end
 	end
-	local N = 0.0
-	function b.IsRoshanAlive()
-		if GetRoshanKillTime() > N then
-			N = GetRoshanKillTime()
+	local lastRoshanKillTime = 0.0
+	function Fu.IsRoshanAlive()
+		if GetRoshanKillTime() > lastRoshanKillTime then
+			lastRoshanKillTime = GetRoshanKillTime()
 		end
-		if GetRoshanKillTime() == 0 or DotaTime() - N > (b.IsModeTurbo() and 6 * 60 or 11 * 60) then
+		if GetRoshanKillTime() == 0 or DotaTime() - lastRoshanKillTime > (Fu.IsModeTurbo() and 6 * 60 or 11 * 60) then
 			return true
 		end
 		return false
 	end
-	function b.IsInLaningPhase()
-		local h = GetBot()
-		if h.isInLanePhase ~= nil and h.isInLanePhase then
+	function Fu.IsInLaningPhase()
+		local bot = GetBot()
+		if bot.isInLanePhase ~= nil and bot.isInLanePhase then
 			return true
 		end
 		return false
 	end
-	function b.IsLocationInChrono(O)
-		for x, P in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+	function Fu.IsLocationInChrono(location)
+		for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
 			if
-				b.IsValidHero(P)
-				and not b.IsSuspiciousIllusion(P)
-				and GetUnitToLocationDistance(P, O) < 300
-				and P:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and GetUnitToLocationDistance(enemyHero, location) < 300
+				and enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
 				return true
 			end
 		end
-		for x, Q in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
 			if
-				b.IsValidHero(Q)
-				and not Q:IsIllusion()
-				and GetUnitToLocationDistance(Q, O) < 300
-				and Q:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				Fu.IsValidHero(allyHero)
+				and not allyHero:IsIllusion()
+				and GetUnitToLocationDistance(allyHero, location) < 300
+				and allyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsLocationInBlackHole(O)
-		for x, P in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+	function Fu.IsLocationInBlackHole(location)
+		for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
 			if
-				b.IsValidHero(P)
-				and not b.IsSuspiciousIllusion(P)
-				and GetUnitToLocationDistance(P, O) < 300
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and GetUnitToLocationDistance(enemyHero, location) < 300
 				and (
-					P:HasModifier("modifier_enigma_black_hole_pull")
-					or P:HasModifier("modifier_enigma_black_hole_pull_scepter")
+					enemyHero:HasModifier("modifier_enigma_black_hole_pull")
+					or enemyHero:HasModifier("modifier_enigma_black_hole_pull_scepter")
 				)
 			then
 				return true
@@ -234,28 +238,28 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsEnemyChronosphereInLocation(O)
-		local o = 500
-		for x, R in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+	function Fu.IsEnemyChronosphereInLocation(location)
+		local radius = 500
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
 			if
-				b.IsValid(R)
-				and GetUnitToLocationDistance(R, O) <= o
-				and R:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				Fu.IsValid(unit)
+				and GetUnitToLocationDistance(unit, location) <= radius
+				and unit:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsEnemyBlackHoleInLocation(O)
-		local o = 500
-		for x, R in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+	function Fu.IsEnemyBlackHoleInLocation(location)
+		local radius = 500
+		for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
 			if
-				b.IsValid(R)
-				and GetUnitToLocationDistance(R, O) <= o
+				Fu.IsValid(unit)
+				and GetUnitToLocationDistance(unit, location) <= radius
 				and (
-					R:HasModifier("modifier_enigma_black_hole_pull")
-					or R:HasModifier("modifier_enigma_black_hole_pull_scepter")
+					unit:HasModifier("modifier_enigma_black_hole_pull")
+					or unit:HasModifier("modifier_enigma_black_hole_pull_scepter")
 				)
 			then
 				return true
@@ -263,137 +267,137 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsLocationInArena(O, S)
-		for x, P in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+	function Fu.IsLocationInArena(location, radius)
+		for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
 			if
-				b.IsValidHero(P)
-				and not b.IsSuspiciousIllusion(P)
-				and GetUnitToLocationDistance(P, O) < S
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and GetUnitToLocationDistance(enemyHero, location) < radius
 				and (
-					P:HasModifier("modifier_mars_arena_of_blood_leash")
-					or P:HasModifier("modifier_mars_arena_of_blood_animation")
+					enemyHero:HasModifier("modifier_mars_arena_of_blood_leash")
+					or enemyHero:HasModifier("modifier_mars_arena_of_blood_animation")
 				)
 			then
 				return true
 			end
 		end
-		for x, Q in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
 			if
-				b.IsValidHero(Q)
-				and not Q:IsIllusion()
-				and GetUnitToLocationDistance(Q, O) < S
-				and Q:HasModifier("modifier_mars_arena_of_blood_animation")
+				Fu.IsValidHero(allyHero)
+				and not allyHero:IsIllusion()
+				and GetUnitToLocationDistance(allyHero, location) < radius
+				and allyHero:HasModifier("modifier_mars_arena_of_blood_animation")
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsHumanInLoc(B, o)
-		for r = 1, #GetTeamPlayers(GetTeam()) do
-			local T = GetTeamMember(r)
+	function Fu.IsHumanInLoc(location, radius)
+		for i = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(i)
 			if
-				T ~= nil
-				and T:IsAlive()
-				and not T:IsBot()
-				and not T:IsIllusion()
-				and not T:HasModifier("modifier_arc_warden_tempest_double")
-				and not b.IsMeepoClone(T)
-				and GetUnitToLocationDistance(T, B) <= o
+				member ~= nil
+				and member:IsAlive()
+				and not member:IsBot()
+				and not member:IsIllusion()
+				and not member:HasModifier("modifier_arc_warden_tempest_double")
+				and not Fu.IsMeepoClone(member)
+				and GetUnitToLocationDistance(member, location) <= radius
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.GetCurrentRoshanLocation()
-		local U = b.Utils.RadiantRoshanLoc
-		local V = b.Utils.DireRoshanLoc
+	function Fu.GetCurrentRoshanLocation()
+		local radiantRoshanLocation = Fu.Utils.RadiantRoshanLoc
+		local direRoshanLocation = Fu.Utils.DireRoshanLoc
 		if DotaTime() < 15 * 60 then
-			return U
+			return radiantRoshanLocation
 		end
-		if b.CheckTimeOfDay() == "day" then
-			return U
+		if Fu.CheckTimeOfDay() == "day" then
+			return radiantRoshanLocation
 		else
-			return V
+			return direRoshanLocation
 		end
 	end
-	function b.GetTormentorLocation(i)
-		if b.CheckTimeOfDay() == "day" then
-			return e
+	function Fu.GetTormentorLocation(_)
+		if Fu.CheckTimeOfDay() == "day" then
+			return tormentorDayLocation
 		else
-			return f
+			return tormentorNightLocation
 		end
 	end
-	local W = Vector(7090, -7220, 256)
-	local X = Vector(8280, -5350, 128)
-	local Y = Vector(-8130, 5450, 128)
-	local Z = Vector(-6970, 7330, 256)
+	local radiantDayWaitLocation = Vector(7090, -7220, 256)
+	local direDayWaitLocation = Vector(8280, -5350, 128)
+	local radiantNightWaitLocation = Vector(-8130, 5450, 128)
+	local direNightWaitLocation = Vector(-6970, 7330, 256)
 	-- Game 036, 30:51: two cores went to the Tormentor while Dire took our bottom T2. Returns why
 	-- our side needs us (a lane defend desire over 0.5, or enemy heroes within 1200 of one of our
 	-- towers or barracks), or nil.
-	function b.OurLaneThreatened()
+	function Fu.OurLaneThreatened()
 		for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
 			if (GetDefendLaneDesire(lane) or 0) > 0.5 then
 				return "defend-lane" .. tostring(lane)
 			end
 		end
-		for _, bld in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
-			if bld ~= nil and not bld:IsNull() and bld:IsAlive() then
-				local nm = bld:GetUnitName() or ""
+		for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+			if building ~= nil and not building:IsNull() and building:IsAlive() then
+				local buildingName = building:GetUnitName() or ""
 				if
-					(string.find(nm, "tower", 1, true) or string.find(nm, "rax", 1, true))
-					and #b.GetEnemiesNearLoc(bld:GetLocation(), 1200) >= 1
+					(string.find(buildingName, "tower", 1, true) or string.find(buildingName, "rax", 1, true))
+					and #Fu.GetEnemiesNearLoc(building:GetLocation(), 1200) >= 1
 				then
-					return "enemy-at-" .. (string.gsub(nm, "npc_dota_", ""))
+					return "enemy-at-" .. (string.gsub(buildingName, "npc_dota_", ""))
 				end
 			end
 		end
 		return nil
 	end
-	function b.GetTormentorWaitingLocation(i)
-		local _ = b.CheckTimeOfDay()
-		if _ == "day" then
-			return GetTeam() == TEAM_RADIANT and W or X
+	function Fu.GetTormentorWaitingLocation(_)
+		local timeOfDay = Fu.CheckTimeOfDay()
+		if timeOfDay == "day" then
+			return GetTeam() == TEAM_RADIANT and radiantDayWaitLocation or direDayWaitLocation
 		else
-			return GetTeam() == TEAM_RADIANT and Y or Z
+			return GetTeam() == TEAM_RADIANT and radiantNightWaitLocation or direNightWaitLocation
 		end
 	end
-	local a0 = nil
-	function b.IsClosestToDustLocation(h, O)
-		if a0 == nil then
-			a0 = GetTeamPlayers(GetTeam())
+	local teamPlayerIds = nil
+	function Fu.IsClosestToDustLocation(bot, location)
+		if teamPlayerIds == nil then
+			teamPlayerIds = GetTeamPlayers(GetTeam())
 		end
-		local a1 = nil
-		local a2 = 100000
-		for x, D in pairs(a0) do
-			local T = GetTeamMember(D)
+		local closestMember = nil
+		local closestDistance = 100000
+		for _, playerId in pairs(teamPlayerIds) do
+			local member = GetTeamMember(playerId)
 			if
-				b.IsValidHero(T)
-				and T:GetItemSlotType(T:FindItemSlot("item_dust")) == ITEM_SLOT_TYPE_MAIN
-				and T:GetItemInSlot(T:FindItemSlot("item_dust")):IsFullyCastable()
-				and not b.IsSuspiciousIllusion(T)
+				Fu.IsValidHero(member)
+				and member:GetItemSlotType(member:FindItemSlot("item_dust")) == ITEM_SLOT_TYPE_MAIN
+				and member:GetItemInSlot(member:FindItemSlot("item_dust")):IsFullyCastable()
+				and not Fu.IsSuspiciousIllusion(member)
 			then
-				local a3 = GetUnitToLocationDistance(T, O)
-				if a3 < a2 then
-					a1 = T
-					a2 = a3
+				local distance = GetUnitToLocationDistance(member, location)
+				if distance < closestDistance then
+					closestMember = member
+					closestDistance = distance
 				end
 			end
 		end
-		if a1 ~= nil then
-			return a1 == h
+		if closestMember ~= nil then
+			return closestMember == bot
 		end
 	end
-	function b.GetPushTPLocation(a4)
-		local a5 = GetLaneFrontLocation(GetTeam(), a4, 0)
-		local a6 = b.GetNearbyLocationToTp(a5)
-		if b.GetLocationToLocationDistance(a5, a6) < 1600 then
-			return a6
+	function Fu.GetPushTPLocation(lane)
+		local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
+		local tpLocation = Fu.GetNearbyLocationToTp(laneFront)
+		if Fu.GetLocationToLocationDistance(laneFront, tpLocation) < 1600 then
+			return tpLocation
 		end
 	end
-	function b.GetDefendTPLocation(a4)
-		return GetLaneFrontLocation(GetTeam(), a4, -950)
+	function Fu.GetDefendTPLocation(lane)
+		return GetLaneFrontLocation(GetTeam(), lane, -950)
 	end
 end
-return a
+return installMapInfo

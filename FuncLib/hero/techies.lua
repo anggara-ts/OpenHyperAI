@@ -1,11 +1,20 @@
 -- Hero-specific helper: techies.
-local a = {}
-local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-a.nMinMineDistance = 350
-a.nProximityMineDmgRadius = 500
-local c =
-	{ TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1, TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2, TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
-local d = {
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+X.nMinMineDistance = 350
+X.nProximityMineDmgRadius = 500
+local towerOrder = {
+	TOWER_TOP_1,
+	TOWER_MID_1,
+	TOWER_BOT_1,
+	TOWER_TOP_2,
+	TOWER_MID_2,
+	TOWER_BOT_2,
+	TOWER_TOP_3,
+	TOWER_MID_3,
+	TOWER_BOT_3,
+}
+local radiantMineSpots = {
 	[TOWER_TOP_1] = { Vector(-5011, 2799, 74), Vector(-4288, 2089, 76), Vector(-3663, 3500, 128) },
 	[TOWER_MID_1] = { Vector(-1921, 377, 68), Vector(-1459, 1120, 0), Vector(1030, -1195, 0), Vector(1916, -2890, 128) },
 	[TOWER_BOT_1] = { Vector(3821, -3474, 128), Vector(7285, -4665, 128), Vector(7908, -5795, 128) },
@@ -63,7 +72,7 @@ local d = {
 		Vector(-2145, -7385, 128),
 	},
 }
-local e = {
+local direMineSpots = {
 	[TOWER_TOP_1] = { Vector(-5273, 4810, 128), Vector(5609, 6573, 128), Vector(-3314, 3704, 195) },
 	[TOWER_MID_1] = {
 		Vector(-1655, 850, 0),
@@ -132,64 +141,64 @@ local e = {
 		Vector(7072, 1376, 128),
 	},
 }
-function a.GetMineSpotsBeforeTowerFall()
-	local f = {}
-	for g = 1, #c do
-		local h = GetTower(GetTeam(), c[g])
+function X.GetMineSpotsBeforeTowerFall()
+	local spots = {}
+	for towerIndex = 1, #towerOrder do
+		local tower = GetTower(GetTeam(), towerOrder[towerIndex])
 		if
-			h ~= nil
+			tower ~= nil
 			or (
-				h == GetTower(GetTeam(), TOWER_TOP_3) == nil
-				or h == GetTower(GetTeam(), TOWER_MID_3) == nil
-				or h == GetTower(GetTeam(), TOWER_BOT_3) == nil
+				tower == GetTower(GetTeam(), TOWER_TOP_3) == nil
+				or tower == GetTower(GetTeam(), TOWER_MID_3) == nil
+				or tower == GetTower(GetTeam(), TOWER_BOT_3) == nil
 			)
 		then
 			if
-				h == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
-				or h == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
-				or h == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
-				or h == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
-				or h == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
-				or h == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
+				tower == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
+				or tower == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
+				or tower == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
+				or tower == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
+				or tower == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
+				or tower == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
 			then
 				break
 			end
 			if GetTeam() == TEAM_RADIANT then
-				for i = 1, #d[c[g]] do
-					table.insert(f, d[c[g]][i])
+				for i = 1, #radiantMineSpots[towerOrder[towerIndex]] do
+					table.insert(spots, radiantMineSpots[towerOrder[towerIndex]][i])
 				end
 			else
-				for i = 1, #e[c[g]] do
-					table.insert(f, e[c[g]][i])
+				for i = 1, #direMineSpots[towerOrder[towerIndex]] do
+					table.insert(spots, direMineSpots[towerOrder[towerIndex]][i])
 				end
 			end
 		end
 	end
-	return f
+	return spots
 end
-function a.GetAvailableSpot()
-	local j = {}
-	for k, l in pairs(a.GetMineSpotsBeforeTowerFall()) do
-		table.insert(j, l)
+function X.GetAvailableSpot()
+	local spots = {}
+	for _, spot in pairs(X.GetMineSpotsBeforeTowerFall()) do
+		table.insert(spots, spot)
 	end
-	return j
+	return spots
 end
-local m = 100
-local n = 50
-local function o(p, q, r)
-	for s = r, q, r do
-		for t = 0, 360, 50 do
-			local u = s * math.cos(math.rad(t))
-			local v = s * math.sin(math.rad(t))
-			local w = p + Vector(u, v, 0)
-			if IsLocationPassable(w) then
-				return w
+local searchMaxRadius = 100
+local searchStep = 50
+local function FindPassableLocationNear(center, maxRadius, step)
+	for searchRadius = step, maxRadius, step do
+		for angle = 0, 360, 50 do
+			local offsetX = searchRadius * math.cos(math.rad(angle))
+			local offsetY = searchRadius * math.sin(math.rad(angle))
+			local candidate = center + Vector(offsetX, offsetY, 0)
+			if IsLocationPassable(candidate) then
+				return candidate
 			end
 		end
 	end
 	return nil
 end
-local x = {
+local mineOffsets = {
 	Vector(300, 0, 0),
 	Vector(-300, 0, 0),
 	Vector(0, 300, 0),
@@ -199,46 +208,46 @@ local x = {
 	Vector(212, -212, 0),
 	Vector(-212, -212, 0),
 }
-function a.GetGoodPlaceForMiningNear(y)
-	for k, z in pairs(x) do
-		local A = y + z
-		if not IsLocationPassable(A) then
-			A = o(A, m, n)
+function X.GetGoodPlaceForMiningNear(location)
+	for _, offset in pairs(mineOffsets) do
+		local mineLocation = location + offset
+		if not IsLocationPassable(mineLocation) then
+			mineLocation = FindPassableLocationNear(mineLocation, searchMaxRadius, searchStep)
 		end
-		for g = 0, 2 do
-			if A then
-				if not a.IsOtherMinesClose(A) then
-					A = o(A, m, n)
+		for _ = 0, 2 do
+			if mineLocation then
+				if not X.IsOtherMinesClose(mineLocation) then
+					mineLocation = FindPassableLocationNear(mineLocation, searchMaxRadius, searchStep)
 				end
-				if b.GetLocationToLocationDistance(y, A) < a.nProximityMineDmgRadius then
-					return BOT_ACTION_DESIRE_HIGH, A
+				if Fu.GetLocationToLocationDistance(location, mineLocation) < X.nProximityMineDmgRadius then
+					return BOT_ACTION_DESIRE_HIGH, mineLocation
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.IsOtherMinesClose(B)
-	for k, C in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if a.IsMines(C) and GetUnitToLocationDistance(C, B) <= a.nMinMineDistance then
+function X.IsOtherMinesClose(location)
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+		if X.IsMines(unit) and GetUnitToLocationDistance(unit, location) <= X.nMinMineDistance then
 			return true
 		end
 	end
 	return false
 end
-function a.GetClosestSpot(D, E)
-	local F = 100000
-	local G = nil
-	for k, l in pairs(E) do
-		local H = GetUnitToLocationDistance(D, l)
-		if H < F then
-			F = H
-			G = l
+function X.GetClosestSpot(bot, spots)
+	local closestDistance = 100000
+	local closestSpot = nil
+	for _, spot in pairs(spots) do
+		local distance = GetUnitToLocationDistance(bot, spot)
+		if distance < closestDistance then
+			closestDistance = distance
+			closestSpot = spot
 		end
 	end
-	return G, F
+	return closestSpot, closestDistance
 end
-function a.IsMines(C)
-	return C:GetUnitName() == "npc_dota_techies_land_mine"
+function X.IsMines(unit)
+	return unit:GetUnitName() == "npc_dota_techies_land_mine"
 end
-return a
+return X

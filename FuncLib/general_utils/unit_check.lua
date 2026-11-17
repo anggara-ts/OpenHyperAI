@@ -1,151 +1,155 @@
 -- Shared helper: unit check.
-local function a(b)
-	function b.IsNoItemIllution(c)
+local function installUnitCheck(Fu)
+	function Fu.IsNoItemIllution(unit)
 		if
-			(c:IsIllusion() or b.IsMeepoClone(c))
-			and not c:HasModifier("modifier_arc_warden_tempest_double")
-			and c:GetUnitName() ~= "npc_dota_hero_vengefulspirit"
+			(unit:IsIllusion() or Fu.IsMeepoClone(unit))
+			and not unit:HasModifier("modifier_arc_warden_tempest_double")
+			and unit:GetUnitName() ~= "npc_dota_hero_vengefulspirit"
 		then
 			return true
 		end
 		return false
 	end
-	function b.IsNoAbilityIllution(c)
+	function Fu.IsNoAbilityIllution(unit)
 		if
-			c:IsIllusion()
-			and not c:HasModifier("modifier_arc_warden_tempest_double")
-			and c:GetUnitName() ~= "npc_dota_hero_vengefulspirit"
-			and not b.IsMeepoClone(c)
+			unit:IsIllusion()
+			and not unit:HasModifier("modifier_arc_warden_tempest_double")
+			and unit:GetUnitName() ~= "npc_dota_hero_vengefulspirit"
+			and not Fu.IsMeepoClone(unit)
 		then
 			return true
 		end
 		return false
 	end
-	function b.IsSuspiciousIllusion(d)
-		if d == nil or d:IsNull() then
+	function Fu.IsSuspiciousIllusion(unit)
+		if unit == nil or unit:IsNull() then
 			return false
 		end
 		-- The answer used to be cached on the handle for the whole game. One bad moment (a level-up
 		-- tick, a dead read) flagged a real hero as an illusion until the game ended, and every
 		-- check that skips illusions ignored that hero. Reuse it for half a second only.
-		if d.is_suspicious_illusion ~= nil and DotaTime() - (d.is_suspicious_illusion_at or -999) < 0.5 then
-			return d.is_suspicious_illusion
+		if unit.is_suspicious_illusion ~= nil and DotaTime() - (unit.is_suspicious_illusion_at or -999) < 0.5 then
+			return unit.is_suspicious_illusion
 		end
-		d.is_suspicious_illusion_at = DotaTime()
-		if not d:CanBeSeen() then
-			d.is_suspicious_illusion = false
+		unit.is_suspicious_illusion_at = DotaTime()
+		if not unit:CanBeSeen() then
+			unit.is_suspicious_illusion = false
 			return false
 		end
-		if d:CanBeSeen() and (not d:IsHero() or d:IsCastingAbility() or d:IsUsingAbility() or d:IsChanneling()) then
-			d.is_suspicious_illusion = false
+		if
+			unit:CanBeSeen()
+			and (not unit:IsHero() or unit:IsCastingAbility() or unit:IsUsingAbility() or unit:IsChanneling())
+		then
+			unit.is_suspicious_illusion = false
 			return false
 		end
-		local c = GetBot()
-		if d:GetTeam() == c:GetTeam() then
-			d.is_suspicious_illusion = d:IsIllusion() or d:HasModifier("modifier_arc_warden_tempest_double")
-			return d.is_suspicious_illusion
-		elseif d:GetTeam() == GetOpposingTeam() then
+		local bot = GetBot()
+		if unit:GetTeam() == bot:GetTeam() then
+			unit.is_suspicious_illusion = unit:IsIllusion() or unit:HasModifier("modifier_arc_warden_tempest_double")
+			return unit.is_suspicious_illusion
+		elseif unit:GetTeam() == GetOpposingTeam() then
 			if
-				d:HasModifier("modifier_illusion")
-				or d:HasModifier("modifier_darkseer_wallofreplica_illusion")
-				or d:HasModifier("modifier_phantom_lancer_doppelwalk_illusion")
-				or d:HasModifier("modifier_phantom_lancer_juxtapose_illusion")
-				or d:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
-				or d:HasModifier("modifier_item_helm_of_the_undying_active")
-				or d:HasModifier("modifier_terrorblade_conjureimage")
+				unit:HasModifier("modifier_illusion")
+				or unit:HasModifier("modifier_darkseer_wallofreplica_illusion")
+				or unit:HasModifier("modifier_phantom_lancer_doppelwalk_illusion")
+				or unit:HasModifier("modifier_phantom_lancer_juxtapose_illusion")
+				or unit:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
+				or unit:HasModifier("modifier_item_helm_of_the_undying_active")
+				or unit:HasModifier("modifier_terrorblade_conjureimage")
 			then
-				d.is_suspicious_illusion = true
+				unit.is_suspicious_illusion = true
 				return true
 			end
-			local e = d:GetPlayerID()
-			if not IsHeroAlive(e) then
-				d.is_suspicious_illusion = true
+			local playerId = unit:GetPlayerID()
+			if not IsHeroAlive(playerId) then
+				unit.is_suspicious_illusion = true
 				return true
 			end
-			if GetHeroLevel(e) > d:GetLevel() then
-				d.is_suspicious_illusion = true
+			if GetHeroLevel(playerId) > unit:GetLevel() then
+				unit.is_suspicious_illusion = true
 				return true
 			end
 		end
-		d.is_suspicious_illusion = false
+		unit.is_suspicious_illusion = false
 		return false
 	end
-	function b.IsKeyWordUnit(f, g)
-		if string.find(g:GetUnitName(), f) ~= nil then
+	function Fu.IsKeyWordUnit(keyword, unit)
+		if string.find(unit:GetUnitName(), keyword) ~= nil then
 			return true
 		end
 		return false
 	end
-	function b.IsHumanPlayer(h)
-		return not h:IsBot()
+	function Fu.IsHumanPlayer(unit)
+		return not unit:IsBot()
 	end
-	function b.IsValid(i)
-		return i ~= nil and not i:IsNull() and i:CanBeSeen() and i:IsAlive() and not i:IsBuilding()
+	function Fu.IsValid(unit)
+		return unit ~= nil and not unit:IsNull() and unit:CanBeSeen() and unit:IsAlive() and not unit:IsBuilding()
 	end
-	function b.IsValidTarget(i)
-		return b.Utils.IsValidHero(i)
+	function Fu.IsValidTarget(unit)
+		return Fu.Utils.IsValidHero(unit)
 	end
-	function b.IsValidHero(i)
-		return b.Utils.IsValidHero(i)
+	function Fu.IsValidHero(unit)
+		return Fu.Utils.IsValidHero(unit)
 	end
-	function b.IsValidBuilding(i)
-		return b.Utils.IsValidBuilding(i)
+	function Fu.IsValidBuilding(unit)
+		return Fu.Utils.IsValidBuilding(unit)
 	end
-	function b.IsRoshan(i)
-		return i ~= nil
-			and not i:IsNull()
-			and i:CanBeSeen()
-			and i:IsAlive()
-			and string.find(i:GetUnitName(), "roshan") ~= nil
+	function Fu.IsRoshan(unit)
+		return unit ~= nil
+			and not unit:IsNull()
+			and unit:CanBeSeen()
+			and unit:IsAlive()
+			and string.find(unit:GetUnitName(), "roshan") ~= nil
 	end
-	function b.CanBeAttacked(j)
-		return j ~= nil
-			and not b.HasForbiddenModifier(j)
-			and j:IsAlive()
-			and j:CanBeSeen()
-			and not j:IsNull()
-			and not j:IsAttackImmune()
-			and not j:IsInvulnerable()
-			and not j:HasModifier("modifier_fountain_glyph")
-			and not j:HasModifier("modifier_omninight_guardian_angel")
-			and not j:HasModifier("modifier_winter_wyvern_cold_embrace")
-			and not j:HasModifier("modifier_dark_willow_shadow_realm_buff")
-			and not j:HasModifier("modifier_ringmaster_the_box_buff")
-			and not j:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
-			and (j:GetTeam() == GetTeam() or not j:HasModifier("modifier_crystal_maiden_frostbite"))
+	function Fu.CanBeAttacked(unit)
+		return unit ~= nil
+			and not Fu.HasForbiddenModifier(unit)
+			and unit:IsAlive()
+			and unit:CanBeSeen()
+			and not unit:IsNull()
+			and not unit:IsAttackImmune()
+			and not unit:IsInvulnerable()
+			and not unit:HasModifier("modifier_fountain_glyph")
+			and not unit:HasModifier("modifier_omninight_guardian_angel")
+			and not unit:HasModifier("modifier_winter_wyvern_cold_embrace")
+			and not unit:HasModifier("modifier_dark_willow_shadow_realm_buff")
+			and not unit:HasModifier("modifier_ringmaster_the_box_buff")
+			and not unit:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
+			and (unit:GetTeam() == GetTeam() or not unit:HasModifier("modifier_crystal_maiden_frostbite"))
 			and (
-				j:GetTeam() ~= GetTeam()
-				or j:GetUnitName() ~= "npc_dota_wraith_king_skeleton_warrior" and j:GetHealth() / j:GetMaxHealth() < 0.5
+				unit:GetTeam() ~= GetTeam()
+				or unit:GetUnitName() ~= "npc_dota_wraith_king_skeleton_warrior"
+					and unit:GetHealth() / unit:GetMaxHealth() < 0.5
 			)
 	end
-	function b.IsTormentor(i)
-		return i ~= nil
-			and not i:IsNull()
-			and i:CanBeSeen()
-			and i:IsAlive()
-			and string.find(i:GetUnitName(), "miniboss") ~= nil
+	function Fu.IsTormentor(unit)
+		return unit ~= nil
+			and not unit:IsNull()
+			and unit:CanBeSeen()
+			and unit:IsAlive()
+			and string.find(unit:GetUnitName(), "miniboss") ~= nil
 	end
-	function b.IsRealBot(c)
-		for k = 1, 5 do
-			local l = GetTeamMember(k)
-			if l and c == l then
+	function Fu.IsRealBot(unit)
+		for i = 1, 5 do
+			local teamMember = GetTeamMember(i)
+			if teamMember and unit == teamMember then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsMeepoClone(m)
-		if b.IsValidHero(m) and m:GetUnitName() == "npc_dota_hero_meepo" and not b.IsRealBot(m) then
+	function Fu.IsMeepoClone(unit)
+		if Fu.IsValidHero(unit) and unit:GetUnitName() == "npc_dota_hero_meepo" and not Fu.IsRealBot(unit) then
 			return true
 		end
 		return false
 	end
-	function b.IsEnemyHero(m)
-		if m ~= nil and m:GetTeam() ~= GetBot():GetTeam() then
+	function Fu.IsEnemyHero(unit)
+		if unit ~= nil and unit:GetTeam() ~= GetBot():GetTeam() then
 			return true
 		else
 			return false
 		end
 	end
 end
-return a
+return installUnitCheck

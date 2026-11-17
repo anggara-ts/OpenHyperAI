@@ -1,20 +1,20 @@
 -- Defend the bottom lane. The decision itself is in FuncLib/systems/defend.lua.
-local a = require(GetScriptDirectory() .. "/FuncLib/systems/defend")
-local b = GetBot()
-local c = b:GetUnitName()
+local Defend = require(GetScriptDirectory() .. "/FuncLib/systems/defend")
+local bot = GetBot()
+local botName = bot:GetUnitName()
 function GetDesire()
-	if ShouldSkipBotThink(b) then
+	if ShouldSkipBotThink(bot) then
 		return 0
 	end
-	return a.GetDefendDesire(b, LANE_BOT)
+	return Defend.GetDefendDesire(bot, LANE_BOT)
 end
 if SafeCall then
-	local d = GetDesire
-	local e = Think
-	if d then
-		GetDesire = SafeCall(d, 0, "DEFEND_TOWER_BOT_GetDesire")
+	local originalGetDesire = GetDesire
+	local originalThink = Think
+	if originalGetDesire then
+		GetDesire = SafeCall(originalGetDesire, 0, "DEFEND_TOWER_BOT_GetDesire")
 	end
-	if e then
-		Think = SafeCall(e, nil, "DEFEND_TOWER_BOT_Think")
+	if originalThink then
+		Think = SafeCall(originalThink, nil, "DEFEND_TOWER_BOT_Think")
 	end
 end

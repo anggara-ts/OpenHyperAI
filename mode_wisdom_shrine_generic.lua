@@ -9,7 +9,7 @@ then
 end
 
 local bot = GetBot()
-local Utils = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 
@@ -42,7 +42,7 @@ function OnEnd()
 end
 
 function Think()
-	if not bot:IsAlive() or Utils.CanNotUseAction and Utils.CanNotUseAction(bot) then
+	if not bot:IsAlive() or Fu.CanNotUseAction and Fu.CanNotUseAction(bot) then
 		return
 	end
 	local loc = targetLoc
@@ -67,9 +67,9 @@ local function OHA_Trap(name, fn, fallback)
 		if res[1] then
 			return unpack(res, 2)
 		end
-		local n = (OHA_TRAP_COUNT[name] or 0) + 1
-		OHA_TRAP_COUNT[name] = n
-		if n <= 3 then
+		local errorCount = (OHA_TRAP_COUNT[name] or 0) + 1
+		OHA_TRAP_COUNT[name] = errorCount
+		if errorCount <= 3 then
 			local hero = "?"
 			pcall(function()
 				hero = GetBot():GetUnitName()

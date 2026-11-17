@@ -1,21 +1,21 @@
 -- Support library: native-operators.
-local a = {}
-function a.sub(b, c)
-	return b - c
+local NativeOperators = {}
+function NativeOperators.sub(left, right)
+	return left - right
 end
-function a.add(b, c)
-	return b + c
+function NativeOperators.add(left, right)
+	return left + right
 end
-function a.multiply(b, c)
-	return b * c
+function NativeOperators.multiply(left, right)
+	return left * right
 end
-function a.dot(b, c)
-	return b.x * c.x + b.y * c.y + b.z * c.z
+function NativeOperators.dot(left, right)
+	return left.x * right.x + left.y * right.y + left.z * right.z
 end
-function a.length2D(b)
-	return math.sqrt(b.x * b.x + b.y * b.y)
+function NativeOperators.length2D(vector)
+	return math.sqrt(vector.x * vector.x + vector.y * vector.y)
 end
-function a.length3D(d)
-	return math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+function NativeOperators.length3D(vector)
+	return math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
 end
-return a
+return NativeOperators

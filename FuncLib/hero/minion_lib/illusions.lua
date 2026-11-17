@@ -1,205 +1,229 @@
 -- Thinking for summoned units: illusions.
-local a = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local b = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
-local c = {}
-local d
-local e = { LANE_TOP, LANE_MID, LANE_BOT }
-function c.Think(f, g)
-	if not b.IsValidUnit(g) then
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
+local X = {}
+local bot
+local lanes = { LANE_TOP, LANE_MID, LANE_BOT }
+function X.Think(ownerBot, minion)
+	if not MinionUtils.IsValidUnit(minion) then
 		return
 	end
-	d = f
-	if g.isIllusion then
-		if c.ConfuseEnemyWithIllusions(f, g) > 0 then
+	bot = ownerBot
+	if minion.isIllusion then
+		if X.ConfuseEnemyWithIllusions(ownerBot, minion) > 0 then
 			return
 		end
 	end
-	g.attack_desire, g.attack_target = c.ConsiderAttack(g)
-	if c.ConsiderRetreat(g, g.attack_target) then
+	minion.attack_desire, minion.attack_target = X.ConsiderAttack(minion)
+	if X.ConsiderRetreat(minion, minion.attack_target) then
 		return
 	end
-	if g.attack_desire > 0 then
-		if b.IsValidTarget(g.attack_target) then
-			g:Action_AttackUnit(g.attack_target, false)
+	if minion.attack_desire > 0 then
+		if MinionUtils.IsValidTarget(minion.attack_target) then
+			minion:Action_AttackUnit(minion.attack_target, false)
 			return
 		end
 	end
-	local h = g._nextMoveTime or 0
-	if DotaTime() >= h then
-		g.move_desire, g.move_location = c.ConsiderMove(g)
-		if g.move_desire > 0 then
-			if GetUnitToLocationDistance(g, g.move_location) > 400 then
-				g:Action_MoveToLocation(g.move_location)
+	local nextMoveTime = minion._nextMoveTime or 0
+	if DotaTime() >= nextMoveTime then
+		minion.move_desire, minion.move_location = X.ConsiderMove(minion)
+		if minion.move_desire > 0 then
+			if GetUnitToLocationDistance(minion, minion.move_location) > 400 then
+				minion:Action_MoveToLocation(minion.move_location)
 			else
-				g:Action_AttackMove(a.GetRandomLocationWithinDist(g.move_location, 0, 300))
+				minion:Action_AttackMove(Fu.GetRandomLocationWithinDist(minion.move_location, 0, 300))
 			end
-			g._nextMoveTime = DotaTime() + 0.2
+			minion._nextMoveTime = DotaTime() + 0.2
 			return
 		end
-		if d:IsAlive() then
-			g:Action_MoveToLocation(a.GetRandomLocationWithinDist(d:GetLocation(), 400, 800))
+		if bot:IsAlive() then
+			minion:Action_MoveToLocation(Fu.GetRandomLocationWithinDist(bot:GetLocation(), 400, 800))
 		else
-			g:Action_MoveToLocation(a.GetClosestTeamLane(g))
+			minion:Action_MoveToLocation(Fu.GetClosestTeamLane(minion))
 		end
-		g._nextMoveTime = DotaTime() + 0.2
+		minion._nextMoveTime = DotaTime() + 0.2
 	end
 end
-function c.ConfuseEnemyWithIllusions(d, g)
-	if a.GetHP(d) < 0.4 and a.IsRetreating(d) and not a.WeAreStronger(d, 1200) then
-		local i = d:GetFacing()
-		local j = (i + 180) % 360
-		local k = 800
-		local l = g:GetLocation() + Vector(k * math.cos(math.rad(j)), k * math.sin(math.rad(j))) + RandomVector(50)
-		g:Action_MoveToLocation(l)
+function X.ConfuseEnemyWithIllusions(bot, minion)
+	if Fu.GetHP(bot) < 0.4 and Fu.IsRetreating(bot) and not Fu.WeAreStronger(bot, 1200) then
+		local botFacing = bot:GetFacing()
+		local awayAngle = (botFacing + 180) % 360
+		local moveDistance = 800
+		local moveLocation = minion:GetLocation()
+			+ Vector(moveDistance * math.cos(math.rad(awayAngle)), moveDistance * math.sin(math.rad(awayAngle)))
+			+ RandomVector(50)
+		minion:Action_MoveToLocation(moveLocation)
 		return 1
 	end
 	return 0
 end
-function c.ConsiderRetreat(g, hTarget)
-	if g:IsIllusion() then
+function X.ConsiderRetreat(minion, hTarget)
+	if minion:IsIllusion() then
 		return nil
 	end
 	if
 		(
-			b.IsValidUnit(hTarget) and a.GetHP(hTarget) > 0.5 and hTarget:IsFacingLocation(g:GetLocation(), 20)
-			or a.GetHP(g) < 0.25
+			MinionUtils.IsValidUnit(hTarget)
+				and Fu.GetHP(hTarget) > 0.5
+				and hTarget:IsFacingLocation(minion:GetLocation(), 20)
+			or Fu.GetHP(minion) < 0.25
 		)
-		and a.GetHP(g) < 0.3
-		and g:GetHealth() < 300
+		and Fu.GetHP(minion) < 0.3
+		and minion:GetHealth() < 300
 	then
-		g:Action_MoveToLocation(a.GetTeamFountain())
+		minion:Action_MoveToLocation(Fu.GetTeamFountain())
 		return 1
 	end
 	return nil
 end
-function c.IsTargetInShouldAimToAttackRange(g, m, n)
-	if not b.IsValidUnit(hTarget) then
+function X.IsTargetInShouldAimToAttackRange(minion, target, maxDistance)
+	if not MinionUtils.IsValidUnit(hTarget) then
 		return false
 	end
-	return GetUnitToUnitDistance(g, m) <= g:GetAttackRange()
-		or not b.CantMove(g) and GetUnitToUnitDistance(g, m) < math.min(g:GetAttackRange() * 3, n)
+	return GetUnitToUnitDistance(minion, target) <= minion:GetAttackRange()
+		or not MinionUtils.CantMove(minion)
+			and GetUnitToUnitDistance(minion, target) < math.min(minion:GetAttackRange() * 3, maxDistance)
 end
-function c.ConsiderAttack(g)
-	if b.CantAttack(g) then
+function X.ConsiderAttack(minion)
+	if MinionUtils.CantAttack(minion) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local hTarget = c.GetAttackTarget(g)
-	if hTarget ~= nil and not b.IsNotAllowedToAttack(hTarget) then
+	local hTarget = X.GetAttackTarget(minion)
+	if hTarget ~= nil and not MinionUtils.IsNotAllowedToAttack(hTarget) then
 		return BOT_ACTION_DESIRE_HIGH, hTarget
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function c.GetAttackTarget(g)
-	local m = nil
-	local o = g:GetUnitName()
-	if d:HasModifier("modifier_bane_nightmare") and not d:IsInvulnerable() and GetUnitToUnitDistance(d, g) < 2000 then
-		m = d
+function X.GetAttackTarget(minion)
+	local target = nil
+	local minionName = minion:GetUnitName()
+	if
+		bot:HasModifier("modifier_bane_nightmare")
+		and not bot:IsInvulnerable()
+		and GetUnitToUnitDistance(bot, minion) < 2000
+	then
+		target = bot
 	end
-	if a.IsInLaningPhase() then
+	if Fu.IsInLaningPhase() then
 		if
 			(
-				string.find(o, "forge_spirit")
-				or string.find(o, "eidolon")
-				or string.find(o, "beastmaster_boar")
-				or string.find(o, "lycan_wolf")
-			) and b.IsTargetedByTower(g)
+				string.find(minionName, "forge_spirit")
+				or string.find(minionName, "eidolon")
+				or string.find(minionName, "beastmaster_boar")
+				or string.find(minionName, "lycan_wolf")
+			) and MinionUtils.IsTargetedByTower(minion)
 		then
 			return nil
 		end
 	end
-	for p, q in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if a.IsValid(q) then
-			local r = q:GetUnitName()
-			local s = a.GetSpecialUnits()
+	for _, enemyUnit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+		if Fu.IsValid(enemyUnit) then
+			local enemyName = enemyUnit:GetUnitName()
+			local specialUnits = Fu.GetSpecialUnits()
 			if
-				s[r]
-				and q:GetTeam() ~= g:GetTeam()
-				and GetUnitToUnitDistance(g, q) <= s[r] * 1600
-				and RandomInt(0, 100) <= s[r] * 100
+				specialUnits[enemyName]
+				and enemyUnit:GetTeam() ~= minion:GetTeam()
+				and GetUnitToUnitDistance(minion, enemyUnit) <= specialUnits[enemyName] * 1600
+				and RandomInt(0, 100) <= specialUnits[enemyName] * 100
 			then
-				return q
+				return enemyUnit
 			end
 		end
 	end
-	if GetUnitToUnitDistance(d, g) < 1600 then
-		local t = a.GetEnemiesNearLoc(d:GetLocation(), 1200)
-		if #t > 0 then
-			m = d:GetAttackTarget()
+	if GetUnitToUnitDistance(bot, minion) < 1600 then
+		local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+		if #enemiesNearBot > 0 then
+			target = bot:GetAttackTarget()
 		end
 	end
-	if m == nil or a.IsRetreating(d) or b.IsTargetedByHero(d) and d:GetAttackTarget() == nil then
-		m = b.GetWeakestHero(1600, g)
-		if m == nil then
-			m = b.GetWeakestCreep(1600, g)
+	if target == nil or Fu.IsRetreating(bot) or MinionUtils.IsTargetedByHero(bot) and bot:GetAttackTarget() == nil then
+		target = MinionUtils.GetWeakestHero(1600, minion)
+		if target == nil then
+			target = MinionUtils.GetWeakestCreep(1600, minion)
 		end
-		if m == nil then
-			m = b.GetWeakestTower(1600, g)
+		if target == nil then
+			target = MinionUtils.GetWeakestTower(1600, minion)
 		end
 	end
-	if m ~= nil then
+	if target ~= nil then
 		if
-			not m:IsBuilding()
-			and not m:IsTower()
-			and m ~= GetAncient(GetOpposingTeam())
-			and c.IsTargetUnderEnemyTower(g, m)
+			not target:IsBuilding()
+			and not target:IsTower()
+			and target ~= GetAncient(GetOpposingTeam())
+			and X.IsTargetUnderEnemyTower(minion, target)
 		then
-			if string.find(o, "warlock_golem") then
-				local u = g:GetAttackDamage()
-				if a.IsChasingTarget(g, m) and not a.WillKillTarget(m, u, DAMAGE_TYPE_PHYSICAL, 6.0) then
-					return d:GetAttackTarget()
+			if string.find(minionName, "warlock_golem") then
+				local attackDamage = minion:GetAttackDamage()
+				if
+					Fu.IsChasingTarget(minion, target)
+					and not Fu.WillKillTarget(target, attackDamage, DAMAGE_TYPE_PHYSICAL, 6.0)
+				then
+					return bot:GetAttackTarget()
 				end
 			end
-			if a.GetHP(m) > 0.25 and d:IsAlive() and not a.IsChasingTarget(d, m) then
-				return d:GetAttackTarget()
+			if Fu.GetHP(target) > 0.25 and bot:IsAlive() and not Fu.IsChasingTarget(bot, target) then
+				return bot:GetAttackTarget()
 			end
 		end
 	end
-	return m
+	return target
 end
-function c.ConsiderMove(g)
-	if a.CanNotUseAction(g) or b.CantMove(g) then
+function X.ConsiderMove(minion)
+	if Fu.CanNotUseAction(minion) or MinionUtils.CantMove(minion) then
 		return BOT_MODE_DESIRE_NONE, nil
 	end
-	local o = g:GetUnitName()
-	if string.find(o, "terrorblade") or string.find(o, "naga_siren") then
-		for v = 1, #e do
-			local w = a.GetClosestTeamLane(g)
-			if not c.IsMinionInLane(g, e[v]) then
-				w = GetLaneFrontLocation(GetTeam(), e[v], 0)
+	local minionName = minion:GetUnitName()
+	if string.find(minionName, "terrorblade") or string.find(minionName, "naga_siren") then
+		for i = 1, #lanes do
+			local laneLocation = Fu.GetClosestTeamLane(minion)
+			if not X.IsMinionInLane(minion, lanes[i]) then
+				laneLocation = GetLaneFrontLocation(GetTeam(), lanes[i], 0)
 			end
-			if not a.IsInLaningPhase() then
-				g.to_farm_lane = e[v]
-				return BOT_ACTION_DESIRE_HIGH, w
+			if not Fu.IsInLaningPhase() then
+				minion.to_farm_lane = lanes[i]
+				return BOT_ACTION_DESIRE_HIGH, laneLocation
 			end
 		end
 	end
-	if GetUnitToUnitDistance(d, g) > 1600 or not d:IsAlive() or d:HasModifier("modifier_teleporting") then
-		local x = a.GetTeamFightLocation(g)
-		if x and GetUnitToLocationDistance(g, x) < 2200 then
-			return BOT_ACTION_DESIRE_HIGH, x
+	if GetUnitToUnitDistance(bot, minion) > 1600 or not bot:IsAlive() or bot:HasModifier("modifier_teleporting") then
+		local teamFightLocation = Fu.GetTeamFightLocation(minion)
+		if teamFightLocation and GetUnitToLocationDistance(minion, teamFightLocation) < 2200 then
+			return BOT_ACTION_DESIRE_HIGH, teamFightLocation
 		end
-		return BOT_ACTION_DESIRE_HIGH, a.GetClosestTeamLane(g)
+		return BOT_ACTION_DESIRE_HIGH, Fu.GetClosestTeamLane(minion)
 	else
-		return BOT_ACTION_DESIRE_HIGH, a.GetRandomLocationWithinDist(d:GetLocation(), 400, 800)
+		return BOT_ACTION_DESIRE_HIGH, Fu.GetRandomLocationWithinDist(bot:GetLocation(), 400, 800)
 	end
 end
-function c.IsTargetUnderEnemyTower(g, y)
-	local z = g:GetNearbyTowers(1600, true)
-	if z then
-		if a.IsValidBuilding(z[1]) and b.IsValidUnit(y) and a.IsInRange(y, z[1], 880) then
+function X.IsTargetUnderEnemyTower(minion, target)
+	local enemyTowers = minion:GetNearbyTowers(1600, true)
+	if enemyTowers then
+		if
+			Fu.IsValidBuilding(enemyTowers[1])
+			and MinionUtils.IsValidUnit(target)
+			and Fu.IsInRange(target, enemyTowers[1], 880)
+		then
 			return true
 		end
 	end
 	return false
 end
-function c.IsMinionInLane(g, A)
-	for p, B in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if a.IsValid(B) and g ~= B and B:IsIllusion() and string.find(d:GetUnitName(), B:GetUnitName()) then
-			if B.to_farm_lane == A or GetUnitToLocationDistance(B, GetLaneFrontLocation(GetTeam(), A, 0)) < 1600 then
+function X.IsMinionInLane(minion, lane)
+	for _, allyUnit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
+		if
+			Fu.IsValid(allyUnit)
+			and minion ~= allyUnit
+			and allyUnit:IsIllusion()
+			and string.find(bot:GetUnitName(), allyUnit:GetUnitName())
+		then
+			if
+				allyUnit.to_farm_lane == lane
+				or GetUnitToLocationDistance(allyUnit, GetLaneFrontLocation(GetTeam(), lane, 0)) < 1600
+			then
 				return true
 			end
 		end
 	end
 	return false
 end
-return c
+return X

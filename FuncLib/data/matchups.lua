@@ -1,25 +1,25 @@
 -- Lookup table: matchups.
-local function a(self, b, c)
-	if c == nil then
-		c = 0
+local function ListContains(self, value, startOffset)
+	if startOffset == nil then
+		startOffset = 0
 	end
-	local d = #self
-	local e = c
-	if c < 0 then
-		e = d + c
+	local length = #self
+	local startIndex = startOffset
+	if startOffset < 0 then
+		startIndex = length + startOffset
 	end
-	if e < 0 then
-		e = 0
+	if startIndex < 0 then
+		startIndex = 0
 	end
-	for f = e + 1, d do
-		if self[f] == b then
+	for i = startIndex + 1, length do
+		if self[i] == value then
 			return true
 		end
 	end
 	return false
 end
-local g = {}
-local h = {
+local Matchups = {}
+local heroMatchups = {
 	npc_dota_hero_abaddon = {
 		synergy = {
 			"npc_dota_hero_axe",
@@ -2789,17 +2789,17 @@ local h = {
 		},
 	},
 }
-function g.GetHeroMatchups(i, j)
-	local k = h[i]
-	if not k then
+function Matchups.GetHeroMatchups(heroName, relation)
+	local entry = heroMatchups[heroName]
+	if not entry then
 		return {}
 	end
-	return k[j]
+	return entry[relation]
 end
-function g.IsSynergy(l, m)
-	return a(g.GetHeroMatchups(l, "synergy"), m)
+function Matchups.IsSynergy(heroName, otherHeroName)
+	return ListContains(Matchups.GetHeroMatchups(heroName, "synergy"), otherHeroName)
 end
-function g.IsCounter(l, m)
-	return a(g.GetHeroMatchups(l, "counter"), m)
+function Matchups.IsCounter(heroName, otherHeroName)
+	return ListContains(Matchups.GetHeroMatchups(heroName, "counter"), otherHeroName)
 end
-return g
+return Matchups

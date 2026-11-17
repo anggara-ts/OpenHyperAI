@@ -1,13 +1,13 @@
 -- Chat text in English, Chinese, Russian, and Japanese.
-local a = {}
-local b
+local Localization = {}
+local CustomLoader
 if GetScriptDirectory() == "bots" then
-	b = require("bots.FuncLib.systems.custom_loader")
+	CustomLoader = require("bots.FuncLib.systems.custom_loader")
 else
-	b = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+	CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 end
-local c = "en"
-local d = {
+local defaultLocale = "en"
+local strings = {
 	en = {
 		welcome_msgs = {
 			"Welcome to Open Hyper AI (OHA-DEV): ",
@@ -79,7 +79,10 @@ local d = {
 				"#C0392B",
 				"GLHF! Native bot scripts lack excitement. This script boosts bots with unfair advantages to make bot games more challenging:",
 			},
-			{ "#9B59B6", "* You can vote for difficulty scales that affect the amount of bonus the bots will receive." },
+			{
+				"#9B59B6",
+				"* You can vote for difficulty scales that affect the amount of bonus the bots will receive.",
+			},
 			{
 				"#2980B9",
 				"* If difficulty >= 0, bots get bonus neutral items, and get fair bonus in gold, exp, stats, etc every minute.",
@@ -241,7 +244,18 @@ local d = {
 		mode_item = "picking up an item",
 		say_not_defending = "I'm %s, not defending.",
 		say_gg_lose = { "gg", "ggwp", "GG", "gg wp", "GG WP" },
-		say_gg_win = { "ez", "gg ez", "ezzzz", "EZ", "gl next", "gg gl next", "too ez", "GG EZ", "close game", "gg close" },
+		say_gg_win = {
+			"ez",
+			"gg ez",
+			"ezzzz",
+			"EZ",
+			"gl next",
+			"gg gl next",
+			"too ez",
+			"GG EZ",
+			"close game",
+			"gg close",
+		},
 	},
 	zh = {
 		welcome_msgs = {
@@ -422,7 +436,11 @@ local d = {
 		say_defend_top = { "防守上路！", "上路有人推！", "支援上路！" },
 		say_defend_mid = { "防守中路！", "中路有人推！", "支援中路！" },
 		say_defend_bot = { "防守下路！", "下路有人推！", "支援下路！" },
-		say_leave_farm_defend = { "不打野了，去防守！", "离开野区去守！", "基地要紧，先不刷了！" },
+		say_leave_farm_defend = {
+			"不打野了，去防守！",
+			"离开野区去守！",
+			"基地要紧，先不刷了！",
+		},
 		say_leave_farm_push = { "不打野了，去推！", "刷完了，一起推！", "集合推塔！" },
 		say_base_defend = { "守家！", "对面进家了！", "守遗迹！" },
 		say_consume_grisgris = {
@@ -691,12 +709,32 @@ local d = {
 		},
 		say_ward_observer = { "Ставлю обсервер.", "Вард здесь.", "Кидаю обсервер." },
 		say_ward_sentry = { "Ставлю сентри.", "Сентри здесь.", "Даю трусай." },
-		say_ward_observer_defend = { "Деф обсервер.", "Вард нашего леса.", "Обсервер для защиты." },
-		say_ward_sentry_defend = { "Деф сентри.", "Сентри у базы.", "Трусай для защиты." },
-		say_ward_observer_offense = { "Офф обсервер.", "Вард их леса.", "Глубокий обсервер." },
-		say_ward_sentry_offense = { "Офф сентри.", "Сентри в их лесу.", "Глубокий сентри." },
+		say_ward_observer_defend = {
+			"Деф обсервер.",
+			"Вард нашего леса.",
+			"Обсервер для защиты.",
+		},
+		say_ward_sentry_defend = {
+			"Деф сентри.",
+			"Сентри у базы.",
+			"Трусай для защиты.",
+		},
+		say_ward_observer_offense = {
+			"Офф обсервер.",
+			"Вард их леса.",
+			"Глубокий обсервер.",
+		},
+		say_ward_sentry_offense = {
+			"Офф сентри.",
+			"Сентри в их лесу.",
+			"Глубокий сентри.",
+		},
 		say_take_lotus = { "Беру лотос.", "Иду за лотосом.", "Лотос мой." },
-		say_take_wisdom = { "Беру святыню мудрости.", "Иду за XP-святыней.", "Закрываю святыню мудрости." },
+		say_take_wisdom = {
+			"Беру святыню мудрости.",
+			"Иду за XP-святыней.",
+			"Закрываю святыню мудрости.",
+		},
 		say_debug_on = { "Verbose debug ВКЛ.", "Режим отладки включён." },
 		say_debug_off = { "Verbose debug ВЫКЛ.", "Режим отладки выключен." },
 	},
@@ -917,30 +955,46 @@ local d = {
 		},
 		say_ward_observer = { "オブザーバーを置く。", "ここにワード。", "オブを挿す。" },
 		say_ward_sentry = { "セントリーを置く。", "ここにセン。", "真視を置く。" },
-		say_ward_observer_defend = { "防衛オブ。", "自陣ジャングルにワード。", "守り用オブザーバー。" },
+		say_ward_observer_defend = {
+			"防衛オブ。",
+			"自陣ジャングルにワード。",
+			"守り用オブザーバー。",
+		},
 		say_ward_sentry_defend = { "防衛セン。", "基地付近にセントリー。", "守り用真視。" },
-		say_ward_observer_offense = { "攻撃オブ。", "敵ジャングルにワード。", "深いオブザーバー。" },
-		say_ward_sentry_offense = { "攻撃セン。", "敵ジャングルにセントリー。", "深いセントリー。" },
+		say_ward_observer_offense = {
+			"攻撃オブ。",
+			"敵ジャングルにワード。",
+			"深いオブザーバー。",
+		},
+		say_ward_sentry_offense = {
+			"攻撃セン。",
+			"敵ジャングルにセントリー。",
+			"深いセントリー。",
+		},
 		say_take_lotus = { "ロータスを取る。", "ロータスプールへ。", "ロータスもらう。" },
-		say_take_wisdom = { "ウィズダムを取る。", "経験値神社へ。", "ウィズダム神社カバー。" },
+		say_take_wisdom = {
+			"ウィズダムを取る。",
+			"経験値神社へ。",
+			"ウィズダム神社カバー。",
+		},
 		say_debug_on = { "デバッグON。ボットが詳しく喋ります。", "Verbose debug 有効。" },
 		say_debug_off = { "デバッグOFF。", "Verbose debug 無効。" },
 	},
 }
-if b and b.Enable and d[b.Localization] then
-	c = b.Localization
+if CustomLoader and CustomLoader.Enable and strings[CustomLoader.Localization] then
+	defaultLocale = CustomLoader.Localization
 else
-	b.Localization = c
+	CustomLoader.Localization = defaultLocale
 end
-function a.Supported(e)
-	return d[e] ~= nil
+function Localization.Supported(locale)
+	return strings[locale] ~= nil
 end
-function a.GetLocale()
-	return b.Localization or c
+function Localization.GetLocale()
+	return CustomLoader.Localization or defaultLocale
 end
-function a.Get(e)
-	local f = d[a.GetLocale()] or d["en"]
-	local g = f[e] or d["en"][e]
-	return g
+function Localization.Get(key)
+	local localeStrings = strings[Localization.GetLocale()] or strings["en"]
+	local text = localeStrings[key] or strings["en"][key]
+	return text
 end
-return a
+return Localization

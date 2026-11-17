@@ -1,73 +1,73 @@
 -- Thinking for summoned units: utils.
-local a = {}
-local b = GetAncient(GetOpposingTeam())
-function a.IsValidUnit(c)
-	return c ~= nil and not c:IsNull() and c:IsAlive() and c:CanBeSeen()
+local X = {}
+local enemyAncient = GetAncient(GetOpposingTeam())
+function X.IsValidUnit(unit)
+	return unit ~= nil and not unit:IsNull() and unit:IsAlive() and unit:CanBeSeen()
 end
-function a.IsValidTarget(c)
-	return a.IsValidUnit(c) and not c:IsInvulnerable() and not c:IsAttackImmune()
+function X.IsValidTarget(unit)
+	return X.IsValidUnit(unit) and not unit:IsInvulnerable() and not unit:IsAttackImmune()
 end
-function a.IsBusy(c)
-	return a.IsValidUnit(c) and (c:IsUsingAbility() or c:IsCastingAbility() or c:IsChanneling())
+function X.IsBusy(unit)
+	return X.IsValidUnit(unit) and (unit:IsUsingAbility() or unit:IsCastingAbility() or unit:IsChanneling())
 end
-function a.CantMove(c)
-	return a.IsValidUnit(c)
+function X.CantMove(unit)
+	return X.IsValidUnit(unit)
 		and (
-			c:IsStunned()
-			or c:IsRooted()
-			or c:IsNightmared()
-			or c:IsInvulnerable() and not c:HasModifier("modifier_fountain_invulnerability")
-			or not c:GetCurrentMovementSpeed()
-			or c:GetCurrentMovementSpeed() < 100
+			unit:IsStunned()
+			or unit:IsRooted()
+			or unit:IsNightmared()
+			or unit:IsInvulnerable() and not unit:HasModifier("modifier_fountain_invulnerability")
+			or not unit:GetCurrentMovementSpeed()
+			or unit:GetCurrentMovementSpeed() < 100
 		)
 end
-function a.CanNotUseAbility(c)
-	return not a.IsValidUnit(c)
-		or c:IsInvulnerable()
-		or c:IsCastingAbility()
-		or c:IsUsingAbility()
-		or c:IsChanneling()
-		or c:IsSilenced()
-		or c:IsStunned()
-		or c:IsHexed()
-		or c:IsNightmared()
-		or c:HasModifier("modifier_ringmaster_the_box_buff")
-		or c:HasModifier("modifier_doom_bringer_doom")
-		or c:HasModifier("modifier_item_forcestaff_active")
+function X.CanNotUseAbility(unit)
+	return not X.IsValidUnit(unit)
+		or unit:IsInvulnerable()
+		or unit:IsCastingAbility()
+		or unit:IsUsingAbility()
+		or unit:IsChanneling()
+		or unit:IsSilenced()
+		or unit:IsStunned()
+		or unit:IsHexed()
+		or unit:IsNightmared()
+		or unit:HasModifier("modifier_ringmaster_the_box_buff")
+		or unit:HasModifier("modifier_doom_bringer_doom")
+		or unit:HasModifier("modifier_item_forcestaff_active")
 end
-function a.CantAttack(c)
-	return a.IsValidUnit(c)
+function X.CantAttack(unit)
+	return X.IsValidUnit(unit)
 		and (
-			c:IsStunned()
-			or c:IsRooted()
-			or c:IsNightmared()
-			or c:IsDisarmed()
-			or c:IsInvulnerable()
-			or c:GetAttackDamage() <= 0
+			unit:IsStunned()
+			or unit:IsRooted()
+			or unit:IsNightmared()
+			or unit:IsDisarmed()
+			or unit:IsInvulnerable()
+			or unit:GetAttackDamage() <= 0
 		)
 end
-function a.GetWeakestHero(d, e)
-	if a.IsValidUnit(e) then
-		local f = e:GetNearbyHeroes(d * 0.5, true, BOT_MODE_NONE) or {}
-		if #f == 0 then
-			f = e:GetNearbyHeroes(d, true, BOT_MODE_NONE) or {}
+function X.GetWeakestHero(radius, sourceUnit)
+	if X.IsValidUnit(sourceUnit) then
+		local nearbyHeroes = sourceUnit:GetNearbyHeroes(radius * 0.5, true, BOT_MODE_NONE) or {}
+		if #nearbyHeroes == 0 then
+			nearbyHeroes = sourceUnit:GetNearbyHeroes(radius, true, BOT_MODE_NONE) or {}
 		end
-		return a.GetWeakest(f)
+		return X.GetWeakest(nearbyHeroes)
 	end
 	return nil
 end
-function a.GetWeakestCreep(d, g)
-	if a.IsValidUnit(g) then
-		local h = g:GetNearbyCreeps(d * 0.5, true) or {}
-		if #h == 0 then
-			h = g:GetNearbyCreeps(d, true) or {}
+function X.GetWeakestCreep(radius, sourceUnit)
+	if X.IsValidUnit(sourceUnit) then
+		local nearbyCreeps = sourceUnit:GetNearbyCreeps(radius * 0.5, true) or {}
+		if #nearbyCreeps == 0 then
+			nearbyCreeps = sourceUnit:GetNearbyCreeps(radius, true) or {}
 		end
-		return a.GetWeakest(h)
+		return X.GetWeakest(nearbyCreeps)
 	end
 	return nil
 end
-function a.GetWeakestTower(d, g)
-	if not a.IsValidUnit(g) then
+function X.GetWeakestTower(radius, sourceUnit)
+	if not X.IsValidUnit(sourceUnit) then
 		return nil
 	end
 	-- GetNearbyTowers is stubbed to nil for non-heroes (serpent wards, etc.).
@@ -75,9 +75,9 @@ function a.GetWeakestTower(d, g)
 	local buildings = {}
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_BUILDINGS) or {}) do
 		if
-			a.IsValidTarget(unit)
-			and GetUnitToUnitDistance(g, unit) <= d
-			and not a.IsNotAllowedToAttack(unit)
+			X.IsValidTarget(unit)
+			and GetUnitToUnitDistance(sourceUnit, unit) <= radius
+			and not X.IsNotAllowedToAttack(unit)
 			and (unit:IsTower() or unit:IsBuilding())
 		then
 			local name = unit:GetUnitName() or ""
@@ -87,238 +87,238 @@ function a.GetWeakestTower(d, g)
 			end
 		end
 	end
-	local weakest = a.GetWeakest(buildings)
+	local weakest = X.GetWeakest(buildings)
 	if weakest ~= nil then
 		return weakest
 	end
-	if a.IsValidTarget(b) and GetUnitToUnitDistance(g, b) <= d then
-		return b
+	if X.IsValidTarget(enemyAncient) and GetUnitToUnitDistance(sourceUnit, enemyAncient) <= radius then
+		return enemyAncient
 	end
 	return nil
 end
-function a.GetWeakest(j)
-	local k = nil
-	local l = 10000
-	if #j > 0 then
-		for m = 1, #j do
-			local c = j[m]
-			if a.IsValidTarget(c) and not a.IsNotAllowedToAttack(c) then
-				local n = c:GetHealth() / c:GetActualIncomingDamage(3000, DAMAGE_TYPE_PHYSICAL)
-				if n < l then
-					k = c
-					l = n
+function X.GetWeakest(units)
+	local weakestUnit = nil
+	local lowestHitsToKill = 10000
+	if #units > 0 then
+		for i = 1, #units do
+			local unit = units[i]
+			if X.IsValidTarget(unit) and not X.IsNotAllowedToAttack(unit) then
+				local hitsToKill = unit:GetHealth() / unit:GetActualIncomingDamage(3000, DAMAGE_TYPE_PHYSICAL)
+				if hitsToKill < lowestHitsToKill then
+					weakestUnit = unit
+					lowestHitsToKill = hitsToKill
 				end
 			end
 		end
 	end
-	return k
+	return weakestUnit
 end
-function a.IsNotAllowedToAttack(c)
-	local o = c:GetUnitName() or ""
-	return o == "#DOTA_OutpostName_North"
-		or o == "#DOTA_OutpostName_South"
-		or o == "npc_dota_watch_tower"
-		or o == "npc_dota_unit_twin_gate"
-		or string.find(o, "twin_gate") ~= nil
+function X.IsNotAllowedToAttack(unit)
+	local unitName = unit:GetUnitName() or ""
+	return unitName == "#DOTA_OutpostName_North"
+		or unitName == "#DOTA_OutpostName_South"
+		or unitName == "npc_dota_watch_tower"
+		or unitName == "npc_dota_unit_twin_gate"
+		or string.find(unitName, "twin_gate") ~= nil
 end
-function a.IsTargetedByHero(c)
-	for p, q in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+function X.IsTargetedByHero(unit)
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
 		if
-			a.IsValidUnit(q)
-			and q:IsHero()
-			and GetUnitToUnitDistance(c, q) <= q:GetAttackRange() + 300
-			and q:GetAttackTarget() == c
+			X.IsValidUnit(enemy)
+			and enemy:IsHero()
+			and GetUnitToUnitDistance(unit, enemy) <= enemy:GetAttackRange() + 300
+			and enemy:GetAttackTarget() == unit
 		then
 			return true
 		end
 	end
 	return false
 end
-function a.IsTargetedByTower(c)
-	for p, q in pairs(GetUnitList(UNIT_LIST_ENEMY_BUILDINGS)) do
+function X.IsTargetedByTower(unit)
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_BUILDINGS)) do
 		if
-			a.IsValidUnit(q)
-			and q:IsTower()
-			and GetUnitToUnitDistance(c, q) <= q:GetAttackRange() + 300
-			and q:GetAttackTarget() == c
+			X.IsValidUnit(enemy)
+			and enemy:IsTower()
+			and GetUnitToUnitDistance(unit, enemy) <= enemy:GetAttackRange() + 300
+			and enemy:GetAttackTarget() == unit
 		then
 			return true
 		end
 	end
 	return false
 end
-function a.IsTargetedByCreep(c)
-	for p, q in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS)) do
+function X.IsTargetedByCreep(unit)
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS)) do
 		if
-			a.IsValidUnit(q)
-			and q:IsCreep()
-			and GetUnitToUnitDistance(c, q) <= q:GetAttackRange() + 300
-			and q:GetAttackTarget() == c
+			X.IsValidUnit(enemy)
+			and enemy:IsCreep()
+			and GetUnitToUnitDistance(unit, enemy) <= enemy:GetAttackRange() + 300
+			and enemy:GetAttackTarget() == unit
 		then
 			return true
 		end
 	end
-	for p, q in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
 		if
-			a.IsValidUnit(q)
-			and q:IsCreep()
-			and GetUnitToUnitDistance(c, q) <= q:GetAttackRange() + 300
-			and q:GetAttackTarget() == c
+			X.IsValidUnit(enemy)
+			and enemy:IsCreep()
+			and GetUnitToUnitDistance(unit, enemy) <= enemy:GetAttackRange() + 300
+			and enemy:GetAttackTarget() == unit
 		then
 			return true
 		end
 	end
 	return false
 end
-function a.IsShamanFowlPlayChicken(c)
-	if c:GetUnitName() == "npc_dota_hero_shadow_shaman" and c:IsIllusion() and c:IsHexed() then
+function X.IsShamanFowlPlayChicken(unit)
+	if unit:GetUnitName() == "npc_dota_hero_shadow_shaman" and unit:IsIllusion() and unit:IsHexed() then
 		return true
 	end
 	return false
 end
-function a.InitiateAbility(c)
-	if c ~= nil and not c:IsNull() then
-		c.abilities = {}
-		for m = 0, 23 do
-			local r = c:GetAbilityInSlot(m)
-			if r and not r:IsHidden() and not r:IsPassive() then
-				c.abilities[m + 1] = r
+function X.InitiateAbility(unit)
+	if unit ~= nil and not unit:IsNull() then
+		unit.abilities = {}
+		for i = 0, 23 do
+			local ability = unit:GetAbilityInSlot(i)
+			if ability and not ability:IsHidden() and not ability:IsPassive() then
+				unit.abilities[i + 1] = ability
 			end
 		end
 	end
 end
-function a.IsAttackingWard(c)
-	local o = c:GetUnitName()
-	return string.find(o, "npc_dota_shadow_shaman_ward")
-		or string.find(o, "npc_dota_venomancer_plague_ward")
-		or string.find(o, "npc_dota_witch_doctor_death_ward")
+function X.IsAttackingWard(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "npc_dota_shadow_shaman_ward")
+		or string.find(unitName, "npc_dota_venomancer_plague_ward")
+		or string.find(unitName, "npc_dota_witch_doctor_death_ward")
 end
-function a.CantBeControlled(c)
-	local o = c:GetUnitName()
-	return o == "npc_dota_zeus_cloud"
-		or string.find(o, "npc_dota_unit_tombstone")
-		or string.find(o, "npc_dota_pugna_nether_ward")
-		or string.find(o, "npc_dota_techies")
-		or o == "npc_dota_rattletrap_cog"
-		or o == "npc_dota_rattletrap_rocket"
-		or o == "npc_dota_broodmother_web"
-		or o == "npc_dota_unit_undying_zombie"
-		or o == "npc_dota_unit_undying_zombie_torso"
-		or o == "npc_dota_weaver_swarm"
-		or o == "npc_dota_death_prophet_torment"
-		or o == "npc_dota_gyrocopter_homing_missile"
-		or o == "npc_dota_plasma_field"
-		or o == "npc_dota_wisp_spirit"
-		or o == "npc_dota_beastmaster_axe"
-		or o == "npc_dota_troll_warlord_axe"
-		or o == "npc_dota_phoenix_sun"
-		or o == "npc_dota_treant_eyes"
-		or o == "npc_dota_clinkz_skeleton_archer"
-		or o == "dota_death_prophet_exorcism_spirit"
-		or o == "npc_dota_dark_willow_creature"
-		or o == "npc_dota_hero_hoodwink" and c:HasModifier("modifier_hoodwink_sharpshooter_windup")
+function X.CantBeControlled(unit)
+	local unitName = unit:GetUnitName()
+	return unitName == "npc_dota_zeus_cloud"
+		or string.find(unitName, "npc_dota_unit_tombstone")
+		or string.find(unitName, "npc_dota_pugna_nether_ward")
+		or string.find(unitName, "npc_dota_techies")
+		or unitName == "npc_dota_rattletrap_cog"
+		or unitName == "npc_dota_rattletrap_rocket"
+		or unitName == "npc_dota_broodmother_web"
+		or unitName == "npc_dota_unit_undying_zombie"
+		or unitName == "npc_dota_unit_undying_zombie_torso"
+		or unitName == "npc_dota_weaver_swarm"
+		or unitName == "npc_dota_death_prophet_torment"
+		or unitName == "npc_dota_gyrocopter_homing_missile"
+		or unitName == "npc_dota_plasma_field"
+		or unitName == "npc_dota_wisp_spirit"
+		or unitName == "npc_dota_beastmaster_axe"
+		or unitName == "npc_dota_troll_warlord_axe"
+		or unitName == "npc_dota_phoenix_sun"
+		or unitName == "npc_dota_treant_eyes"
+		or unitName == "npc_dota_clinkz_skeleton_archer"
+		or unitName == "dota_death_prophet_exorcism_spirit"
+		or unitName == "npc_dota_dark_willow_creature"
+		or unitName == "npc_dota_hero_hoodwink" and unit:HasModifier("modifier_hoodwink_sharpshooter_windup")
 end
-function a.IsMinionWithNoSkill(c)
-	local o = c:GetUnitName()
-	return string.find(o, "eidolon")
-		or o == "npc_dota_furion_treant"
-		or o == "npc_dota_furion_treant_large"
-		or o == "npc_dota_invoker_forged_spirit"
-		or o == "npc_dota_broodmother_spiderling"
-		or o == "npc_dota_broodmother_spiderite"
-		or o == "npc_dota_wraith_king_skeleton_warrior"
-		or o == "npc_dota_beastmaster_greater_boar"
-		or o == "npc_dota_dark_troll_warlord_skeleton_warrior"
-		or string.find(o, "npc_dota_warlock")
-		or string.find(o, "npc_dota_beastmaster_boar")
-		or string.find(o, "npc_dota_lycan_wolf")
-		or string.find(o, "npc_dota_neutral_kobold")
-		or string.find(o, "npc_dota_creep_goodguys")
-		or string.find(o, "npc_dota_goodguys_siege")
-		or string.find(o, "npc_dota_creep_badguys")
-		or string.find(o, "npc_dota_badguys_siege")
-		or string.find(o, "npc_dota_necronomicon_warrior")
-		or o == "npc_dota_neutral_centaur_outrunner"
-		or o == "npc_dota_neutral_fel_beast"
-		or o == "npc_dota_neutral_polar_furbolg_champion"
-		or o == "npc_dota_neutral_ogre_mauler"
-		or o == "npc_dota_neutral_giant_wolf"
-		or o == "npc_dota_neutral_alpha_wolf"
-		or o == "npc_dota_neutral_wildkin"
-		or o == "npc_dota_neutral_jungle_stalker"
-		or o == "npc_dota_neutral_elder_jungle_stalker"
-		or o == "npc_dota_neutral_prowler_acolyte"
-		or o == "npc_dota_neutral_rock_golem"
-		or o == "npc_dota_neutral_granite_golem"
-		or o == "npc_dota_neutral_small_thunder_lizard"
-		or o == "npc_dota_neutral_gnoll_assassin"
-		or o == "npc_dota_neutral_ghost"
-		or o == "npc_dota_wraith_ghost"
-		or o == "npc_dota_neutral_dark_troll"
-		or o == "npc_dota_neutral_forest_troll_berserker"
-		or o == "npc_dota_neutral_harpy_scout"
-		or o == "npc_dota_neutral_black_drake"
-		or o == "npc_dota_neutral_tadpole"
+function X.IsMinionWithNoSkill(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "eidolon")
+		or unitName == "npc_dota_furion_treant"
+		or unitName == "npc_dota_furion_treant_large"
+		or unitName == "npc_dota_invoker_forged_spirit"
+		or unitName == "npc_dota_broodmother_spiderling"
+		or unitName == "npc_dota_broodmother_spiderite"
+		or unitName == "npc_dota_wraith_king_skeleton_warrior"
+		or unitName == "npc_dota_beastmaster_greater_boar"
+		or unitName == "npc_dota_dark_troll_warlord_skeleton_warrior"
+		or string.find(unitName, "npc_dota_warlock")
+		or string.find(unitName, "npc_dota_beastmaster_boar")
+		or string.find(unitName, "npc_dota_lycan_wolf")
+		or string.find(unitName, "npc_dota_neutral_kobold")
+		or string.find(unitName, "npc_dota_creep_goodguys")
+		or string.find(unitName, "npc_dota_goodguys_siege")
+		or string.find(unitName, "npc_dota_creep_badguys")
+		or string.find(unitName, "npc_dota_badguys_siege")
+		or string.find(unitName, "npc_dota_necronomicon_warrior")
+		or unitName == "npc_dota_neutral_centaur_outrunner"
+		or unitName == "npc_dota_neutral_fel_beast"
+		or unitName == "npc_dota_neutral_polar_furbolg_champion"
+		or unitName == "npc_dota_neutral_ogre_mauler"
+		or unitName == "npc_dota_neutral_giant_wolf"
+		or unitName == "npc_dota_neutral_alpha_wolf"
+		or unitName == "npc_dota_neutral_wildkin"
+		or unitName == "npc_dota_neutral_jungle_stalker"
+		or unitName == "npc_dota_neutral_elder_jungle_stalker"
+		or unitName == "npc_dota_neutral_prowler_acolyte"
+		or unitName == "npc_dota_neutral_rock_golem"
+		or unitName == "npc_dota_neutral_granite_golem"
+		or unitName == "npc_dota_neutral_small_thunder_lizard"
+		or unitName == "npc_dota_neutral_gnoll_assassin"
+		or unitName == "npc_dota_neutral_ghost"
+		or unitName == "npc_dota_wraith_ghost"
+		or unitName == "npc_dota_neutral_dark_troll"
+		or unitName == "npc_dota_neutral_forest_troll_berserker"
+		or unitName == "npc_dota_neutral_harpy_scout"
+		or unitName == "npc_dota_neutral_black_drake"
+		or unitName == "npc_dota_neutral_tadpole"
 end
-function a.IsMinionWithSkill(c)
-	local o = c:GetUnitName()
-	return o == "npc_dota_neutral_centaur_khan"
-		or o == "npc_dota_neutral_polar_furbolg_ursa_warrior"
-		or o == "npc_dota_neutral_mud_golem"
-		or o == "npc_dota_neutral_mud_golem_split"
-		or o == "npc_dota_neutral_mud_golem_split_doom"
-		or o == "npc_dota_neutral_ogre_magi"
-		or o == "npc_dota_neutral_enraged_wildkin"
-		or o == "npc_dota_neutral_satyr_soulstealer"
-		or o == "npc_dota_neutral_satyr_hellcaller"
-		or o == "npc_dota_neutral_prowler_shaman"
-		or o == "npc_dota_neutral_big_thunder_lizard"
-		or o == "npc_dota_neutral_dark_troll_warlord"
-		or o == "npc_dota_neutral_satyr_trickster"
-		or o == "npc_dota_neutral_forest_troll_high_priest"
-		or o == "npc_dota_neutral_harpy_storm"
-		or o == "npc_dota_neutral_black_dragon"
-		or o == "npc_dota_neutral_warpine_raider"
-		or o == "npc_dota_neutral_froglet_mage"
-		or o == "npc_dota_neutral_froglet"
-		or o == "npc_dota_neutral_grown_frog_mage"
-		or o == "npc_dota_neutral_grown_frog"
-		or o == "npc_dota_neutral_ancient_frog_mage"
-		or o == "npc_dota_neutral_ancient_frog"
-		or string.find(o, "npc_dota_necronomicon_archer")
+function X.IsMinionWithSkill(unit)
+	local unitName = unit:GetUnitName()
+	return unitName == "npc_dota_neutral_centaur_khan"
+		or unitName == "npc_dota_neutral_polar_furbolg_ursa_warrior"
+		or unitName == "npc_dota_neutral_mud_golem"
+		or unitName == "npc_dota_neutral_mud_golem_split"
+		or unitName == "npc_dota_neutral_mud_golem_split_doom"
+		or unitName == "npc_dota_neutral_ogre_magi"
+		or unitName == "npc_dota_neutral_enraged_wildkin"
+		or unitName == "npc_dota_neutral_satyr_soulstealer"
+		or unitName == "npc_dota_neutral_satyr_hellcaller"
+		or unitName == "npc_dota_neutral_prowler_shaman"
+		or unitName == "npc_dota_neutral_big_thunder_lizard"
+		or unitName == "npc_dota_neutral_dark_troll_warlord"
+		or unitName == "npc_dota_neutral_satyr_trickster"
+		or unitName == "npc_dota_neutral_forest_troll_high_priest"
+		or unitName == "npc_dota_neutral_harpy_storm"
+		or unitName == "npc_dota_neutral_black_dragon"
+		or unitName == "npc_dota_neutral_warpine_raider"
+		or unitName == "npc_dota_neutral_froglet_mage"
+		or unitName == "npc_dota_neutral_froglet"
+		or unitName == "npc_dota_neutral_grown_frog_mage"
+		or unitName == "npc_dota_neutral_grown_frog"
+		or unitName == "npc_dota_neutral_ancient_frog_mage"
+		or unitName == "npc_dota_neutral_ancient_frog"
+		or string.find(unitName, "npc_dota_necronomicon_archer")
 end
-function a.IsFrozeSigil(c)
-	local o = c:GetUnitName()
-	return string.find(o, "npc_dota_tusk_frozen_sigil")
+function X.IsFrozeSigil(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "npc_dota_tusk_frozen_sigil")
 end
-function a.IsHawk(c)
-	local o = c:GetUnitName()
-	return o == "npc_dota_scout_hawk"
-		or o == "npc_dota_greater_hawk"
-		or string.find(o, "npc_dota_beastmaster_hawk")
-		or string.find(o, "npc_dota_beastmaster_raptor")
+function X.IsHawk(unit)
+	local unitName = unit:GetUnitName()
+	return unitName == "npc_dota_scout_hawk"
+		or unitName == "npc_dota_greater_hawk"
+		or string.find(unitName, "npc_dota_beastmaster_hawk")
+		or string.find(unitName, "npc_dota_beastmaster_raptor")
 end
-function a.IsTornado(c)
-	local o = c:GetUnitName()
-	return o == "npc_dota_enraged_wildkin_tornado"
+function X.IsTornado(unit)
+	local unitName = unit:GetUnitName()
+	return unitName == "npc_dota_enraged_wildkin_tornado"
 end
-function a.IsHealingWard(c)
-	local o = c:GetUnitName()
-	return o == "npc_dota_juggernaut_healing_ward"
+function X.IsHealingWard(unit)
+	local unitName = unit:GetUnitName()
+	return unitName == "npc_dota_juggernaut_healing_ward"
 end
-function a.IsBear(c)
-	local o = c:GetUnitName()
-	return string.find(o, "npc_dota_lone_druid_bear")
+function X.IsBear(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "npc_dota_lone_druid_bear")
 end
-function a.IsFamiliar(c)
-	local o = c:GetUnitName()
-	return string.find(o, "npc_dota_visage_familiar")
+function X.IsFamiliar(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "npc_dota_visage_familiar")
 end
-function a.IsPrimalSplit(c)
-	local o = c:GetUnitName()
-	return string.find(o, "npc_dota_brewmaster_earth")
-		or string.find(o, "npc_dota_brewmaster_storm")
-		or string.find(o, "npc_dota_brewmaster_fire")
-		or string.find(o, "npc_dota_brewmaster_void")
+function X.IsPrimalSplit(unit)
+	local unitName = unit:GetUnitName()
+	return string.find(unitName, "npc_dota_brewmaster_earth")
+		or string.find(unitName, "npc_dota_brewmaster_storm")
+		or string.find(unitName, "npc_dota_brewmaster_fire")
+		or string.find(unitName, "npc_dota_brewmaster_void")
 end
-return a
+return X

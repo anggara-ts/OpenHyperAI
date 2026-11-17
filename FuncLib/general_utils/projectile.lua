@@ -1,40 +1,40 @@
 -- Shared helper: projectile.
-local function a(b)
-	function b.IsAllyUnitSpell(c)
-		return b.Skill["sAllyUnitAbilityIndex"][c] == true
+local function installProjectile(Fu)
+	function Fu.IsAllyUnitSpell(abilityName)
+		return Fu.Skill["sAllyUnitAbilityIndex"][abilityName] == true
 	end
-	function b.IsProjectileUnitSpell(c)
-		return b.Skill["sProjectileAbilityIndex"][c] == true
+	function Fu.IsProjectileUnitSpell(abilityName)
+		return Fu.Skill["sProjectileAbilityIndex"][abilityName] == true
 	end
-	function b.IsOnlyProjectileSpell(c)
-		return b.Skill["sOnlyProjectileAbilityIndex"][c] == true
+	function Fu.IsOnlyProjectileSpell(abilityName)
+		return Fu.Skill["sOnlyProjectileAbilityIndex"][abilityName] == true
 	end
-	function b.IsStunProjectileSpell(c)
-		return b.Skill["sStunProjectileAbilityIndex"][c] == true
+	function Fu.IsStunProjectileSpell(abilityName)
+		return Fu.Skill["sStunProjectileAbilityIndex"][abilityName] == true
 	end
-	function b.IsWillBeCastUnitTargetSpell(d, e)
-		if e > 1600 then
-			e = 1600
+	function Fu.IsWillBeCastUnitTargetSpell(unit, range)
+		if range > 1600 then
+			range = 1600
 		end
-		local f = b.GetNearbyHeroes(d, e, true, BOT_MODE_NONE)
-		for g, h in pairs(f) do
+		local nearbyEnemies = Fu.GetNearbyHeroes(unit, range, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				h ~= nil
-				and h:IsAlive()
-				and (h:IsCastingAbility() or h:IsUsingAbility())
-				and h:IsFacingLocation(d:GetLocation(), 20)
+				enemyHero ~= nil
+				and enemyHero:IsAlive()
+				and (enemyHero:IsCastingAbility() or enemyHero:IsUsingAbility())
+				and enemyHero:IsFacingLocation(unit:GetLocation(), 20)
 			then
-				local i = h:GetCurrentActiveAbility()
-				if i ~= nil and i:GetBehavior() == ABILITY_BEHAVIOR_UNIT_TARGET then
-					local c = i:GetName()
-					if not b.IsAllyUnitSpell(c) then
-						if b.IsInRange(h, d, 330) or not b.IsProjectileUnitSpell(c) then
-							if not b.IsHumanPlayer(h) then
+				local activeAbility = enemyHero:GetCurrentActiveAbility()
+				if activeAbility ~= nil and activeAbility:GetBehavior() == ABILITY_BEHAVIOR_UNIT_TARGET then
+					local abilityName = activeAbility:GetName()
+					if not Fu.IsAllyUnitSpell(abilityName) then
+						if Fu.IsInRange(enemyHero, unit, 330) or not Fu.IsProjectileUnitSpell(abilityName) then
+							if not Fu.IsHumanPlayer(enemyHero) then
 								return true
 							else
-								local j = h:GetAnimCycle()
-								local k = i:GetCastPoint()
-								if j > 0.1 and k * (1 - j) < 0.27 then
+								local animCycle = enemyHero:GetAnimCycle()
+								local castPoint = activeAbility:GetCastPoint()
+								if animCycle > 0.1 and castPoint * (1 - animCycle) < 0.27 then
 									return true
 								end
 							end
@@ -45,21 +45,21 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsWillBeCastPointSpell(d, e)
-		local f = b.GetNearbyHeroes(d, e, true, BOT_MODE_NONE)
-		for g, h in pairs(f) do
+	function Fu.IsWillBeCastPointSpell(unit, range)
+		local nearbyEnemies = Fu.GetNearbyHeroes(unit, range, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				h ~= nil
-				and h:IsAlive()
-				and (h:IsCastingAbility() or h:IsUsingAbility())
-				and h:IsFacingLocation(d:GetLocation(), 50)
+				enemyHero ~= nil
+				and enemyHero:IsAlive()
+				and (enemyHero:IsCastingAbility() or enemyHero:IsUsingAbility())
+				and enemyHero:IsFacingLocation(unit:GetLocation(), 50)
 			then
-				local i = h:GetCurrentActiveAbility()
-				if i ~= nil then
+				local activeAbility = enemyHero:GetCurrentActiveAbility()
+				if activeAbility ~= nil then
 					if
-						i:GetBehavior() == ABILITY_BEHAVIOR_POINT
-						or i:GetBehavior() == ABILITY_BEHAVIOR_NO_TARGET
-						or i:GetBehavior() == 48
+						activeAbility:GetBehavior() == ABILITY_BEHAVIOR_POINT
+						or activeAbility:GetBehavior() == ABILITY_BEHAVIOR_NO_TARGET
+						or activeAbility:GetBehavior() == 48
 					then
 						return true
 					end
@@ -68,21 +68,21 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsProjectileIncoming(d, l)
-		local m = d:GetIncomingTrackingProjectiles()
-		for g, n in pairs(m) do
+	function Fu.IsProjectileIncoming(unit, range)
+		local projectiles = unit:GetIncomingTrackingProjectiles()
+		for _, projectile in pairs(projectiles) do
 			if
-				n.is_dodgeable
-				and not n.is_attack
-				and GetUnitToLocationDistance(d, n.location) < l
-				and (n.caster == nil or n.caster:GetTeam() ~= GetTeam())
+				projectile.is_dodgeable
+				and not projectile.is_attack
+				and GetUnitToLocationDistance(unit, projectile.location) < range
+				and (projectile.caster == nil or projectile.caster:GetTeam() ~= GetTeam())
 				and (
-					n.ability ~= nil
-					and not b.IsOnlyProjectileSpell(n.ability:GetName())
+					projectile.ability ~= nil
+					and not Fu.IsOnlyProjectileSpell(projectile.ability:GetName())
 					and (
-						n.ability:GetName() ~= "medusa_mystic_snake"
-						or n.caster == nil
-						or n.caster:GetUnitName() == "npc_dota_hero_medusa"
+						projectile.ability:GetName() ~= "medusa_mystic_snake"
+						or projectile.caster == nil
+						or projectile.caster:GetUnitName() == "npc_dota_hero_medusa"
 					)
 				)
 			then
@@ -91,17 +91,17 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsUnitTargetProjectileIncoming(d, l)
-		local m = d:GetIncomingTrackingProjectiles()
-		for g, n in pairs(m) do
+	function Fu.IsUnitTargetProjectileIncoming(unit, range)
+		local projectiles = unit:GetIncomingTrackingProjectiles()
+		for _, projectile in pairs(projectiles) do
 			if
-				not n.is_attack
-				and GetUnitToLocationDistance(d, n.location) < l
-				and (n.caster == nil or n.caster:GetTeam() ~= d:GetTeam() and n.caster:IsHero() and n.caster:GetUnitName() ~= "npc_dota_hero_antimage" and n.caster:GetUnitName() ~= "npc_dota_hero_templar_assassin")
-				and (n.ability ~= nil and (n.ability:GetName() ~= "medusa_mystic_snake" or n.caster == nil or n.caster:GetUnitName() == "npc_dota_hero_medusa"))
+				not projectile.is_attack
+				and GetUnitToLocationDistance(unit, projectile.location) < range
+				and (projectile.caster == nil or projectile.caster:GetTeam() ~= unit:GetTeam() and projectile.caster:IsHero() and projectile.caster:GetUnitName() ~= "npc_dota_hero_antimage" and projectile.caster:GetUnitName() ~= "npc_dota_hero_templar_assassin")
+				and (projectile.ability ~= nil and (projectile.ability:GetName() ~= "medusa_mystic_snake" or projectile.caster == nil or projectile.caster:GetUnitName() == "npc_dota_hero_medusa"))
 				and (
-					n.ability:GetBehavior() == ABILITY_BEHAVIOR_UNIT_TARGET
-					or not b.IsOnlyProjectileSpell(n.ability:GetName())
+					projectile.ability:GetBehavior() == ABILITY_BEHAVIOR_UNIT_TARGET
+					or not Fu.IsOnlyProjectileSpell(projectile.ability:GetName())
 				)
 			then
 				return true
@@ -109,42 +109,42 @@ local function a(b)
 		end
 		return false
 	end
-	function b.IsStunProjectileIncoming(d, l)
-		local m = d:GetIncomingTrackingProjectiles()
-		for g, n in pairs(m) do
+	function Fu.IsStunProjectileIncoming(unit, range)
+		local projectiles = unit:GetIncomingTrackingProjectiles()
+		for _, projectile in pairs(projectiles) do
 			if
-				not n.is_attack
-				and GetUnitToLocationDistance(d, n.location) < l
-				and n.ability ~= nil
-				and b.IsStunProjectileSpell(n.ability:GetName())
+				not projectile.is_attack
+				and GetUnitToLocationDistance(unit, projectile.location) < range
+				and projectile.ability ~= nil
+				and Fu.IsStunProjectileSpell(projectile.ability:GetName())
 			then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsAttackProjectileIncoming(d, l)
-		local m = d:GetIncomingTrackingProjectiles()
-		for g, n in pairs(m) do
-			if n.is_attack and GetUnitToLocationDistance(d, n.location) < l then
+	function Fu.IsAttackProjectileIncoming(unit, range)
+		local projectiles = unit:GetIncomingTrackingProjectiles()
+		for _, projectile in pairs(projectiles) do
+			if projectile.is_attack and GetUnitToLocationDistance(unit, projectile.location) < range then
 				return true
 			end
 		end
 		return false
 	end
-	function b.IsNotAttackProjectileIncoming(d, l)
-		local m = d:GetIncomingTrackingProjectiles()
-		for g, n in pairs(m) do
+	function Fu.IsNotAttackProjectileIncoming(unit, range)
+		local projectiles = unit:GetIncomingTrackingProjectiles()
+		for _, projectile in pairs(projectiles) do
 			if
-				not n.is_attack
-				and GetUnitToLocationDistance(d, n.location) < l
-				and (n.caster == nil or n.caster:GetTeam() ~= d:GetTeam())
+				not projectile.is_attack
+				and GetUnitToLocationDistance(unit, projectile.location) < range
+				and (projectile.caster == nil or projectile.caster:GetTeam() ~= unit:GetTeam())
 				and (
-					n.ability ~= nil
+					projectile.ability ~= nil
 					and (
-						n.ability:GetName() ~= "medusa_mystic_snake"
-						or n.caster == nil
-						or n.caster:GetUnitName() == "npc_dota_hero_medusa"
+						projectile.ability:GetName() ~= "medusa_mystic_snake"
+						or projectile.caster == nil
+						or projectile.caster:GetUnitName() == "npc_dota_hero_medusa"
 					)
 				)
 			then
@@ -153,7 +153,7 @@ local function a(b)
 		end
 		return false
 	end
-	local o = {
+	local ignoredSelfCasts = {
 		["antimage_blink"] = true,
 		["arc_warden_magnetic_field"] = true,
 		["arc_warden_spark_wraith"] = true,
@@ -176,29 +176,33 @@ local function a(b)
 		["windrunner_windrun"] = true,
 		["witch_doctor_voodoo_restoration"] = true,
 	}
-	function b.DidEnemyCastAbility()
-		local d = GetBot()
-		local p = b.GetNearbyHeroes(d, 1200, true, BOT_MODE_NONE)
-		for g, h in pairs(p) do
+	function Fu.DidEnemyCastAbility()
+		local bot = GetBot()
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				h ~= nil
-				and h:IsAlive()
-				and h:IsFacingLocation(d:GetLocation(), 30)
-				and (h:IsCastingAbility() or h:IsUsingAbility())
+				enemyHero ~= nil
+				and enemyHero:IsAlive()
+				and enemyHero:IsFacingLocation(bot:GetLocation(), 30)
+				and (enemyHero:IsCastingAbility() or enemyHero:IsUsingAbility())
 			then
-				local i = h:GetCurrentActiveAbility()
-				if i ~= nil then
-					local q = i:GetBehavior()
-					local c = i:GetName()
-					if q ~= ABILITY_BEHAVIOR_UNIT_TARGET and (h:IsBot() or h:GetLevel() >= 5) and not o[c] then
+				local activeAbility = enemyHero:GetCurrentActiveAbility()
+				if activeAbility ~= nil then
+					local behavior = activeAbility:GetBehavior()
+					local abilityName = activeAbility:GetName()
+					if
+						behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET
+						and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5)
+						and not ignoredSelfCasts[abilityName]
+					then
 						return true
 					end
 					if
-						q == ABILITY_BEHAVIOR_UNIT_TARGET
-						and h:GetLevel() >= 6
-						and not h:IsBot()
-						and not b.IsAllyUnitSpell(c)
-						and (not b.IsProjectileUnitSpell(c) or b.IsInRange(d, h, 400))
+						behavior == ABILITY_BEHAVIOR_UNIT_TARGET
+						and enemyHero:GetLevel() >= 6
+						and not enemyHero:IsBot()
+						and not Fu.IsAllyUnitSpell(abilityName)
+						and (not Fu.IsProjectileUnitSpell(abilityName) or Fu.IsInRange(bot, enemyHero, 400))
 					then
 						return true
 					end
@@ -208,4 +212,4 @@ local function a(b)
 		return false
 	end
 end
-return a
+return installProjectile

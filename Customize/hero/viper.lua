@@ -1,14 +1,14 @@
 --[[
-This is a place for you to customize the Open Hyper AI bots. 
+This is a place for you to customize the Open Hyper AI bots.
 
-1. You can customize each individual heroes so they can behave the way you personally preferred - good for your experimental games, and you 
+1. You can customize each individual heroes so they can behave the way you personally preferred - good for your experimental games, and you
    can keep overridding the setup by copy/pasting the files for yourself at any time for diff styles. And you can share the setup files to friends.
    To customize the setup for another hero, just add a new file with the hero's unit name but without the prefix `npc_dota_hero_`.
    Hero unit names list: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
-2. When modiftying this file, be VERY careful to the spelling, punctuation and variable names - it's very easy to cause 
+2. When modiftying this file, be VERY careful to the spelling, punctuation and variable names - it's very easy to cause
    syntax errors and could be hard for you to debug.
-3. In the case you saw the bots cannot purchase items, fail to upgrade abilities, or having some random names or picks (heroes not what you have set or without "OHA-DEV" name suffix), 
-   that means you had made some mistakes/errors while modifying this file. 
+3. In the case you saw the bots cannot purchase items, fail to upgrade abilities, or having some random names or picks (heroes not what you have set or without "OHA-DEV" name suffix),
+   that means you had made some mistakes/errors while modifying this file.
 4. In any case this file got messed up and caused the bots to malfunction, you can try to delete this customized hero file.
 5. If you think the setup you made or your idea is better in the general cases and should better be shared to all other players, don't hesitate to contributing to our Github repo.
 

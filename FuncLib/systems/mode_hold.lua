@@ -23,25 +23,36 @@ function M.Hold(bot, key, mode, desire, cond)
 	end
 	local now = DotaTime()
 	bot._modeHold = bot._modeHold or {}
-	local h = bot._modeHold[key]
+	local held = bot._modeHold[key]
 	if not bot:IsAlive() or bot:GetActiveMode() ~= mode then
 		bot._modeHold[key] = nil
 		return desire
 	end
-	if h == nil or desire >= h.d * 0.95 then
+	if held == nil or desire >= held.d * 0.95 then
 		if desire > 0.05 and desire <= HOLD_MAX then
 			bot._modeHold[key] = { d = desire, t = now }
 		end
 		return desire
 	end
-	if now - h.t <= HOLD_SECONDS then
+	if now - held.t <= HOLD_SECONDS then
 		-- Game 029 (build 053): flips went on at the same rate and no hold was visible. Log each bridge
 		-- (once per 15s per bot) to see whether this branch runs at all.
 		if now >= (bot._modeHoldLogAt or -999) then
 			bot._modeHoldLogAt = now + 15
-			pcall(print, string.format("[OHA-HOLD] t=%.1f %s %s raw=%.2f held=%.2f age=%.1f", now, (string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")), key, desire, h.d * 0.95, now - h.t))
+			pcall(
+				print,
+				string.format(
+					"[OHA-HOLD] t=%.1f %s %s raw=%.2f held=%.2f age=%.1f",
+					now,
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					key,
+					desire,
+					held.d * 0.95,
+					now - held.t
+				)
+			)
 		end
-		return h.d * 0.95
+		return held.d * 0.95
 	end
 	bot._modeHold[key] = nil
 	return desire
@@ -52,12 +63,12 @@ function M.Wrap(getDesire, key, mode, cond)
 		return getDesire
 	end
 	return function(...)
-		local d = getDesire(...)
-		local ok, held = pcall(M.Hold, GetBot(), key, mode, d, cond)
+		local desire = getDesire(...)
+		local ok, heldDesire = pcall(M.Hold, GetBot(), key, mode, desire, cond)
 		if ok then
-			return held
+			return heldDesire
 		end
-		return d
+		return desire
 	end
 end
 return M

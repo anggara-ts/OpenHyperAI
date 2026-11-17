@@ -1,38 +1,40 @@
 -- Draft logic: which heroes bots pick or ban, lane slots, and chat commands such as !pos and !pick.
 require(GetScriptDirectory() .. "/FuncLib/systems/global_overrides")
-local a = {}
-local b =
-	{ initialized = false, NextPickAt = { [1] = math.huge, [2] = math.huge, [3] = math.huge, [4] = math.huge, [5] = math.huge } }
-local c = {}
-local d = {}
-local e = {}
-local f = {}
-local g = false
-local h = require(GetScriptDirectory() .. "/FuncLib/data/matchups_data")
-local i = require(GetScriptDirectory() .. "/FuncLib/systems/role")
-local j = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local k = require(GetScriptDirectory() .. "/FuncLib/data/team_names")
-local l = require(GetScriptDirectory() .. "/FuncLib/hero/captain_mode")
-local m = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
-local n = require(GetScriptDirectory() .. "/FuncLib/data/hero_pos_weights")
-local o = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
-local p = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local HeroSelection = {}
+local pickState = {
+	initialized = false,
+	NextPickAt = { [1] = math.huge, [2] = math.huge, [3] = math.huge, [4] = math.huge, [5] = math.huge },
+}
+local banList = {}
+local slotHeroes = {}
+local positionHeroPools = {}
+local laneAssignments = {}
+local skipHumanWait = false
+local MatchupsData = require(GetScriptDirectory() .. "/FuncLib/data/matchups_data")
+local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local TeamNames = require(GetScriptDirectory() .. "/FuncLib/data/team_names")
+local CaptainMode = require(GetScriptDirectory() .. "/FuncLib/hero/captain_mode")
+local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+local heroPosWeights = require(GetScriptDirectory() .. "/FuncLib/data/hero_pos_weights")
+local HeroDisplayNames = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
+local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
-n = n.GetHeroPositions()
+heroPosWeights = heroPosWeights.GetHeroPositions()
 if GAMEMODE_TURBO == nil then
 	GAMEMODE_TURBO = 23
 end
-local q = 50
-local r = 35
-local s = 1
-local t = { type = "exp", base = 0.6 }
-local u = {}
-local v = false
-local w = false
-local x = {}
-local y = {}
-local z = { [TEAM_RADIANT] = 0, [TEAM_DIRE] = 0 }
-local A = {
+local maxWeightRoll = 50
+local maxPoolSize = 35
+local defaultWeakHeroCap = 1
+local defaultWeakPenalty = { type = "exp", base = 0.6 }
+local allHeroNames = {}
+local radiantLanesSet = false
+local direLanesSet = false
+local direLaneSlot = {}
+local poolCountByPos = {}
+local weakHeroPickCount = { [TEAM_RADIANT] = 0, [TEAM_DIRE] = 0 }
+local weakHeroes = {
 	"npc_dota_hero_chen",
 	"npc_dota_hero_ancient_apparition",
 	"npc_dota_hero_tinker",
@@ -52,218 +54,233 @@ local A = {
 	"npc_dota_hero_hoodwink",
 	"npc_dota_hero_wisp",
 }
-if p and not p.Enable then
-	p = nil
+if CustomLoader and not CustomLoader.Enable then
+	CustomLoader = nil
 end
-local B = GetTeam() == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
-local function C(D)
-	local E = {}
-	for F, G in pairs(D) do
-		table.insert(E, F)
+local ownTeamKey = GetTeam() == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
+local function getKeys(source)
+	local keys = {}
+	for key, _ in pairs(source) do
+		table.insert(keys, key)
 	end
-	return E
+	return keys
 end
-local function H(I, J, K)
-	return y[J] <= K and i.IsDurable(I) or (i.IsDisabler(I) or i.IsNuker(I))
+local function fitsCorePool(heroName, pos, durableQuota)
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsDisabler(heroName) or Role.IsNuker(heroName))
 end
-local function L(I, J, K)
-	return y[J] <= K and i.IsDurable(I) or (i.IsInitiator(I) or i.IsDisabler(I) and i.IsDurable(I))
+local function fitsOfflanePool(heroName, pos, durableQuota)
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsInitiator(heroName) or Role.IsDisabler(heroName) and Role.IsDurable(heroName))
 end
-local function M(I, J, K)
-	return y[J] <= K and i.IsDurable(I) or (i.IsDisabler(I) or i.IsHealer(I) or i.IsInitiator(I))
+local function fitsSoftSupportPool(heroName, pos, durableQuota)
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsDisabler(heroName) or Role.IsHealer(heroName) or Role.IsInitiator(heroName))
 end
-local function N(D, J)
-	local O = {}
-	for F, P in pairs(D) do
-		local Q = P[J]
-		if Q > RandomInt(5, q) then
-			if not j.HasValue(A, F) or RandomInt(1, 10) > 7 then
-				table.insert(O, { name = F, weight = Q })
+local function buildPositionPool(weightsByHero, pos)
+	local candidates = {}
+	for name, weights in pairs(weightsByHero) do
+		local weight = weights[pos]
+		if weight > RandomInt(5, maxWeightRoll) then
+			if not Utils.HasValue(weakHeroes, name) or RandomInt(1, 10) > 7 then
+				table.insert(candidates, { name = name, weight = weight })
 			end
 		end
 	end
-	table.sort(O, function(R, S)
-		return R.weight > S.weight
+	table.sort(candidates, function(candidateA, candidateB)
+		return candidateA.weight > candidateB.weight
 	end)
-	local T = {}
-	for G, U in ipairs(O) do
-		local I = U.name
-		if y[J] == nil then
-			y[J] = 0
+	local pool = {}
+	for _, candidate in ipairs(candidates) do
+		local heroName = candidate.name
+		if poolCountByPos[pos] == nil then
+			poolCountByPos[pos] = 0
 		end
 		if
-			J == 1 and H(I, J, 6)
-			or J == 2 and H(I, J, 6)
-			or J == 3 and (not i.IsRanged(I) or U.weight > 50) and L(I, J, 6)
-			or J == 4 and i.IsSupport(I) and M(I, J, 4)
-			or J == 5
-				and i.IsSupport(I)
-				and (i.IsRanged(I) or U.weight >= 60)
-				and (i.IsDisabler(I) or i.IsHealer(I) or i.IsInitiator(I))
+			pos == 1 and fitsCorePool(heroName, pos, 6)
+			or pos == 2 and fitsCorePool(heroName, pos, 6)
+			or pos == 3 and (not Role.IsRanged(heroName) or candidate.weight > 50) and fitsOfflanePool(heroName, pos, 6)
+			or pos == 4 and Role.IsSupport(heroName) and fitsSoftSupportPool(heroName, pos, 4)
+			or pos == 5
+				and Role.IsSupport(heroName)
+				and (Role.IsRanged(heroName) or candidate.weight >= 60)
+				and (Role.IsDisabler(heroName) or Role.IsHealer(heroName) or Role.IsInitiator(heroName))
 		then
-			table.insert(T, I)
-			y[J] = y[J] + 1
-			if #T >= r then
-				return T
+			table.insert(pool, heroName)
+			poolCountByPos[pos] = poolCountByPos[pos] + 1
+			if #pool >= maxPoolSize then
+				return pool
 			end
 		end
 	end
-	if #T < 6 then
-		T = j.CombineTablesUnique(T, N(D, J))
+	if #pool < 6 then
+		pool = Utils.CombineTablesUnique(pool, buildPositionPool(weightsByHero, pos))
 	end
-	return T
+	return pool
 end
-u = C(n)
-e = { [1] = N(n, 1), [2] = N(n, 2), [3] = N(n, 3), [4] = N(n, 4), [5] = N(n, 5) }
-d = {
-	[1] = e[1][RandomInt(1, #e[1])],
-	[2] = e[2][RandomInt(1, #e[2])],
-	[3] = e[3][RandomInt(1, #e[3])],
-	[4] = e[4][RandomInt(1, #e[4])],
-	[5] = e[5][RandomInt(1, #e[5])],
+allHeroNames = getKeys(heroPosWeights)
+positionHeroPools = {
+	[1] = buildPositionPool(heroPosWeights, 1),
+	[2] = buildPositionPool(heroPosWeights, 2),
+	[3] = buildPositionPool(heroPosWeights, 3),
+	[4] = buildPositionPool(heroPosWeights, 4),
+	[5] = buildPositionPool(heroPosWeights, 5),
 }
-local V = { [1] = LANE_BOT, [2] = LANE_MID, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_BOT }
-local W = { [1] = LANE_TOP, [2] = LANE_MID, [3] = LANE_BOT, [4] = LANE_BOT, [5] = LANE_TOP }
-f = { TEAM_RADIANT = j.Deepcopy(V), TEAM_DIRE = j.Deepcopy(W) }
-local X = { [1] = LANE_MID, [2] = LANE_MID, [3] = LANE_MID, [4] = LANE_MID, [5] = LANE_MID }
-local Y = { [1] = LANE_MID, [2] = LANE_TOP, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_TOP }
+slotHeroes = {
+	[1] = positionHeroPools[1][RandomInt(1, #positionHeroPools[1])],
+	[2] = positionHeroPools[2][RandomInt(1, #positionHeroPools[2])],
+	[3] = positionHeroPools[3][RandomInt(1, #positionHeroPools[3])],
+	[4] = positionHeroPools[4][RandomInt(1, #positionHeroPools[4])],
+	[5] = positionHeroPools[5][RandomInt(1, #positionHeroPools[5])],
+}
+local radiantDefaultLanes = { [1] = LANE_BOT, [2] = LANE_MID, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_BOT }
+local direDefaultLanes = { [1] = LANE_TOP, [2] = LANE_MID, [3] = LANE_BOT, [4] = LANE_BOT, [5] = LANE_TOP }
+laneAssignments = { TEAM_RADIANT = Utils.Deepcopy(radiantDefaultLanes), TEAM_DIRE = Utils.Deepcopy(direDefaultLanes) }
+local allMidLanes = { [1] = LANE_MID, [2] = LANE_MID, [3] = LANE_MID, [4] = LANE_MID, [5] = LANE_MID }
+local oneVsOneLanes = { [1] = LANE_MID, [2] = LANE_TOP, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_TOP }
 -- Resolve which Customize pick list applies to a team.
 -- Debug_Ally/Enemy override Radiant/Dire when that debug list has real hero names.
-local function a_DebugHumanTeam()
-	if j.IsHumanPlayerInTeam(TEAM_RADIANT) then
+local function getDebugHumanTeam()
+	if Utils.IsHumanPlayerInTeam(TEAM_RADIANT) then
 		return TEAM_RADIANT
 	end
-	if j.IsHumanPlayerInTeam(TEAM_DIRE) then
+	if Utils.IsHumanPlayerInTeam(TEAM_DIRE) then
 		return TEAM_DIRE
 	end
 	return TEAM_RADIANT
 end
-local function a_HasForcedHeroNames(list)
+local function hasForcedHeroNames(list)
 	if type(list) ~= "table" then
 		return false
 	end
-	for Z = 1, #list do
-		local U = j.TrimString(list[Z] or "")
-		if U ~= "" and U ~= "Random" then
+	for i = 1, #list do
+		local heroName = Utils.TrimString(list[i] or "")
+		if heroName ~= "" and heroName ~= "Random" then
 			return true
 		end
 	end
 	return false
 end
-local function a_GetForcedPickList(ab)
-	if not p then
+local function getForcedPickList(team)
+	if not CustomLoader then
 		return nil
 	end
-	local allyList = p.Debug_Ally_Heros
-	local enemyList = p.Debug_Enemy_Heros
-	local useAlly = a_HasForcedHeroNames(allyList)
-	local useEnemy = a_HasForcedHeroNames(enemyList)
+	local allyList = CustomLoader.Debug_Ally_Heros
+	local enemyList = CustomLoader.Debug_Enemy_Heros
+	local useAlly = hasForcedHeroNames(allyList)
+	local useEnemy = hasForcedHeroNames(enemyList)
 	if useAlly or useEnemy then
-		local humanTeam = a_DebugHumanTeam()
-		if ab == humanTeam then
+		local humanTeam = getDebugHumanTeam()
+		if team == humanTeam then
 			return useAlly and allyList or nil
 		end
 		return useEnemy and enemyList or nil
 	end
-	if ab == TEAM_RADIANT and p.Radiant_Heros then
-		return p.Radiant_Heros
+	if team == TEAM_RADIANT and CustomLoader.Radiant_Heros then
+		return CustomLoader.Radiant_Heros
 	end
-	if ab == TEAM_DIRE and p.Dire_Heros then
-		return p.Dire_Heros
+	if team == TEAM_DIRE and CustomLoader.Dire_Heros then
+		return CustomLoader.Dire_Heros
 	end
 	return nil
 end
--- forcedSlot[Z] marks a slot whose hero comes from a pick list, not from the random pool.
+-- forcedSlot[slot] marks a slot whose hero comes from a pick list, not from the random pool.
 -- Checked by slot: a "Random" slot whose roll matches a listed hero is still random.
 local forcedSlot = {}
-local function a_ApplyForcedPicks(list)
+local function applyForcedPicks(list)
 	if type(list) ~= "table" then
 		return false
 	end
 	local applied = false
-	for Z = 1, math.min(5, #list) do
-		local U = j.TrimString(list[Z] or "")
-		if U ~= "" and U ~= "Random" and j.HasValue(u, U) then
-			d[Z] = U
-			forcedSlot[Z] = true
+	for slot = 1, math.min(5, #list) do
+		local heroName = Utils.TrimString(list[slot] or "")
+		if heroName ~= "" and heroName ~= "Random" and Utils.HasValue(allHeroNames, heroName) then
+			slotHeroes[slot] = heroName
+			forcedSlot[slot] = true
 			applied = true
 		end
 	end
 	return applied
 end
-local a_ForcedPickList = nil
-local a_HasDebugForcedPicks = false
-if p then
-	a_ForcedPickList = a_GetForcedPickList(GetTeam())
-	a_HasDebugForcedPicks = a_ApplyForcedPicks(a_ForcedPickList)
-		and (
-			a_HasForcedHeroNames(p.Debug_Ally_Heros) or a_HasForcedHeroNames(p.Debug_Enemy_Heros)
-		)
+local forcedPickList = nil
+local hasDebugForcedPicks = false
+if CustomLoader then
+	forcedPickList = getForcedPickList(GetTeam())
+	hasDebugForcedPicks = applyForcedPicks(forcedPickList)
+		and (hasForcedHeroNames(CustomLoader.Debug_Ally_Heros) or hasForcedHeroNames(CustomLoader.Debug_Enemy_Heros))
 end
-function a.IsInCustomizedPicks(I)
-	if not p then
+function HeroSelection.IsInCustomizedPicks(heroName)
+	if not CustomLoader then
 		return false
 	end
-	local _ = a_ForcedPickList or a_GetForcedPickList(GetTeam())
-	if type(_) ~= "table" then
+	local pickList = forcedPickList or getForcedPickList(GetTeam())
+	if type(pickList) ~= "table" then
 		return false
 	end
-	return j.HasValue(_, I)
+	return Utils.HasValue(pickList, heroName)
 end
-function a.ShuffleArray(a0)
-	if type(a0) ~= "table" then
-		error("Expected a table, got " .. type(a0))
+function HeroSelection.ShuffleArray(array)
+	if type(array) ~= "table" then
+		error("Expected a table, got " .. type(array))
 	end
-	local a1 = #a0
-	for Z = a1, 2, -1 do
-		local a2 = RandomInt(1, Z)
-		a0[Z], a0[a2] = a0[a2], a0[Z]
+	local count = #array
+	for i = count, 2, -1 do
+		local swapIndex = RandomInt(1, i)
+		array[i], array[swapIndex] = array[swapIndex], array[i]
 	end
-	return a0
+	return array
 end
-function a.ShufflePickOrder(a3)
-	local a4 = a.ShuffleArray({ 1, 2, 3, 4, 5 })
-	for Z = 1, #a4 do
-		local a5 = a4[Z]
-		if a3[Z] and a3[Z] >= 0 and IsPlayerBot(a3[Z]) and IsPlayerBot(a3[a5]) then
-			d[Z], d[a5] = d[a5], d[Z]
-			forcedSlot[Z], forcedSlot[a5] = forcedSlot[a5], forcedSlot[Z]
-			e[Z], e[a5] = e[a5], e[Z]
-			f["TEAM_RADIANT"][Z], f["TEAM_RADIANT"][a5] = f["TEAM_RADIANT"][a5], f["TEAM_RADIANT"][Z]
-			f["TEAM_DIRE"][Z], f["TEAM_DIRE"][a5] = f["TEAM_DIRE"][a5], f["TEAM_DIRE"][Z]
-			i.RoleAssignment["TEAM_RADIANT"][Z], i.RoleAssignment["TEAM_RADIANT"][a5] =
-				i.RoleAssignment["TEAM_RADIANT"][a5], i.RoleAssignment["TEAM_RADIANT"][Z]
-			i.RoleAssignment["TEAM_DIRE"][Z], i.RoleAssignment["TEAM_DIRE"][a5] =
-				i.RoleAssignment["TEAM_DIRE"][a5], i.RoleAssignment["TEAM_DIRE"][Z]
+function HeroSelection.ShufflePickOrder(teamPlayers)
+	local order = HeroSelection.ShuffleArray({ 1, 2, 3, 4, 5 })
+	for slot = 1, #order do
+		local otherSlot = order[slot]
+		if
+			teamPlayers[slot]
+			and teamPlayers[slot] >= 0
+			and IsPlayerBot(teamPlayers[slot])
+			and IsPlayerBot(teamPlayers[otherSlot])
+		then
+			slotHeroes[slot], slotHeroes[otherSlot] = slotHeroes[otherSlot], slotHeroes[slot]
+			forcedSlot[slot], forcedSlot[otherSlot] = forcedSlot[otherSlot], forcedSlot[slot]
+			positionHeroPools[slot], positionHeroPools[otherSlot] =
+				positionHeroPools[otherSlot], positionHeroPools[slot]
+			laneAssignments["TEAM_RADIANT"][slot], laneAssignments["TEAM_RADIANT"][otherSlot] =
+				laneAssignments["TEAM_RADIANT"][otherSlot], laneAssignments["TEAM_RADIANT"][slot]
+			laneAssignments["TEAM_DIRE"][slot], laneAssignments["TEAM_DIRE"][otherSlot] =
+				laneAssignments["TEAM_DIRE"][otherSlot], laneAssignments["TEAM_DIRE"][slot]
+			Role.RoleAssignment["TEAM_RADIANT"][slot], Role.RoleAssignment["TEAM_RADIANT"][otherSlot] =
+				Role.RoleAssignment["TEAM_RADIANT"][otherSlot], Role.RoleAssignment["TEAM_RADIANT"][slot]
+			Role.RoleAssignment["TEAM_DIRE"][slot], Role.RoleAssignment["TEAM_DIRE"][otherSlot] =
+				Role.RoleAssignment["TEAM_DIRE"][otherSlot], Role.RoleAssignment["TEAM_DIRE"][slot]
 		end
 	end
 end
-if p and p.Ban then
-	c = p.Ban
+if CustomLoader and CustomLoader.Ban then
+	banList = CustomLoader.Ban
 end
-function a.SetChatHeroBan(a6)
-	c[#c + 1] = string.lower(a6)
+function HeroSelection.SetChatHeroBan(heroName)
+	banList[#banList + 1] = string.lower(heroName)
 end
-function a.IsBannedHero(a7)
-	if not a7 then
+function HeroSelection.IsBannedHero(heroName)
+	if not heroName then
 		return true
 	end
-	if (GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM) and IsCMBannedHero(a7) then
+	if (GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM) and IsCMBannedHero(heroName) then
 		return true
 	end
-	local a8 = true
-	if p and p.Strict_Ban_Match ~= nil then
-		a8 = p.Strict_Ban_Match
+	local strictMatch = true
+	if CustomLoader and CustomLoader.Strict_Ban_Match ~= nil then
+		strictMatch = CustomLoader.Strict_Ban_Match
 	end
-	for Z = 1, #c do
-		local a9 = c[Z]
-		if a9 ~= nil then
-			a9 = j.TrimString(string.lower(a9))
-			if string.lower(a7) == a9 then
+	for i = 1, #banList do
+		local bannedName = banList[i]
+		if bannedName ~= nil then
+			bannedName = Utils.TrimString(string.lower(bannedName))
+			if string.lower(heroName) == bannedName then
 				return true
 			end
-			if not a8 then
-				if #a9 >= 6 and string.find(string.lower(a7), a9, 1, true) then
+			if not strictMatch then
+				if #bannedName >= 6 and string.find(string.lower(heroName), bannedName, 1, true) then
 					return true
 				end
 			end
@@ -271,77 +288,77 @@ function a.IsBannedHero(a7)
 	end
 	return false
 end
-local function aa(ab)
-	if p and p.Weak_Hero_Cap ~= nil then
-		return tonumber(p.Weak_Hero_Cap) or s
+local function getWeakHeroCap(team)
+	if CustomLoader and CustomLoader.Weak_Hero_Cap ~= nil then
+		return tonumber(CustomLoader.Weak_Hero_Cap) or defaultWeakHeroCap
 	end
-	return s
+	return defaultWeakHeroCap
 end
-local function ac(ab)
-	local ad = p and p.Weak_Penalty or t
-	local ae = z[ab] or 0
-	local af = math.max(1, aa(ab))
-	local ag = math.min(1.0, ae / af)
-	if ad.type == "linear" then
-		local ah = ad.k ~= nil and tonumber(ad.k) or 0.25
-		local ai = 1.0 - ah * ag
-		if ai < 0 then
-			ai = 0
+local function getWeakHeroPenalty(team)
+	local penaltyConfig = CustomLoader and CustomLoader.Weak_Penalty or defaultWeakPenalty
+	local weakCount = weakHeroPickCount[team] or 0
+	local cap = math.max(1, getWeakHeroCap(team))
+	local capFraction = math.min(1.0, weakCount / cap)
+	if penaltyConfig.type == "linear" then
+		local slope = penaltyConfig.k ~= nil and tonumber(penaltyConfig.k) or 0.25
+		local multiplier = 1.0 - slope * capFraction
+		if multiplier < 0 then
+			multiplier = 0
 		end
-		return ai
-	elseif ad.type == "quad" then
-		local ah = ad.k ~= nil and tonumber(ad.k) or 1.0
-		local ai = (1.0 - ag) ^ 2
-		return ai * ah + 1.0 - ah
-	elseif ad.type == "exp" then
-		local aj = ad.base ~= nil and tonumber(ad.base) or 0.6
-		if aj < 0.05 then
-			aj = 0.05
+		return multiplier
+	elseif penaltyConfig.type == "quad" then
+		local strength = penaltyConfig.k ~= nil and tonumber(penaltyConfig.k) or 1.0
+		local multiplier = (1.0 - capFraction) ^ 2
+		return multiplier * strength + 1.0 - strength
+	elseif penaltyConfig.type == "exp" then
+		local base = penaltyConfig.base ~= nil and tonumber(penaltyConfig.base) or 0.6
+		if base < 0.05 then
+			base = 0.05
 		end
-		if aj > 0.99 then
-			aj = 0.99
+		if base > 0.99 then
+			base = 0.99
 		end
-		return aj ^ ae
+		return base ^ weakCount
 	end
-	return t.base ^ ae
+	return defaultWeakPenalty.base ^ weakCount
 end
-local function ak(a7)
-	for al = 0, 20 do
-		if IsTeamPlayer(al) and GetSelectedHeroName(al) == a7 then
+local function isHeroPicked(heroName)
+	for playerId = 0, 20 do
+		if IsTeamPlayer(playerId) and GetSelectedHeroName(playerId) == heroName then
 			return true
 		end
 	end
 	return false
 end
-local function am(ab, a7)
-	if not j.HasValue(A, a7) then
+local function isWeakHeroCapReached(team, heroName)
+	if not Utils.HasValue(weakHeroes, heroName) then
 		return false
 	end
-	return z[ab] >= aa(ab)
+	return weakHeroPickCount[team] >= getWeakHeroCap(team)
 end
-function a.CanPickHero(ab, a7)
-	if not a7 then
+function HeroSelection.CanPickHero(team, heroName)
+	if not heroName then
 		return false
 	end
-	if a.IsBannedHero(a7) then
+	if HeroSelection.IsBannedHero(heroName) then
 		return false
 	end
-	if am(ab, a7) then
+	if isWeakHeroCapReached(team, heroName) then
 		return false
 	end
-	if p and p.Allow_Repeated_Heroes then
+	if CustomLoader and CustomLoader.Allow_Repeated_Heroes then
 		return true
 	end
-	return not ak(a7)
+	return not isHeroPicked(heroName)
 end
 -- A hero named in either team's pick list is kept for that slot. A random slot that picks
 -- first would otherwise take it, and the listed slot then picked it again (two Techies).
-function a.IsReservedByForcedPick(a7)
-	for G, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
-		local list = a_GetForcedPickList(team)
+function HeroSelection.IsReservedByForcedPick(heroName)
+	for _, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+		local list = getForcedPickList(team)
 		if type(list) == "table" then
-			for Z = 1, math.min(5, #list) do
-				if j.TrimString(list[Z] or "") == a7 then
+			for slot = 1, math.min(5, #list) do
+				if Utils.TrimString(list[slot] or "") == heroName then
 					return true
 				end
 			end
@@ -349,125 +366,125 @@ function a.IsReservedByForcedPick(a7)
 	end
 	return false
 end
-function a.CanPickRandomHero(ab, a7)
-	return a.CanPickHero(ab, a7) and not a.IsReservedByForcedPick(a7)
+function HeroSelection.CanPickRandomHero(team, heroName)
+	return HeroSelection.CanPickHero(team, heroName) and not HeroSelection.IsReservedByForcedPick(heroName)
 end
-function a.GetRandomAvailableHero(ab, an)
-	if type(an) ~= "table" or #an == 0 then
+function HeroSelection.GetRandomAvailableHero(team, heroList)
+	if type(heroList) ~= "table" or #heroList == 0 then
 		return nil
 	end
-	local ao = {}
-	for Z = 1, #an do
-		ao[Z] = an[Z]
+	local shuffled = {}
+	for i = 1, #heroList do
+		shuffled[i] = heroList[i]
 	end
-	a.ShuffleArray(ao)
-	for G, ap in ipairs(ao) do
-		if a.CanPickRandomHero(ab, ap) then
-			return ap
+	HeroSelection.ShuffleArray(shuffled)
+	for _, heroName in ipairs(shuffled) do
+		if HeroSelection.CanPickRandomHero(team, heroName) then
+			return heroName
 		end
 	end
 	return nil
 end
-function a.GetNotRepeatHero(aq)
-	if type(aq) ~= "table" or #aq == 0 then
+function HeroSelection.GetNotRepeatHero(heroList)
+	if type(heroList) ~= "table" or #heroList == 0 then
 		return nil
 	end
-	local ar = a.GetRandomAvailableHero(GetTeam(), aq)
-	return ar or aq[1]
+	local heroName = HeroSelection.GetRandomAvailableHero(GetTeam(), heroList)
+	return heroName or heroList[1]
 end
-function a.IsRepeatHero(a7)
-	if p and p.Allow_Repeated_Heroes then
+function HeroSelection.IsRepeatHero(heroName)
+	if CustomLoader and CustomLoader.Allow_Repeated_Heroes then
 		return false
 	end
-	return ak(a7)
+	return isHeroPicked(heroName)
 end
-function a.SkipPickingWeakHeroes(a7)
-	return am(GetTeam(), a7)
+function HeroSelection.SkipPickingWeakHeroes(heroName)
+	return isWeakHeroCapReached(GetTeam(), heroName)
 end
-function a.IsHumanNotReady(as)
-	if GameTime() > 20 or g then
+function HeroSelection.IsHumanNotReady(team)
+	if GameTime() > 20 or skipHumanWait then
 		return false
 	end
-	local at, au = 0, 0
-	for G, al in pairs(GetTeamPlayers(as)) do
-		if not IsPlayerBot(al) then
-			at = at + 1
-			if GetSelectedHeroName(al) ~= "" then
-				au = au + 1
+	local humanCount, humanPickedCount = 0, 0
+	for _, playerId in pairs(GetTeamPlayers(team)) do
+		if not IsPlayerBot(playerId) then
+			humanCount = humanCount + 1
+			if GetSelectedHeroName(playerId) ~= "" then
+				humanPickedCount = humanPickedCount + 1
 			end
 		end
 	end
-	return au < at
+	return humanPickedCount < humanCount
 end
-function a.GetCurrentTeam(as, av)
-	local aw = {}
-	for Z, al in pairs(GetTeamPlayers(as)) do
-		local ax = GetSelectedHeroName(al)
-		if ax ~= nil and ax ~= "" then
-			if av then
-				table.insert(aw, { name = ax, pos = i.GetBestEffortSuitableRole(ax) })
+function HeroSelection.GetCurrentTeam(team, useBestRole)
+	local currentTeam = {}
+	for slot, playerId in pairs(GetTeamPlayers(team)) do
+		local heroName = GetSelectedHeroName(playerId)
+		if heroName ~= nil and heroName ~= "" then
+			if useBestRole then
+				table.insert(currentTeam, { name = heroName, pos = Role.GetBestEffortSuitableRole(heroName) })
 			else
-				table.insert(aw, { name = ax, pos = i.RoleAssignment[B][Z] })
+				table.insert(currentTeam, { name = heroName, pos = Role.RoleAssignment[ownTeamKey][slot] })
 			end
 		end
 	end
-	return aw
+	return currentTeam
 end
-local ay = { TEAM_RADIANT = false, TEAM_DIRE = false }
-local function az()
-	if GetTeam() == TEAM_RADIANT and not v then
-		for Z, al in pairs(GetTeamPlayers(TEAM_RADIANT)) do
-			local aA = i.RoleAssignment["TEAM_RADIANT"][Z]
-			f.TEAM_RADIANT[Z] = V[aA]
+local pickOrderShuffled = { TEAM_RADIANT = false, TEAM_DIRE = false }
+local function assignLanes()
+	if GetTeam() == TEAM_RADIANT and not radiantLanesSet then
+		for slot, _ in pairs(GetTeamPlayers(TEAM_RADIANT)) do
+			local role = Role.RoleAssignment["TEAM_RADIANT"][slot]
+			laneAssignments.TEAM_RADIANT[slot] = radiantDefaultLanes[role]
 		end
-		v = true
-	elseif GetTeam() == TEAM_DIRE and not w then
-		local aB = 1
-		for Z, al in pairs(GetTeamPlayers(TEAM_DIRE)) do
-			local aA = i.RoleAssignment["TEAM_DIRE"][Z]
-			if not IsPlayerBot(al) then
-				f.TEAM_DIRE[aB] = W[aA]
-				x[Z] = aB
-				aB = aB + 1
+		radiantLanesSet = true
+	elseif GetTeam() == TEAM_DIRE and not direLanesSet then
+		local laneSlot = 1
+		for slot, playerId in pairs(GetTeamPlayers(TEAM_DIRE)) do
+			local role = Role.RoleAssignment["TEAM_DIRE"][slot]
+			if not IsPlayerBot(playerId) then
+				laneAssignments.TEAM_DIRE[laneSlot] = direDefaultLanes[role]
+				direLaneSlot[slot] = laneSlot
+				laneSlot = laneSlot + 1
 			end
 		end
-		for Z, al in pairs(GetTeamPlayers(TEAM_DIRE)) do
-			local aA = i.RoleAssignment["TEAM_DIRE"][Z]
-			if IsPlayerBot(al) then
-				f.TEAM_DIRE[aB] = W[aA]
-				x[Z] = aB
-				aB = aB + 1
+		for slot, playerId in pairs(GetTeamPlayers(TEAM_DIRE)) do
+			local role = Role.RoleAssignment["TEAM_DIRE"][slot]
+			if IsPlayerBot(playerId) then
+				laneAssignments.TEAM_DIRE[laneSlot] = direDefaultLanes[role]
+				direLaneSlot[slot] = laneSlot
+				laneSlot = laneSlot + 1
 			end
 		end
-		w = true
+		direLanesSet = true
 	end
 end
-local function aC()
-	local aD = {}
-	for G, al in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		local aE = GetSelectedHeroName(al)
-		if aE ~= nil and aE ~= "" then
-			table.insert(aD, aE)
+local function getEnemyPicks()
+	local enemyPicks = {}
+	for _, playerId in pairs(GetTeamPlayers(GetOpposingTeam())) do
+		local heroName = GetSelectedHeroName(playerId)
+		if heroName ~= nil and heroName ~= "" then
+			table.insert(enemyPicks, heroName)
 		end
 	end
-	return aD
+	return enemyPicks
 end
-local function aF()
-	local aG = {}
-	for G, al in pairs(GetTeamPlayers(GetTeam())) do
-		local aE = GetSelectedHeroName(al)
-		if aE ~= nil and aE ~= "" then
-			table.insert(aG, aE)
+local function getAllyPicks()
+	local allyPicks = {}
+	for _, playerId in pairs(GetTeamPlayers(GetTeam())) do
+		local heroName = GetSelectedHeroName(playerId)
+		if heroName ~= nil and heroName ~= "" then
+			table.insert(allyPicks, heroName)
 		end
 	end
-	return aG
+	return allyPicks
 end
-local aH = { TEAM_RADIANT = { "1", "2", "3", "4", "5" }, TEAM_DIRE = { "1", "2", "3", "4", "5" } }
+local availablePositions = { TEAM_RADIANT = { "1", "2", "3", "4", "5" }, TEAM_DIRE = { "1", "2", "3", "4", "5" } }
 local function HeroPosWeight(heroName, pos)
 	if heroName == nil or heroName == "" then
 		return 10
 	end
-	local weights = n[heroName]
+	local weights = heroPosWeights[heroName]
 	if weights == nil then
 		return 10
 	end
@@ -490,13 +507,13 @@ end
 local function ApplyLanesFromRoles(teamKey)
 	local radiant = teamKey == "TEAM_RADIANT"
 	for idx = 1, 5 do
-		local role = i.RoleAssignment[teamKey][idx]
+		local role = Role.RoleAssignment[teamKey][idx]
 		if role ~= nil then
 			local lane = LaneForRole(radiant, role)
 			if teamKey == "TEAM_DIRE" then
-				f[teamKey][x[idx] or idx] = lane
+				laneAssignments[teamKey][direLaneSlot[idx] or idx] = lane
 			else
-				f[teamKey][idx] = lane
+				laneAssignments[teamKey][idx] = lane
 			end
 		end
 	end
@@ -508,7 +525,7 @@ local function ReassignBotRoles(teamKey, locked)
 	local players = GetTeamPlayers(teamId)
 	local takenPos = {}
 	for idx, pos in pairs(locked) do
-		i.RoleAssignment[teamKey][idx] = pos
+		Role.RoleAssignment[teamKey][idx] = pos
 		takenPos[pos] = true
 	end
 	local freePos = {}
@@ -518,13 +535,13 @@ local function ReassignBotRoles(teamKey, locked)
 		end
 	end
 	-- Fill core spots before support spots.
-	table.sort(freePos, function(a, b)
-		local ac = a <= 3 and 0 or 1
-		local bc = b <= 3 and 0 or 1
-		if ac ~= bc then
-			return ac < bc
+	table.sort(freePos, function(posA, posB)
+		local groupA = posA <= 3 and 0 or 1
+		local groupB = posB <= 3 and 0 or 1
+		if groupA ~= groupB then
+			return groupA < groupB
 		end
-		return a < b
+		return posA < posB
 	end)
 	local freeBots = {}
 	for idx, pid in pairs(players) do
@@ -558,7 +575,7 @@ local function ReassignBotRoles(teamKey, locked)
 		end
 		if best ~= nil then
 			assigned[best.idx] = true
-			i.RoleAssignment[teamKey][best.idx] = pos
+			Role.RoleAssignment[teamKey][best.idx] = pos
 			log(
 				"Reassign role ok. Team: %s idx: %s hero: %s -> pos %s (score %.0f)",
 				teamKey,
@@ -571,12 +588,12 @@ local function ReassignBotRoles(teamKey, locked)
 	end
 	ApplyLanesFromRoles(teamKey)
 	-- Force GetPosition() to re-read RoleAssignment.
-	i.HeroPositions = {}
+	Role.HeroPositions = {}
 end
 -- Exchange roster slot idx with whoever currently holds newPos. Every other slot stays.
 -- Returns "ok", "same", "human", or "missing".
 local function SwapRoleWithHolder(teamKey, players, idx, newPos)
-	local roles = i.RoleAssignment[teamKey]
+	local roles = Role.RoleAssignment[teamKey]
 	local oldPos = roles[idx]
 	if oldPos == nil then
 		return "missing"
@@ -602,541 +619,551 @@ local function SwapRoleWithHolder(teamKey, players, idx, newPos)
 		roles[holder] = oldPos
 	end
 	ApplyLanesFromRoles(teamKey)
-	i.HeroPositions = {}
-	log(
-		"Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s",
-		teamKey,
-		idx,
-		oldPos,
-		tostring(holder),
-		newPos
-	)
+	Role.HeroPositions = {}
+	log("Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s", teamKey, idx, oldPos, tostring(holder), newPos)
 	return "ok"
 end
-local function aI(ab)
-	local aJ = 0
-	for G, al in pairs(GetTeamPlayers(ab)) do
-		local aE = GetSelectedHeroName(al)
-		if aE and aE ~= "" and j.HasValue(A, aE) then
-			aJ = aJ + 1
+local function countWeakHeroes(team)
+	local count = 0
+	for _, playerId in pairs(GetTeamPlayers(team)) do
+		local heroName = GetSelectedHeroName(playerId)
+		if heroName and heroName ~= "" and Utils.HasValue(weakHeroes, heroName) then
+			count = count + 1
 		end
 	end
-	return aJ
+	return count
 end
-local function aK(al)
-	return GetTeamForPlayer(al)
+local function getTeamOfPlayer(playerId)
+	return GetTeamForPlayer(playerId)
 end
-local function aL(ab, aM, aN, aO)
-	local aP = {}
-	local aQ = ac(ab)
-	local aR = aF()
-	for G, ap in ipairs(aM) do
-		if a.CanPickRandomHero(ab, ap) then
-			local aS = 0
-			if h[ap] then
-				for G, aT in ipairs(aN) do
-					local aU = h[ap][aT]
-					if aU ~= nil then
-						local aV = -1 * aU
-						if aV >= 0 then
-							aS = aS + math.sqrt(aV)
+local function scoreCandidates(team, pool, enemyPicks, pos)
+	local scored = {}
+	local weakPenalty = getWeakHeroPenalty(team)
+	local allyPicks = getAllyPicks()
+	for _, heroName in ipairs(pool) do
+		if HeroSelection.CanPickRandomHero(team, heroName) then
+			local score = 0
+			if MatchupsData[heroName] then
+				for _, enemyHero in ipairs(enemyPicks) do
+					local matchup = MatchupsData[heroName][enemyHero]
+					if matchup ~= nil then
+						local advantage = -1 * matchup
+						if advantage >= 0 then
+							score = score + math.sqrt(advantage)
 						else
-							aS = aS - math.sqrt(math.abs(aV))
+							score = score - math.sqrt(math.abs(advantage))
 						end
 					end
 				end
 			end
-			if h.IsSynergy and #aR > 0 then
-				for G, aW in ipairs(aR) do
-					if aW ~= ap then
-						if h.IsSynergy(ap, aW) then
-							aS = aS + 1.5
+			if MatchupsData.IsSynergy and #allyPicks > 0 then
+				for _, allyHero in ipairs(allyPicks) do
+					if allyHero ~= heroName then
+						if MatchupsData.IsSynergy(heroName, allyHero) then
+							score = score + 1.5
 						end
-						if h.IsCounter and h.IsCounter(aW, ap) then
-							aS = aS - 0.5
+						if MatchupsData.IsCounter and MatchupsData.IsCounter(allyHero, heroName) then
+							score = score - 0.5
 						end
 					end
 				end
 			end
-			if aO and n[ap] then
-				local aX = n[ap][aO] or 50
-				aS = aS * aX / 100
+			if pos and heroPosWeights[heroName] then
+				local posWeight = heroPosWeights[heroName][pos] or 50
+				score = score * posWeight / 100
 			end
-			if j.HasValue(A, ap) then
-				aS = aS * aQ
+			if Utils.HasValue(weakHeroes, heroName) then
+				score = score * weakPenalty
 			end
-			table.insert(aP, { name = ap, score = aS })
+			table.insert(scored, { name = heroName, score = score })
 		end
 	end
-	table.sort(aP, function(R, S)
-		return R.score > S.score
+	table.sort(scored, function(candidateA, candidateB)
+		return candidateA.score > candidateB.score
 	end)
-	return aP
+	return scored
 end
-local function aY(aZ)
-	while #aZ > 5 do
-		table.remove(aZ)
+local function pickWeightedTop5(scored)
+	while #scored > 5 do
+		table.remove(scored)
 	end
-	if #aZ == 0 then
+	if #scored == 0 then
 		return nil
 	end
-	local a_ = { 35, 25, 20, 12, 8 }
-	local b0 = RandomInt(1, 100)
-	local b1 = 0
-	for Z, b2 in ipairs(a_) do
-		b1 = b1 + b2
-		if b0 <= b1 and aZ[Z] then
-			return aZ[Z].name
+	local rankWeights = { 35, 25, 20, 12, 8 }
+	local roll = RandomInt(1, 100)
+	local cumulative = 0
+	for rank, rankWeight in ipairs(rankWeights) do
+		cumulative = cumulative + rankWeight
+		if roll <= cumulative and scored[rank] then
+			return scored[rank].name
 		end
 	end
-	return aZ[1].name
+	return scored[1].name
 end
-local function b3(Z, al)
-	local ab = aK(al)
-	local aM = e[Z]
-	local b4 = d[Z]
-	local ar = b4
-	local forced = forcedSlot[Z] == true
+local function chooseHeroForSlot(slot, playerId)
+	local team = getTeamOfPlayer(playerId)
+	local pool = positionHeroPools[slot]
+	local defaultHero = slotHeroes[slot]
+	local heroName = defaultHero
+	local forced = forcedSlot[slot] == true
 	if not forced and RandomInt(1, 5) >= 1 then
-		local aN = aC()
-		local aZ = aL(ab, aM, aN, Z)
-		local b5 = ab == TEAM_RADIANT and "Radiant" or "Dire"
-		log("==== top 5 heroes for team: %s pos: %s id: %s ====", b5, Z, al)
-		for ah = 1, math.min(5, #aZ) do
-			log("%d: score=%s name=%s", ah, aZ[ah].score, aZ[ah].name)
+		local enemyPicks = getEnemyPicks()
+		local scored = scoreCandidates(team, pool, enemyPicks, slot)
+		local teamName = team == TEAM_RADIANT and "Radiant" or "Dire"
+		log("==== top 5 heroes for team: %s pos: %s id: %s ====", teamName, slot, playerId)
+		for rank = 1, math.min(5, #scored) do
+			log("%d: score=%s name=%s", rank, scored[rank].score, scored[rank].name)
 		end
-		ar = aY(aZ)
-		if not ar then
-			ar = a.GetRandomAvailableHero(ab, aM) or b4
-		end
-	end
-	local b6 = forced and b4 == ar
-	if not b6 then
-		if not a.CanPickRandomHero(ab, ar) then
-			ar = a.GetRandomAvailableHero(ab, aM) or b4
+		heroName = pickWeightedTop5(scored)
+		if not heroName then
+			heroName = HeroSelection.GetRandomAvailableHero(team, pool) or defaultHero
 		end
 	end
-	if j.HasValue(A, ar) then
-		z[ab] = aI(ab)
-		z[ab] = z[ab] + 1
+	local keepForced = forced and defaultHero == heroName
+	if not keepForced then
+		if not HeroSelection.CanPickRandomHero(team, heroName) then
+			heroName = HeroSelection.GetRandomAvailableHero(team, pool) or defaultHero
+		end
 	end
-	return ar
+	if Utils.HasValue(weakHeroes, heroName) then
+		weakHeroPickCount[team] = countWeakHeroes(team)
+		weakHeroPickCount[team] = weakHeroPickCount[team] + 1
+	end
+	return heroName
 end
-local function b7()
-	local a3 = GetTeamPlayers(GetTeam(), true)
+local function pickNextBotHero()
+	local teamPlayers = GetTeamPlayers(GetTeam(), true)
 	-- Keep debug force-pick order stable (pos 1..N as listed).
 	if
-		not ay[B]
-		and not a_HasDebugForcedPicks
-		and not j.IsHumanPlayerInTeam(GetTeam())
+		not pickOrderShuffled[ownTeamKey]
+		and not hasDebugForcedPicks
+		and not Utils.IsHumanPlayerInTeam(GetTeam())
 		and not IsLanMode()
 	then
-		a.ShufflePickOrder(a3)
-		ay[B] = true
-	elseif not ay[B] and a_HasDebugForcedPicks then
-		ay[B] = true
+		HeroSelection.ShufflePickOrder(teamPlayers)
+		pickOrderShuffled[ownTeamKey] = true
+	elseif not pickOrderShuffled[ownTeamKey] and hasDebugForcedPicks then
+		pickOrderShuffled[ownTeamKey] = true
 	end
-	for Z, al in pairs(a3) do
+	for slot, playerId in pairs(teamPlayers) do
 		if
-			IsPlayerBot(al)
-			and GetSelectedHeroName(al) == ""
-			and IsPlayerInHeroSelectionControl(al)
-			and GameTime() >= (b.NextPickAt[Z] or math.huge)
+			IsPlayerBot(playerId)
+			and GetSelectedHeroName(playerId) == ""
+			and IsPlayerInHeroSelectionControl(playerId)
+			and GameTime() >= (pickState.NextPickAt[slot] or math.huge)
 		then
-			local b8 = b3(Z, al)
-			SelectHero(al, b8)
-			b.NextPickAt[Z] = math.huge
+			local heroName = chooseHeroForSlot(slot, playerId)
+			SelectHero(playerId, heroName)
+			pickState.NextPickAt[slot] = math.huge
 			break
 		end
 	end
 end
-local function b9(ba)
-	return string.len(ba) > 3 and ba:sub(1, 1) == "!"
+local function isChatCommand(text)
+	return string.len(text) > 3 and text:sub(1, 1) == "!"
 end
-local function bb(bc)
-	local bd, be = j.TrimString(bc):match("^(%S+)%s+(.*)$")
-	return bd, be
+local function splitCommand(text)
+	local command, rest = Utils.TrimString(text):match("^(%S+)%s+(.*)$")
+	return command, rest
 end
-local bf = false
-local function bg(bh, bi, bj)
-	local bk, bl = bb(bh)
-	if bk == nil then
-		log("[WARN] Invalid command: %s", bh)
+local heroPickedByChat = false
+local function handleChatCommand(text, senderId, teamOnly)
+	local commandWord, commandText = splitCommand(text)
+	if commandWord == nil then
+		log("[WARN] Invalid command: %s", text)
 		return
 	end
-	local a3 = GetTeamPlayers(GetTeam())
-	if (a3 == nil or #a3 == 0) and bi ~= nil then
-		local bm = GetTeamForPlayer(bi)
-		if bm ~= nil then
-			a3 = GetTeamPlayers(bm) or {}
+	local teamPlayers = GetTeamPlayers(GetTeam())
+	if (teamPlayers == nil or #teamPlayers == 0) and senderId ~= nil then
+		local playerTeam = GetTeamForPlayer(senderId)
+		if playerTeam ~= nil then
+			teamPlayers = GetTeamPlayers(playerTeam) or {}
 		end
-		if #a3 == 0 then
-			local bn = {}
-			for Z = 1, 5 do
-				local bo = GetTeamMember(Z)
-				if bo ~= nil then
-					local bp = bo:GetPlayerID()
-					if bp ~= nil then
-						bn[Z] = bp
+		if #teamPlayers == 0 then
+			local roster = {}
+			for i = 1, 5 do
+				local member = GetTeamMember(i)
+				if member ~= nil then
+					local memberPlayerId = member:GetPlayerID()
+					if memberPlayerId ~= nil then
+						roster[i] = memberPlayerId
 					end
 				end
 			end
-			if #bn > 0 then
-				a3 = bn
+			if #roster > 0 then
+				teamPlayers = roster
 			end
 		end
-		if #a3 == 0 and bm ~= nil then
-			local bn = {}
-			local bq = {}
-			for bp = 0, 63 do
-				local br = GetTeamForPlayer(bp)
-				local bs = false
+		if #teamPlayers == 0 and playerTeam ~= nil then
+			local roster = {}
+			local seen = {}
+			for scanPlayerId = 0, 63 do
+				local pidTeam = GetTeamForPlayer(scanPlayerId)
+				local inSelection = false
 				pcall(function()
-					bs = IsPlayerInHeroSelectionControl(bp)
+					inSelection = IsPlayerInHeroSelectionControl(scanPlayerId)
 				end)
-				local bt = false
+				local isBot = false
 				pcall(function()
-					bt = IsPlayerBot(bp)
+					isBot = IsPlayerBot(scanPlayerId)
 				end)
-				if (bs or bt or br == bm) and not bq[bp] then
-					bq[bp] = true
-					bn[#bn + 1] = bp
+				if (inSelection or isBot or pidTeam == playerTeam) and not seen[scanPlayerId] then
+					seen[scanPlayerId] = true
+					roster[#roster + 1] = scanPlayerId
 				end
 			end
-			if #bn > 0 then
-				a3 = bn
+			if #roster > 0 then
+				teamPlayers = roster
 				log(
 					"[CHAT] roster rebuilt by PID scan (#%s): first=[%s,%s,%s,%s,%s]",
-					tostring(#bn),
-					tostring(bn[1]),
-					tostring(bn[2]),
-					tostring(bn[3]),
-					tostring(bn[4]),
-					tostring(bn[5])
+					tostring(#roster),
+					tostring(roster[1]),
+					tostring(roster[2]),
+					tostring(roster[3]),
+					tostring(roster[4]),
+					tostring(roster[5])
 				)
 			end
 		end
 	end
-	log("Handling command starting with: %s, text: %s", bk, bl)
-	local bu = {}
-	for bc in bh:gmatch("[^;]+") do
-		table.insert(bu, bc:match("^%s*(.-)%s*$"))
+	log("Handling command starting with: %s, text: %s", commandWord, commandText)
+	local commands = {}
+	for command in text:gmatch("[^;]+") do
+		table.insert(commands, command:match("^%s*(.-)%s*$"))
 	end
-	for G, bc in ipairs(bu) do
-		local bv, bw = bc:match("(!%w+)%s*(.*)")
-		if bv == "!pick" and GetGameMode() ~= GAMEMODE_CM and GetGameMode() ~= GAMEMODE_REVERSE_CM then
-			log("Picking hero %s, is-for-ally: %s", bw, bj)
-			local U = GetHumanChatHero(bw)
-			log("Actual picking hero %s ", U)
-			if U ~= "" then
-				if not a.CanPickHero(GetTeam(), U) then
-					log("Hero %s cannot be picked now (banned/repeat/weakcap)", U)
+	for _, command in ipairs(commands) do
+		local action, argument = command:match("(!%w+)%s*(.*)")
+		if action == "!pick" and GetGameMode() ~= GAMEMODE_CM and GetGameMode() ~= GAMEMODE_REVERSE_CM then
+			log("Picking hero %s, is-for-ally: %s", argument, teamOnly)
+			local heroName = GetHumanChatHero(argument)
+			log("Actual picking hero %s ", heroName)
+			if heroName ~= "" then
+				if not HeroSelection.CanPickHero(GetTeam(), heroName) then
+					log("Hero %s cannot be picked now (banned/repeat/weakcap)", heroName)
 					return
 				end
-				local bx = bj == true or bj == false and GetTeamForPlayer(bi) ~= GetTeam()
-				if bx then
-					for G, al in pairs(a3) do
-						if IsPlayerBot(al) and IsPlayerInHeroSelectionControl(al) and GetSelectedHeroName(al) == "" then
-							SelectHero(al, U)
-							if j.HasValue(A, U) then
-								z[GetTeam()] = z[GetTeam()] + 1
+				local pickForAlly = teamOnly == true or teamOnly == false and GetTeamForPlayer(senderId) ~= GetTeam()
+				if pickForAlly then
+					for _, playerId in pairs(teamPlayers) do
+						if
+							IsPlayerBot(playerId)
+							and IsPlayerInHeroSelectionControl(playerId)
+							and GetSelectedHeroName(playerId) == ""
+						then
+							SelectHero(playerId, heroName)
+							if Utils.HasValue(weakHeroes, heroName) then
+								weakHeroPickCount[GetTeam()] = weakHeroPickCount[GetTeam()] + 1
 							end
 							break
 						end
 					end
 				end
-				bf = true
+				heroPickedByChat = true
 			else
 				log(
 					"Hero name not found or not supported! See: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71"
 				)
 			end
-		elseif bv == "!ban" and GetGameState() == GAME_STATE_HERO_SELECTION then
-			log("Banning hero %s", bw)
-			local U = GetHumanChatHero(bw)
-			if U ~= "" then
-				if ak(U) then
-					log("Hero  %s has already been picked", U)
+		elseif action == "!ban" and GetGameState() == GAME_STATE_HERO_SELECTION then
+			log("Banning hero %s", argument)
+			local heroName = GetHumanChatHero(argument)
+			if heroName ~= "" then
+				if isHeroPicked(heroName) then
+					log("Hero  %s has already been picked", heroName)
 					return
 				end
-				a.SetChatHeroBan(U)
-				log("Banned hero %s. Banned list:", U)
-				j.PrintTable(c)
+				HeroSelection.SetChatHeroBan(heroName)
+				log("Banned hero %s. Banned list:", heroName)
+				Utils.PrintTable(banList)
 			else
 				log(
 					"Hero name not found or not supported! See: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71"
 				)
 			end
-		elseif bv == "!pos" and GetGameState() == GAME_STATE_PRE_GAME then
-			log("Selecting pos %s", bw)
-			local by = GetTeamForPlayer(bi) == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
-			local bz = aH[by]
-			if j.HasValue(bz, bw) then
-				local aA = tonumber(bw)
-				local bA = bi + 1
-				for bB, al in pairs(a3) do
-					if al == bi then
-						bA = bB
+		elseif action == "!pos" and GetGameState() == GAME_STATE_PRE_GAME then
+			log("Selecting pos %s", argument)
+			local teamKey = GetTeamForPlayer(senderId) == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
+			local positions = availablePositions[teamKey]
+			if Utils.HasValue(positions, argument) then
+				local position = tonumber(argument)
+				local requesterIndex = senderId + 1
+				for index, playerId in pairs(teamPlayers) do
+					if playerId == senderId then
+						requesterIndex = index
 					end
 				end
 				local ownerIsBot = false
-				for aB, al in pairs(a3) do
-					if i.RoleAssignment[by][aB] == aA then
-						ownerIsBot = IsPlayerBot(al)
+				for index, playerId in pairs(teamPlayers) do
+					if Role.RoleAssignment[teamKey][index] == position then
+						ownerIsBot = IsPlayerBot(playerId)
 						break
 					end
 				end
-				if not ownerIsBot and i.RoleAssignment[by][bA] ~= aA then
+				if not ownerIsBot and Role.RoleAssignment[teamKey][requesterIndex] ~= position then
 					log("Switch role failed: target role belongs to human.")
 				else
 					local locked = {}
 					-- Lock every human on this team; requester takes the chosen pos.
-					for idx, pid in pairs(a3) do
+					for idx, pid in pairs(teamPlayers) do
 						if idx <= 5 and not IsPlayerBot(pid) then
-							if pid == bi then
-								locked[idx] = aA
-							elseif i.RoleAssignment[by][idx] ~= aA then
-								locked[idx] = i.RoleAssignment[by][idx]
+							if pid == senderId then
+								locked[idx] = position
+							elseif Role.RoleAssignment[teamKey][idx] ~= position then
+								locked[idx] = Role.RoleAssignment[teamKey][idx]
 							end
 						end
 					end
-					locked[bA] = aA
-					ReassignBotRoles(by, locked)
+					locked[requesterIndex] = position
+					ReassignBotRoles(teamKey, locked)
 					log(
 						"Switch role ok (role-aware). Team: %s PID: %s, idx: %s, new role: %s",
-						by,
-						bi,
-						bA,
-						i.RoleAssignment[by][bA]
+						teamKey,
+						senderId,
+						requesterIndex,
+						Role.RoleAssignment[teamKey][requesterIndex]
 					)
 				end
 			else
-				log("Cannot select pos: %s (not available).", bw)
+				log("Cannot select pos: %s (not available).", argument)
 			end
-		elseif bv:match("^!(%d+)pos$") ~= nil and GetGameState() == GAME_STATE_PRE_GAME then
-			local bE, bF = bh:match("^!(%d+)pos (%d+)$")
-			if bE and bF then
-				log("Swap position for #%s to play pos %s", bE, bF)
+		elseif action:match("^!(%d+)pos$") ~= nil and GetGameState() == GAME_STATE_PRE_GAME then
+			local botIndexText, positionText = text:match("^!(%d+)pos (%d+)$")
+			if botIndexText and positionText then
+				log("Swap position for #%s to play pos %s", botIndexText, positionText)
 			else
 				log("Invalid command format for swapping pos")
 				return
 			end
-			local by = GetTeamForPlayer(bi) == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
-			local bz = aH[by]
-			if j.HasValue(bz, bF) then
-				local aA = tonumber(bF)
-				local bA = tonumber(bE)
-				if bA == nil or bA < 1 or bA > 5 then
+			local teamKey = GetTeamForPlayer(senderId) == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
+			local positions = availablePositions[teamKey]
+			if Utils.HasValue(positions, positionText) then
+				local position = tonumber(positionText)
+				local botIndex = tonumber(botIndexText)
+				if botIndex == nil or botIndex < 1 or botIndex > 5 then
 					log("Invalid bot index for !Npos")
 					return
 				end
-				local targetPid = a3[bA]
+				local targetPid = teamPlayers[botIndex]
 				local targetHero = targetPid and GetSelectedHeroName(targetPid) or ""
 				-- Don't force a core hero onto 4/5. Leave the roster as it is.
-				if aA >= 4 and IsCorePreferredHero(targetHero) then
-					log(
-						"Refuse !%spos %s: %s is a core hero",
-						bE,
-						bF,
-						targetHero
-					)
+				if position >= 4 and IsCorePreferredHero(targetHero) then
+					log("Refuse !%spos %s: %s is a core hero", botIndexText, positionText, targetHero)
 				else
-					local swapped = SwapRoleWithHolder(by, a3, bA, aA)
+					local swapped = SwapRoleWithHolder(teamKey, teamPlayers, botIndex, position)
 					if swapped == "human" then
 						log("Switch role failed: target role belongs to human.")
 					elseif swapped == "same" then
-						log("Switch role skipped: idx %s already pos %s", bA, aA)
+						log("Switch role skipped: idx %s already pos %s", botIndex, position)
 					elseif swapped == "missing" then
-						log("Switch role failed: idx %s has no role", bA)
+						log("Switch role failed: idx %s has no role", botIndex)
 					end
 				end
 			else
-				log("Cannot select pos: %s (not available).", bF)
+				log("Cannot select pos: %s (not available).", positionText)
 			end
-		elseif bv == "!sp" or bv == "!speak" then
-			HandleLocaleSetting(bw)
+		elseif action == "!sp" or action == "!speak" then
+			HandleLocaleSetting(argument)
 		else
-			log("Unknown action: %s, command text: %s", bv, bh)
+			log("Unknown action: %s, command text: %s", action, text)
 		end
 	end
 end
-function HandleLocaleSetting(bG)
-	p.Localization = bG
-	log("Set to speak: %s", bG)
+function HandleLocaleSetting(locale)
+	CustomLoader.Localization = locale
+	log("Set to speak: %s", locale)
 end
-local function bH()
-	if b.initialized then
+local function initPickTimes()
+	if pickState.initialized then
 		return
 	end
-	if GameTime() < 3.0 and not g or a.IsHumanNotReady(GetTeam()) or a.IsHumanNotReady(GetOpposingTeam()) then
+	if
+		GameTime() < 3.0 and not skipHumanWait
+		or HeroSelection.IsHumanNotReady(GetTeam())
+		or HeroSelection.IsHumanNotReady(GetOpposingTeam())
+	then
 		return
 	end
-	local aj = GameTime() + 3
-	local bI = GetTeam() * 3
-	local bJ, bK = 1, 3
-	local a3 = GetTeamPlayers(GetTeam(), true)
-	for bL = 1, #a3 do
-		local bM = RandomFloat(bJ, bK)
-		b.NextPickAt[bL] = aj + (bL - 1) * bI + bM
+	local startTime = GameTime() + 3
+	local slotDelay = GetTeam() * 3
+	local minJitter, maxJitter = 1, 3
+	local teamPlayers = GetTeamPlayers(GetTeam(), true)
+	for slot = 1, #teamPlayers do
+		local jitter = RandomFloat(minJitter, maxJitter)
+		pickState.NextPickAt[slot] = startTime + (slot - 1) * slotDelay + jitter
 	end
-	b.initialized = true
+	pickState.initialized = true
 end
 function Think()
 	MatchTrace.MatchMarker("start", "mode=" .. tostring(GetGameMode()))
 	if GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM then
-		l.CaptainModeLogic(u)
-		l.AddToList()
+		CaptainMode.CaptainModeLogic(allHeroNames)
+		CaptainMode.AddToList()
 	elseif GetGameMode() == GAMEMODE_1V1MID then
 		OneVsOneLogic()
 	else
-		if GameTime() < 3.0 and not g or a.IsHumanNotReady(GetTeam()) or a.IsHumanNotReady(GetOpposingTeam()) then
+		if
+			GameTime() < 3.0 and not skipHumanWait
+			or HeroSelection.IsHumanNotReady(GetTeam())
+			or HeroSelection.IsHumanNotReady(GetOpposingTeam())
+		then
 			if GetGameMode() ~= GAMEMODE_TURBO then
 				return
 			end
 		end
-		bH()
-		if not b.initialized then
+		initPickTimes()
+		if not pickState.initialized then
 			return
 		end
-		b7()
+		pickNextBotHero()
 	end
 end
-function GetHumanChatHero(I)
-	if I == nil then
+function GetHumanChatHero(heroQuery)
+	if heroQuery == nil then
 		return ""
 	end
-	I = I:lower()
-	for G, U in pairs(u) do
-		if o["en"][U]:lower() == I then
-			log("Found hero %s for %s", U, I)
-			return U
+	heroQuery = heroQuery:lower()
+	for _, heroName in pairs(allHeroNames) do
+		if HeroDisplayNames["en"][heroName]:lower() == heroQuery then
+			log("Found hero %s for %s", heroName, heroQuery)
+			return heroName
 		end
 	end
-	for G, U in pairs(u) do
-		if string.find(U, I) then
-			log("Found hero %s for %s", U, I)
-			return U
+	for _, heroName in pairs(allHeroNames) do
+		if string.find(heroName, heroQuery) then
+			log("Found hero %s for %s", heroName, heroQuery)
+			return heroName
 		end
 	end
-	log("Hero not supported with name: %s", I)
+	log("Hero not supported with name: %s", heroQuery)
 	return ""
 end
-function SelectHeroChatCallback(bi, bN, bj)
-	local bO = string.lower(bN)
-	if GetGameState() == GAME_STATE_HERO_SELECTION and string.len(bN) == 2 then
-		if m.Supported(bN) then
-			HandleLocaleSetting(bN)
+function SelectHeroChatCallback(senderId, text, teamOnly)
+	local lowerText = string.lower(text)
+	if GetGameState() == GAME_STATE_HERO_SELECTION and string.len(text) == 2 then
+		if Localization.Supported(text) then
+			HandleLocaleSetting(text)
 		end
 	end
-	if b9(bO) then
-		bg(bO, bi, bj)
+	if isChatCommand(lowerText) then
+		handleChatCommand(lowerText, senderId, teamOnly)
 	end
 end
-local bP = { Radiant = {}, Dire = {} }
-if p then
-	for Z = 1, #p.Radiant_Names do
-		if p.Radiant_Names[Z] ~= nil then
-			bP.Radiant[Z] = j.TrimString(p.Radiant_Names[Z])
+local customBotNames = { Radiant = {}, Dire = {} }
+if CustomLoader then
+	for i = 1, #CustomLoader.Radiant_Names do
+		if CustomLoader.Radiant_Names[i] ~= nil then
+			customBotNames.Radiant[i] = Utils.TrimString(CustomLoader.Radiant_Names[i])
 		end
 	end
-	for Z = 1, #p.Dire_Names do
-		if p.Dire_Names[Z] ~= nil then
-			bP.Dire[Z] = j.TrimString(p.Dire_Names[Z])
+	for i = 1, #CustomLoader.Dire_Names do
+		if CustomLoader.Dire_Names[i] ~= nil then
+			customBotNames.Dire[i] = Utils.TrimString(CustomLoader.Dire_Names[i])
 		end
 	end
 end
-local bQ = k.generateTeams(bP)
+local botNames = TeamNames.generateTeams(customBotNames)
 function GetBotNames()
-	return GetTeam() == TEAM_RADIANT and bQ.Radiant or bQ.Dire
+	return GetTeam() == TEAM_RADIANT and botNames.Radiant or botNames.Dire
 end
-local bR = false
+local chatCallbackInstalled = false
 function UpdateLaneAssignments()
-	local ab = GetTeam() == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
+	local teamKey = GetTeam() == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
 	if GetGameMode() == GAMEMODE_MO then
-		i.RoleAssignment[ab] = { 2, 2, 2, 2, 2 }
-		return X
+		Role.RoleAssignment[teamKey] = { 2, 2, 2, 2, 2 }
+		return allMidLanes
 	end
 	if GetGameMode() == GAMEMODE_1V1MID then
-		return Y
+		return oneVsOneLanes
 	end
 	if GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM then
-		f[ab] = l.CMLaneAssignment(i.RoleAssignment, bf)
+		laneAssignments[teamKey] = CaptainMode.CMLaneAssignment(Role.RoleAssignment, heroPickedByChat)
 	end
 	if
-		not bR
+		not chatCallbackInstalled
 		and (
 			GetGameState() == GAME_STATE_HERO_SELECTION
 			or GetGameState() == GAME_STATE_STRATEGY_TIME
 			or GetGameState() == GAME_STATE_PRE_GAME
 		)
 	then
-		InstallChatCallback(function(bS)
-			SelectHeroChatCallback(bS.player_id, bS.string, bS.team_only)
+		InstallChatCallback(function(event)
+			SelectHeroChatCallback(event.player_id, event.string, event.team_only)
 		end)
-		bR = true
+		chatCallbackInstalled = true
 	end
-	az()
-	return f[ab]
+	assignLanes()
+	return laneAssignments[teamKey]
 end
-function AlignLanesBasedOnRoles(ab)
-	for bB, bT in pairs(i.RoleAssignment[ab]) do
-		if bT == 1 or bT == 5 then
+function AlignLanesBasedOnRoles(teamKey)
+	for index, role in pairs(Role.RoleAssignment[teamKey]) do
+		if role == 1 or role == 5 then
 			if GetTeam() == TEAM_RADIANT then
-				f[ab][bB] = LANE_BOT
+				laneAssignments[teamKey][index] = LANE_BOT
 			else
-				f[ab][bB] = LANE_TOP
+				laneAssignments[teamKey][index] = LANE_TOP
 			end
-		elseif bT == 2 then
-			f[ab][bB] = LANE_MID
-		elseif bT == 3 or bT == 4 then
+		elseif role == 2 then
+			laneAssignments[teamKey][index] = LANE_MID
+		elseif role == 3 or role == 4 then
 			if GetTeam() == TEAM_RADIANT then
-				f[ab][bB] = LANE_TOP
+				laneAssignments[teamKey][index] = LANE_TOP
 			else
-				f[ab][bB] = LANE_BOT
+				laneAssignments[teamKey][index] = LANE_BOT
 			end
 		end
 	end
 end
-local bU = false
+local oneVsOnePicked = false
 function OneVsOneLogic()
-	local U
-	if j.IsHumanPlayerInTeam(GetTeam()) then
-		bU = true
+	local heroName
+	if Utils.IsHumanPlayerInTeam(GetTeam()) then
+		oneVsOnePicked = true
 	end
-	for G, Z in pairs(GetTeamPlayers(GetTeam())) do
-		if not bU and IsPlayerBot(Z) and IsPlayerInHeroSelectionControl(Z) and GetSelectedHeroName(Z) == "" then
-			if j.IsHumanPlayerInAnyTeam() then
-				U = GetSelectedHumanHero(GetOpposingTeam())
+	for _, playerId in pairs(GetTeamPlayers(GetTeam())) do
+		if
+			not oneVsOnePicked
+			and IsPlayerBot(playerId)
+			and IsPlayerInHeroSelectionControl(playerId)
+			and GetSelectedHeroName(playerId) == ""
+		then
+			if Utils.IsHumanPlayerInAnyTeam() then
+				heroName = GetSelectedHumanHero(GetOpposingTeam())
 			else
-				U = a.GetRandomAvailableHero(GetTeam(), e[2]) or d[2]
+				heroName = HeroSelection.GetRandomAvailableHero(GetTeam(), positionHeroPools[2]) or slotHeroes[2]
 			end
-			if U ~= nil then
-				SelectHero(Z, U)
-				bU = true
-				if j.HasValue(A, U) then
-					z[GetTeam()] = z[GetTeam()] + 1
+			if heroName ~= nil then
+				SelectHero(playerId, heroName)
+				oneVsOnePicked = true
+				if Utils.HasValue(weakHeroes, heroName) then
+					weakHeroPickCount[GetTeam()] = weakHeroPickCount[GetTeam()] + 1
 				end
 			end
 			return
-		elseif bU and IsPlayerBot(Z) and IsPlayerInHeroSelectionControl(Z) and GetSelectedHeroName(Z) == "" then
-			local bV = "npc_dota_hero_techies"
-			if a.CanPickHero(GetTeam(), bV) then
-				SelectHero(Z, bV)
+		elseif
+			oneVsOnePicked
+			and IsPlayerBot(playerId)
+			and IsPlayerInHeroSelectionControl(playerId)
+			and GetSelectedHeroName(playerId) == ""
+		then
+			local fallbackHero = "npc_dota_hero_techies"
+			if HeroSelection.CanPickHero(GetTeam(), fallbackHero) then
+				SelectHero(playerId, fallbackHero)
 			else
-				local bW = a.GetRandomAvailableHero(GetTeam(), e[2]) or d[2]
-				SelectHero(Z, bW)
-				if j.HasValue(A, bW) then
-					z[GetTeam()] = z[GetTeam()] + 1
+				local heroName = HeroSelection.GetRandomAvailableHero(GetTeam(), positionHeroPools[2]) or slotHeroes[2]
+				SelectHero(playerId, heroName)
+				if Utils.HasValue(weakHeroes, heroName) then
+					weakHeroPickCount[GetTeam()] = weakHeroPickCount[GetTeam()] + 1
 				end
 			end
 			return
 		end
 	end
 end
-function GetSelectedHumanHero(ab)
-	for G, al in pairs(GetTeamPlayers(ab)) do
-		if not IsPlayerBot(al) and GetSelectedHeroName(al) ~= "" then
-			return GetSelectedHeroName(al)
+function GetSelectedHumanHero(team)
+	for _, playerId in pairs(GetTeamPlayers(team)) do
+		if not IsPlayerBot(playerId) and GetSelectedHeroName(playerId) ~= "" then
+			return GetSelectedHeroName(playerId)
 		end
 	end
 end
@@ -1151,18 +1178,18 @@ local function OHA_Trap(name, fn, fallback)
 		return fn
 	end
 	return function(...)
-		local res = { pcall(fn, ...) }
-		if res[1] then
-			return unpack(res, 2)
+		local results = { pcall(fn, ...) }
+		if results[1] then
+			return unpack(results, 2)
 		end
-		local n = (OHA_TRAP_COUNT[name] or 0) + 1
-		OHA_TRAP_COUNT[name] = n
-		if n <= 3 then
+		local trapCount = (OHA_TRAP_COUNT[name] or 0) + 1
+		OHA_TRAP_COUNT[name] = trapCount
+		if trapCount <= 3 then
 			local hero = "?"
 			pcall(function()
 				hero = GetBot():GetUnitName()
 			end)
-			pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(res[2])))
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(results[2])))
 		end
 		return fallback
 	end

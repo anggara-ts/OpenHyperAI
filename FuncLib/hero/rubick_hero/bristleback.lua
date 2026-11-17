@@ -1,226 +1,251 @@
 -- How Rubick plays after stealing a spell from Bristleback.
-local a = GetBot()
-local b = {}
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d
-local e
-local f
-local g
-local h
-local i, j, k
-function b.ConsiderStolenSpell(l)
-	a = GetBot()
-	if c.CanNotUseAbility(a) then
+local bot = GetBot()
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local viscousNasalGooAbility
+local quillSprayAbility
+local hairballAbility
+local bristlebackAbility
+local botTarget
+local mpRatio, botLevel, nearbyEnemies
+function X.ConsiderStolenSpell(ability)
+	bot = GetBot()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	h = c.GetProperTarget(a)
-	local m = l:GetName()
-	i = a:GetMana() / a:GetMaxMana()
-	j = a:GetLevel()
-	k = c.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
-	if m == "bristleback_hairball" then
-		f = l
-		HairBallDesire, HairBallLocation = b.ConsiderHairBall()
+	botTarget = Fu.GetProperTarget(bot)
+	local abilityName = ability:GetName()
+	mpRatio = bot:GetMana() / bot:GetMaxMana()
+	botLevel = bot:GetLevel()
+	nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+	if abilityName == "bristleback_hairball" then
+		hairballAbility = ability
+		HairBallDesire, HairBallLocation = X.ConsiderHairBall()
 		if HairBallDesire > 0 then
-			a:Action_UseAbilityOnLocation(f, HairBallLocation)
+			bot:Action_UseAbilityOnLocation(hairballAbility, HairBallLocation)
 			return
 		end
 	end
-	if m == "bristleback_bristleback" then
-		g = l
-		BristlebackDesire, BristlebackLocation = b.ConsiderBristleback()
+	if abilityName == "bristleback_bristleback" then
+		bristlebackAbility = ability
+		BristlebackDesire, BristlebackLocation = X.ConsiderBristleback()
 		if BristlebackDesire > 0 then
-			a:Action_UseAbilityOnLocation(g, BristlebackLocation)
+			bot:Action_UseAbilityOnLocation(bristlebackAbility, BristlebackLocation)
 			return
 		end
 	end
-	if m == "bristleback_viscous_nasal_goo" then
-		d = l
-		ViscousNasalGooDesire, ViscousNasalGooTarget = b.ConsiderViscousNasalGoo()
+	if abilityName == "bristleback_viscous_nasal_goo" then
+		viscousNasalGooAbility = ability
+		ViscousNasalGooDesire, ViscousNasalGooTarget = X.ConsiderViscousNasalGoo()
 		if ViscousNasalGooDesire > 0 then
-			a:Action_UseAbilityOnEntity(d, ViscousNasalGooTarget)
+			bot:Action_UseAbilityOnEntity(viscousNasalGooAbility, ViscousNasalGooTarget)
 			return
 		end
 	end
-	if m == "bristleback_quill_spray" then
-		e = l
-		QuillSprayDesire = b.ConsiderQuillSpray()
+	if abilityName == "bristleback_quill_spray" then
+		quillSprayAbility = ability
+		QuillSprayDesire = X.ConsiderQuillSpray()
 		if QuillSprayDesire > 0 then
-			a:Action_UseAbility(e)
+			bot:Action_UseAbility(quillSprayAbility)
 			return
 		end
 	end
 end
-function b.ConsiderViscousNasalGoo()
-	if not d:IsFullyCastable() then
+function X.ConsiderViscousNasalGoo()
+	if not viscousNasalGooAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local n = d:GetSpecialValueInt("radius_scepter")
-	local o = c.GetProperCastRange(false, a, d:GetCastRange())
-	local p = d:GetManaCost()
-	local q = c.GetNearbyHeroes(a, n, true, BOT_MODE_NONE)
-	local r = c.GetNearbyHeroes(a, 800, true, BOT_MODE_NONE)
-	if c.IsRetreating(a) then
-		local s = q[1]
-		if c.IsValid(s) then
-			if a:HasScepter() then
-				return BOT_ACTION_DESIRE_LOW, s
+	local scepterRadius = viscousNasalGooAbility:GetSpecialValueInt("radius_scepter")
+	local castRange = Fu.GetProperCastRange(false, bot, viscousNasalGooAbility:GetCastRange())
+	local manaCost = viscousNasalGooAbility:GetManaCost()
+	local enemiesInScepterRadius = Fu.GetNearbyHeroes(bot, scepterRadius, true, BOT_MODE_NONE)
+	local closeEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) then
+		local nearestEnemy = enemiesInScepterRadius[1]
+		if Fu.IsValid(nearestEnemy) then
+			if bot:HasScepter() then
+				return BOT_ACTION_DESIRE_LOW, nearestEnemy
 			end
 			if
-				c.CanCastOnNonMagicImmune(s)
-				and c.CanCastOnTargetAdvanced(s)
-				and (a:IsFacingLocation(s:GetLocation(), 10) or #r <= 1)
-				and (a:WasRecentlyDamagedByHero(s, 2.0) or j >= 10)
+				Fu.CanCastOnNonMagicImmune(nearestEnemy)
+				and Fu.CanCastOnTargetAdvanced(nearestEnemy)
+				and (bot:IsFacingLocation(nearestEnemy:GetLocation(), 10) or #closeEnemies <= 1)
+				and (bot:WasRecentlyDamagedByHero(nearestEnemy, 2.0) or botLevel >= 10)
 			then
-				return BOT_ACTION_DESIRE_LOW, s
+				return BOT_ACTION_DESIRE_LOW, nearestEnemy
 			end
 		end
 	end
-	if a:GetActiveMode() == BOT_MODE_ROSHAN then
-		if c.IsRoshan(h) and c.CanCastOnMagicImmune(h) and c.IsInRange(h, a, o) then
-			return BOT_ACTION_DESIRE_LOW, h
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
+			return BOT_ACTION_DESIRE_LOW, botTarget
 		end
 	end
-	if c.IsInTeamFight(a, 1400) and a:HasScepter() then
-		if q ~= nil and #q >= 1 and c.IsValidHero(q[1]) and c.CanCastOnNonMagicImmune(q[1]) then
-			return BOT_ACTION_DESIRE_HIGH, q[1]
+	if Fu.IsInTeamFight(bot, 1400) and bot:HasScepter() then
+		if
+			enemiesInScepterRadius ~= nil
+			and #enemiesInScepterRadius >= 1
+			and Fu.IsValidHero(enemiesInScepterRadius[1])
+			and Fu.CanCastOnNonMagicImmune(enemiesInScepterRadius[1])
+		then
+			return BOT_ACTION_DESIRE_HIGH, enemiesInScepterRadius[1]
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(h)
-			and c.CanCastOnNonMagicImmune(h)
-			and c.IsInRange(h, a, n)
-			and c.CanCastOnTargetAdvanced(h)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, scepterRadius)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
 		then
-			return BOT_ACTION_DESIRE_ABSOLUTE, h
+			return BOT_ACTION_DESIRE_ABSOLUTE, botTarget
 		end
 		if
-			c.IsValid(h)
-			and #k == 0
-			and c.IsAllowedToSpam(a, p)
-			and c.CanCastOnNonMagicImmune(h)
-			and c.CanCastOnTargetAdvanced(h)
-			and c.IsInRange(h, a, n)
-			and not c.CanKillTarget(h, a:GetAttackDamage() * 1.68, DAMAGE_TYPE_PHYSICAL)
+			Fu.IsValid(botTarget)
+			and #nearbyEnemies == 0
+			and Fu.IsAllowedToSpam(bot, manaCost)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and Fu.IsInRange(botTarget, bot, scepterRadius)
+			and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 1.68, DAMAGE_TYPE_PHYSICAL)
 		then
-			local t = a:GetNearbyCreeps(800, true)
-			if #t >= 1 then
-				return BOT_ACTION_DESIRE_ABSOLUTE, h
+			local nearbyCreeps = bot:GetNearbyCreeps(800, true)
+			if #nearbyCreeps >= 1 then
+				return BOT_ACTION_DESIRE_ABSOLUTE, botTarget
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function b.ConsiderQuillSpray()
-	if not e:IsFullyCastable() then
+function X.ConsiderQuillSpray()
+	if not quillSprayAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local n = e:GetSpecialValueInt("radius")
-	local p = e:GetManaCost()
-	local q = c.GetNearbyHeroes(a, n, true, BOT_MODE_NONE)
-	if c.IsRetreating(a) and #q > 0 then
-		for u, s in pairs(q) do
-			if a:WasRecentlyDamagedByHero(s, 4.0) or s:HasModifier("modifier_bristleback_quill_spray") then
+	local radius = quillSprayAbility:GetSpecialValueInt("radius")
+	local manaCost = quillSprayAbility:GetManaCost()
+	local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) and #enemiesInRadius > 0 then
+		for _, enemyHero in pairs(enemiesInRadius) do
+			if
+				bot:WasRecentlyDamagedByHero(enemyHero, 4.0)
+				or enemyHero:HasModifier("modifier_bristleback_quill_spray")
+			then
 				return BOT_ACTION_DESIRE_MODERATE
 			end
 		end
 	end
-	if c.IsPushing(a) or c.IsDefending(a) or c.IsGoingOnSomeone(a) and j >= 6 then
-		local v = a:GetNearbyLaneCreeps(n, true)
-		if v ~= nil and #v >= 1 and c.IsAllowedToSpam(a, p) then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsGoingOnSomeone(bot) and botLevel >= 6 then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 1 and Fu.IsAllowedToSpam(bot, manaCost) then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
-	if c.IsFarming(a) and j > 5 and c.IsAllowedToSpam(a, p) then
-		if c.IsValid(h) and h:GetTeam() == TEAM_NEUTRAL then
-			if h:GetHealth() > a:GetAttackDamage() * 2.28 then
+	if Fu.IsFarming(bot) and botLevel > 5 and Fu.IsAllowedToSpam(bot, manaCost) then
+		if Fu.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL then
+			if botTarget:GetHealth() > bot:GetAttackDamage() * 2.28 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			local t = a:GetNearbyCreeps(n, true)
-			if #t >= 2 then
+			local nearbyCreeps = bot:GetNearbyCreeps(radius, true)
+			if #nearbyCreeps >= 2 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsInTeamFight(a, 1200) then
-		if #q >= 1 then
+	if Fu.IsInTeamFight(bot, 1200) then
+		if #enemiesInRadius >= 1 then
 			return BOT_ACTION_DESIRE_LOW
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		if c.IsValidHero(h) and c.CanCastOnMagicImmune(h) and c.IsInRange(h, a, n - 100) then
+	if Fu.IsGoingOnSomeone(bot) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius - 100)
+		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
-		if c.IsValidHero(h) and c.IsAllowedToSpam(a, p) and c.CanCastOnNonMagicImmune(h) and c.IsInRange(h, a, n) then
-			local t = a:GetNearbyCreeps(800, true)
-			if #t >= 1 then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsAllowedToSpam(bot, manaCost)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+		then
+			local nearbyCreeps = bot:GetNearbyCreeps(800, true)
+			if #nearbyCreeps >= 1 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if a:GetActiveMode() == BOT_MODE_ROSHAN then
-		if c.IsRoshan(h) and c.CanCastOnMagicImmune(h) and c.IsInRange(a, h, n) then
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
+		if Fu.IsRoshan(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
-	if i > 0.95 and j >= 6 and a:DistanceFromFountain() > 2400 and c.IsAllowedToSpam(a, p) then
+	if mpRatio > 0.95 and botLevel >= 6 and bot:DistanceFromFountain() > 2400 and Fu.IsAllowedToSpam(bot, manaCost) then
 		return BOT_ACTION_DESIRE_LOW
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function b.ConsiderBristleback()
-	if g:IsPassive() or not g:IsTrained() or not g:IsFullyCastable() then
+function X.ConsiderBristleback()
+	if
+		bristlebackAbility:IsPassive()
+		or not bristlebackAbility:IsTrained()
+		or not bristlebackAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if c.IsInTeamFight(a, 1400) then
-		local w = c.GetAoeEnemyHeroLocation(a, 700, 700, 2)
-		if w ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, w
+	if Fu.IsInTeamFight(bot, 1400) then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, 700, 700, 2)
+		if aoeLocation ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		local x = c.GetProperTarget(a)
-		if c.IsValidHero(x) and c.IsInRange(a, x, 700) and c.CanCastOnNonMagicImmune(x) then
-			return BOT_ACTION_DESIRE_HIGH, x:GetLocation()
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
+		if Fu.IsValidHero(target) and Fu.IsInRange(bot, target, 700) and Fu.CanCastOnNonMagicImmune(target) then
+			return BOT_ACTION_DESIRE_HIGH, target:GetLocation()
 		end
 	end
-	if c.IsRetreating(a) then
-		local r = c.GetNearbyHeroes(a, 700, true, BOT_MODE_NONE)
-		if r ~= nil and #r > 0 then
-			local x = r[1]
-			if c.IsValidHero(x) and c.CanCastOnNonMagicImmune(x) then
-				return BOT_ACTION_DESIRE_MODERATE, x:GetLocation()
+	if Fu.IsRetreating(bot) then
+		local enemiesInRange = Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE)
+		if enemiesInRange ~= nil and #enemiesInRange > 0 then
+			local enemyHero = enemiesInRange[1]
+			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				return BOT_ACTION_DESIRE_MODERATE, enemyHero:GetLocation()
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function b.ConsiderHairBall()
-	if not f:IsTrained() or not f:IsFullyCastable() then
+function X.ConsiderHairBall()
+	if not hairballAbility:IsTrained() or not hairballAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local n = 700
-	local o = c.GetProperCastRange(false, a, f:GetCastRange())
-	if c.IsRetreating(a) then
-		local y = c.GetNearbyHeroes(a, n, true, BOT_MODE_NONE)
-		local x = y[1]
-		if c.IsValidHero(x) and c.CanCastOnNonMagicImmune(x) then
-			return BOT_ACTION_DESIRE_HIGH, a:GetLocation()
+	local radius = 700
+	local castRange = Fu.GetProperCastRange(false, bot, hairballAbility:GetCastRange())
+	if Fu.IsRetreating(bot) then
+		local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+		local enemyHero = enemiesInRadius[1]
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 		end
 	end
-	if c.IsInTeamFight(a, 1400) then
-		local w = c.GetAoeEnemyHeroLocation(a, o, n, 2)
-		if w ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, w
+	if Fu.IsInTeamFight(bot, 1400) then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
+		if aoeLocation ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		local x = c.GetProperTarget(a)
-		if c.IsValidHero(x) and c.IsInRange(a, x, o) and c.CanCastOnNonMagicImmune(x) then
-			return BOT_ACTION_DESIRE_HIGH, x:GetLocation()
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
+		if Fu.IsValidHero(target) and Fu.IsInRange(bot, target, castRange) and Fu.CanCastOnNonMagicImmune(target) then
+			return BOT_ACTION_DESIRE_HIGH, target:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-return b
+return X

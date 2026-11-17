@@ -11,7 +11,7 @@ local bot = GetBot()
 if bot == nil or not bot:IsHero() or bot:IsIllusion() then
 	return
 end
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 
 local ANYONE = { item_gem = true, item_rapier = true }
 local NOT_OWN = {
@@ -45,7 +45,7 @@ local function HasRoom(name)
 	if string.find(name, "_token", 1, true) then
 		return true
 	end
-	return c.Item.GetEmptyInventoryAmount(bot) > 0
+	return Fu.Item.GetEmptyInventoryAmount(bot) > 0
 end
 
 function GetDesire()
@@ -53,15 +53,15 @@ function GetDesire()
 		return 0
 	end
 	target = nil
-	if not bot:IsAlive() or c.IsRetreating(bot) then
+	if not bot:IsAlive() or Fu.IsRetreating(bot) then
 		return BOT_MODE_DESIRE_NONE
 	end
 	local best, bestDist = nil, RANGE
 	for _, drop in pairs(GetDroppedItemList() or {}) do
 		if Allowed(drop) and HasRoom(drop.item:GetName()) then
-			local d = GetUnitToLocationDistance(bot, drop.location)
-			if d < bestDist then
-				best, bestDist = drop, d
+			local distance = GetUnitToLocationDistance(bot, drop.location)
+			if distance < bestDist then
+				best, bestDist = drop, distance
 			end
 		end
 	end
@@ -69,8 +69,8 @@ function GetDesire()
 		return BOT_MODE_DESIRE_NONE
 	end
 	-- Not into a fight we are losing for it.
-	local foes = #(c.GetEnemiesNearLoc(best.location, 900) or {})
-	local friends = #(c.GetAlliesNearLoc(best.location, 900) or {})
+	local foes = #(Fu.GetEnemiesNearLoc(best.location, 900) or {})
+	local friends = #(Fu.GetAlliesNearLoc(best.location, 900) or {})
 	if foes > friends then
 		return BOT_MODE_DESIRE_NONE
 	end
@@ -91,8 +91,8 @@ function Think()
 end
 
 if SafeCall then
-	local d0 = GetDesire
-	local t0 = Think
-	GetDesire = SafeCall(d0, 0, "ITEM_GetDesire")
-	Think = SafeCall(t0, nil, "ITEM_Think")
+	local rawGetDesire = GetDesire
+	local rawThink = Think
+	GetDesire = SafeCall(rawGetDesire, 0, "ITEM_GetDesire")
+	Think = SafeCall(rawThink, nil, "ITEM_Think")
 end

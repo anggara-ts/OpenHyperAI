@@ -1,13 +1,13 @@
 --[[
 This is a place for you to customize the Open Hyper AI bots.
 
-1. When modiftying this file, be VERY careful to the spelling, punctuation and variable names - it's very easy to cause 
+1. When modiftying this file, be VERY careful to the spelling, punctuation and variable names - it's very easy to cause
    syntax errors and mess up the entire logic for all bots, and could be hard for you to debug.
-2. In the case you saw the bots having some random names or picks (heroes not what you have set or without "OHA-DEV" name suffix), 
-   that means you had made some mistakes/errors while modifying this file. 
-3. In any case this file got messed up and caused the bots to malfunction, you can try to restore the file. Either you have a 
+2. In the case you saw the bots having some random names or picks (heroes not what you have set or without "OHA-DEV" name suffix),
+   that means you had made some mistakes/errors while modifying this file.
+3. In any case this file got messed up and caused the bots to malfunction, you can try to restore the file. Either you have a
    copy to replace, or resubscribe the script, or download from github.
-4. To avoid these customize files from getting overridden by workshop updates, you can copy 
+4. To avoid these customize files from getting overridden by workshop updates, you can copy
    the entire Customize folder to under: <Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\game>
    and then modify the settings in <Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\game\Customize> directory.
 5. Note there is a list of known to-be-improved (aka weak) heroes, check out [Appendix - 2] on the bottom of this file.
@@ -83,7 +83,7 @@ Customize.Debug_Enemy_Heros = {
 2. Hero internal name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
 3. Don't need to provide a value for all 5 bots, any empty/missing value will fallback to a Random value.
 4. The position is ranked by the order of the names you put in the below list, pos 1 - 5, from top to down.
-5. There are sample team picks in Appendix section below. 
+5. There are sample team picks in Appendix section below.
 6. Check Appendix to ensure you DO NOT pick more than 1 "weak" heroes in a team for your game experience.
 7. Ignored for a side when the matching Debug_Ally_Heros / Debug_Enemy_Heros list above is non-empty.
 --]]
@@ -98,7 +98,7 @@ Customize.Dire_Heros = {
 }
 
 --[[
-1. To allow bots to randomly pick heroes that can be the same/repeated. 
+1. To allow bots to randomly pick heroes that can be the same/repeated.
 2. WARNING: Setting this to true CAN reduce the gaming experience due to the fact some heroes are kind of weak or buggy
    at the moment (listed below) and are intentionally having reduced chances to get picked by bots. Setting this to true
    may cause the bots to pick multiple weak heroes. See Appendix below about "weak" heroes.
@@ -210,16 +210,16 @@ return Customize
 
 [Appendix - 2] -- List of to-be-improved (aka weak) heroes, as of 2024/10/20 --
 
-    They are relatively weaker than others and can still get selected by bots, 
+    They are relatively weaker than others and can still get selected by bots,
     but there SHOULD NOT have more than 1 of those in a team to ensure the bar of gaming experience for human players.
 
     Those are weak due to:
-        1, Some have bugs from Valve side, which I've spent a lot of effrot with to improve and fix things. 
+        1, Some have bugs from Valve side, which I've spent a lot of effrot with to improve and fix things.
         2, It's not easy to implement the hero in a good way in terms of doing it via coding with the code base we have.
-        3, I do not play some of those heroes a lot myself so can't make good bots, 
+        3, I do not play some of those heroes a lot myself so can't make good bots,
 
-    It's a matter of time to get everything improved, but I don't have a lot of time to do everything to make bots better. 
-    So I put them here, and hopefully make it easy for you to use, or learn, or improve the script. 
+    It's a matter of time to get everything improved, but I don't have a lot of time to do everything to make bots better.
+    So I put them here, and hopefully make it easy for you to use, or learn, or improve the script.
     I'd appreciate any actual help from you to make the bots better, and I'm certain we can achieve it by contributing together.
 
     -- -- List A. Weak ones, meaning they are too far from being able to apply their power:

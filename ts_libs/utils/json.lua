@@ -1,531 +1,580 @@
 -- Support library: json.
-local a = false
-local b = false
-local c = "json"
+local alwaysTryUsingLpeg = false
+local registerGlobalModuleTable = false
+local globalModuleName = "json"
 local pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset =
 	pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset
 local error, require, pcall, select = error, require, pcall, select
-local d, e = math.floor, math.huge
-local f, g, h, i, j, k, l, m =
+local floor, huge = math.floor, math.huge
+local strrep, gsub, strsub, strbyte, strchar, strfind, strlen, strformat =
 	string.rep, string.gsub, string.sub, string.byte, string.char, string.find, string.len, string.format
-local n = string.match
-local o = table.concat
-local p = { version = "dkjson 2.5.1 - removed lpeg" }
-if b then
-	_G[c] = p
+local strmatch = string.match
+local concat = table.concat
+local json = { version = "dkjson 2.5.1 - removed lpeg" }
+if registerGlobalModuleTable then
+	_G[globalModuleName] = json
 end
-local q = nil
+local envBlocker = nil
 pcall(function()
-	local r = require("debug").getmetatable
-	if r then
-		getmetatable = r
+	local debugGetmetatable = require("debug").getmetatable
+	if debugGetmetatable then
+		getmetatable = debugGetmetatable
 	end
 end)
-p.null = setmetatable({}, {
+json.null = setmetatable({}, {
 	__tojson = function()
 		return "null"
 	end,
 })
-local function s(t)
-	local u, v, w = 0, 0, 0
-	for x, y in pairs(t) do
-		if x == "n" and type(y) == "number" then
-			w = y
-			if y > u then
-				u = y
+local function isArray(tbl)
+	local maxIndex, count, arrayLength = 0, 0, 0
+	for key, value in pairs(tbl) do
+		if key == "n" and type(value) == "number" then
+			arrayLength = value
+			if value > maxIndex then
+				maxIndex = value
 			end
 		else
-			if type(x) ~= "number" or x < 1 or d(x) ~= x then
+			if type(key) ~= "number" or key < 1 or floor(key) ~= key then
 				return false
 			end
-			if x > u then
-				u = x
+			if key > maxIndex then
+				maxIndex = key
 			end
-			v = v + 1
+			count = count + 1
 		end
 	end
-	if u > 10 and u > w and u > v * 2 then
+	if maxIndex > 10 and maxIndex > arrayLength and maxIndex > count * 2 then
 		return false
 	end
-	return true, u
+	return true, maxIndex
 end
-local z =
+local escapeCodes =
 	{ ['"'] = '\\"', ["\\"] = "\\\\", ["\b"] = "\\b", ["\f"] = "\\f", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
-local function A(B)
-	local C = z[B]
-	if C then
-		return C
+local function escapeUtf8(char)
+	local codePoint = escapeCodes[char]
+	if codePoint then
+		return codePoint
 	end
-	local D, E, F, G = i(B, 1, 4)
-	D, E, F, G = D or 0, E or 0, F or 0, G or 0
-	if D <= 0x7f then
-		C = D
-	elseif 0xc0 <= D and D <= 0xdf and E >= 0x80 then
-		C = (D - 0xc0) * 0x40 + E - 0x80
-	elseif 0xe0 <= D and D <= 0xef and E >= 0x80 and F >= 0x80 then
-		C = ((D - 0xe0) * 0x40 + E - 0x80) * 0x40 + F - 0x80
-	elseif 0xf0 <= D and D <= 0xf7 and E >= 0x80 and F >= 0x80 and G >= 0x80 then
-		C = (((D - 0xf0) * 0x40 + E - 0x80) * 0x40 + F - 0x80) * 0x40 + G - 0x80
+	local byte1, byte2, byte3, byte4 = strbyte(char, 1, 4)
+	byte1, byte2, byte3, byte4 = byte1 or 0, byte2 or 0, byte3 or 0, byte4 or 0
+	if byte1 <= 0x7f then
+		codePoint = byte1
+	elseif 0xc0 <= byte1 and byte1 <= 0xdf and byte2 >= 0x80 then
+		codePoint = (byte1 - 0xc0) * 0x40 + byte2 - 0x80
+	elseif 0xe0 <= byte1 and byte1 <= 0xef and byte2 >= 0x80 and byte3 >= 0x80 then
+		codePoint = ((byte1 - 0xe0) * 0x40 + byte2 - 0x80) * 0x40 + byte3 - 0x80
+	elseif 0xf0 <= byte1 and byte1 <= 0xf7 and byte2 >= 0x80 and byte3 >= 0x80 and byte4 >= 0x80 then
+		codePoint = (((byte1 - 0xf0) * 0x40 + byte2 - 0x80) * 0x40 + byte3 - 0x80) * 0x40 + byte4 - 0x80
 	else
 		return ""
 	end
-	if C <= 0xffff then
-		return m("\\u%.4x", C)
-	elseif C <= 0x10ffff then
-		C = C - 0x10000
-		local H, I = 0xD800 + d(C / 0x400), 0xDC00 + C % 0x400
-		return m("\\u%.4x\\u%.4x", H, I)
+	if codePoint <= 0xffff then
+		return strformat("\\u%.4x", codePoint)
+	elseif codePoint <= 0x10ffff then
+		codePoint = codePoint - 0x10000
+		local highSurrogate, lowSurrogate = 0xD800 + floor(codePoint / 0x400), 0xDC00 + codePoint % 0x400
+		return strformat("\\u%.4x\\u%.4x", highSurrogate, lowSurrogate)
 	else
 		return ""
 	end
 end
-local function J(K, L, M)
-	if k(K, L) then
-		return g(K, L, M)
+local function fsub(str, pattern, replacement)
+	if strfind(str, pattern) then
+		return gsub(str, pattern, replacement)
 	else
-		return K
+		return str
 	end
 end
-local function N(C)
-	C = J(C, '[%z\1-\31"\\\127]', A)
-	if k(C, "[\194\216\220\225\226\239]") then
-		C = J(C, "\194[\128-\159\173]", A)
-		C = J(C, "\216[\128-\132]", A)
-		C = J(C, "\220\143", A)
-		C = J(C, "\225\158[\180\181]", A)
-		C = J(C, "\226\128[\140-\143\168-\175]", A)
-		C = J(C, "\226\129[\160-\175]", A)
-		C = J(C, "\239\187\191", A)
-		C = J(C, "\239\191[\176-\191]", A)
+local function quoteString(value)
+	value = fsub(value, '[%z\1-\31"\\\127]', escapeUtf8)
+	if strfind(value, "[\194\216\220\225\226\239]") then
+		value = fsub(value, "\194[\128-\159\173]", escapeUtf8)
+		value = fsub(value, "\216[\128-\132]", escapeUtf8)
+		value = fsub(value, "\220\143", escapeUtf8)
+		value = fsub(value, "\225\158[\180\181]", escapeUtf8)
+		value = fsub(value, "\226\128[\140-\143\168-\175]", escapeUtf8)
+		value = fsub(value, "\226\129[\160-\175]", escapeUtf8)
+		value = fsub(value, "\239\187\191", escapeUtf8)
+		value = fsub(value, "\239\191[\176-\191]", escapeUtf8)
 	end
-	return '"' .. C .. '"'
+	return '"' .. value .. '"'
 end
-p.quotestring = N
-local function O(K, P, v)
-	local Q, R = k(K, P, 1, true)
-	if Q then
-		return h(K, 1, Q - 1) .. v .. h(K, R + 1, -1)
+json.quotestring = quoteString
+local function replace(str, search, replacement)
+	local startPos, endPos = strfind(str, search, 1, true)
+	if startPos then
+		return strsub(str, 1, startPos - 1) .. replacement .. strsub(str, endPos + 1, -1)
 	else
-		return K
+		return str
 	end
 end
-local S, T
-local function U()
-	S = n(tostring(0.5), "([^05+])")
-	T = "[^0-9%-%+eE" .. g(S, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") .. "]+"
+local decimalPoint, numberFilter
+local function updateDecimalPoint()
+	decimalPoint = strmatch(tostring(0.5), "([^05+])")
+	numberFilter = "[^0-9%-%+eE" .. gsub(decimalPoint, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") .. "]+"
 end
-U()
-local function V(W)
-	return O(J(tostring(W), T, ""), S, ".")
+updateDecimalPoint()
+local function numberToString(number)
+	return replace(fsub(tostring(number), numberFilter, ""), decimalPoint, ".")
 end
-local function X(K)
-	local W = tonumber(O(K, ".", S))
-	if not W then
-		U()
-		W = tonumber(O(K, ".", S))
+local function stringToNumber(str)
+	local number = tonumber(replace(str, ".", decimalPoint))
+	if not number then
+		updateDecimalPoint()
+		number = tonumber(replace(str, ".", decimalPoint))
 	end
-	return W
+	return number
 end
-local function Y(Z, _, a0)
-	_[a0 + 1] = "\n"
-	_[a0 + 2] = f("  ", Z)
-	a0 = a0 + 2
-	return a0
+local function addNewline2(level, buffer, bufferLength)
+	buffer[bufferLength + 1] = "\n"
+	buffer[bufferLength + 2] = strrep("  ", level)
+	bufferLength = bufferLength + 2
+	return bufferLength
 end
-function p.addnewline(a1)
-	if a1.indent then
-		a1.bufferlen = Y(a1.level or 0, a1.buffer, a1.bufferlen or #a1.buffer)
+function json.addnewline(state)
+	if state.indent then
+		state.bufferlen = addNewline2(state.level or 0, state.buffer, state.bufferlen or #state.buffer)
 	end
 end
-local a2
-local function a3(a4, C, a5, a6, Z, _, a0, a7, a8, a1)
-	local a9 = type(a4)
-	if a9 ~= "string" and a9 ~= "number" then
-		return nil, "type '" .. a9 .. "' is not supported as a key by JSON."
+local encode2
+local function addPair(key, value, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
+	local keyType = type(key)
+	if keyType ~= "string" and keyType ~= "number" then
+		return nil, "type '" .. keyType .. "' is not supported as a key by JSON."
 	end
-	if a5 then
-		a0 = a0 + 1
-		_[a0] = ","
+	if prev then
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = ","
 	end
-	if a6 then
-		a0 = Y(Z, _, a0)
+	if indent then
+		bufferLength = addNewline2(level, buffer, bufferLength)
 	end
-	_[a0 + 1] = N(a4)
-	_[a0 + 2] = ":"
-	return a2(C, a6, Z, _, a0 + 2, a7, a8, a1)
+	buffer[bufferLength + 1] = quoteString(key)
+	buffer[bufferLength + 2] = ":"
+	return encode2(value, indent, level, buffer, bufferLength + 2, tables, globalOrder, state)
 end
-local function aa(ab, _, a1)
-	local a0 = a1.bufferlen
-	if type(ab) == "string" then
-		a0 = a0 + 1
-		_[a0] = ab
+local function appendCustom(result, buffer, state)
+	local bufferLength = state.bufferlen
+	if type(result) == "string" then
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = result
 	end
-	return a0
+	return bufferLength
 end
-local function ac(ad, C, a1, _, a0, ae)
-	ae = ae or ad
-	local af = a1.exception
-	if not af then
-		return nil, ae
+local function exception(reason, value, state, buffer, bufferLength, defaultMessage)
+	defaultMessage = defaultMessage or reason
+	local handler = state.exception
+	if not handler then
+		return nil, defaultMessage
 	else
-		a1.bufferlen = a0
-		local ag, ah = af(ad, C, a1, ae)
-		if not ag then
-			return nil, ah or ae
+		state.bufferlen = bufferLength
+		local result, message = handler(reason, value, state, defaultMessage)
+		if not result then
+			return nil, message or defaultMessage
 		end
-		return aa(ag, _, a1)
+		return appendCustom(result, buffer, state)
 	end
 end
-function p.encodeexception(ad, C, a1, ae)
-	return N("<" .. ae .. ">")
+function json.encodeexception(reason, value, state, defaultMessage)
+	return quoteString("<" .. defaultMessage .. ">")
 end
-a2 = function(C, a6, Z, _, a0, a7, a8, a1)
-	local ai = type(C)
-	local aj = getmetatable(C)
-	aj = type(aj) == "table" and aj
-	local ak = aj and aj.__tojson
-	if ak then
-		if a7[C] then
-			return ac("reference cycle", C, a1, _, a0)
+encode2 = function(value, indent, level, buffer, bufferLength, tables, globalOrder, state)
+	local valueType = type(value)
+	local valueMeta = getmetatable(value)
+	valueMeta = type(valueMeta) == "table" and valueMeta
+	local valueToJson = valueMeta and valueMeta.__tojson
+	if valueToJson then
+		if tables[value] then
+			return exception("reference cycle", value, state, buffer, bufferLength)
 		end
-		a7[C] = true
-		a1.bufferlen = a0
-		local ag, ah = ak(C, a1)
-		if not ag then
-			return ac("custom encoder failed", C, a1, _, a0, ah)
+		tables[value] = true
+		state.bufferlen = bufferLength
+		local result, message = valueToJson(value, state)
+		if not result then
+			return exception("custom encoder failed", value, state, buffer, bufferLength, message)
 		end
-		a7[C] = nil
-		a0 = aa(ag, _, a1)
-	elseif C == nil then
-		a0 = a0 + 1
-		_[a0] = "null"
-	elseif ai == "number" then
-		local al
-		if C ~= C or C >= e or -C >= e then
-			al = "null"
+		tables[value] = nil
+		bufferLength = appendCustom(result, buffer, state)
+	elseif value == nil then
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = "null"
+	elseif valueType == "number" then
+		local numberText
+		if value ~= value or value >= huge or -value >= huge then
+			numberText = "null"
 		else
-			al = V(C)
+			numberText = numberToString(value)
 		end
-		a0 = a0 + 1
-		_[a0] = al
-	elseif ai == "boolean" then
-		a0 = a0 + 1
-		_[a0] = C and "true" or "false"
-	elseif ai == "string" then
-		a0 = a0 + 1
-		_[a0] = N(C)
-	elseif ai == "table" then
-		if a7[C] then
-			return ac("reference cycle", C, a1, _, a0)
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = numberText
+	elseif valueType == "boolean" then
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = value and "true" or "false"
+	elseif valueType == "string" then
+		bufferLength = bufferLength + 1
+		buffer[bufferLength] = quoteString(value)
+	elseif valueType == "table" then
+		if tables[value] then
+			return exception("reference cycle", value, state, buffer, bufferLength)
 		end
-		a7[C] = true
-		Z = Z + 1
-		local am, v = s(C)
-		if v == 0 and aj and aj.__jsontype == "object" then
-			am = false
+		tables[value] = true
+		level = level + 1
+		local isArrayTable, count = isArray(value)
+		if count == 0 and valueMeta and valueMeta.__jsontype == "object" then
+			isArrayTable = false
 		end
-		local ah
-		if am then
-			a0 = a0 + 1
-			_[a0] = "["
-			for Q = 1, v do
-				a0, ah = a2(C[Q], a6, Z, _, a0, a7, a8, a1)
-				if not a0 then
-					return nil, ah
+		local message
+		if isArrayTable then
+			bufferLength = bufferLength + 1
+			buffer[bufferLength] = "["
+			for i = 1, count do
+				bufferLength, message =
+					encode2(value[i], indent, level, buffer, bufferLength, tables, globalOrder, state)
+				if not bufferLength then
+					return nil, message
 				end
-				if Q < v then
-					a0 = a0 + 1
-					_[a0] = ","
+				if i < count then
+					bufferLength = bufferLength + 1
+					buffer[bufferLength] = ","
 				end
 			end
-			a0 = a0 + 1
-			_[a0] = "]"
+			bufferLength = bufferLength + 1
+			buffer[bufferLength] = "]"
 		else
-			local a5 = false
-			a0 = a0 + 1
-			_[a0] = "{"
-			local an = aj and aj.__jsonorder or a8
-			if an then
-				local ao = {}
-				v = #an
-				for Q = 1, v do
-					local x = an[Q]
-					local y = C[x]
-					if y then
-						ao[x] = true
-						a0, ah = a3(x, y, a5, a6, Z, _, a0, a7, a8, a1)
-						a5 = true
+			local prev = false
+			bufferLength = bufferLength + 1
+			buffer[bufferLength] = "{"
+			local order = valueMeta and valueMeta.__jsonorder or globalOrder
+			if order then
+				local used = {}
+				count = #order
+				for i = 1, count do
+					local key = order[i]
+					local entryValue = value[key]
+					if entryValue then
+						used[key] = true
+						bufferLength, message = addPair(
+							key,
+							entryValue,
+							prev,
+							indent,
+							level,
+							buffer,
+							bufferLength,
+							tables,
+							globalOrder,
+							state
+						)
+						prev = true
 					end
 				end
-				for x, y in pairs(C) do
-					if not ao[x] then
-						a0, ah = a3(x, y, a5, a6, Z, _, a0, a7, a8, a1)
-						if not a0 then
-							return nil, ah
+				for key, entryValue in pairs(value) do
+					if not used[key] then
+						bufferLength, message = addPair(
+							key,
+							entryValue,
+							prev,
+							indent,
+							level,
+							buffer,
+							bufferLength,
+							tables,
+							globalOrder,
+							state
+						)
+						if not bufferLength then
+							return nil, message
 						end
-						a5 = true
+						prev = true
 					end
 				end
 			else
-				for x, y in pairs(C) do
-					a0, ah = a3(x, y, a5, a6, Z, _, a0, a7, a8, a1)
-					if not a0 then
-						return nil, ah
+				for key, entryValue in pairs(value) do
+					bufferLength, message =
+						addPair(key, entryValue, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
+					if not bufferLength then
+						return nil, message
 					end
-					a5 = true
+					prev = true
 				end
 			end
-			if a6 then
-				a0 = Y(Z - 1, _, a0)
+			if indent then
+				bufferLength = addNewline2(level - 1, buffer, bufferLength)
 			end
-			a0 = a0 + 1
-			_[a0] = "}"
+			bufferLength = bufferLength + 1
+			buffer[bufferLength] = "}"
 		end
-		a7[C] = nil
+		tables[value] = nil
 	else
-		return ac("unsupported type", C, a1, _, a0, "type '" .. ai .. "' is not supported by JSON.")
+		return exception(
+			"unsupported type",
+			value,
+			state,
+			buffer,
+			bufferLength,
+			"type '" .. valueType .. "' is not supported by JSON."
+		)
 	end
-	return a0
+	return bufferLength
 end
-function p.encode(C, a1)
-	a1 = a1 or {}
-	local ap = a1.buffer
-	local _ = ap or {}
-	a1.buffer = _
-	U()
-	local ag, ah = a2(C, a1.indent, a1.level or 0, _, a1.bufferlen or 0, a1.tables or {}, a1.keyorder, a1)
-	if not ag then
-		error(ah, 2)
-	elseif ap == _ then
-		a1.bufferlen = ag
+function json.encode(value, state)
+	state = state or {}
+	local oldBuffer = state.buffer
+	local buffer = oldBuffer or {}
+	state.buffer = buffer
+	updateDecimalPoint()
+	local result, message = encode2(
+		value,
+		state.indent,
+		state.level or 0,
+		buffer,
+		state.bufferlen or 0,
+		state.tables or {},
+		state.keyorder,
+		state
+	)
+	if not result then
+		error(message, 2)
+	elseif oldBuffer == buffer then
+		state.bufferlen = result
 		return true
 	else
-		a1.bufferlen = nil
-		a1.buffer = nil
-		return o(_)
+		state.bufferlen = nil
+		state.buffer = nil
+		return concat(buffer)
 	end
 end
-local function aq(K, ar)
-	local as, at, au = 1, 1, 0
+local function describePosition(str, where)
+	local line, pos, linePos = 1, 1, 0
 	while true do
-		at = k(K, "\n", at, true)
-		if at and at < ar then
-			as = as + 1
-			au = at
-			at = at + 1
+		pos = strfind(str, "\n", pos, true)
+		if pos and pos < where then
+			line = line + 1
+			linePos = pos
+			pos = pos + 1
 		else
 			break
 		end
 	end
-	return "line " .. as .. ", column " .. ar - au
+	return "line " .. line .. ", column " .. where - linePos
 end
-local function av(K, aw, ar)
-	return nil, l(K) + 1, "unterminated " .. aw .. " at " .. aq(K, ar)
+local function unterminated(str, what, where)
+	return nil, strlen(str) + 1, "unterminated " .. what .. " at " .. describePosition(str, where)
 end
-local function ax(K, at)
+local function scanWhite(str, pos)
 	while true do
-		at = k(K, "%S", at)
-		if not at then
+		pos = strfind(str, "%S", pos)
+		if not pos then
 			return nil
 		end
-		local ay = h(K, at, at + 1)
-		if ay == "\239\187" and h(K, at + 2, at + 2) == "\191" then
-			at = at + 3
-		elseif ay == "//" then
-			at = k(K, "[\n\r]", at + 2)
-			if not at then
+		local twoChars = strsub(str, pos, pos + 1)
+		if twoChars == "\239\187" and strsub(str, pos + 2, pos + 2) == "\191" then
+			pos = pos + 3
+		elseif twoChars == "//" then
+			pos = strfind(str, "[\n\r]", pos + 2)
+			if not pos then
 				return nil
 			end
-		elseif ay == "/*" then
-			at = k(K, "*/", at + 2)
-			if not at then
+		elseif twoChars == "/*" then
+			pos = strfind(str, "*/", pos + 2)
+			if not pos then
 				return nil
 			end
-			at = at + 2
+			pos = pos + 2
 		else
-			return at
+			return pos
 		end
 	end
 end
-local az =
+local escapeChars =
 	{ ['"'] = '"', ["\\"] = "\\", ["/"] = "/", ["b"] = "\b", ["f"] = "\f", ["n"] = "\n", ["r"] = "\r", ["t"] = "\t" }
-local function aA(C)
-	if C < 0 then
+local function unicodeChar(codePoint)
+	if codePoint < 0 then
 		return nil
-	elseif C <= 0x007f then
-		return j(C)
-	elseif C <= 0x07ff then
-		return j(0xc0 + d(C / 0x40), 0x80 + d(C) % 0x40)
-	elseif C <= 0xffff then
-		return j(0xe0 + d(C / 0x1000), 0x80 + d(C / 0x40) % 0x40, 0x80 + d(C) % 0x40)
-	elseif C <= 0x10ffff then
-		return j(0xf0 + d(C / 0x40000), 0x80 + d(C / 0x1000) % 0x40, 0x80 + d(C / 0x40) % 0x40, 0x80 + d(C) % 0x40)
+	elseif codePoint <= 0x007f then
+		return strchar(codePoint)
+	elseif codePoint <= 0x07ff then
+		return strchar(0xc0 + floor(codePoint / 0x40), 0x80 + floor(codePoint) % 0x40)
+	elseif codePoint <= 0xffff then
+		return strchar(
+			0xe0 + floor(codePoint / 0x1000),
+			0x80 + floor(codePoint / 0x40) % 0x40,
+			0x80 + floor(codePoint) % 0x40
+		)
+	elseif codePoint <= 0x10ffff then
+		return strchar(
+			0xf0 + floor(codePoint / 0x40000),
+			0x80 + floor(codePoint / 0x1000) % 0x40,
+			0x80 + floor(codePoint / 0x40) % 0x40,
+			0x80 + floor(codePoint) % 0x40
+		)
 	else
 		return nil
 	end
 end
-local function aB(K, at)
-	local aC = at + 1
-	local _, v = {}, 0
+local function scanString(str, pos)
+	local lastPos = pos + 1
+	local buffer, count = {}, 0
 	while true do
-		local aD = k(K, '["\\]', aC)
-		if not aD then
-			return av(K, "string", at)
+		local nextPos = strfind(str, '["\\]', lastPos)
+		if not nextPos then
+			return unterminated(str, "string", pos)
 		end
-		if aD > aC then
-			v = v + 1
-			_[v] = h(K, aC, aD - 1)
+		if nextPos > lastPos then
+			count = count + 1
+			buffer[count] = strsub(str, lastPos, nextPos - 1)
 		end
-		if h(K, aD, aD) == '"' then
-			aC = aD + 1
+		if strsub(str, nextPos, nextPos) == '"' then
+			lastPos = nextPos + 1
 			break
 		else
-			local aE = h(K, aD + 1, aD + 1)
-			local C
-			if aE == "u" then
-				C = tonumber(h(K, aD + 2, aD + 5), 16)
-				if C then
-					local aF
-					if 0xD800 <= C and C <= 0xDBff then
-						if h(K, aD + 6, aD + 7) == "\\u" then
-							aF = tonumber(h(K, aD + 8, aD + 11), 16)
-							if aF and 0xDC00 <= aF and aF <= 0xDFFF then
-								C = (C - 0xD800) * 0x400 + aF - 0xDC00 + 0x10000
+			local escapeChar = strsub(str, nextPos + 1, nextPos + 1)
+			local value
+			if escapeChar == "u" then
+				value = tonumber(strsub(str, nextPos + 2, nextPos + 5), 16)
+				if value then
+					local lowSurrogate
+					if 0xD800 <= value and value <= 0xDBff then
+						if strsub(str, nextPos + 6, nextPos + 7) == "\\u" then
+							lowSurrogate = tonumber(strsub(str, nextPos + 8, nextPos + 11), 16)
+							if lowSurrogate and 0xDC00 <= lowSurrogate and lowSurrogate <= 0xDFFF then
+								value = (value - 0xD800) * 0x400 + lowSurrogate - 0xDC00 + 0x10000
 							else
-								aF = nil
+								lowSurrogate = nil
 							end
 						end
 					end
-					C = C and aA(C)
-					if C then
-						if aF then
-							aC = aD + 12
+					value = value and unicodeChar(value)
+					if value then
+						if lowSurrogate then
+							lastPos = nextPos + 12
 						else
-							aC = aD + 6
+							lastPos = nextPos + 6
 						end
 					end
 				end
 			end
-			if not C then
-				C = az[aE] or aE
-				aC = aD + 2
+			if not value then
+				value = escapeChars[escapeChar] or escapeChar
+				lastPos = nextPos + 2
 			end
-			v = v + 1
-			_[v] = C
+			count = count + 1
+			buffer[count] = value
 		end
 	end
-	if v == 1 then
-		return _[1], aC
-	elseif v > 1 then
-		return o(_), aC
+	if count == 1 then
+		return buffer[1], lastPos
+	elseif count > 1 then
+		return concat(buffer), lastPos
 	else
-		return "", aC
+		return "", lastPos
 	end
 end
-local aG
-local function aH(aw, aI, K, aJ, aK, aL, aM)
-	local aN = l(K)
-	local t, v = {}, 0
-	local at = aJ + 1
-	if aw == "object" then
-		setmetatable(t, aL)
+local scanValue
+local function scanTable(what, closeChar, str, startPos, nullValue, objectMeta, arrayMeta)
+	local length = strlen(str)
+	local tbl, count = {}, 0
+	local pos = startPos + 1
+	if what == "object" then
+		setmetatable(tbl, objectMeta)
 	else
-		setmetatable(t, aM)
+		setmetatable(tbl, arrayMeta)
 	end
 	while true do
-		at = ax(K, at)
-		if not at then
-			return av(K, aw, aJ)
+		pos = scanWhite(str, pos)
+		if not pos then
+			return unterminated(str, what, startPos)
 		end
-		local aO = h(K, at, at)
-		if aO == aI then
-			return t, at + 1
+		local char = strsub(str, pos, pos)
+		if char == closeChar then
+			return tbl, pos + 1
 		end
-		local aP, aQ
-		aP, at, aQ = aG(K, at, aK, aL, aM)
-		if aQ then
-			return nil, at, aQ
+		local firstValue, err
+		firstValue, pos, err = scanValue(str, pos, nullValue, objectMeta, arrayMeta)
+		if err then
+			return nil, pos, err
 		end
-		at = ax(K, at)
-		if not at then
-			return av(K, aw, aJ)
+		pos = scanWhite(str, pos)
+		if not pos then
+			return unterminated(str, what, startPos)
 		end
-		aO = h(K, at, at)
-		if aO == ":" then
-			if aP == nil then
-				return nil, at, "cannot use nil as table index (at " .. aq(K, at) .. ")"
+		char = strsub(str, pos, pos)
+		if char == ":" then
+			if firstValue == nil then
+				return nil, pos, "cannot use nil as table index (at " .. describePosition(str, pos) .. ")"
 			end
-			at = ax(K, at + 1)
-			if not at then
-				return av(K, aw, aJ)
+			pos = scanWhite(str, pos + 1)
+			if not pos then
+				return unterminated(str, what, startPos)
 			end
-			local aR
-			aR, at, aQ = aG(K, at, aK, aL, aM)
-			if aQ then
-				return nil, at, aQ
+			local secondValue
+			secondValue, pos, err = scanValue(str, pos, nullValue, objectMeta, arrayMeta)
+			if err then
+				return nil, pos, err
 			end
-			t[aP] = aR
-			at = ax(K, at)
-			if not at then
-				return av(K, aw, aJ)
+			tbl[firstValue] = secondValue
+			pos = scanWhite(str, pos)
+			if not pos then
+				return unterminated(str, what, startPos)
 			end
-			aO = h(K, at, at)
+			char = strsub(str, pos, pos)
 		else
-			v = v + 1
-			t[v] = aP
+			count = count + 1
+			tbl[count] = firstValue
 		end
-		if aO == "," then
-			at = at + 1
+		if char == "," then
+			pos = pos + 1
 		end
 	end
 end
-aG = function(K, at, aK, aL, aM)
-	at = at or 1
-	at = ax(K, at)
-	if not at then
-		return nil, l(K) + 1, "no valid JSON value (reached the end)"
+scanValue = function(str, pos, nullValue, objectMeta, arrayMeta)
+	pos = pos or 1
+	pos = scanWhite(str, pos)
+	if not pos then
+		return nil, strlen(str) + 1, "no valid JSON value (reached the end)"
 	end
-	local aO = h(K, at, at)
-	if aO == "{" then
-		return aH("object", "}", K, at, aK, aL, aM)
-	elseif aO == "[" then
-		return aH("array", "]", K, at, aK, aL, aM)
-	elseif aO == '"' then
-		return aB(K, at)
+	local char = strsub(str, pos, pos)
+	if char == "{" then
+		return scanTable("object", "}", str, pos, nullValue, objectMeta, arrayMeta)
+	elseif char == "[" then
+		return scanTable("array", "]", str, pos, nullValue, objectMeta, arrayMeta)
+	elseif char == '"' then
+		return scanString(str, pos)
 	else
-		local aS, aT = k(K, "^%-?[%d%.]+[eE]?[%+%-]?%d*", at)
-		if aS then
-			local aU = X(h(K, aS, aT))
-			if aU then
-				return aU, aT + 1
+		local matchStart, matchEnd = strfind(str, "^%-?[%d%.]+[eE]?[%+%-]?%d*", pos)
+		if matchStart then
+			local number = stringToNumber(strsub(str, matchStart, matchEnd))
+			if number then
+				return number, matchEnd + 1
 			end
 		end
-		aS, aT = k(K, "^%a%w*", at)
-		if aS then
-			local aV = h(K, aS, aT)
-			if aV == "true" then
-				return true, aT + 1
-			elseif aV == "false" then
-				return false, aT + 1
-			elseif aV == "null" then
-				return aK, aT + 1
+		matchStart, matchEnd = strfind(str, "^%a%w*", pos)
+		if matchStart then
+			local word = strsub(str, matchStart, matchEnd)
+			if word == "true" then
+				return true, matchEnd + 1
+			elseif word == "false" then
+				return false, matchEnd + 1
+			elseif word == "null" then
+				return nullValue, matchEnd + 1
 			end
 		end
-		return nil, at, "no valid JSON value at " .. aq(K, at)
+		return nil, pos, "no valid JSON value at " .. describePosition(str, pos)
 	end
 end
-local function aW(...)
+local function optionalMetatables(...)
 	if select("#", ...) > 0 then
 		return ...
 	else
 		return { __jsontype = "object" }, { __jsontype = "array" }
 	end
 end
-function p.decode(K, at, aK, ...)
-	local aL, aM = aW(...)
-	return aG(K, at, aK, aL, aM)
+function json.decode(str, pos, nullValue, ...)
+	local objectMeta, arrayMeta = optionalMetatables(...)
+	return scanValue(str, pos, nullValue, objectMeta, arrayMeta)
 end
-if a then
-	pcall(p.use_lpeg)
+if alwaysTryUsingLpeg then
+	pcall(json.use_lpeg)
 end
-return p
+return json

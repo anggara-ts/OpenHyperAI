@@ -618,6 +618,71 @@ function GetDesireHelper()
 	-- While behind (push.lua flag) or with fewer heroes alive: own-side camps and lane creeps only, so
 	-- farm does not walk the bot straight back into the enemy half after a withdraw.
 	local keepOwnSide = not Fu.IsInLaningPhase() and (BehindLaneNear(nil) ~= nil or aliveEnemyCount > aliveAllyCount)
+	-- Otherwise an enemy camp is fine only when our wave on its lane is at least as deep toward their Ancient as
+	-- the camp: the wave gives vision and draws them. Game 039, 27:00: Phantom Lancer farmed Dire camps with
+	-- our bottom wave pushed back toward us. With at most 2 enemies alive the enemy jungle is open anyway.
+	local campCovered = function(camp)
+		if not Fu.Site.IsEnemyCamp(camp) or Fu.IsInLaningPhase() or aliveEnemyCount <= 2 then
+			return true
+		end
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		local campLoc = camp.cattr and camp.cattr.location
+		if enemyAncient == nil or campLoc == nil then
+			return true
+		end
+		-- Cached 2s per camp: farm's desire runs every think, and the lane lookups add up over ~9 camps.
+		bot._campCover = bot._campCover or {}
+		local key = math.floor(campLoc.x) .. "," .. math.floor(campLoc.y)
+		local cachedCover = bot._campCover[key]
+		if cachedCover ~= nil and DotaTime() < cachedCover.until_ then
+			return cachedCover.covered
+		end
+		local lane, laneDist = nil, math.huge
+		for _, candidate in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+			local along = GetAmountAlongLane(candidate, campLoc)
+			if along ~= nil and along.distance < laneDist then
+				lane, laneDist = candidate, along.distance
+			end
+		end
+		if lane == nil then
+			return true
+		end
+		local front = GetLaneFrontLocation(GetTeam(), lane, 0)
+		local ancientLoc = enemyAncient:GetLocation()
+		local waveDepth = Fu.GetLocationToLocationDistance(front, ancientLoc)
+		local campDepth = Fu.GetLocationToLocationDistance(campLoc, ancientLoc)
+		local covered = waveDepth <= campDepth + 500
+		bot._campCover[key] = { covered = covered, until_ = DotaTime() + 2 }
+		if not covered and DotaTime() >= (bot._farmSideLogAt or -999) then
+			bot._farmSideLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-FARM] t=%.0f %s enemy-camp-uncovered lane=%d campToAncient=%d waveToAncient=%d at=%.0f,%.0f",
+					DotaTime(),
+					ShortName(bot),
+					lane,
+					campDepth,
+					waveDepth,
+					campLoc.x,
+					campLoc.y
+				)
+			)
+		end
+		return covered
+	end
+	if not keepOwnSide then
+		local coveredCamps = {}
+		for _, camp in ipairs(availableCamps or {}) do
+			if campCovered(camp) then
+				coveredCamps[#coveredCamps + 1] = camp
+			end
+		end
+		availableCamps = coveredCamps
+		if preferredCamp ~= nil and not campCovered(preferredCamp) then
+			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+		end
+	end
 	if keepOwnSide then
 		local ownCamps = {}
 		for _, camp in ipairs(availableCamps or {}) do

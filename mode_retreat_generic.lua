@@ -1,6 +1,7 @@
 -- Retreat mode. Also pulls a bot off a wisdom-shrine walk that has become dangerous.
 local Retreat = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local RetreatRules = require(GetScriptDirectory() .. "/FuncLib/systems/retreat_rules")
 local bot = GetBot()
 local hpRatio, mpRatio, botName, botHealth, healthRegen, manaRegen, botLocation, botTarget
 local botLevel, activeMode
@@ -359,19 +360,56 @@ local function HardRetreatDesire(lastStand)
 		return 0, 201
 	end
 	local now = DotaTime()
-	local alliesNearby = Fu.GetAllyCount(bot, 1400)
+	-- Allies: every allied hero near us except illusions, Meepo clones included (Fu.GetAllyCount drops the
+	-- clones, so a Meepo with 3 bodies counted as alone).
+	local alliesNearby = 0
+	for _, ally in pairs(bot:GetNearbyHeroes(1400, false, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(ally) and not ally:IsIllusion() then
+			alliesNearby = alliesNearby + 1
+		end
+	end
+	alliesNearby = math.max(1, alliesNearby)
 	local enemiesNearby = Fu.GetEnemyCount(bot, 1400)
 	local lastSeen = Fu.GetLastSeenEnemiesNearLoc and Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
 	local pressure = math.max(enemiesNearby, #lastSeen)
 	local freeKill = Fu.ShouldFinishCommittedKill(bot, botTarget)
-	local outnumbered = alliesNearby <= 1 and pressure >= 2
-		or pressure >= alliesNearby + 1 and not Fu.WeAreStronger(bot, 1400)
+	local stronger = Fu.WeAreStronger(bot, 1400)
+	local hit = bot:WasRecentlyDamagedByAnyHero(2.0)
+	local outnumbered =
+		RetreatRules.HardRetreatOutnumbered(alliesNearby, enemiesNearby, #lastSeen, hpRatio, hit, stronger)
 	local attacking = activeMode == BOT_MODE_ATTACK
 		or activeMode == BOT_MODE_TEAM_ROAM
 		or activeMode == BOT_MODE_ROAM
 		or Fu.IsGoingOnSomeone(bot)
 	local holding = bot._hardRetreatUntil ~= nil and now < bot._hardRetreatUntil and activeMode == BOT_MODE_RETREAT
 	if freeKill or not outnumbered or not attacking and not holding then
+		-- Game 038: the old rule (Meepo clones not counted, stale sightings at any HP) fired 156 times on healthy
+		-- bots. Say when it would have, to show the new rule holding the fight. At most every 5s.
+		local oldAllies = Fu.GetAllyCount(bot, 1400)
+		local oldOutnumbered = oldAllies <= 1 and pressure >= 2 or pressure >= oldAllies + 1 and not stronger
+		if
+			not outnumbered
+			and oldOutnumbered
+			and attacking
+			and not freeKill
+			and hpRatio >= 0.6
+			and now >= (bot._hardRetreatSkipLogAt or -999)
+		then
+			bot._hardRetreatSkipLogAt = now + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s healthy-fight-kept hp=%.2f allies=%d visible=%d recent=%d hit=%s",
+					now,
+					HeroName(),
+					hpRatio,
+					alliesNearby,
+					enemiesNearby,
+					#lastSeen,
+					tostring(hit)
+				)
+			)
+		end
 		bot._hardRetreatUntil = nil
 		return 0, 201
 	end
@@ -395,7 +433,25 @@ local function HardRetreatDesire(lastStand)
 		end
 		return 0.98, holding and 202 or 201
 	end
-	bot._hardRetreatUntil = nil
+	-- Healthy but clearly outnumbered (seen, two more than us, being hit): back off at 0.7. Held for 2s like the
+	-- hurt case; without the hold it returned 0 on the next think (retreat active, no longer attacking) and
+	-- attack won back, a one-think pulse every time.
+	bot._hardRetreatUntil = now + 2
+	if now >= (bot._hardRetreatLogAt or -999) then
+		bot._hardRetreatLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s hard-retreat healthy-outnumbered hp=%.2f allies=%d visible=%d hit=%s",
+				now,
+				HeroName(),
+				hpRatio,
+				alliesNearby,
+				enemiesNearby,
+				tostring(hit)
+			)
+		)
+	end
 	return BOT_MODE_DESIRE_ABSOLUTE, 201
 end
 function GetDesire()

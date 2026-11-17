@@ -8330,7 +8330,11 @@ function Usage.LogModeFlip()
 	bot._modeHist = hist
 	local last = hist[#hist]
 	if last == nil or last.mode ~= mode then
-		hist[#hist + 1] = { t = now, mode = mode, des = bot:GetActiveModeDesire(), loc = bot:GetLocation() }
+		-- Why farm let go, when the switch is away from farm (game 039, 25:10: Rubick cycled farm 0.35 ->
+		-- assemble 0.10 -> push 0.13-0.18 26 times in 20s and nothing said why farm kept dropping).
+		local farmWhy = last ~= nil and last.mode == BOT_MODE_FARM and bot._farmExitReason or nil
+		hist[#hist + 1] =
+			{ t = now, mode = mode, des = bot:GetActiveModeDesire(), loc = bot:GetLocation(), farmWhy = farmWhy }
 	end
 	while #hist > 0 and hist[1].t < now - 20 do
 		table.remove(hist, 1)
@@ -8346,6 +8350,7 @@ function Usage.LogModeFlip()
 	local parts = {}
 	for _, entry in ipairs(hist) do
 		parts[#parts + 1] = string.format("%s:%.2f@%.0f", StuckModeName(entry.mode), entry.des or 0, entry.t)
+			.. (entry.farmWhy and ("(farm-left:" .. tostring(entry.farmWhy) .. ")") or "")
 	end
 	local loc = bot:GetLocation()
 	pcall(

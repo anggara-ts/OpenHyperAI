@@ -1559,6 +1559,40 @@ function Push.PushThink(bot, lane)
 			return
 		end
 	end
+	-- The tower ahead is backdoor-protected (no creeps of ours at it): wait for the wave outside its attack
+	-- range. The fallback below attack-moves to the lane front, which is right under that tower: game 038,
+	-- 27:50, Dire's five idled under Radiant's bottom T2 (push capped to 0.25 by the backdoor) taking hits.
+	for _, tower in ipairs(bot:GetNearbyTowers(1200, true) or {}) do
+		if Fu.IsValidBuilding(tower) and Push.HasBackdoorProtect(tower) then
+			-- GetAttackRange on a building is not in Docs/BOT_API_RUNTIME.md: guarded, with 700 as an unverified
+			-- fallback; the log prints the range used so a game confirms it.
+			local okRange, rawRange = pcall(function()
+				return tower:GetAttackRange()
+			end)
+			local baseRange = (okRange and type(rawRange) == "number" and rawRange > 0) and rawRange or 700
+			local towerRange = baseRange + tower:GetBoundingRadius() + bot:GetBoundingRadius()
+			local towerDistance = GetUnitToUnitDistance(bot, tower)
+			if towerDistance < towerRange + 150 then
+				if DotaTime() >= (bot._pushWaitOutsideLogAt or -999) then
+					bot._pushWaitOutsideLogAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-PUSH] t=%.0f %s wait-outside-tower why=backdoor tower=%s dist=%d range=%d",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tower:GetUnitName(),
+							towerDistance,
+							towerRange
+						)
+					)
+				end
+				local waitLocation = Fu.AdjustLocationWithOffsetTowardsFountain(tower:GetLocation(), towerRange + 250)
+				bot:Action_MoveToLocation(add(waitLocation, RandomVector(80)))
+				return
+			end
+		end
+	end
 	if distanceToEnemyFountain > 2500 then
 		local nearbyEnemies = bot:GetNearbyHeroes(attackRange + 300, true, BotMode.None) or {}
 		for _, enemyHero in ipairs(nearbyEnemies) do

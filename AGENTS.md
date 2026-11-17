@@ -153,8 +153,15 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`.
 4. **Track what is not tested in a game yet.** `node Util/verify.js add <pr>` imports the PR's
    "How to verify in game" list into `Util/verify/tracker.json` (git-ignored). Every PR with game-visible
    changes goes there until a game proves it.
-5. **Play a game** on a branch that contains the PRs under test (or `main` once merged). Note which build ran.
-6. **Review the game** (below). Then for the tracked PRs:
+5. **Set the test lineup** (local only, `Customize/general.lua`, never committed). When a tracked item needs a
+   specific hero on the field (a hero fix, or a mechanic only some heroes trigger), put that hero in a **free**
+   slot: one that is `"Random"`, unset, or whose `TEST` tag `node Util/verify.js lineup` reports as "can free".
+   Use the hero's main role from `Util/role-weights/rows.json` (slot order = position 1-5). Tag the line:
+   `"npc_dota_hero_x", -- pos N -- TEST #<pr> [#<issue>]: <log tag to watch>`. If no slot is free, **wait for
+   the next game**; never replace a slot that is still testing another PR. When a PR's items pass, set its slots
+   back to `"Random"`. Check the "weak hero" cap (`Customize.Weak_Hero_Cap`) when stacking test heroes.
+6. **Play a game** on a branch that contains the PRs under test (or `main` once merged). Note which build ran.
+7. **Review the game** (below). Then for the tracked PRs:
    - `node Util/verify.js check Util/match-logs/game-NNN_*.log --game NNN` counts each item's log tags and shows
      sample lines; read them and set each item: `node Util/verify.js set <pr> <item> pass|fail|skip [note]`.
    - Read the maintainer's PR comments (`gh pr view <pr> --comments`): game-review PRs get comments written while
@@ -162,7 +169,7 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`.
      in that PR (if it is about that PR's change) or filed as an issue (grouped as in step 1).
    - An item that failed or did not fire: fix it in the same PR and keep it in the tracker; an item that never
      triggered (the situation didn't happen) stays pending for the next game.
-7. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
+8. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
    tick the PR's checks (including "Tested in a local game (game NNN)"), squash-merge with `gh pr merge <pr>
    --squash`, delete the branch, and `node Util/verify.js done <pr>`. Stacked PRs merge in order (base first);
    after each squash-merge, merge `origin/main` into the next branch so its PR shows only its own changes.

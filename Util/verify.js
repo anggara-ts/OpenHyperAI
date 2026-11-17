@@ -8,6 +8,8 @@
 //   node Util/verify.js set <pr> <item|all> <pass|fail|pending|skip> [note...]
 //   node Util/verify.js show [pr]             status table; a PR is ready when every item is pass/skip
 //   node Util/verify.js done <pr>             drop a merged PR from the tracker
+//   node Util/verify.js lineup                test lineup in Customize/general.lua: which slots serve a PR still
+//                                              in testing (keep) and which can go back to "Random" (free)
 //
 // An item's patterns are the backticked parts of its line, e.g. `[OHA-KITE]` or
 // `[OHA-RETREAT] over-evasive`. A log line matches a pattern when it contains every word of it
@@ -131,6 +133,45 @@ function cmdShow(only) {
 	}
 }
 
+// Test lineup in Customize/general.lua: hero lines tagged `-- TEST #<n> [#<m>]: what`. A slot is still
+// needed while any tagged number is a tracked PR that is not ready; otherwise it can go back to "Random".
+function cmdLineup() {
+	const db = load();
+	const file = path.join(__dirname, "..", "Customize", "general.lua");
+	const src = fs.readFileSync(file, "utf8");
+	for (const side of ["Radiant_Heros", "Dire_Heros"]) {
+		const m = src.match(new RegExp(`Customize\\.${side}\\s*=\\s*\\{([\\s\\S]*?)\\n\\}`));
+		if (!m) continue;
+		const lines = m[1].split(/\r?\n/).filter((l) => /^\s*"/.test(l));
+		console.log(side.replace("_Heros", ""));
+		for (let pos = 1; pos <= 5; pos++) {
+			const l = lines[pos - 1];
+			if (!l) {
+				console.log(`  pos ${pos}: FREE (not set)`);
+				continue;
+			}
+			const hero = (l.match(/"([^"]+)"/) || [])[1];
+			const tag = l.match(/TEST\s+((?:#\d+\s*)+):?\s*(.*)$/);
+			if (hero === "Random" || !tag) {
+				console.log(`  pos ${pos}: ${hero === "Random" ? "FREE (Random)" : `${hero} (no TEST tag)`}`);
+				continue;
+			}
+			const nums = [...tag[1].matchAll(/#(\d+)/g)].map((x) => x[1]);
+			const states = nums.map((n) => {
+				const pr = db.prs[n];
+				if (!pr) return `#${n} untracked`;
+				const ready = pr.items.length && pr.items.every((i) => i.status === "pass" || i.status === "skip");
+				return `#${n} ${ready ? "ready" : "testing"}`;
+			});
+			const needed = nums.some((n) => {
+				const pr = db.prs[n];
+				return pr && !pr.items.every((i) => i.status === "pass" || i.status === "skip");
+			});
+			console.log(`  pos ${pos}: ${hero.replace("npc_dota_hero_", "")}  [${states.join(", ")}]  ${needed ? "keep" : "can free"}  ${tag[2]}`);
+		}
+	}
+}
+
 function cmdDone(pr) {
 	const db = load();
 	delete db.prs[pr];
@@ -147,6 +188,7 @@ try {
 	} else if (cmd === "set") cmdSet(a[0], a[1], a[2], a.slice(3).join(" "));
 	else if (cmd === "show") cmdShow(a[0]);
 	else if (cmd === "done") cmdDone(a[0]);
+	else if (cmd === "lineup") cmdLineup();
 	else {
 		console.log(fs.readFileSync(__filename, "utf8").split("\n").slice(1, 17).join("\n"));
 		process.exit(1);

@@ -978,7 +978,10 @@ function X.ConsiderSwitchDiscipline()
 		end
 		local distance = GetUnitToUnitDistance(bot, botTarget)
 		local chasing = distance > 600 and Fu.IsRunning(botTarget)
-		local wantSai = attackers >= 1 or chasing
+		-- Parry only when Shodo Sai is ready: it shares its cooldown with the Katana (datafeed), so the Katana's
+		-- cooldown says. Otherwise the target hitting back would pull Kez out of every Katana trade.
+		local parryReady = kazuraiKatanaAbility:GetCooldownTimeRemaining() <= 0
+		local wantSai = attackers >= 1 and parryReady or chasing
 		if bot.kez_mode == "katana" and wantSai and Fu.GetMP(bot) > 0.25 then
 			X.LogKez("stance-switch to=sai why=" .. (attackers >= 1 and "parry" or "chase"))
 			return BOT_ACTION_DESIRE_HIGH

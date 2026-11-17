@@ -24,3 +24,7 @@ Rules: `AGENTS.md` (workflow step 9). The agent decides and merges without askin
 6. **Clean up:** `node Util/verify.js done <pr>`; set its lineup slots back to `"Random"` (`verify.js lineup`
    shows them as "can free"); for any later PR built on this one, `git merge origin/main` into it and push.
 7. Tell the user what was merged, which issue items were ticked or closed, and what is still testing.
+
+**Branch cleanup** (every merge, without asking): delete local branches whose upstream is gone (`git fetch --prune`,
+`git branch -vv` shows `[gone]`, then `git branch -D`) and remote branches with no open PR whose content is in `main`
+or identical to another branch. Keep `main`, `plugin-fretbots`, `release-*`, branches with an open PR and local `test/next`.

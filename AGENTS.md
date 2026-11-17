@@ -223,6 +223,11 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    - For each issue the PR refers to: tick the task items it fixed and verified, and comment the PR link and the
      game. **Close an issue only when every task item in it is ticked**; a PR never closes an issue by itself.
    - If a later PR was built on this one, merge `origin/main` into it so its PR shows only its own changes.
+   - **Delete branches that are no longer used** (the agent does this without asking): the merged PR's branch
+     (`--delete-branch`), local branches whose upstream is gone (`git branch -vv` shows `[gone]`; squash-merged,
+     so `git branch -D`), and remote branches with no open PR whose content is already in `main` or identical to
+     another branch (check with `git diff --stat`). Never delete `main`, `plugin-fretbots`, `release-*`, a branch
+     with an open PR, or the local `test/next`.
 
 ## Reviewing a game (regular task)
 

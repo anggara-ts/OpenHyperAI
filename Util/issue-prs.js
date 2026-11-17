@@ -1,9 +1,14 @@
 #!/usr/bin/env node
-// Opens a draft PR for every open issue that has none yet.
+// Starts work on issues (WIP) and keeps the PRs' priority labels in step with their issues.
 //
-//   node Util/issue-prs.js [--dry-run]
+//   node Util/issue-prs.js            priority sync only: each open PR gets its issue's priority label, and
+//                                     untriaged issues (no P1-P4 label) are listed. Creates nothing.
+//   node Util/issue-prs.js 12 34      start work on issues #12 and #34 (also: issues labelled "wip")
+//   node Util/issue-prs.js --dry-run  show what would happen
 //
-// For each open issue without a PR (matched by "Refs #N" / "Closes #N" in a PR body or "issue-N" in the branch):
+// Filing an issue does not open a PR: an empty draft PR per issue only clutters the PR list. A branch and draft
+// PR are made when work starts. For each started issue without a PR (matched by "Refs #N" / "Closes #N" in a
+// PR body or "issue-N" in the branch):
 //   - branch  <prefix>/issue-<N>-<slug>  from origin/main  (prefix: feat for "enhancement", docs for
 //     "documentation", chore for "chore", otherwise fix)
 //   - one signed empty commit (git commit-tree -S, so no checkout and no working-tree change),
@@ -20,6 +25,13 @@ const path = require("path");
 const fs = require("fs");
 
 const DRY = process.argv.includes("--dry-run");
+const START = new Set(
+	process.argv
+		.slice(2)
+		.map((a) => a.replace(/^#/, ""))
+		.filter((a) => /^\d+$/.test(a))
+		.map(Number)
+);
 const GH = process.env.GH || (process.platform === "win32" ? "C:\\Program Files\\GitHub CLI\\gh.exe" : "gh");
 const ROOT = path.join(__dirname, "..");
 
@@ -62,6 +74,7 @@ let made = 0;
 for (const issue of issues) {
 	const labels = issue.labels.map((l) => l.name);
 	if (covered.has(issue.number) || labels.includes("no-pr")) continue;
+	if (!START.has(issue.number) && !labels.includes("wip")) continue;
 	const prefix = prefixFor(labels);
 	const branch = `${prefix}/issue-${issue.number}-${slug(issue.title)}`;
 	const title = `${prefix}: ${issue.title} (#${issue.number})`;
@@ -74,7 +87,7 @@ for (const issue of issues) {
 	console.log("   " + out.trim());
 	made++;
 }
-console.log(DRY ? "dry run, nothing created" : `${made} draft PR(s) created`);
+console.log(DRY ? "dry run, nothing created" : `${made} draft PR(s) created${START.size ? "" : " (start work with: node Util/issue-prs.js <issue numbers>)"}`);
 
 // Priority: the issue decides, its open PRs follow. Untriaged issues are listed so they get a label.
 const untriaged = [];
@@ -82,6 +95,7 @@ const prsNow = DRY ? prs : JSON.parse(gh(["pr", "list", "--state", "open", "--li
 for (const issue of issues) {
 	const prio = issue.labels.map((l) => l.name).find((n) => PRIORITY.includes(n));
 	if (!prio) {
+		if (issue.labels.some((l) => l.name === "icebox")) continue; // parked on purpose: no priority
 		untriaged.push(issue.number);
 		continue;
 	}

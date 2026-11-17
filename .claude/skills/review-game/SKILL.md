@@ -20,7 +20,7 @@ Rules: `AGENTS.md` ("Reviewing a game", workflow steps 7-8). Checklist:
 4. **Maintainer comments:** each observation becomes either a fix in the PR it is about, or part of a grouped
    issue card (skill `start-issue`).
 5. **Findings:** write them as time + log line / why it matters / code location / suggested fix / confidence.
-   Verify Dota mechanics against game data. File grouped issues and run `Util/issue-prs.js`.
+   Verify Dota mechanics against game data. File grouped issues (no PR until work starts).
 5b. **Re-triage:** check the priority labels of the issues this game touched (raise what keeps happening,
    lower what was rare), then `node Util/issue-prs.js` so the PRs follow.
 6. **Lineup for the next game:** `node Util/verify.js lineup` and `lineup --suggest [--write]` (free slots
@@ -28,3 +28,6 @@ Rules: `AGENTS.md` ("Reviewing a game", workflow steps 7-8). Checklist:
 7. **Merge what passed:** skill `merge-pr` for every PR that `node Util/verify.js show` marks READY.
 8. **Report** to the user: how the game went in 3-4 lines, what passed/failed per PR, new issues, the next
    lineup, and what you'll fix next.
+
+An observation that turns out to be an API or engine limit (not a bug we can fix): add or update it in the main
+post of discussion #50 (AGENTS.md, "Known limitations"), with the evidence and the issue.

@@ -4,7 +4,8 @@
 //
 //   node Util/verify.js add <pr>              import the PR's "How to verify in game" list (via gh); re-adding
 //                                              keeps the status/notes of items whose text did not change
-//   node Util/verify.js check <game.log> [--game NNN]
+//   node Util/verify.js check <game.log> [--game NNN] [--prs 4,5]   (--prs: only the PRs in that game's build;
+//                                              Util/after-game.js passes it from git ancestry)
 //                                              count each item's log tags in a game log, apply `expect` rules
 //   node Util/verify.js set <pr> <item|all> <pass|fail|pending|skip> [note...]
 //   node Util/verify.js expect <pr> <item> "<rules>"   set an item's rules ("none" clears), see below
@@ -278,13 +279,19 @@ function cmdAdd(pr) {
 
 // ---------- check ----------
 
-function cmdCheck(log, game) {
+function cmdCheck(log, game, only) {
 	const db = load();
 	const text = fs.readFileSync(log, "utf8").split(/\r?\n/);
 	const g = game || path.basename(log).replace(/\.log$/, "");
 	const heroesInLog = new Set();
 	for (const l of text) for (const m of l.matchAll(/npc_dota_hero_([a-z0-9_]+)/g)) heroesInLog.add(m[1]);
 	for (const [num, pr] of Object.entries(db.prs)) {
+		// --prs: only PRs that were in the build this log came from. A PR missing from the build must not be
+		// auto-passed by an `absent` rule or counted as "not seen".
+		if (only && !only.includes(num)) {
+			console.log(`\n#${num} ${pr.title}  (not in this game's build: skipped)`);
+			continue;
+		}
 		console.log(`\n#${num} ${pr.title}`);
 		pr.items.forEach((it, idx) => {
 			const ruled = !!(it.expect || (it.heroes && it.heroes.length));
@@ -715,7 +722,9 @@ function main(argv) {
 	if (cmd === "add") cmdAdd(a[0]);
 	else if (cmd === "check") {
 		const gi = a.indexOf("--game");
-		cmdCheck(a[0], gi >= 0 ? a[gi + 1] : null);
+		const pi = a.indexOf("--prs");
+		const only = pi >= 0 && a[pi + 1] ? a[pi + 1].split(",").map((x) => x.replace(/^#/, "").trim()).filter(Boolean) : null;
+		cmdCheck(a[0], gi >= 0 ? a[gi + 1] : null, only);
 	} else if (cmd === "set") cmdSet(a[0], a[1], a[2], a.slice(3).join(" "));
 	else if (cmd === "expect") cmdExpect(a[0], a[1], a.slice(2).join(" "));
 	else if (cmd === "heroes") cmdHeroes(a[0], a[1], a.slice(2).join(","));

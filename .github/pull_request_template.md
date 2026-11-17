@@ -33,7 +33,7 @@ check a bullet, end it with an HTML comment holding "expect: seen>=1; key<=X" an
 
 ## Checks
 - [ ] CI green: LuaJIT syntax, luacheck, StyLua, Tests
-- [ ] Build checked: `[OHA-BUILD]` in the test game names this branch
+- [ ] Build checked: the test game's `[OHA-BUILD]` commit contains this PR (its branch, or a `test/next` build with it; `Util/after-game.js` lists the PRs in the build)
 - [ ] No `Customize/general.lua` test lineup, no match logs committed
 - [ ] Dota mechanics checked against game data / datafeed (not memory)
 - [ ] Tested in a local game (game NNN) / not yet tested

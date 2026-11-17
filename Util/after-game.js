@@ -160,8 +160,30 @@ function buildSection(lines, summary) {
 	} else {
 		out.push("", "No Util/verify/test-build.json (game not run from a test build).");
 	}
+	// Which tracked PRs were in this game, straight from git: a PR is in the build when its branch tip is an
+	// ancestor of the commit the game printed in [OHA-BUILD]. Works for one PR branch and for a test/next build
+	// with many PRs alike, and keeps working after test/next is rebuilt.
+	gamePrs = null;
+	if (commit) {
+		const tracker = readJson(TRACKER, { prs: {} });
+		const inBuild = [];
+		const notIn = [];
+		const isAncestor = (a) => cp.spawnSync("git", ["merge-base", "--is-ancestor", a, commit], { cwd: ROOT }).status === 0;
+		for (const [n, p] of Object.entries(tracker.prs || {})) {
+			if (!p.branch) continue;
+			// The PR's own (non-merge) commits must all be in the build. Merge commits are ignored: a later
+			// "merge main into the PR" commit doesn't change what the PR contributes.
+			const own = git(["rev-list", "--no-merges", `origin/main..origin/${p.branch}`]).split(/\r?\n/).filter(Boolean);
+			const ok = own.length ? own.every(isAncestor) : isAncestor(`origin/${p.branch}`);
+			(ok ? inBuild : notIn).push(n);
+		}
+		gamePrs = inBuild;
+		out.push("", `Tracked PRs in this game's build (all their own commits are ancestors of the build commit): ${inBuild.map((n) => "#" + n).join(" ") || "none"}`);
+		if (notIn.length) out.push(`Not in this build (their items are not checked): ${notIn.map((n) => "#" + n).join(" ")}`);
+	}
 	return out.join("\n");
 }
+let gamePrs = null;
 
 // --- 4. errors, spam, deaths -----------------------------------------------------------------------------
 function errorsSection(lines) {
@@ -316,7 +338,9 @@ function main() {
 
 	console.log(`game ${game.num}: ${game.file}`);
 	const build = buildSection(lines, summary);
-	const verify = run(process.execPath, [path.join(__dirname, "verify.js"), "check", rel(logFile), "--game", game.num]);
+	const checkArgs = [path.join(__dirname, "verify.js"), "check", rel(logFile), "--game", game.num];
+	if (gamePrs) checkArgs.push("--prs", gamePrs.join(",") || "none");
+	const verify = run(process.execPath, checkArgs);
 	const tracker = readJson(TRACKER, { prs: {} });
 	const head = summary.split(/\r?\n/).slice(0, 7).join("\n");
 

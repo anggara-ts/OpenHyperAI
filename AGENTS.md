@@ -195,10 +195,13 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    matching issue card, a comment on the PR under test, or a note for the review. Don't change code while the
    game runs.
 8. **Review the game** (below), then for the tracked PRs:
-   - `node Util/verify.js check <log> --game NNN` (run by `after-game.js`) auto-passes or auto-fails items with
+   - `after-game.js` works out which tracked PRs were in the game from git: a PR counts when all its own
+     (non-merge) commits are ancestors of the `[OHA-BUILD]` commit, so one `test/next` game tests many PRs and a
+     rebuilt `test/next` doesn't lose the mapping. It runs `node Util/verify.js check <log> --game NNN --prs <those>`,
+     which auto-passes or auto-fails items with
      `expect` rules, keeps items pending when none of their `heroes` played, and shows sample lines for the rest;
-     set those with `node Util/verify.js set <pr> <item> pass|fail|skip [note]`. Only check a log from a build
-     whose `test-build.json` lists the PR (an `absent` rule passes trivially otherwise).
+     set those with `node Util/verify.js set <pr> <item> pass|fail|skip [note]`. PRs not in the build are skipped
+     (an `absent` rule would otherwise pass trivially).
    - Read the maintainer's PR comments (`after-game.js` lists those since the last review). Each observation is
      either fixed in the PR it is about or added to a grouped issue card (step 1).
    - An item that failed: fix it in the same PR and keep it tracked; an item whose situation didn't happen stays

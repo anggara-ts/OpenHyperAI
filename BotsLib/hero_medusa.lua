@@ -1,21 +1,21 @@
 -- Medusa: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
 -- 1 Split Shot, 2 Mystic Snake, 3 Gorgon's Grasp, 6 Stone Gaze. Snake maxed first (levels 1/3/5/7),
 -- Split Shot second, Grasp last (Dotabuff most picked order). The old order put Snake at levels 4
 -- and 5, which the hero level does not allow yet. Ultimate at entries 6/11/15 (levels 6/12/18).
-local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_1"] = {
+local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_null_talisman",
@@ -37,7 +37,7 @@ m["pos_1"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-m["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_medusa_outfit",
 	"item_dragon_lance",
 	"item_hurricane_pike",
@@ -53,380 +53,376 @@ m["pos_2"] = {
 	"item_hydras_breath",
 	"item_travel_boots_2",
 }
-m["pos_4"] = m["pos_2"]
-m["pos_5"] = m["pos_2"]
-m["pos_3"] = m["pos_2"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
-a["LastStandSpells"] = { { name = "medusa_stone_gaze", kind = "none" } }
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+X["LastStandSpells"] = { { name = "medusa_stone_gaze", kind = "none" } }
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName("medusa_split_shot"), "medusa_split_shot", "medusa")
-local p = SafeAbility(b:GetAbilityByName("medusa_mystic_snake"), "medusa_mystic_snake", "medusa")
-local q = SafeAbility(b:GetAbilityByName("medusa_stone_gaze"), "medusa_stone_gaze", "medusa")
-local r = nil
-local s = SafeAbility(b:GetAbilityByName("medusa_gorgon_grasp"), "medusa_gorgon_grasp", "medusa")
-local t
-local u, v
-local w
-local x
-local y, z
-local A, B, C, D, E
-local F = 0
-local G
-function a.SkillsComplement()
-	c.ConsiderForMkbDisassembleMask(b)
-	c.ConsiderTarget()
-	if c.CanNotUseAbility(b) or b:IsInvisible() then
+local splitShotAbility = SafeAbility(bot:GetAbilityByName("medusa_split_shot"), "medusa_split_shot", "medusa")
+local mysticSnakeAbility = SafeAbility(bot:GetAbilityByName("medusa_mystic_snake"), "medusa_mystic_snake", "medusa")
+local stoneGazeAbility = SafeAbility(bot:GetAbilityByName("medusa_stone_gaze"), "medusa_stone_gaze", "medusa")
+local unusedAbility = nil
+local gorgonGraspAbility = SafeAbility(bot:GetAbilityByName("medusa_gorgon_grasp"), "medusa_gorgon_grasp", "medusa")
+local splitShotDesire
+local mysticSnakeDesire, mysticSnakeTarget
+local unusedDesire
+local stoneGazeDesire
+local gorgonGraspDesire, gorgonGraspLocation
+local hpRatio
+local aetherRange = 0
+local botTarget
+function X.SkillsComplement()
+	Fu.ConsiderForMkbDisassembleMask(bot)
+	Fu.ConsiderTarget()
+	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
-	o = SafeAbility(b:GetAbilityByName("medusa_split_shot"), "medusa_split_shot", "medusa")
-	p = SafeAbility(b:GetAbilityByName("medusa_mystic_snake"), "medusa_mystic_snake", "medusa")
-	q = SafeAbility(b:GetAbilityByName("medusa_stone_gaze"), "medusa_stone_gaze", "medusa")
-	s = SafeAbility(b:GetAbilityByName("medusa_gorgon_grasp"), "medusa_gorgon_grasp", "medusa")
-	local H = d.Build(b)
-	A = 400
-	D = H.level
-	B = H.mp
-	C = H.hp
-	E = H.enemies
-	u, v = a.ConsiderW()
-	if u > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(p, v)
+	splitShotAbility = SafeAbility(bot:GetAbilityByName("medusa_split_shot"), "medusa_split_shot", "medusa")
+	mysticSnakeAbility = SafeAbility(bot:GetAbilityByName("medusa_mystic_snake"), "medusa_mystic_snake", "medusa")
+	stoneGazeAbility = SafeAbility(bot:GetAbilityByName("medusa_stone_gaze"), "medusa_stone_gaze", "medusa")
+	gorgonGraspAbility = SafeAbility(bot:GetAbilityByName("medusa_gorgon_grasp"), "medusa_gorgon_grasp", "medusa")
+	local context = AbilityContext.Build(bot)
+	hpRatio = context.hp
+	mysticSnakeDesire, mysticSnakeTarget = X.ConsiderW()
+	if mysticSnakeDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(mysticSnakeAbility, mysticSnakeTarget)
 		return
 	end
-	x = a.ConsiderR()
-	if x > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(q)
+	stoneGazeDesire = X.ConsiderR()
+	if stoneGazeDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(stoneGazeAbility)
 		return
 	end
-	y, z = a.ConsiderGorgonGrasp()
-	if y > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(s, z)
+	gorgonGraspDesire, gorgonGraspLocation = X.ConsiderGorgonGrasp()
+	if gorgonGraspDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnLocation(gorgonGraspAbility, gorgonGraspLocation)
 		return
 	end
-	t = a.ConsiderQ()
-	if t > 0 then
-		b:Action_UseAbility(o)
+	splitShotDesire = X.ConsiderQ()
+	if splitShotDesire > 0 then
+		bot:Action_UseAbility(splitShotAbility)
 		return
 	end
 end
-function a.ConsiderGorgonGrasp()
-	if not s:IsFullyCastable() then
+function X.ConsiderGorgonGrasp()
+	if not gorgonGraspAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local I = c.GetProperCastRange(false, b, s:GetCastRange())
-	local J = s:GetCastPoint()
-	local K = s:GetSpecialValueInt("delay")
-	local L = s:GetSpecialValueInt("damage")
-	local M = s:GetSpecialValueInt("damage_pers")
+	local castRange = Fu.GetProperCastRange(false, bot, gorgonGraspAbility:GetCastRange())
+	local castPoint = gorgonGraspAbility:GetCastPoint()
+	local delay = gorgonGraspAbility:GetSpecialValueInt("delay")
+	local damage = gorgonGraspAbility:GetSpecialValueInt("damage")
+	local damagePerSecond = gorgonGraspAbility:GetSpecialValueInt("damage_pers")
 	-- Float: duration is 0.8/1.2/1.6/2.0 (game data); the Int read gave 0/1/1/2 and undercounted the kill damage.
-	local N = s:GetSpecialValueFloat("duration")
-	G = c.GetProperTarget(b)
-	local O = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local P = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	local Q = J + K
-	for R, S in pairs(P) do
-		if c.IsValidHero(S) and c.IsInRange(b, S, I) and c.CanCastOnNonMagicImmune(S) then
-			if S:HasModifier("modifier_teleporting") then
-				if c.GetModifierTime(S, "modifier_teleporting") > K + J then
-					return BOT_ACTION_DESIRE_HIGH, S:GetLocation()
+	local duration = gorgonGraspAbility:GetSpecialValueFloat("duration")
+	botTarget = Fu.GetProperTarget(bot)
+	local nearbyAllyHeroes = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	local totalDelay = castPoint + delay
+	for _, enemyHero in pairs(nearbyEnemyHeroes) do
+		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if enemyHero:HasModifier("modifier_teleporting") then
+				if Fu.GetModifierTime(enemyHero, "modifier_teleporting") > delay + castPoint then
+					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
-			elseif S:IsChanneling() then
-				return BOT_ACTION_DESIRE_HIGH, S:GetLocation()
+			elseif enemyHero:IsChanneling() then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
 			if
-				c.CanKillTarget(S, L + M * N, DAMAGE_TYPE_PHYSICAL)
-				and not S:HasModifier("modifier_abaddon_borrowed_time")
-				and not S:HasModifier("modifier_dazzle_shallow_grave")
-				and not S:HasModifier("modifier_enigma_black_hole_pull")
-				and not S:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not S:HasModifier("modifier_necrolyte_reapers_scythe")
+				Fu.CanKillTarget(enemyHero, damage + damagePerSecond * duration, DAMAGE_TYPE_PHYSICAL)
+				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemyHero:HasModifier("modifier_enigma_black_hole_pull")
+				and not enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				return BOT_ACTION_DESIRE_HIGH, S:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(G)
-			and c.CanCastOnNonMagicImmune(G)
-			and c.IsInRange(b, G, I)
-			and not c.IsDisabled(G)
-			and not G:HasModifier("modifier_enigma_black_hole_pull")
-			and not G:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and (G:GetCurrentMovementSpeed() <= 250 or c.IsInRange(b, G, I * 0.55))
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsDisabled(botTarget)
+			and not botTarget:HasModifier("modifier_enigma_black_hole_pull")
+			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and (botTarget:GetCurrentMovementSpeed() <= 250 or Fu.IsInRange(bot, botTarget, castRange * 0.55))
 		then
-			return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
-	if c.IsRetreating(b) and not c.IsRealInvisible(b) then
-		for R, S in pairs(P) do
+	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) then
+		for _, enemyHero in pairs(nearbyEnemyHeroes) do
 			if
-				c.IsValidHero(S)
-				and c.IsInRange(b, S, I)
-				and not c.IsInRange(b, S, I * 0.3)
-				and b:WasRecentlyDamagedByHero(S, 3.0)
-				and (c.IsChasingTarget(S, b) or c.GetHP(b) < 0.5)
-				and c.CanCastOnNonMagicImmune(S)
-				and not c.IsDisabled(S)
-				and not S:HasModifier("modifier_enigma_black_hole_pull")
-				and not S:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not S:HasModifier("modifier_necrolyte_reapers_scythe")
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and not Fu.IsInRange(bot, enemyHero, castRange * 0.3)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
+				and (Fu.IsChasingTarget(enemyHero, bot) or Fu.GetHP(bot) < 0.5)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and not enemyHero:HasModifier("modifier_enigma_black_hole_pull")
+				and not enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				return BOT_ACTION_DESIRE_HIGH, (b:GetLocation() + S:GetLocation()) / 2
+				return BOT_ACTION_DESIRE_HIGH, (bot:GetLocation() + enemyHero:GetLocation()) / 2
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderQ()
-	if not o:IsFullyCastable() then
+function X.ConsiderQ()
+	if not splitShotAbility:IsFullyCastable() then
 		return 0
 	end
-	local I = b:GetAttackRange() + 150
-	local T = o:GetLevel()
-	local U = c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE)
-	local V = b:GetNearbyCreeps(I, true)
-	local W = b:GetNearbyLaneCreeps(I, true)
-	local X = b:GetNearbyLaneCreeps(800, false)
-	G = c.GetProperTarget(b)
+	local splitShotRange = bot:GetAttackRange() + 150
+	local abilityLevel = splitShotAbility:GetLevel()
+	local enemyHeroesInRange = Fu.GetNearbyHeroes(bot, splitShotRange, true, BOT_MODE_NONE)
+	local creepsInRange = bot:GetNearbyCreeps(splitShotRange, true)
+	local laneCreepsInRange = bot:GetNearbyLaneCreeps(splitShotRange, true)
+	local allyLaneCreeps = bot:GetNearbyLaneCreeps(800, false)
+	botTarget = Fu.GetProperTarget(bot)
 	-- Off when only one enemy unit (hero or creep) is in Split Shot reach (attack range + 150,
 	-- Valve data): the extra arrows have nothing to hit and the main one loses damage.
-	local units = #U + #V
+	local units = #enemyHeroesInRange + #creepsInRange
 	if
-		c.IsLaning(b)
+		Fu.IsLaning(bot)
 		or units <= 1
-		or c.IsGoingOnSomeone(b) and c.IsValidHero(G) and T <= 2 and #U == 2
-		or #U == 0 and #W >= 2 and #X >= 1 and T <= 3
+		or Fu.IsGoingOnSomeone(bot) and Fu.IsValidHero(botTarget) and abilityLevel <= 2 and #enemyHeroesInRange == 2
+		or #enemyHeroesInRange == 0 and #laneCreepsInRange >= 2 and #allyLaneCreeps >= 1 and abilityLevel <= 3
 	then
-		if o:GetToggleState() then
+		if splitShotAbility:GetToggleState() then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	else
-		if not o:GetToggleState() then
+		if not splitShotAbility:GetToggleState() then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-local function Y(I, Z, _)
-	local a0 = nil
-	local a1 = 0
-	local a2 = Z * 1.2
-	local a3 = b:GetNearbyCreeps(I + a2, true)
-	if #a3 < _ then
-		local a4 = a3[1]
-		if c.IsValid(a4) then
-			local a5 = #c.GetEnemiesNearLoc(a4:GetLocation(), a2)
-			if a5 >= 1 then
-				a0 = a4
-				a1 = math.min(#a3 + a5, _)
+local function FindSnakeBounceCreep(castRange, radius, jumpCount)
+	local bounceCreep = nil
+	local bounceCount = 0
+	local searchRadius = radius * 1.2
+	local creeps = bot:GetNearbyCreeps(castRange + searchRadius, true)
+	if #creeps < jumpCount then
+		local firstCreep = creeps[1]
+		if Fu.IsValid(firstCreep) then
+			local enemiesNearCreep = #Fu.GetEnemiesNearLoc(firstCreep:GetLocation(), searchRadius)
+			if enemiesNearCreep >= 1 then
+				bounceCreep = firstCreep
+				bounceCount = math.min(#creeps + enemiesNearCreep, jumpCount)
 			end
 		end
-	elseif #a3 >= _ then
-		if (c.IsFarming(b) or c.IsPushing(b)) and c.IsValid(a3[1]) then
-			return a3[1], #a3
+	elseif #creeps >= jumpCount then
+		if (Fu.IsFarming(bot) or Fu.IsPushing(bot)) and Fu.IsValid(creeps[1]) then
+			return creeps[1], #creeps
 		end
 	end
-	return a0, a1
+	return bounceCreep, bounceCount
 end
-function a.ConsiderW()
-	if not p:IsFullyCastable() then
+function X.ConsiderW()
+	if not mysticSnakeAbility:IsFullyCastable() then
 		return 0
 	end
-	local I = p:GetCastRange() + 20
-	local _ = p:GetSpecialValueInt("snake_jumps")
-	local a6 = p:GetSpecialValueInt("snake_damage")
-	local Z = p:GetSpecialValueInt("radius")
-	local T = p:GetLevel()
-	if c.IsRetreating(b) then
-		local a7 = c.GetNearbyHeroes(b, I - 200, true, BOT_MODE_NONE)
-		for R, a8 in pairs(a7) do
+	local castRange = mysticSnakeAbility:GetCastRange() + 20
+	local snakeJumps = mysticSnakeAbility:GetSpecialValueInt("snake_jumps")
+	local snakeDamage = mysticSnakeAbility:GetSpecialValueInt("snake_damage")
+	local radius = mysticSnakeAbility:GetSpecialValueInt("radius")
+	local abilityLevel = mysticSnakeAbility:GetLevel()
+	if Fu.IsRetreating(bot) then
+		local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange - 200, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(a8)
-				and b:WasRecentlyDamagedByHero(a8, 3.0)
-				and c.CanCastOnTargetAdvanced(a8)
-				and c.CanCastOnNonMagicImmune(a8)
+				Fu.IsValidHero(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
 			then
-				return BOT_ACTION_DESIRE_MODERATE, a8
+				return BOT_ACTION_DESIRE_MODERATE, enemyHero
 			end
 		end
 	end
 	-- Grouped heroes: the snake jumps between enemies within 450 and gains 25% per jump.
 	-- Start it on the hero nearest the middle of the group, in any fight, not only a team fight.
-	local group = b:FindAoELocation(true, true, b:GetLocation(), I, Z, 0, 0)
+	local group = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 	if group ~= nil and group.count >= 2 then
 		local best, bestDist = nil, math.huge
-		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE) or {}) do
 			if
-				c.IsValidHero(a8)
-				and not c.IsSuspiciousIllusion(a8)
-				and c.CanCastOnNonMagicImmune(a8)
-				and c.CanCastOnTargetAdvanced(a8)
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
 			then
-				local dist = GetUnitToLocationDistance(a8, group.targetloc)
+				local dist = GetUnitToLocationDistance(enemyHero, group.targetloc)
 				if dist < bestDist then
-					best, bestDist = a8, dist
+					best, bestDist = enemyHero, dist
 				end
 			end
 		end
 		if best ~= nil then
-			a.LogSnake("group", best, group.count)
+			X.LogSnake("group", best, group.count)
 			return BOT_ACTION_DESIRE_HIGH, best
 		end
 	end
 	-- Lane poke: the snake gives back mana from what it hits, so a hero in range is worth it
 	-- while she keeps enough mana for Mana Shield.
-	if c.IsInLaningPhase() and c.GetManaAfter(p:GetManaCost()) >= 0.45 then
-		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+	if Fu.IsInLaningPhase() and Fu.GetManaAfter(mysticSnakeAbility:GetManaCost()) >= 0.45 then
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE) or {}) do
 			if
-				c.IsValidHero(a8)
-				and not c.IsSuspiciousIllusion(a8)
-				and c.CanCastOnNonMagicImmune(a8)
-				and c.CanCastOnTargetAdvanced(a8)
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
 			then
-				a.LogSnake("lane-poke", a8, 1)
-				return BOT_ACTION_DESIRE_MODERATE, a8
+				X.LogSnake("lane-poke", enemyHero, 1)
+				return BOT_ACTION_DESIRE_MODERATE, enemyHero
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local a9 = nil
-		local aa = 0
-		local a7 = c.GetNearbyHeroes(b, I + 50, true, BOT_MODE_NONE)
-		for R, a8 in pairs(a7) do
-			if c.IsValidHero(a8) and c.CanCastOnNonMagicImmune(a8) and c.CanCastOnTargetAdvanced(a8) then
-				local ab = a8:GetMaxMana()
-				if ab > aa then
-					aa = ab
-					a9 = a8
+	if Fu.IsInTeamFight(bot, 1200) then
+		local maxManaTarget = nil
+		local maxMana = 0
+		local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(enemiesInRange) do
+			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+				local enemyMaxMana = enemyHero:GetMaxMana()
+				if enemyMaxMana > maxMana then
+					maxMana = enemyMaxMana
+					maxManaTarget = enemyHero
 				end
 			end
 		end
-		if a9 ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, a9
+		if maxManaTarget ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, maxManaTarget
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
-		local ac = c.GetProperTarget(b)
-		if c.IsValidHero(ac) and c.CanCastOnNonMagicImmune(ac) and c.CanCastOnTargetAdvanced(ac) then
-			local ad, a1 = Y(I, Z, _)
-			if ad and c.IsInRange(ad, b, I + 50) then
-				return BOT_ACTION_DESIRE_HIGH, ad
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
+		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and Fu.CanCastOnTargetAdvanced(target) then
+			local bounceCreep, bounceCount = FindSnakeBounceCreep(castRange, radius, snakeJumps)
+			if bounceCreep and Fu.IsInRange(bounceCreep, bot, castRange + 50) then
+				return BOT_ACTION_DESIRE_HIGH, bounceCreep
 			end
-			-- Was "return ..., ad": ad is nil when no creep bounce exists, which sent a cast
+			-- Was "return ..., bounceCreep": bounceCreep is nil when no creep bounce exists, which sent a cast
 			-- with no target (refused=nil-target). The target itself is the fallback.
-			if c.IsInRange(ac, b, I + 50) then
-				return BOT_ACTION_DESIRE_HIGH, ac
+			if Fu.IsInRange(target, bot, castRange + 50) then
+				return BOT_ACTION_DESIRE_HIGH, target
 			end
 		end
 	end
-	local ad, a1 = Y(I, Z, _)
-	if ad and c.IsInRange(ad, b, I + 50) then
-		return BOT_ACTION_DESIRE_HIGH, ad
+	local bounceCreep, bounceCount = FindSnakeBounceCreep(castRange, radius, snakeJumps)
+	if bounceCreep and Fu.IsInRange(bounceCreep, bot, castRange + 50) then
+		return BOT_ACTION_DESIRE_HIGH, bounceCreep
 	end
-	if T >= 3 then
-		local ae = b:FindAoELocation(true, false, b:GetLocation(), I * 2, Z * 1.2, 0, 0)
-		local af = 5
-		local ag = b:GetNearbyCreeps(I, true)
-		local ah = b:GetNearbyLaneCreeps(1600, true)
-		if T == 4 then
-			af = 4
+	if abilityLevel >= 3 then
+		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange * 2, radius * 1.2, 0, 0)
+		local requiredCount = 5
+		local nearbyCreeps = bot:GetNearbyCreeps(castRange, true)
+		local enemyLaneCreeps = bot:GetNearbyLaneCreeps(1600, true)
+		if abilityLevel == 4 then
+			requiredCount = 4
 		end
-		if b:GetLevel() >= 20 or c.GetMP(b) > 0.88 then
-			af = 3
+		if bot:GetLevel() >= 20 or Fu.GetMP(bot) > 0.88 then
+			requiredCount = 3
 		end
-		if ae.count >= af then
+		if aoe.count >= requiredCount then
 			if
-				c.IsValid(ag[1])
-				and c.CanCastOnNonMagicImmune(ag[1])
-				and not (ag[1]:GetTeam() == TEAM_NEUTRAL and #ah >= 1)
-				and c.GetAroundTargetEnemyUnitCount(ag[1], 470) >= 2
+				Fu.IsValid(nearbyCreeps[1])
+				and Fu.CanCastOnNonMagicImmune(nearbyCreeps[1])
+				and not (nearbyCreeps[1]:GetTeam() == TEAM_NEUTRAL and #enemyLaneCreeps >= 1)
+				and Fu.GetAroundTargetEnemyUnitCount(nearbyCreeps[1], 470) >= 2
 			then
-				return BOT_ACTION_DESIRE_HIGH, ag[1]
+				return BOT_ACTION_DESIRE_HIGH, nearbyCreeps[1]
 			end
 		end
-		if #ag >= 2 and T >= 3 then
-			local ai = b:GetNearbyCreeps(1400, true)
-			local aj = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
+		if #nearbyCreeps >= 2 and abilityLevel >= 3 then
+			local creepsIn1400 = bot:GetNearbyCreeps(1400, true)
+			local enemiesIn1000 = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
 			if
-				c.IsValid(ag[1])
-				and #ai + #aj >= 4
-				and c.CanCastOnNonMagicImmune(ag[1])
-				and not (ag[1]:GetTeam() == TEAM_NEUTRAL and #ah >= 1)
-				and c.GetAroundTargetEnemyUnitCount(ag[1], 470) >= 2
+				Fu.IsValid(nearbyCreeps[1])
+				and #creepsIn1400 + #enemiesIn1000 >= 4
+				and Fu.CanCastOnNonMagicImmune(nearbyCreeps[1])
+				and not (nearbyCreeps[1]:GetTeam() == TEAM_NEUTRAL and #enemyLaneCreeps >= 1)
+				and Fu.GetAroundTargetEnemyUnitCount(nearbyCreeps[1], 470) >= 2
 			then
-				return BOT_ACTION_DESIRE_HIGH, ag[1]
+				return BOT_ACTION_DESIRE_HIGH, nearbyCreeps[1]
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 -- [OHA-MEDUSA]: Mystic Snake casts from the group and lane-poke rules, once per 10s per rule.
-function a.LogSnake(why, target, heroes)
-	b._snakeLogAt = b._snakeLogAt or {}
-	if DotaTime() < (b._snakeLogAt[why] or -999) then
+function X.LogSnake(why, target, heroes)
+	bot._snakeLogAt = bot._snakeLogAt or {}
+	if DotaTime() < (bot._snakeLogAt[why] or -999) then
 		return
 	end
-	b._snakeLogAt[why] = DotaTime() + 10
+	bot._snakeLogAt[why] = DotaTime() + 10
 	pcall(print, string.format(
 		"[OHA-MEDUSA] t=%.0f mystic-snake why=%s target=%s heroes=%d mp=%.2f",
 		DotaTime(),
 		why,
 		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
 		heroes,
-		c.GetMP(b)
+		Fu.GetMP(bot)
 	))
 end
 -- [OHA-MEDUSA]: each Stone Gaze with why and how many heroes were looking at her.
-function a.LogGaze(why, looking)
+function X.LogGaze(why, looking)
 	pcall(print, string.format(
 		"[OHA-MEDUSA] t=%.0f stone-gaze why=%s looking=%d hp=%.2f mp=%.2f",
 		DotaTime(),
 		why,
 		looking,
-		c.GetHP(b),
-		c.GetMP(b)
+		Fu.GetHP(bot),
+		Fu.GetMP(bot)
 	))
 end
-function a.ConsiderR()
-	if not q:IsFullyCastable() then
+function X.ConsiderR()
+	if not stoneGazeAbility:IsFullyCastable() then
 		return 0
 	end
-	local I = q:GetSpecialValueInt("radius")
-	if I == nil or I <= 0 then
-		I = 1200
+	local radius = stoneGazeAbility:GetSpecialValueInt("radius")
+	if radius == nil or radius <= 0 then
+		radius = 1200
 	end
-	local ak = b:GetAttackRange()
+	local attackRange = bot:GetAttackRange()
 	-- Stone Gaze works on anyone in 1200 who looks at her: slowed at once, stone after 2s of
 	-- looking. A hero attacking or chasing her is looking at her by definition. The old gate
 	-- only counted enemies inside her attack range facing her within 50 degrees.
 	local looking = 0
-	for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE) or {}) do
 		if
-			c.IsValidHero(a8)
-			and not c.IsSuspiciousIllusion(a8)
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
 			-- Was CanCastOnNonMagicImmune: Stone Gaze is SPELL_IMMUNITY_ENEMIES_YES in the game data
 			-- (it pierces debuff immunity), so a BKB carry hitting her counts as looking too.
-			and not a8:IsInvulnerable()
+			and not enemyHero:IsInvulnerable()
 			and (
-				a8:GetAttackTarget() == b
-				or c.IsChasingTarget(a8, b)
-				or a8:IsFacingLocation(b:GetLocation(), 45)
+				enemyHero:GetAttackTarget() == bot
+				or Fu.IsChasingTarget(enemyHero, bot)
+				or enemyHero:IsFacingLocation(bot:GetLocation(), 45)
 			)
 		then
 			looking = looking + 1
@@ -435,96 +431,96 @@ function a.ConsiderR()
 	if looking == 0 then
 		return 0
 	end
-	local fighting = c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) or b:WasRecentlyDamagedByAnyHero(2.0)
+	local fighting = Fu.IsInTeamFight(bot, 1200) or Fu.IsGoingOnSomeone(bot) or bot:WasRecentlyDamagedByAnyHero(2.0)
 	-- Two or more heroes looking at her in a fight: that is most of the ult's value.
 	if fighting and looking >= 2 then
-		a.LogGaze("group", looking)
+		X.LogGaze("group", looking)
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	-- Low and being hit: petrify the attacker and take the speed boost.
-	if looking >= 1 and C < 0.45 and b:WasRecentlyDamagedByAnyHero(2.0) then
-		a.LogGaze("survive", looking)
+	if looking >= 1 and hpRatio < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.0) then
+		X.LogGaze("survive", looking)
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if c.IsRetreating(b) then
-		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-		for R, a8 in pairs(a7) do
-			if b:WasRecentlyDamagedByHero(a8, 2.0) and a8:IsFacingLocation(b:GetLocation(), 20) then
+	if Fu.IsRetreating(bot) then
+		local enemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(enemies) do
+			if bot:WasRecentlyDamagedByHero(enemyHero, 2.0) and enemyHero:IsFacingLocation(bot:GetLocation(), 20) then
 				return BOT_ACTION_DESIRE_MODERATE
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) then
-		local an = b:FindAoELocation(true, true, b:GetLocation(), ak, 400, 0, 0)
-		if an.count >= 2 then
-			local ao = c.GetInvUnitInLocCount(b, ak + 200, 400, an.targetloc, true)
-			if ao >= an.count then
+	if Fu.IsInTeamFight(bot, 1200) or Fu.IsGoingOnSomeone(bot) then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), attackRange, 400, 0, 0)
+		if aoe.count >= 2 then
+			local unitsInAoe = Fu.GetInvUnitInLocCount(bot, attackRange + 200, 400, aoe.targetloc, true)
+			if unitsInAoe >= aoe.count then
 				return BOT_ACTION_DESIRE_MODERATE
 			end
 		end
-		local ap = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-		if #ap >= 3 then
+		local enemiesIn800 = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
+		if #enemiesIn800 >= 3 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		local ae = b:FindAoELocation(true, true, b:GetLocation(), 10, 700, 1.0, 0)
-		if ae.count >= 3 then
+		local aoeNear = bot:FindAoELocation(true, true, bot:GetLocation(), 10, 700, 1.0, 0)
+		if aoeNear.count >= 3 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		local ac = c.GetProperTarget(b)
+		local target = Fu.GetProperTarget(bot)
 		if
-			c.IsValidHero(ac)
-			and c.CanCastOnNonMagicImmune(ac)
-			and not c.IsDisabled(ac)
-			and GetUnitToUnitDistance(ac, b) <= b:GetAttackRange()
-			and ac:GetHealth() > 600
-			and ac:GetPrimaryAttribute() ~= ATTRIBUTE_INTELLECT
-			and ac:IsFacingLocation(b:GetLocation(), 30)
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and not Fu.IsDisabled(target)
+			and GetUnitToUnitDistance(target, bot) <= bot:GetAttackRange()
+			and target:GetHealth() > 600
+			and target:GetPrimaryAttribute() ~= ATTRIBUTE_INTELLECT
+			and target:IsFacingLocation(bot:GetLocation(), 30)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.GetHurtCount(aq, ar)
-	local as = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-	local ag = b:GetNearbyCreeps(1600, true, BOT_MODE_NONE)
-	local at = {}
-	table.insert(at, aq)
-	local au = 1
-	for av = 1, ar do
-		local aw = a.GetNearestUnit(aq, as, ag, at)
-		if aw ~= nil and GetUnitToUnitDistance(aq, aw) <= 475 then
-			au = au + 1
-			table.insert(at, aw)
+function X.GetHurtCount(startUnit, maxJumps)
+	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+	local enemyCreeps = bot:GetNearbyCreeps(1600, true, BOT_MODE_NONE)
+	local hitUnits = {}
+	table.insert(hitUnits, startUnit)
+	local hurtCount = 1
+	for _ = 1, maxJumps do
+		local nextUnit = X.GetNearestUnit(startUnit, enemyHeroes, enemyCreeps, hitUnits)
+		if nextUnit ~= nil and GetUnitToUnitDistance(startUnit, nextUnit) <= 475 then
+			hurtCount = hurtCount + 1
+			table.insert(hitUnits, nextUnit)
 		else
 			break
 		end
 	end
-	return au
+	return hurtCount
 end
-function a.GetNearestUnit(aq, as, ag, at)
-	local ax = nil
-	local ay = 9999
-	for R, az in pairs(as) do
-		if az ~= nil and az:IsAlive() and not a.IsExistInTable(az, at) and GetUnitToUnitDistance(aq, az) < ay then
-			ax = az
-			ay = GetUnitToUnitDistance(aq, az)
+function X.GetNearestUnit(unit, heroes, creeps, excluded)
+	local nearestUnit = nil
+	local nearestDistance = 9999
+	for _, candidate in pairs(heroes) do
+		if candidate ~= nil and candidate:IsAlive() and not X.IsExistInTable(candidate, excluded) and GetUnitToUnitDistance(unit, candidate) < nearestDistance then
+			nearestUnit = candidate
+			nearestDistance = GetUnitToUnitDistance(unit, candidate)
 		end
 	end
-	for R, az in pairs(ag) do
-		if az ~= nil and az:IsAlive() and not a.IsExistInTable(az, at) and GetUnitToUnitDistance(aq, az) < ay then
-			ax = az
-			ay = GetUnitToUnitDistance(aq, az)
+	for _, candidate in pairs(creeps) do
+		if candidate ~= nil and candidate:IsAlive() and not X.IsExistInTable(candidate, excluded) and GetUnitToUnitDistance(unit, candidate) < nearestDistance then
+			nearestUnit = candidate
+			nearestDistance = GetUnitToUnitDistance(unit, candidate)
 		end
 	end
-	return ax
+	return nearestUnit
 end
-function a.IsExistInTable(aA, aB)
-	for R, aC in pairs(aB) do
-		if aC == aA then
+function X.IsExistInTable(value, list)
+	for _, element in pairs(list) do
+		if element == value then
 			return true
 		end
 	end
 	return false
 end
-return a
+return X

@@ -1,18 +1,18 @@
 -- Shadow Shaman: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_4"] = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local tAllAbilityBuildList = { { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -30,7 +30,7 @@ m["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -48,7 +48,7 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_1"] = {
+sRoleItemsBuyList["pos_1"] = {
 	"item_crystal_maiden_outfit",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
@@ -61,436 +61,435 @@ m["pos_1"] = {
 	"item_ultimate_scepter_2",
 	"item_refresher",
 }
-m["pos_2"] = m["pos_1"]
-m["pos_3"] = m["pos_1"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_cyclone", "item_magic_wand", "item_ultimate_scepter", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mage" }, {}
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_cyclone", "item_magic_wand", "item_ultimate_scepter", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
-a["LastStandSpells"] = { { name = "shadow_shaman_voodoo", kind = "unit" } }
-a["bDeafaultItem"] = true
-function a.MinionThink(n)
-	e.MinionThink(n)
+X["LastStandSpells"] = { { name = "shadow_shaman_voodoo", kind = "unit" } }
+X["bDeafaultItem"] = true
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "shadow_shaman")
-local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "shadow_shaman")
-local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "shadow_shaman")
-local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "shadow_shaman")
-local s = SafeAbility(b:GetAbilityByName("shadow_shaman_urnaconda"), "shadow_shaman_urnaconda", "shadow_shaman")
-local t = SafeAbility(b:GetAbilityByName(f[3]), "sTalentList[3]", "shadow_shaman")
-local u = SafeAbility(b:GetAbilityByName(f[7]), "sTalentList[7]", "shadow_shaman")
-local v, w
-local x, y
-local z, A
-local B, C
-local D, E
-local F = 0
-local G = 0
-local H
-local I, J, K, L, M, N
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) or b:IsInvisible() then
+local etherShockAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "shadow_shaman")
+local hexAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "shadow_shaman")
+local shacklesAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "shadow_shaman")
+local serpentWardAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "shadow_shaman")
+local urnacondaAbility = SafeAbility(bot:GetAbilityByName("shadow_shaman_urnaconda"), "shadow_shaman_urnaconda", "shadow_shaman")
+local talent3 = SafeAbility(bot:GetAbilityByName(sTalentList[3]), "sTalentList[3]", "shadow_shaman")
+local talent7 = SafeAbility(bot:GetAbilityByName(sTalentList[7]), "sTalentList[7]", "shadow_shaman")
+local etherShockDesire, etherShockTarget
+local hexDesire, hexTarget
+local shacklesDesire, shacklesTarget
+local serpentWardDesire, serpentWardLocation
+local urnacondaDesire, urnacondaLocation
+local aetherRange = 0
+local bonusDamage = 0
+local isAttacking
+local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
-	H = c.IsAttacking(b)
-	local O = d.Build(b)
-	J = 400
-	F = O.aetherRange
-	G = 0
-	I = O.level
-	K = O.mp
-	L = O.hp
-	botTarget = O.target
-	M = O.enemies
-	N = O.allies
-	if u:IsTrained() then
-		G = u:GetSpecialValueInt("value")
+	isAttacking = Fu.IsAttacking(bot)
+	local context = AbilityContext.Build(bot)
+	aetherRange = context.aetherRange
+	bonusDamage = 0
+	botLevel = context.level
+	mpRatio = context.mp
+	hpRatio = context.hp
+	botTarget = context.target
+	nearbyEnemies = context.enemies
+	nearbyAllies = context.allies
+	if talent7:IsTrained() then
+		bonusDamage = talent7:GetSpecialValueInt("value")
 	end
-	x, y = a.ConsiderW()
-	if x > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(p, y)
+	hexDesire, hexTarget = X.ConsiderW()
+	if hexDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(hexAbility, hexTarget)
 		return
 	end
-	D, E = a.ConsiderUrnaconda()
-	if D > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(s, E)
+	urnacondaDesire, urnacondaLocation = X.ConsiderUrnaconda()
+	if urnacondaDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(urnacondaAbility, urnacondaLocation)
 		return
 	end
-	B, C = a.ConsiderR()
-	if B > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(r, C)
+	serpentWardDesire, serpentWardLocation = X.ConsiderR()
+	if serpentWardDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(serpentWardAbility, serpentWardLocation)
 		return
 	end
-	v, w = a.ConsiderQ()
-	if v > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(o, w)
+	etherShockDesire, etherShockTarget = X.ConsiderQ()
+	if etherShockDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(etherShockAbility, etherShockTarget)
 		return
 	end
-	z, A = a.ConsiderE()
-	if z > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(q, A)
+	shacklesDesire, shacklesTarget = X.ConsiderE()
+	if shacklesDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(shacklesAbility, shacklesTarget)
 		return
 	end
 end
-function a.ConsiderQ()
-	if not o:IsFullyCastable() then
+function X.ConsiderQ()
+	if not etherShockAbility:IsFullyCastable() then
 		return 0
 	end
-	local P = o:GetLevel()
-	local Q = o:GetCastRange()
-	local R = o:GetCastPoint()
-	local S = o:GetManaCost()
-	local T = o:GetSpecialValueInt("damage") + G
-	local U = DAMAGE_TYPE_MAGICAL
-	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
-	local W = c.GetNearbyHeroes(b, Q + 220, true, BOT_MODE_NONE)
+	local abilityLevel = etherShockAbility:GetLevel()
+	local castRange = etherShockAbility:GetCastRange()
+	local castPoint = etherShockAbility:GetCastPoint()
+	local manaCost = etherShockAbility:GetManaCost()
+	local damage = etherShockAbility:GetSpecialValueInt("damage") + bonusDamage
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local enemiesInWideRange = Fu.GetNearbyHeroes(bot, castRange + 220, true, BOT_MODE_NONE)
 	-- Ether Shock is only worth walking into when it kills. Otherwise stay at range.
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, Q)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.CanCastOnTargetAdvanced(botTarget)
-			and (c.WillMagicKillTarget(b, botTarget, T, R) or c.GetHP(botTarget) < 0.3)
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and (Fu.WillMagicKillTarget(bot, botTarget, damage, castPoint) or Fu.GetHP(botTarget) < 0.3)
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-attack:" .. c.Chat.GetNormName(botTarget)
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-attack:" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	for X, Y in pairs(W) do
+	for _, enemy in pairs(enemiesInWideRange) do
 		if
-			c.IsValid(Y)
-			and c.CanCastOnNonMagicImmune(Y)
-			and c.CanCastOnTargetAdvanced(Y)
-			and c.WillMagicKillTarget(b, Y, T, R)
+			Fu.IsValid(enemy)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and Fu.CanCastOnTargetAdvanced(enemy)
+			and Fu.WillMagicKillTarget(bot, enemy, damage, castPoint)
 		then
-			return BOT_ACTION_DESIRE_HIGH, Y, "Q-kill" .. c.Chat.GetNormName(Y)
+			return BOT_ACTION_DESIRE_HIGH, enemy, "Q-kill" .. Fu.Chat.GetNormName(enemy)
 		end
 	end
-	if c.IsInTeamFight(b, 1200) and I >= 5 then
-		local Z = nil
-		local _ = 9999
-		for X, Y in pairs(V) do
-			if c.IsValid(Y) and c.CanCastOnNonMagicImmune(Y) and c.CanCastOnTargetAdvanced(Y) then
-				local a0 = Y:GetHealth()
-				if a0 < _ then
-					_ = a0
-					Z = Y
+	if Fu.IsInTeamFight(bot, 1200) and botLevel >= 5 then
+		local weakestEnemy = nil
+		local lowestHealth = 9999
+		for _, enemy in pairs(enemiesInRange) do
+			if Fu.IsValid(enemy) and Fu.CanCastOnNonMagicImmune(enemy) and Fu.CanCastOnTargetAdvanced(enemy) then
+				local health = enemy:GetHealth()
+				if health < lowestHealth then
+					lowestHealth = health
+					weakestEnemy = enemy
 				end
 			end
 		end
-		if Z ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, Z, "Q-Battle-Weakest:" .. c.Chat.GetNormName(Z)
+		if weakestEnemy ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, weakestEnemy, "Q-Battle-Weakest:" .. Fu.Chat.GetNormName(weakestEnemy)
 		end
 	end
-	if c.IsRetreating(b) then
-		for X, Y in pairs(V) do
+	if Fu.IsRetreating(bot) then
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(Y)
-				and (b:WasRecentlyDamagedByHero(Y, 4.0) or K > 0.68 or GetUnitToUnitDistance(b, Y) <= 400)
-				and c.CanCastOnNonMagicImmune(Y)
-				and c.CanCastOnTargetAdvanced(Y)
-				and b:IsFacingLocation(Y:GetLocation(), 30)
+				Fu.IsValidHero(enemy)
+				and (bot:WasRecentlyDamagedByHero(enemy, 4.0) or mpRatio > 0.68 or GetUnitToUnitDistance(bot, enemy) <= 400)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+				and bot:IsFacingLocation(enemy:GetLocation(), 30)
 			then
-				return BOT_ACTION_DESIRE_HIGH, Y, "Q-Retreat:" .. c.Chat.GetNormName(Y)
+				return BOT_ACTION_DESIRE_HIGH, enemy, "Q-Retreat:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if c.IsLaning(b) then
-		if K > 0.5 then
-			for X, Y in pairs(V) do
+	if Fu.IsLaning(bot) then
+		if mpRatio > 0.5 then
+			for _, enemy in pairs(enemiesInRange) do
 				if
-					c.IsValid(Y)
-					and c.CanCastOnNonMagicImmune(Y)
-					and c.CanCastOnTargetAdvanced(Y)
-					and c.GetAttackEnemysAllyCreepCount(Y, 1400) >= 3
+					Fu.IsValid(enemy)
+					and Fu.CanCastOnNonMagicImmune(enemy)
+					and Fu.CanCastOnTargetAdvanced(enemy)
+					and Fu.GetAttackEnemysAllyCreepCount(enemy, 1400) >= 3
 				then
-					return BOT_ACTION_DESIRE_HIGH, Y, "Q-Laning:" .. c.Chat.GetNormName(Y)
+					return BOT_ACTION_DESIRE_HIGH, enemy, "Q-Laning:" .. Fu.Chat.GetNormName(enemy)
 				end
 			end
 		end
-		if #N <= 1 or c.IsCore(b) then
-			local a1 = b:GetNearbyLaneCreeps(800, true)
-			for X, a2 in pairs(a1) do
-				if c.IsValid(a2) and not a2:HasModifier("modifier_fountain_glyph") and not c.IsAllysTarget(a2) then
-					if c.IsKeyWordUnit("ranged", a2) and c.WillKillTarget(a2, T, U, R) then
-						return BOT_ACTION_DESIRE_HIGH, a2, "Q-LaneRanged"
+		if #nearbyAllies <= 1 or Fu.IsCore(bot) then
+			local laneCreeps = bot:GetNearbyLaneCreeps(800, true)
+			for _, creep in pairs(laneCreeps) do
+				if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and not Fu.IsAllysTarget(creep) then
+					if Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, damage, damageType, castPoint) then
+						return BOT_ACTION_DESIRE_HIGH, creep, "Q-LaneRanged"
 					end
 					if
-						b:GetMana() > 320
-						and c.IsKeyWordUnit("melee", a2)
-						and c.WillKillTarget(a2, T, U, R)
-						and not c.WillKillTarget(a2, T * 0.5, U, R)
+						bot:GetMana() > 320
+						and Fu.IsKeyWordUnit("melee", creep)
+						and Fu.WillKillTarget(creep, damage, damageType, castPoint)
+						and not Fu.WillKillTarget(creep, damage * 0.5, damageType, castPoint)
 					then
-						return BOT_ACTION_DESIRE_HIGH, a2, "Q-LaneMelee"
+						return BOT_ACTION_DESIRE_HIGH, creep, "Q-LaneMelee"
 					end
 				end
 			end
 		end
 	end
 	if
-		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
-		and c.IsAllowedToSpam(b, 30)
-		and P >= 3
-		and #M == 0
-		and #N <= 3
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, 30)
+		and abilityLevel >= 3
+		and #nearbyEnemies == 0
+		and #nearbyAllies <= 3
 	then
-		local a1 = b:GetNearbyLaneCreeps(999, true)
-		local a3 = b:GetNearbyLaneCreeps(888, false)
-		for X, a2 in pairs(a1) do
-			if c.IsValid(a2) and not a2:HasModifier("modifier_fountain_glyph") and c.IsInRange(a2, b, Q + 300) then
-				if #a3 == 0 and c.GetAroundTargetEnemyUnitCount(a2, 380) >= 2 and #a1 >= 4 then
-					return BOT_ACTION_DESIRE_HIGH, a2, "Q-PushAoe"
+		local laneCreeps = bot:GetNearbyLaneCreeps(999, true)
+		local allyLaneCreeps = bot:GetNearbyLaneCreeps(888, false)
+		for _, creep in pairs(laneCreeps) do
+			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and Fu.IsInRange(creep, bot, castRange + 300) then
+				if #allyLaneCreeps == 0 and Fu.GetAroundTargetEnemyUnitCount(creep, 380) >= 2 and #laneCreeps >= 4 then
+					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushAoe"
 				end
-				if c.IsKeyWordUnit("ranged", a2) and c.WillKillTarget(a2, T, U, R) then
-					return BOT_ACTION_DESIRE_HIGH, a2, "Q-PushRanged"
+				if Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, damage, damageType, castPoint) then
+					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushRanged"
 				end
 				if
-					c.IsKeyWordUnit("melee", a2)
-					and c.WillKillTarget(a2, T, U, R)
-					and (c.GetAroundTargetEnemyUnitCount(a2, 380) >= 2 or K > 0.8)
+					Fu.IsKeyWordUnit("melee", creep)
+					and Fu.WillKillTarget(creep, damage, damageType, castPoint)
+					and (Fu.GetAroundTargetEnemyUnitCount(creep, 380) >= 2 or mpRatio > 0.8)
 				then
-					return BOT_ACTION_DESIRE_HIGH, a2, "Q-PushMelee"
+					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushMelee"
 				end
 			end
 		end
 	end
 	if
-		c.IsFarming(b)
-		and P >= 3
-		and c.IsAllowedToSpam(b, S)
-		and #M == 0
-		and #N <= 2
-		and not (c.IsPushing(b) or c.IsDefending(b))
+		Fu.IsFarming(bot)
+		and abilityLevel >= 3
+		and Fu.IsAllowedToSpam(bot, manaCost)
+		and #nearbyEnemies == 0
+		and #nearbyAllies <= 2
+		and not (Fu.IsPushing(bot) or Fu.IsDefending(bot))
 	then
-		local a4 = b:GetNearbyNeutralCreeps(Q + 200)
-		if #a4 >= 2 or K >= 0.5 then
-			local a5 = a4[1]
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange + 200)
+		if #neutralCreeps >= 2 or mpRatio >= 0.5 then
+			local neutralCreep = neutralCreeps[1]
 			if
-				c.IsValid(a5)
-				and b:IsFacingLocation(a5:GetLocation(), 30)
-				and a5:GetHealth() >= 500
-				and a5:GetMagicResist() < 0.3
-				and c.GetAroundTargetEnemyUnitCount(a5, 300) >= 2
+				Fu.IsValid(neutralCreep)
+				and bot:IsFacingLocation(neutralCreep:GetLocation(), 30)
+				and neutralCreep:GetHealth() >= 500
+				and neutralCreep:GetMagicResist() < 0.3
+				and Fu.GetAroundTargetEnemyUnitCount(neutralCreep, 300) >= 2
 			then
-				return BOT_ACTION_DESIRE_HIGH, a5, "Q-Farm:" .. #a4
+				return BOT_ACTION_DESIRE_HIGH, neutralCreep, "Q-Farm:" .. #neutralCreeps
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
+	if Fu.IsDoingRoshan(bot) then
 		if
-			c.IsRoshan(botTarget)
-			and c.IsInRange(b, botTarget, Q)
-			and c.CanBeAttacked(botTarget)
-			and H
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanBeAttacked(botTarget)
+			and isAttacking
 			and not botTarget:HasModifier("modifier_roshan_spell_block")
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, ""
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(botTarget) and c.IsInRange(b, botTarget, Q) and H then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, ""
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderW()
-	if not p:IsFullyCastable() then
+function X.ConsiderW()
+	if not hexAbility:IsFullyCastable() then
 		return 0
 	end
-	local P = p:GetLevel()
-	local Q = p:GetCastRange() + F
-	local R = p:GetCastPoint()
-	local S = p:GetManaCost()
-	local T = p:GetAbilityDamage()
-	local U = DAMAGE_TYPE_MAGICAL
-	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
-	local W = c.GetNearbyHeroes(b, Q + 240, true, BOT_MODE_NONE)
+	local abilityLevel = hexAbility:GetLevel()
+	local castRange = hexAbility:GetCastRange() + aetherRange
+	local castPoint = hexAbility:GetCastPoint()
+	local manaCost = hexAbility:GetManaCost()
+	local damage = hexAbility:GetAbilityDamage()
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local enemiesInWideRange = Fu.GetNearbyHeroes(bot, castRange + 240, true, BOT_MODE_NONE)
 	-- Hex from the back of its range. Closing in just to land it walks him into the fight.
-	local hexRange = math.max(200, Q - 150)
-	for X, Y in pairs(W) do
-		if c.IsValidHero(Y) and c.CanCastOnTargetAdvanced(Y) and c.CanCastOnNonMagicImmune(Y) then
-			if Y:IsChanneling() then
-				return BOT_ACTION_DESIRE_HIGH, Y, "W-Check1:" .. c.Chat.GetNormName(Y)
+	local hexRange = math.max(200, castRange - 150)
+	for _, enemy in pairs(enemiesInWideRange) do
+		if Fu.IsValidHero(enemy) and Fu.CanCastOnTargetAdvanced(enemy) and Fu.CanCastOnNonMagicImmune(enemy) then
+			if enemy:IsChanneling() then
+				return BOT_ACTION_DESIRE_HIGH, enemy, "W-Check1:" .. Fu.Chat.GetNormName(enemy)
 			end
-			if Y:IsCastingAbility() and c.IsInRange(b, Y, Q + 50) then
-				return BOT_ACTION_DESIRE_HIGH, Y, "W-Check2:" .. c.Chat.GetNormName(Y)
+			if enemy:IsCastingAbility() and Fu.IsInRange(bot, enemy, castRange + 50) then
+				return BOT_ACTION_DESIRE_HIGH, enemy, "W-Check2:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) and (#W >= 2 or #N >= 3) then
-		local a6 = nil
-		local a7 = 0
-		for X, Y in pairs(W) do
+	if Fu.IsInTeamFight(bot, 1200) and (#enemiesInWideRange >= 2 or #nearbyAllies >= 3) then
+		local strongestEnemy = nil
+		local maxDamage = 0
+		for _, enemy in pairs(enemiesInWideRange) do
 			if
-				c.IsValid(Y)
-				and c.CanCastOnNonMagicImmune(Y)
-				and c.CanCastOnTargetAdvanced(Y)
-				and not c.IsDisabled(Y)
-				and not c.IsTaunted(Y)
-				and not Y:IsDisarmed()
+				Fu.IsValid(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not Fu.IsTaunted(enemy)
+				and not enemy:IsDisarmed()
 			then
-				local a8 = Y:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_PHYSICAL)
-				if a8 > a7 then
-					a7 = a8
-					a6 = Y
+				local estimatedDamage = enemy:GetEstimatedDamageToTarget(false, bot, 3.0, DAMAGE_TYPE_PHYSICAL)
+				if estimatedDamage > maxDamage then
+					maxDamage = estimatedDamage
+					strongestEnemy = enemy
 				end
 			end
 		end
-		if a6 ~= nil and c.IsInRange(b, a6, hexRange) then
-			return BOT_ACTION_DESIRE_HIGH, a6, "W-Battle:" .. c.Chat.GetNormName(a6)
+		if strongestEnemy ~= nil and Fu.IsInRange(bot, strongestEnemy, hexRange) then
+			return BOT_ACTION_DESIRE_HIGH, strongestEnemy, "W-Battle:" .. Fu.Chat.GetNormName(strongestEnemy)
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.CanCastOnTargetAdvanced(botTarget)
-			and c.IsInRange(b, botTarget, hexRange)
-			and not c.IsDisabled(botTarget)
-			and not c.IsTaunted(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and Fu.IsInRange(bot, botTarget, hexRange)
+			and not Fu.IsDisabled(botTarget)
+			and not Fu.IsTaunted(botTarget)
 			and not botTarget:IsDisarmed()
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Attack:" .. c.Chat.GetNormName(botTarget)
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Attack:" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	if b:WasRecentlyDamagedByAnyHero(3.0) and I >= 10 and b:GetActiveMode() ~= BOT_MODE_RETREAT and #V >= 1 then
-		for X, Y in pairs(V) do
+	if bot:WasRecentlyDamagedByAnyHero(3.0) and botLevel >= 10 and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 then
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValid(Y)
-				and c.CanCastOnNonMagicImmune(Y)
-				and c.CanCastOnTargetAdvanced(Y)
-				and not c.IsDisabled(Y)
-				and not c.IsTaunted(Y)
-				and not Y:IsDisarmed()
+				Fu.IsValid(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not Fu.IsTaunted(enemy)
+				and not enemy:IsDisarmed()
 			then
-				return BOT_ACTION_DESIRE_HIGH, Y, "W-protect"
+				return BOT_ACTION_DESIRE_HIGH, enemy, "W-protect"
 			end
 		end
 	end
-	if c.IsRetreating(b) then
-		for X, Y in pairs(V) do
+	if Fu.IsRetreating(bot) then
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(Y)
-				and (b:WasRecentlyDamagedByHero(Y, 4.0) or GetUnitToUnitDistance(b, Y) <= 500)
-				and c.CanCastOnNonMagicImmune(Y)
-				and c.CanCastOnTargetAdvanced(Y)
-				and not c.IsDisabled(Y)
-				and not c.IsTaunted(Y)
-				and not Y:IsDisarmed()
+				Fu.IsValidHero(enemy)
+				and (bot:WasRecentlyDamagedByHero(enemy, 4.0) or GetUnitToUnitDistance(bot, enemy) <= 500)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not Fu.IsTaunted(enemy)
+				and not enemy:IsDisarmed()
 			then
-				return BOT_ACTION_DESIRE_HIGH, Y, "W-Retreat:" .. c.Chat.GetNormName(Y)
+				return BOT_ACTION_DESIRE_HIGH, enemy, "W-Retreat:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) and K > 0.6 then
+	if Fu.IsDoingRoshan(bot) and mpRatio > 0.6 then
 		if
-			c.IsRoshan(botTarget)
-			and c.IsInRange(b, botTarget, Q)
-			and not c.IsDisabled(botTarget)
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsDisabled(botTarget)
 			and not botTarget:IsDisarmed()
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Roshan"
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(botTarget) and c.IsInRange(b, botTarget, Q) and H then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, ""
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderE()
-	if not q:IsFullyCastable() then
+function X.ConsiderE()
+	if not shacklesAbility:IsFullyCastable() then
 		return 0
 	end
-	local P = q:GetLevel()
-	local Q = q:GetCastRange() + F
-	local R = q:GetCastPoint()
-	local S = q:GetManaCost()
-	local T = P * 100 - 40 + b:GetAttackDamage() * 2
-	local U = DAMAGE_TYPE_MAGICAL
-	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
-	local W = c.GetNearbyHeroes(b, Q + 240, true, BOT_MODE_NONE)
+	local abilityLevel = shacklesAbility:GetLevel()
+	local castRange = shacklesAbility:GetCastRange() + aetherRange
+	local castPoint = shacklesAbility:GetCastPoint()
+	local manaCost = shacklesAbility:GetManaCost()
+	local damage = abilityLevel * 100 - 40 + bot:GetAttackDamage() * 2
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local enemiesInWideRange = Fu.GetNearbyHeroes(bot, castRange + 240, true, BOT_MODE_NONE)
 	-- Shackles roots him for the whole channel, so only start it with a clear way out.
-	local shackleRange = math.max(200, Q - 150)
-	for X, Y in pairs(W) do
-		if c.IsValidHero(Y) and c.CanCastOnTargetAdvanced(Y) and c.CanCastOnNonMagicImmune(Y) then
-			if Y:IsChanneling() then
-				return BOT_ACTION_DESIRE_HIGH, Y, "E-Check1:" .. c.Chat.GetNormName(Y)
+	local shackleRange = math.max(200, castRange - 150)
+	for _, enemy in pairs(enemiesInWideRange) do
+		if Fu.IsValidHero(enemy) and Fu.CanCastOnTargetAdvanced(enemy) and Fu.CanCastOnNonMagicImmune(enemy) then
+			if enemy:IsChanneling() then
+				return BOT_ACTION_DESIRE_HIGH, enemy, "E-Check1:" .. Fu.Chat.GetNormName(enemy)
 			end
-			if #N >= 2 and Y:IsCastingAbility() and c.IsInRange(b, Y, Q + 30) then
-				return BOT_ACTION_DESIRE_HIGH, Y, "E-Check2:" .. c.Chat.GetNormName(Y)
+			if #nearbyAllies >= 2 and enemy:IsCastingAbility() and Fu.IsInRange(bot, enemy, castRange + 30) then
+				return BOT_ACTION_DESIRE_HIGH, enemy, "E-Check2:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if c.IsInTeamFight(b, 1200) and I >= 5 then
-		local a6 = nil
-		local a7 = 0
-		for X, Y in pairs(W) do
+	if Fu.IsInTeamFight(bot, 1200) and botLevel >= 5 then
+		local strongestEnemy = nil
+		local maxDamage = 0
+		for _, enemy in pairs(enemiesInWideRange) do
 			if
-				c.IsValid(Y)
-				and c.CanCastOnNonMagicImmune(Y)
-				and not c.IsDisabled(Y)
-				and not c.IsTaunted(Y)
-				and not Y:IsDisarmed()
+				Fu.IsValid(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not Fu.IsTaunted(enemy)
+				and not enemy:IsDisarmed()
 			then
-				local a8 = Y:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_PHYSICAL)
-				if a8 > a7 then
-					a7 = a8
-					a6 = Y
+				local estimatedDamage = enemy:GetEstimatedDamageToTarget(false, bot, 3.0, DAMAGE_TYPE_PHYSICAL)
+				if estimatedDamage > maxDamage then
+					maxDamage = estimatedDamage
+					strongestEnemy = enemy
 				end
 			end
 		end
-		if a6 ~= nil and c.IsInRange(b, a6, shackleRange) then
-			return BOT_ACTION_DESIRE_HIGH, a6, "E-Battle:" .. c.Chat.GetNormName(a6)
+		if strongestEnemy ~= nil and Fu.IsInRange(bot, strongestEnemy, shackleRange) then
+			return BOT_ACTION_DESIRE_HIGH, strongestEnemy, "E-Battle:" .. Fu.Chat.GetNormName(strongestEnemy)
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, shackleRange)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.CanCastOnTargetAdvanced(botTarget)
-			and not c.IsDisabled(botTarget)
-			and not c.IsTaunted(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, shackleRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not Fu.IsTaunted(botTarget)
 			and not botTarget:IsDisarmed()
 		then
-			if P >= 2 or K > 0.68 or c.GetHP(botTarget) < 0.35 or L < 0.28 then
-				return BOT_ACTION_DESIRE_HIGH, botTarget, "E-Attack:" .. c.Chat.GetNormName(botTarget)
+			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.35 or hpRatio < 0.28 then
+				return BOT_ACTION_DESIRE_HIGH, botTarget, "E-Attack:" .. Fu.Chat.GetNormName(botTarget)
 			end
 		end
 	end
-	if c.IsRetreating(b) and P >= 3 and #M == 1 and #N >= 2 then
-		for X, Y in pairs(V) do
+	if Fu.IsRetreating(bot) and abilityLevel >= 3 and #nearbyEnemies == 1 and #nearbyAllies >= 2 then
+		for _, enemy in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(Y)
-				and c.CanCastOnNonMagicImmune(Y)
-				and c.CanCastOnTargetAdvanced(Y)
-				and not c.IsDisabled(Y)
-				and not c.IsTaunted(Y)
-				and not Y:IsDisarmed()
+				Fu.IsValidHero(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+				and not Fu.IsDisabled(enemy)
+				and not Fu.IsTaunted(enemy)
+				and not enemy:IsDisarmed()
 			then
-				return BOT_ACTION_DESIRE_HIGH, Y, "E-Retreat:" .. c.Chat.GetNormName(Y)
+				return BOT_ACTION_DESIRE_HIGH, enemy, "E-Retreat:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if b:GetActiveMode() == BOT_MODE_ROSHAN and b:GetMana() >= 800 then
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() >= 800 then
 		if
-			c.IsRoshan(botTarget)
-			and c.GetHP(botTarget) > 0.2
-			and c.IsInRange(b, botTarget, Q + 100)
-			and not c.IsDisabled(botTarget)
+			Fu.IsRoshan(botTarget)
+			and Fu.GetHP(botTarget) > 0.2
+			and Fu.IsInRange(bot, botTarget, castRange + 100)
+			and not Fu.IsDisabled(botTarget)
 			and not botTarget:IsDisarmed()
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
@@ -498,189 +497,189 @@ function a.ConsiderE()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderR()
-	if not r:IsFullyCastable() then
+function X.ConsiderR()
+	if not serpentWardAbility:IsFullyCastable() then
 		return 0
 	end
-	local P = r:GetLevel()
-	local Q = r:GetCastRange() + F + 100
-	local a9 = 150
-	local R = r:GetCastPoint()
-	local S = r:GetManaCost()
-	local T = r:GetAbilityDamage()
-	local U = DAMAGE_TYPE_MAGICAL
-	local V = c.GetNearbyHeroes(b, Q, true, BOT_MODE_NONE)
-	local aa = nil
-	if c.IsGoingOnSomeone(b) then
-		local ab = c.GetAoeEnemyHeroLocation(b, Q + 100, a9, 2)
-		if ab ~= nil then
-			aa = ab
-			return BOT_ACTION_DESIRE_HIGH, aa, "R-Aoe"
+	local abilityLevel = serpentWardAbility:GetLevel()
+	local castRange = serpentWardAbility:GetCastRange() + aetherRange + 100
+	local radius = 150
+	local castPoint = serpentWardAbility:GetCastPoint()
+	local manaCost = serpentWardAbility:GetManaCost()
+	local damage = serpentWardAbility:GetAbilityDamage()
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local castLocation = nil
+	if Fu.IsGoingOnSomeone(bot) then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange + 100, radius, 2)
+		if aoeLocation ~= nil then
+			castLocation = aoeLocation
+			return BOT_ACTION_DESIRE_HIGH, castLocation, "R-Aoe"
 		end
 		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, Q)
-			and c.CanCastOnMagicImmune(botTarget)
-			and botTarget:GetHealth() > b:GetAttackDamage() * 3
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and botTarget:GetHealth() > bot:GetAttackDamage() * 3
 		then
-			aa = botTarget:GetExtrapolatedLocation(R)
-			return BOT_ACTION_DESIRE_HIGH, aa, "R-Attack:" .. c.Chat.GetNormName(botTarget)
+			castLocation = botTarget:GetExtrapolatedLocation(castPoint)
+			return BOT_ACTION_DESIRE_HIGH, castLocation, "R-Attack:" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	if c.IsRetreating(b) then
-		for X, Y in pairs(V) do
-			if c.IsValidHero(Y) and c.CanCastOnMagicImmune(Y) and b:WasRecentlyDamagedByHero(Y, 3.0) then
-				aa = Y:GetExtrapolatedLocation(R)
-				return BOT_ACTION_DESIRE_HIGH, aa, "R-Retreat:" .. c.Chat.GetNormName(Y)
+	if Fu.IsRetreating(bot) then
+		for _, enemy in pairs(enemiesInRange) do
+			if Fu.IsValidHero(enemy) and Fu.CanCastOnMagicImmune(enemy) and bot:WasRecentlyDamagedByHero(enemy, 3.0) then
+				castLocation = enemy:GetExtrapolatedLocation(castPoint)
+				return BOT_ACTION_DESIRE_HIGH, castLocation, "R-Retreat:" .. Fu.Chat.GetNormName(enemy)
 			end
 		end
 	end
-	if c.IsPushing(b) then
-		local ac = b:GetNearbyTowers(1100, true)
-		local ad = b:GetNearbyBarracks(1100, true)
-		local ae = GetAncient(GetOpposingTeam())
-		local af = { ac[1], ad[1], ae }
-		for X, ag in pairs(af) do
+	if Fu.IsPushing(bot) then
+		local enemyTowers = bot:GetNearbyTowers(1100, true)
+		local enemyBarracks = bot:GetNearbyBarracks(1100, true)
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		local buildings = { enemyTowers[1], enemyBarracks[1], enemyAncient }
+		for _, building in pairs(buildings) do
 			if
-				c.IsValidBuilding(ag)
-				and c.IsInRange(b, ag, Q + 500)
-				and not ag:HasModifier("modifier_fountain_glyph")
-				and not ag:HasModifier("modifier_invulnerable")
-				and not ag:HasModifier("modifier_backdoor_protection")
+				Fu.IsValidBuilding(building)
+				and Fu.IsInRange(bot, building, castRange + 500)
+				and not building:HasModifier("modifier_fountain_glyph")
+				and not building:HasModifier("modifier_invulnerable")
+				and not building:HasModifier("modifier_backdoor_protection")
 			then
-				aa = c.GetUnitTowardDistanceLocation(ag, b, 240)
-				if GetUnitToLocationDistance(b, aa) < 180 then
-					aa = c.GetUnitTowardDistanceLocation(b, ag, 240)
+				castLocation = Fu.GetUnitTowardDistanceLocation(building, bot, 240)
+				if GetUnitToLocationDistance(bot, castLocation) < 180 then
+					castLocation = Fu.GetUnitTowardDistanceLocation(bot, building, 240)
 				end
-				if aa ~= nil then
-					return BOT_ACTION_DESIRE_HIGH, aa, "R-Pushing"
+				if castLocation ~= nil then
+					return BOT_ACTION_DESIRE_HIGH, castLocation, "R-Pushing"
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderUrnaconda()
-	if not c.CanCastAbility(s) then
+function X.ConsiderUrnaconda()
+	if not Fu.CanCastAbility(urnacondaAbility) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local Q = s:GetCastRange()
-	local R = s:GetCastPoint()
-	local T = s:GetSpecialValueInt("impact_damage")
-	local ah = s:GetSpecialValueInt("speed")
-	local a9 = s:GetSpecialValueInt("impact_radius")
-	local S = s:GetManaCost()
-	local ai = c.GetManaAfter(S)
-	local aj = c.GetManaThreshold(b, S, { o, p, q, r })
-	local ak = b:GetNearbyHeroes(Q + 300, true, BOT_MODE_NONE)
-	local al = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	for X, am in pairs(ak) do
+	local castRange = urnacondaAbility:GetCastRange()
+	local castPoint = urnacondaAbility:GetCastPoint()
+	local damage = urnacondaAbility:GetSpecialValueInt("impact_damage")
+	local speed = urnacondaAbility:GetSpecialValueInt("speed")
+	local radius = urnacondaAbility:GetSpecialValueInt("impact_radius")
+	local manaCost = urnacondaAbility:GetManaCost()
+	local manaAfter = Fu.GetManaAfter(manaCost)
+	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { etherShockAbility, hexAbility, shacklesAbility, serpentWardAbility })
+	local enemyHeroes = bot:GetNearbyHeroes(castRange + 300, true, BOT_MODE_NONE)
+	local allyHeroes = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	for _, enemy in pairs(enemyHeroes) do
 		if
-			c.IsValidHero(am)
-			and c.CanBeAttacked(am)
-			and c.IsInRange(b, am, Q + 300)
-			and not c.IsInRange(b, am, 300)
-			and c.CanCastOnNonMagicImmune(am)
-			and not c.IsChasingTarget(b, am)
-			and not am:HasModifier("modifier_abaddon_borrowed_time")
-			and not am:HasModifier("modifier_dazzle_shallow_grave")
-			and not am:HasModifier("modifier_oracle_false_promise_timer")
-			and not am:HasModifier("modifier_templar_assassin_refraction_absorb")
+			Fu.IsValidHero(enemy)
+			and Fu.CanBeAttacked(enemy)
+			and Fu.IsInRange(bot, enemy, castRange + 300)
+			and not Fu.IsInRange(bot, enemy, 300)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and not Fu.IsChasingTarget(bot, enemy)
+			and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemy:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local an = GetUnitToUnitDistance(b, am) / ah + R
-			if c.WillKillTarget(am, T, DAMAGE_TYPE_MAGICAL, an) then
-				return BOT_ACTION_DESIRE_HIGH, am:GetLocation()
+			local hitDelay = GetUnitToUnitDistance(bot, enemy) / speed + castPoint
+			if Fu.WillKillTarget(enemy, damage, DAMAGE_TYPE_MAGICAL, hitDelay) then
+				return BOT_ACTION_DESIRE_HIGH, enemy:GetLocation()
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanBeAttacked(botTarget)
-			and c.IsInRange(b, botTarget, Q + 300)
-			and not c.IsChasingTarget(b, botTarget)
-			and not c.IsSuspiciousIllusion(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + 300)
+			and not Fu.IsChasingTarget(bot, botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			if
-				c.IsDisabled(botTarget)
+				Fu.IsDisabled(botTarget)
 					and not (botTarget:HasModifier("modifier_enigma_black_hole_pull") or botTarget:HasModifier(
 						"modifier_faceless_void_chronosphere_freeze"
 					))
 				or botTarget:GetCurrentMovementSpeed() <= 250
 			then
-				if c.GetHP(botTarget) > 0.4 then
-					if c.GetTotalEstimatedDamageToTarget(al, botTarget, 8.0) > botTarget:GetHealth() then
+				if Fu.GetHP(botTarget) > 0.4 then
+					if Fu.GetTotalEstimatedDamageToTarget(allyHeroes, botTarget, 8.0) > botTarget:GetHealth() then
 						return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 					end
 				end
 			end
-			if c.IsInTeamFight(b, 1200) then
+			if Fu.IsInTeamFight(bot, 1200) then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
 	if
-		c.IsRetreating(b)
-		and not c.IsRealInvisible(b)
-		and not c.CanCastAbilitySoon(p, 5.0)
-		and not c.IsInTeamFight(b, 1200)
-		and c.IsRunning(b)
+		Fu.IsRetreating(bot)
+		and not Fu.IsRealInvisible(bot)
+		and not Fu.CanCastAbilitySoon(hexAbility, 5.0)
+		and not Fu.IsInTeamFight(bot, 1200)
+		and Fu.IsRunning(bot)
 	then
-		for X, am in pairs(ak) do
+		for _, enemy in pairs(enemyHeroes) do
 			if
-				c.IsValidHero(am)
-				and c.CanBeAttacked(am)
-				and c.IsInRange(b, am, Q)
-				and not c.IsInRange(b, am, a9)
-				and not c.IsSuspiciousIllusion(am)
-				and not c.IsDisabled(am)
-				and c.IsChasingTarget(am, b)
-				and b:WasRecentlyDamagedByHero(am, 3.0)
+				Fu.IsValidHero(enemy)
+				and Fu.CanBeAttacked(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and not Fu.IsInRange(bot, enemy, radius)
+				and not Fu.IsSuspiciousIllusion(enemy)
+				and not Fu.IsDisabled(enemy)
+				and Fu.IsChasingTarget(enemy, bot)
+				and bot:WasRecentlyDamagedByHero(enemy, 3.0)
 			then
-				return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
-	if c.IsPushing(b) and #al >= #ak and ai > aj then
-		local ao = Min(Q + b:GetAttackRange(), 1600)
-		local ap = b:GetNearbyTowers(ao, true)
-		local aq = b:GetNearbyBarracks(ao, true)
-		local ar = GetAncient(GetOpposingTeam())
-		local as = c.GetAlliesNearLoc(b:GetLocation(), 800)
-		local af = { botTarget, ap[1], aq[1], ar }
-		for X, at in pairs(af) do
+	if Fu.IsPushing(bot) and #allyHeroes >= #enemyHeroes and manaAfter > manaThreshold then
+		local searchRange = Min(castRange + bot:GetAttackRange(), 1600)
+		local enemyTowers = bot:GetNearbyTowers(searchRange, true)
+		local enemyBarracks = bot:GetNearbyBarracks(searchRange, true)
+		local enemyAncient = GetAncient(GetOpposingTeam())
+		local alliesNearby = Fu.GetAlliesNearLoc(bot:GetLocation(), 800)
+		local targets = { botTarget, enemyTowers[1], enemyBarracks[1], enemyAncient }
+		for _, building in pairs(targets) do
 			if
-				c.IsValidBuilding(at)
-				and c.CanBeAttacked(at)
-				and c.IsInRange(b, at, Q + b:GetAttackRange())
-				and not c.IsKeyWordUnit("DOTA_Outpost", at)
+				Fu.IsValidBuilding(building)
+				and Fu.CanBeAttacked(building)
+				and Fu.IsInRange(bot, building, castRange + bot:GetAttackRange())
+				and not Fu.IsKeyWordUnit("DOTA_Outpost", building)
 			then
-				local au = at:GetUnitName()
-				if #as <= 3 or string.find(au, "barracks") or at == ar then
-					if at:GetHealthRegen() == 0 or b:GetAttackTarget() == at then
-						return BOT_ACTION_DESIRE_HIGH, c.VectorTowards(at:GetLocation(), b:GetLocation(), a9)
+				local unitName = building:GetUnitName()
+				if #alliesNearby <= 3 or string.find(unitName, "barracks") or building == enemyAncient then
+					if building:GetHealthRegen() == 0 or bot:GetAttackTarget() == building then
+						return BOT_ACTION_DESIRE_HIGH, Fu.VectorTowards(building:GetLocation(), bot:GetLocation(), radius)
 					end
 				end
 			end
 		end
 	end
-	local a1 = b:GetNearbyCreeps(Min(Q + 300, 1600), true)
-	if c.IsFarming(b) and H and ai > aj + 0.1 and #al <= 1 then
-		for X, a2 in pairs(a1) do
-			if c.IsValid(a2) and c.CanBeAttacked(a2) then
-				local av = b:FindAoELocation(true, false, a2:GetLocation(), 0, a9, 0, 0)
+	local enemyCreeps = bot:GetNearbyCreeps(Min(castRange + 300, 1600), true)
+	if Fu.IsFarming(bot) and isAttacking and manaAfter > manaThreshold + 0.1 and #allyHeroes <= 1 then
+		for _, creep in pairs(enemyCreeps) do
+			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
+				local aoe = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
 				if
-					av.count >= 3
-					or av.count >= 2 and a2:IsAncientCreep()
-					or av.count >= 1 and a2:GetHealth() >= 1000
+					aoe.count >= 3
+					or aoe.count >= 2 and creep:IsAncientCreep()
+					or aoe.count >= 1 and creep:GetHealth() >= 1000
 				then
-					return BOT_ACTION_DESIRE_HIGH, av.targetloc
+					return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 				end
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

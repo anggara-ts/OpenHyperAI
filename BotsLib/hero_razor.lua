@@ -1,28 +1,28 @@
 -- Razor: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 2, 1, 2, 1, 2, 6, 2, 3, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
-local k
-local l
-if h == "pos_1" or h == "pos_2" then
-	k = j[1]
-	l = c.Skill.GetTalentBuild(i[1])
+local tAllAbilityBuildList = { { 2, 1, 2, 1, 2, 6, 2, 3, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
+local nAbilityBuildList
+local nTalentBuildList
+if sRole == "pos_1" or sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 else
-	k = j[2]
-	l = c.Skill.GetTalentBuild(i[2])
+	nAbilityBuildList = tAllAbilityBuildList[2]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
-local m = {}
-m["pos_1"] = {
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_magic_stick",
@@ -41,8 +41,8 @@ m["pos_1"] = {
 	"item_refresher",
 	"item_ultimate_scepter_2",
 }
-m["pos_2"] = m["pos_1"]
-m["pos_3"] = {
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_slippers",
@@ -62,309 +62,303 @@ m["pos_3"] = {
 	"item_satanic",
 	"item_ultimate_scepter_2",
 }
-m["pos_4"] = m["pos_3"]
-m["pos_5"] = m["pos_3"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local o, p, q
-local r
-local s, t
-local u
-local v = 0
-local w
-local x, y
-local z, A
-local B, C
-function a.SkillsComplement()
-	b = GetBot()
-	c.ConsiderForMkbDisassembleMask(b)
-	if c.CanNotUseAbility(b) then
+local plasmaFieldAbility, staticLinkAbility, eyeOfTheStormAbility
+local plasmaFieldDesire
+local staticLinkDesire, staticLinkTarget
+local eyeOfTheStormDesire
+local aetherRange = 0
+local botTarget
+local botLevel, reservedMana
+function X.SkillsComplement()
+	bot = GetBot()
+	Fu.ConsiderForMkbDisassembleMask(bot)
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	o = SafeAbility(b:GetAbilityByName("razor_plasma_field"), "plasma_field", "razor")
-	p = SafeAbility(b:GetAbilityByName("razor_static_link"), "static_link", "razor")
-	q = SafeAbility(b:GetAbilityByName("razor_eye_of_the_storm"), "eye_of_the_storm", "razor")
-	local D = d.Build(b)
-	C = 300
-	v = D.aetherRange
-	B = D.level
-	x = D.hp
-	y = D.target
-	w = c.IsAttacking(b)
-	z = D.allies
-	A = D.enemies
-	r = a.ConsiderQ()
-	if r > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbility(o)
+	plasmaFieldAbility = SafeAbility(bot:GetAbilityByName("razor_plasma_field"), "plasma_field", "razor")
+	staticLinkAbility = SafeAbility(bot:GetAbilityByName("razor_static_link"), "static_link", "razor")
+	eyeOfTheStormAbility = SafeAbility(bot:GetAbilityByName("razor_eye_of_the_storm"), "eye_of_the_storm", "razor")
+	local context = AbilityContext.Build(bot)
+	reservedMana = 300
+	aetherRange = context.aetherRange
+	botLevel = context.level
+	botTarget = context.target
+	plasmaFieldDesire = X.ConsiderQ()
+	if plasmaFieldDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbility(plasmaFieldAbility)
 		return
 	end
-	s, t = a.ConsiderW()
-	if s > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(p, t)
+	staticLinkDesire, staticLinkTarget = X.ConsiderW()
+	if staticLinkDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnEntity(staticLinkAbility, staticLinkTarget)
 		return
 	end
-	u = a.ConsiderR()
-	if u > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbility(q)
+	eyeOfTheStormDesire = X.ConsiderR()
+	if eyeOfTheStormDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbility(eyeOfTheStormAbility)
 		return
 	end
 end
-function a.ConsiderQ()
-	if not o:IsFullyCastable() then
+function X.ConsiderQ()
+	if not plasmaFieldAbility:IsFullyCastable() then
 		return 0
 	end
-	local E = o:GetLevel()
+	local abilityLevel = plasmaFieldAbility:GetLevel()
 	-- datafeed: Plasma Field radius is 700; the old 777 counted enemies the field never reaches.
-	local F = o:GetSpecialValueInt("radius")
-	if F <= 0 then
-		F = 700
+	local radius = plasmaFieldAbility:GetSpecialValueInt("radius")
+	if radius <= 0 then
+		radius = 700
 	end
-	local G = o:GetCastPoint()
-	local H = o:GetManaCost()
-	local I = o:GetAbilityDamage()
-	local J = o:GetSpecialValueInt("damage_min")
-	local K = o:GetSpecialValueInt("damage_max")
-	local L = DAMAGE_TYPE_MAGICAL
-	local M = c.GetNearbyHeroes(b, F, true, BOT_MODE_NONE)
-	local N = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	local O = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-	local y = c.GetProperTarget(b)
-	for P, Q in pairs(M) do
+	local castPoint = plasmaFieldAbility:GetCastPoint()
+	local manaCost = plasmaFieldAbility:GetManaCost()
+	local damage = plasmaFieldAbility:GetAbilityDamage()
+	local minDamage = plasmaFieldAbility:GetSpecialValueInt("damage_min")
+	local maxDamage = plasmaFieldAbility:GetSpecialValueInt("damage_max")
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+	local enemiesNearby = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+	local alliesNearby = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+	local botTarget = Fu.GetProperTarget(bot)
+	for _, enemyHero in pairs(enemiesInRadius) do
 		-- Plasma Field is SPELL_IMMUNITY_ENEMIES_NO (game files): a BKB'd hero is not hit, so it should
 		-- not trigger the kill / retreat / fight casts.
-		if c.IsValidHero(Q) and c.CanCastOnNonMagicImmune(Q) then
-			local R = GetUnitToUnitDistance(b, Q)
-			local I = RemapValClamped(R, 0, F, J, K) * 2
-			if c.WillMagicKillTarget(b, Q, I, G + R / 636) then
-				return BOT_ACTION_DESIRE_HIGH, "Q击杀" .. c.Chat.GetNormName(Q)
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			local distance = GetUnitToUnitDistance(bot, enemyHero)
+			local damage = RemapValClamped(distance, 0, radius, minDamage, maxDamage) * 2
+			if Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint + distance / 636) then
+				return BOT_ACTION_DESIRE_HIGH, "Q击杀" .. Fu.Chat.GetNormName(enemyHero)
 			end
-			if Q:HasModifier("modifier_flask_healing") and c.GetModifierTime(Q, "modifier_flask_healing") > 3.0 then
-				return BOT_ACTION_DESIRE_HIGH, "Q断药" .. c.Chat.GetNormName(Q)
+			if enemyHero:HasModifier("modifier_flask_healing") and Fu.GetModifierTime(enemyHero, "modifier_flask_healing") > 3.0 then
+				return BOT_ACTION_DESIRE_HIGH, "Q断药" .. Fu.Chat.GetNormName(enemyHero)
 			end
 			if
-				c.IsRetreating(b)
-				and (b:WasRecentlyDamagedByHero(Q, 2.0) or b:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				Fu.IsRetreating(bot)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
 			then
-				return BOT_ACTION_DESIRE_HIGH, "Q撤退" .. c.Chat.GetNormName(Q)
+				return BOT_ACTION_DESIRE_HIGH, "Q撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
-			if c.IsGoingOnSomeone(b) and c.IsValidHero(y) and c.IsInRange(b, y, F) then
-				return BOT_ACTION_DESIRE_HIGH, "Q打架" .. c.Chat.GetNormName(y)
+			if Fu.IsGoingOnSomeone(bot) and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, radius) then
+				return BOT_ACTION_DESIRE_HIGH, "Q打架" .. Fu.Chat.GetNormName(botTarget)
 			end
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b)) and #O < 3 and B > 7 and c.IsAllowedToSpam(b, H) then
-		local S = 0
-		local T = 0
-		local U = b:GetNearbyLaneCreeps(F + 100, true)
-		for P, V in pairs(U) do
-			if c.IsValid(V) and not V:HasModifier("modifier_fountain_glyph") then
-				T = T + 1
-				local R = GetUnitToUnitDistance(b, V)
-				local I = RemapValClamped(R, 0, F, J, K) * 2
-				if c.WillKillTarget(V, I, L, R / 636) then
-					S = S + 1
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and #alliesNearby < 3 and botLevel > 7 and Fu.IsAllowedToSpam(bot, manaCost) then
+		local killableCount = 0
+		local creepCount = 0
+		local laneCreeps = bot:GetNearbyLaneCreeps(radius + 100, true)
+		for _, creep in pairs(laneCreeps) do
+			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") then
+				creepCount = creepCount + 1
+				local distance = GetUnitToUnitDistance(bot, creep)
+				local damage = RemapValClamped(distance, 0, radius, minDamage, maxDamage) * 2
+				if Fu.WillKillTarget(creep, damage, damageType, distance / 636) then
+					killableCount = killableCount + 1
 				end
 			end
 		end
-		if S >= 3 or T >= 5 then
-			return BOT_ACTION_DESIRE_HIGH, "Q推进" .. T
+		if killableCount >= 3 or creepCount >= 5 then
+			return BOT_ACTION_DESIRE_HIGH, "Q推进" .. creepCount
 		end
 	end
-	if c.IsFarming(b) and B > 7 and b:GetMana() > C then
-		local W = b:GetNearbyNeutralCreeps(F + 200)
-		local X = b:GetNearbyNeutralCreeps(400)
-		if #W >= 3 and #X <= 2 or #W >= 5 then
-			return BOT_ACTION_DESIRE_HIGH, "Q打野" .. #W
+	if Fu.IsFarming(bot) and botLevel > 7 and bot:GetMana() > reservedMana then
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius + 200)
+		local closeNeutralCreeps = bot:GetNearbyNeutralCreeps(400)
+		if #neutralCreeps >= 3 and #closeNeutralCreeps <= 2 or #neutralCreeps >= 5 then
+			return BOT_ACTION_DESIRE_HIGH, "Q打野" .. #neutralCreeps
 		end
 	end
-	if c.IsLaning(b) then
-		local Y = 0
-		local Z = 0
-		local U = b:GetNearbyLaneCreeps(F + 100, true)
-		for P, V in pairs(U) do
-			if c.IsValid(V) and not V:HasModifier("modifier_fountain_glyph") then
-				local R = GetUnitToUnitDistance(b, V)
-				local I = RemapValClamped(R, 0, F, J, K) * 2
-				if c.WillKillTarget(V, I, L, R * 0.9 / 636) then
-					if c.IsKeyWordUnit("ranged", V) then
-						Z = Z + 1
-						if not c.IsInRange(b, V, b:GetAttackRange() + 50) then
+	if Fu.IsLaning(bot) then
+		local killableMeleeCount = 0
+		local killableRangedCount = 0
+		local laneCreeps = bot:GetNearbyLaneCreeps(radius + 100, true)
+		for _, creep in pairs(laneCreeps) do
+			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") then
+				local distance = GetUnitToUnitDistance(bot, creep)
+				local damage = RemapValClamped(distance, 0, radius, minDamage, maxDamage) * 2
+				if Fu.WillKillTarget(creep, damage, damageType, distance * 0.9 / 636) then
+					if Fu.IsKeyWordUnit("ranged", creep) then
+						killableRangedCount = killableRangedCount + 1
+						if not Fu.IsInRange(bot, creep, bot:GetAttackRange() + 50) then
 							return BOT_ACTION_DESIRE_HIGH, "Q对线1"
 						end
 					end
-					if c.IsKeyWordUnit("melee", V) then
-						Y = Y + 1
+					if Fu.IsKeyWordUnit("melee", creep) then
+						killableMeleeCount = killableMeleeCount + 1
 					end
 				end
 			end
 		end
-		if Y + Z >= 3 then
+		if killableMeleeCount + killableRangedCount >= 3 then
 			return BOT_ACTION_DESIRE_HIGH, "Q对线2"
 		end
-		if Z >= 1 and Y >= 1 then
+		if killableRangedCount >= 1 and killableMeleeCount >= 1 then
 			return BOT_ACTION_DESIRE_HIGH, "Q对线3"
 		end
 	end
 	if
-		(#N > 0 or b:WasRecentlyDamagedByAnyHero(3.0))
-		and (b:GetActiveMode() ~= BOT_MODE_RETREAT or #O >= 2)
-		and #M >= 1
-		and B >= 15
+		(#enemiesNearby > 0 or bot:WasRecentlyDamagedByAnyHero(3.0))
+		and (bot:GetActiveMode() ~= BOT_MODE_RETREAT or #alliesNearby >= 2)
+		and #enemiesInRadius >= 1
+		and botLevel >= 15
 	then
-		for P, Q in pairs(M) do
-			if c.IsValid(Q) and c.CanCastOnNonMagicImmune(Q) then
-				return BOT_ACTION_DESIRE_HIGH, "Q通用" .. c.Chat.GetNormName(Q)
+		for _, enemyHero in pairs(enemiesInRadius) do
+			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				return BOT_ACTION_DESIRE_HIGH, "Q通用" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderW()
-	if not p:IsFullyCastable() then
+function X.ConsiderW()
+	if not staticLinkAbility:IsFullyCastable() then
 		return 0
 	end
-	local E = p:GetLevel()
-	local F = p:GetCastRange() + v
-	local G = p:GetCastPoint()
-	local H = p:GetManaCost()
-	local I = p:GetAbilityDamage()
-	local L = DAMAGE_TYPE_MAGICAL
-	local M = c.GetNearbyHeroes(b, F, true, BOT_MODE_NONE)
-	local N = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	local O = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-	local y = c.GetProperTarget(b)
-	local _ = 0
-	local a0 = nil
-	local a1 = 0
-	for P, Q in pairs(M) do
+	local abilityLevel = staticLinkAbility:GetLevel()
+	local castRange = staticLinkAbility:GetCastRange() + aetherRange
+	local castPoint = staticLinkAbility:GetCastPoint()
+	local manaCost = staticLinkAbility:GetManaCost()
+	local damage = staticLinkAbility:GetAbilityDamage()
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local enemiesNearby = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+	local alliesNearby = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+	local botTarget = Fu.GetProperTarget(bot)
+	local validTargetCount = 0
+	local bestTarget = nil
+	local highestAttackDamage = 0
+	for _, enemyHero in pairs(enemiesInRange) do
 		if
-			c.IsValidHero(Q)
-			and c.CanCastOnNonMagicImmune(Q)
-			and c.CanCastOnTargetAdvanced(Q)
-			and not Q:HasModifier("modifier_razor_static_link_debuff")
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+			and not enemyHero:HasModifier("modifier_razor_static_link_debuff")
 		then
-			_ = _ + 1
-			if Q:GetAttackDamage() > a1 then
-				a0 = Q
-				a1 = Q:GetAttackDamage()
+			validTargetCount = validTargetCount + 1
+			if enemyHero:GetAttackDamage() > highestAttackDamage then
+				bestTarget = enemyHero
+				highestAttackDamage = enemyHero:GetAttackDamage()
 			end
 		end
 	end
-	if _ >= 2 and a0 ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, a0, "W择优" .. c.Chat.GetNormName(a0)
+	if validTargetCount >= 2 and bestTarget ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, bestTarget, "W择优" .. Fu.Chat.GetNormName(bestTarget)
 	end
-	if c.IsLaning(b) then
-		a0 = M[1]
+	if Fu.IsLaning(bot) then
+		bestTarget = enemiesInRange[1]
 		if
-			c.IsValidHero(a0)
-			and c.CanCastOnNonMagicImmune(a0)
-			and c.CanCastOnTargetAdvanced(a0)
-			and c.IsInRange(b, a0, F - 180)
-			and not a0:HasModifier("modifier_razor_static_link_debuff")
+			Fu.IsValidHero(bestTarget)
+			and Fu.CanCastOnNonMagicImmune(bestTarget)
+			and Fu.CanCastOnTargetAdvanced(bestTarget)
+			and Fu.IsInRange(bot, bestTarget, castRange - 180)
+			and not bestTarget:HasModifier("modifier_razor_static_link_debuff")
 		then
-			b:SetTarget(a0)
-			return BOT_ACTION_DESIRE_HIGH, a0, "W对线" .. c.Chat.GetNormName(a0)
+			bot:SetTarget(bestTarget)
+			return BOT_ACTION_DESIRE_HIGH, bestTarget, "W对线" .. Fu.Chat.GetNormName(bestTarget)
 		end
 	end
 	if
-		c.IsGoingOnSomeone(b)
-		and c.IsValidHero(y)
-		and not y:HasModifier("modifier_razor_static_link_debuff")
-		and c.CanCastOnNonMagicImmune(y)
-		and c.CanCastOnTargetAdvanced(y)
-		and c.IsInRange(b, y, F - 100)
-		and c.GetAllyCount(b, 1200) - c.GetEnemyCount(b, 1600) < 3
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and not botTarget:HasModifier("modifier_razor_static_link_debuff")
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.CanCastOnTargetAdvanced(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange - 100)
+		and Fu.GetAllyCount(bot, 1200) - Fu.GetEnemyCount(bot, 1600) < 3
 	then
-		return BOT_ACTION_DESIRE_HIGH, y, "W进攻" .. c.Chat.GetNormName(y)
+		return BOT_ACTION_DESIRE_HIGH, botTarget, "W进攻" .. Fu.Chat.GetNormName(botTarget)
 	end
-	if c.IsRetreating(b) then
-		for P, Q in pairs(M) do
+	if Fu.IsRetreating(bot) then
+		for _, enemyHero in pairs(enemiesInRange) do
 			if
-				c.IsValidHero(Q)
-				and not Q:HasModifier("modifier_razor_static_link_debuff")
-				and c.CanCastOnNonMagicImmune(Q)
-				and c.CanCastOnTargetAdvanced(Q)
-				and (b:WasRecentlyDamagedByHero(Q, 3.0) or b:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				Fu.IsValidHero(enemyHero)
+				and not enemyHero:HasModifier("modifier_razor_static_link_debuff")
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 3.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
 			then
-				return BOT_ACTION_DESIRE_HIGH, Q, "W撤退" .. c.Chat.GetNormName(Q)
+				return BOT_ACTION_DESIRE_HIGH, enemyHero, "W撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
 	end
 	if
-		(#N > 0 or b:WasRecentlyDamagedByAnyHero(3.0))
-		and (b:GetActiveMode() ~= BOT_MODE_RETREAT or #O >= 2)
-		and #M >= 1
-		and B >= 15
+		(#enemiesNearby > 0 or bot:WasRecentlyDamagedByAnyHero(3.0))
+		and (bot:GetActiveMode() ~= BOT_MODE_RETREAT or #alliesNearby >= 2)
+		and #enemiesInRange >= 1
+		and botLevel >= 15
 	then
-		for P, Q in pairs(M) do
+		for _, enemyHero in pairs(enemiesInRange) do
 			if
-				c.IsValid(Q)
-				and not Q:HasModifier("modifier_razor_static_link_debuff")
-				and c.IsInRange(b, Q, F - 100)
-				and c.CanCastOnNonMagicImmune(Q)
-				and c.CanCastOnTargetAdvanced(Q)
+				Fu.IsValid(enemyHero)
+				and not enemyHero:HasModifier("modifier_razor_static_link_debuff")
+				and Fu.IsInRange(bot, enemyHero, castRange - 100)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
 			then
-				return BOT_ACTION_DESIRE_HIGH, Q, "W通用" .. c.Chat.GetNormName(Q)
+				return BOT_ACTION_DESIRE_HIGH, enemyHero, "W通用" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderR()
-	if not q:IsFullyCastable() or b:HasModifier("modifier_razor_eye_of_the_storm") then
+function X.ConsiderR()
+	if not eyeOfTheStormAbility:IsFullyCastable() or bot:HasModifier("modifier_razor_eye_of_the_storm") then
 		return 0
 	end
-	local E = q:GetLevel()
-	local F = 500
-	local G = q:GetCastPoint()
-	local H = q:GetManaCost()
-	local I = q:GetAbilityDamage()
-	local L = DAMAGE_TYPE_PHYSICAL
-	local M = c.GetNearbyHeroes(b, F, true, BOT_MODE_NONE)
-	local a2 = 0
-	for P, Q in pairs(M) do
-		if c.IsValidHero(Q) and c.CanCastOnMagicImmune(Q) then
-			a2 = a2 + 1
+	local abilityLevel = eyeOfTheStormAbility:GetLevel()
+	local radius = 500
+	local castPoint = eyeOfTheStormAbility:GetCastPoint()
+	local manaCost = eyeOfTheStormAbility:GetManaCost()
+	local damage = eyeOfTheStormAbility:GetAbilityDamage()
+	local damageType = DAMAGE_TYPE_PHYSICAL
+	local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+	local enemyCount = 0
+	for _, enemyHero in pairs(enemiesInRadius) do
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnMagicImmune(enemyHero) then
+			enemyCount = enemyCount + 1
 		end
 	end
-	if a2 >= 2 then
+	if enemyCount >= 2 then
 		return BOT_ACTION_DESIRE_HIGH, "R两人"
 	end
-	if c.IsGoingOnSomeone(b) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(y)
-			and c.IsInRange(b, y, F + 200)
-			and c.CanCastOnMagicImmune(y)
-			and (c.GetProperTarget(y) ~= nil or c.IsInRange(b, y, F))
-			and c.GetAllyCount(b, 1200) - c.GetEnemyCount(b, 1600) <= 2
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius + 200)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and (Fu.GetProperTarget(botTarget) ~= nil or Fu.IsInRange(bot, botTarget, radius))
+			and Fu.GetAllyCount(bot, 1200) - Fu.GetEnemyCount(bot, 1600) <= 2
 		then
-			return BOT_ACTION_DESIRE_HIGH, "R进攻" .. c.Chat.GetNormName(y)
+			return BOT_ACTION_DESIRE_HIGH, "R进攻" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	if c.IsRetreating(b) then
-		for P, Q in pairs(M) do
+	if Fu.IsRetreating(bot) then
+		for _, enemyHero in pairs(enemiesInRadius) do
 			if
-				c.IsValidHero(Q)
-				and c.CanCastOnMagicImmune(Q)
-				and (b:WasRecentlyDamagedByHero(Q, 2.0) or b:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnMagicImmune(enemyHero)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
 			then
-				return BOT_ACTION_DESIRE_HIGH, "R撤退" .. c.Chat.GetNormName(Q)
+				return BOT_ACTION_DESIRE_HIGH, "R撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-return a
+return X

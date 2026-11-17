@@ -1,1096 +1,1092 @@
 -- Shared bot system: utils.
-local function a(b)
-	local c = {}
-	local d = 0
-	for e in pairs(b) do
-		d = d + 1
-		c[d] = { e, b[e] }
+local function objectEntries(object)
+	local result = {}
+	local count = 0
+	for key in pairs(object) do
+		count = count + 1
+		result[count] = { key, object[key] }
 	end
-	return c
+	return result
 end
-local f, g
+local createSymbol, Symbol
 do
-	local h = {
+	local symbolMetatable = {
 		__tostring = function(self)
 			return ("Symbol(" .. (self.description or "")) .. ")"
 		end,
 	}
-	function f(i)
-		return setmetatable({ description = i }, h)
+	function createSymbol(description)
+		return setmetatable({ description = description }, symbolMetatable)
 	end
-	g = {
-		asyncDispose = f("Symbol.asyncDispose"),
-		dispose = f("Symbol.dispose"),
-		iterator = f("Symbol.iterator"),
-		hasInstance = f("Symbol.hasInstance"),
-		species = f("Symbol.species"),
-		toStringTag = f("Symbol.toStringTag"),
+	Symbol = {
+		asyncDispose = createSymbol("Symbol.asyncDispose"),
+		dispose = createSymbol("Symbol.dispose"),
+		iterator = createSymbol("Symbol.iterator"),
+		hasInstance = createSymbol("Symbol.hasInstance"),
+		species = createSymbol("Symbol.species"),
+		toStringTag = createSymbol("Symbol.toStringTag"),
 	}
 end
-local function j(k)
-	local e = 0
+local function arrayEntries(array)
+	local index = 0
 	return {
-		[g.iterator] = function(self)
+		[Symbol.iterator] = function(self)
 			return self
 		end,
 		next = function(self)
-			local c = { done = k[e + 1] == nil, value = { e, k[e + 1] } }
-			e = e + 1
-			return c
+			local result = { done = array[index + 1] == nil, value = { index, array[index + 1] } }
+			index = index + 1
+			return result
 		end,
 	}
 end
-local l
+local iterate
 do
-	local function m(self)
-		local n = self.____coroutine
-		local o, p = coroutine.resume(n)
-		if not o then
-			error(p, 0)
+	local function iteratorGeneratorStep(self)
+		local coroutineObject = self.____coroutine
+		local ok, value = coroutine.resume(coroutineObject)
+		if not ok then
+			error(value, 0)
 		end
-		if coroutine.status(n) == "dead" then
+		if coroutine.status(coroutineObject) == "dead" then
 			return
 		end
-		return true, p
+		return true, value
 	end
-	local function q(self)
-		local c = self:next()
-		if c.done then
+	local function iteratorIteratorStep(self)
+		local result = self:next()
+		if result.done then
 			return
 		end
-		return true, c.value
+		return true, result.value
 	end
-	local function r(self, s)
-		s = s + 1
-		if s > #self then
+	local function iteratorStringStep(self, index)
+		index = index + 1
+		if index > #self then
 			return
 		end
-		return s, string.sub(self, s, s)
+		return index, string.sub(self, index, index)
 	end
-	function l(t)
-		if type(t) == "string" then
-			return r, t, 0
-		elseif t.____coroutine ~= nil then
-			return m, t
-		elseif t[g.iterator] then
-			local u = t[g.iterator](t)
-			return q, u
+	function iterate(iterable)
+		if type(iterable) == "string" then
+			return iteratorStringStep, iterable, 0
+		elseif iterable.____coroutine ~= nil then
+			return iteratorGeneratorStep, iterable
+		elseif iterable[Symbol.iterator] then
+			local iterator = iterable[Symbol.iterator](iterable)
+			return iteratorIteratorStep, iterator
 		else
-			return ipairs(t)
+			return ipairs(iterable)
 		end
 	end
 end
-local function v(self, w)
+local function numberToFixed(self, fractionDigits)
 	if math.abs(self) >= 1e+21 or self ~= self then
 		return tostring(self)
 	end
-	local x = math.floor(w or 0)
-	if x < 0 or x > 99 then
+	local digits = math.floor(fractionDigits or 0)
+	if digits < 0 or digits > 99 then
 		error("toFixed() digits argument must be between 0 and 99", 0)
 	end
-	return string.format(("%." .. tostring(x)) .. "f", self)
+	return string.format(("%." .. tostring(digits)) .. "f", self)
 end
-local function y(self, z, A)
-	if A == nil or A > #self then
-		A = #self
+local function stringEndsWith(self, searchString, endPosition)
+	if endPosition == nil or endPosition > #self then
+		endPosition = #self
 	end
-	return string.sub(self, A - #z + 1, A) == z
+	return string.sub(self, endPosition - #searchString + 1, endPosition) == searchString
 end
-local function B(self, z, C)
-	if not C then
-		C = 1
+local function stringIncludes(self, searchString, position)
+	if not position then
+		position = 1
 	else
-		C = C + 1
+		position = position + 1
 	end
-	local s = string.find(self, z, C, true)
-	return s ~= nil
+	local index = string.find(self, searchString, position, true)
+	return index ~= nil
 end
-local function D(E, ...)
-	local F = setmetatable({}, E.prototype)
-	F:____constructor(...)
-	return F
+local function newInstance(Class, ...)
+	local instance = setmetatable({}, Class.prototype)
+	instance:____constructor(...)
+	return instance
 end
-local function G(self)
-	local H = { prototype = {} }
-	H.prototype.__index = H.prototype
-	H.prototype.constructor = H
-	return H
+local function createClass(self)
+	local Class = { prototype = {} }
+	Class.prototype.__index = Class.prototype
+	Class.prototype.constructor = Class
+	return Class
 end
-local function I(E, J)
-	E.____super = J
-	local K = setmetatable({ __index = J }, J)
-	setmetatable(E, K)
-	local L = getmetatable(J)
-	if L then
-		if type(L.__index) == "function" then
-			K.__index = L.__index
+local function classExtends(Target, Base)
+	Target.____super = Base
+	local staticMetatable = setmetatable({ __index = Base }, Base)
+	setmetatable(Target, staticMetatable)
+	local baseMetatable = getmetatable(Base)
+	if baseMetatable then
+		if type(baseMetatable.__index) == "function" then
+			staticMetatable.__index = baseMetatable.__index
 		end
-		if type(L.__newindex) == "function" then
-			K.__newindex = L.__newindex
+		if type(baseMetatable.__newindex) == "function" then
+			staticMetatable.__newindex = baseMetatable.__newindex
 		end
 	end
-	setmetatable(E.prototype, J.prototype)
-	if type(J.prototype.__index) == "function" then
-		E.prototype.__index = J.prototype.__index
+	setmetatable(Target.prototype, Base.prototype)
+	if type(Base.prototype.__index) == "function" then
+		Target.prototype.__index = Base.prototype.__index
 	end
-	if type(J.prototype.__newindex) == "function" then
-		E.prototype.__newindex = J.prototype.__newindex
+	if type(Base.prototype.__newindex) == "function" then
+		Target.prototype.__newindex = Base.prototype.__newindex
 	end
-	if type(J.prototype.__tostring) == "function" then
-		E.prototype.__tostring = J.prototype.__tostring
+	if type(Base.prototype.__tostring) == "function" then
+		Target.prototype.__tostring = Base.prototype.__tostring
 	end
 end
-local M, N, O, P, Q, R
+local Error, TypeError
 do
-	local function S(self, T)
+	local function getErrorStack(self, constructor)
 		if debug == nil then
 			return nil
 		end
-		local U = 1
+		local level = 1
 		while true do
-			local V = debug.getinfo(U, "f")
-			U = U + 1
-			if not V then
-				U = 1
+			local info = debug.getinfo(level, "f")
+			level = level + 1
+			if not info then
+				level = 1
 				break
-			elseif V.func == T then
+			elseif info.func == constructor then
 				break
 			end
 		end
-		if B(_VERSION, "Lua 5.0") then
-			return debug.traceback(("[Level " .. tostring(U)) .. "]")
+		if stringIncludes(_VERSION, "Lua 5.0") then
+			return debug.traceback(("[Level " .. tostring(level)) .. "]")
 		else
-			return debug.traceback(nil, U)
+			return debug.traceback(nil, level)
 		end
 	end
-	local function W(self, X)
+	local function wrapErrorToString(self, toStringFn)
 		return function(self)
-			local i = X(self)
-			local Y = debug.getinfo(3, "f")
-			local Z = B(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
-			if Z or Y and Y.func ~= error then
-				return i
+			local description = toStringFn(self)
+			local caller = debug.getinfo(3, "f")
+			local isClassicLua = stringIncludes(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
+			if isClassicLua or caller and caller.func ~= error then
+				return description
 			else
-				return (i .. "\n") .. tostring(self.stack)
+				return (description .. "\n") .. tostring(self.stack)
 			end
 		end
 	end
-	local function _(self, a0, a1)
-		a0.name = a1
-		return setmetatable(a0, {
-			__call = function(a2, a3, a4)
-				return D(a0, a4)
+	local function initErrorClass(self, Type, name)
+		Type.name = name
+		return setmetatable(Type, {
+			__call = function(_, _self, message)
+				return newInstance(Type, message)
 			end,
 		})
 	end
-	local a5 = _
-	local a6 = G()
-	a6.name = ""
-	function a6.prototype.____constructor(self, a4)
-		if a4 == nil then
-			a4 = ""
+	local createErrorClass = initErrorClass
+	local ErrorClass = createClass()
+	ErrorClass.name = ""
+	function ErrorClass.prototype.____constructor(self, message)
+		if message == nil then
+			message = ""
 		end
-		self.message = a4
+		self.message = message
 		self.name = "Error"
-		self.stack = S(nil, self.constructor.new)
-		local a7 = getmetatable(self)
-		if a7 and not a7.__errorToStringPatched then
-			a7.__errorToStringPatched = true
-			a7.__tostring = W(nil, a7.__tostring)
+		self.stack = getErrorStack(nil, self.constructor.new)
+		local metatable = getmetatable(self)
+		if metatable and not metatable.__errorToStringPatched then
+			metatable.__errorToStringPatched = true
+			metatable.__tostring = wrapErrorToString(nil, metatable.__tostring)
 		end
 	end
-	function a6.prototype.__tostring(self)
+	function ErrorClass.prototype.__tostring(self)
 		return self.message ~= "" and (self.name .. ": ") .. self.message or self.name
 	end
-	M = a5(nil, a6, "Error")
-	local function a8(self, a1)
-		local a9 = _
-		local aa = G()
-		aa.name = aa.name
-		I(aa, M)
-		function aa.prototype.____constructor(self, ...)
-			aa.____super.prototype.____constructor(self, ...)
-			self.name = a1
+	Error = createErrorClass(nil, ErrorClass, "Error")
+	local function createDerivedErrorClass(self, name)
+		local initClass = initErrorClass
+		local DerivedError = createClass()
+		DerivedError.name = DerivedError.name
+		classExtends(DerivedError, Error)
+		function DerivedError.prototype.____constructor(self, ...)
+			DerivedError.____super.prototype.____constructor(self, ...)
+			self.name = name
 		end
-		return a9(nil, aa, a1)
+		return initClass(nil, DerivedError, name)
 	end
-	N = a8(nil, "RangeError")
-	O = a8(nil, "ReferenceError")
-	P = a8(nil, "SyntaxError")
-	Q = a8(nil, "TypeError")
-	R = a8(nil, "URIError")
+	TypeError = createDerivedErrorClass(nil, "TypeError")
 end
-local function ab(ac)
-	local a7 = getmetatable(ac)
-	if not a7 then
+local function getDescriptors(target)
+	local metatable = getmetatable(target)
+	if not metatable then
 		return {}
 	end
-	return rawget(a7, "_descriptors") or {}
+	return rawget(metatable, "_descriptors") or {}
 end
-local function ad(E, e)
-	local ae = ab(E)
-	local af = ae[e]
-	if af then
-		if not af.configurable then
-			error(D(Q, ((("Cannot delete property " .. tostring(e)) .. " of ") .. tostring(E)) .. "."), 0)
+local function deleteProperty(target, key)
+	local descriptors = getDescriptors(target)
+	local descriptor = descriptors[key]
+	if descriptor then
+		if not descriptor.configurable then
+			error(newInstance(TypeError, ((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."), 0)
 		end
-		ae[e] = nil
+		descriptors[key] = nil
 		return true
 	end
-	E[e] = nil
+	target[key] = nil
 	return true
 end
-local ag
+local Set
 do
-	ag = G()
-	ag.name = "Set"
-	function ag.prototype.____constructor(self, ah)
-		self[g.toStringTag] = "Set"
+	Set = createClass()
+	Set.name = "Set"
+	function Set.prototype.____constructor(self, values)
+		self[Symbol.toStringTag] = "Set"
 		self.size = 0
 		self.nextKey = {}
 		self.previousKey = {}
-		if ah == nil then
+		if values == nil then
 			return
 		end
-		local t = ah
-		if t[g.iterator] then
-			local u = t[g.iterator](t)
+		local iterable = values
+		if iterable[Symbol.iterator] then
+			local iterator = iterable[Symbol.iterator](iterable)
 			while true do
-				local c = u:next()
-				if c.done then
+				local result = iterator:next()
+				if result.done then
 					break
 				end
-				self:add(c.value)
+				self:add(result.value)
 			end
 		else
-			local k = ah
-			for a2, p in ipairs(k) do
-				self:add(p)
+			local array = values
+			for _, value in ipairs(array) do
+				self:add(value)
 			end
 		end
 	end
-	function ag.prototype.add(self, p)
-		local ai = not self:has(p)
-		if ai then
+	function Set.prototype.add(self, value)
+		local isNewValue = not self:has(value)
+		if isNewValue then
 			self.size = self.size + 1
 		end
 		if self.firstKey == nil then
-			self.firstKey = p
-			self.lastKey = p
-		elseif ai then
-			self.nextKey[self.lastKey] = p
-			self.previousKey[p] = self.lastKey
-			self.lastKey = p
+			self.firstKey = value
+			self.lastKey = value
+		elseif isNewValue then
+			self.nextKey[self.lastKey] = value
+			self.previousKey[value] = self.lastKey
+			self.lastKey = value
 		end
 		return self
 	end
-	function ag.prototype.clear(self)
+	function Set.prototype.clear(self)
 		self.nextKey = {}
 		self.previousKey = {}
 		self.firstKey = nil
 		self.lastKey = nil
 		self.size = 0
 	end
-	function ag.prototype.delete(self, p)
-		local aj = self:has(p)
-		if aj then
+	function Set.prototype.delete(self, value)
+		local contains = self:has(value)
+		if contains then
 			self.size = self.size - 1
-			local next = self.nextKey[p]
-			local ak = self.previousKey[p]
-			if next ~= nil and ak ~= nil then
-				self.nextKey[ak] = next
-				self.previousKey[next] = ak
+			local next = self.nextKey[value]
+			local previous = self.previousKey[value]
+			if next ~= nil and previous ~= nil then
+				self.nextKey[previous] = next
+				self.previousKey[next] = previous
 			elseif next ~= nil then
 				self.firstKey = next
 				self.previousKey[next] = nil
-			elseif ak ~= nil then
-				self.lastKey = ak
-				self.nextKey[ak] = nil
+			elseif previous ~= nil then
+				self.lastKey = previous
+				self.nextKey[previous] = nil
 			else
 				self.firstKey = nil
 				self.lastKey = nil
 			end
-			self.nextKey[p] = nil
-			self.previousKey[p] = nil
+			self.nextKey[value] = nil
+			self.previousKey[value] = nil
 		end
-		return aj
+		return contains
 	end
-	function ag.prototype.forEach(self, al)
-		for a2, e in l(self:keys()) do
-			al(nil, e, e, self)
+	function Set.prototype.forEach(self, callback)
+		for _, key in iterate(self:keys()) do
+			callback(nil, key, key, self)
 		end
 	end
-	function ag.prototype.has(self, p)
-		return self.nextKey[p] ~= nil or self.lastKey == p
+	function Set.prototype.has(self, value)
+		return self.nextKey[value] ~= nil or self.lastKey == value
 	end
-	ag.prototype[g.iterator] = function(self)
+	Set.prototype[Symbol.iterator] = function(self)
 		return self:values()
 	end
-	function ag.prototype.entries(self)
-		local am = self.nextKey
-		local e = self.firstKey
+	function Set.prototype.entries(self)
+		local nextKey = self.nextKey
+		local key = self.firstKey
 		return {
-			[g.iterator] = function(self)
+			[Symbol.iterator] = function(self)
 				return self
 			end,
 			next = function(self)
-				local c = { done = not e, value = { e, e } }
-				e = am[e]
-				return c
+				local result = { done = not key, value = { key, key } }
+				key = nextKey[key]
+				return result
 			end,
 		}
 	end
-	function ag.prototype.keys(self)
-		local am = self.nextKey
-		local e = self.firstKey
+	function Set.prototype.keys(self)
+		local nextKey = self.nextKey
+		local key = self.firstKey
 		return {
-			[g.iterator] = function(self)
+			[Symbol.iterator] = function(self)
 				return self
 			end,
 			next = function(self)
-				local c = { done = not e, value = e }
-				e = am[e]
-				return c
+				local result = { done = not key, value = key }
+				key = nextKey[key]
+				return result
 			end,
 		}
 	end
-	function ag.prototype.values(self)
-		local am = self.nextKey
-		local e = self.firstKey
+	function Set.prototype.values(self)
+		local nextKey = self.nextKey
+		local key = self.firstKey
 		return {
-			[g.iterator] = function(self)
+			[Symbol.iterator] = function(self)
 				return self
 			end,
 			next = function(self)
-				local c = { done = not e, value = e }
-				e = am[e]
-				return c
+				local result = { done = not key, value = key }
+				key = nextKey[key]
+				return result
 			end,
 		}
 	end
-	function ag.prototype.union(self, an)
-		local c = D(ag, self)
-		for a2, ao in l(an) do
-			c:add(ao)
+	function Set.prototype.union(self, other)
+		local result = newInstance(Set, self)
+		for _, item in iterate(other) do
+			result:add(item)
 		end
-		return c
+		return result
 	end
-	function ag.prototype.intersection(self, an)
-		local c = D(ag)
-		for a2, ao in l(self) do
-			if an:has(ao) then
-				c:add(ao)
+	function Set.prototype.intersection(self, other)
+		local result = newInstance(Set)
+		for _, item in iterate(self) do
+			if other:has(item) then
+				result:add(item)
 			end
 		end
-		return c
+		return result
 	end
-	function ag.prototype.difference(self, an)
-		local c = D(ag, self)
-		for a2, ao in l(an) do
-			c:delete(ao)
+	function Set.prototype.difference(self, other)
+		local result = newInstance(Set, self)
+		for _, item in iterate(other) do
+			result:delete(item)
 		end
-		return c
+		return result
 	end
-	function ag.prototype.symmetricDifference(self, an)
-		local c = D(ag, self)
-		for a2, ao in l(an) do
-			if self:has(ao) then
-				c:delete(ao)
+	function Set.prototype.symmetricDifference(self, other)
+		local result = newInstance(Set, self)
+		for _, item in iterate(other) do
+			if self:has(item) then
+				result:delete(item)
 			else
-				c:add(ao)
+				result:add(item)
 			end
 		end
-		return c
+		return result
 	end
-	function ag.prototype.isSubsetOf(self, an)
-		for a2, ao in l(self) do
-			if not an:has(ao) then
+	function Set.prototype.isSubsetOf(self, other)
+		for _, item in iterate(self) do
+			if not other:has(item) then
 				return false
 			end
 		end
 		return true
 	end
-	function ag.prototype.isSupersetOf(self, an)
-		for a2, ao in l(an) do
-			if not self:has(ao) then
+	function Set.prototype.isSupersetOf(self, other)
+		for _, item in iterate(other) do
+			if not self:has(item) then
 				return false
 			end
 		end
 		return true
 	end
-	function ag.prototype.isDisjointFrom(self, an)
-		for a2, ao in l(self) do
-			if an:has(ao) then
+	function Set.prototype.isDisjointFrom(self, other)
+		for _, item in iterate(self) do
+			if other:has(item) then
 				return false
 			end
 		end
 		return true
 	end
-	ag[g.species] = ag
+	Set[Symbol.species] = Set
 end
-local function ap(p)
-	return type(p) == "table" and (p[1] ~= nil or next(p) == nil)
+local function isArray(value)
+	return type(value) == "table" and (value[1] ~= nil or next(value) == nil)
 end
-local function aq(self, ...)
-	local ar = { ... }
-	local c = {}
-	local d = 0
-	for as = 1, #self do
-		d = d + 1
-		c[d] = self[as]
+local function arrayConcat(self, ...)
+	local items = { ... }
+	local result = {}
+	local count = 0
+	for i = 1, #self do
+		count = count + 1
+		result[count] = self[i]
 	end
-	for as = 1, #ar do
-		local ao = ar[as]
-		if ap(ao) then
-			for at = 1, #ao do
-				d = d + 1
-				c[d] = ao[at]
+	for i = 1, #items do
+		local item = items[i]
+		if isArray(item) then
+			for j = 1, #item do
+				count = count + 1
+				result[count] = item[j]
 			end
 		else
-			d = d + 1
-			c[d] = ao
+			count = count + 1
+			result[count] = item
 		end
 	end
-	return c
+	return result
 end
-local function au(self, av, aw)
-	for as = 1, #self do
-		if av(aw, self[as], as - 1, self) then
+local function arraySome(self, callback, thisArg)
+	for i = 1, #self do
+		if callback(thisArg, self[i], i - 1, self) then
 			return true
 		end
 	end
 	return false
 end
-local function ax(self)
-	local c = string.gsub(self, "^[%s ﻿]*(.-)[%s ﻿]*$", "%1")
-	return c
+local function stringTrim(self)
+	local result = string.gsub(self, "^[%s ﻿]*(.-)[%s ﻿]*$", "%1")
+	return result
 end
-local function ay(self, av, aw)
-	local c = {}
-	local d = 0
-	for as = 1, #self do
-		if av(aw, self[as], as - 1, self) then
-			d = d + 1
-			c[d] = self[as]
+local function arrayFilter(self, callback, thisArg)
+	local result = {}
+	local count = 0
+	for i = 1, #self do
+		if callback(thisArg, self[i], i - 1, self) then
+			count = count + 1
+			result[count] = self[i]
 		end
 	end
-	return c
+	return result
 end
-local function az(self, aA, aB)
-	if aB == nil then
-		aB = 0
+local function arrayIncludes(self, searchElement, fromIndex)
+	if fromIndex == nil then
+		fromIndex = 0
 	end
-	local d = #self
-	local aC = aB
-	if aB < 0 then
-		aC = d + aB
+	local length = #self
+	local startIndex = fromIndex
+	if fromIndex < 0 then
+		startIndex = length + fromIndex
 	end
-	if aC < 0 then
-		aC = 0
+	if startIndex < 0 then
+		startIndex = 0
 	end
-	for as = aC + 1, d do
-		if self[as] == aA then
+	for i = startIndex + 1, length do
+		if self[i] == searchElement then
 			return true
 		end
 	end
 	return false
 end
-local aD = {}
-local aE, aF
-local aG = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local aH = aG.Barracks
-local aI = aG.BotActionType
-local aJ = aG.BotMode
-local aK = aG.Lane
-local aL = aG.Team
-local aM = aG.Tower
-local aN = aG.UnitType
-local aO = aG.BotScriptEnums
-local aP = require(GetScriptDirectory() .. "/ts_libs/utils/http_utils/http_req")
-local aQ = aP.Request
-local aR = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
-local aS = aR.add
-local aT = aR.dot
-local aU = aR.length2D
-local aV = aR.length3D
-local aW = aR.multiply
-local aX = aR.sub
-local aY = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
-local aZ = aY.HeroName
-local a_ = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
-function aD.IsValidUnit(E)
+local Utils = {}
+local dangerZones, humanPlayerInTeam
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Barracks = Dota.Barracks
+local BotActionType = Dota.BotActionType
+local BotMode = Dota.BotMode
+local Lane = Dota.Lane
+local Team = Dota.Team
+local Tower = Dota.Tower
+local UnitType = Dota.UnitType
+local BotScriptEnums = Dota.BotScriptEnums
+local HttpReq = require(GetScriptDirectory() .. "/ts_libs/utils/http_utils/http_req")
+local Request = HttpReq.Request
+local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local add = NativeOperators.add
+local dot = NativeOperators.dot
+local length2D = NativeOperators.length2D
+local length3D = NativeOperators.length3D
+local multiply = NativeOperators.multiply
+local sub = NativeOperators.sub
+local Heroes = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
+local HeroName = Heroes.HeroName
+local CacheKeys = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
+function Utils.IsValidUnit(unit)
 	-- A number reached here from the defend desire in every game ("attempt to index local
 	-- E (a number value)", pos 4 heroes, all three lanes); the caller could not be traced (no
 	-- debug.traceback in the game sandbox). Not a unit, so not valid.
-	if E == nil or type(E) == "number" or type(E) == "string" or type(E) == "boolean" then
+	if unit == nil or type(unit) == "number" or type(unit) == "string" or type(unit) == "boolean" then
 		return false
 	end
-	return not E:IsNull() and E:CanBeSeen() and E:IsAlive() and not E:IsInvulnerable()
+	return not unit:IsNull() and unit:CanBeSeen() and unit:IsAlive() and not unit:IsInvulnerable()
 end
-function aD.IsValidHero(E)
-	if E == nil then
+function Utils.IsValidHero(unit)
+	if unit == nil then
 		return false
 	end
-	return aD.IsValidUnit(E) and E:IsHero()
+	return Utils.IsValidUnit(unit) and unit:IsHero()
 end
-function aD.IsValidBuilding(E)
-	if E == nil then
+function Utils.IsValidBuilding(unit)
+	if unit == nil then
 		return false
 	end
-	return aD.IsValidUnit(E) and E:IsBuilding()
+	return Utils.IsValidUnit(unit) and unit:IsBuilding()
 end
-function aD.GetLocationToLocationDistance(b0, b1)
-	local b2 = b0.x
-	local b3 = b1.x
-	local b4 = b0.y
-	local b5 = b1.y
-	return math.sqrt((b5 - b4) * (b5 - b4) + (b3 - b2) * (b3 - b2))
+function Utils.GetLocationToLocationDistance(fromLocation, toLocation)
+	local x1 = fromLocation.x
+	local x2 = toLocation.x
+	local y1 = fromLocation.y
+	local y2 = toLocation.y
+	return math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1))
 end
-function aD.findSafePosition(b6, b7)
-	local b8 = aX(b7, b6):Normalized()
-	local b9 = aD.getSafeDistance(b6, b7)
-	return aS(b6, aW(b8, b9))
+function Utils.findSafePosition(origin, target)
+	local direction = sub(target, origin):Normalized()
+	local safeDistance = Utils.getSafeDistance(origin, target)
+	return add(origin, multiply(direction, safeDistance))
 end
-function aD.getSafeDistance(b6, b7)
-	local ba = aU(aX(b7, b6))
-	for a2, bb in ipairs(aE) do
-		local bc = aD.projectPointOntoLine(b6, b7, bb.center)
-		local bd = aU(aX(bc, bb.center))
-		if bd <= bb.radius then
-			local be = aU(aX(bc, b6)) - bb.radius
-			return math.max(0, be)
+function Utils.getSafeDistance(origin, target)
+	local distance = length2D(sub(target, origin))
+	for _, zone in ipairs(dangerZones) do
+		local projectedPoint = Utils.projectPointOntoLine(origin, target, zone.center)
+		local distanceToCenter = length2D(sub(projectedPoint, zone.center))
+		if distanceToCenter <= zone.radius then
+			local safeDistance = length2D(sub(projectedPoint, origin)) - zone.radius
+			return math.max(0, safeDistance)
 		end
 	end
-	return ba
+	return distance
 end
-function aD.projectPointOntoLine(bf, bg, bh)
-	local bi = aX(bg, bf):Normalized()
-	local bj = aX(bh, bf)
-	local bk = aT(bj, bi)
-	return aS(bf, aW(bi, bk))
+function Utils.projectPointOntoLine(lineStart, lineEnd, point)
+	local direction = sub(lineEnd, lineStart):Normalized()
+	local offset = sub(point, lineStart)
+	local projectionLength = dot(offset, direction)
+	return add(lineStart, multiply(direction, projectionLength))
 end
-function aD.IsAnyOfTheBuildingsAlive(bl)
-	for a2, bm in ipairs(bl) do
-		if bm ~= nil and (not bm:CanBeSeen() or bm:GetHealth() > 0) then
+function Utils.IsAnyOfTheBuildingsAlive(buildings)
+	for _, building in ipairs(buildings) do
+		if building ~= nil and (not building:CanBeSeen() or building:GetHealth() > 0) then
 			return true
 		end
 	end
 	return false
 end
-function aD.IsHumanPlayerInTeam(bn)
-	if aF[bn] ~= nil then
-		return aF[bn]
+function Utils.IsHumanPlayerInTeam(team)
+	if humanPlayerInTeam[team] ~= nil then
+		return humanPlayerInTeam[team]
 	end
-	for a2, bo in ipairs(GetTeamPlayers(bn)) do
-		if not IsPlayerBot(bo) then
-			aF[bn] = true
+	for _, playerId in ipairs(GetTeamPlayers(team)) do
+		if not IsPlayerBot(playerId) then
+			humanPlayerInTeam[team] = true
 			return true
 		end
 	end
-	aF[bn] = false
+	humanPlayerInTeam[team] = false
 	return false
 end
-function aD.GetLastSeenEnemyIdsNearLocation(bp, bq)
-	local br = {}
-	for a2, bo in ipairs(GetTeamPlayers(GetOpposingTeam())) do
-		if IsHeroAlive(bo) then
-			local bs = GetHeroLastSeenInfo(bo)
-			if bs ~= nil and bs[1] ~= nil then
-				local bt = bs[1]
-				if aD.GetLocationToLocationDistance(bt.location, bp) <= bq and bt.time_since_seen <= 3 then
-					br[#br + 1] = bo
+function Utils.GetLastSeenEnemyIdsNearLocation(location, radius)
+	local enemyIds = {}
+	for _, playerId in ipairs(GetTeamPlayers(GetOpposingTeam())) do
+		if IsHeroAlive(playerId) then
+			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+			if lastSeenInfo ~= nil and lastSeenInfo[1] ~= nil then
+				local info = lastSeenInfo[1]
+				if Utils.GetLocationToLocationDistance(info.location, location) <= radius and info.time_since_seen <= 3 then
+					enemyIds[#enemyIds + 1] = playerId
 				end
 			end
 		end
 	end
-	br = aq(br, aD.GetEnemyIdsInTpToLocation(bp, bq))
-	return br
+	enemyIds = arrayConcat(enemyIds, Utils.GetEnemyIdsInTpToLocation(location, radius))
+	return enemyIds
 end
-function aD.GetEnemyIdsInTpToLocation(bp, bq)
-	local br = {}
-	for a2, bu in ipairs(GetIncomingTeleports()) do
-		if bu ~= nil and aD.GetLocationToLocationDistance(bp, bu.location) <= bq and not IsTeamPlayer(bu.playerid) then
-			br[#br + 1] = bu.playerid
+function Utils.GetEnemyIdsInTpToLocation(location, radius)
+	local enemyIds = {}
+	for _, teleport in ipairs(GetIncomingTeleports()) do
+		if teleport ~= nil and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius and not IsTeamPlayer(teleport.playerid) then
+			enemyIds[#enemyIds + 1] = teleport.playerid
 		end
 	end
-	return br
+	return enemyIds
 end
-function aD.SpreadBotApartDir(bv, bw, bx)
-	local by = bv:GetLocation()
-	for a2, bz in ipairs(bx) do
-		if aD.IsValidUnit(bz) and bz ~= bv and GetUnitToUnitDistance(bv, bz) <= bw then
-			local bA = aX(by, bz:GetLocation())
-			return aW(bA:Normalized(), bw)
+function Utils.SpreadBotApartDir(bot, distance, units)
+	local botLocation = bot:GetLocation()
+	for _, unit in ipairs(units) do
+		if Utils.IsValidUnit(unit) and unit ~= bot and GetUnitToUnitDistance(bot, unit) <= distance then
+			local awayVector = sub(botLocation, unit:GetLocation())
+			return multiply(awayVector:Normalized(), distance)
 		end
 	end
 	return nil
 end
-function aD.GetItemFromFullInventory(bv, bB)
-	return aD.GetItemFromCountedInventory(bv, bB, 16)
+function Utils.GetItemFromFullInventory(bot, itemName)
+	return Utils.GetItemFromCountedInventory(bot, itemName, 16)
 end
-function aD.GetItemFromCountedInventory(bv, bB, bC)
+function Utils.GetItemFromCountedInventory(bot, itemName, slotCount)
 	do
-		local as = 0
-		while as < bC do
-			local ao = bv:GetItemInSlot(as)
-			if ao and ao:GetName() == bB then
-				return ao
+		local i = 0
+		while i < slotCount do
+			local item = bot:GetItemInSlot(i)
+			if item and item:GetName() == itemName then
+				return item
 			end
-			as = as + 1
+			i = i + 1
 		end
 	end
 	return nil
 end
 require(GetScriptDirectory() .. "/ts_libs/utils/json")
-aD.DebugMode = false
-aD.ScriptID = 3246316298
-aD.RadiantFountainTpPoint = Vector(-7172, -6652, 384)
-aD.DireFountainTpPoint = Vector(6982, 6422, 392)
-aD.RadiantRoshanLoc = Vector(-2984, 2349, 384)
-aD.DireRoshanLoc = Vector(2980, -2816, 384)
-aD.BarrackList = { aH.TopMelee, aH.TopRanged, aH.MidMelee, aH.MidRanged, aH.BotMelee, aH.BotRanged }
-aD.WisdomRunes = { [aL.Radiant] = Vector(-8126, -320, 256), [aL.Dire] = Vector(8319, 266, 256) }
+Utils.DebugMode = false
+Utils.ScriptID = 3246316298
+Utils.RadiantFountainTpPoint = Vector(-7172, -6652, 384)
+Utils.DireFountainTpPoint = Vector(6982, 6422, 392)
+Utils.RadiantRoshanLoc = Vector(-2984, 2349, 384)
+Utils.DireRoshanLoc = Vector(2980, -2816, 384)
+Utils.BarrackList = { Barracks.TopMelee, Barracks.TopRanged, Barracks.MidMelee, Barracks.MidRanged, Barracks.BotMelee, Barracks.BotRanged }
+Utils.WisdomRunes = { [Team.Radiant] = Vector(-8126, -320, 256), [Team.Dire] = Vector(8319, 266, 256) }
 -- Lotus pool centers (7.41 map). Prefer live npc_dota_lotus_pool discovery in modes.
-aD.LotusPools = {
+Utils.LotusPools = {
 	top = Vector(-7421, 4238, 0),
 	bottom = Vector(7309, -4419, 0),
 }
-aD.BuggyHeroesDueToValveTooLazy = {
-	[aZ.Muerta] = true,
-	[aZ.Marci] = true,
-	[aZ.LoneDruidBear] = true,
-	[aZ.PrimalBeast] = true,
-	[aZ.DarkWillow] = true,
-	[aZ.ElderTitan] = true,
-	[aZ.Hoodwink] = true,
-	[aZ.IO] = true,
-	[aZ.Kez] = true,
+Utils.BuggyHeroesDueToValveTooLazy = {
+	[HeroName.Muerta] = true,
+	[HeroName.Marci] = true,
+	[HeroName.LoneDruidBear] = true,
+	[HeroName.PrimalBeast] = true,
+	[HeroName.DarkWillow] = true,
+	[HeroName.ElderTitan] = true,
+	[HeroName.Hoodwink] = true,
+	[HeroName.IO] = true,
+	[HeroName.Kez] = true,
 }
-aD.HighGroundTowers = { aM.Top3, aM.Mid3, aM.Bot3, aM.Base1, aM.Base2 }
-aD.FirstTierTowers = { aM.Top1, aM.Mid1, aM.Bot1 }
-aD.SecondTierTowers = { aM.Top2, aM.Mid2, aM.Bot2 }
-aD.AllTowers = { aM.Top1, aM.Mid1, aM.Bot1, aM.Top2, aM.Mid2, aM.Bot2, aM.Top3, aM.Mid3, aM.Bot3, aM.Base1, aM.Base2 }
-aD.NonTier1Towers = { aM.Top2, aM.Mid2, aM.Bot2, aM.Top3, aM.Mid3, aM.Bot3, aM.Base1, aM.Base2 }
-aD.CachedVarsCleanTime = 5
-local bD = {
-	[aZ.Axe] = { minLevel = 4, requiredItems = {}, requiredModifiers = {} },
-	[aZ.Enigma] = { minLevel = 6, requiredItems = {}, requiredModifiers = {} },
-	[aZ.Earthshaker] = { minLevel = 6, requiredItems = { "item_blink" }, requiredModifiers = {} },
-	[aZ.Invoker] = { minLevel = 9, requiredItems = {}, requiredModifiers = {} },
-	[aZ.SandKing] = { minLevel = 6, requiredItems = { "item_blink" }, requiredModifiers = {} },
-	[aZ.TrollWarlord] = {
+Utils.HighGroundTowers = { Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
+Utils.FirstTierTowers = { Tower.Top1, Tower.Mid1, Tower.Bot1 }
+Utils.SecondTierTowers = { Tower.Top2, Tower.Mid2, Tower.Bot2 }
+Utils.AllTowers = { Tower.Top1, Tower.Mid1, Tower.Bot1, Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
+Utils.NonTier1Towers = { Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
+Utils.CachedVarsCleanTime = 5
+local initiatorRequirements = {
+	[HeroName.Axe] = { minLevel = 4, requiredItems = {}, requiredModifiers = {} },
+	[HeroName.Enigma] = { minLevel = 6, requiredItems = {}, requiredModifiers = {} },
+	[HeroName.Earthshaker] = { minLevel = 6, requiredItems = { "item_blink" }, requiredModifiers = {} },
+	[HeroName.Invoker] = { minLevel = 9, requiredItems = {}, requiredModifiers = {} },
+	[HeroName.SandKing] = { minLevel = 6, requiredItems = { "item_blink" }, requiredModifiers = {} },
+	[HeroName.TrollWarlord] = {
 		minLevel = 6,
 		requiredItems = { "item_bfury" },
 		requiredModifiers = { "modifier_troll_warlord_battle_trance" },
 	},
 }
-aD.ImportantSpells = {
-	[aZ.Alchemist] = { "alchemist_chemical_rage" },
-	[aZ.Axe] = { "axe_culling_blade" },
-	[aZ.Bristleback] = { "bristleback_bristleback" },
-	[aZ.Centaur] = { "centaur_stampede" },
-	[aZ.ChaosKnight] = { "chaos_knight_phantasm" },
-	[aZ.Dawnbreaker] = { "dawnbreaker_solar_guardian" },
-	[aZ.Doom] = { "doom_bringer_doom" },
-	[aZ.DragonKnight] = { "dragon_knight_elder_dragon_form" },
-	[aZ.EarthSpirit] = { "earth_spirit_magnetize" },
-	[aZ.Earthshaker] = { "earthshaker_echo_slam" },
-	[aZ.ElderTitan] = { "elder_titan_earth_splitter" },
-	[aZ.Kunkka] = { "kunkka_ghostship" },
-	[aZ.LegionCommander] = { "legion_commander_duel" },
-	[aZ.Lifestealer] = { "life_stealer_rage" },
-	[aZ.Mars] = { "mars_arena_of_blood" },
-	[aZ.NightStalker] = { "night_stalker_darkness" },
-	[aZ.Omniknight] = { "omniknight_guardian_angel" },
-	[aZ.PrimalBeast] = { "primal_beast_pulverize" },
-	[aZ.Sven] = { "sven_gods_strength" },
-	[aZ.Tidehunter] = { "tidehunter_ravage" },
-	[aZ.TreantProtector] = { "treant_overgrowth" },
-	[aZ.Undying] = { "undying_tombstone", "undying_flesh_golem" },
-	[aZ.WraithKing] = { "skeleton_king_reincarnation" },
-	[aZ.Antimage] = { "antimage_mana_void" },
-	[aZ.Bloodseeker] = { "bloodseeker_rupture" },
-	[aZ.Clinkz] = { "clinkz_burning_barrage" },
-	[aZ.FacelessVoid] = { "faceless_void_chronosphere" },
-	[aZ.Gyrocopter] = { "gyrocopter_flak_cannon" },
-	[aZ.Hoodwink] = { "hoodwink_sharpshooter" },
-	[aZ.Juggernaut] = { "juggernaut_omni_slash" },
-	[aZ.Luna] = { "luna_eclipse" },
-	[aZ.Medusa] = { "medusa_stone_gaze" },
-	[aZ.MonkeyKing] = { "monkey_king_wukongs_command" },
-	[aZ.NagaSiren] = { "naga_siren_song_of_the_siren" },
-	[aZ.Razor] = { "razor_static_link" },
-	[aZ.ShadowFiend] = { "nevermore_requiem" },
-	[aZ.Slark] = { "slark_shadow_dance" },
-	[aZ.Spectre] = { "spectre_shadow_step", "spectre_haunt" },
-	[aZ.Terrorblade] = { "terrorblade_metamorphosis", "terrorblade_sunder" },
-	[aZ.TrollWarlord] = { "troll_warlord_battle_trance" },
-	[aZ.Ursa] = { "ursa_enrage" },
-	[aZ.Viper] = { "viper_viper_strike" },
-	[aZ.Weaver] = { "weaver_time_lapse" },
-	[aZ.AncientApparition] = { "ancient_apparition_ice_blast" },
-	[aZ.CrystalMaiden] = { "crystal_maiden_freezing_field" },
-	[aZ.DeathProphet] = { "death_prophet_exorcism" },
-	[aZ.Disruptor] = { "disruptor_static_storm" },
-	[aZ.Grimstroke] = { "grimstroke_dark_portrait", "grimstroke_soul_chain" },
-	[aZ.Jakiro] = { "jakiro_macropyre" },
-	[aZ.Lich] = { "lich_chain_frost" },
-	[aZ.Lina] = { "lina_laguna_blade" },
-	[aZ.Lion] = { "lion_finger_of_death" },
-	[aZ.Muerta] = { "muerta_pierce_the_veil" },
-	[aZ.Necrophos] = { "necrolyte_ghost_shroud", "necrolyte_reapers_scythe" },
-	[aZ.Oracle] = { "oracle_false_promise" },
-	[aZ.OutworldDestroyer] = { "obsidian_destroyer_sanity_eclipse" },
-	[aZ.Puck] = { "puck_dream_coil" },
-	[aZ.Pugna] = { "pugna_life_drain" },
-	[aZ.QueenOfPain] = { "queenofpain_sonic_wave" },
-	[aZ.Ringmaster] = { "ringmaster_wheel" },
-	[aZ.ShadowDeamon] = { "shadow_demon_disruption", "shadow_demon_demonic_cleanse", "shadow_demon_demonic_purge" },
-	[aZ.ShadowShaman] = { "shadow_shaman_mass_serpent_ward" },
-	[aZ.Silencer] = { "silencer_global_silence" },
-	[aZ.SkywrathMage] = { "skywrath_mage_mystic_flare" },
-	[aZ.Warlock] = { "warlock_fatal_bonds", "warlock_golem" },
-	[aZ.WitchDoctor] = { "witch_doctor_voodoo_switcheroo", "witch_doctor_death_ward" },
-	[aZ.Zeus] = { "zuus_thundergods_wrath" },
-	[aZ.Abaddon] = { "abaddon_borrowed_time" },
-	[aZ.Bane] = { "bane_fiends_grip" },
-	[aZ.Batrider] = { "batrider_flaming_lasso" },
-	[aZ.Beastmaster] = { "beastmaster_primal_roar" },
-	[aZ.Brewmaster] = { "brewmaster_primal_split" },
-	[aZ.Broodmother] = { "broodmother_insatiable_hunger" },
-	[aZ.Chen] = { "chen_hand_of_god" },
-	[aZ.DarkSeer] = { "dark_seer_wall_of_replica" },
-	[aZ.DarkWillow] = { "dark_willow_terrorize" },
-	[aZ.Enigma] = { "enigma_black_hole" },
-	[aZ.Lycan] = { "lycan_shapeshift" },
-	[aZ.Magnus] = { "magnataur_reverse_polarity" },
-	[aZ.Marci] = { "marci_unleash" },
-	[aZ.Pangolier] = { "pangolier_gyroshell" },
-	[aZ.Phoenix] = { "phoenix_supernova" },
-	[aZ.SandKing] = { "sandking_epicenter" },
-	[aZ.Snapfire] = { "snapfire_mortimer_kisses" },
-	[aZ.VengefulSpirit] = { "vengefulspirit_nether_swap" },
-	[aZ.Venomancer] = { "venomancer_noxious_plague" },
-	[aZ.Windrunner] = { "windrunner_focusfire" },
-	[aZ.WinterWyvern] = { "winter_wyvern_cold_embrace", "winter_wyvern_winters_curse" },
+Utils.ImportantSpells = {
+	[HeroName.Alchemist] = { "alchemist_chemical_rage" },
+	[HeroName.Axe] = { "axe_culling_blade" },
+	[HeroName.Bristleback] = { "bristleback_bristleback" },
+	[HeroName.Centaur] = { "centaur_stampede" },
+	[HeroName.ChaosKnight] = { "chaos_knight_phantasm" },
+	[HeroName.Dawnbreaker] = { "dawnbreaker_solar_guardian" },
+	[HeroName.Doom] = { "doom_bringer_doom" },
+	[HeroName.DragonKnight] = { "dragon_knight_elder_dragon_form" },
+	[HeroName.EarthSpirit] = { "earth_spirit_magnetize" },
+	[HeroName.Earthshaker] = { "earthshaker_echo_slam" },
+	[HeroName.ElderTitan] = { "elder_titan_earth_splitter" },
+	[HeroName.Kunkka] = { "kunkka_ghostship" },
+	[HeroName.LegionCommander] = { "legion_commander_duel" },
+	[HeroName.Lifestealer] = { "life_stealer_rage" },
+	[HeroName.Mars] = { "mars_arena_of_blood" },
+	[HeroName.NightStalker] = { "night_stalker_darkness" },
+	[HeroName.Omniknight] = { "omniknight_guardian_angel" },
+	[HeroName.PrimalBeast] = { "primal_beast_pulverize" },
+	[HeroName.Sven] = { "sven_gods_strength" },
+	[HeroName.Tidehunter] = { "tidehunter_ravage" },
+	[HeroName.TreantProtector] = { "treant_overgrowth" },
+	[HeroName.Undying] = { "undying_tombstone", "undying_flesh_golem" },
+	[HeroName.WraithKing] = { "skeleton_king_reincarnation" },
+	[HeroName.Antimage] = { "antimage_mana_void" },
+	[HeroName.Bloodseeker] = { "bloodseeker_rupture" },
+	[HeroName.Clinkz] = { "clinkz_burning_barrage" },
+	[HeroName.FacelessVoid] = { "faceless_void_chronosphere" },
+	[HeroName.Gyrocopter] = { "gyrocopter_flak_cannon" },
+	[HeroName.Hoodwink] = { "hoodwink_sharpshooter" },
+	[HeroName.Juggernaut] = { "juggernaut_omni_slash" },
+	[HeroName.Luna] = { "luna_eclipse" },
+	[HeroName.Medusa] = { "medusa_stone_gaze" },
+	[HeroName.MonkeyKing] = { "monkey_king_wukongs_command" },
+	[HeroName.NagaSiren] = { "naga_siren_song_of_the_siren" },
+	[HeroName.Razor] = { "razor_static_link" },
+	[HeroName.ShadowFiend] = { "nevermore_requiem" },
+	[HeroName.Slark] = { "slark_shadow_dance" },
+	[HeroName.Spectre] = { "spectre_shadow_step", "spectre_haunt" },
+	[HeroName.Terrorblade] = { "terrorblade_metamorphosis", "terrorblade_sunder" },
+	[HeroName.TrollWarlord] = { "troll_warlord_battle_trance" },
+	[HeroName.Ursa] = { "ursa_enrage" },
+	[HeroName.Viper] = { "viper_viper_strike" },
+	[HeroName.Weaver] = { "weaver_time_lapse" },
+	[HeroName.AncientApparition] = { "ancient_apparition_ice_blast" },
+	[HeroName.CrystalMaiden] = { "crystal_maiden_freezing_field" },
+	[HeroName.DeathProphet] = { "death_prophet_exorcism" },
+	[HeroName.Disruptor] = { "disruptor_static_storm" },
+	[HeroName.Grimstroke] = { "grimstroke_dark_portrait", "grimstroke_soul_chain" },
+	[HeroName.Jakiro] = { "jakiro_macropyre" },
+	[HeroName.Lich] = { "lich_chain_frost" },
+	[HeroName.Lina] = { "lina_laguna_blade" },
+	[HeroName.Lion] = { "lion_finger_of_death" },
+	[HeroName.Muerta] = { "muerta_pierce_the_veil" },
+	[HeroName.Necrophos] = { "necrolyte_ghost_shroud", "necrolyte_reapers_scythe" },
+	[HeroName.Oracle] = { "oracle_false_promise" },
+	[HeroName.OutworldDestroyer] = { "obsidian_destroyer_sanity_eclipse" },
+	[HeroName.Puck] = { "puck_dream_coil" },
+	[HeroName.Pugna] = { "pugna_life_drain" },
+	[HeroName.QueenOfPain] = { "queenofpain_sonic_wave" },
+	[HeroName.Ringmaster] = { "ringmaster_wheel" },
+	[HeroName.ShadowDeamon] = { "shadow_demon_disruption", "shadow_demon_demonic_cleanse", "shadow_demon_demonic_purge" },
+	[HeroName.ShadowShaman] = { "shadow_shaman_mass_serpent_ward" },
+	[HeroName.Silencer] = { "silencer_global_silence" },
+	[HeroName.SkywrathMage] = { "skywrath_mage_mystic_flare" },
+	[HeroName.Warlock] = { "warlock_fatal_bonds", "warlock_golem" },
+	[HeroName.WitchDoctor] = { "witch_doctor_voodoo_switcheroo", "witch_doctor_death_ward" },
+	[HeroName.Zeus] = { "zuus_thundergods_wrath" },
+	[HeroName.Abaddon] = { "abaddon_borrowed_time" },
+	[HeroName.Bane] = { "bane_fiends_grip" },
+	[HeroName.Batrider] = { "batrider_flaming_lasso" },
+	[HeroName.Beastmaster] = { "beastmaster_primal_roar" },
+	[HeroName.Brewmaster] = { "brewmaster_primal_split" },
+	[HeroName.Broodmother] = { "broodmother_insatiable_hunger" },
+	[HeroName.Chen] = { "chen_hand_of_god" },
+	[HeroName.DarkSeer] = { "dark_seer_wall_of_replica" },
+	[HeroName.DarkWillow] = { "dark_willow_terrorize" },
+	[HeroName.Enigma] = { "enigma_black_hole" },
+	[HeroName.Lycan] = { "lycan_shapeshift" },
+	[HeroName.Magnus] = { "magnataur_reverse_polarity" },
+	[HeroName.Marci] = { "marci_unleash" },
+	[HeroName.Pangolier] = { "pangolier_gyroshell" },
+	[HeroName.Phoenix] = { "phoenix_supernova" },
+	[HeroName.SandKing] = { "sandking_epicenter" },
+	[HeroName.Snapfire] = { "snapfire_mortimer_kisses" },
+	[HeroName.VengefulSpirit] = { "vengefulspirit_nether_swap" },
+	[HeroName.Venomancer] = { "venomancer_noxious_plague" },
+	[HeroName.Windrunner] = { "windrunner_focusfire" },
+	[HeroName.WinterWyvern] = { "winter_wyvern_cold_embrace", "winter_wyvern_winters_curse" },
 }
-aD.ImportantItems = { "item_black_king_bar", "item_refresher" }
-aE = {}
-aD.GameStates = { defendPings = nil, recentDefendTime = -200, cachedVars = nil, twinGates = {} }
-aD.LoneDruid = {}
-aD.FrameProcessTime = 0.01
-aD.EstimatedEnemyRoles = { npc_dota_hero_any = { lane = aK.Mid, role = 2 } }
-function aD.PrintTable(bE, bF)
-	if bF == nil then
-		bF = 0
+Utils.ImportantItems = { "item_black_king_bar", "item_refresher" }
+dangerZones = {}
+Utils.GameStates = { defendPings = nil, recentDefendTime = -200, cachedVars = nil, twinGates = {} }
+Utils.LoneDruid = {}
+Utils.FrameProcessTime = 0.01
+Utils.EstimatedEnemyRoles = { npc_dota_hero_any = { lane = Lane.Mid, role = 2 } }
+function Utils.PrintTable(tbl, depth)
+	if depth == nil then
+		depth = 0
 	end
-	if bE == nil then
+	if tbl == nil then
 		log("nil")
 		return
 	end
-	for a2, bG in ipairs(a(bE)) do
-		local e = bG[1]
-		local p = bG[2]
-		local bH = string.rep("  ", bF)
-		if type(p) == "table" then
-			if bF < 3 then
-				log("%s%s: ", bH, e)
-				aD.PrintTable(p, bF + 1)
+	for _, entry in ipairs(objectEntries(tbl)) do
+		local key = entry[1]
+		local value = entry[2]
+		local indent = string.rep("  ", depth)
+		if type(value) == "table" then
+			if depth < 3 then
+				log("%s%s: ", indent, key)
+				Utils.PrintTable(value, depth + 1)
 			else
-				log("%s%s: [WARN] Table has deep nested tables in it, stop printing more nested tables.", bH, e)
+				log("%s%s: [WARN] Table has deep nested tables in it, stop printing more nested tables.", indent, key)
 			end
 		else
-			log("%s%s: %s", bH, e, p)
+			log("%s%s: %s", indent, key, value)
 		end
 	end
 end
-function aD.PrintUnitModifiers(bz)
-	local bI = bz:NumModifiers()
+function Utils.PrintUnitModifiers(unit)
+	local modifierCount = unit:NumModifiers()
 	do
-		local as = 0
-		while as < bI do
-			local bJ = bz:GetModifierName(as)
-			local bK = bz:GetModifierStackCount(as)
-			log("Unit %s has modifier %s with stack count %s", bz:GetUnitName(), bJ, bK)
-			as = as + 1
+		local i = 0
+		while i < modifierCount do
+			local modifierName = unit:GetModifierName(i)
+			local stackCount = unit:GetModifierStackCount(i)
+			log("Unit %s has modifier %s with stack count %s", unit:GetUnitName(), modifierName, stackCount)
+			i = i + 1
 		end
 	end
 end
-function aD.PrintPings(bL)
-	local bM = {}
-	for a2, bG in l(j(GetAvoidanceZones())) do
-		local bN = bG[1]
-		local bb = bG[2]
-		aD.PrintTable(bb)
+function Utils.PrintPings(maxAge)
+	local pings = {}
+	for _, entry in iterate(arrayEntries(GetAvoidanceZones())) do
+		local zoneIndex = entry[1]
+		local zone = entry[2]
+		Utils.PrintTable(zone)
 	end
-	local bO = GetTeamPlayers(GetTeam())
+	local teamPlayers = GetTeamPlayers(GetTeam())
 	do
-		local as = 1
-		while as <= #bO do
+		local i = 1
+		while i <= #teamPlayers do
 			do
-				local bP
+				local continueLoop
 				repeat
-					local bQ = GetTeamMember(as)
-					if bQ == nil or not bQ:IsAlive() or bQ:IsIllusion() then
-						bP = true
+					local member = GetTeamMember(i)
+					if member == nil or not member:IsAlive() or member:IsIllusion() then
+						continueLoop = true
 						break
 					end
-					local bR = bQ:GetMostRecentPing()
-					if bR.time ~= 0 and GameTime() - bR.time < bL then
-						bM[#bM + 1] = bR
-						local bS = bR.location
+					local ping = member:GetMostRecentPing()
+					if ping.time ~= 0 and GameTime() - ping.time < maxAge then
+						pings[#pings + 1] = ping
+						local pingLocation = ping.location
 						log(
 							"[PING] Player %d pinged at (%d, %d, %d) normal=%s time=%.1f",
-							as,
-							math.floor(bS.x),
-							math.floor(bS.y),
-							math.floor(bS.z),
-							tostring(bR.normal_ping),
-							bR.time
+							i,
+							math.floor(pingLocation.x),
+							math.floor(pingLocation.y),
+							math.floor(pingLocation.z),
+							tostring(ping.normal_ping),
+							ping.time
 						)
-						for a2, bz in ipairs(GetUnitList(aN.All)) do
-							if aD.GetLocationToLocationDistance(bR.location, bz:GetLocation()) < 400 then
-								log("  nearby: %s", bz:GetUnitName())
+						for _, unit in ipairs(GetUnitList(UnitType.All)) do
+							if Utils.GetLocationToLocationDistance(ping.location, unit:GetLocation()) < 400 then
+								log("  nearby: %s", unit:GetUnitName())
 							end
 						end
 					end
-					bP = true
+					continueLoop = true
 				until true
-				if not bP then
+				if not continueLoop then
 					break
 				end
 			end
-			as = as + 1
+			i = i + 1
 		end
 	end
-	if #bM > 0 then
-		aD.PrintTable(bM)
+	if #pings > 0 then
+		Utils.PrintTable(pings)
 	end
 end
-function aD.PrintAllAbilities(bz)
-	log("Get all abilities of bot %s", bz:GetUnitName())
-	for s = 0, 10 do
-		local bT = bz:GetAbilityInSlot(s)
-		if bT and not bT:IsNull() then
-			log("Ability At Index %d: %s", s, bT:GetName())
+function Utils.PrintAllAbilities(unit)
+	log("Get all abilities of bot %s", unit:GetUnitName())
+	for slot = 0, 10 do
+		local ability = unit:GetAbilityInSlot(slot)
+		if ability and not ability:IsNull() then
+			log("Ability At Index %d: %s", slot, ability:GetName())
 		else
-			log("Ability At Index %d is nil", s)
+			log("Ability At Index %d is nil", slot)
 		end
 	end
 end
-function aD.GetEnemyFountainTpPoint()
-	if GetTeam() == aL.Dire then
-		return aD.RadiantFountainTpPoint
+function Utils.GetEnemyFountainTpPoint()
+	if GetTeam() == Team.Dire then
+		return Utils.RadiantFountainTpPoint
 	end
-	return aD.DireFountainTpPoint
+	return Utils.DireFountainTpPoint
 end
-function aD.GetTeamFountainTpPoint()
-	if GetTeam() == aL.Dire then
-		return aD.DireFountainTpPoint
+function Utils.GetTeamFountainTpPoint()
+	if GetTeam() == Team.Dire then
+		return Utils.DireFountainTpPoint
 	end
-	return aD.RadiantFountainTpPoint
+	return Utils.RadiantFountainTpPoint
 end
-function aD.GetTeamSideDirection(bn)
-	if bn == aL.Radiant then
+function Utils.GetTeamSideDirection(team)
+	if team == Team.Radiant then
 		return Vector(-1, -1, 0):Normalized()
 	else
 		return Vector(1, 1, 0):Normalized()
 	end
 end
-function aD.Shuffle(bU)
+function Utils.Shuffle(list)
 	do
-		local as = #bU - 1
-		while as > 0 do
-			local at = RandomInt(0, as)
-			local bV = bU[as + 1]
-			bU[as + 1] = bU[at + 1]
-			bU[at + 1] = bV
-			as = as - 1
+		local i = #list - 1
+		while i > 0 do
+			local j = RandomInt(0, i)
+			local temp = list[i + 1]
+			list[i + 1] = list[j + 1]
+			list[j + 1] = temp
+			i = i - 1
 		end
 	end
-	return bU
+	return list
 end
-function aD.SetFrameProcessTime(bv)
-	if bv.frameProcessTime == nil then
-		bv.frameProcessTime = aD.FrameProcessTime + v(
-			math.fmod(bv:GetPlayerID() / 1000, aD.FrameProcessTime / 10) * 3,
+function Utils.SetFrameProcessTime(bot)
+	if bot.frameProcessTime == nil then
+		bot.frameProcessTime = Utils.FrameProcessTime + numberToFixed(
+			math.fmod(bot:GetPlayerID() / 1000, Utils.FrameProcessTime / 10) * 3,
 			2
 		)
 	end
 end
-function aD.GetHumanPing()
-	for a2, bW in ipairs(GetTeamPlayers(GetTeam())) do
-		local bX = GetTeamMember(bW)
-		if bX ~= nil and not bX:IsBot() then
-			return bX, bX:GetMostRecentPing()
+function Utils.GetHumanPing()
+	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
+		local member = GetTeamMember(playerId)
+		if member ~= nil and not member:IsBot() then
+			return member, member:GetMostRecentPing()
 		end
 	end
 	return nil, nil
 end
-function aD.IsPingedByAnyPlayer(bv, bL, bw, ba)
-	if not bv:IsAlive() then
+function Utils.IsPingedByAnyPlayer(bot, maxAge, minDistance, maxDistance)
+	if not bot:IsAlive() then
 		return nil
 	end
-	local bY = {}
-	bw = bw or 1500
-	ba = ba or 10000
-	for a2, bW in ipairs(GetTeamPlayers(GetTeam())) do
+	local pings = {}
+	minDistance = minDistance or 1500
+	maxDistance = maxDistance or 10000
+	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
 		do
-			local bZ
+			local continueLoop
 			repeat
-				local bX = GetTeamMember(bW)
-				if bX == nil or bX:IsIllusion() or bX == bv then
-					bZ = true
+				local member = GetTeamMember(playerId)
+				if member == nil or member:IsIllusion() or member == bot then
+					continueLoop = true
 					break
 				end
-				local bR = bX:GetMostRecentPing()
-				if bR and bR.time and GameTime() - bR.time < bL then
-					bY[#bY + 1] = bR
+				local ping = member:GetMostRecentPing()
+				if ping and ping.time and GameTime() - ping.time < maxAge then
+					pings[#pings + 1] = ping
 				end
-				bZ = true
+				continueLoop = true
 			until true
-			if not bZ then
+			if not continueLoop then
 				break
 			end
 		end
 	end
-	for a2, bR in ipairs(bY) do
-		local b_ = aD.GetLocationToLocationDistance(bR.location, bv:GetLocation())
-		local c0 = bw <= b_ and b_ <= ba
-		local c1 = GameTime() - bR.time < bL
-		if c0 and c1 then
-			log("Bot %s noticed the ping", bv:GetUnitName())
-			return bR
+	for _, ping in ipairs(pings) do
+		local distance = Utils.GetLocationToLocationDistance(ping.location, bot:GetLocation())
+		local inRange = minDistance <= distance and distance <= maxDistance
+		local isRecent = GameTime() - ping.time < maxAge
+		if inRange and isRecent then
+			log("Bot %s noticed the ping", bot:GetUnitName())
+			return ping
 		end
 	end
 	return nil
 end
-function aD.SetCachedVars(e, p)
-	if not aD.GameStates.cachedVars then
-		aD.GameStates.cachedVars = {}
+function Utils.SetCachedVars(key, value)
+	if not Utils.GameStates.cachedVars then
+		Utils.GameStates.cachedVars = {}
 	end
-	aD.GameStates.cachedVars[e] = { t = DotaTime(), v = p }
+	Utils.GameStates.cachedVars[key] = { t = DotaTime(), v = value }
 end
-function aD.GetCachedVars(e, c2)
-	if not aD.GameStates.cachedVars then
+function Utils.GetCachedVars(key, maxAge)
+	if not Utils.GameStates.cachedVars then
 		return nil
 	end
-	local c3 = aD.GameStates.cachedVars[e]
-	if not c3 then
+	local entry = Utils.GameStates.cachedVars[key]
+	if not entry then
 		return nil
 	end
-	if DotaTime() - c3.t <= c2 then
-		return c3.v
+	if DotaTime() - entry.t <= maxAge then
+		return entry.v
 	end
 	return nil
 end
-function aD.CleanupCachedVars()
+function Utils.CleanupCachedVars()
 	return
 end
-function aD.CountEnemyHeroesNear(bS, c4)
-	local c5 = 0
-	for a2, c6 in ipairs(GetUnitList(aN.EnemyHeroes)) do
-		if aD.IsValidHero(c6) and GetUnitToLocationDistance(c6, bS) <= c4 then
-			c5 = c5 + 1
+function Utils.CountEnemyHeroesNear(location, radius)
+	local count = 0
+	for _, enemyHero in ipairs(GetUnitList(UnitType.EnemyHeroes)) do
+		if Utils.IsValidHero(enemyHero) and GetUnitToLocationDistance(enemyHero, location) <= radius then
+			count = count + 1
 		end
 	end
-	return c5
+	return count
 end
-local c7 = { aH.TopMelee, aH.TopRanged, aH.MidMelee, aH.MidRanged, aH.BotMelee, aH.BotRanged }
-local c8 = { aM.Top3, aM.Mid3, aM.Bot3 }
-function aD.CountEnemyHeroesOnHighGround(bn)
-	local c9 = 60000 + (bn or 0)
-	local ca = aD.GetCachedVars(c9, 1)
-	if ca ~= nil then
-		return ca
+local barracksList = { Barracks.TopMelee, Barracks.TopRanged, Barracks.MidMelee, Barracks.MidRanged, Barracks.BotMelee, Barracks.BotRanged }
+local highGroundTowers = { Tower.Top3, Tower.Mid3, Tower.Bot3 }
+function Utils.CountEnemyHeroesOnHighGround(team)
+	local cacheKey = 60000 + (team or 0)
+	local cached = Utils.GetCachedVars(cacheKey, 1)
+	if cached ~= nil then
+		return cached
 	end
-	local cb = {}
-	for a2, cc in ipairs(c8) do
-		local cd = GetTower(bn, cc)
-		if aD.IsValidBuilding(cd) then
-			cb[#cb + 1] = cd
+	local buildings = {}
+	for _, towerId in ipairs(highGroundTowers) do
+		local tower = GetTower(team, towerId)
+		if Utils.IsValidBuilding(tower) then
+			buildings[#buildings + 1] = tower
 		end
 	end
-	for a2, ce in ipairs(c7) do
-		local cf = GetBarracks(bn, ce)
-		if aD.IsValidBuilding(cf) then
-			cb[#cb + 1] = cf
+	for _, barracksId in ipairs(barracksList) do
+		local barracks = GetBarracks(team, barracksId)
+		if Utils.IsValidBuilding(barracks) then
+			buildings[#buildings + 1] = barracks
 		end
 	end
-	local cg = GetAncient(bn)
-	if aD.IsValidBuilding(cg) then
-		cb[#cb + 1] = cg
+	local ancient = GetAncient(team)
+	if Utils.IsValidBuilding(ancient) then
+		buildings[#buildings + 1] = ancient
 	end
-	local ch = 0
-	for a2, bU in ipairs(cb) do
-		local H = aD.CountEnemyHeroesNear(bU:GetLocation(), 1600)
-		if H > ch then
-			ch = H
+	local maxEnemies = 0
+	for _, building in ipairs(buildings) do
+		local enemyCount = Utils.CountEnemyHeroesNear(building:GetLocation(), 1600)
+		if enemyCount > maxEnemies then
+			maxEnemies = enemyCount
 		end
 	end
-	aD.SetCachedVars(c9, ch)
-	return ch
+	Utils.SetCachedVars(cacheKey, maxEnemies)
+	return maxEnemies
 end
 -- How far out from a high-ground building a creep wave starts to count. Defenders are sent
 -- while the wave is still walking up, so they arrive before it hits the building. It was
 -- 1600; 1000 more gives a walking hero about 3s more lead.
-aD.HG_WAVE_RADIUS = 2600
+Utils.HG_WAVE_RADIUS = 2600
 -- Enemy creeps within `radius` of loc, counting only those closer to loc than to another of
 -- our T3 towers (mid and top T3 are close enough that one wave would count for both).
-function aD.CountHighGroundWave(team, loc, radius)
+function Utils.CountHighGroundWave(team, location, radius)
 	local others = {}
-	for a2, id in ipairs(c8) do
+	for _, id in ipairs(highGroundTowers) do
 		local tower = GetTower(team, id)
-		if aD.IsValidBuilding(tower) then
-			local tl = tower:GetLocation()
-			if (tl.x - loc.x) ^ 2 + (tl.y - loc.y) ^ 2 > 300 * 300 then
-				others[#others + 1] = tl
+		if Utils.IsValidBuilding(tower) then
+			local towerLocation = tower:GetLocation()
+			if (towerLocation.x - location.x) ^ 2 + (towerLocation.y - location.y) ^ 2 > 300 * 300 then
+				others[#others + 1] = towerLocation
 			end
 		end
 	end
-	local n = 0
-	for a2, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+	local count = 0
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
 		if unit ~= nil and unit:IsAlive() then
-			local d = GetUnitToLocationDistance(unit, loc)
-			if d <= radius then
+			local distance = GetUnitToLocationDistance(unit, location)
+			if distance <= radius then
 				local mine = true
-				for a3, tl in ipairs(others) do
-					if GetUnitToLocationDistance(unit, tl) < d then
+				for _, towerLocation in ipairs(others) do
+					if GetUnitToLocationDistance(unit, towerLocation) < distance then
 						mine = false
 						break
 					end
 				end
 				if mine then
-					n = n + 1
+					count = count + 1
 				end
 			end
 		end
 	end
-	return n
+	return count
 end
 -- A creep wave (2+ enemy creeps within HG_WAVE_RADIUS) at one of our high-ground buildings
 -- (T3 or barracks) with no enemy hero that close to it, and that building within `range` of
 -- the bot. Returns the building and the creep count, or nil.
-function aD.HighGroundCreepWaveNear(bot, range)
+function Utils.HighGroundCreepWaveNear(bot, range)
 	local team = bot:GetTeam()
 	local buildings = {}
-	for a2, id in ipairs(c8) do
+	for _, id in ipairs(highGroundTowers) do
 		local tower = GetTower(team, id)
-		if aD.IsValidBuilding(tower) then
+		if Utils.IsValidBuilding(tower) then
 			buildings[#buildings + 1] = tower
 		end
 	end
-	for a2, id in ipairs(c7) do
+	for _, id in ipairs(barracksList) do
 		local rax = GetBarracks(team, id)
-		if aD.IsValidBuilding(rax) then
+		if Utils.IsValidBuilding(rax) then
 			buildings[#buildings + 1] = rax
 		end
 	end
-	for a2, building in ipairs(buildings) do
+	for _, building in ipairs(buildings) do
 		if GetUnitToUnitDistance(bot, building) <= range then
-			local loc = building:GetLocation()
-			if aD.CountEnemyHeroesNear(loc, aD.HG_WAVE_RADIUS) == 0 then
-				local creeps = aD.CountHighGroundWave(team, loc, aD.HG_WAVE_RADIUS)
+			local location = building:GetLocation()
+			if Utils.CountEnemyHeroesNear(location, Utils.HG_WAVE_RADIUS) == 0 then
+				local creeps = Utils.CountHighGroundWave(team, location, Utils.HG_WAVE_RADIUS)
 				if creeps >= 2 then
 					return building, creeps
 				end
@@ -1099,952 +1095,952 @@ function aD.HighGroundCreepWaveNear(bot, range)
 	end
 	return nil
 end
-function aD.GetDistanceFromAncient(bv, ci)
-	local cj = GetAncient(ci and GetOpposingTeam() or GetTeam())
-	return GetUnitToUnitDistance(bv, cj)
+function Utils.GetDistanceFromAncient(bot, isEnemy)
+	local ancient = GetAncient(isEnemy and GetOpposingTeam() or GetTeam())
+	return GetUnitToUnitDistance(bot, ancient)
 end
-function aD.IsValidCreep(E)
-	if E == nil then
+function Utils.IsValidCreep(unit)
+	if unit == nil then
 		return false
 	end
-	return aD.IsValidUnit(E)
-		and E:GetHealth() < 5000
-		and not E:IsHero()
-		and (GetBot():GetLevel() > 9 or not E:IsAncientCreep())
+	return Utils.IsValidUnit(unit)
+		and unit:GetHealth() < 5000
+		and not unit:IsHero()
+		and (GetBot():GetLevel() > 9 or not unit:IsAncientCreep())
 end
-function aD.IsValidTower(E)
-	if E == nil then
+function Utils.IsValidTower(unit)
+	if unit == nil then
 		return false
 	end
-	return aD.IsValidUnit(E) and E:IsTower()
+	return Utils.IsValidUnit(unit) and unit:IsTower()
 end
-function aD.HasItem(bv, bB)
-	local ck = bv:FindItemSlot(bB)
-	return ck >= 0 and ck <= 8
+function Utils.HasItem(bot, itemName)
+	local slot = bot:FindItemSlot(itemName)
+	return slot >= 0 and slot <= 8
 end
-function aD.FindAllyWithName(a1)
-	for a2, cl in ipairs(GetUnitList(aN.AlliedHeroes)) do
-		if aD.IsValidHero(cl) and { string.find(cl:GetUnitName(), a1) } then
-			return cl
+function Utils.FindAllyWithName(name)
+	for _, ally in ipairs(GetUnitList(UnitType.AlliedHeroes)) do
+		if Utils.IsValidHero(ally) and { string.find(ally:GetUnitName(), name) } then
+			return ally
 		end
 	end
 	return nil
 end
-function aD.Deepcopy(cm)
-	local cn = type(cm)
-	local co
-	if cn == "table" then
-		co = {}
-		for a2, bG in ipairs(a(cm)) do
-			local e = bG[1]
-			local p = bG[2]
-			co[aD.Deepcopy(e)] = aD.Deepcopy(p)
+function Utils.Deepcopy(original)
+	local originalType = type(original)
+	local copy
+	if originalType == "table" then
+		copy = {}
+		for _, entry in ipairs(objectEntries(original)) do
+			local key = entry[1]
+			local value = entry[2]
+			copy[Utils.Deepcopy(key)] = Utils.Deepcopy(value)
 		end
-		setmetatable(co, aD.Deepcopy(getmetatable(cm)))
+		setmetatable(copy, Utils.Deepcopy(getmetatable(original)))
 	else
-		co = cm
+		copy = original
 	end
-	return co
+	return copy
 end
-function aD.CombineTablesUnique(cp, cq)
-	local cr = D(ag)
-	for a2, bG in ipairs(a(cp)) do
-		local bN = bG[1]
-		local p = bG[2]
-		cr:add(p)
+function Utils.CombineTablesUnique(first, second)
+	local uniqueValues = newInstance(Set)
+	for _, entry in ipairs(objectEntries(first)) do
+		local key = entry[1]
+		local value = entry[2]
+		uniqueValues:add(value)
 	end
-	for a2, bG in ipairs(a(cq)) do
-		local bN = bG[1]
-		local p = bG[2]
-		cr:add(p)
+	for _, entry in ipairs(objectEntries(second)) do
+		local key = entry[1]
+		local value = entry[2]
+		uniqueValues:add(value)
 	end
-	local c = {}
-	for a2, cs in l(cr) do
-		c[#c + 1] = cs
+	local result = {}
+	for _, value in iterate(uniqueValues) do
+		result[#result + 1] = value
 	end
-	return c
+	return result
 end
-function aD.MergeLists(bU, ce)
-	return aq(bU, ce)
+function Utils.MergeLists(first, second)
+	return arrayConcat(first, second)
 end
-function aD.RemoveValueFromTable(ct, cu, cv)
-	local as = 0
-	while as < #ct do
-		if ct[as + 1] == cu then
-			table.remove(ct, as + 1)
-			if not cv then
+function Utils.RemoveValueFromTable(list, valueToRemove, removeAll)
+	local i = 0
+	while i < #list do
+		if list[i + 1] == valueToRemove then
+			table.remove(list, i + 1)
+			if not removeAll then
 				break
 			end
 		else
-			as = as + 1
+			i = i + 1
 		end
 	end
 end
-function aD.NumActionTypeInQueue(bv, cw)
-	local bC = 0
-	for s = 1, bv:NumQueuedActions() do
-		local cx = bv:GetQueuedActionType(s)
-		if cx == cw then
-			bC = bC + 1
+function Utils.NumActionTypeInQueue(bot, actionType)
+	local count = 0
+	for i = 1, bot:NumQueuedActions() do
+		local queuedType = bot:GetQueuedActionType(i)
+		if queuedType == actionType then
+			count = count + 1
 		end
 	end
-	return bC
+	return count
 end
-local cy = {}
-function aD.NumHumanBotPlayersInTeam(bn)
-	if not (cy[bn] ~= nil) then
-		local cz = 0
-		local cA = 0
-		for a2, bo in ipairs(GetTeamPlayers(bn)) do
-			if IsPlayerBot(bo) then
-				cA = cA + 1
+local humanBotCountCache = {}
+function Utils.NumHumanBotPlayersInTeam(team)
+	if humanBotCountCache[team] == nil then
+		local humanCount = 0
+		local botCount = 0
+		for _, playerId in ipairs(GetTeamPlayers(team)) do
+			if IsPlayerBot(playerId) then
+				botCount = botCount + 1
 			else
-				cz = cz + 1
+				humanCount = humanCount + 1
 			end
 		end
-		cy[bn] = { cz, cA }
+		humanBotCountCache[team] = { humanCount, botCount }
 	end
-	return cy[bn][1], cy[bn][2]
+	return humanBotCountCache[team][1], humanBotCountCache[team][2]
 end
-function aD.GetNearbyAllyAverageHpPercent(bv, cB)
-	local cC = 0
-	local cD = 0
-	for a2, bW in ipairs(GetTeamPlayers(bv:GetTeam())) do
-		local cl = GetTeamMember(bW)
-		if cl and cl:IsAlive() and GetUnitToUnitDistance(cl, bv) <= cB then
-			cC = cC + cl:GetHealth() / cl:GetMaxHealth()
-			cD = cD + 1
+function Utils.GetNearbyAllyAverageHpPercent(bot, radius)
+	local hpRatioSum = 0
+	local allyCount = 0
+	for _, playerId in ipairs(GetTeamPlayers(bot:GetTeam())) do
+		local ally = GetTeamMember(playerId)
+		if ally and ally:IsAlive() and GetUnitToUnitDistance(ally, bot) <= radius then
+			hpRatioSum = hpRatioSum + ally:GetHealth() / ally:GetMaxHealth()
+			allyCount = allyCount + 1
 		end
 	end
-	return cD ~= nil and cC / cD or 0
+	return allyCount ~= nil and hpRatioSum / allyCount or 0
 end
-function aD.IsWithoutSpellShield(cE)
-	return not cE:HasModifier("modifier_item_sphere_target")
-		and not cE:HasModifier("modifier_antimage_spell_shield")
-		and not cE:HasModifier("modifier_item_lotus_orb_active")
+function Utils.IsWithoutSpellShield(unit)
+	return not unit:HasModifier("modifier_item_sphere_target")
+		and not unit:HasModifier("modifier_antimage_spell_shield")
+		and not unit:HasModifier("modifier_item_lotus_orb_active")
 end
-function aD.SetContains(cr, e)
-	return not not cr[e]
+function Utils.SetContains(set, key)
+	return not not set[key]
 end
-function aD.AddToSet(cr, e)
-	cr[e] = true
+function Utils.AddToSet(set, key)
+	set[key] = true
 end
-function aD.RemoveFromSet(cr, e)
-	ad(cr, e)
+function Utils.RemoveFromSet(set, key)
+	deleteProperty(set, key)
 end
-function aD.HasValue(cr, p)
-	for bN, cs in ipairs(cr) do
-		if p == cs then
+function Utils.HasValue(set, value)
+	for _, item in ipairs(set) do
+		if value == item then
 			return true
 		end
 	end
 	return false
 end
-function aD.CountBackpackEmptySpace(bv)
-	local bC = 3
-	for a2, ck in ipairs({ 6, 7, 8 }) do
-		if bv:GetItemInSlot(ck) ~= nil then
-			bC = bC - 1
+function Utils.CountBackpackEmptySpace(bot)
+	local emptySlots = 3
+	for _, slot in ipairs({ 6, 7, 8 }) do
+		if bot:GetItemInSlot(slot) ~= nil then
+			emptySlots = emptySlots - 1
 		end
 	end
-	return bC
+	return emptySlots
 end
-function aD.FloatEqual(bU, ce)
-	return math.abs(bU - ce) < 0.000001
+function Utils.FloatEqual(left, right)
+	return math.abs(left - right) < 0.000001
 end
-local cF = {}
-cF.__index = cF
-function aD.NewTable()
-	local bU = {}
-	setmetatable(bU, cF)
-	return bU
+local tableMetatable = {}
+tableMetatable.__index = tableMetatable
+function Utils.NewTable()
+	local newTable = {}
+	setmetatable(newTable, tableMetatable)
+	return newTable
 end
-function aD.ForEach(bN, cG, cH)
-	for e, p in ipairs(cG) do
-		cH(e, p)
+function Utils.ForEach(_, list, callback)
+	for index, value in ipairs(list) do
+		callback(index, value)
 	end
 end
-function aD.Remove_Modify(cI, ao)
-	local cJ = ao
-	if type(ao) ~= "function" then
-		cJ = function(cc)
-			return cc == ao
+function Utils.Remove_Modify(list, itemOrPredicate)
+	local predicate = itemOrPredicate
+	if type(itemOrPredicate) ~= "function" then
+		predicate = function(item)
+			return item == itemOrPredicate
 		end
 	end
-	local as = 1
-	local cK = cI.length
-	while as <= cK do
-		if cJ(cI[as]) then
-			table.remove(cI, as)
-			cK = cK - 1
+	local i = 1
+	local length = list.length
+	while i <= length do
+		if predicate(list[i]) then
+			table.remove(list, i)
+			length = length - 1
 		else
-			as = as + 1
+			i = i + 1
 		end
 	end
 end
-function aD.AbilityBehaviorHasFlag(cL, cM)
-	return bit.band(cL, cM) == cM
+function Utils.AbilityBehaviorHasFlag(behavior, flag)
+	return bit.band(behavior, flag) == flag
 end
-local cN = {}
-local function cO(cP, cQ)
-	local cR = tostring(cQ)
-	cN[cR] = { lastCallTime = DotaTime() + RandomInt(0, cP * 1000) / 1000, interval = cP, startup = true }
+local throttleState = {}
+local function throttle(interval, func)
+	local funcKey = tostring(func)
+	throttleState[funcKey] = { lastCallTime = DotaTime() + RandomInt(0, interval * 1000) / 1000, interval = interval, startup = true }
 	return function(...)
-		local cS = cN[cR]
-		if cS.startup then
-			cS.startup = nil
-			return cQ(...)
-		elseif cS.lastCallTime <= DotaTime() - cS.interval then
-			cS.lastCallTime = DotaTime()
-			return cQ(...)
+		local state = throttleState[funcKey]
+		if state.startup then
+			state.startup = nil
+			return func(...)
+		elseif state.lastCallTime <= DotaTime() - state.interval then
+			state.lastCallTime = DotaTime()
+			return func(...)
 		end
-		return aD.NewTable()
+		return Utils.NewTable()
 	end
 end
-function aD.RecentlyTookDamage(bv, cT)
-	return bv:WasRecentlyDamagedByAnyHero(cT) or bv:WasRecentlyDamagedByTower(cT) or bv:WasRecentlyDamagedByCreep(cT)
+function Utils.RecentlyTookDamage(bot, duration)
+	return bot:WasRecentlyDamagedByAnyHero(duration) or bot:WasRecentlyDamagedByTower(duration) or bot:WasRecentlyDamagedByCreep(duration)
 end
-function aD.IsUnitWithName(bz, a1)
-	local c = { string.find(bz:GetUnitName(), a1) }
-	return c ~= nil
+function Utils.IsUnitWithName(unit, name)
+	local matches = { string.find(unit:GetUnitName(), name) }
+	return matches ~= nil
 end
-function aD.IsBear(bz)
-	return aD.IsUnitWithName(bz, "lone_druid_bear")
+function Utils.IsBear(unit)
+	return Utils.IsUnitWithName(unit, "lone_druid_bear")
 end
-function aD.GetOffsetLocationTowardsTargetLocation(cU, cV, cW)
-	local cX = aX(cV, cU):Normalized()
-	return aS(cU, aW(cX, cW))
+function Utils.GetOffsetLocationTowardsTargetLocation(fromLocation, towardLocation, distance)
+	local direction = sub(towardLocation, fromLocation):Normalized()
+	return add(fromLocation, multiply(direction, distance))
 end
-function aD.TimeNeedToHealHP(bv)
-	local c4 = bv:GetHealthRegen()
-	return c4 > 0 and (bv:GetMaxHealth() - bv:GetHealth()) / c4 or math.huge
+function Utils.TimeNeedToHealHP(bot)
+	local regen = bot:GetHealthRegen()
+	return regen > 0 and (bot:GetMaxHealth() - bot:GetHealth()) / regen or math.huge
 end
-function aD.TimeNeedToHealMP(bv)
-	local c4 = bv:GetManaRegen()
-	return c4 > 0 and (bv:GetMaxMana() - bv:GetMana()) / c4 or math.huge
+function Utils.TimeNeedToHealMP(bot)
+	local regen = bot:GetManaRegen()
+	return regen > 0 and (bot:GetMaxMana() - bot:GetMana()) / regen or math.huge
 end
-function aD.HasAnyEffect(bz, ...)
-	local cY = { ... }
-	return au(cY, function(a2, cZ)
-		return bz:HasModifier(cZ)
+function Utils.HasAnyEffect(unit, ...)
+	local modifierNames = { ... }
+	return arraySome(modifierNames, function(_, modifierName)
+		return unit:HasModifier(modifierName)
 	end)
 end
-function aD.IsModeTurbo()
-	for a2, c6 in ipairs(GetUnitList(aN.Allies)) do
-		if c6 and c6:GetUnitName() == "npc_dota_courier" and c6:GetCurrentMovementSpeed() == 1100 then
+function Utils.IsModeTurbo()
+	for _, unit in ipairs(GetUnitList(UnitType.Allies)) do
+		if unit and unit:GetUnitName() == "npc_dota_courier" and unit:GetCurrentMovementSpeed() == 1100 then
 			return true
 		end
 	end
 	return false
 end
-function aD.DetermineEnemyBotRole(bv)
-	local c_ = bv:GetUnitName()
-	local d0 = aD.EstimatedEnemyRoles[c_]
-	if d0 == nil then
-		log("Enemy bot %s role not cached yet.", c_)
+function Utils.DetermineEnemyBotRole(bot)
+	local unitName = bot:GetUnitName()
+	local estimatedRole = Utils.EstimatedEnemyRoles[unitName]
+	if estimatedRole == nil then
+		log("Enemy bot %s role not cached yet.", unitName)
 		return 3
 	end
-	return d0.role
+	return estimatedRole.role
 end
-function aD.QueryCounters(d1)
-	log("heroId=%s", d1)
-	aQ:RawGetRequest(("https://api.opendota.com/api/heroes/" .. tostring(d1)) .. "/matchups", function(d2)
-		aD.PrintTable(d2)
+function Utils.QueryCounters(heroId)
+	log("heroId=%s", heroId)
+	Request:RawGetRequest(("https://api.opendota.com/api/heroes/" .. tostring(heroId)) .. "/matchups", function(response)
+		Utils.PrintTable(response)
 	end)
 end
-function aD.InitiStats()
-	aQ:GetUUID(function(d3)
-		log("uuid=%s", d3)
+function Utils.InitiStats()
+	Request:GetUUID(function(uuid)
+		log("uuid=%s", uuid)
 	end)
 end
-function aD.GetLoneDruid(bv)
-	local d2 = aD.LoneDruid[bv:GetPlayerID()]
-	if d2 == nil then
-		aD.LoneDruid[bv:GetPlayerID()] = {}
-		d2 = aD.LoneDruid[bv:GetPlayerID()]
+function Utils.GetLoneDruid(bot)
+	local loneDruidState = Utils.LoneDruid[bot:GetPlayerID()]
+	if loneDruidState == nil then
+		Utils.LoneDruid[bot:GetPlayerID()] = {}
+		loneDruidState = Utils.LoneDruid[bot:GetPlayerID()]
 	end
-	return d2
+	return loneDruidState
 end
-function aD.TrimString(d4)
-	return ax(d4)
+function Utils.TrimString(text)
+	return stringTrim(text)
 end
-function aD.addCustomAvoidanceZone(d5, cB, d6)
-	local d7 = DotaTime()
-	local d8 = d6 ~= nil and d7 + d6 or math.huge
-	aE[#aE + 1] = { center = d5, radius = cB, expirationTime = d8 }
+function Utils.addCustomAvoidanceZone(center, radius, duration)
+	local now = DotaTime()
+	local expirationTime = duration ~= nil and now + duration or math.huge
+	dangerZones[#dangerZones + 1] = { center = center, radius = radius, expirationTime = expirationTime }
 end
-function aD.cleanExpiredAvoidanceZones()
-	local d7 = DotaTime()
-	aE = ay(aE, function(a2, bb)
-		return bb.expirationTime > d7
+function Utils.cleanExpiredAvoidanceZones()
+	local now = DotaTime()
+	dangerZones = arrayFilter(dangerZones, function(_, zone)
+		return zone.expirationTime > now
 	end)
 end
-function aD.getCustomAvoidanceZones()
-	return aE
+function Utils.getCustomAvoidanceZones()
+	return dangerZones
 end
-local d9 = { aZ.ArcWarden, aZ.Phoenix, aZ.Terrorblade }
-function aD.IsSpecialOffensiveHero(a1)
-	return az(d9, a1)
+local specialOffensiveHeroes = { HeroName.ArcWarden, HeroName.Phoenix, HeroName.Terrorblade }
+function Utils.IsSpecialOffensiveHero(name)
+	return arrayIncludes(specialOffensiveHeroes, name)
 end
-function aD.isPositionInAvoidanceZone(C)
-	for a2, bb in ipairs(aE) do
-		local da = aU(aX(C, bb.center))
-		if da <= bb.radius then
+function Utils.isPositionInAvoidanceZone(position)
+	for _, zone in ipairs(dangerZones) do
+		local distance = length2D(sub(position, zone.center))
+		if distance <= zone.radius then
 			return true
 		end
 	end
 	return false
 end
-function aD.moveToPositionAvoidingZones(bv, b7)
-	if aD.isPositionInAvoidanceZone(b7) then
-		local db = aD.findSafePosition(bv:GetLocation(), b7)
-		bv:Action_MoveToLocation(db)
+function Utils.moveToPositionAvoidingZones(bot, target)
+	if Utils.isPositionInAvoidanceZone(target) then
+		local safePosition = Utils.findSafePosition(bot:GetLocation(), target)
+		bot:Action_MoveToLocation(safePosition)
 	else
-		bv:Action_MoveToLocation(b7)
+		bot:Action_MoveToLocation(target)
 	end
 end
-function aD.drawAvoidanceZones()
-	for a2, bb in ipairs(aE) do
-		DebugDrawCircle(bb.center, bb.radius, 0, 255, 0)
+function Utils.drawAvoidanceZones()
+	for _, zone in ipairs(dangerZones) do
+		DebugDrawCircle(zone.center, zone.radius, 0, 255, 0)
 	end
 end
-function aD.findPathAvoidingZones(dc, A)
+function Utils.findPathAvoidingZones(start, goal)
 	return {}
 end
-function aD.IsBuildingAttackedByEnemy(bm)
-	for a2, dd in ipairs(GetUnitList(aN.EnemyHeroes)) do
+function Utils.IsBuildingAttackedByEnemy(building)
+	for _, enemyHero in ipairs(GetUnitList(UnitType.EnemyHeroes)) do
 		if
-			aD.IsValidHero(dd)
-			and GetUnitToUnitDistance(bm, dd) <= dd:GetAttackRange() + 200
-			and dd:GetAttackTarget() == bm
+			Utils.IsValidHero(enemyHero)
+			and GetUnitToUnitDistance(building, enemyHero) <= enemyHero:GetAttackRange() + 200
+			and enemyHero:GetAttackTarget() == building
 		then
-			return bm
+			return building
 		end
 	end
 	return nil
 end
-function aD.IsAnyBarrackAttackByEnemyHero()
-	for a2, de in ipairs(aD.BarrackList) do
-		local df = GetBarracks(GetTeam(), de)
-		if df ~= nil and df:GetHealth() > 0 then
-			local dg = aD.IsBuildingAttackedByEnemy(df)
-			if dg ~= nil then
-				return dg
+function Utils.IsAnyBarrackAttackByEnemyHero()
+	for _, barracksId in ipairs(Utils.BarrackList) do
+		local barracks = GetBarracks(GetTeam(), barracksId)
+		if barracks ~= nil and barracks:GetHealth() > 0 then
+			local attacked = Utils.IsBuildingAttackedByEnemy(barracks)
+			if attacked ~= nil then
+				return attacked
 			end
 		end
 	end
 	return nil
 end
-function aD.IsAnyBarracksOnLaneAlive(dh, di)
-	local dj = {}
-	local bn = GetTeam()
-	if dh then
-		bn = GetOpposingTeam()
+function Utils.IsAnyBarracksOnLaneAlive(isEnemy, lane)
+	local barracks = {}
+	local team = GetTeam()
+	if isEnemy then
+		team = GetOpposingTeam()
 	end
-	if di == aK.Top then
-		dj = { GetBarracks(bn, aH.TopMelee), GetBarracks(bn, aH.TopRanged) }
-	elseif di == aK.Mid then
-		dj = { GetBarracks(bn, aH.MidMelee), GetBarracks(bn, aH.MidRanged) }
-	elseif di == aK.Bot then
-		dj = { GetBarracks(bn, aH.BotMelee), GetBarracks(bn, aH.BotRanged) }
+	if lane == Lane.Top then
+		barracks = { GetBarracks(team, Barracks.TopMelee), GetBarracks(team, Barracks.TopRanged) }
+	elseif lane == Lane.Mid then
+		barracks = { GetBarracks(team, Barracks.MidMelee), GetBarracks(team, Barracks.MidRanged) }
+	elseif lane == Lane.Bot then
+		barracks = { GetBarracks(team, Barracks.BotMelee), GetBarracks(team, Barracks.BotRanged) }
 	end
-	return aD.IsAnyOfTheBuildingsAlive(dj)
+	return Utils.IsAnyOfTheBuildingsAlive(barracks)
 end
-aF = { [aL.Radiant] = nil, [aL.Dire] = nil }
-function aD.IsHumanPlayerInAnyTeam()
-	return aD.IsHumanPlayerInTeam(aL.Radiant) or aD.IsHumanPlayerInTeam(aL.Dire)
+humanPlayerInTeam = { [Team.Radiant] = nil, [Team.Dire] = nil }
+function Utils.IsHumanPlayerInAnyTeam()
+	return Utils.IsHumanPlayerInTeam(Team.Radiant) or Utils.IsHumanPlayerInTeam(Team.Dire)
 end
-function aD.GetEnemyHeroByPlayerId(dk)
-	for a2, dd in ipairs(GetUnitList(aN.EnemyHeroes)) do
-		if aD.IsValidHero(dd) and dd:GetPlayerID() == dk then
-			return dd
+function Utils.GetEnemyHeroByPlayerId(playerId)
+	for _, enemyHero in ipairs(GetUnitList(UnitType.EnemyHeroes)) do
+		if Utils.IsValidHero(enemyHero) and enemyHero:GetPlayerID() == playerId then
+			return enemyHero
 		end
 	end
 	return nil
 end
-function aD.IsTruelyInvisible(bz)
-	return bz:IsInvisible()
-		and not bz:HasModifier("modifier_item_dustofappearance")
-		and not aD.RecentlyTookDamage(bz, 1.5)
+function Utils.IsTruelyInvisible(unit)
+	return unit:IsInvisible()
+		and not unit:HasModifier("modifier_item_dustofappearance")
+		and not Utils.RecentlyTookDamage(unit, 1.5)
 end
-function aD.HasModifierContainsName(bz, a1)
-	if not aD.IsValidUnit(bz) then
+function Utils.HasModifierContainsName(unit, name)
+	if not Utils.IsValidUnit(unit) then
 		return false
 	end
-	local bI = bz:NumModifiers()
+	local modifierCount = unit:NumModifiers()
 	do
-		local as = 0
-		while as < bI do
-			local bJ = bz:GetModifierName(as)
-			if (string.find(bJ, a1, nil, true) or 0) - 1 > -1 then
+		local i = 0
+		while i < modifierCount do
+			local modifierName = unit:GetModifierName(i)
+			if (string.find(modifierName, name, nil, true) or 0) - 1 > -1 then
 				return true
 			end
-			as = as + 1
+			i = i + 1
 		end
 	end
 	return false
 end
-function aD.IsNearEnemySecondTierTower(bz, dl)
-	for a2, dm in ipairs(aD.SecondTierTowers) do
-		local dn = GetTower(GetOpposingTeam(), dm)
-		if dn ~= nil and aD.IsValidBuilding(dn) and GetUnitToUnitDistance(bz, dn) < dl then
+function Utils.IsNearEnemySecondTierTower(unit, distance)
+	for _, towerId in ipairs(Utils.SecondTierTowers) do
+		local tower = GetTower(GetOpposingTeam(), towerId)
+		if tower ~= nil and Utils.IsValidBuilding(tower) and GetUnitToUnitDistance(unit, tower) < distance then
 			return true
 		end
 	end
 	return false
 end
-function aD.GetEnemyIdsNearNonTier1Towers(dl)
-	local c = {}
-	for a2, dm in ipairs(aD.NonTier1Towers) do
-		local dn = GetTower(GetTeam(), dm)
-		if dn ~= nil and aD.IsValidBuilding(dn) then
-			local dp = aD.GetLastSeenEnemyIdsNearLocation(dn:GetLocation(), dl)
-			c[dm] = { tower = dn, enemyIds = dp }
+function Utils.GetEnemyIdsNearNonTier1Towers(distance)
+	local result = {}
+	for _, towerId in ipairs(Utils.NonTier1Towers) do
+		local tower = GetTower(GetTeam(), towerId)
+		if tower ~= nil and Utils.IsValidBuilding(tower) then
+			local enemyIds = Utils.GetLastSeenEnemyIdsNearLocation(tower:GetLocation(), distance)
+			result[towerId] = { tower = tower, enemyIds = enemyIds }
 		end
 	end
-	return c
+	return result
 end
-function aD.GetNonTier1TowerWithLeastEnemiesAround(dl)
-	local dq = aD.GetEnemyIdsNearNonTier1Towers(dl)
-	local dr = 999
-	local ds = nil
-	for a2, dm in ipairs(aD.NonTier1Towers) do
-		local dt = dq[dm]
-		if dt ~= nil and #dt.enemyIds <= dr then
-			ds = dt.tower
-			dr = #dt.enemyIds
+function Utils.GetNonTier1TowerWithLeastEnemiesAround(distance)
+	local towerEnemies = Utils.GetEnemyIdsNearNonTier1Towers(distance)
+	local leastEnemies = 999
+	local bestTower = nil
+	for _, towerId in ipairs(Utils.NonTier1Towers) do
+		local towerInfo = towerEnemies[towerId]
+		if towerInfo ~= nil and #towerInfo.enemyIds <= leastEnemies then
+			bestTower = towerInfo.tower
+			leastEnemies = #towerInfo.enemyIds
 		end
 	end
-	if dr ~= 0 then
-		return ds
+	if leastEnemies ~= 0 then
+		return bestTower
 	end
 	return nil
 end
-function aD.GetClosestTowerOrBarrackToAttack(bz)
-	local du = nil
-	local dv = 2 ^ 1024
-	for a2, de in ipairs(aD.BarrackList) do
-		local df = GetBarracks(GetOpposingTeam(), de)
+function Utils.GetClosestTowerOrBarrackToAttack(unit)
+	local closestBuilding = nil
+	local closestDistance = 2 ^ 1024
+	for _, barracksId in ipairs(Utils.BarrackList) do
+		local barracks = GetBarracks(GetOpposingTeam(), barracksId)
 		if
-			df ~= nil
-			and df:GetHealth() > 0
+			barracks ~= nil
+			and barracks:GetHealth() > 0
 			and not (
-				df:HasModifier("modifier_fountain_glyph")
-				or df:HasModifier("modifier_invulnerable")
-				or df:HasModifier("modifier_backdoor_protection_active")
+				barracks:HasModifier("modifier_fountain_glyph")
+				or barracks:HasModifier("modifier_invulnerable")
+				or barracks:HasModifier("modifier_backdoor_protection_active")
 			)
 		then
-			local da = GetUnitToUnitDistance(bz, df)
-			if da < dv then
-				dv = da
-				du = df
+			local distance = GetUnitToUnitDistance(unit, barracks)
+			if distance < closestDistance then
+				closestDistance = distance
+				closestBuilding = barracks
 			end
 		end
 	end
-	for a2, dm in ipairs(aD.HighGroundTowers) do
-		local dn = GetTower(GetOpposingTeam(), dm)
+	for _, towerId in ipairs(Utils.HighGroundTowers) do
+		local tower = GetTower(GetOpposingTeam(), towerId)
 		if
-			dn ~= nil
-			and aD.IsValidBuilding(dn)
+			tower ~= nil
+			and Utils.IsValidBuilding(tower)
 			and not (
-				dn:HasModifier("modifier_fountain_glyph")
-				or dn:HasModifier("modifier_invulnerable")
-				or dn:HasModifier("modifier_backdoor_protection_active")
+				tower:HasModifier("modifier_fountain_glyph")
+				or tower:HasModifier("modifier_invulnerable")
+				or tower:HasModifier("modifier_backdoor_protection_active")
 			)
 		then
-			local da = GetUnitToUnitDistance(bz, dn)
-			if da < dv then
-				dv = da
-				du = dn
+			local distance = GetUnitToUnitDistance(unit, tower)
+			if distance < closestDistance then
+				closestDistance = distance
+				closestBuilding = tower
 			end
 		end
 	end
-	return du
+	return closestBuilding
 end
-function aD.IsNearEnemyHighGroundTower(bz, dl)
-	for a2, dm in ipairs(aD.HighGroundTowers) do
-		local dn = GetTower(GetOpposingTeam(), dm)
-		if dn ~= nil and aD.IsValidBuilding(dn) and GetUnitToUnitDistance(bz, dn) < dl then
+function Utils.IsNearEnemyHighGroundTower(unit, distance)
+	for _, towerId in ipairs(Utils.HighGroundTowers) do
+		local tower = GetTower(GetOpposingTeam(), towerId)
+		if tower ~= nil and Utils.IsValidBuilding(tower) and GetUnitToUnitDistance(unit, tower) < distance then
 			return true
 		end
 	end
 	return false
 end
-function aD.IsTeamPushingSecondTierOrHighGround(bv)
-	local c9 = 61000 + bv:GetTeam()
-	local dw = aD.GetCachedVars(c9, 1)
-	if dw ~= nil then
-		return dw
+function Utils.IsTeamPushingSecondTierOrHighGround(bot)
+	local cacheKey = 61000 + bot:GetTeam()
+	local cached = Utils.GetCachedVars(cacheKey, 1)
+	if cached ~= nil then
+		return cached
 	end
-	local dx = GetAncient(GetOpposingTeam())
-	if dx ~= nil then
-		for a2, bo in ipairs(GetTeamPlayers(bv:GetTeam())) do
-			if IsHeroAlive(bo) then
-				local bX = GetTeamMember(bo)
+	local enemyAncient = GetAncient(GetOpposingTeam())
+	if enemyAncient ~= nil then
+		for _, playerId in ipairs(GetTeamPlayers(bot:GetTeam())) do
+			if IsHeroAlive(playerId) then
+				local member = GetTeamMember(playerId)
 				if
-					bX ~= nil
-					and #(bX:GetNearbyHeroes(2000, false, aJ.None) or {}) >= 2
+					member ~= nil
+					and #(member:GetNearbyHeroes(2000, false, BotMode.None) or {}) >= 2
 					and (
-						aD.IsNearEnemySecondTierTower(bX, 2000)
-						or aD.IsNearEnemyHighGroundTower(bX, 3000)
-						or GetUnitToUnitDistance(bX, dx) < 3000
+						Utils.IsNearEnemySecondTierTower(member, 2000)
+						or Utils.IsNearEnemyHighGroundTower(member, 3000)
+						or GetUnitToUnitDistance(member, enemyAncient) < 3000
 					)
 				then
-					aD.SetCachedVars(c9, true)
+					Utils.SetCachedVars(cacheKey, true)
 					return true
 				end
 			end
 		end
 	end
-	aD.SetCachedVars(c9, false)
+	Utils.SetCachedVars(cacheKey, false)
 	return false
 end
-function aD.GetNumOfAliveHeroes(dh)
-	local bC = 0
-	local dy = GetTeam()
-	if dh then
-		dy = GetOpposingTeam()
+function Utils.GetNumOfAliveHeroes(isEnemy)
+	local count = 0
+	local targetTeam = GetTeam()
+	if isEnemy then
+		targetTeam = GetOpposingTeam()
 	end
-	for a2, bo in ipairs(GetTeamPlayers(dy)) do
-		if IsHeroAlive(bo) then
-			bC = bC + 1
+	for _, playerId in ipairs(GetTeamPlayers(targetTeam)) do
+		if IsHeroAlive(playerId) then
+			count = count + 1
 		end
 	end
-	return bC
+	return count
 end
-function aD.CountMissingEnemyHeroes()
-	local c9 = a_.COUNT_MISSING_ENEMY + GetTeam()
-	local dw = aD.GetCachedVars(c9, 0.5)
-	if dw ~= nil then
-		return dw
+function Utils.CountMissingEnemyHeroes()
+	local cacheKey = CacheKeys.COUNT_MISSING_ENEMY + GetTeam()
+	local cached = Utils.GetCachedVars(cacheKey, 0.5)
+	if cached ~= nil then
+		return cached
 	end
-	local bC = 0
-	for a2, bo in ipairs(GetTeamPlayers(GetOpposingTeam())) do
+	local count = 0
+	for _, playerId in ipairs(GetTeamPlayers(GetOpposingTeam())) do
 		do
-			local dz
+			local continueLoop
 			repeat
-				if IsHeroAlive(bo) then
-					local bs = GetHeroLastSeenInfo(bo)
-					if bs ~= nil and bs[1] ~= nil then
-						local bt = bs[1]
-						if bt.time_since_seen >= 2.5 then
-							bC = bC + 1
-							dz = true
+				if IsHeroAlive(playerId) then
+					local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+					if lastSeenInfo ~= nil and lastSeenInfo[1] ~= nil then
+						local info = lastSeenInfo[1]
+						if info.time_since_seen >= 2.5 then
+							count = count + 1
+							continueLoop = true
 							break
 						end
 					end
 				end
-				dz = true
+				continueLoop = true
 			until true
-			if not dz then
+			if not continueLoop then
 				break
 			end
 		end
 	end
-	aD.SetCachedVars(c9, bC)
-	return bC
+	Utils.SetCachedVars(cacheKey, count)
+	return count
 end
-function aD.FindAllyWithAtLeastDistanceAway(bv, bq)
-	if bv:GetTeam() ~= GetTeam() then
+function Utils.FindAllyWithAtLeastDistanceAway(bot, minDistance)
+	if bot:GetTeam() ~= GetTeam() then
 		log("[ERROR] Wrong usage of the method")
 		return nil
 	end
-	for a2, bW in ipairs(GetTeamPlayers(GetTeam())) do
-		local bX = GetTeamMember(bW)
-		if bX ~= nil and bX:IsAlive() and GetUnitToUnitDistance(bX, bv) >= bq then
-			return bX
+	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
+		local member = GetTeamMember(playerId)
+		if member ~= nil and member:IsAlive() and GetUnitToUnitDistance(member, bot) >= minDistance then
+			return member
 		end
 	end
 	return nil
 end
-local function dA(ci, dB)
-	if ci:GetLevel() < dB.minLevel then
+local function meetsInitiatorRequirements(enemyHero, requirements)
+	if enemyHero:GetLevel() < requirements.minLevel then
 		return false
 	end
-	for a2, bB in ipairs(dB.requiredItems) do
-		if not aD.HasItem(ci, bB) then
+	for _, itemName in ipairs(requirements.requiredItems) do
+		if not Utils.HasItem(enemyHero, itemName) then
 			return false
 		end
 	end
-	for a2, dC in ipairs(dB.requiredModifiers) do
-		if not ci:HasModifier(dC) then
+	for _, modifierName in ipairs(requirements.requiredModifiers) do
+		if not enemyHero:HasModifier(modifierName) then
 			return false
 		end
 	end
 	return true
 end
-local dD = 1200
-function aD.IsAnySpecialAOEThreatNearby(bv, dE)
-	for a2, ci in ipairs(GetUnitList(aN.EnemyHeroes)) do
+local threatRangeBuffer = 1200
+function Utils.IsAnySpecialAOEThreatNearby(bot, range)
+	for _, enemyHero in ipairs(GetUnitList(UnitType.EnemyHeroes)) do
 		do
-			local dF
+			local continueLoop
 			repeat
-				if not aD.IsValidHero(ci) then
-					dF = true
+				if not Utils.IsValidHero(enemyHero) then
+					continueLoop = true
 					break
 				end
-				local dG = ci:GetUnitName()
-				if not (bD[dG] ~= nil) then
-					dF = true
+				local heroName = enemyHero:GetUnitName()
+				if initiatorRequirements[heroName] == nil then
+					continueLoop = true
 					break
 				end
-				if GetUnitToUnitDistance(bv, ci) > dE + dD then
-					dF = true
+				if GetUnitToUnitDistance(bot, enemyHero) > range + threatRangeBuffer then
+					continueLoop = true
 					break
 				end
-				if dA(ci, bD[dG]) then
+				if meetsInitiatorRequirements(enemyHero, initiatorRequirements[heroName]) then
 					return true
 				end
-				dF = true
+				continueLoop = true
 			until true
-			if not dF then
+			if not continueLoop then
 				break
 			end
 		end
 	end
 	return false
 end
-function aD.ShouldBotsSpreadOut(bv, bw)
-	if #(bv:GetNearbyHeroes(bw, false, aJ.None) or {}) <= 1 then
+function Utils.ShouldBotsSpreadOut(bot, range)
+	if #(bot:GetNearbyHeroes(range, false, BotMode.None) or {}) <= 1 then
 		return false
 	end
-	local dH = false
-	local dI = aD.IsAnySpecialAOEThreatNearby(bv, bw)
-	if dI then
-		dH = true
+	local shouldSpread = false
+	local hasThreat = Utils.IsAnySpecialAOEThreatNearby(bot, range)
+	if hasThreat then
+		shouldSpread = true
 	end
-	return dH
+	return shouldSpread
 end
-function aD.GetNearbyAllyUnits(bv, dJ)
-	local dK = bv:GetNearbyHeroes(dJ, false, aJ.None) or {}
-	local dL = bv:GetNearbyLaneCreeps(dJ, false) or {}
-	local bx = aq(dK, dL)
-	return bx
+function Utils.GetNearbyAllyUnits(bot, radius)
+	local allyHeroes = bot:GetNearbyHeroes(radius, false, BotMode.None) or {}
+	local allyCreeps = bot:GetNearbyLaneCreeps(radius, false) or {}
+	local units = arrayConcat(allyHeroes, allyCreeps)
+	return units
 end
-function aD.SmartSpreadOut(bv, dJ, bw, dM, dN)
-	if dM == nil then
-		dM = {}
+function Utils.SmartSpreadOut(bot, radius, distance, extraUnits, onlyExtraUnits)
+	if extraUnits == nil then
+		extraUnits = {}
 	end
-	if dN == nil then
-		dN = false
+	if onlyExtraUnits == nil then
+		onlyExtraUnits = false
 	end
-	local bx = {}
-	if dN then
-		bx = dM
+	local units = {}
+	if onlyExtraUnits then
+		units = extraUnits
 	else
-		bx = aq(aD.GetNearbyAllyUnits(bv, dJ), dM)
+		units = arrayConcat(Utils.GetNearbyAllyUnits(bot, radius), extraUnits)
 	end
-	local dO = aD.SpreadBotApartDir(bv, bw, bx)
-	if not dO then
-		bv:Action_MoveToLocation(aS(aD.GetTeamFountainTpPoint(), RandomVector(50)))
+	local apartDirection = Utils.SpreadBotApartDir(bot, distance, units)
+	if not apartDirection then
+		bot:Action_MoveToLocation(add(Utils.GetTeamFountainTpPoint(), RandomVector(50)))
 		return
 	end
-	local by = bv:GetLocation()
-	local dP = 0.7
-	local dQ = 0.3
-	local dR = aD.GetTeamSideDirection(GetTeam())
-	if #dM == 0 then
-		dR = aW(dR, 0.5)
+	local botLocation = bot:GetLocation()
+	local apartWeight = 0.7
+	local teamSideWeight = 0.3
+	local teamSideDirection = Utils.GetTeamSideDirection(GetTeam())
+	if #extraUnits == 0 then
+		teamSideDirection = multiply(teamSideDirection, 0.5)
 	end
-	local dS = aS(aW(dO, dP), aW(dR, dQ)):Normalized()
-	local dT = aW(dS, bw)
-	local dU = aX(aD.GetEnemyFountainTpPoint(), by):Normalized()
-	if aT(dT:Normalized(), dU) > 0 then
-		dT = aW(dR, bw)
+	local direction = add(multiply(apartDirection, apartWeight), multiply(teamSideDirection, teamSideWeight)):Normalized()
+	local offset = multiply(direction, distance)
+	local towardEnemyDirection = sub(Utils.GetEnemyFountainTpPoint(), botLocation):Normalized()
+	if dot(offset:Normalized(), towardEnemyDirection) > 0 then
+		offset = multiply(teamSideDirection, distance)
 	end
-	local cV = aS(by, dT)
-	if aD.GetDistanceFromAncient(bv, true) < 2600 then
-		if aT(aX(cV, by), dU) > 0 then
-			dT = aW(dR, bw)
-			cV = aS(by, dT)
+	local destination = add(botLocation, offset)
+	if Utils.GetDistanceFromAncient(bot, true) < 2600 then
+		if dot(sub(destination, botLocation), towardEnemyDirection) > 0 then
+			offset = multiply(teamSideDirection, distance)
+			destination = add(botLocation, offset)
 		end
 	end
-	bv:Action_MoveToLocation(aS(cV, RandomVector(50)))
+	bot:Action_MoveToLocation(add(destination, RandomVector(50)))
 end
-function aD.SpreadBotApartDir_2(bv, bw, bx)
-	local by = bv:GetLocation()
-	local dS = Vector(0, 0, 0)
-	for a2, bz in ipairs(bx) do
-		if aD.IsValidUnit(bz) and bz ~= bv then
-			local dV = GetUnitToUnitDistance(bv, bz)
-			if dV <= bw then
-				local bA = aX(by, bz:GetLocation())
-				dS = aS(dS, bA)
+function Utils.SpreadBotApartDir_2(bot, distance, units)
+	local botLocation = bot:GetLocation()
+	local sumVector = Vector(0, 0, 0)
+	for _, unit in ipairs(units) do
+		if Utils.IsValidUnit(unit) and unit ~= bot then
+			local unitDistance = GetUnitToUnitDistance(bot, unit)
+			if unitDistance <= distance then
+				local awayVector = sub(botLocation, unit:GetLocation())
+				sumVector = add(sumVector, awayVector)
 			end
 		end
 	end
-	local dW = aV(dS)
-	if dW < 0.00001 then
+	local magnitude = length3D(sumVector)
+	if magnitude < 0.00001 then
 		return nil
 	end
-	local dT = aW(dS:Normalized(), bw)
-	return dT
+	local offset = multiply(sumVector:Normalized(), distance)
+	return offset
 end
-function aD.GetAllyIdsInTpToLocation(bp, bq)
-	local dX = {}
-	for a2, bu in ipairs(GetIncomingTeleports()) do
-		if bu ~= nil and aD.GetLocationToLocationDistance(bp, bu.location) <= bq and IsTeamPlayer(bu.playerid) then
-			dX[#dX + 1] = bu.playerid
+function Utils.GetAllyIdsInTpToLocation(location, radius)
+	local allyIds = {}
+	for _, teleport in ipairs(GetIncomingTeleports()) do
+		if teleport ~= nil and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius and IsTeamPlayer(teleport.playerid) then
+			allyIds[#allyIds + 1] = teleport.playerid
 		end
 	end
-	return dX
+	return allyIds
 end
-function aD.ConsiderTPToTarget(bv, cV, dY)
-	local dV = GetUnitToLocationDistance(bv, cV)
-	if bv:IsUsingAbility() or bv:HasModifier("modifier_teleporting") then
+function Utils.ConsiderTPToTarget(bot, targetLocation, includeAncient)
+	local distance = GetUnitToLocationDistance(bot, targetLocation)
+	if bot:IsUsingAbility() or bot:HasModifier("modifier_teleporting") then
 		return false
 	end
-	local bu = aD.GetItemFromFullInventory(bv, "item_tpscroll")
-	if bu == nil or not bu:IsFullyCastable() then
+	local tpScroll = Utils.GetItemFromFullInventory(bot, "item_tpscroll")
+	if tpScroll == nil or not tpScroll:IsFullyCastable() then
 		return false
 	end
-	local dZ = aD.GetAllyIdsInTpToLocation(cV, 2500)
-	if #dZ >= 2 then
+	local alliesTeleporting = Utils.GetAllyIdsInTpToLocation(targetLocation, 2500)
+	if #alliesTeleporting >= 2 then
 		return false
 	end
-	local d_ = false
-	if dV > 2000 then
-		local by = bv:GetLocation()
-		local e0 = Vector((by.x + cV.x) / 2, (by.y + cV.y) / 2, 0)
-		for a2, dk in ipairs(GetTeamPlayers(GetOpposingTeam())) do
-			if IsHeroAlive(dk) then
-				local V = GetHeroLastSeenInfo(dk)
-				if V ~= nil and V[1] ~= nil then
-					local cK = V[1]
-					if aD.GetLocationToLocationDistance(e0, cK.location) <= 1600 and cK.time_since_seen <= 5 then
-						d_ = true
+	local enemiesOnPath = false
+	if distance > 2000 then
+		local botLocation = bot:GetLocation()
+		local midpoint = Vector((botLocation.x + targetLocation.x) / 2, (botLocation.y + targetLocation.y) / 2, 0)
+		for _, playerId in ipairs(GetTeamPlayers(GetOpposingTeam())) do
+			if IsHeroAlive(playerId) then
+				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
+				if lastSeenInfo ~= nil and lastSeenInfo[1] ~= nil then
+					local info = lastSeenInfo[1]
+					if Utils.GetLocationToLocationDistance(midpoint, info.location) <= 1600 and info.time_since_seen <= 5 then
+						enemiesOnPath = true
 						break
 					end
 				end
 			end
 		end
 	end
-	if dV <= 4000 and not d_ then
+	if distance <= 4000 and not enemiesOnPath then
 		return false
 	end
-	local bn = bv:GetTeam()
-	local e1 = nil
-	local e2 = math.huge
-	for a2, e3 in ipairs({ 0, 1, 2, 3, 4, 5, 6, 7, 8 }) do
-		local dn = GetTower(bn, e3)
-		if dn ~= nil and dn:IsAlive() then
-			local e4 = aD.GetLocationToLocationDistance(dn:GetLocation(), cV)
-			if e4 < e2 then
-				e2 = e4
-				e1 = dn
+	local team = bot:GetTeam()
+	local closestBuilding = nil
+	local closestDistance = math.huge
+	for _, towerId in ipairs({ 0, 1, 2, 3, 4, 5, 6, 7, 8 }) do
+		local tower = GetTower(team, towerId)
+		if tower ~= nil and tower:IsAlive() then
+			local towerDistance = Utils.GetLocationToLocationDistance(tower:GetLocation(), targetLocation)
+			if towerDistance < closestDistance then
+				closestDistance = towerDistance
+				closestBuilding = tower
 			end
 		end
 	end
-	if dY then
-		local cj = GetAncient(bn)
-		if cj ~= nil and cj:IsAlive() then
-			local e5 = aD.GetLocationToLocationDistance(cj:GetLocation(), cV)
-			if e5 < e2 then
-				e2 = e5
-				e1 = cj
+	if includeAncient then
+		local ancient = GetAncient(team)
+		if ancient ~= nil and ancient:IsAlive() then
+			local ancientDistance = Utils.GetLocationToLocationDistance(ancient:GetLocation(), targetLocation)
+			if ancientDistance < closestDistance then
+				closestDistance = ancientDistance
+				closestBuilding = ancient
 			end
 		end
 	end
-	if e1 ~= nil and e2 < 4000 then
-		local e6 = e1:GetLocation()
-		local e7 = bn == aL.Radiant and aD.RadiantFountainTpPoint or aD.DireFountainTpPoint
-		local e8 = e7.x - e6.x
-		local e9 = e7.y - e6.y
-		local d = math.max(1, math.sqrt(e8 * e8 + e9 * e9))
-		local ea = Vector(e6.x + e8 / d * 200, e6.y + e9 / d * 200, 0)
-		log("[TP] %s t=%.0f DEFEND tp to building at (%.0f,%.0f)", bv:GetUnitName(), DotaTime(), ea.x, ea.y)
-		bv:Action_UseAbilityOnLocation(bu, ea)
+	if closestBuilding ~= nil and closestDistance < 4000 then
+		local buildingLocation = closestBuilding:GetLocation()
+		local fountain = team == Team.Radiant and Utils.RadiantFountainTpPoint or Utils.DireFountainTpPoint
+		local dx = fountain.x - buildingLocation.x
+		local dy = fountain.y - buildingLocation.y
+		local length = math.max(1, math.sqrt(dx * dx + dy * dy))
+		local tpLocation = Vector(buildingLocation.x + dx / length * 200, buildingLocation.y + dy / length * 200, 0)
+		log("[TP] %s t=%.0f DEFEND tp to building at (%.0f,%.0f)", bot:GetUnitName(), DotaTime(), tpLocation.x, tpLocation.y)
+		bot:Action_UseAbilityOnLocation(tpScroll, tpLocation)
 		return true
 	end
 	return false
 end
-function aD.IsBotPushingTowerInDanger(bv)
-	local eb = #bv:GetNearbyTowers(1100, true) >= 1
-	if not eb then
+function Utils.IsBotPushingTowerInDanger(bot)
+	local isNearEnemyTower = #bot:GetNearbyTowers(1100, true) >= 1
+	if not isNearEnemyTower then
 		return false
 	end
-	local ec = bv:GetNearbyHeroes(1600, false, aJ.None) or {}
-	local ed = aD.GetNumOfAliveHeroes(true)
-	local ee = aD.GetLastSeenEnemyIdsNearLocation(bv:GetLocation(), 2000)
-	if eb and #ec < ed and #ee >= #ec then
+	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BotMode.None) or {}
+	local aliveEnemyCount = Utils.GetNumOfAliveHeroes(true)
+	local nearbyEnemyIds = Utils.GetLastSeenEnemyIdsNearLocation(bot:GetLocation(), 2000)
+	if isNearEnemyTower and #nearbyAllies < aliveEnemyCount and #nearbyEnemyIds >= #nearbyAllies then
 		return true
 	end
 	return false
 end
-function aD.GetDistanceToCloestEnemyTower(bv)
-	local ef = nil
-	local eg = 99999
-	for a2, dm in ipairs(aD.AllTowers) do
-		local dn = GetTower(GetOpposingTeam(), dm)
+function Utils.GetDistanceToCloestEnemyTower(bot)
+	local closestTower = nil
+	local closestDistance = 99999
+	for _, towerId in ipairs(Utils.AllTowers) do
+		local tower = GetTower(GetOpposingTeam(), towerId)
 		if
-			dn ~= nil
-			and aD.IsValidBuilding(dn)
+			tower ~= nil
+			and Utils.IsValidBuilding(tower)
 			and not (
-				dn:HasModifier("modifier_fountain_glyph")
-				or dn:HasModifier("modifier_invulnerable")
-				or dn:HasModifier("modifier_backdoor_protection_active")
+				tower:HasModifier("modifier_fountain_glyph")
+				or tower:HasModifier("modifier_invulnerable")
+				or tower:HasModifier("modifier_backdoor_protection_active")
 			)
 		then
-			local eh = GetUnitToUnitDistance(bv, dn)
-			if eh < eg then
-				ef = dn
-				eg = eh
+			local distance = GetUnitToUnitDistance(bot, tower)
+			if distance < closestDistance then
+				closestTower = tower
+				closestDistance = distance
 			end
 		end
 	end
-	return eg, ef
+	return closestDistance, closestTower
 end
-function aD.GetCirclarPointsAroundCenterPoint(ei, dE, ej)
-	local ek = { ei }
-	local el = 360 / ej
+function Utils.GetCirclarPointsAroundCenterPoint(center, radius, pointCount)
+	local points = { center }
+	local angleStep = 360 / pointCount
 	do
-		local as = 1
-		while as <= ej do
-			local em = el * as * math.pi / 180
-			local bh = Vector(ei.x + dE * math.cos(em), ei.y + dE * math.sin(em), ei.z)
-			ek[#ek + 1] = bh
-			as = as + 1
+		local i = 1
+		while i <= pointCount do
+			local angle = angleStep * i * math.pi / 180
+			local point = Vector(center.x + radius * math.cos(angle), center.y + radius * math.sin(angle), center.z)
+			points[#points + 1] = point
+			i = i + 1
 		end
 	end
-	return ek
+	return points
 end
-function aD.IsValidAbility(bT)
+function Utils.IsValidAbility(ability)
 	if
-		bT == nil
-		or bT:IsNull()
-		or bT:GetName() == ""
-		or bT:IsHidden()
-		or not bT:IsTrained()
-		or not bT:IsActivated()
+		ability == nil
+		or ability:IsNull()
+		or ability:GetName() == ""
+		or ability:IsHidden()
+		or not ability:IsTrained()
+		or not ability:IsActivated()
 	then
 		return false
 	end
 	return true
 end
-function aD.HasCriticalSpellWithCooldown(bv, en)
-	local eo = bv:GetUnitName()
-	if aD.ImportantSpells[eo] ~= nil then
-		local bT = bv:GetAbilityByName(aD.ImportantSpells[eo][1])
-		if aD.IsValidAbility(bT) and bT:GetCooldownTimeRemaining() > en then
+function Utils.HasCriticalSpellWithCooldown(bot, minCooldown)
+	local unitName = bot:GetUnitName()
+	if Utils.ImportantSpells[unitName] ~= nil then
+		local ability = bot:GetAbilityByName(Utils.ImportantSpells[unitName][1])
+		if Utils.IsValidAbility(ability) and ability:GetCooldownTimeRemaining() > minCooldown then
 			return true
 		end
 	end
 	return false
 end
-function aD.GetItem(bv, bB)
-	return aD.GetItemFromCountedInventory(bv, bB, 6)
+function Utils.GetItem(bot, itemName)
+	return Utils.GetItemFromCountedInventory(bot, itemName, 6)
 end
-function aD.HasTeamMemberWithCriticalSpellInCooldown(cV)
-	local c9 = a_.HAS_CRITICAL_SPELL_CD + GetTeam()
-	local dw = aD.GetCachedVars(c9, 2)
-	if dw ~= nil then
-		return dw
+function Utils.HasTeamMemberWithCriticalSpellInCooldown(targetLocation)
+	local cacheKey = CacheKeys.HAS_CRITICAL_SPELL_CD + GetTeam()
+	local cached = Utils.GetCachedVars(cacheKey, 2)
+	if cached ~= nil then
+		return cached
 	end
-	for a2, bW in ipairs(GetTeamPlayers(GetTeam())) do
-		local bX = GetTeamMember(bW)
-		if bX ~= nil and bX:IsAlive() then
-			local en = GetUnitToLocationDistance(bX, cV) / bX:GetCurrentMovementSpeed()
-			if aD.HasCriticalSpellWithCooldown(bX, en) then
-				aD.SetCachedVars(c9, true)
+	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
+		local member = GetTeamMember(playerId)
+		if member ~= nil and member:IsAlive() then
+			local travelTime = GetUnitToLocationDistance(member, targetLocation) / member:GetCurrentMovementSpeed()
+			if Utils.HasCriticalSpellWithCooldown(member, travelTime) then
+				Utils.SetCachedVars(cacheKey, true)
 				return true
 			end
 		end
 	end
-	aD.SetCachedVars(c9, false)
+	Utils.SetCachedVars(cacheKey, false)
 	return false
 end
-function aD.HasTeamMemberWithCriticalItemInCooldown(cV)
-	local c9 = a_.HAS_CRITICAL_ITEM_CD + GetTeam()
-	local dw = aD.GetCachedVars(c9, 2)
-	if dw ~= nil then
-		return dw
+function Utils.HasTeamMemberWithCriticalItemInCooldown(targetLocation)
+	local cacheKey = CacheKeys.HAS_CRITICAL_ITEM_CD + GetTeam()
+	local cached = Utils.GetCachedVars(cacheKey, 2)
+	if cached ~= nil then
+		return cached
 	end
-	for a2, bW in ipairs(GetTeamPlayers(GetTeam())) do
-		local bX = GetTeamMember(bW)
-		if bX ~= nil and bX:IsAlive() then
-			local en = GetUnitToLocationDistance(bX, cV) / bX:GetCurrentMovementSpeed()
-			for a2, bB in ipairs(aD.ImportantItems) do
-				local ao = aD.GetItem(bX, bB)
-				if ao and ao:GetCooldownTimeRemaining() > en then
-					aD.SetCachedVars(c9, true)
+	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
+		local member = GetTeamMember(playerId)
+		if member ~= nil and member:IsAlive() then
+			local travelTime = GetUnitToLocationDistance(member, targetLocation) / member:GetCurrentMovementSpeed()
+			for _, itemName in ipairs(Utils.ImportantItems) do
+				local item = Utils.GetItem(member, itemName)
+				if item and item:GetCooldownTimeRemaining() > travelTime then
+					Utils.SetCachedVars(cacheKey, true)
 					return true
 				end
 			end
 		end
 	end
-	aD.SetCachedVars(c9, false)
+	Utils.SetCachedVars(cacheKey, false)
 	return false
 end
-function aD.HasPossibleWallOfReplicaAround(bv)
-	if bv:HasModifier("modifier_dark_seer_wall_slow") then
+function Utils.HasPossibleWallOfReplicaAround(bot)
+	if bot:HasModifier("modifier_dark_seer_wall_slow") then
 		return true
 	end
 	return false
 end
-function aD.GetWallIllusionPositions(bv)
-	local ep = {}
-	if aD.HasPossibleWallOfReplicaAround(bv) then
-		local br = bv:GetNearbyHeroes(1600, true, aJ.None) or {}
-		for a2, ci in ipairs(br) do
-			if ci:HasModifier("modifier_darkseer_wallofreplica_illusion") then
-				ep[#ep + 1] = ci:GetLocation()
+function Utils.GetWallIllusionPositions(bot)
+	local illusionPositions = {}
+	if Utils.HasPossibleWallOfReplicaAround(bot) then
+		local enemyHeroes = bot:GetNearbyHeroes(1600, true, BotMode.None) or {}
+		for _, enemyHero in ipairs(enemyHeroes) do
+			if enemyHero:HasModifier("modifier_darkseer_wallofreplica_illusion") then
+				illusionPositions[#illusionPositions + 1] = enemyHero:GetLocation()
 			end
 		end
 	end
-	return ep
+	return illusionPositions
 end
-function aD.IsLocationInDangerZone(bv, eq)
-	local cB = 1000 + 500
-	local er = aD.GetWallIllusionPositions(bv)
-	for a2, es in ipairs(er) do
-		local et = aX(eq, es)
-		if aU(et) < cB then
-			return { inDanger = true, dangerCenter = es }
+function Utils.IsLocationInDangerZone(bot, location)
+	local radius = 1000 + 500
+	local illusionPositions = Utils.GetWallIllusionPositions(bot)
+	for _, illusionPosition in ipairs(illusionPositions) do
+		local offset = sub(location, illusionPosition)
+		if length2D(offset) < radius then
+			return { inDanger = true, dangerCenter = illusionPosition }
 		end
 	end
 	return { inDanger = false }
 end
-function aD.RotateVector(eu, ev)
-	local ew = math.cos(ev)
-	local ex = math.sin(ev)
-	return Vector(eu.x * ew - eu.y * ex, eu.x * ex + eu.y * ew, eu.z)
+function Utils.RotateVector(vector, angle)
+	local cosAngle = math.cos(angle)
+	local sinAngle = math.sin(angle)
+	return Vector(vector.x * cosAngle - vector.y * sinAngle, vector.x * sinAngle + vector.y * cosAngle, vector.z)
 end
-function aD.GetSafeDestination(bv, eq)
-	local ey = eq or aS(bv:GetLocation(), RandomVector(260))
-	local c = aD.IsLocationInDangerZone(bv, ey)
-	if c.inDanger and c.dangerCenter then
-		local ez = 1000 + 500
-		local eA = 250
-		local eB = aX(ey, c.dangerCenter)
-		if aU(eB) == 0 then
-			eB = RandomVector(100)
+function Utils.GetSafeDestination(bot, location)
+	local destination = location or add(bot:GetLocation(), RandomVector(260))
+	local danger = Utils.IsLocationInDangerZone(bot, destination)
+	if danger.inDanger and danger.dangerCenter then
+		local dangerRadius = 1000 + 500
+		local margin = 250
+		local direction = sub(destination, danger.dangerCenter)
+		if length2D(direction) == 0 then
+			direction = RandomVector(100)
 		end
-		eB = eB:Normalized()
-		local eC = aS(c.dangerCenter, aW(eB, ez + eA))
-		local eD = 5
-		local eE = 0
-		while not IsLocationPassable(eC) and eE < eD do
-			eB = aD.RotateVector(eB, 36 * math.pi / 180)
-			eC = aS(c.dangerCenter, aW(eB, ez + eA))
-			eE = eE + 1
+		direction = direction:Normalized()
+		local safeLocation = add(danger.dangerCenter, multiply(direction, dangerRadius + margin))
+		local maxTries = 5
+		local tries = 0
+		while not IsLocationPassable(safeLocation) and tries < maxTries do
+			direction = Utils.RotateVector(direction, 36 * math.pi / 180)
+			safeLocation = add(danger.dangerCenter, multiply(direction, dangerRadius + margin))
+			tries = tries + 1
 		end
-		if not IsLocationPassable(eC) then
-			return bv:GetLocation()
+		if not IsLocationPassable(safeLocation) then
+			return bot:GetLocation()
 		end
-		return eC
+		return safeLocation
 	end
-	return ey
+	return destination
 end
-function aD.MoveBotSafely(bv, eq)
-	local eF = bv:GetLocation()
-	local eG = aD.GetSafeDestination(bv, eq)
-	if aU(aX(eF, eG)) <= 100 then
-		bv:Action_MoveToLocation(eG)
+function Utils.MoveBotSafely(bot, location)
+	local botLocation = bot:GetLocation()
+	local safeDestination = Utils.GetSafeDestination(bot, location)
+	if length2D(sub(botLocation, safeDestination)) <= 100 then
+		bot:Action_MoveToLocation(safeDestination)
 		return
 	end
-	bv:Action_MoveToLocation(eG)
+	bot:Action_MoveToLocation(safeDestination)
 end
-local eH = {
+local meaningfulActivities = {
 	ACTIVITY_RUN,
 	ACTIVITY_ATTACK,
 	ACTIVITY_ATTACK2,
@@ -2062,56 +2058,56 @@ local eH = {
 	ACTIVITY_CHANNEL_ABILITY_5,
 	ACTIVITY_CHANNEL_ABILITY_6,
 }
-aD.ThinkActionType = ThinkActionType or {}
-aD.ThinkActionType.All = 0
-aD.ThinkActionType[aD.ThinkActionType.All] = "All"
-aD.ThinkActionType.Rune = 1
-aD.ThinkActionType[aD.ThinkActionType.Rune] = "Rune"
-aD.ThinkActionType.Defend = 2
-aD.ThinkActionType[aD.ThinkActionType.Defend] = "Defend"
-aD.ThinkActionType.Push = 3
-aD.ThinkActionType[aD.ThinkActionType.Push] = "Push"
-aD.ThinkActionType.Farm = 4
-aD.ThinkActionType[aD.ThinkActionType.Farm] = "Farm"
-function aD.IsBotThinkingMeaningfulAction(bv, eI, eJ)
-	if eI == nil then
-		eI = 1
+Utils.ThinkActionType = ThinkActionType or {}
+Utils.ThinkActionType.All = 0
+Utils.ThinkActionType[Utils.ThinkActionType.All] = "All"
+Utils.ThinkActionType.Rune = 1
+Utils.ThinkActionType[Utils.ThinkActionType.Rune] = "Rune"
+Utils.ThinkActionType.Defend = 2
+Utils.ThinkActionType[Utils.ThinkActionType.Defend] = "Defend"
+Utils.ThinkActionType.Push = 3
+Utils.ThinkActionType[Utils.ThinkActionType.Push] = "Push"
+Utils.ThinkActionType.Farm = 4
+Utils.ThinkActionType[Utils.ThinkActionType.Farm] = "Farm"
+function Utils.IsBotThinkingMeaningfulAction(bot, cacheFactor, actionType)
+	if cacheFactor == nil then
+		cacheFactor = 1
 	end
-	if eJ == nil then
-		eJ = aD.ThinkActionType.All
+	if actionType == nil then
+		actionType = Utils.ThinkActionType.All
 	end
-	if eI < 0 then
-		eI = 0
-	elseif eI > 10 then
-		eI = 10
+	if cacheFactor < 0 then
+		cacheFactor = 0
+	elseif cacheFactor > 10 then
+		cacheFactor = 10
 	end
-	local c9 = 50000 + bv:GetPlayerID() * 10 + eJ
-	local dw = aD.GetCachedVars(c9, 0.11 * eI)
-	if dw ~= nil then
-		return dw
+	local cacheKey = 50000 + bot:GetPlayerID() * 10 + actionType
+	local cached = Utils.GetCachedVars(cacheKey, 0.11 * cacheFactor)
+	if cached ~= nil then
+		return cached
 	end
 	do
-		local eK, eL, eM = pcall(function()
-			if az(eH, bv:GetAnimActivity()) then
-				aD.SetCachedVars(c9, true)
+		local ok, handled, result = pcall(function()
+			if arrayIncludes(meaningfulActivities, bot:GetAnimActivity()) then
+				Utils.SetCachedVars(cacheKey, true)
 				return true, true
 			end
 		end)
-		if eK and eL then
-			return eM
+		if ok and handled then
+			return result
 		end
 	end
-	local eN = bv:NumQueuedActions()
-	if eN > 0 then
-		for s = 1, eN do
-			local cx = bv:GetQueuedActionType(s)
-			if cx ~= aI.None then
-				aD.SetCachedVars(c9, true)
+	local queuedCount = bot:NumQueuedActions()
+	if queuedCount > 0 then
+		for i = 1, queuedCount do
+			local queuedType = bot:GetQueuedActionType(i)
+			if queuedType ~= BotActionType.None then
+				Utils.SetCachedVars(cacheKey, true)
 				return true
 			end
 		end
 	end
-	aD.SetCachedVars(c9, false)
+	Utils.SetCachedVars(cacheKey, false)
 	return false
 end
-return aD
+return Utils

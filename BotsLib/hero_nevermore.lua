@@ -1,26 +1,26 @@
 -- Nevermore: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 4, 6, 4, 4, 6 } }
-local k = j[1]
-local l
-if h == "pos_1" or h == "pos_3" then
-	l = c.Skill.GetTalentBuild(i[1])
+local tAllAbilityBuildList = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 4, 6, 4, 4, 6 } }
+local nAbilityBuildList = tAllAbilityBuildList[1]
+local nTalentBuildList
+if sRole == "pos_1" or sRole == "pos_3" then
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 else
-	l = c.Skill.GetTalentBuild(i[2])
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
-local m = {}
-m["pos_1"] = {
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -39,7 +39,7 @@ m["pos_1"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-m["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
@@ -64,7 +64,7 @@ m["pos_2"] = {
 	"item_ultimate_scepter_2",
 }
 -- One pair of boots in this build (user rule; Util/boots-check.js).
-m["pos_4"] = {
+sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
 	"item_tango",
 	"item_double_branches",
@@ -83,7 +83,7 @@ m["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_tango",
 	"item_double_branches",
@@ -103,138 +103,140 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_3"] = m["pos_1"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_kaya", "item_quelling_blade", "item_octarine_core", "item_bottle" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_kaya", "item_quelling_blade", "item_octarine_core", "item_bottle" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "nevermore")
-local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "nevermore")
-local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "nevermore")
-local r = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "nevermore")
-local s = SafeAbility(b:GetAbilityByName("nevermore_frenzy"), "nevermore_frenzy", "nevermore")
-local t = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "nevermore")
-local u = SafeAbility(b:GetAbilityByName(f[4]), "sTalentList[4]", "nevermore")
-local v
-local w
-local x
-local y, z
-local A
-local B
-local C, D, E, F, G, H
-local I
-function a.SkillsComplement()
-	if b.invisUltCombo then
+local shadowrazeNearAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "nevermore")
+local shadowrazeMediumAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "nevermore")
+local shadowrazeFarAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "nevermore")
+-- sAbilityList[4] is Feast of Souls or Presence of the Dark Lord (slot order not in the datafeed;
+-- Necromastery is innate), so the handle keeps a neutral name.
+local slot4Ability = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "nevermore")
+local feastOfSoulsAbility = SafeAbility(bot:GetAbilityByName("nevermore_frenzy"), "nevermore_frenzy", "nevermore")
+local requiemAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "nevermore")
+local talent4 = SafeAbility(bot:GetAbilityByName(sTalentList[4]), "sTalentList[4]", "nevermore")
+local razeNearDesire
+local razeMediumDesire
+local razeFarDesire
+local slot4Desire, slot4Target
+local feastOfSoulsDesire
+local requiemDesire
+local razeManaReserve, mpRatio, hpRatio, botLevel, nearbyEnemies, botTarget
+local isAttacking
+function X.SkillsComplement()
+	if bot.invisUltCombo then
 		return
 	end
-	c.ConsiderTarget()
-	if c.CanNotUseAbility(b) then
+	Fu.ConsiderTarget()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	I = c.IsAttacking(b)
-	local J = d.Build(b)
-	C = 340
-	F = J.level
-	D = J.mp
-	E = J.hp
-	G = J.enemies
-	H = J.target
-	B = a.ConsiderR()
-	if B > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbility(t)
+	isAttacking = Fu.IsAttacking(bot)
+	local context = AbilityContext.Build(bot)
+	razeManaReserve = 340
+	botLevel = context.level
+	mpRatio = context.mp
+	hpRatio = context.hp
+	nearbyEnemies = context.enemies
+	botTarget = context.target
+	requiemDesire = X.ConsiderR()
+	if requiemDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbility(requiemAbility)
 		return
 	end
-	if a.ConsiderBlinkRequiem() then
+	if X.ConsiderBlinkRequiem() then
 		return
 	end
-	if t:IsFullyCastable() and c.Utils.IsTruelyInvisible(b) then
+	if requiemAbility:IsFullyCastable() and Fu.Utils.IsTruelyInvisible(bot) then
 		return
 	end
-	w = a.Consider(p, 450)
-	if w > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(p)
+	razeMediumDesire = X.Consider(shadowrazeMediumAbility, 450)
+	if razeMediumDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(shadowrazeMediumAbility)
 		return
 	end
-	x = a.Consider(q, 700)
-	if x > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(q)
+	razeFarDesire = X.Consider(shadowrazeFarAbility, 700)
+	if razeFarDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(shadowrazeFarAbility)
 		return
 	end
-	v = a.Consider(o, 200)
-	if v > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbility(o)
+	razeNearDesire = X.Consider(shadowrazeNearAbility, 200)
+	if razeNearDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbility(shadowrazeNearAbility)
 		return
 	end
-	y, z = a.ConsiderN()
-	if y > 0 then
-		b:ActionQueue_UseAbilityOnEntity(r, z)
+	slot4Desire, slot4Target = X.ConsiderN()
+	if slot4Desire > 0 then
+		bot:ActionQueue_UseAbilityOnEntity(slot4Ability, slot4Target)
 		return
 	end
-	A = a.ConsiderFeastOfSouls()
-	if A > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbility(s)
+	feastOfSoulsDesire = X.ConsiderFeastOfSouls()
+	if feastOfSoulsDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbility(feastOfSoulsAbility)
 		return
 	end
 end
-function a.ConsiderN()
-	if not r:IsTrained() or r:IsPassive() or not r:IsFullyCastable() or b:IsDisarmed() or r:GetAutoCastState() then
+function X.ConsiderN()
+	if not slot4Ability:IsTrained() or slot4Ability:IsPassive() or not slot4Ability:IsFullyCastable() or bot:IsDisarmed() or slot4Ability:GetAutoCastState() then
 		return 0
 	end
-	if not r:GetAutoCastState() then
-		r:ToggleAutoCast()
+	if not slot4Ability:GetAutoCastState() then
+		slot4Ability:ToggleAutoCast()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderR()
-	if not t:IsFullyCastable() then
+function X.ConsiderR()
+	if not requiemAbility:IsFullyCastable() then
 		return 0
 	end
-	local K = b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery"))
-	if K < 10 and E > 0.5 then
+	local soulCount = bot:GetModifierStackCount(bot:GetModifierByName("modifier_nevermore_necromastery"))
+	if soulCount < 10 and hpRatio > 0.5 then
 		return 0
 	end
-	local L = c.GetEnemyList(b, 1200)
-	local M = c.GetEnemyList(b, 750)
-	local N = c.GetEnemyList(b, 350)
+	local enemiesIn1200 = Fu.GetEnemyList(bot, 1200)
+	local enemiesIn750 = Fu.GetEnemyList(bot, 750)
+	local enemiesIn350 = Fu.GetEnemyList(bot, 350)
 	-- Follow-through of ConsiderBlinkRequiem: just blinked in, 2+ enemies within 750.
-	if DotaTime() - (b._sfBlinkAt or -999) <= 1.5 and #M >= 2 then
-		b._sfBlinkAt = nil
+	if DotaTime() - (bot._sfBlinkAt or -999) <= 1.5 and #enemiesIn750 >= 2 then
+		bot._sfBlinkAt = nil
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	for O, P in pairs(N) do
-		local Q = c.GetModifierTime(P, "modifier_brewmaster_storm_cyclone")
-		if c.IsValidHero(P) and (Q > 0 and Q <= 1.66 or c.Utils.IsTruelyInvisible(b)) and P:GetHealth() > 700 then
+	for _, enemyHero in pairs(enemiesIn350) do
+		local cycloneTime = Fu.GetModifierTime(enemyHero, "modifier_brewmaster_storm_cyclone")
+		if Fu.IsValidHero(enemyHero) and (cycloneTime > 0 and cycloneTime <= 1.66 or Fu.Utils.IsTruelyInvisible(bot)) and enemyHero:GetHealth() > 700 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsInTeamFight(b, 1000) or c.IsGoingOnSomeone(b) then
-		if #M >= 3 or #N >= 1 and #M >= 2 or #L >= 3 and #M >= 2 or #L >= 4 and #N >= 1 then
+	if Fu.IsInTeamFight(bot, 1000) or Fu.IsGoingOnSomeone(bot) then
+		if #enemiesIn750 >= 3 or #enemiesIn350 >= 1 and #enemiesIn750 >= 2 or #enemiesIn1200 >= 3 and #enemiesIn750 >= 2 or #enemiesIn1200 >= 4 and #enemiesIn350 >= 1 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		local R = b:FindAoELocation(true, true, b:GetLocation(), 100, 800, 1.67, 0)
-		if R.count >= 3 then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), 100, 800, 1.67, 0)
+		if aoe.count >= 3 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		local S = c.GetProperTarget(b)
+		local target = Fu.GetProperTarget(bot)
 		if
-			c.IsValidHero(S)
-			and c.CanCastOnNonMagicImmune(S)
-			and not c.IsDisabled(S)
-			and GetUnitToUnitDistance(S, b) <= 400
-			and S:GetHealth() > 700
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and not Fu.IsDisabled(target)
+			and GetUnitToUnitDistance(target, bot) <= 400
+			and target:GetHealth() > 700
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -245,232 +247,232 @@ end
 -- already stood. In a team fight (2+ of our heroes attacking within 1600, so he never blinks in
 -- alone), with Requiem and its mana ready, 10+ souls and 40%+ HP, blink (1200, Arcane 1400, item
 -- data) onto a spot 500+ away with 3+ enemy heroes within 450. ConsiderR casts Requiem for 1.5s
--- after the blink (b._sfBlinkAt) whatever its own fight gates say.
-function a.ConsiderBlinkRequiem()
-	if not t:IsFullyCastable() or b:GetMana() < t:GetManaCost() or b:IsRooted() then
+-- after the blink (bot._sfBlinkAt) whatever its own fight gates say.
+function X.ConsiderBlinkRequiem()
+	if not requiemAbility:IsFullyCastable() or bot:GetMana() < requiemAbility:GetManaCost() or bot:IsRooted() then
 		return false
 	end
-	if c.IsRetreating(b) or c.GetHP(b) < 0.4 or not c.IsInTeamFight(b, 1600) then
+	if Fu.IsRetreating(bot) or Fu.GetHP(bot) < 0.4 or not Fu.IsInTeamFight(bot, 1600) then
 		return false
 	end
-	if b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery")) < 10 then
+	if bot:GetModifierStackCount(bot:GetModifierByName("modifier_nevermore_necromastery")) < 10 then
 		return false
 	end
-	if not c.CanBlinkDagger(b) or b.Blink == nil then
+	if not Fu.CanBlinkDagger(bot) or bot.Blink == nil then
 		return false
 	end
-	local range = b.Blink:GetName() == "item_arcane_blink" and 1400 or 1200
-	local aoe = b:FindAoELocation(true, true, b:GetLocation(), range - 100, 450, 0, 0)
+	local range = bot.Blink:GetName() == "item_arcane_blink" and 1400 or 1200
+	local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), range - 100, 450, 0, 0)
 	if aoe == nil or aoe.count == nil or aoe.count < 3 or aoe.targetloc == nil then
 		return false
 	end
-	if GetUnitToLocationDistance(b, aoe.targetloc) < 500 or not IsLocationPassable(aoe.targetloc) then
+	if GetUnitToLocationDistance(bot, aoe.targetloc) < 500 or not IsLocationPassable(aoe.targetloc) then
 		return false
 	end
 	local foes = 0
-	for _, e0 in pairs(c.GetEnemiesNearLoc(aoe.targetloc, 450) or {}) do
-		if c.IsValidHero(e0) and c.CanCastOnNonMagicImmune(e0) and not c.IsSuspiciousIllusion(e0) then
+	for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(aoe.targetloc, 450) or {}) do
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
 			foes = foes + 1
 		end
 	end
 	if foes < 3 then
 		return false
 	end
-	if DotaTime() >= (b._sfBlinkLogAt or -999) then
-		b._sfBlinkLogAt = DotaTime() + 3
+	if DotaTime() >= (bot._sfBlinkLogAt or -999) then
+		bot._sfBlinkLogAt = DotaTime() + 3
 		pcall(print, string.format(
 			"[OHA-SF] t=%.0f blink-requiem foes=%d dist=%d",
 			DotaTime(),
 			foes,
-			math.floor(GetUnitToLocationDistance(b, aoe.targetloc))
+			math.floor(GetUnitToLocationDistance(bot, aoe.targetloc))
 		))
 	end
-	b._sfBlinkAt = DotaTime()
-	b:Action_UseAbilityOnLocation(b.Blink, aoe.targetloc)
+	bot._sfBlinkAt = DotaTime()
+	bot:Action_UseAbilityOnLocation(bot.Blink, aoe.targetloc)
 	return true
 end
-function a.Consider(T, U)
-	if not T:IsFullyCastable() then
+function X.Consider(razeAbility, razeDistance)
+	if not razeAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local V = 248
-	local W = c.GetFaceTowardDistanceLocation(b, U)
-	local X = T:GetCastPoint()
-	local Y = DAMAGE_TYPE_MAGICAL
-	local Z = T:GetLevel()
+	local razeRadius = 248
+	local razeLocation = Fu.GetFaceTowardDistanceLocation(bot, razeDistance)
+	local castPoint = razeAbility:GetCastPoint()
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local abilityLevel = razeAbility:GetLevel()
 	-- datafeed: Shadowraze deals shadowraze_damage 85/150/215/280 plus damage_per_soul (2) per Necromastery soul;
-	-- the old 20 + 70 * level was too high and ignored souls. The talent f[4] is now a Feast of Souls talent, so it
+	-- the old 20 + 70 * level was too high and ignored souls. The talent sTalentList[4] is now a Feast of Souls talent, so it
 	-- is no longer added here.
-	local _ = T:GetSpecialValueInt("shadowraze_damage")
-	if _ <= 0 then
-		_ = 20 + 65 * Z
+	local damage = razeAbility:GetSpecialValueInt("shadowraze_damage")
+	if damage <= 0 then
+		damage = 20 + 65 * abilityLevel
 	end
-	local aSouls = b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery"))
-	_ = _ + aSouls * T:GetSpecialValueInt("damage_per_soul")
-	local a0 = T:GetSpecialValueInt("stack_bonus_damage")
-	local a1 = "ranged"
-	local a2 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-	local S = c.GetProperTarget(b)
+	local aSouls = bot:GetModifierStackCount(bot:GetModifierByName("modifier_nevermore_necromastery"))
+	damage = damage + aSouls * razeAbility:GetSpecialValueInt("damage_per_soul")
+	local stackBonusDamage = razeAbility:GetSpecialValueInt("stack_bonus_damage")
+	local creepKeyword = "ranged"
+	local enemiesInRange = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+	local target = Fu.GetProperTarget(bot)
 	if
-		c.IsValidHero(S)
-		and c.CanCastOnNonMagicImmune(S)
-		and a.IsUnitNearLoc(S, W, V - 20, X)
+		Fu.IsValidHero(target)
+		and Fu.CanCastOnNonMagicImmune(target)
+		and X.IsUnitNearLoc(target, razeLocation, razeRadius - 20, castPoint)
 		and (
-			not (b:GetMana() <= C * (1 - Z / 4))
-			or a.IsUnitCanBeKill(S, _, a0, X)
-			or S:HasModifier("modifier_nevermore_requiem_fear")
+			bot:GetMana() > razeManaReserve * (1 - abilityLevel / 4)
+			or X.IsUnitCanBeKill(target, damage, stackBonusDamage, castPoint)
+			or target:HasModifier("modifier_nevermore_requiem_fear")
 		)
 	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	for O, P in pairs(a2) do
+	for _, enemyHero in pairs(enemiesInRange) do
 		if
-			c.IsValidHero(P)
-			and c.CanCastOnNonMagicImmune(P)
-			and a.IsUnitNearLoc(P, W, V - 30, X)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and X.IsUnitNearLoc(enemyHero, razeLocation, razeRadius - 30, castPoint)
 			and (
-				not (b:GetMana() <= C * (1 - Z / 4))
-				or a.IsUnitCanBeKill(P, _, a0, X)
-				or P:HasModifier("modifier_nevermore_requiem_fear")
+				bot:GetMana() > razeManaReserve * (1 - abilityLevel / 4)
+				or X.IsUnitCanBeKill(enemyHero, damage, stackBonusDamage, castPoint)
+				or enemyHero:HasModifier("modifier_nevermore_requiem_fear")
 			)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if F <= 12 then
-		local a3 = b:GetNearbyLaneCreeps(1000, true)
-		local a4 = 0
-		for O, a5 in pairs(a3) do
+	if botLevel <= 12 then
+		local laneCreeps = bot:GetNearbyLaneCreeps(1000, true)
+		local killableCount = 0
+		for _, creep in pairs(laneCreeps) do
 			if
-				c.IsValid(a5)
-				and not a5:HasModifier("modifier_fountain_glyph")
-				and c.IsKeyWordUnit(a1, a5)
-				and a.IsUnitNearLoc(a5, W, V, X)
-				and a.IsUnitCanBeKill(a5, _, a0, X)
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.IsKeyWordUnit(creepKeyword, creep)
+				and X.IsUnitNearLoc(creep, razeLocation, razeRadius, castPoint)
+				and X.IsUnitCanBeKill(creep, damage, stackBonusDamage, castPoint)
 			then
-				a4 = a4 + 1
+				killableCount = killableCount + 1
 			end
 		end
-		if a4 >= 2 then
+		if killableCount >= 2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if not c.IsRetreating(b) then
-		local a6 = b:GetNearbyCreeps(1200, true)
-		local a7 = b:GetNearbyLaneCreeps(U + V * 1.5, true)
-		local a8 = 0
-		local a9 = 0
-		for O, a5 in pairs(a6) do
+	if not Fu.IsRetreating(bot) then
+		local nearbyCreeps = bot:GetNearbyCreeps(1200, true)
+		local laneCreepsInRange = bot:GetNearbyLaneCreeps(razeDistance + razeRadius * 1.5, true)
+		local hitCount = 0
+		local killCount = 0
+		for _, creep in pairs(nearbyCreeps) do
 			if
-				c.IsValid(a5)
-				and not a5:HasModifier("modifier_fountain_glyph")
-				and (a5:GetMagicResist() < 0.4 or D > 0.9)
-				and a.IsUnitNearLoc(a5, W, V, X)
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and (creep:GetMagicResist() < 0.4 or mpRatio > 0.9)
+				and X.IsUnitNearLoc(creep, razeLocation, razeRadius, castPoint)
 			then
-				a8 = a8 + 1
-				if a.IsUnitCanBeKill(a5, _, a0, X) then
-					a9 = a9 + 1
+				hitCount = hitCount + 1
+				if X.IsUnitCanBeKill(creep, damage, stackBonusDamage, castPoint) then
+					killCount = killCount + 1
 				end
 			end
 		end
-		if F >= 8 and a2[1] == nil then
+		if botLevel >= 8 and enemiesInRange[1] == nil then
 			if
-				a8 >= 4 and D > 0.6
-				or a8 >= 3 and b:GetActiveMode() ~= BOT_MODE_LANING and D > 0.78
-				or a9 >= 2 and a8 == #a7
-				or a8 >= 2 and D > 0.8 and F > 10 and #a6 == 2
-				or a8 >= 2 and F > 24 and #a6 == 2 and c.IsAllowedToSpam(b, 180)
+				hitCount >= 4 and mpRatio > 0.6
+				or hitCount >= 3 and bot:GetActiveMode() ~= BOT_MODE_LANING and mpRatio > 0.78
+				or killCount >= 2 and hitCount == #laneCreepsInRange
+				or hitCount >= 2 and mpRatio > 0.8 and botLevel > 10 and #nearbyCreeps == 2
+				or hitCount >= 2 and botLevel > 24 and #nearbyCreeps == 2 and Fu.IsAllowedToSpam(bot, 180)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
-		if F <= 10 then
-			if a9 >= 2 and (a8 == #a7 or D > 0.8) then
+		if botLevel <= 10 then
+			if killCount >= 2 and (hitCount == #laneCreepsInRange or mpRatio > 0.8) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
-		if a9 >= 3 then
+		if killCount >= 3 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return 0
 end
-function a.ConsiderFeastOfSouls()
-	if not s:IsFullyCastable() then
+function X.ConsiderFeastOfSouls()
+	if not feastOfSoulsAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local aa = b:GetAttackRange()
-	local K = b:GetModifierStackCount(b:GetModifierByName("modifier_nevermore_necromastery"))
-	local ab = c.GetManaAfter(s:GetManaCost()) * b:GetMana()
+	local attackRange = bot:GetAttackRange()
+	local soulCount = bot:GetModifierStackCount(bot:GetModifierByName("modifier_nevermore_necromastery"))
+	local manaAfter = Fu.GetManaAfter(feastOfSoulsAbility:GetManaCost()) * bot:GetMana()
 	-- datafeed: Necromastery max souls is 20 and Feast of Souls (nevermore_frenzy) gathers souls rather than
-	-- spending them, so the old "K < 25 souls" gate kept it unused unless max souls were raised. Gate removed.
-	if c.IsGoingOnSomeone(b) then
+	-- spending them, so the old "soulCount < 25" gate kept it unused unless max souls were raised. Gate removed.
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidTarget(H)
-			and c.IsInRange(b, H, aa)
-			and not c.IsChasingTarget(b, H)
-			and not c.IsSuspiciousIllusion(H)
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, attackRange)
+			and not Fu.IsChasingTarget(bot, botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			local ac = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-			local G = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if ac ~= nil and G ~= nil and #ac >= #G then
+			local targetEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local targetAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsFarming(b) and ab > 0.3 then
-		if I then
-			local ad = b:GetNearbyNeutralCreeps(1000)
-			if ad ~= nil and (#ad >= 3 or #ad >= 2 and ad[1]:IsAncientCreep()) then
+	if Fu.IsFarming(bot) and manaAfter > 0.3 then
+		if isAttacking then
+			local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
+			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			local ae = b:GetNearbyLaneCreeps(1000, true)
-			if ae ~= nil and #ae >= 4 then
+			local laneCreeps = bot:GetNearbyLaneCreeps(1000, true)
+			if laneCreeps ~= nil and #laneCreeps >= 4 then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local ae = b:GetNearbyLaneCreeps(1000, true)
-		if ae ~= nil and #ae >= 4 and G ~= nil and #G == 0 and ab > 0.3 then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+		local laneCreeps = bot:GetNearbyLaneCreeps(1000, true)
+		if laneCreeps ~= nil and #laneCreeps >= 4 and nearbyEnemies ~= nil and #nearbyEnemies == 0 and manaAfter > 0.3 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		if c.IsValidBuilding(H) and c.CanBeAttacked(H) and I then
+		if Fu.IsValidBuilding(botTarget) and Fu.CanBeAttacked(botTarget) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(H) or c.IsTormentor(H)) and c.IsInRange(b, H, aa) and I then
+	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
+		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, attackRange) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.IsUnitNearLoc(af, ag, ah, ai)
-	if GetUnitToLocationDistance(af, ag) > 250 then
+function X.IsUnitNearLoc(unit, location, radius, delay)
+	if GetUnitToLocationDistance(unit, location) > 250 then
 		return false
 	end
-	local aj = af:GetMovementDirectionStability()
-	if aj < 0.98 then
-		ah = ah - 14
+	local stability = unit:GetMovementDirectionStability()
+	if stability < 0.98 then
+		radius = radius - 14
 	end
-	if aj < 0.91 then
-		ah = ah - 26
+	if stability < 0.91 then
+		radius = radius - 26
 	end
-	if aj < 0.81 then
-		ah = ah - 30
+	if stability < 0.81 then
+		radius = radius - 30
 	end
-	local ak = c.GetCorrectLoc(af, ai)
-	if c.GetLocationToLocationDistance(ak, ag) < ah then
+	local predictedLocation = Fu.GetCorrectLoc(unit, delay)
+	if Fu.GetLocationToLocationDistance(predictedLocation, location) < radius then
 		return true
 	end
 	return false
 end
-function a.IsUnitCanBeKill(af, _, a0, X)
-	local Y = DAMAGE_TYPE_MAGICAL
-	local al = c.GetModifierCount(af, "modifier_nevermore_shadowraze_debuff")
-	local am = _ + al * a0
-	return c.WillKillTarget(af, am, Y, X)
+function X.IsUnitCanBeKill(unit, damage, stackBonusDamage, castPoint)
+	local damageType = DAMAGE_TYPE_MAGICAL
+	local debuffStacks = Fu.GetModifierCount(unit, "modifier_nevermore_shadowraze_debuff")
+	local totalDamage = damage + debuffStacks * stackBonusDamage
+	return Fu.WillKillTarget(unit, totalDamage, damageType, castPoint)
 end
-return a
+return X

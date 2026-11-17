@@ -1,234 +1,235 @@
 -- How Rubick plays after stealing a spell from Bloodseeker.
-local a = GetBot()
-local b = {}
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d
-local e
-local f
-local g
-local h
-local i
-function b.ConsiderStolenSpell(j)
-	a = GetBot()
-	if c.CanNotUseAbility(a) then
+local bot = GetBot()
+local X = {}
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local bloodrageAbility
+local bloodRiteAbility
+local bloodMistAbility
+local ruptureAbility
+local botTarget
+local hpRatio
+function X.ConsiderStolenSpell(ability)
+	bot = GetBot()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	h = c.GetProperTarget(a)
-	local k = j:GetName()
-	i = a:GetHealth() / a:GetMaxHealth()
-	if k == "bloodseeker_blood_mist" then
-		f = j
-		BloodMistDesire = b.ConsiderBloodMist()
+	botTarget = Fu.GetProperTarget(bot)
+	local abilityName = ability:GetName()
+	hpRatio = bot:GetHealth() / bot:GetMaxHealth()
+	if abilityName == "bloodseeker_blood_mist" then
+		bloodMistAbility = ability
+		BloodMistDesire = X.ConsiderBloodMist()
 		if BloodMistDesire > 0 then
-			a:Action_UseAbility(f)
+			bot:Action_UseAbility(bloodMistAbility)
 			return
 		end
 	end
-	if k == "bloodseeker_rupture" then
-		g = j
-		RuptureDesire, RuptureTarget = b.ConsiderRupture()
+	if abilityName == "bloodseeker_rupture" then
+		ruptureAbility = ability
+		RuptureDesire, RuptureTarget = X.ConsiderRupture()
 		if RuptureDesire > 0 then
-			a:Action_UseAbilityOnEntity(g, RuptureTarget)
+			bot:Action_UseAbilityOnEntity(ruptureAbility, RuptureTarget)
 			return
 		end
 	end
-	if k == "bloodseeker_bloodrage" then
-		d = j
-		BloodrageDesire, BloodrageTarget = b.ConsiderBloodrage()
+	if abilityName == "bloodseeker_bloodrage" then
+		bloodrageAbility = ability
+		BloodrageDesire, BloodrageTarget = X.ConsiderBloodrage()
 		if BloodrageDesire > 0 then
-			a:Action_UseAbilityOnEntity(d, BloodrageTarget)
+			bot:Action_UseAbilityOnEntity(bloodrageAbility, BloodrageTarget)
 			return
 		end
 	end
-	if k == "bloodseeker_blood_bath" then
-		e = j
-		BloodRiteDesire, BloodRiteLocation = b.ConsiderBloodRite()
+	if abilityName == "bloodseeker_blood_bath" then
+		bloodRiteAbility = ability
+		BloodRiteDesire, BloodRiteLocation = X.ConsiderBloodRite()
 		if BloodRiteDesire > 0 then
-			a:Action_UseAbilityOnLocation(e, BloodRiteLocation)
+			bot:Action_UseAbilityOnLocation(bloodRiteAbility, BloodRiteLocation)
 			return
 		end
 	end
 end
-function b.ConsiderBloodrage()
-	if not d:IsFullyCastable() then
+function X.ConsiderBloodrage()
+	if not bloodrageAbility:IsFullyCastable() then
 		return 0
 	end
-	local l = c.GetProperCastRange(false, a, d:GetCastRange())
-	local m = a:GetAttackDamage()
-	if c.IsInTeamFight(a, 1200) or c.IsPushing(a) or c.IsDefending(a) then
-		local n = c.GetNearbyHeroes(a, 1200, true, BOT_MODE_NONE)
-		if #n >= 1 then
-			local o = c.GetNearbyHeroes(a, l + 200, false, BOT_MODE_NONE)
-			local p = 0
-			local q = nil
-			for r, s in pairs(o) do
-				local t = s:GetAttackDamage()
+	local castRange = Fu.GetProperCastRange(false, bot, bloodrageAbility:GetCastRange())
+	local attackDamage = bot:GetAttackDamage()
+	if Fu.IsInTeamFight(bot, 1200) or Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		if #nearbyEnemies >= 1 then
+			local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 200, false, BOT_MODE_NONE)
+			local bestAttackDamage = 0
+			local bestAlly = nil
+			for _, ally in pairs(nearbyAllies) do
+				local allyAttackDamage = ally:GetAttackDamage()
 				if
-					c.IsValid(s)
-					and s:GetAttackTarget() ~= nil
-					and c.CanCastOnNonMagicImmune(s)
-					and (c.GetHP(s) > 0.18 or c.GetHP(s:GetAttackTarget()) < 0.18)
-					and not s:HasModifier("modifier_bloodseeker_bloodrage")
-					and t > p
+					Fu.IsValid(ally)
+					and ally:GetAttackTarget() ~= nil
+					and Fu.CanCastOnNonMagicImmune(ally)
+					and (Fu.GetHP(ally) > 0.18 or Fu.GetHP(ally:GetAttackTarget()) < 0.18)
+					and not ally:HasModifier("modifier_bloodseeker_bloodrage")
+					and allyAttackDamage > bestAttackDamage
 				then
-					p = t
-					q = s
+					bestAttackDamage = allyAttackDamage
+					bestAlly = ally
 				end
 			end
-			if q ~= nil then
-				return BOT_ACTION_DESIRE_HIGH, q
+			if bestAlly ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, bestAlly
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		if c.IsValidHero(h) and c.CanCastOnMagicImmune(h) and c.IsInRange(h, a, 600) then
-			if not a:HasModifier("modifier_bloodseeker_bloodrage") then
-				return BOT_ACTION_DESIRE_HIGH, a
+	if Fu.IsGoingOnSomeone(bot) then
+		if Fu.IsValidHero(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, 600) then
+			if not bot:HasModifier("modifier_bloodseeker_bloodrage") then
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
 	end
-	if c.IsValid(h) and h:GetTeam() == TEAM_NEUTRAL and not a:HasModifier("modifier_bloodseeker_bloodrage") then
-		local u = a:GetNearbyCreeps(1000, true)
-		for r, v in pairs(u) do
-			if c.IsValid(v) and not c.CanKillTarget(v, m, DAMAGE_TYPE_PHYSICAL) then
-				return BOT_ACTION_DESIRE_HIGH, a
+	if Fu.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL and not bot:HasModifier("modifier_bloodseeker_bloodrage") then
+		local nearbyCreeps = bot:GetNearbyCreeps(1000, true)
+		for _, creep in pairs(nearbyCreeps) do
+			if Fu.IsValid(creep) and not Fu.CanKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL) then
+				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
 	end
-	if a:GetActiveMode() == BOT_MODE_ROSHAN then
-		if not a:HasModifier("modifier_bloodseeker_bloodrage") and a:GetAttackTarget() ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, a
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
+		if not bot:HasModifier("modifier_bloodseeker_bloodrage") and bot:GetAttackTarget() ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function b.ConsiderBloodRite()
-	if not e:IsFullyCastable() then
+function X.ConsiderBloodRite()
+	if not bloodRiteAbility:IsFullyCastable() then
 		return 0
 	end
-	local w = 600
-	local l = c.GetProperCastRange(false, a, e:GetCastRange())
-	local x = e:GetCastPoint()
-	local y = e:GetSpecialValueFloat("delay")
-	local z = e:GetManaCost()
-	local m = e:GetSpecialValueInt("damage")
-	local n = c.GetNearbyHeroes(a, l, true, BOT_MODE_NONE)
-	local o = c.GetNearbyHeroes(a, 800, false, BOT_MODE_NONE)
-	for r, A in pairs(n) do
-		if c.IsValid(A) and c.CanCastOnNonMagicImmune(A) and c.CanKillTarget(A, m, DAMAGE_TYPE_PURE) then
-			if A:GetMovementDirectionStability() >= 0.75 then
-				return BOT_ACTION_DESIRE_HIGH, A:GetExtrapolatedLocation(y)
+	local radius = 600
+	local castRange = Fu.GetProperCastRange(false, bot, bloodRiteAbility:GetCastRange())
+	local castPoint = bloodRiteAbility:GetCastPoint()
+	local delay = bloodRiteAbility:GetSpecialValueFloat("delay")
+	local manaCost = bloodRiteAbility:GetManaCost()
+	local damage = bloodRiteAbility:GetSpecialValueInt("damage")
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PURE) then
+			if enemyHero:GetMovementDirectionStability() >= 0.75 then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
 			else
-				return BOT_ACTION_DESIRE_HIGH, A:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
 		end
 	end
-	if a:GetActiveMode() == BOT_MODE_LANING and c.IsAllowedToSpam(a, z) then
-		local B = a:FindAoELocation(true, false, a:GetLocation(), 1000, w / 2, x, m)
-		if B.count >= 4 then
-			return BOT_ACTION_DESIRE_MODERATE, B.targetloc
+	if bot:GetActiveMode() == BOT_MODE_LANING and Fu.IsAllowedToSpam(bot, manaCost) then
+		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 1000, radius / 2, castPoint, damage)
+		if aoeLocation.count >= 4 then
+			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 		end
 	end
-	if (c.IsPushing(a) or c.IsDefending(a)) and c.IsAllowedToSpam(a, z) and n == nil or #n == 0 and #o <= 2 then
-		local C = a:GetNearbyLaneCreeps(1000, true)
-		local B = a:FindAoELocation(true, false, a:GetLocation(), 1000, w / 2, x, m)
-		if B.count >= 4 and #C >= 4 then
-			return BOT_ACTION_DESIRE_MODERATE, B.targetloc
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and nearbyEnemies == nil or #nearbyEnemies == 0 and #nearbyAllies <= 2 then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1000, true)
+		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 1000, radius / 2, castPoint, damage)
+		if aoeLocation.count >= 4 and #nearbyLaneCreeps >= 4 then
+			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 		end
 	end
-	if c.IsRetreating(a) then
-		for r, A in pairs(n) do
-			if c.IsValid(A) and a:WasRecentlyDamagedByHero(A, 1.0) and c.CanCastOnNonMagicImmune(A) then
-				return BOT_ACTION_DESIRE_HIGH, a:GetLocation()
+	if Fu.IsRetreating(bot) then
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 1.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
-	if c.IsInTeamFight(a, 1200) then
-		local B = a:FindAoELocation(true, true, a:GetLocation(), l - 200, w / 2, x, 0)
-		if B.count >= 2 then
-			local D = c.GetInvUnitInLocCount(a, l, w / 2, B.targetloc, false)
-			if D >= B.count then
-				return BOT_ACTION_DESIRE_MODERATE, B.targetloc
+	if Fu.IsInTeamFight(bot, 1200) then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 200, radius / 2, castPoint, 0)
+		if aoeLocation.count >= 2 then
+			local castableEnemyCount = Fu.GetInvUnitInLocCount(bot, castRange, radius / 2, aoeLocation.targetloc, false)
+			if castableEnemyCount >= aoeLocation.count then
+				return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
-		if c.IsValidHero(h) and c.CanCastOnNonMagicImmune(h) and c.IsInRange(h, a, l + w) then
-			local E = c.GetDelayCastLocation(a, h, l, w, 2.0)
-			if E ~= nil then
-				return BOT_ACTION_DESIRE_HIGH, E
+	if Fu.IsGoingOnSomeone(bot) then
+		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + radius) then
+			local castLocation = Fu.GetDelayCastLocation(bot, botTarget, castRange, radius, 2.0)
+			if castLocation ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function b.ConsiderRupture()
-	if not g:IsFullyCastable() then
+function X.ConsiderRupture()
+	if not ruptureAbility:IsFullyCastable() then
 		return 0
 	end
-	local l = g:GetCastRange()
-	local n = c.GetNearbyHeroes(a, l + 200, true, BOT_MODE_NONE)
-	if c.IsRetreating(a) then
-		for r, A in pairs(n) do
+	local castRange = ruptureAbility:GetCastRange()
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) then
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				a:WasRecentlyDamagedByHero(A, 1.0)
-				and c.CanCastOnNonMagicImmune(A)
-				and c.CanCastOnTargetAdvanced(A)
-				and not A:HasModifier("modifier_bloodseeker_rupture")
+				bot:WasRecentlyDamagedByHero(enemyHero, 1.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and not enemyHero:HasModifier("modifier_bloodseeker_rupture")
 			then
-				return BOT_ACTION_DESIRE_MODERATE, A
+				return BOT_ACTION_DESIRE_MODERATE, enemyHero
 			end
 		end
 	end
-	if c.IsInTeamFight(a, 1200) then
-		for r, A in pairs(n) do
+	if Fu.IsInTeamFight(bot, 1200) then
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.CanCastOnNonMagicImmune(A)
-				and c.CanCastOnTargetAdvanced(A)
-				and c.Role.IsCarry(A:GetUnitName())
-				and not A:HasModifier("modifier_bloodseeker_rupture")
-				and not c.IsDisabled(A)
+				Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+				and Fu.Role.IsCarry(enemyHero:GetUnitName())
+				and not enemyHero:HasModifier("modifier_bloodseeker_rupture")
+				and not Fu.IsDisabled(enemyHero)
 			then
-				return BOT_ACTION_DESIRE_HIGH, A
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	if c.IsGoingOnSomeone(a) then
+	if Fu.IsGoingOnSomeone(bot) then
 		if
-			c.IsValidHero(h)
-			and c.CanCastOnNonMagicImmune(h)
-			and c.CanCastOnTargetAdvanced(h)
-			and c.IsInRange(h, a, l + 100)
-			and not h:HasModifier("modifier_bloodseeker_rupture")
-			and not c.IsDisabled(h)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 100)
+			and not botTarget:HasModifier("modifier_bloodseeker_rupture")
+			and not Fu.IsDisabled(botTarget)
 		then
-			local F = c.GetNearbyHeroes(h, 1200, true, BOT_MODE_NONE)
-			if F ~= nil and #F >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, h
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and #alliesNearTarget >= 2 then
+				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function b.ConsiderBloodMist()
-	if not a:HasScepter() or not f:IsFullyCastable() then
+function X.ConsiderBloodMist()
+	if not bot:HasScepter() or not bloodMistAbility:IsFullyCastable() then
 		return BOT_MODE_NONE
 	end
-	local w = 450
-	local G = c.GetNearbyHeroes(a, w, true, BOT_MODE_NONE)
-	if f:GetToggleState() == true then
-		if i < 0.2 then
+	local radius = 450
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+	if bloodMistAbility:GetToggleState() == true then
+		if hpRatio < 0.2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		if #G == 0 then
+		if #nearbyEnemies == 0 then
 			return BOT_ACTION_DESIRE_ABSOLUTE
 		end
 	end
-	if not f:GetToggleState() == false and i > 0.5 then
-		if c.IsValidHero(h) and c.IsInRange(a, h, w * 0.8) and c.CanCastOnNonMagicImmune(h) then
+	-- Toggle Blood Mist on (it was `not toggle == false`, which only fired while it was already on)
+	if bloodMistAbility:GetToggleState() == false and hpRatio > 0.5 then
+		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, radius * 0.8) and Fu.CanCastOnNonMagicImmune(botTarget) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_MODE_NONE
 end
-return b
+return X

@@ -1,308 +1,304 @@
 -- Shared bot system: cache.
-local function a(self, b, c)
-	local d = {}
-	local e = 0
-	for f = 1, #self do
-		if b(c, self[f], f - 1, self) then
-			e = e + 1
-			d[e] = self[f]
+local function arrayFilter(self, predicate, thisArg)
+	local result = {}
+	local count = 0
+	for i = 1, #self do
+		if predicate(thisArg, self[i], i - 1, self) then
+			count = count + 1
+			result[count] = self[i]
 		end
 	end
-	return d
+	return result
 end
-local function g(self, h, i)
-	if not i then
-		i = 1
+local function stringIncludes(self, searchString, position)
+	if not position then
+		position = 1
 	else
-		i = i + 1
+		position = position + 1
 	end
-	local j = string.find(self, h, i, true)
-	return j ~= nil
+	local index = string.find(self, searchString, position, true)
+	return index ~= nil
 end
-local function k(l, ...)
-	local m = setmetatable({}, l.prototype)
-	m:____constructor(...)
-	return m
+local function newInstance(Class, ...)
+	local instance = setmetatable({}, Class.prototype)
+	instance:____constructor(...)
+	return instance
 end
-local function n(self)
-	local o = { prototype = {} }
-	o.prototype.__index = o.prototype
-	o.prototype.constructor = o
-	return o
+local function createClass(self)
+	local Class = { prototype = {} }
+	Class.prototype.__index = Class.prototype
+	Class.prototype.constructor = Class
+	return Class
 end
-local function p(l, q)
-	l.____super = q
-	local r = setmetatable({ __index = q }, q)
-	setmetatable(l, r)
-	local s = getmetatable(q)
-	if s then
-		if type(s.__index) == "function" then
-			r.__index = s.__index
+local function classExtends(Target, Base)
+	Target.____super = Base
+	local staticMetatable = setmetatable({ __index = Base }, Base)
+	setmetatable(Target, staticMetatable)
+	local baseMetatable = getmetatable(Base)
+	if baseMetatable then
+		if type(baseMetatable.__index) == "function" then
+			staticMetatable.__index = baseMetatable.__index
 		end
-		if type(s.__newindex) == "function" then
-			r.__newindex = s.__newindex
+		if type(baseMetatable.__newindex) == "function" then
+			staticMetatable.__newindex = baseMetatable.__newindex
 		end
 	end
-	setmetatable(l.prototype, q.prototype)
-	if type(q.prototype.__index) == "function" then
-		l.prototype.__index = q.prototype.__index
+	setmetatable(Target.prototype, Base.prototype)
+	if type(Base.prototype.__index) == "function" then
+		Target.prototype.__index = Base.prototype.__index
 	end
-	if type(q.prototype.__newindex) == "function" then
-		l.prototype.__newindex = q.prototype.__newindex
+	if type(Base.prototype.__newindex) == "function" then
+		Target.prototype.__newindex = Base.prototype.__newindex
 	end
-	if type(q.prototype.__tostring) == "function" then
-		l.prototype.__tostring = q.prototype.__tostring
+	if type(Base.prototype.__tostring) == "function" then
+		Target.prototype.__tostring = Base.prototype.__tostring
 	end
 end
-local t, u, v, w, x, y
+local Error, TypeError
 do
-	local function z(self, A)
+	local function getErrorStack(self, constructor)
 		if debug == nil then
 			return nil
 		end
-		local B = 1
+		local level = 1
 		while true do
-			local C = debug.getinfo(B, "f")
-			B = B + 1
-			if not C then
-				B = 1
+			local info = debug.getinfo(level, "f")
+			level = level + 1
+			if not info then
+				level = 1
 				break
-			elseif C.func == A then
+			elseif info.func == constructor then
 				break
 			end
 		end
-		if g(_VERSION, "Lua 5.0") then
-			return debug.traceback(("[Level " .. tostring(B)) .. "]")
+		if stringIncludes(_VERSION, "Lua 5.0") then
+			return debug.traceback(("[Level " .. tostring(level)) .. "]")
 		else
-			return debug.traceback(nil, B)
+			return debug.traceback(nil, level)
 		end
 	end
-	local function D(self, E)
+	local function wrapErrorToString(self, toStringFn)
 		return function(self)
-			local F = E(self)
-			local G = debug.getinfo(3, "f")
-			local H = g(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
-			if H or G and G.func ~= error then
-				return F
+			local description = toStringFn(self)
+			local caller = debug.getinfo(3, "f")
+			local isClassicLua = stringIncludes(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
+			if isClassicLua or caller and caller.func ~= error then
+				return description
 			else
-				return (F .. "\n") .. tostring(self.stack)
+				return (description .. "\n") .. tostring(self.stack)
 			end
 		end
 	end
-	local function I(self, J, K)
-		J.name = K
-		return setmetatable(J, {
-			__call = function(L, M, N)
-				return k(J, N)
+	local function initErrorClass(self, Type, name)
+		Type.name = name
+		return setmetatable(Type, {
+			__call = function(_, _self, message)
+				return newInstance(Type, message)
 			end,
 		})
 	end
-	local O = I
-	local P = n()
-	P.name = ""
-	function P.prototype.____constructor(self, N)
-		if N == nil then
-			N = ""
+	local createErrorClass = initErrorClass
+	local ErrorClass = createClass()
+	ErrorClass.name = ""
+	function ErrorClass.prototype.____constructor(self, message)
+		if message == nil then
+			message = ""
 		end
-		self.message = N
+		self.message = message
 		self.name = "Error"
-		self.stack = z(nil, self.constructor.new)
-		local Q = getmetatable(self)
-		if Q and not Q.__errorToStringPatched then
-			Q.__errorToStringPatched = true
-			Q.__tostring = D(nil, Q.__tostring)
+		self.stack = getErrorStack(nil, self.constructor.new)
+		local metatable = getmetatable(self)
+		if metatable and not metatable.__errorToStringPatched then
+			metatable.__errorToStringPatched = true
+			metatable.__tostring = wrapErrorToString(nil, metatable.__tostring)
 		end
 	end
-	function P.prototype.__tostring(self)
+	function ErrorClass.prototype.__tostring(self)
 		return self.message ~= "" and (self.name .. ": ") .. self.message or self.name
 	end
-	t = O(nil, P, "Error")
-	local function R(self, K)
-		local S = I
-		local T = n()
-		T.name = T.name
-		p(T, t)
-		function T.prototype.____constructor(self, ...)
-			T.____super.prototype.____constructor(self, ...)
-			self.name = K
+	Error = createErrorClass(nil, ErrorClass, "Error")
+	local function createDerivedErrorClass(self, name)
+		local initClass = initErrorClass
+		local DerivedError = createClass()
+		DerivedError.name = DerivedError.name
+		classExtends(DerivedError, Error)
+		function DerivedError.prototype.____constructor(self, ...)
+			DerivedError.____super.prototype.____constructor(self, ...)
+			self.name = name
 		end
-		return S(nil, T, K)
+		return initClass(nil, DerivedError, name)
 	end
-	u = R(nil, "RangeError")
-	v = R(nil, "ReferenceError")
-	w = R(nil, "SyntaxError")
-	x = R(nil, "TypeError")
-	y = R(nil, "URIError")
+	TypeError = createDerivedErrorClass(nil, "TypeError")
 end
-local function U(V)
-	local Q = getmetatable(V)
-	if not Q then
+local function getDescriptors(target)
+	local metatable = getmetatable(target)
+	if not metatable then
 		return {}
 	end
-	return rawget(Q, "_descriptors") or {}
+	return rawget(metatable, "_descriptors") or {}
 end
-local function W(l, X)
-	local Y = U(l)
-	local Z = Y[X]
-	if Z then
-		if not Z.configurable then
-			error(k(x, ((("Cannot delete property " .. tostring(X)) .. " of ") .. tostring(l)) .. "."), 0)
+local function deleteProperty(target, key)
+	local descriptors = getDescriptors(target)
+	local descriptor = descriptors[key]
+	if descriptor then
+		if not descriptor.configurable then
+			error(newInstance(TypeError, ((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."), 0)
 		end
-		Y[X] = nil
+		descriptors[key] = nil
 		return true
 	end
-	l[X] = nil
+	target[key] = nil
 	return true
 end
-local function _(a0)
-	local d = {}
-	local e = 0
-	for X in pairs(a0) do
-		e = e + 1
-		d[e] = X
+local function objectKeys(object)
+	local result = {}
+	local count = 0
+	for key in pairs(object) do
+		count = count + 1
+		result[count] = key
 	end
-	return d
+	return result
 end
-local function a1(self, a2, c)
-	for f = 1, #self do
-		a2(c, self[f], f - 1, self)
+local function arrayForEach(self, callback, thisArg)
+	for i = 1, #self do
+		callback(thisArg, self[i], i - 1, self)
 	end
 end
-local a3 = {}
-local a4 = require(GetScriptDirectory() .. "/ts_libs/dota/index")
-local a5 = a4.Lane
-local a6 = a4.UnitType
-local a7 = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local a8 = {}
-local a9 = 0.5
-local aa = nil
-local ab = nil
-local ac = nil
+local Cache = {}
+local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Lane = Dota.Lane
+local UnitType = Dota.UnitType
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local globalCache = {}
+local cacheTtl = 0.5
+local gameStateCache = nil
+local unitStateCache = nil
+local locationStateCache = nil
 do
-	local ad = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-	local ae = ad.SetCachedVars
-	local af = ad.GetCachedVars
-	a3.SetCachedVars = ae
-	a3.GetCachedVars = af
+	local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+	local setCachedVars = Utils.SetCachedVars
+	local getCachedVars = Utils.GetCachedVars
+	Cache.SetCachedVars = setCachedVars
+	Cache.GetCachedVars = getCachedVars
 end
-a3.CK = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
-function a3.getGlobalGameState()
-	local ag = DotaTime()
-	if aa and ag - aa.lastUpdate < a9 then
-		return aa
+Cache.CK = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
+function Cache.getGlobalGameState()
+	local now = DotaTime()
+	if gameStateCache and now - gameStateCache.lastUpdate < cacheTtl then
+		return gameStateCache
 	end
-	local ah = GetTeam()
-	local ai = GetOpposingTeam()
-	local aj = DotaTime()
-	local ak = GetGameMode()
-	local al = ak == 23 and aj * 2 or aj
-	local am, an = a7.GetInventoryNetworth()
-	aa = {
-		lastUpdate = ag,
-		currentTime = al,
-		gameMode = ak,
-		team = ah,
-		enemyTeam = ai,
-		ourAncient = GetAncient(ah),
-		enemyAncient = GetAncient(ai),
-		aliveAllyCount = a7.GetNumOfAliveHeroes(false),
-		aliveEnemyCount = a7.GetNumOfAliveHeroes(true),
-		aliveAllyCoreCount = a7.GetAliveCoreCount(false),
-		aliveEnemyCoreCount = a7.GetAliveCoreCount(true),
-		teamNetworth = am,
-		enemyNetworth = an,
-		averageLevel = a7.GetAverageLevel(false),
-		hasAegis = a7.DoesTeamHaveAegis(),
-		isEarlyGame = a7.IsEarlyGame(),
-		isMidGame = a7.IsMidGame(),
-		isLateGame = a7.IsLateGame(),
-		isLaningPhase = a7.IsInLaningPhase(),
+	local team = GetTeam()
+	local enemyTeam = GetOpposingTeam()
+	local dotaTime = DotaTime()
+	local gameMode = GetGameMode()
+	local currentTime = gameMode == 23 and dotaTime * 2 or dotaTime
+	local teamNetworth, enemyNetworth = Fu.GetInventoryNetworth()
+	gameStateCache = {
+		lastUpdate = now,
+		currentTime = currentTime,
+		gameMode = gameMode,
+		team = team,
+		enemyTeam = enemyTeam,
+		ourAncient = GetAncient(team),
+		enemyAncient = GetAncient(enemyTeam),
+		aliveAllyCount = Fu.GetNumOfAliveHeroes(false),
+		aliveEnemyCount = Fu.GetNumOfAliveHeroes(true),
+		aliveAllyCoreCount = Fu.GetAliveCoreCount(false),
+		aliveEnemyCoreCount = Fu.GetAliveCoreCount(true),
+		teamNetworth = teamNetworth,
+		enemyNetworth = enemyNetworth,
+		averageLevel = Fu.GetAverageLevel(false),
+		hasAegis = Fu.DoesTeamHaveAegis(),
+		isEarlyGame = Fu.IsEarlyGame(),
+		isMidGame = Fu.IsMidGame(),
+		isLateGame = Fu.IsLateGame(),
+		isLaningPhase = Fu.IsInLaningPhase(),
 	}
-	return aa
+	return gameStateCache
 end
-function a3.getGlobalUnitState()
-	local ag = DotaTime()
-	if ab and ag - ab.lastUpdate < a9 then
-		return ab
+function Cache.getGlobalUnitState()
+	local now = DotaTime()
+	if unitStateCache and now - unitStateCache.lastUpdate < cacheTtl then
+		return unitStateCache
 	end
-	local a7 = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-	ab = {
-		lastUpdate = ag,
-		enemyBuildings = GetUnitList(a6.EnemyBuildings),
-		alliedHeroes = GetUnitList(a6.AlliedHeroes),
-		enemyHeroes = a(GetUnitList(a6.Enemies), function(L, ao)
-			return a7.IsValidHero(ao)
+	local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+	unitStateCache = {
+		lastUpdate = now,
+		enemyBuildings = GetUnitList(UnitType.EnemyBuildings),
+		alliedHeroes = GetUnitList(UnitType.AlliedHeroes),
+		enemyHeroes = arrayFilter(GetUnitList(UnitType.Enemies), function(_, unit)
+			return Fu.IsValidHero(unit)
 		end),
-		alliedCreeps = GetUnitList(a6.AlliedCreeps),
-		enemyCreeps = a(GetUnitList(a6.Enemies), function(L, ao)
-			return ao:IsCreep() or ao:IsAncientCreep()
+		alliedCreeps = GetUnitList(UnitType.AlliedCreeps),
+		enemyCreeps = arrayFilter(GetUnitList(UnitType.Enemies), function(_, unit)
+			return unit:IsCreep() or unit:IsAncientCreep()
 		end),
 	}
-	return ab
+	return unitStateCache
 end
-function a3.getGlobalLocationState()
-	local ag = DotaTime()
-	if ac and ag - ac.lastUpdate < a9 then
-		return ac
+function Cache.getGlobalLocationState()
+	local now = DotaTime()
+	if locationStateCache and now - locationStateCache.lastUpdate < cacheTtl then
+		return locationStateCache
 	end
-	local a7 = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-	local ah = GetTeam()
-	ac = {
-		lastUpdate = ag,
+	local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+	local team = GetTeam()
+	locationStateCache = {
+		lastUpdate = now,
 		laneFronts = {
-			[a5.Top] = GetLaneFrontLocation(ah, a5.Top, 0),
-			[a5.Mid] = GetLaneFrontLocation(ah, a5.Mid, 0),
-			[a5.Bot] = GetLaneFrontLocation(ah, a5.Bot, 0),
+			[Lane.Top] = GetLaneFrontLocation(team, Lane.Top, 0),
+			[Lane.Mid] = GetLaneFrontLocation(team, Lane.Mid, 0),
+			[Lane.Bot] = GetLaneFrontLocation(team, Lane.Bot, 0),
 		},
-		teamFountain = a7.GetTeamFountain(),
-		enemyFountain = a7.GetTeamFountain(),
-		roshanLocation = a7.GetCurrentRoshanLocation(),
-		tormentorLocation = a7.GetTormentorLocation(ah),
-		tormentorWaitingLocation = a7.GetTormentorWaitingLocation(ah),
+		teamFountain = Fu.GetTeamFountain(),
+		enemyFountain = Fu.GetTeamFountain(),
+		roshanLocation = Fu.GetCurrentRoshanLocation(),
+		tormentorLocation = Fu.GetTormentorLocation(team),
+		tormentorWaitingLocation = Fu.GetTormentorWaitingLocation(team),
 	}
-	return ac
+	return locationStateCache
 end
-function a3.getCachedData(X, ap, aq)
-	local ag = DotaTime()
-	local ar = a8[X]
-	if ar and ag - ar.lastUpdate < ap then
-		return ar.data
+function Cache.getCachedData(key, ttl, compute)
+	local now = DotaTime()
+	local entry = globalCache[key]
+	if entry and now - entry.lastUpdate < ttl then
+		return entry.data
 	end
-	local as = aq()
-	a8[X] = { lastUpdate = ag, data = as }
-	return as
+	local data = compute()
+	globalCache[key] = { lastUpdate = now, data = data }
+	return data
 end
-function a3.cleanupGlobalCache()
-	local ag = DotaTime()
-	local at = 10
-	a1(_(a8), function(L, X)
-		if ag - a8[X].lastUpdate > at then
-			W(a8, X)
+function Cache.cleanupGlobalCache()
+	local now = DotaTime()
+	local maxAge = 10
+	arrayForEach(objectKeys(globalCache), function(_, key)
+		if now - globalCache[key].lastUpdate > maxAge then
+			deleteProperty(globalCache, key)
 		end
 	end)
 end
-function a3.clearAllCaches()
-	a1(_(a8), function(L, X)
-		W(a8, X)
+function Cache.clearAllCaches()
+	arrayForEach(objectKeys(globalCache), function(_, key)
+		deleteProperty(globalCache, key)
 	end)
-	aa = nil
-	ab = nil
-	ac = nil
+	gameStateCache = nil
+	unitStateCache = nil
+	locationStateCache = nil
 end
-function a3.getCachedAlliesNearLoc(au, av)
-	local a7 = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-	return a7.GetAlliesNearLoc(au, av)
+function Cache.getCachedAlliesNearLoc(location, radius)
+	local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+	return Fu.GetAlliesNearLoc(location, radius)
 end
-function a3.getCachedEnemiesNearLoc(au, av)
-	local a7 = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-	return a7.GetEnemiesNearLoc(au, av)
+function Cache.getCachedEnemiesNearLoc(location, radius)
+	local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+	return Fu.GetEnemiesNearLoc(location, radius)
 end
-local aw = 0
-function a3.autoCleanupCache()
-	local ag = DotaTime()
-	if ag - aw > 30 then
-		a3.cleanupGlobalCache()
-		aw = ag
+local lastCleanupTime = 0
+function Cache.autoCleanupCache()
+	local now = DotaTime()
+	if now - lastCleanupTime > 30 then
+		Cache.cleanupGlobalCache()
+		lastCleanupTime = now
 	end
 end
-return a3
+return Cache

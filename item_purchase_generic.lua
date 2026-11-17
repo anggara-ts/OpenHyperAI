@@ -1,23 +1,23 @@
 -- Buys and sells items from the hero build.
-local a = GetBot()
-local b = a:GetUnitName()
+local bot = GetBot()
+local botName = bot:GetUnitName()
 if
-	a == nil
-	or a:IsInvulnerable()
-	or not a:IsHero()
-	or not a:IsAlive()
-	or not string.find(b, "hero")
-	or a:IsIllusion()
+	bot == nil
+	or bot:IsInvulnerable()
+	or not bot:IsHero()
+	or not bot:IsAlive()
+	or not string.find(botName, "hero")
+	or bot:IsIllusion()
 then
 	return
 end
 if GAMEMODE_ARDM == nil then
 	GAMEMODE_ARDM = 20
 end
-local c = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/role")
-local e = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local f = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
 -- Observer stock is shared with the human. When a ward lands in the shop, leave it
@@ -39,23 +39,23 @@ local function ObserverStockForHumans()
 	obsStockSeen = stock
 	return now >= obsStockAt + OBS_HUMAN_WINDOW
 end
-local g = {}
-if a:IsInvulnerable() or not a:IsHero() or a:IsIllusion() then
+local ItemPurchase = {}
+if bot:IsInvulnerable() or not bot:IsHero() or bot:IsIllusion() then
 	return
 end
-local h = require(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(b, "npc_dota_", ""))
-if h == nil then
+local heroModule = require(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botName, "npc_dota_", ""))
+if heroModule == nil then
 	return
 end
-a.purchaseListInReverseOrder = {}
-a.currBuyingItemInPurchaseList = nil
-a.currBuyingBasicItem = nil
-a.currBuyingBasicItemList = {}
-a.currBuyingBasicItemRefList = {}
-a.currBuyingRequiredCounts = nil
-a._lastPurchaseAttempt = { name = nil, t = -999 }
-a.rebuildCount = 0
-a.SecretShop = false
+bot.purchaseListInReverseOrder = {}
+bot.currBuyingItemInPurchaseList = nil
+bot.currBuyingBasicItem = nil
+bot.currBuyingBasicItemList = {}
+bot.currBuyingBasicItemRefList = {}
+bot.currBuyingRequiredCounts = nil
+bot._lastPurchaseAttempt = { name = nil, t = -999 }
+bot.rebuildCount = 0
+bot.SecretShop = false
 -- Boots of Travel 2 needs Boots of Travel first in the list. About 60 builds list only Boots of
 -- Travel 2: the planner then bought Boots and the recipe, again and again (game 020: OD ended
 -- with two level-1 Boots of Travel and kept re-buying the recipe; Lich bought Boots 21 times
@@ -77,56 +77,56 @@ local function FixTravelBoots(list)
 	end
 	return out
 end
-local i = FixTravelBoots(h["sBuyList"])
-local j = h["sSellList"]
-if i == nil then
-	log("[ERROR] Can't load purchase list for: %s", b)
+local buyList = FixTravelBoots(heroModule["sBuyList"])
+local sellList = heroModule["sSellList"]
+if buyList == nil then
+	log("[ERROR] Can't load purchase list for: %s", botName)
 	log("Stack Trace:", debug.traceback())
 	return
 end
-log("[Purchase] %s loaded %d items: %s -> %s", b, #i, i[1] or "nil", i[#i] or "nil")
-for k = 1, #i do
-	a.purchaseListInReverseOrder[k] = i[#i - k + 1]
+log("[Purchase] %s loaded %d items: %s -> %s", botName, #buyList, buyList[1] or "nil", buyList[#buyList] or "nil")
+for i = 1, #buyList do
+	bot.purchaseListInReverseOrder[i] = buyList[#buyList - i + 1]
 end
-a.sell_time = -90
-local l = -90
-a.countInvCheck = 0
-a.lastItemToBuy = nil
-a.bPurchaseFromSecret = false
-a.hasBuyShard = true
-local m = 0
-local n = nil
-local o = false
-local p = -90
-a.lastInvCheck = -90
-a.fullInvCheck = -90
-a.switchTime = 0
-a.hasBuyClarity = false
-local q = -90
-local r = false
-local s = false
-local t = -999
-local u = 0
-local v = false
-local w, x, y, z, A, B, C, D, E
-local function F(G, H)
-	local I = 0
-	for J = 0, 14 do
-		local K = G:GetItemInSlot(J)
-		if K ~= nil and K:GetName() == H then
-			I = I + 1
+bot.sell_time = -90
+local unusedSellTime = -90
+bot.countInvCheck = 0
+bot.lastItemToBuy = nil
+bot.bPurchaseFromSecret = false
+bot.hasBuyShard = true
+local nextItemCost = 0
+local courier = nil
+local keepBuybackGold = false
+local lastBuybackCheckTime = -90
+bot.lastInvCheck = -90
+bot.fullInvCheck = -90
+bot.switchTime = 0
+bot.hasBuyClarity = false
+local lastBootsCheckTime = -90
+local hasBoots = false
+local wasPreGame = false
+local unusedTime = -999
+local unusedCount = 0
+local unusedFlag = false
+local now, botLevel, gold, netWorth, activeMode, courierValue, stashValue, fountainDistance
+local function CountItem(unit, itemName)
+	local count = 0
+	for slot = 0, 14 do
+		local item = unit:GetItemInSlot(slot)
+		if item ~= nil and item:GetName() == itemName then
+			count = count + 1
 		end
 	end
-	return I
+	return count
 end
-local function L(M)
-	local N = {}
-	for O, P in ipairs(M) do
-		N[P] = (N[P] or 0) + 1
+local function CountList(list)
+	local counts = {}
+	for _, name in ipairs(list) do
+		counts[name] = (counts[name] or 0) + 1
 	end
-	return N
+	return counts
 end
-local Q = {
+local tEarlyGameItems = {
 	item_tango = true,
 	item_double_tango = true,
 	item_clarity = true,
@@ -153,10 +153,10 @@ local Q = {
 	item_null_talisman = true,
 	item_soul_ring = true,
 }
-local function R(H)
-	if H == "item_boots" then
-		local S = a.currBuyingItemInPurchaseList
-		local T = {
+local function ShouldBuyBasicItem(itemName)
+	if itemName == "item_boots" then
+		local buildingItem = bot.currBuyingItemInPurchaseList
+		local bootUpgrades = {
 			item_power_treads = true,
 			item_phase_boots = true,
 			item_arcane_boots = true,
@@ -166,59 +166,59 @@ local function R(H)
 			item_guardian_greaves = true,
 			item_boots_of_bearing = true,
 		}
-		if c.HasBootsInMainSolt(a) and not T[S] then
+		if Item.HasBootsInMainSolt(bot) and not bootUpgrades[buildingItem] then
 			return false
 		end
 	end
-	if GetGameMode() == GAMEMODE_ARDM and DotaTime() > 2 * 60 and Q[H] then
+	if GetGameMode() == GAMEMODE_ARDM and DotaTime() > 2 * 60 and tEarlyGameItems[itemName] then
 		return false
 	end
-	if not a.currBuyingRequiredCounts then
+	if not bot.currBuyingRequiredCounts then
 		return true
 	end
-	local U = a.currBuyingRequiredCounts[H]
-	if not U then
+	local requiredCount = bot.currBuyingRequiredCounts[itemName]
+	if not requiredCount then
 		return true
 	end
-	local V = F(a, H)
-	return V < U
+	local ownedCount = CountItem(bot, itemName)
+	return ownedCount < requiredCount
 end
-local function W()
-	while #a.currBuyingBasicItemList > 0 do
-		local X = a.currBuyingBasicItemList[#a.currBuyingBasicItemList]
-		if R(X) then
-			return X
+local function NextBasicItem()
+	while #bot.currBuyingBasicItemList > 0 do
+		local itemName = bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList]
+		if ShouldBuyBasicItem(itemName) then
+			return itemName
 		else
-			a.currBuyingBasicItemList[#a.currBuyingBasicItemList] = nil
+			bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList] = nil
 		end
 	end
 	return nil
 end
-local function Y(X)
-	local Z = DotaTime()
-	if a._lastPurchaseAttempt.name == X and Z - a._lastPurchaseAttempt.t < 0.4 then
+local function IsRepeatedPurchase(itemName)
+	local time = DotaTime()
+	if bot._lastPurchaseAttempt.name == itemName and time - bot._lastPurchaseAttempt.t < 0.4 then
 		return true
 	end
-	a._lastPurchaseAttempt.name, a._lastPurchaseAttempt.t = X, Z
+	bot._lastPurchaseAttempt.name, bot._lastPurchaseAttempt.t = itemName, time
 	return false
 end
-local function _()
-	local a0 = c.GetItemCharges(a, "item_tpscroll")
-	return a0 >= 2 or a0 >= 1 and c.HasItem(a, "item_travel_boots") or a0 >= 1 and c.HasItem(a, "item_travel_boots_2")
+local function HasEnoughTpScrolls()
+	local tpCharges = Item.GetItemCharges(bot, "item_tpscroll")
+	return tpCharges >= 2 or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots") or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots_2")
 end
-local function a1()
-	a.countInvCheck = 0
-	a.currBuyingBasicItem = nil
-	a.currBuyingBasicItemList[#a.currBuyingBasicItemList] = nil
+local function FinishBasicItem()
+	bot.countInvCheck = 0
+	bot.currBuyingBasicItem = nil
+	bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList] = nil
 end
-local function a2()
-	a.countInvCheck = 0
-	a.currBuyingItemInPurchaseList = nil
-	a.currBuyingBasicItem = nil
-	a.currBuyingBasicItemList = {}
-	a.currBuyingBasicItemRefList = {}
-	a.currBuyingRequiredCounts = nil
-	a._recipeTarget = nil
+local function ResetBuyState()
+	bot.countInvCheck = 0
+	bot.currBuyingItemInPurchaseList = nil
+	bot.currBuyingBasicItem = nil
+	bot.currBuyingBasicItemList = {}
+	bot.currBuyingBasicItemRefList = {}
+	bot.currBuyingRequiredCounts = nil
+	bot._recipeTarget = nil
 end
 -- Which bot cores owe the team a lockdown answer. Mid first, then offlane,
 -- then the carry if a human holds one of those roles. Every bot computes the
@@ -264,10 +264,10 @@ local function OwnedAnywhere(unit, itemName)
 	return nSlot >= 0 and nSlot <= 14
 end
 local function ReactiveOwnedOrBuilding(itemName)
-	if OwnedAnywhere(a, itemName) then
+	if OwnedAnywhere(bot, itemName) then
 		return true
 	end
-	if a.currBuyingItemInPurchaseList == itemName then
+	if bot.currBuyingItemInPurchaseList == itemName then
 		return true
 	end
 	return false
@@ -277,24 +277,24 @@ local function QueueReactiveItem(itemName)
 		return false
 	end
 	tReactiveQueued[itemName] = true
-	if not QueueFront(a.purchaseListInReverseOrder, itemName) then
+	if not QueueFront(bot.purchaseListInReverseOrder, itemName) then
 		return false
 	end
 	-- Keep what is left of the item being built, so it resumes there after the reactive item.
 	-- Game 014: Ghost Scepter cut into Mirana's priest_outfit at 20:19, the outfit restarted from
 	-- scratch, and she bought tangos, branches, Magic Stick and the wand recipe again while she
 	-- already had a Magic Wand.
-	if a.currBuyingItemInPurchaseList ~= nil and #a.currBuyingBasicItemList > 0 then
-		a._resumeBuy = a._resumeBuy or {}
-		a._resumeBuy[a.currBuyingItemInPurchaseList] = {
-			list = f.Deepcopy(a.currBuyingBasicItemList),
-			ref = f.Deepcopy(a.currBuyingBasicItemRefList),
-			target = a._recipeTarget and f.Deepcopy(a._recipeTarget) or nil,
+	if bot.currBuyingItemInPurchaseList ~= nil and #bot.currBuyingBasicItemList > 0 then
+		bot._resumeBuy = bot._resumeBuy or {}
+		bot._resumeBuy[bot.currBuyingItemInPurchaseList] = {
+			list = Utils.Deepcopy(bot.currBuyingBasicItemList),
+			ref = Utils.Deepcopy(bot.currBuyingBasicItemRefList),
+			target = bot._recipeTarget and Utils.Deepcopy(bot._recipeTarget) or nil,
 		}
 	end
-	a2()
-	a.rebuildCount = 0
-	log("[Item] %s queued counter %s (pos %s)", b, itemName, tostring(e.GetPosition(a)))
+	ResetBuyState()
+	bot.rebuildCount = 0
+	log("[Item] %s queued counter %s (pos %s)", botName, itemName, tostring(Fu.GetPosition(bot)))
 	return true
 end
 local function QueueRightclickCounters()
@@ -306,7 +306,7 @@ local function QueueRightclickCounters()
 		reactiveRightclickMenace = false
 		for _, id in pairs(GetTeamPlayers(GetOpposingTeam())) do
 			local sHero = GetSelectedHeroName(id)
-			if sHero ~= nil and e.tRightclickMenace[sHero] then
+			if sHero ~= nil and Fu.tRightclickMenace[sHero] then
 				reactiveRightclickMenace = true
 			end
 		end
@@ -329,7 +329,7 @@ local function QueueRightclickCounters()
 		if ally ~= nil and not ally:IsNull() then
 			nResolved = nResolved + 1
 			if ally:IsBot() then
-				local nAllyPos = e.GetPosition(ally)
+				local nAllyPos = Fu.GetPosition(ally)
 				tPositions[nAllyPos] = true
 				tLockdownStrByPos[nAllyPos] = ally:GetPrimaryAttribute() == ATTRIBUTE_STRENGTH
 			end
@@ -349,15 +349,15 @@ local function QueueRightclickCounters()
 	if tLockdownBotPositions == nil then
 		return
 	end
-	local nPos = e.GetPosition(a)
-	local bStr = a:GetPrimaryAttribute() == ATTRIBUTE_STRENGTH
+	local nPos = Fu.GetPosition(bot)
+	local bStr = bot:GetPrimaryAttribute() == ATTRIBUTE_STRENGTH
 	if nPos <= 3 then
 		local bAssigned = IsLockdownBuyer(nPos, tLockdownBotPositions, 2)
 		local bFallback = nTeamLock == 0 and DotaTime() > nStart + 10 * 60
 		local sLockItem = LockdownItemFor(bStr)
 		local bOwnLock = false
 		for _, sLock in ipairs(tLock) do
-			if OwnedAnywhere(a, sLock) then
+			if OwnedAnywhere(bot, sLock) then
 				bOwnLock = true
 			end
 		end
@@ -374,9 +374,9 @@ local function QueueRightclickCounters()
 			and DotaTime() > 25 * 60
 		then
 			local nHexPos = nil
-			for _, p in ipairs({ 2, 3, 1 }) do
-				if IsLockdownBuyer(p, tLockdownBotPositions, 2) and tLockdownStrByPos[p] == false then
-					nHexPos = p
+			for _, pos in ipairs({ 2, 3, 1 }) do
+				if IsLockdownBuyer(pos, tLockdownBotPositions, 2) and tLockdownStrByPos[pos] == false then
+					nHexPos = pos
 					break
 				end
 			end
@@ -386,7 +386,7 @@ local function QueueRightclickCounters()
 				end
 			end
 		end
-	elseif not OwnedAnywhere(a, "item_ethereal_blade") then
+	elseif not OwnedAnywhere(bot, "item_ethereal_blade") then
 		if QueueReactiveItem("item_ghost") then
 			return
 		end
@@ -440,18 +440,18 @@ local PARK_IN_BACKPACK = {
 	item_flask = true,
 }
 local function ForceSwap(fromSlot, toSlot)
-	a._swapDespiteEnemies = true
-	a:ActionImmediate_SwapItems(fromSlot, toSlot)
-	a._swapDespiteEnemies = nil
+	bot._swapDespiteEnemies = true
+	bot:ActionImmediate_SwapItems(fromSlot, toSlot)
+	bot._swapDespiteEnemies = nil
 end
 local function MainSlotForBackpackItem()
 	for slot = 0, 5 do
-		if a:GetItemInSlot(slot) == nil then
+		if bot:GetItemInSlot(slot) == nil then
 			return slot
 		end
 	end
 	for slot = 0, 5 do
-		local it = a:GetItemInSlot(slot)
+		local it = bot:GetItemInSlot(slot)
 		if it ~= nil and PARK_IN_BACKPACK[it:GetName()] then
 			return slot
 		end
@@ -462,35 +462,35 @@ end
 -- The grenade takes a main slot ahead of a branch. Do not pull that branch back out.
 local function PreferBloodGrenadeOverBranch()
 	if VerifyLastSwap then
-		VerifyLastSwap(a)
+		VerifyLastSwap(bot)
 	end
-	local grenadeSlot = a:FindItemSlot("item_blood_grenade")
+	local grenadeSlot = bot:FindItemSlot("item_blood_grenade")
 	-- Log every slot change of the grenade with the main inventory and the mode. A move into
 	-- the backpack that no logged swap made was something outside the swap wrapper.
-	if grenadeSlot ~= (a._grenadeLastSlot or -1) then
-		if grenadeSlot >= 0 or (a._grenadeLastSlot or -1) >= 0 then
+	if grenadeSlot ~= (bot._grenadeLastSlot or -1) then
+		if grenadeSlot >= 0 or (bot._grenadeLastSlot or -1) >= 0 then
 			local main = {}
-			for s = 0, 5 do
-				local it = a:GetItemInSlot(s)
+			for slot = 0, 5 do
+				local it = bot:GetItemInSlot(slot)
 				main[#main + 1] = it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
 			end
 			local pack = {}
-			for s = 6, 8 do
-				local it = a:GetItemInSlot(s)
+			for slot = 6, 8 do
+				local it = bot:GetItemInSlot(slot)
 				pack[#pack + 1] = it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
 			end
 			pcall(print, string.format(
 				"[OHA-ITEM] t=%.0f %s grenade-moved from=%d to=%d mode=%s main=%s pack=%s",
 				DotaTime(),
-				(string.gsub(b, "npc_dota_hero_", "")),
-				a._grenadeLastSlot or -1,
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				bot._grenadeLastSlot or -1,
 				grenadeSlot,
-				tostring(a:GetActiveMode()),
+				tostring(bot:GetActiveMode()),
 				table.concat(main, ","),
 				table.concat(pack, ",")
 			))
 		end
-		a._grenadeLastSlot = grenadeSlot
+		bot._grenadeLastSlot = grenadeSlot
 	end
 	-- Bot item swaps do not take effect in this game build (every checked swap was a no-op), so
 	-- there is nothing to do while the grenade is merely in the backpack. The game moves it
@@ -499,44 +499,44 @@ local function PreferBloodGrenadeOverBranch()
 	if grenadeSlot < 0 or grenadeSlot > 8 or DotaTime() < 12 * 60 then
 		return
 	end
-	if #(a:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) > 0 then
+	if #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) > 0 then
 		return
 	end
-	local grenade = a:GetItemInSlot(grenadeSlot)
+	local grenade = bot:GetItemInSlot(grenadeSlot)
 	if grenade == nil then
 		return
 	end
 	-- A dropped item can be picked straight back up by the engine (seen with a Clarity).
 	-- Drop it once; if it comes back, only sell it at base from then on.
-	if a._grenadeDroppedAt ~= nil and DotaTime() - a._grenadeDroppedAt < 3 then
+	if bot._grenadeDroppedAt ~= nil and DotaTime() - bot._grenadeDroppedAt < 3 then
 		return
 	end
-	if a._grenadeDroppedAt ~= nil and not a._grenadeRepickLogged then
-		a._grenadeRepickLogged = true
+	if bot._grenadeDroppedAt ~= nil and not bot._grenadeRepickLogged then
+		bot._grenadeRepickLogged = true
 		pcall(print, string.format(
 			"[OHA-ITEM] t=%.0f %s grenade-repicked after=%.0fs",
 			DotaTime(),
-			(string.gsub(b, "npc_dota_hero_", "")),
-			DotaTime() - a._grenadeDroppedAt
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			DotaTime() - bot._grenadeDroppedAt
 		))
 	end
 	local how
-	if a:DistanceFromFountain() <= 1600 then
-		a:ActionImmediate_SellItem(grenade)
+	if bot:DistanceFromFountain() <= 1600 then
+		bot:ActionImmediate_SellItem(grenade)
 		how = "sold"
-	elseif a._grenadeDroppedAt == nil then
-		a:Action_DropItem(grenade, a:GetLocation())
-		a._grenadeDroppedAt = DotaTime()
+	elseif bot._grenadeDroppedAt == nil then
+		bot:Action_DropItem(grenade, bot:GetLocation())
+		bot._grenadeDroppedAt = DotaTime()
 		how = "dropped"
 	else
 		return
 	end
-	if DotaTime() >= (a._grenadeDisposeLogAt or -999) then
-		a._grenadeDisposeLogAt = DotaTime() + 10
+	if DotaTime() >= (bot._grenadeDisposeLogAt or -999) then
+		bot._grenadeDisposeLogAt = DotaTime() + 10
 		pcall(print, string.format(
 			"[OHA-ITEM] t=%.0f %s grenade-%s slot=%d",
 			DotaTime(),
-			(string.gsub(b, "npc_dota_hero_", "")),
+			(string.gsub(botName, "npc_dota_hero_", "")),
 			how,
 			grenadeSlot
 		))
@@ -548,22 +548,22 @@ local function PromoteBackpackCounters()
 	end
 	promoteNextCheck = DotaTime() + 2
 	for nBpSlot = 6, 8 do
-		local hBpItem = a:GetItemInSlot(nBpSlot)
+		local hBpItem = bot:GetItemInSlot(nBpSlot)
 		-- Game 032: Dust (promoted since build 055) picked the Ward Dispenser as the cheapest main item;
 		-- the engine ignored every swap and it was tried every 12s all game (Oracle 325 tries, 708 for
 		-- four supports), keeping the 11s swap gap running for every other swap. Wards are never moved
 		-- out for it, and an item that two swaps did not move is left for 120s.
-		a._promoteTries = a._promoteTries or {}
-		local tries = hBpItem ~= nil and a._promoteTries[hBpItem:GetName()] or nil
+		bot._promoteTries = bot._promoteTries or {}
+		local tries = hBpItem ~= nil and bot._promoteTries[hBpItem:GetName()] or nil
 		if tries ~= nil and DotaTime() > tries.untilAt then
-			a._promoteTries[hBpItem:GetName()] = nil
+			bot._promoteTries[hBpItem:GetName()] = nil
 			tries = nil
 		end
 		if hBpItem ~= nil and tPromoteFromBackpack[hBpItem:GetName()] and not (tries ~= nil and tries.n >= 2) then
 			local nBpCost = tPromoteAnyCost[hBpItem:GetName()] and math.huge or GetItemCost(hBpItem:GetName())
 			local nBestSlot, nBestCost = -1, nBpCost
 			for nSlot = 0, 5 do
-				local hItem = a:GetItemInSlot(nSlot)
+				local hItem = bot:GetItemInSlot(nSlot)
 				if hItem == nil then
 					nBestSlot, nBestCost = nSlot, -1
 					break
@@ -573,7 +573,7 @@ local function PromoteBackpackCounters()
 				if
 					nCost < nBestCost
 					and not tPromoteFromBackpack[sName]
-					and not c.IsCanNotSwitchItem(sName)
+					and not Item.IsCanNotSwitchItem(sName)
 					and not string.find(sName, "boots")
 					and not string.find(sName, "item_ward", 1, true)
 					and sName ~= "item_power_treads"
@@ -583,12 +583,12 @@ local function PromoteBackpackCounters()
 				end
 			end
 			if nBestSlot ~= -1 then
-				log("[Item] %s backpack -> main: %s", b, hBpItem:GetName())
-				local tr = a._promoteTries[hBpItem:GetName()] or { n = 0, untilAt = 0 }
-				tr.n = tr.n + 1
-				tr.untilAt = DotaTime() + 120
-				a._promoteTries[hBpItem:GetName()] = tr
-				a:ActionImmediate_SwapItems(nBpSlot, nBestSlot)
+				log("[Item] %s backpack -> main: %s", botName, hBpItem:GetName())
+				local tryRecord = bot._promoteTries[hBpItem:GetName()] or { n = 0, untilAt = 0 }
+				tryRecord.n = tryRecord.n + 1
+				tryRecord.untilAt = DotaTime() + 120
+				bot._promoteTries[hBpItem:GetName()] = tryRecord
+				bot:ActionImmediate_SwapItems(nBpSlot, nBestSlot)
 				return
 			end
 		end
@@ -602,12 +602,12 @@ local function BuyLog(fmt, ...)
 	pcall(print, string.format(
 		"[OHA-BUY] t=%.0f %s " .. fmt,
 		DotaTime(),
-		(string.gsub(b, "npc_dota_hero_", "")),
+		(string.gsub(botName, "npc_dota_hero_", "")),
 		...
 	))
 end
 local function IsBasicItem(name)
-	if type(c[name]) == "table" then
+	if type(Item[name]) == "table" then
 		return false
 	end
 	local ok, parts = pcall(GetItemComponents, name)
@@ -616,9 +616,9 @@ end
 -- An ingredient of this recipe's item that the hero does not own yet, or nil.
 local function MissingIngredient(recipe)
 	local parent = string.gsub(recipe, "^item_recipe_", "item_")
-	local parts = c[parent]
+	local parts = Item[parent]
 	if type(parts) ~= "table" then
-		local ok, list = pcall(c.GetComponentList, parent)
+		local ok, list = pcall(Item.GetComponentList, parent)
 		parts = ok and list or nil
 	end
 	if type(parts) ~= "table" then
@@ -631,7 +631,7 @@ local function MissingIngredient(recipe)
 		end
 	end
 	for part, count in pairs(need) do
-		if F(a, part) < count then
+		if CountItem(bot, part) < count then
 			return part
 		end
 	end
@@ -640,8 +640,8 @@ end
 local CourierHasItem
 -- true when one of names is seen on the courier.
 local function CourierHasItemAny(names)
-	for _, n in ipairs(names) do
-		if CourierHasItem(n) == true then
+	for _, name in ipairs(names) do
+		if CourierHasItem(name) == true then
 			return true
 		end
 	end
@@ -649,7 +649,7 @@ local function CourierHasItemAny(names)
 end
 -- true/false when the courier's slots can be read, nil when there is no courier handle.
 function CourierHasItem(name)
-	local courier = a.theCourier
+	local courier = bot.theCourier
 	if courier == nil then
 		return nil
 	end
@@ -674,8 +674,8 @@ local MAX_REQUEUES = 3
 -- its recipe, ...). A composite ingredient never sits in the basic buy list itself.
 local function IngredientParts(name)
 	local parts = { name }
-	local function walk(n, depth)
-		local list = c[n]
+	local function walk(itemName, depth)
+		local list = Item[itemName]
 		if depth > 3 or type(list) ~= "table" then
 			return
 		end
@@ -692,64 +692,64 @@ end
 -- A recipe is bought only after its own ingredients. Returns true when the recipe was
 -- held back this think.
 local function HoldRecipe()
-	local item = a.currBuyingBasicItem
+	local item = bot.currBuyingBasicItem
 	if type(item) ~= "string" or not string.find(item, "item_recipe_", 1, true) then
 		return false
 	end
 	-- A recipe whose item the hero already has as many of as this build wants is a
 	-- leftover from a rebuild. Buying its ingredients would make an extra item.
 	local parent = string.gsub(item, "^item_recipe_", "item_")
-	local wanted = a._recipeTarget and a._recipeTarget[parent]
-	if wanted ~= nil and F(a, parent) >= wanted then
+	local wanted = bot._recipeTarget and bot._recipeTarget[parent]
+	if wanted ~= nil and CountItem(bot, parent) >= wanted then
 		BuyLog(
 			"recipe-stray %s owned=%d wanted=%d for=%s",
 			ShortItem(item),
-			F(a, parent),
+			CountItem(bot, parent),
 			wanted,
-			ShortItem(a.currBuyingItemInPurchaseList)
+			ShortItem(bot.currBuyingItemInPurchaseList)
 		)
-		a1()
+		FinishBasicItem()
 		return true
 	end
-	a._recipeHold = a._recipeHold or {}
+	bot._recipeHold = bot._recipeHold or {}
 	local missing = MissingIngredient(item)
 	if missing == nil then
-		a._recipeHold[item] = nil
+		bot._recipeHold[item] = nil
 		return false
 	end
 	local parts = IngredientParts(missing)
 	local isPart = {}
-	for _, p in ipairs(parts) do
-		isPart[p] = true
+	for _, part in ipairs(parts) do
+		isPart[part] = true
 	end
-	local list = a.currBuyingBasicItemList
+	local list = bot.currBuyingBasicItemList
 	-- Nearest upcoming entry for this ingredient or one of its parts. Buy order runs from
 	-- the end of the list, so the highest index below the recipe is the next one bought.
 	local queuedAt = nil
-	for k = #list - 1, 1, -1 do
-		if isPart[list[k]] then
-			queuedAt = k
+	for i = #list - 1, 1, -1 do
+		if isPart[list[i]] then
+			queuedAt = i
 			break
 		end
 	end
 	-- Only act on an ingredient this build planned to buy. An upgrade recipe can name an
 	-- item whose parts the hero no longer holds (boots inside Travel Boots); leave those alone.
 	local planned = false
-	for _, entry in ipairs(a.currBuyingBasicItemRefList or {}) do
+	for _, entry in ipairs(bot.currBuyingBasicItemRefList or {}) do
 		if isPart[entry] then
 			planned = true
 			break
 		end
 	end
 	if queuedAt == nil and not planned then
-		a._recipeHold[item] = nil
+		bot._recipeHold[item] = nil
 		return false
 	end
 	local now = DotaTime()
-	local hold = a._recipeHold[item]
+	local hold = bot._recipeHold[item]
 	if hold == nil then
 		hold = { since = now, requeues = 0 }
-		a._recipeHold[item] = hold
+		bot._recipeHold[item] = hold
 	end
 	-- The 60s only counts time spent truly stuck. Queuing or deferring for the ingredient
 	-- restarts it; waiting on the courier and repeated failed re-queues do not.
@@ -761,7 +761,7 @@ local function HoldRecipe()
 				ShortItem(item),
 				ShortItem(missing),
 				hold.requeues,
-				ShortItem(a.currBuyingItemInPurchaseList)
+				ShortItem(bot.currBuyingItemInPurchaseList)
 			)
 		end
 		return false
@@ -770,8 +770,8 @@ local function HoldRecipe()
 	-- later copy in the queue (a Sobi Mask meant for Urn pushed the Ring of Basilius recipe
 	-- to the end of the build, and Arcane Boots never combined).
 	local onCourier = nil
-	for _, p in ipairs(parts) do
-		local found = CourierHasItem(p)
+	for _, part in ipairs(parts) do
+		local found = CourierHasItem(part)
 		if found == true then
 			onCourier = true
 			break
@@ -780,7 +780,7 @@ local function HoldRecipe()
 		end
 	end
 	if onCourier == nil then
-		onCourier = (a:GetCourierValue() or 0) > 0
+		onCourier = (bot:GetCourierValue() or 0) > 0
 	end
 	local action
 	if onCourier then
@@ -802,31 +802,31 @@ local function HoldRecipe()
 		-- Mekansm had not combined yet when the Greaves recipe came up, and the Ring of Regen
 		-- inside his Headdress was queued again because only basic items were counted.
 		local need = {}
-		local function NeedParts(n, depth)
-			if F(a, n) >= 1 or depth > 4 then
+		local function NeedParts(itemName, depth)
+			if CountItem(bot, itemName) >= 1 or depth > 4 then
 				return
 			end
-			local list = c[n]
-			if type(list) ~= "table" or IsBasicItem(n) then
-				need[n] = (need[n] or 0) + 1
+			local list = Item[itemName]
+			if type(list) ~= "table" or IsBasicItem(itemName) then
+				need[itemName] = (need[itemName] or 0) + 1
 				return
 			end
-			for _, p in ipairs(list) do
-				if type(p) == "string" then
-					NeedParts(p, depth + 1)
+			for _, part in ipairs(list) do
+				if type(part) == "string" then
+					NeedParts(part, depth + 1)
 				end
 			end
 		end
 		NeedParts(missing, 0)
 		local added = 0
-		for p, count in pairs(need) do
-			for _ = 1, count - F(a, p) do
-				list[#list + 1] = p
+		for part, count in pairs(need) do
+			for _ = 1, count - CountItem(bot, part) do
+				list[#list + 1] = part
 				added = added + 1
 			end
 		end
 		if added == 0 then
-			a._recipeHold[item] = nil
+			bot._recipeHold[item] = nil
 			return false
 		end
 		hold.requeues = hold.requeues + 1
@@ -835,17 +835,17 @@ local function HoldRecipe()
 			hold.since = now
 		end
 	end
-	a.currBuyingBasicItem = nil
-	if a._recipeHoldLogAt == nil or now >= a._recipeHoldLogAt then
-		a._recipeHoldLogAt = now + 3
+	bot.currBuyingBasicItem = nil
+	if bot._recipeHoldLogAt == nil or now >= bot._recipeHoldLogAt then
+		bot._recipeHoldLogAt = now + 3
 		BuyLog(
 			"recipe-hold %s missing=%s action=%s requeues=%d for=%s gold=%d",
 			ShortItem(item),
 			ShortItem(missing),
 			action,
 			hold.requeues,
-			ShortItem(a.currBuyingItemInPurchaseList),
-			a:GetGold()
+			ShortItem(bot.currBuyingItemInPurchaseList),
+			bot:GetGold()
 		)
 	end
 	return true
@@ -861,332 +861,332 @@ local function FailureDropsItem(result, stock)
 	end
 	return stock < 1 and result ~= 63
 end
-local function a3()
-	if a.lastItemToBuy ~= a.currBuyingBasicItem then
-		a.lastItemToBuy = a.currBuyingBasicItem
-		a:SetNextItemPurchaseValue(GetItemCost(a.currBuyingBasicItem))
-		a.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(a.currBuyingBasicItem)
-		m = GetItemCost(a.currBuyingBasicItem)
+local function BuyBasicItem()
+	if bot.lastItemToBuy ~= bot.currBuyingBasicItem then
+		bot.lastItemToBuy = bot.currBuyingBasicItem
+		bot:SetNextItemPurchaseValue(GetItemCost(bot.currBuyingBasicItem))
+		bot.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(bot.currBuyingBasicItem)
+		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 	end
 	if
-		a.currBuyingBasicItem == "item_infused_raindrop"
-		or a.currBuyingBasicItem == "item_tome_of_knowledge"
-		or a.currBuyingBasicItem == "item_flask"
+		bot.currBuyingBasicItem == "item_infused_raindrop"
+		or bot.currBuyingBasicItem == "item_tome_of_knowledge"
+		or bot.currBuyingBasicItem == "item_flask"
 	then
-		if GetItemStockCount(a.currBuyingBasicItem) <= 0 then
-			a1()
+		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
+			FinishBasicItem()
 			return
 		end
 	end
-	local a4 = W()
-	if not a4 then
+	local nextItem = NextBasicItem()
+	if not nextItem then
 		return
 	end
-	a.currBuyingBasicItem = a4
+	bot.currBuyingBasicItem = nextItem
 	if HoldRecipe() then
 		return
 	end
-	if Y(a.currBuyingBasicItem) then
+	if IsRepeatedPurchase(bot.currBuyingBasicItem) then
 		return
 	end
-	-- The price set at the top of a3 belongs to the item picked last think. In the opening
+	-- The price set at the top of BuyBasicItem belongs to the item picked last think. In the opening
 	-- loop that was a 50-gold Branch, so a hero with 110 gold tried the wand recipe and failed.
-	if a.lastItemToBuy ~= a.currBuyingBasicItem then
-		a.lastItemToBuy = a.currBuyingBasicItem
-		a:SetNextItemPurchaseValue(GetItemCost(a.currBuyingBasicItem))
-		a.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(a.currBuyingBasicItem)
-		m = GetItemCost(a.currBuyingBasicItem)
+	if bot.lastItemToBuy ~= bot.currBuyingBasicItem then
+		bot.lastItemToBuy = bot.currBuyingBasicItem
+		bot:SetNextItemPurchaseValue(GetItemCost(bot.currBuyingBasicItem))
+		bot.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(bot.currBuyingBasicItem)
+		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 	end
-	local a5 = m
+	local requiredGold = nextItemCost
 	if
-		a.lastItemToBuy == "item_boots"
-		and a.currBuyingItemInPurchaseList == "item_travel_boots"
-		and c.HasBootsInMainSolt(a)
+		bot.lastItemToBuy == "item_boots"
+		and bot.currBuyingItemInPurchaseList == "item_travel_boots"
+		and Item.HasBootsInMainSolt(bot)
 	then
-		a5 = GetItemCost("item_travel_boots")
+		requiredGold = GetItemCost("item_travel_boots")
 	end
-	if a:GetLevel() >= 18 and o == false and DotaTime() > p + 1.0 then
-		for k = 2, 8, 3 do
-			local a6 = GetTower(GetTeam(), k)
-			if a6 == nil or a6:GetHealth() / a6:GetMaxHealth() < 0.3 then
-				o = true
+	if bot:GetLevel() >= 18 and keepBuybackGold == false and DotaTime() > lastBuybackCheckTime + 1.0 then
+		for i = 2, 8, 3 do
+			local tower = GetTower(GetTeam(), i)
+			if tower == nil or tower:GetHealth() / tower:GetMaxHealth() < 0.3 then
+				keepBuybackGold = true
 				break
 			end
 		end
-		for k = 1, 7, 3 do
-			local a6 = GetTower(GetTeam(), k)
-			if a6 ~= nil and a6:IsAlive() then
-				o = false
+		for i = 1, 7, 3 do
+			local tower = GetTower(GetTeam(), i)
+			if tower ~= nil and tower:IsAlive() then
+				keepBuybackGold = false
 				break
 			end
 		end
-		for k = 9, 10, 1 do
-			local a6 = GetTower(GetTeam(), k)
-			if a6 == nil or a6:GetHealth() / a6:GetMaxHealth() < 0.9 then
-				o = true
+		for i = 9, 10, 1 do
+			local tower = GetTower(GetTeam(), i)
+			if tower == nil or tower:GetHealth() / tower:GetMaxHealth() < 0.9 then
+				keepBuybackGold = true
 				break
 			end
 		end
 		if DotaTime() >= 54 * 60 then
-			o = true
+			keepBuybackGold = true
 		end
-		p = DotaTime()
-	elseif o == true and a:GetBuybackCooldown() <= 10 then
+		lastBuybackCheckTime = DotaTime()
+	elseif keepBuybackGold == true and bot:GetBuybackCooldown() <= 10 then
 		-- Buyback reserve. Game 036: Primal Beast bought nothing 38:26-52:43 and Lion nothing after
 		-- 40:00. Supports (pos 4-5) keep no reserve, and a core holds one item at most 3 min; then
 		-- it buys and the next item can be held again. [OHA-BUY] hold-for-buyback logs the wait.
-		local reserveTo = m + a:GetBuybackCost() + a:GetNetWorth() / 40 - 300
-		if e.GetPosition(a) <= 3 and a:GetGold() < reserveTo then
-			if a:GetGold() >= m then
-				if a._bbHoldItem ~= a.currBuyingBasicItem then
-					a._bbHoldItem = a.currBuyingBasicItem
-					a._bbHoldSince = DotaTime()
+		local reserveTo = nextItemCost + bot:GetBuybackCost() + bot:GetNetWorth() / 40 - 300
+		if Fu.GetPosition(bot) <= 3 and bot:GetGold() < reserveTo then
+			if bot:GetGold() >= nextItemCost then
+				if bot._bbHoldItem ~= bot.currBuyingBasicItem then
+					bot._bbHoldItem = bot.currBuyingBasicItem
+					bot._bbHoldSince = DotaTime()
 				end
-				local held = DotaTime() - (a._bbHoldSince or DotaTime())
+				local held = DotaTime() - (bot._bbHoldSince or DotaTime())
 				if held < 180 then
-					a5 = reserveTo
-					if DotaTime() >= (a._bbHoldLogAt or -999) then
-						a._bbHoldLogAt = DotaTime() + 30
+					requiredGold = reserveTo
+					if DotaTime() >= (bot._bbHoldLogAt or -999) then
+						bot._bbHoldLogAt = DotaTime() + 30
 						BuyLog("hold-for-buyback item=%s gold=%d need=%d buyback=%d held=%.0fs",
-							ShortItem(a.currBuyingBasicItem), a:GetGold(), math.floor(reserveTo), a:GetBuybackCost(), held)
+							ShortItem(bot.currBuyingBasicItem), bot:GetGold(), math.floor(reserveTo), bot:GetBuybackCost(), held)
 					end
-				elseif not a._bbHoldReleased then
-					a._bbHoldReleased = true
+				elseif not bot._bbHoldReleased then
+					bot._bbHoldReleased = true
 					BuyLog("hold-for-buyback released item=%s gold=%d after=%.0fs",
-						ShortItem(a.currBuyingBasicItem), a:GetGold(), held)
+						ShortItem(bot.currBuyingBasicItem), bot:GetGold(), held)
 				end
 			else
-				a5 = reserveTo
+				requiredGold = reserveTo
 			end
 		end
 	end
-	if a._bbHoldItem ~= nil and a._bbHoldItem ~= a.currBuyingBasicItem then
-		a._bbHoldItem, a._bbHoldSince, a._bbHoldReleased = nil, nil, nil
+	if bot._bbHoldItem ~= nil and bot._bbHoldItem ~= bot.currBuyingBasicItem then
+		bot._bbHoldItem, bot._bbHoldSince, bot._bbHoldReleased = nil, nil, nil
 	end
-	if #a.currBuyingBasicItemList == 1 or d.IsPvNMode() then
-		a5 = m
+	if #bot.currBuyingBasicItemList == 1 or Role.IsPvNMode() then
+		requiredGold = nextItemCost
 	end
-	if not a.hasBuyShard and DotaTime() > 12 * 60 then
-		local a7 = 15 * 60 - DotaTime()
-		if a7 < 0 then
-			a5 = a5 + 1400
+	if not bot.hasBuyShard and DotaTime() > 12 * 60 then
+		local shardTimeLeft = 15 * 60 - DotaTime()
+		if shardTimeLeft < 0 then
+			requiredGold = requiredGold + 1400
 		else
-			a5 = a5 + 1400 * (1 - a7 / 300)
+			requiredGold = requiredGold + 1400 * (1 - shardTimeLeft / 300)
 		end
 	end
-	if a.currBuyingBasicItem == "item_aghanims_shard" then
-		a.hasBuyShard = false
-		a1()
+	if bot.currBuyingBasicItem == "item_aghanims_shard" then
+		bot.hasBuyShard = false
+		FinishBasicItem()
 		return
 	end
-	if a:GetGold() >= a5 and a:GetItemInSlot(14) == nil then
-		if DotaTime() < 20 and (a:DistanceFromFountain() > 1000 or c.GetEmptyInventoryAmount(a) < 1) and a:DistanceFromSecretShop() > 300 then
+	if bot:GetGold() >= requiredGold and bot:GetItemInSlot(14) == nil then
+		if DotaTime() < 20 and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1) and bot:DistanceFromSecretShop() > 300 then
 			return
 		end
-		if n == nil then
-			n = a.theCourier
+		if courier == nil then
+			courier = bot.theCourier
 		end
-		if a.SecretShop and n ~= nil and n:DistanceFromSecretShop() == 0 then
-			local a8 = n:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
-			if a8 == PURCHASE_ITEM_SUCCESS then
+		if bot.SecretShop and courier ~= nil and courier:DistanceFromSecretShop() == 0 then
+			local courierResult = courier:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+			if courierResult == PURCHASE_ITEM_SUCCESS then
 				BuyLog(
 					"bought %s for=%s gold=%d left=%d courier=secret",
-					ShortItem(a.currBuyingBasicItem),
-					ShortItem(a.currBuyingItemInPurchaseList),
-					a:GetGold(),
-					math.max(0, #a.currBuyingBasicItemList - 1)
+					ShortItem(bot.currBuyingBasicItem),
+					ShortItem(bot.currBuyingItemInPurchaseList),
+					bot:GetGold(),
+					math.max(0, #bot.currBuyingBasicItemList - 1)
 				)
-				a1()
-				a.SecretShop = false
+				FinishBasicItem()
+				bot.SecretShop = false
 				return
-			elseif FailureDropsItem(a8, GetItemStockCount(a.currBuyingBasicItem)) then
-				a1()
-				a.SecretShop = false
+			elseif FailureDropsItem(courierResult, GetItemStockCount(bot.currBuyingBasicItem)) then
+				FinishBasicItem()
+				bot.SecretShop = false
 				return
 			end
 		end
-		if a.bPurchaseFromSecret and a:DistanceFromSecretShop() > 0 then
-			a.SecretShop = true
+		if bot.bPurchaseFromSecret and bot:DistanceFromSecretShop() > 0 then
+			bot.SecretShop = true
 		else
-			if f.CountBackpackEmptySpace(a) > 0 or a:DistanceFromSecretShop() > 700 then
-				local result = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
+			if Utils.CountBackpackEmptySpace(bot) > 0 or bot:DistanceFromSecretShop() > 700 then
+				local result = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
 				if result == PURCHASE_ITEM_SUCCESS then
 					BuyLog(
 						"bought %s for=%s gold=%d left=%d",
-						ShortItem(a.currBuyingBasicItem),
-						ShortItem(a.currBuyingItemInPurchaseList),
-						a:GetGold(),
-						math.max(0, #a.currBuyingBasicItemList - 1)
+						ShortItem(bot.currBuyingBasicItem),
+						ShortItem(bot.currBuyingItemInPurchaseList),
+						bot:GetGold(),
+						math.max(0, #bot.currBuyingBasicItemList - 1)
 					)
-					a1()
-					a.SecretShop = false
+					FinishBasicItem()
+					bot.SecretShop = false
 					return
 				else
-					local stock = GetItemStockCount(a.currBuyingBasicItem)
+					local stock = GetItemStockCount(bot.currBuyingBasicItem)
 					if FailureDropsItem(result, stock) then
 						-- The item leaves the queue here. If it was an ingredient, the recipe guard puts it back.
 						BuyLog(
 							"dropped %s for=%s result=%s stock=%s gold=%d",
-							ShortItem(a.currBuyingBasicItem),
-							ShortItem(a.currBuyingItemInPurchaseList),
+							ShortItem(bot.currBuyingBasicItem),
+							ShortItem(bot.currBuyingItemInPurchaseList),
 							tostring(result),
 							tostring(stock),
-							a:GetGold()
+							bot:GetGold()
 						)
-						a1()
-						a.SecretShop = false
+						FinishBasicItem()
+						bot.SecretShop = false
 					else
-						local a9 = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
-						log("%s 未能购买物品 %s : %s", b, a.currBuyingBasicItem, a9)
+						local retryResult = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+						log("%s 未能购买物品 %s : %s", botName, bot.currBuyingBasicItem, retryResult)
 					end
 				end
 			end
 		end
 	else
-		a.SecretShop = false
+		bot.SecretShop = false
 	end
 end
-local function aa()
-	local a4 = W()
-	if not a4 then
+local function BuyBasicItemTurbo()
+	local nextItem = NextBasicItem()
+	if not nextItem then
 		return
 	end
-	a.currBuyingBasicItem = a4
+	bot.currBuyingBasicItem = nextItem
 	if HoldRecipe() then
 		return
 	end
-	if Y(a.currBuyingBasicItem) then
+	if IsRepeatedPurchase(bot.currBuyingBasicItem) then
 		return
 	end
-	if a.lastItemToBuy ~= a.currBuyingBasicItem then
-		a.lastItemToBuy = a.currBuyingBasicItem
-		a:SetNextItemPurchaseValue(GetItemCost(a.currBuyingBasicItem))
-		m = GetItemCost(a.currBuyingBasicItem)
-		a.lastItemToBuy = a.currBuyingBasicItem
+	if bot.lastItemToBuy ~= bot.currBuyingBasicItem then
+		bot.lastItemToBuy = bot.currBuyingBasicItem
+		bot:SetNextItemPurchaseValue(GetItemCost(bot.currBuyingBasicItem))
+		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
+		bot.lastItemToBuy = bot.currBuyingBasicItem
 	end
-	if a.currBuyingBasicItem == "item_infused_raindrop" or a.currBuyingBasicItem == "item_tome_of_knowledge" then
-		if GetItemStockCount(a.currBuyingBasicItem) <= 0 then
-			a1()
+	if bot.currBuyingBasicItem == "item_infused_raindrop" or bot.currBuyingBasicItem == "item_tome_of_knowledge" then
+		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
+			FinishBasicItem()
 			return
 		end
 	end
-	local a5 = m
+	local requiredGold = nextItemCost
 	if
-		a.lastItemToBuy == "item_boots"
-		and a.currBuyingItemInPurchaseList == "item_travel_boots"
-		and c.HasBootsInMainSolt(a)
+		bot.lastItemToBuy == "item_boots"
+		and bot.currBuyingItemInPurchaseList == "item_travel_boots"
+		and Item.HasBootsInMainSolt(bot)
 	then
-		a5 = GetItemCost("item_travel_boots")
+		requiredGold = GetItemCost("item_travel_boots")
 	end
-	if not a.hasBuyShard and DotaTime() > 8 * 60 then
-		local a7 = 10 * 60 - DotaTime()
-		if a7 < 0 then
-			a5 = a5 + 1400
+	if not bot.hasBuyShard and DotaTime() > 8 * 60 then
+		local shardTimeLeft = 10 * 60 - DotaTime()
+		if shardTimeLeft < 0 then
+			requiredGold = requiredGold + 1400
 		else
-			a5 = a5 + 1400 * (1 - a7 / 180)
+			requiredGold = requiredGold + 1400 * (1 - shardTimeLeft / 180)
 		end
 	end
-	if a.currBuyingBasicItem == "item_aghanims_shard" then
-		a.hasBuyShard = false
-		a1()
+	if bot.currBuyingBasicItem == "item_aghanims_shard" then
+		bot.hasBuyShard = false
+		FinishBasicItem()
 		return
 	end
-	if a:GetGold() >= a5 and a:GetItemInSlot(14) == nil then
-		if DotaTime() < 20 and (a:DistanceFromFountain() > 1000 or c.GetEmptyInventoryAmount(a) < 1) and a:DistanceFromSecretShop() > 300 then
+	if bot:GetGold() >= requiredGold and bot:GetItemInSlot(14) == nil then
+		if DotaTime() < 20 and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1) and bot:DistanceFromSecretShop() > 300 then
 			return
 		end
-		local result = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
+		local result = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
 		if result == PURCHASE_ITEM_SUCCESS then
 			BuyLog(
 				"bought %s for=%s gold=%d left=%d",
-				ShortItem(a.currBuyingBasicItem),
-				ShortItem(a.currBuyingItemInPurchaseList),
-				a:GetGold(),
-				math.max(0, #a.currBuyingBasicItemList - 1)
+				ShortItem(bot.currBuyingBasicItem),
+				ShortItem(bot.currBuyingItemInPurchaseList),
+				bot:GetGold(),
+				math.max(0, #bot.currBuyingBasicItemList - 1)
 			)
-			a1()
+			FinishBasicItem()
 			return
 		else
-			local stock = GetItemStockCount(a.currBuyingBasicItem)
+			local stock = GetItemStockCount(bot.currBuyingBasicItem)
 			if FailureDropsItem(result, stock) then
 				BuyLog(
 					"dropped %s for=%s result=%s stock=%s gold=%d",
-					ShortItem(a.currBuyingBasicItem),
-					ShortItem(a.currBuyingItemInPurchaseList),
+					ShortItem(bot.currBuyingBasicItem),
+					ShortItem(bot.currBuyingItemInPurchaseList),
 					tostring(result),
 					tostring(stock),
-					a:GetGold()
+					bot:GetGold()
 				)
-				a1()
+				FinishBasicItem()
 			else
-				local a9 = a:ActionImmediate_PurchaseItem(a.currBuyingBasicItem)
-				log("%s 未能购买物品 %s : %s", b, a.currBuyingBasicItem, a9)
+				local retryResult = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+				log("%s 未能购买物品 %s : %s", botName, bot.currBuyingBasicItem, retryResult)
 			end
 		end
 	end
 end
 function ItemPurchaseThink()
-	w = DotaTime()
-	local ab, ac, ad = e.IsStaleARDMHero(a, b)
-	if ab then
+	now = DotaTime()
+	local isStale, currentHero, currentName = Fu.IsStaleARDMHero(bot, botName)
+	if isStale then
 		return
 	end
-	if ad ~= b then
-		if not ac:IsAlive() then
+	if currentName ~= botName then
+		if not currentHero:IsAlive() then
 			return
 		end
-		log("[ARDM] Item purchase: hero changed from %s to %s", b, ad)
-		a = ac
-		b = ad
-		local ae = string.gsub(b, "npc_dota_", "")
-		local af, ag = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. ae)
-		if af and ag ~= nil and ag["sBuyList"] ~= nil then
-			h = ag
-			i = FixTravelBoots(ag["sBuyList"])
-			j = ag["sSellList"]
+		log("[ARDM] Item purchase: hero changed from %s to %s", botName, currentName)
+		bot = currentHero
+		botName = currentName
+		local heroFile = string.gsub(botName, "npc_dota_", "")
+		local loaded, newHeroModule = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. heroFile)
+		if loaded and newHeroModule ~= nil and newHeroModule["sBuyList"] ~= nil then
+			heroModule = newHeroModule
+			buyList = FixTravelBoots(newHeroModule["sBuyList"])
+			sellList = newHeroModule["sSellList"]
 		else
-			i = {}
-			j = {}
+			buyList = {}
+			sellList = {}
 		end
-		local ah = c.HasBuyBoots(a)
-			or c.HasItem(a, "item_guardian_greaves")
-			or c.HasItem(a, "item_travel_boots")
-			or c.HasItem(a, "item_travel_boots_2")
-			or c.HasItem(a, "item_boots_of_bearing")
-		local ai = {
+		local ownsBoots = Item.HasBuyBoots(bot)
+			or Item.HasItem(bot, "item_guardian_greaves")
+			or Item.HasItem(bot, "item_travel_boots")
+			or Item.HasItem(bot, "item_travel_boots_2")
+			or Item.HasItem(bot, "item_boots_of_bearing")
+		local earlyBootsSet = {
 			item_boots = true,
 			item_phase_boots = true,
 			item_power_treads = true,
 			item_tranquil_boots = true,
 			item_arcane_boots = true,
 		}
-		a.purchaseListInReverseOrder = {}
-		local aj = 0
-		for k = #i, 1, -1 do
-			local H = i[k]
-			local ak = false
-			if c.IsItemInHero(H) then
-				ak = true
-			elseif GetGameMode() == GAMEMODE_ARDM and DotaTime() > 2 * 60 and Q[H] then
-				ak = true
-			elseif ah and ai[H] then
-				ak = true
+		bot.purchaseListInReverseOrder = {}
+		local count = 0
+		for i = #buyList, 1, -1 do
+			local itemName = buyList[i]
+			local skip = false
+			if Item.IsItemInHero(itemName) then
+				skip = true
+			elseif GetGameMode() == GAMEMODE_ARDM and DotaTime() > 2 * 60 and tEarlyGameItems[itemName] then
+				skip = true
+			elseif ownsBoots and earlyBootsSet[itemName] then
+				skip = true
 			end
-			if not ak then
-				aj = aj + 1
-				a.purchaseListInReverseOrder[aj] = H
+			if not skip then
+				count = count + 1
+				bot.purchaseListInReverseOrder[count] = itemName
 			end
 		end
-		local al = {}
-		for O, H in ipairs(i) do
-			al[H] = true
-			if c[H] ~= nil then
-				for O, am in pairs(c[H]) do
-					al[am] = true
+		local neededItems = {}
+		for _, itemName in ipairs(buyList) do
+			neededItems[itemName] = true
+			if Item[itemName] ~= nil then
+				for _, component in pairs(Item[itemName]) do
+					neededItems[component] = true
 				end
 			end
 		end
-		local an = {
+		local keepItems = {
 			item_aegis = true,
 			item_rapier = true,
 			item_gem = true,
@@ -1198,75 +1198,75 @@ function ItemPurchaseThink()
 			item_great_famango = true,
 			item_greater_famango = true,
 		}
-		local ao = {}
-		for J = 0, 14 do
-			local ap = a:GetItemInSlot(J)
-			if ap ~= nil then
-				local X = ap:GetName()
-				if not an[X] and not al[X] and not string.find(X, "token") then
-					table.insert(ao, { slot = J, name = X, cost = GetItemCost(X) })
+		local sellCandidates = {}
+		for slot = 0, 14 do
+			local item = bot:GetItemInSlot(slot)
+			if item ~= nil then
+				local itemName = item:GetName()
+				if not keepItems[itemName] and not neededItems[itemName] and not string.find(itemName, "token") then
+					table.insert(sellCandidates, { slot = slot, name = itemName, cost = GetItemCost(itemName) })
 				end
 			end
 		end
-		table.sort(ao, function(aq, ar)
-			return aq.cost < ar.cost
+		table.sort(sellCandidates, function(left, right)
+			return left.cost < right.cost
 		end)
-		local as = 3
-		for O, at in ipairs(ao) do
-			local ap = a:GetItemInSlot(at.slot)
-			if ap ~= nil then
-				if string.find(at.name, "recipe") or at.cost < 1000 then
-					a:ActionImmediate_SellItem(ap)
-					log("[ARDM] Sold: %s (cost: %s)", at.name, at.cost)
+		local minFreeSlots = 3
+		for _, candidate in ipairs(sellCandidates) do
+			local item = bot:GetItemInSlot(candidate.slot)
+			if item ~= nil then
+				if string.find(candidate.name, "recipe") or candidate.cost < 1000 then
+					bot:ActionImmediate_SellItem(item)
+					log("[ARDM] Sold: %s (cost: %s)", candidate.name, candidate.cost)
 				end
 			end
 		end
-		local au = 0
-		for J = 0, 8 do
-			if a:GetItemInSlot(J) ~= nil then
-				au = au + 1
+		local usedSlots = 0
+		for slot = 0, 8 do
+			if bot:GetItemInSlot(slot) ~= nil then
+				usedSlots = usedSlots + 1
 			end
 		end
-		local av = 9 - au
-		if av < as then
-			for O, at in ipairs(ao) do
-				if av >= as then
+		local freeSlots = 9 - usedSlots
+		if freeSlots < minFreeSlots then
+			for _, candidate in ipairs(sellCandidates) do
+				if freeSlots >= minFreeSlots then
 					break
 				end
-				local ap = a:GetItemInSlot(at.slot)
-				if ap ~= nil then
-					a:ActionImmediate_SellItem(ap)
-					log("[ARDM] Sold (full inv): %s (cost: %s)", at.name, at.cost)
-					av = av + 1
+				local item = bot:GetItemInSlot(candidate.slot)
+				if item ~= nil then
+					bot:ActionImmediate_SellItem(item)
+					log("[ARDM] Sold (full inv): %s (cost: %s)", candidate.name, candidate.cost)
+					freeSlots = freeSlots + 1
 				end
 			end
 		end
-		a.currBuyingItemInPurchaseList = nil
-		a.currBuyingBasicItem = nil
-		a.currBuyingBasicItemList = {}
-		a.currBuyingBasicItemRefList = {}
-		a.currBuyingRequiredCounts = nil
-		a.rebuildCount = 0
-		a.countInvCheck = 0
+		bot.currBuyingItemInPurchaseList = nil
+		bot.currBuyingBasicItem = nil
+		bot.currBuyingBasicItemList = {}
+		bot.currBuyingBasicItemRefList = {}
+		bot.currBuyingRequiredCounts = nil
+		bot.rebuildCount = 0
+		bot.countInvCheck = 0
 	end
-	if a.needPurchaseRebuild then
-		a.needPurchaseRebuild = nil
-		local aw = e.GetPosition(a)
-		log("[PosSwap] Item purchase rebuild for %s -> pos%s", b, aw)
-		local ae = string.gsub(b, "npc_dota_", "")
-		local af, ag = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. ae)
-		if af and ag ~= nil and ag["sBuyList"] ~= nil then
-			h = ag
-			i = FixTravelBoots(ag["sBuyList"])
-			j = ag["sSellList"]
+	if bot.needPurchaseRebuild then
+		bot.needPurchaseRebuild = nil
+		local position = Fu.GetPosition(bot)
+		log("[PosSwap] Item purchase rebuild for %s -> pos%s", botName, position)
+		local heroFile = string.gsub(botName, "npc_dota_", "")
+		local loaded, newHeroModule = pcall(dofile, GetScriptDirectory() .. "/BotsLib/" .. heroFile)
+		if loaded and newHeroModule ~= nil and newHeroModule["sBuyList"] ~= nil then
+			heroModule = newHeroModule
+			buyList = FixTravelBoots(newHeroModule["sBuyList"])
+			sellList = newHeroModule["sSellList"]
 		end
-		if i then
-			local ah = c.HasBuyBoots(a)
-				or c.HasItem(a, "item_guardian_greaves")
-				or c.HasItem(a, "item_travel_boots")
-				or c.HasItem(a, "item_travel_boots_2")
-				or c.HasItem(a, "item_boots_of_bearing")
-			local ai = {
+		if buyList then
+			local ownsBoots = Item.HasBuyBoots(bot)
+				or Item.HasItem(bot, "item_guardian_greaves")
+				or Item.HasItem(bot, "item_travel_boots")
+				or Item.HasItem(bot, "item_travel_boots_2")
+				or Item.HasItem(bot, "item_boots_of_bearing")
+			local earlyBootsSet = {
 				item_boots = true,
 				item_phase_boots = true,
 				item_power_treads = true,
@@ -1275,260 +1275,259 @@ function ItemPurchaseThink()
 			}
 			-- The new position's boots replace the old pair. Dropping them from the buy list
 			-- left the old pair in the inventory, so a swap stacked two pairs of boots.
-			if ah then
+			if ownsBoots then
 				local kept = {}
-				for k = 1, #i do
-					kept[i[k]] = true
-					for _, part in pairs(c[i[k]] or {}) do
+				for i = 1, #buyList do
+					kept[buyList[i]] = true
+					for _, part in pairs(Item[buyList[i]] or {}) do
 						kept[part] = true
 					end
 				end
-				for _, boot in pairs(c["tEarlyBoots"]) do
+				for _, boot in pairs(Item["tEarlyBoots"]) do
 					if not kept[boot] then
-						local slot = a:FindItemSlot(boot)
+						local slot = bot:FindItemSlot(boot)
 						if slot >= 0 and slot <= 8 then
-							log("[PosSwap] Selling %s — %s no longer builds it", boot, b)
-							a:ActionImmediate_SellItem(a:GetItemInSlot(slot))
+							log("[PosSwap] Selling %s — %s no longer builds it", boot, botName)
+							bot:ActionImmediate_SellItem(bot:GetItemInSlot(slot))
 						end
 					end
 				end
 			end
-			a.purchaseListInReverseOrder = {}
-			local aj = 0
-			for k = #i, 1, -1 do
-				local H = i[k]
-				local ak = false
-				if c.IsItemInHero(H) then
-					ak = true
-				elseif ah and ai[H] then
-					ak = true
-				elseif DotaTime() > 10 * 60 and Q[H] then
-					ak = true
+			bot.purchaseListInReverseOrder = {}
+			local count = 0
+			for i = #buyList, 1, -1 do
+				local itemName = buyList[i]
+				local skip = false
+				if Item.IsItemInHero(itemName) then
+					skip = true
+				elseif ownsBoots and earlyBootsSet[itemName] then
+					skip = true
+				elseif DotaTime() > 10 * 60 and tEarlyGameItems[itemName] then
+					skip = true
 				end
-				if not ak then
-					aj = aj + 1
-					a.purchaseListInReverseOrder[aj] = H
+				if not skip then
+					count = count + 1
+					bot.purchaseListInReverseOrder[count] = itemName
 				end
 			end
 		end
-		a.currBuyingItemInPurchaseList = nil
-		a.currBuyingBasicItem = nil
-		a.currBuyingBasicItemList = {}
-		a.currBuyingBasicItemRefList = {}
-		a.currBuyingRequiredCounts = nil
-		a.rebuildCount = 0
-		a.countInvCheck = 0
-		log("[PosSwap] Purchase list rebuilt with %s items", #a.purchaseListInReverseOrder)
+		bot.currBuyingItemInPurchaseList = nil
+		bot.currBuyingBasicItem = nil
+		bot.currBuyingBasicItemList = {}
+		bot.currBuyingBasicItemRefList = {}
+		bot.currBuyingRequiredCounts = nil
+		bot.rebuildCount = 0
+		bot.countInvCheck = 0
+		log("[PosSwap] Purchase list rebuilt with %s items", #bot.purchaseListInReverseOrder)
 	end
-	if a.lastItemPurchaseFrameProcessTime == nil then
-		a.lastItemPurchaseFrameProcessTime = w
+	if bot.lastItemPurchaseFrameProcessTime == nil then
+		bot.lastItemPurchaseFrameProcessTime = now
 	end
-	if w > 30 and w - a.lastItemPurchaseFrameProcessTime < 1 then
+	if now > 30 and now - bot.lastItemPurchaseFrameProcessTime < 1 then
 		return
 	end
-	a.lastItemPurchaseFrameProcessTime = w
+	bot.lastItemPurchaseFrameProcessTime = now
 	if GetGameState() ~= GAME_STATE_PRE_GAME and GetGameState() ~= GAME_STATE_GAME_IN_PROGRESS then
 		return
 	end
 	if
-		a:IsIllusion()
-		or a:HasModifier("modifier_arc_warden_tempest_double")
-		or w > 0 and e.IsMeepoClone(a)
-		or a:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
+		bot:IsIllusion()
+		or bot:HasModifier("modifier_arc_warden_tempest_double")
+		or now > 0 and Fu.IsMeepoClone(bot)
+		or bot:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
 	then
-		a.purchaseListInReverseOrder = {}
+		bot.purchaseListInReverseOrder = {}
 		return
 	end
-	x = a:GetLevel()
-	y = a:GetGold()
-	z = a:GetNetWorth()
-	A = a:GetActiveMode()
-	B = e.GetHP(a)
-	C = a:GetCourierValue()
-	D = a:GetStashValue()
-	E = a:DistanceFromFountain()
+	botLevel = bot:GetLevel()
+	gold = bot:GetGold()
+	netWorth = bot:GetNetWorth()
+	activeMode = bot:GetActiveMode()
+	courierValue = bot:GetCourierValue()
+	stashValue = bot:GetStashValue()
+	fountainDistance = bot:DistanceFromFountain()
 	QueueRightclickCounters()
 	PromoteBackpackCounters()
 	PreferBloodGrenadeOverBranch()
-	if c.TryPickupRoshanDrop(a) then
+	if Item.TryPickupRoshanDrop(bot) then
 		return
 	end
-	local ax = GetDroppedItemList()
-	for O, ay in pairs(ax) do
+	local droppedItems = GetDroppedItemList()
+	for _, drop in pairs(droppedItems) do
 		if
-			ay ~= nil
-			and ay.owner == a
-			and ay.item ~= nil
-			and not string.find(ay.item:GetName(), "token")
-			and not f.HasValue(c.tEarlyConsumableItem, ay.item:GetName())
-			and ay.item:GetName() ~= "item_famango"
-			and ay.item:GetName() ~= "item_great_famango"
-			and ay.item:GetName() ~= "item_greater_famango"
+			drop ~= nil
+			and drop.owner == bot
+			and drop.item ~= nil
+			and not string.find(drop.item:GetName(), "token")
+			and not Utils.HasValue(Item.tEarlyConsumableItem, drop.item:GetName())
+			and drop.item:GetName() ~= "item_famango"
+			and drop.item:GetName() ~= "item_great_famango"
+			and drop.item:GetName() ~= "item_greater_famango"
 			-- Never re-pick wards we just handed to supports (breaks drop↔pickup loops).
-			and ay.item:GetName() ~= "item_ward_observer"
-			and ay.item:GetName() ~= "item_ward_sentry"
-			and ay.item:GetName() ~= "item_ward_dispenser"
-			and c.RoshanClaimKind(ay.item:GetName()) == nil
+			and drop.item:GetName() ~= "item_ward_observer"
+			and drop.item:GetName() ~= "item_ward_sentry"
+			and drop.item:GetName() ~= "item_ward_dispenser"
+			and Item.RoshanClaimKind(drop.item:GetName()) == nil
 		then
-			local az = GetUnitToLocationDistance(a, ay.location)
-			if az > 200 and az < 1000 then
-				a:Action_MoveToLocation(ay.location)
-			elseif az <= 100 then
-				a:Action_PickUpItem(ay.item)
+			local distance = GetUnitToLocationDistance(bot, drop.location)
+			if distance > 200 and distance < 1000 then
+				bot:Action_MoveToLocation(drop.location)
+			elseif distance <= 100 then
+				bot:Action_PickUpItem(drop.item)
 				return
 			end
 		end
 	end
-	if f.IsBear(a) and a:IsAlive() then
-		local aA = f.GetLoneDruid(a).bearItemsMap or {}
-		local aB = GetDroppedItemList()
-		for O, aC in pairs(aB) do
+	if Utils.IsBear(bot) and bot:IsAlive() then
+		local bearItemsMap = Utils.GetLoneDruid(bot).bearItemsMap or {}
+		local droppedItems = GetDroppedItemList()
+		for _, drop in pairs(droppedItems) do
 			if
-				aC.owner == f.GetLoneDruid(a).hero
-				and aC.item ~= nil
-				and not string.find(aC.item:GetName(), "token")
+				drop.owner == Utils.GetLoneDruid(bot).hero
+				and drop.item ~= nil
+				and not string.find(drop.item:GetName(), "token")
 			then
-				local H = aC.item:GetName()
-				if aA[H] and not c.HasItem(a, H) then
-					local aD = GetUnitToLocationDistance(a, aC.location)
-					if aD > 100 and aD < 1000 then
-						a:Action_MoveToLocation(aC.location)
+				local itemName = drop.item:GetName()
+				if bearItemsMap[itemName] and not Item.HasItem(bot, itemName) then
+					local distance = GetUnitToLocationDistance(bot, drop.location)
+					if distance > 100 and distance < 1000 then
+						bot:Action_MoveToLocation(drop.location)
 						return
-					elseif aD <= 100 then
-						a:Action_PickUpItem(aC.item)
+					elseif distance <= 100 then
+						bot:Action_PickUpItem(drop.item)
 						return
 					end
 				end
 			end
 		end
 	end
-	if d["supportExist"] == nil then
-		d.UpdateSupportStatus(a)
+	if Role["supportExist"] == nil then
+		Role.UpdateSupportStatus(bot)
 	end
-	if d["invisEnemyExist"] == false then
-		d.UpdateInvisEnemyStatus(a)
+	if Role["invisEnemyExist"] == false then
+		Role.UpdateInvisEnemyStatus(bot)
 	end
-	if r == false and w > q + 2.0 then
-		r = c.HasBuyBoots(a)
-		q = w
+	if hasBoots == false and now > lastBootsCheckTime + 2.0 then
+		hasBoots = Item.HasBuyBoots(bot)
+		lastBootsCheckTime = now
 	end
 	if
-		e.GetMP(a) < 0.3
-		and E > 2000
-		and C == 0
+		Fu.GetMP(bot) < 0.3
+		and fountainDistance > 2000
+		and courierValue == 0
 		and GetItemStockCount("item_clarity") > 1
-		and c.GetItemCharges(a, "item_clarity") <= 0
-		and y >= GetItemCost("item_clarity")
+		and Item.GetItemCharges(bot, "item_clarity") <= 0
+		and gold >= GetItemCost("item_clarity")
 	then
-		a.hasBuyClarity = true
-		a:ActionImmediate_PurchaseItem("item_clarity")
+		bot.hasBuyClarity = true
+		bot:ActionImmediate_PurchaseItem("item_clarity")
 	end
-	if e.GetPosition(a) >= 4 then
+	if Fu.GetPosition(bot) >= 4 then
 		if
-			w > 30
-			and not a.hasBuyClarity
-			and y >= GetItemCost("item_clarity")
-			and not d.IsPvNMode()
-			and f.CountBackpackEmptySpace(a) >= 2
+			now > 30
+			and not bot.hasBuyClarity
+			and gold >= GetItemCost("item_clarity")
+			and not Role.IsPvNMode()
+			and Utils.CountBackpackEmptySpace(bot) >= 2
 		then
-			a.hasBuyClarity = true
-			a:ActionImmediate_PurchaseItem("item_clarity")
+			bot.hasBuyClarity = true
+			bot:ActionImmediate_PurchaseItem("item_clarity")
 		elseif
-			x >= 5
-			and d["invisEnemyExist"] == true
-			and r == true
-			and y >= GetItemCost("item_dust")
-			and c.GetEmptyInventoryAmount(a) >= 2
-			and c.GetItemCharges(a, "item_dust") <= 0
-			and C == 0
-			and not e.HasItem(a, "item_ward_sentry")
+			botLevel >= 5
+			and Role["invisEnemyExist"] == true
+			and hasBoots == true
+			and gold >= GetItemCost("item_dust")
+			and Item.GetEmptyInventoryAmount(bot) >= 2
+			and Item.GetItemCharges(bot, "item_dust") <= 0
+			and courierValue == 0
+			and not Fu.HasItem(bot, "item_ward_sentry")
 		then
-			a:ActionImmediate_PurchaseItem("item_dust")
+			bot:ActionImmediate_PurchaseItem("item_dust")
 		end
 	end
-	if e.IsInLaningPhase() and not string.find(b, "lone_druid") then
+	if Fu.IsInLaningPhase() and not string.find(botName, "lone_druid") then
 		if
-			x < 6
-			and a:IsAlive()
-			and C == 0
-			and a:FindItemSlot("item_flask") < 0
-			and a:FindItemSlot("item_tango") < 0
-			and E > 2000
-			and D == 0
-			and not a:HasModifier("modifier_elixer_healing")
-			and not a:HasModifier("modifier_filler_heal")
-			and not a:HasModifier("modifier_flask_healing")
-			and not a:HasModifier("modifier_fountain_aura_buff")
-			and not a:HasModifier("modifier_juggernaut_healing_ward_heal")
-			and not a:HasModifier("modifier_warlock_shadow_word")
-			and not IsThereHealingInStash(a)
-			and c.GetEmptyInventoryAmount(a) >= 1
-			and e.GetHP(a) < 0.5
+			botLevel < 6
+			and bot:IsAlive()
+			and courierValue == 0
+			and bot:FindItemSlot("item_flask") < 0
+			and bot:FindItemSlot("item_tango") < 0
+			and fountainDistance > 2000
+			and stashValue == 0
+			and not bot:HasModifier("modifier_elixer_healing")
+			and not bot:HasModifier("modifier_filler_heal")
+			and not bot:HasModifier("modifier_flask_healing")
+			and not bot:HasModifier("modifier_fountain_aura_buff")
+			and not bot:HasModifier("modifier_juggernaut_healing_ward_heal")
+			and not bot:HasModifier("modifier_warlock_shadow_word")
+			and not IsThereHealingInStash(bot)
+			and Item.GetEmptyInventoryAmount(bot) >= 1
+			and Fu.GetHP(bot) < 0.5
 		then
-			local aE = e.GetLanePartner(a)
-			if a:GetHealthRegen() <= 10 then
-				if e.IsCore(a) then
-					if aE ~= nil then
+			local lanePartner = Fu.GetLanePartner(bot)
+			if bot:GetHealthRegen() <= 10 then
+				if Fu.IsCore(bot) then
+					if lanePartner ~= nil then
 						if
-							aE:FindItemSlot("item_flask") < 0
-							and aE:FindItemSlot("item_tango") < 0
-							and c.GetItemCharges(a, "item_flask") <= 0
-							and y >= GetItemCost("item_flask")
+							lanePartner:FindItemSlot("item_flask") < 0
+							and lanePartner:FindItemSlot("item_tango") < 0
+							and Item.GetItemCharges(bot, "item_flask") <= 0
+							and gold >= GetItemCost("item_flask")
 							and GetItemStockCount("item_flask") > 1
 						then
-							a:ActionImmediate_PurchaseItem("item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					else
 						if
-							c.GetItemCharges(a, "item_flask") <= 0
-							and y >= GetItemCost("item_flask")
+							Item.GetItemCharges(bot, "item_flask") <= 0
+							and gold >= GetItemCost("item_flask")
 							and GetItemStockCount("item_flask") > 1
 							and (
-								not e.HasItem(a, "item_bottle")
-								or e.HasItem(a, "item_bottle") and c.GetItemCharges(a, "item_bottle") <= 0
+								not Fu.HasItem(bot, "item_bottle")
+								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							a:ActionImmediate_PurchaseItem("item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					end
 				else
 					if
-						c.GetItemCharges(a, "item_flask") <= 0
-						and y >= GetItemCost("item_flask")
+						Item.GetItemCharges(bot, "item_flask") <= 0
+						and gold >= GetItemCost("item_flask")
 						and GetItemStockCount("item_flask") > 1
 					then
-						a:ActionImmediate_PurchaseItem("item_flask")
+						bot:ActionImmediate_PurchaseItem("item_flask")
 					end
 				end
 			else
-				if e.IsCore(a) then
-					if aE ~= nil then
+				if Fu.IsCore(bot) then
+					if lanePartner ~= nil then
 						if
-							aE:FindItemSlot("item_flask") < 0
-							and aE:FindItemSlot("item_tango") < 0
-							and aE ~= nil
-							and c.GetItemCharges(a, "item_tango") <= 0
-							and y >= GetItemCost("item_tango")
+							lanePartner:FindItemSlot("item_flask") < 0
+							and lanePartner:FindItemSlot("item_tango") < 0
+							and lanePartner ~= nil
+							and Item.GetItemCharges(bot, "item_tango") <= 0
+							and gold >= GetItemCost("item_tango")
 							and GetItemStockCount("item_flask") > 1
 						then
-							a:ActionImmediate_PurchaseItem("item_tango")
+							bot:ActionImmediate_PurchaseItem("item_tango")
 						end
 					else
 						if
-							c.GetItemCharges(a, "item_flask") <= 0
+							Item.GetItemCharges(bot, "item_flask") <= 0
 							and GetItemStockCount("item_flask") > 1
-							and y >= GetItemCost("item_flask")
+							and gold >= GetItemCost("item_flask")
 							and (
-								not e.HasItem(a, "item_bottle")
-								or e.HasItem(a, "item_bottle") and c.GetItemCharges(a, "item_bottle") <= 0
+								not Fu.HasItem(bot, "item_bottle")
+								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							a:ActionImmediate_PurchaseItem("item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					end
 				else
-					if c.GetItemCharges(a, "item_tango") <= 0 and y >= GetItemCost("item_tango") then
-						a:ActionImmediate_PurchaseItem("item_tango")
+					if Item.GetItemCharges(bot, "item_tango") <= 0 and gold >= GetItemCost("item_tango") then
+						bot:ActionImmediate_PurchaseItem("item_tango")
 					end
 				end
 			end
@@ -1538,14 +1537,14 @@ function ItemPurchaseThink()
 	-- pos4 sentry only after 5m, and obs/sentry split by exact role — so bags full
 	-- of starting consumables meant nobody bought.
 	local wardNames = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
-	local obsForHumans = e.GetPosition(a) >= 4 and ObserverStockForHumans()
-	if e.GetPosition(a) >= 4 and C == 0 then
-		local emptySlots = c.GetEmptyInventoryAmount(a)
+	local obsForHumans = Fu.GetPosition(bot) >= 4 and ObserverStockForHumans()
+	if Fu.GetPosition(bot) >= 4 and courierValue == 0 then
+		local emptySlots = Item.GetEmptyInventoryAmount(bot)
 		-- A buy outside the fountain shop goes straight to the stash. During the
 		-- opening that sentry then sits there, so require a free slot and the shop.
 		-- Before the horn a ward bought away from the shop goes to the stash; the courier now
 		-- brings wards out from -56s (other stash items still wait for 0:20).
-		local canReceive = emptySlots >= 1 and (w >= 20 or E <= 1000 or w >= -60)
+		local canReceive = emptySlots >= 1 and (now >= 20 or fountainDistance <= 1000 or now >= -60)
 		if canReceive then
 			local function tryBuyWard(itemName, maxCharges, reason)
 				if itemName == "item_ward_observer" and not obsForHumans then
@@ -1554,31 +1553,31 @@ function ItemPurchaseThink()
 				if GetItemStockCount(itemName) < 1 then
 					return false
 				end
-				if y < GetItemCost(itemName) then
+				if gold < GetItemCost(itemName) then
 					return false
 				end
-				if c.GetWardCharges(a, itemName) >= maxCharges then
+				if Item.GetWardCharges(bot, itemName) >= maxCharges then
 					return false
 				end
-				MatchTrace.Buy(a, itemName, reason)
-				a:ActionImmediate_PurchaseItem(itemName)
-				y = a:GetGold()
-				emptySlots = c.GetEmptyInventoryAmount(a)
+				MatchTrace.Buy(bot, itemName, reason)
+				bot:ActionImmediate_PurchaseItem(itemName)
+				gold = bot:GetGold()
+				emptySlots = Item.GetEmptyInventoryAmount(bot)
 				return true
 			end
 			-- Observers first. One sentry for the whole team before 8:00.
 			-- A second waits until 8:00 or a known invis hero.
-			local earlyLane = w < 8 * 60 and d["invisEnemyExist"] ~= true
+			local earlyLane = now < 8 * 60 and Role["invisEnemyExist"] ~= true
 			local sentryCap = 2
 			if earlyLane then
 				sentryCap = 1
 				for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
 					if
 						ally ~= nil
-						and ally ~= a
+						and ally ~= bot
 						and ally:IsHero()
 						and not ally:IsIllusion()
-						and c.GetWardCharges(ally, "item_ward_sentry") >= 1
+						and Item.GetWardCharges(ally, "item_ward_sentry") >= 1
 					then
 						sentryCap = 0
 						break
@@ -1587,17 +1586,17 @@ function ItemPurchaseThink()
 			end
 			-- Before the horn only pos 5 buys observers (user call: pos 5 always plants the early
 			-- one); the stock is shared, so pos 4 buying first left pos 5 without one.
-			if w >= 0 or e.GetPosition(a) == 5 then
+			if now >= 0 or Fu.GetPosition(bot) == 5 then
 				tryBuyWard("item_ward_observer", 2, "support obs")
 			end
-			if sentryCap > 0 and w > (a._sentryBuyAt or -100) + 15 then
+			if sentryCap > 0 and now > (bot._sentryBuyAt or -100) + 15 then
 				if tryBuyWard("item_ward_sentry", sentryCap, "support sentry") then
-					a._sentryBuyAt = w
+					bot._sentryBuyAt = now
 				end
 			end
 		end
 		-- Supports: pick up wards a core dropped for us.
-		if emptySlots >= 1 or c.GetEmptyInventoryAmount(a) >= 1 then
+		if emptySlots >= 1 or Item.GetEmptyInventoryAmount(bot) >= 1 then
 			for _, drop in pairs(GetDroppedItemList() or {}) do
 				if drop ~= nil and drop.item ~= nil then
 					local dropName = drop.item:GetName()
@@ -1606,12 +1605,12 @@ function ItemPurchaseThink()
 						or dropName == "item_ward_sentry"
 						or dropName == "item_ward_dispenser"
 					then
-						local dropDist = GetUnitToLocationDistance(a, drop.location)
+						local dropDist = GetUnitToLocationDistance(bot, drop.location)
 						if dropDist <= 1200 then
 							if dropDist > 120 then
-								a:Action_MoveToLocation(drop.location)
+								bot:Action_MoveToLocation(drop.location)
 							else
-								a:Action_PickUpItem(drop.item)
+								bot:Action_PickUpItem(drop.item)
 							end
 							return
 						end
@@ -1619,32 +1618,32 @@ function ItemPurchaseThink()
 				end
 			end
 		end
-	elseif e.GetPosition(a) <= 3 then
+	elseif Fu.GetPosition(bot) <= 3 then
 		-- Cores should not hold wards. Only drop when a support is close enough to take it;
 		-- otherwise stow in backpack (never drop at own feet — that caused pick↔drop loops).
-		if w > (a._lastCoreWardDrop or -100) + 3.0 then
+		if now > (bot._lastCoreWardDrop or -100) + 3.0 then
 			local nearbySupport = nil
-			for _, ally in pairs(a:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
-				if ally ~= nil and ally ~= a and ally:IsAlive() and e.GetPosition(ally) >= 4 then
+			for _, ally in pairs(bot:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
+				if ally ~= nil and ally ~= bot and ally:IsAlive() and Fu.GetPosition(ally) >= 4 then
 					nearbySupport = ally
 					break
 				end
 			end
 			for _, wardName in ipairs(wardNames) do
-				local wardSlot = a:FindItemSlot(wardName)
+				local wardSlot = bot:FindItemSlot(wardName)
 				if wardSlot >= 0 then
-					local wardItem = a:GetItemInSlot(wardSlot)
+					local wardItem = bot:GetItemInSlot(wardSlot)
 					if wardItem ~= nil then
-						a._lastCoreWardDrop = w
+						bot._lastCoreWardDrop = now
 						if nearbySupport ~= nil then
-							MatchTrace.Buy(a, wardName, "core handoff to support")
-							a:Action_DropItem(wardItem, nearbySupport:GetLocation())
+							MatchTrace.Buy(bot, wardName, "core handoff to support")
+							bot:Action_DropItem(wardItem, nearbySupport:GetLocation())
 							return
 						elseif wardSlot <= 5 then
 							for pack = 6, 8 do
-								if a:GetItemInSlot(pack) == nil then
-									a:ActionImmediate_SwapItems(wardSlot, pack)
-									MatchTrace.Buy(a, wardName, "core stow backpack")
+								if bot:GetItemInSlot(pack) == nil then
+									bot:ActionImmediate_SwapItems(wardSlot, pack)
+									MatchTrace.Buy(bot, wardName, "core stow backpack")
 									break
 								end
 							end
@@ -1658,78 +1657,78 @@ function ItemPurchaseThink()
 	-- rarely held, so Smoke was seldom bought). One free main-inventory slot is required: bot
 	-- swaps do not take effect, so a Smoke bought into the backpack may never get used.
 	if
-		e.GetPosition(a) >= 4
+		Fu.GetPosition(bot) >= 4
 		and GetItemStockCount("item_smoke_of_deceit") > 1
-		and y >= GetItemCost("item_smoke_of_deceit")
-		and c.GetEmptyNonBackpackInventoryAmount(a) >= 1
-		and c.GetItemCharges(a, "item_smoke_of_deceit") == 0
-		and C == 0
+		and gold >= GetItemCost("item_smoke_of_deceit")
+		and Item.GetEmptyNonBackpackInventoryAmount(bot) >= 1
+		and Item.GetItemCharges(bot, "item_smoke_of_deceit") == 0
+		and courierValue == 0
 	then
 		-- No Smoke before the horn or in the laning phase: it is wasted gold and a slot that
 		-- early. Supports buy one once laning is over.
 		-- By the clock: the laning-phase flag drops out mid-lane (GetDesireRaw clears it and
 		-- several early returns never set it back), so Techies bought one at 7:00 in lane.
-		if DotaTime() >= 12 * 60 and not e.IsInLaningPhase() then
-			MatchTrace.Buy(a, "item_smoke_of_deceit", "post_laning support")
-			a:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
+		if DotaTime() >= 12 * 60 and not Fu.IsInLaningPhase() then
+			MatchTrace.Buy(bot, "item_smoke_of_deceit", "post_laning support")
+			bot:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
 		end
 	end
 	-- No Blood Grenade rebuys: the one in the starting build (bought before the horn) is all a
 	-- hero needs. Rebuys landed in full bags (Lina, Earthshaker in the backpack).
-	if not a.hasBuyShard and GetItemStockCount("item_aghanims_shard") > 0 and y >= 1400 then
-		a.hasBuyShard = true
-		a:ActionImmediate_PurchaseItem("item_aghanims_shard")
+	if not bot.hasBuyShard and GetItemStockCount("item_aghanims_shard") > 0 and gold >= 1400 then
+		bot.hasBuyShard = true
+		bot:ActionImmediate_PurchaseItem("item_aghanims_shard")
 	end
-	if s == false and w < 0 then
-		s = true
+	if wasPreGame == false and now < 0 then
+		wasPreGame = true
 	end
-	local aI = GetItemCost("item_tpscroll")
+	local tpCost = GetItemCost("item_tpscroll")
 	if
-		w > 4 * 60
-		and C <= 100
-		and y >= aI
-		and not _()
-		and b ~= "npc_dota_hero_meepo"
-		and b ~= "npc_dota_hero_lone_druid_bear"
+		now > 4 * 60
+		and courierValue <= 100
+		and gold >= tpCost
+		and not HasEnoughTpScrolls()
+		and botName ~= "npc_dota_hero_meepo"
+		and botName ~= "npc_dota_hero_lone_druid_bear"
 	then
-		local a0 = c.GetItemCharges(a, "item_tpscroll")
-		if a:HasModifier("modifier_teleporting") then
-			a0 = a0 - 1
+		local tpCharges = Item.GetItemCharges(bot, "item_tpscroll")
+		if bot:HasModifier("modifier_teleporting") then
+			tpCharges = tpCharges - 1
 		end
-		if a0 <= 0 or x >= 18 and a0 <= 1 then
-			if y >= aI * 2 and w > 25 * 60 then
-				a:ActionImmediate_PurchaseItem("item_tpscroll")
+		if tpCharges <= 0 or botLevel >= 18 and tpCharges <= 1 then
+			if gold >= tpCost * 2 and now > 25 * 60 then
+				bot:ActionImmediate_PurchaseItem("item_tpscroll")
 			end
-			a:ActionImmediate_PurchaseItem("item_tpscroll")
+			bot:ActionImmediate_PurchaseItem("item_tpscroll")
 		end
 	end
-	if w > 180 and w < 1800 and a.switchTime < w - 5.6 then
-		local aJ = a:FindItemSlot("item_infused_raindrop")
-		local aK = c.GetItemCharges(a, "item_infused_raindrop")
-		local aL = e.GetNearbyHeroes(a, 1600, true, BOT_MODE_NONE)
+	if now > 180 and now < 1800 and bot.switchTime < now - 5.6 then
+		local raindropSlot = bot:FindItemSlot("item_infused_raindrop")
+		local raindropCharges = Item.GetItemCharges(bot, "item_infused_raindrop")
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 		if
-			aJ >= 0
-			and aJ <= 5
-			and (aL[1] ~= nil or A == BOT_MODE_ROSHAN or a:WasRecentlyDamagedByAnyHero(3.1))
-			and (aK == 1 or aK >= 7)
+			raindropSlot >= 0
+			and raindropSlot <= 5
+			and (nearbyEnemies[1] ~= nil or activeMode == BOT_MODE_ROSHAN or bot:WasRecentlyDamagedByAnyHero(3.1))
+			and (raindropCharges == 1 or raindropCharges >= 7)
 		then
-			a.switchTime = w
-			a:ActionImmediate_SwapItems(aJ, 6)
+			bot.switchTime = now
+			bot:ActionImmediate_SwapItems(raindropSlot, 6)
 		end
 	end
-	if e.GetPosition(a) >= 4 and w > (a._lastWardSwapTime or 0) + 3 then
-		local aM = A == BOT_MODE_WARD
-		local aN = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
-		for O, aO in ipairs(aN) do
-			local aP = a:FindItemSlot(aO)
-			if aP >= 0 then
-				if aM then
-					if aP >= 6 and aP <= 8 then
-						for aQ = 0, 5 do
-							local aR = a:GetItemInSlot(aQ)
-							if aR == nil then
-								a:ActionImmediate_SwapItems(aP, aQ)
-								a._lastWardSwapTime = w
+	if Fu.GetPosition(bot) >= 4 and now > (bot._lastWardSwapTime or 0) + 3 then
+		local isWarding = activeMode == BOT_MODE_WARD
+		local wardItemNames = { "item_ward_observer", "item_ward_sentry", "item_ward_dispenser" }
+		for _, wardItemName in ipairs(wardItemNames) do
+			local wardSlot = bot:FindItemSlot(wardItemName)
+			if wardSlot >= 0 then
+				if isWarding then
+					if wardSlot >= 6 and wardSlot <= 8 then
+						for mainSlot = 0, 5 do
+							local mainItem = bot:GetItemInSlot(mainSlot)
+							if mainItem == nil then
+								bot:ActionImmediate_SwapItems(wardSlot, mainSlot)
+								bot._lastWardSwapTime = now
 								break
 							end
 						end
@@ -1737,12 +1736,12 @@ function ItemPurchaseThink()
 				else
 					-- Stash observers only. A sentry or a sentry-only dispenser
 					-- goes on cooldown when it is swapped back into the bag.
-					if aO == "item_ward_observer" and aP >= 0 and aP <= 5 then
-						for aS = 6, 8 do
-							local aT = a:GetItemInSlot(aS)
-							if aT == nil then
-								a:ActionImmediate_SwapItems(aP, aS)
-								a._lastWardSwapTime = w
+					if wardItemName == "item_ward_observer" and wardSlot >= 0 and wardSlot <= 5 then
+						for backpackSlot = 6, 8 do
+							local backpackItem = bot:GetItemInSlot(backpackSlot)
+							if backpackItem == nil then
+								bot:ActionImmediate_SwapItems(wardSlot, backpackSlot)
+								bot._lastWardSwapTime = now
 								break
 							end
 						end
@@ -1754,14 +1753,14 @@ function ItemPurchaseThink()
 	-- Witch Doctor: when packed, consume Gris-Gris (right-click Consume == Action_UseAbility; not SellItem).
 	-- Skip early game — starting consumables fill the bag; keep Gris-Gris until ~15m (turbo ~9m).
 	local grisMinTime = (GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23) and (9 * 60) or (15 * 60)
-	if b == "npc_dota_hero_witch_doctor" and w >= grisMinTime and w > (a._grisPurchaseCheck or -100) + 2.0 then
-		a._grisPurchaseCheck = w
-		local mainEmpty = c.GetEmptyNonBackpackInventoryAmount(a)
-		local packEmpty = f.CountBackpackEmptySpace(a)
-		if mainEmpty <= 0 and (packEmpty <= 0 or a.currBuyingBasicItem ~= nil) then
-			local grisSlot = a:FindItemSlot("item_grisgris")
+	if botName == "npc_dota_hero_witch_doctor" and now >= grisMinTime and now > (bot._grisPurchaseCheck or -100) + 2.0 then
+		bot._grisPurchaseCheck = now
+		local mainEmpty = Item.GetEmptyNonBackpackInventoryAmount(bot)
+		local packEmpty = Utils.CountBackpackEmptySpace(bot)
+		if mainEmpty <= 0 and (packEmpty <= 0 or bot.currBuyingBasicItem ~= nil) then
+			local grisSlot = bot:FindItemSlot("item_grisgris")
 			if grisSlot >= 0 then
-				local gris = a:GetItemInSlot(grisSlot)
+				local gris = bot:GetItemInSlot(grisSlot)
 				if gris ~= nil then
 					local locOk, loc = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
 					local msg = "Consuming Gris-Gris — inventory full!"
@@ -1773,143 +1772,143 @@ function ItemPurchaseThink()
 							msg = lines
 						end
 					end
-					a:ActionImmediate_Chat(msg, true)
+					bot:ActionImmediate_Chat(msg, true)
 					if grisSlot == 16 or grisSlot >= 6 then
-						for J = 0, 8 do
-							local junk = a:GetItemInSlot(J)
+						for slot = 0, 8 do
+							local junk = bot:GetItemInSlot(slot)
 							if
 								junk ~= nil
 								and junk:GetName() ~= "item_grisgris"
 								and junk:GetName() ~= "item_tpscroll"
 								and (GetItemCost(junk:GetName()) or 0) < 600
 							then
-								a:ActionImmediate_SellItem(junk)
+								bot:ActionImmediate_SellItem(junk)
 								break
 							end
 						end
-						for J = 0, 5 do
-							if a:GetItemInSlot(J) == nil then
-								a:ActionImmediate_SwapItems(grisSlot, J)
-								grisSlot = J
-								gris = a:GetItemInSlot(J)
+						for slot = 0, 5 do
+							if bot:GetItemInSlot(slot) == nil then
+								bot:ActionImmediate_SwapItems(grisSlot, slot)
+								grisSlot = slot
+								gris = bot:GetItemInSlot(slot)
 								break
 							end
 						end
 					end
 					if gris ~= nil then
-						a:Action_ClearActions(false)
-						a:Action_UseAbility(gris)
-						MatchTrace.Buy(a, "item_grisgris", "consume (purchase path)")
+						bot:Action_ClearActions(false)
+						bot:Action_UseAbility(gris)
+						MatchTrace.Buy(bot, "item_grisgris", "consume (purchase path)")
 					end
 				end
 			end
 		end
 	end
 	if
-		GetGameMode() ~= 23 and x > 6 and w > a.fullInvCheck + 1.0 and (E <= 200 or a:DistanceFromSecretShop() <= 200)
-		or GetGameMode() == 23 and x > 9 and w > a.fullInvCheck + 1.0
+		GetGameMode() ~= 23 and botLevel > 6 and now > bot.fullInvCheck + 1.0 and (fountainDistance <= 200 or bot:DistanceFromSecretShop() <= 200)
+		or GetGameMode() == 23 and botLevel > 9 and now > bot.fullInvCheck + 1.0
 	then
-		local aU = c.GetEmptyInventoryAmount(a)
-		local aV = nil
-		local aW = 2
-		if x <= 17 then
-			aW = 1
+		local emptyInventory = Item.GetEmptyInventoryAmount(bot)
+		local sellSlot = nil
+		local minEmptySlots = 2
+		if botLevel <= 17 then
+			minEmptySlots = 1
 		end
-		if not e.IsCore(a) and x > 10 then
-			aW = 2
+		if not Fu.IsCore(bot) and botLevel > 10 then
+			minEmptySlots = 2
 		end
-		if aU <= aW - 1 then
-			for k = 1, #c["tEarlyItem"] do
-				local H = c["tEarlyItem"][k]
-				local aX = a:FindItemSlot(H)
-				if aX >= 0 and aX <= 8 then
-					aV = aX
+		if emptyInventory <= minEmptySlots - 1 then
+			for i = 1, #Item["tEarlyItem"] do
+				local itemName = Item["tEarlyItem"][i]
+				local itemSlot = bot:FindItemSlot(itemName)
+				if itemSlot >= 0 and itemSlot <= 8 then
+					sellSlot = itemSlot
 					break
 				end
 			end
-			if aV == nil and not e.IsCore(a) then
-				for k = 1, #c["tSupportSellWhenFull"] do
-					local H = c["tSupportSellWhenFull"][k]
-					local aX = a:FindItemSlot(H)
-					if aX >= 0 and aX <= 8 then
-						aV = aX
+			if sellSlot == nil and not Fu.IsCore(bot) then
+				for i = 1, #Item["tSupportSellWhenFull"] do
+					local itemName = Item["tSupportSellWhenFull"][i]
+					local itemSlot = bot:FindItemSlot(itemName)
+					if itemSlot >= 0 and itemSlot <= 8 then
+						sellSlot = itemSlot
 						break
 					end
 				end
 			end
 		end
-		if aV == nil and z > 10000 and a:GetItemInSlot(6) ~= nil and a:GetItemInSlot(7) ~= nil then
-			local aY = a:FindItemSlot("item_magic_wand")
-			local aZ = a:FindItemSlot("item_infused_raindrop")
-			if aZ < 0 then
-				aZ = a:FindItemSlot("item_bracer")
+		if sellSlot == nil and netWorth > 10000 and bot:GetItemInSlot(6) ~= nil and bot:GetItemInSlot(7) ~= nil then
+			local wandSlot = bot:FindItemSlot("item_magic_wand")
+			local cheapSlot = bot:FindItemSlot("item_infused_raindrop")
+			if cheapSlot < 0 then
+				cheapSlot = bot:FindItemSlot("item_bracer")
 			end
-			if aZ < 0 then
-				aZ = a:FindItemSlot("item_null_talisman")
+			if cheapSlot < 0 then
+				cheapSlot = bot:FindItemSlot("item_null_talisman")
 			end
-			if aZ < 0 then
-				aZ = a:FindItemSlot("item_wraith_band")
+			if cheapSlot < 0 then
+				cheapSlot = bot:FindItemSlot("item_wraith_band")
 			end
-			if aZ >= 0 and aY >= 6 and aY <= 8 then
-				aV = aZ
+			if cheapSlot >= 0 and wandSlot >= 6 and wandSlot <= 8 then
+				sellSlot = cheapSlot
 			end
 		end
-		if aV ~= nil then
-			a:ActionImmediate_SellItem(a:GetItemInSlot(aV))
+		if sellSlot ~= nil then
+			bot:ActionImmediate_SellItem(bot:GetItemInSlot(sellSlot))
 		end
-		a.fullInvCheck = w
+		bot.fullInvCheck = now
 	end
-	local a_ = f.CountBackpackEmptySpace(a)
-	if w > a.sell_time + 0.5 and a_ <= 1 and (E <= 100 or a:DistanceFromSecretShop() <= 100) then
-		a.sell_time = w
-		SetPairedItems(c.sSellList)
-		SetPairedItems(j)
-		if z > 23000 then
-			if c.HasItem(a, "item_hand_of_midas") then
-				a:ActionImmediate_SellItem(a:GetItemInSlot(a:FindItemSlot("item_hand_of_midas")))
+	local backpackEmpty = Utils.CountBackpackEmptySpace(bot)
+	if now > bot.sell_time + 0.5 and backpackEmpty <= 1 and (fountainDistance <= 100 or bot:DistanceFromSecretShop() <= 100) then
+		bot.sell_time = now
+		SetPairedItems(Item.sSellList)
+		SetPairedItems(sellList)
+		if netWorth > 23000 then
+			if Item.HasItem(bot, "item_hand_of_midas") then
+				bot:ActionImmediate_SellItem(bot:GetItemInSlot(bot:FindItemSlot("item_hand_of_midas")))
 			end
 		end
 		if
-			(w > 18 * 60 or z > 20000) and (c.HasItem(a, "item_travel_boots") or c.HasItem(a, "item_travel_boots_2"))
+			(now > 18 * 60 or netWorth > 20000) and (Item.HasItem(bot, "item_travel_boots") or Item.HasItem(bot, "item_travel_boots_2"))
 		then
-			for k = 1, #c["tEarlyBoots"] do
-				local b0 = a:FindItemSlot(c["tEarlyBoots"][k])
-				if b0 >= 0 then
-					a:ActionImmediate_SellItem(a:GetItemInSlot(b0))
+			for i = 1, #Item["tEarlyBoots"] do
+				local bootsSlot = bot:FindItemSlot(Item["tEarlyBoots"][i])
+				if bootsSlot >= 0 then
+					bot:ActionImmediate_SellItem(bot:GetItemInSlot(bootsSlot))
 				end
 			end
 		end
 	end
 	pcall(SellMarkedItems)
-	if c.HasItem(a, "item_mask_of_madness") and c.HasItem(a, "item_satanic") then
-		a:ActionImmediate_SellItem(a:GetItemInSlot(a:FindItemSlot("item_mask_of_madness")))
+	if Item.HasItem(bot, "item_mask_of_madness") and Item.HasItem(bot, "item_satanic") then
+		bot:ActionImmediate_SellItem(bot:GetItemInSlot(bot:FindItemSlot("item_mask_of_madness")))
 	end
 	-- Healing Lotus (item_famango*) cannot be sold — stack / use / drop to free a slot.
 	-- Prefer supports holding them: healthy cores hand off to a nearby support with space.
 	local lateLotus = (GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23) and (15 * 60) or (25 * 60)
 	-- Step 0: finish greater-famango stack pickup after a merge drop, or start a merge anytime.
-	if c.TryPickupStackedGreaterFamango(a) then
+	if Item.TryPickupStackedGreaterFamango(bot) then
 		return
 	end
-	if c.CanStackGreaterFamango(a) and w > (a._lastLotusStack or -100) + 2.0 then
-		if c.TryStackGreaterFamango(a) then
-			a._lastLotusStack = w
-			MatchTrace.Buy(a, "item_greater_famango", "stack merge")
+	if Item.CanStackGreaterFamango(bot) and now > (bot._lastLotusStack or -100) + 2.0 then
+		if Item.TryStackGreaterFamango(bot) then
+			bot._lastLotusStack = now
+			MatchTrace.Buy(bot, "item_greater_famango", "stack merge")
 			return
 		end
 	end
 	local function NearbySupportForLotus(preferGreaterStack)
-		for _, ally in pairs(a:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
-			if ally ~= nil and ally ~= a and ally:IsAlive() and e.GetPosition(ally) >= 4 then
+		for _, ally in pairs(bot:GetNearbyHeroes(450, false, BOT_MODE_NONE) or {}) do
+			if ally ~= nil and ally ~= bot and ally:IsAlive() and Fu.GetPosition(ally) >= 4 then
 				local greater = ally:FindItemSlot("item_greater_famango")
 				local canStackOnAlly = false
 				if preferGreaterStack and greater >= 0 then
 					local gItem = ally:GetItemInSlot(greater)
-					if gItem ~= nil and c.GetLotusCharges(gItem) < c.GREATER_FAMANGO_MAX_STACK then
+					if gItem ~= nil and Item.GetLotusCharges(gItem) < Item.GREATER_FAMANGO_MAX_STACK then
 						canStackOnAlly = true
 					end
 				end
-				local emptyOk = c.GetEmptyNonBackpackInventoryAmount(ally) >= 1 or canStackOnAlly
+				local emptyOk = Item.GetEmptyNonBackpackInventoryAmount(ally) >= 1 or canStackOnAlly
 				if emptyOk then
 					return ally
 				end
@@ -1919,7 +1918,7 @@ function ItemPurchaseThink()
 	end
 	local function BackpackLotus()
 		for slot = 6, 8 do
-			local it = a:GetItemInSlot(slot)
+			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
 				if
@@ -1935,7 +1934,7 @@ function ItemPurchaseThink()
 	end
 	local function BackpackForage()
 		for slot = 6, 8 do
-			local it = a:GetItemInSlot(slot)
+			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
 				if
@@ -1951,30 +1950,30 @@ function ItemPurchaseThink()
 	end
 	-- Vital Toadstool, Ironwood Nut, Tomo'kan Ringcap. They land in the backpack, which cannot cast them.
 	-- Swap one into a main slot and eat it. A drop leaves it on the ground.
-	local forageCalm = #(a:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
-		and not a:WasRecentlyDamagedByAnyHero(3.0)
-	if forageCalm and w > (a._lastBackpackForage or -100) + 3.0 then
+	local forageCalm = #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
+		and not bot:WasRecentlyDamagedByAnyHero(3.0)
+	if forageCalm and now > (bot._lastBackpackForage or -100) + 3.0 then
 		local forageName, forageSlot, forageItem = BackpackForage()
 		if forageItem ~= nil then
-			a._lastBackpackForage = w
+			bot._lastBackpackForage = now
 			local dest = MainSlotForBackpackItem()
 			if dest == nil then
-				local cheap = c.GetMainInvLessValItemSlot(a)
+				local cheap = Item.GetMainInvLessValItemSlot(bot)
 				if cheap ~= nil and cheap >= 0 then
 					dest = cheap
 				end
 			end
 			if dest ~= nil then
 				ForceSwap(forageSlot, dest)
-				local moved = a:GetItemInSlot(dest)
+				local moved = bot:GetItemInSlot(dest)
 				-- Game 031: Dazzle kept a Forager mushroom in the backpack for the rest of the game,
 				-- and this step never logged a use. Log each try (once per 15s).
-				if w >= (a._forageLogAt or -999) then
-					a._forageLogAt = w + 15
+				if now >= (bot._forageLogAt or -999) then
+					bot._forageLogAt = now + 15
 					pcall(print, string.format(
 						"[OHA-FORAGE] t=%.0f %s swap %s slot%d->%d moved=%s",
-						w,
-						(string.gsub(b, "npc_dota_hero_", "")),
+						now,
+						(string.gsub(botName, "npc_dota_hero_", "")),
 						forageName,
 						forageSlot,
 						dest,
@@ -1982,11 +1981,11 @@ function ItemPurchaseThink()
 					))
 				end
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == forageName then
-					MatchTrace.Buy(a, forageName, "backpack forage swap and use")
+					MatchTrace.Buy(bot, forageName, "backpack forage swap and use")
 					if forageName == "item_foragers_stats" or forageName == "item_foragers_mana" then
-						a:Action_UseAbility(moved)
+						bot:Action_UseAbility(moved)
 					else
-						a:Action_UseAbilityOnEntity(moved, a)
+						bot:Action_UseAbilityOnEntity(moved, bot)
 					end
 				end
 				return
@@ -1999,13 +1998,13 @@ function ItemPurchaseThink()
 	-- mana at once. Below 35% mana, swap one into a main slot: a free slot, a parked consumable, else the
 	-- cheapest swappable item that is not one the backpack-promote routine would pull straight back.
 	-- The usage rules (item_clarity / item_enchanted_mango) cast it once the 6s backpack cooldown ends.
-	if w > (a._lastBackpackMana or -100) + 3.0 and e.GetMP(a) < 0.35 and a:DistanceFromFountain() > 2000 then
+	if now > (bot._lastBackpackMana or -100) + 3.0 and Fu.GetMP(bot) < 0.35 and bot:DistanceFromFountain() > 2000 then
 		local manaSlot, manaName = -1, nil
 		for slot = 6, 8 do
-			local it = a:GetItemInSlot(slot)
+			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
-				if name == "item_enchanted_mango" or name == "item_clarity" and not a:WasRecentlyDamagedByAnyHero(4.0) then
+				if name == "item_enchanted_mango" or name == "item_clarity" and not bot:WasRecentlyDamagedByAnyHero(4.0) then
 					manaSlot, manaName = slot, name
 					if name == "item_enchanted_mango" then
 						break
@@ -2014,10 +2013,10 @@ function ItemPurchaseThink()
 			end
 		end
 		if manaName ~= nil then
-			a._lastBackpackMana = w
+			bot._lastBackpackMana = now
 			local dest = nil
 			for slot = 0, 5 do
-				local it = a:GetItemInSlot(slot)
+				local it = bot:GetItemInSlot(slot)
 				if it == nil then
 					dest = slot
 					break
@@ -2026,14 +2025,14 @@ function ItemPurchaseThink()
 			if dest == nil then
 				local bestCost = math.huge
 				for slot = 0, 5 do
-					local it = a:GetItemInSlot(slot)
+					local it = bot:GetItemInSlot(slot)
 					local name = it ~= nil and not it:IsNull() and it:GetName() or nil
 					if
 						name ~= nil
 						and name ~= "item_clarity"
 						and name ~= "item_enchanted_mango"
 						and not tPromoteFromBackpack[name]
-						and not c.IsCanNotSwitchItem(name)
+						and not Item.IsCanNotSwitchItem(name)
 						and not string.find(name, "item_ward", 1, true)
 					then
 						local cost = PARK_IN_BACKPACK[name] and 0 or (GetItemCost(name) or 0)
@@ -2043,75 +2042,75 @@ function ItemPurchaseThink()
 					end
 				end
 			end
-			local out = dest ~= nil and a:GetItemInSlot(dest) or nil
+			local out = dest ~= nil and bot:GetItemInSlot(dest) or nil
 			if dest ~= nil then
-				a:ActionImmediate_SwapItems(manaSlot, dest)
+				bot:ActionImmediate_SwapItems(manaSlot, dest)
 			end
 			-- [OHA-MANA] unverified: whether the swap lands (swaps were often no-ops in earlier builds).
 			-- moved= shows what sits in the main slot right after the order.
-			local moved = dest ~= nil and a:GetItemInSlot(dest) or nil
+			local moved = dest ~= nil and bot:GetItemInSlot(dest) or nil
 			pcall(print, string.format(
 				"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s mp=%.2f",
-				w,
-				(string.gsub(b, "npc_dota_hero_", "")),
+				now,
+				(string.gsub(botName, "npc_dota_hero_", "")),
 				(string.gsub(manaName, "item_", "")),
 				manaSlot,
 				dest ~= nil and tostring(dest) or "none",
 				out ~= nil and not out:IsNull() and (string.gsub(out:GetName(), "item_", "")) or "-",
 				moved ~= nil and not moved:IsNull() and (string.gsub(moved:GetName(), "item_", "")) or "-",
-				e.GetMP(a)
+				Fu.GetMP(bot)
 			))
 		end
 	end
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
-	if w > (a._lastBackpackLotus or -100) + 3.0 then
+	if now > (bot._lastBackpackLotus or -100) + 3.0 then
 		local lotusName, lotusSlot, lotusItem = BackpackLotus()
 		if lotusItem ~= nil then
-			a._lastBackpackLotus = w
-			local hp = e.GetHP(a)
-			local mp = e.GetMP(a)
+			bot._lastBackpackLotus = now
+			local hp = Fu.GetHP(bot)
+			local mp = Fu.GetMP(bot)
 			local ally = nil
 			if hp >= 0.6 and mp >= 0.4 then
 				ally = NearbySupportForLotus(lotusName == "item_greater_famango")
 			end
 			if ally ~= nil then
-				MatchTrace.Buy(a, lotusName, "backpack lotus to support")
-				a:Action_DropItem(lotusItem, ally:GetLocation())
+				MatchTrace.Buy(bot, lotusName, "backpack lotus to support")
+				bot:Action_DropItem(lotusItem, ally:GetLocation())
 				return
 			end
-			local dest = c.GetMainInvLessValItemSlot(a)
+			local dest = Item.GetMainInvLessValItemSlot(bot)
 			if dest ~= nil and dest >= 0 then
-				a:ActionImmediate_SwapItems(lotusSlot, dest)
-				local moved = a:GetItemInSlot(dest)
+				bot:ActionImmediate_SwapItems(lotusSlot, dest)
+				local moved = bot:GetItemInSlot(dest)
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == lotusName then
-					MatchTrace.Buy(a, lotusName, "backpack lotus swap and use")
-					a:Action_UseAbilityOnEntity(moved, a)
+					MatchTrace.Buy(bot, lotusName, "backpack lotus swap and use")
+					bot:Action_UseAbilityOnEntity(moved, bot)
 				end
 				return
 			end
-			MatchTrace.Buy(a, lotusName, "backpack lotus drop")
-			a:Action_DropItem(lotusItem, a:GetLocation())
+			MatchTrace.Buy(bot, lotusName, "backpack lotus drop")
+			bot:Action_DropItem(lotusItem, bot:GetLocation())
 			return
 		end
 	end
-	if e.GetPosition(a) <= 3 and w > (a._lastLotusHandoff or -100) + 4.0 then
-		local hp = e.GetHP(a)
-		local mp = e.GetMP(a)
+	if Fu.GetPosition(bot) <= 3 and now > (bot._lastLotusHandoff or -100) + 4.0 then
+		local hp = Fu.GetHP(bot)
+		local mp = Fu.GetMP(bot)
 		if hp >= 0.78 and mp >= 0.6 then
-			local lotusName, _, lotusItem = c.FindLotusToFreeSlot(a)
+			local lotusName, _, lotusItem = Item.FindLotusToFreeSlot(bot)
 			if lotusItem ~= nil then
 				local ally = NearbySupportForLotus(lotusName == "item_greater_famango")
 				if ally ~= nil then
-					a._lastLotusHandoff = w
-					MatchTrace.Buy(a, lotusName, "core handoff lotus to support")
-					a:Action_DropItem(lotusItem, ally:GetLocation())
+					bot._lastLotusHandoff = now
+					MatchTrace.Buy(bot, lotusName, "core handoff lotus to support")
+					bot:Action_DropItem(lotusItem, ally:GetLocation())
 					return
 				end
 			end
 		end
-	elseif e.GetPosition(a) >= 4 then
+	elseif Fu.GetPosition(bot) >= 4 then
 		-- Supports pick up healing lotuses cores dropped for them (or own stack merge).
-		if c.GetEmptyNonBackpackInventoryAmount(a) >= 1 or c.CanStackGreaterFamango(a) then
+		if Item.GetEmptyNonBackpackInventoryAmount(bot) >= 1 or Item.CanStackGreaterFamango(bot) then
 			for _, drop in pairs(GetDroppedItemList() or {}) do
 				if drop ~= nil and drop.item ~= nil then
 					local dropName = drop.item:GetName()
@@ -2120,12 +2119,12 @@ function ItemPurchaseThink()
 						or dropName == "item_great_famango"
 						or dropName == "item_greater_famango"
 					then
-						local dropDist = GetUnitToLocationDistance(a, drop.location)
+						local dropDist = GetUnitToLocationDistance(bot, drop.location)
 						if dropDist <= 1000 then
 							if dropDist > 120 then
-								a:Action_MoveToLocation(drop.location)
+								bot:Action_MoveToLocation(drop.location)
 							else
-								a:Action_PickUpItem(drop.item)
+								bot:Action_PickUpItem(drop.item)
 							end
 							return
 						end
@@ -2137,53 +2136,53 @@ function ItemPurchaseThink()
 	-- Late game: main bag full.
 	-- 0) Stack greater famango (max 3) when two piles exist — frees a slot.
 	-- 1) Else drop to support if HP/MP full, or consume.
-	if w >= lateLotus and w > (a._lastLotusFreeSlot or -100) + 3.0 then
-		if c.GetEmptyNonBackpackInventoryAmount(a) <= 0 then
-			if c.TryStackGreaterFamango(a) then
-				a._lastLotusFreeSlot = w
-				MatchTrace.Buy(a, "item_greater_famango", "late full-bag stack merge")
+	if now >= lateLotus and now > (bot._lastLotusFreeSlot or -100) + 3.0 then
+		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+			if Item.TryStackGreaterFamango(bot) then
+				bot._lastLotusFreeSlot = now
+				MatchTrace.Buy(bot, "item_greater_famango", "late full-bag stack merge")
 				return
 			end
-			local lotusName, lotusSlot, lotusItem = c.FindLotusToFreeSlot(a)
+			local lotusName, lotusSlot, lotusItem = Item.FindLotusToFreeSlot(bot)
 			if lotusItem ~= nil then
-				local hp = e.GetHP(a)
-				local mp = e.GetMP(a)
+				local hp = Fu.GetHP(bot)
+				local mp = Fu.GetMP(bot)
 				local ally = NearbySupportForLotus(lotusName == "item_greater_famango")
 				if hp >= 0.9 and mp >= 0.85 and ally ~= nil then
-					a._lastLotusFreeSlot = w
-					MatchTrace.Buy(a, lotusName, "late full-bag drop to support")
-					a:Action_DropItem(lotusItem, ally:GetLocation())
+					bot._lastLotusFreeSlot = now
+					MatchTrace.Buy(bot, lotusName, "late full-bag drop to support")
+					bot:Action_DropItem(lotusItem, ally:GetLocation())
 					return
 				end
 				-- Consume (even near full) — cannot sell; opens a slot for the next buy.
 				if lotusSlot > 5 then
-					for J = 0, 5 do
-						if a:GetItemInSlot(J) == nil then
-							a:ActionImmediate_SwapItems(lotusSlot, J)
-							lotusSlot = J
-							lotusItem = a:GetItemInSlot(J)
+					for slot = 0, 5 do
+						if bot:GetItemInSlot(slot) == nil then
+							bot:ActionImmediate_SwapItems(lotusSlot, slot)
+							lotusSlot = slot
+							lotusItem = bot:GetItemInSlot(slot)
 							break
 						end
 					end
 				end
 				if lotusItem ~= nil and lotusSlot >= 0 and lotusSlot <= 5 then
-					a._lastLotusFreeSlot = w
-					MatchTrace.Buy(a, lotusName, "late full-bag consume")
-					a:Action_UseAbilityOnEntity(lotusItem, a)
+					bot._lastLotusFreeSlot = now
+					MatchTrace.Buy(bot, lotusName, "late full-bag consume")
+					bot:Action_UseAbilityOnEntity(lotusItem, bot)
 					return
 				end
 			end
 		end
 	end
-	if #a.purchaseListInReverseOrder == 0 then
-		a2()
-		a:SetNextItemPurchaseValue(0)
-		if w < 20 and E <= 1000 and (D or 0) == 0 then
-			a._openingShopDone = true
+	if #bot.purchaseListInReverseOrder == 0 then
+		ResetBuyState()
+		bot:SetNextItemPurchaseValue(0)
+		if now < 20 and fountainDistance <= 1000 and (stashValue or 0) == 0 then
+			bot._openingShopDone = true
 		end
 		return
 	end
-	local b3 = {
+	local earlyBootsSet = {
 		item_boots = true,
 		item_phase_boots = true,
 		item_power_treads = true,
@@ -2191,160 +2190,160 @@ function ItemPurchaseThink()
 		item_arcane_boots = true,
 	}
 	local function OwnsOtherBoots(item)
-		for _, boot in pairs(c["tEarlyBoots"]) do
-			if boot ~= item and a:FindItemSlot(boot) >= 0 then
+		for _, boot in pairs(Item["tEarlyBoots"]) do
+			if boot ~= item and bot:FindItemSlot(boot) >= 0 then
 				return boot
 			end
 		end
 		return nil
 	end
-	if a.currBuyingItemInPurchaseList == nil and #a.currBuyingBasicItemList == 0 then
-		while #a.purchaseListInReverseOrder > 0 do
-			local b4 = a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder]
-			local otherBoots = b3[b4] and OwnsOtherBoots(b4) or nil
+	if bot.currBuyingItemInPurchaseList == nil and #bot.currBuyingBasicItemList == 0 then
+		while #bot.purchaseListInReverseOrder > 0 do
+			local nextItem = bot.purchaseListInReverseOrder[#bot.purchaseListInReverseOrder]
+			local otherBoots = earlyBootsSet[nextItem] and OwnsOtherBoots(nextItem) or nil
 			-- Aura boots stay: a bot with Guardian Greaves or Boots of Bearing does not also buy Boots of
 			-- Travel (one pair of boots, user rule). Neither the sell-the-old-pair rule above nor the
 			-- travel-boots sell marks cover the aura boots, so 5 builds carried both.
-			local auraBoots = (b4 == "item_travel_boots" or b4 == "item_travel_boots_2")
-				and (a:FindItemSlot("item_guardian_greaves") >= 0 or a:FindItemSlot("item_boots_of_bearing") >= 0)
+			local auraBoots = (nextItem == "item_travel_boots" or nextItem == "item_travel_boots_2")
+				and (bot:FindItemSlot("item_guardian_greaves") >= 0 or bot:FindItemSlot("item_boots_of_bearing") >= 0)
 			if auraBoots then
-				log("[Purchase] Skipping %s — aura boots already owned", b4)
-				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
+				log("[Purchase] Skipping %s — aura boots already owned", nextItem)
+				bot.purchaseListInReverseOrder[#bot.purchaseListInReverseOrder] = nil
 			elseif otherBoots ~= nil then
 				-- A second pair never combines with the first. Sell the old one and buy this.
-				local slot = a:FindItemSlot(otherBoots)
+				local slot = bot:FindItemSlot(otherBoots)
 				if slot >= 0 and slot <= 8 then
-					log("[Purchase] Selling %s to buy %s", otherBoots, b4)
-					a:ActionImmediate_SellItem(a:GetItemInSlot(slot))
+					log("[Purchase] Selling %s to buy %s", otherBoots, nextItem)
+					bot:ActionImmediate_SellItem(bot:GetItemInSlot(slot))
 				end
 				break
-			elseif TeamItems.AllyOwns(a, b4) then
+			elseif TeamItems.AllyOwns(bot, nextItem) then
 				-- Pipe / Crimson / Lotus / Urn / Vessel do not stack. A human or a fixed build may already have one.
-				log("[Purchase] Skipping %s — an ally already has it", b4)
-				a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
+				log("[Purchase] Skipping %s — an ally already has it", nextItem)
+				bot.purchaseListInReverseOrder[#bot.purchaseListInReverseOrder] = nil
 			else
 				break
 			end
 		end
-		if #a.purchaseListInReverseOrder == 0 then
-			a2()
-			a:SetNextItemPurchaseValue(0)
+		if #bot.purchaseListInReverseOrder == 0 then
+			ResetBuyState()
+			bot:SetNextItemPurchaseValue(0)
 			return
 		end
-		a.currBuyingItemInPurchaseList = a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder]
-		local resume = a._resumeBuy and a._resumeBuy[a.currBuyingItemInPurchaseList]
+		bot.currBuyingItemInPurchaseList = bot.purchaseListInReverseOrder[#bot.purchaseListInReverseOrder]
+		local resume = bot._resumeBuy and bot._resumeBuy[bot.currBuyingItemInPurchaseList]
 		if resume ~= nil then
-			a._resumeBuy[a.currBuyingItemInPurchaseList] = nil
-			a.currBuyingBasicItemList = resume.list
-			a.currBuyingBasicItemRefList = resume.ref
-			a.currBuyingRequiredCounts = L(a.currBuyingBasicItemRefList)
-			a._recipeTarget = resume.target or {}
+			bot._resumeBuy[bot.currBuyingItemInPurchaseList] = nil
+			bot.currBuyingBasicItemList = resume.list
+			bot.currBuyingBasicItemRefList = resume.ref
+			bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
+			bot._recipeTarget = resume.target or {}
 			BuyLog(
 				"resume %s left=%d",
-				ShortItem(a.currBuyingItemInPurchaseList),
-				#a.currBuyingBasicItemList
+				ShortItem(bot.currBuyingItemInPurchaseList),
+				#bot.currBuyingBasicItemList
 			)
-			W()
+			NextBasicItem()
 			return
 		end
-		local b5 = c.GetBasicItems({ a.currBuyingItemInPurchaseList })
-		for k = 1, math.ceil(#b5 / 2) do
-			a.currBuyingBasicItemList[k] = b5[#b5 - k + 1]
-			a.currBuyingBasicItemList[#b5 - k + 1] = b5[k]
+		local basicItems = Item.GetBasicItems({ bot.currBuyingItemInPurchaseList })
+		for i = 1, math.ceil(#basicItems / 2) do
+			bot.currBuyingBasicItemList[i] = basicItems[#basicItems - i + 1]
+			bot.currBuyingBasicItemList[#basicItems - i + 1] = basicItems[i]
 		end
-		a.currBuyingBasicItemRefList = f.Deepcopy(a.currBuyingBasicItemList)
-		a.currBuyingRequiredCounts = L(a.currBuyingBasicItemRefList)
+		bot.currBuyingBasicItemRefList = Utils.Deepcopy(bot.currBuyingBasicItemList)
+		bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
 		-- How many of each recipe item this build should end with: owned now plus the recipes in it.
-		a._recipeTarget = {}
-		for _, part in ipairs(a.currBuyingBasicItemRefList) do
+		bot._recipeTarget = {}
+		for _, part in ipairs(bot.currBuyingBasicItemRefList) do
 			if string.find(part, "item_recipe_", 1, true) then
 				local parent = string.gsub(part, "^item_recipe_", "item_")
-				a._recipeTarget[parent] = (a._recipeTarget[parent] or F(a, parent)) + 1
+				bot._recipeTarget[parent] = (bot._recipeTarget[parent] or CountItem(bot, parent)) + 1
 			end
 		end
-		W()
+		NextBasicItem()
 	end
-	if #a.currBuyingBasicItemList == 0 then
+	if #bot.currBuyingBasicItemList == 0 then
 		if
-			c.IsItemInHero(a.currBuyingItemInPurchaseList)
-			or a.currBuyingItemInPurchaseList == "item_aghanims_shard"
-			or a == f.GetLoneDruid(a).hero and f.GetLoneDruid(a).bear ~= nil and c.GetItemTotalWorthInSlots(
-				f.GetLoneDruid(a).bear
-			) < 28000 and c.IsItemInTargetHero(a.currBuyingItemInPurchaseList, f.GetLoneDruid(a).bear)
-			or a.countInvCheck > (GetGameMode() == GAMEMODE_ARDM and 30 or 30)
-			or a.rebuildCount >= 5 and C == 0 and D == 0
+			Item.IsItemInHero(bot.currBuyingItemInPurchaseList)
+			or bot.currBuyingItemInPurchaseList == "item_aghanims_shard"
+			or bot == Utils.GetLoneDruid(bot).hero and Utils.GetLoneDruid(bot).bear ~= nil and Item.GetItemTotalWorthInSlots(
+				Utils.GetLoneDruid(bot).bear
+			) < 28000 and Item.IsItemInTargetHero(bot.currBuyingItemInPurchaseList, Utils.GetLoneDruid(bot).bear)
+			or bot.countInvCheck > (GetGameMode() == GAMEMODE_ARDM and 30 or 30)
+			or bot.rebuildCount >= 5 and courierValue == 0 and stashValue == 0
 		then
-			if a.countInvCheck > 0 or a.rebuildCount >= 5 then
+			if bot.countInvCheck > 0 or bot.rebuildCount >= 5 then
 				log(
 					"[Purchase] %s skipping stuck item %s (rebuilds=%d invCheck=%d)",
-					b,
-					tostring(a.currBuyingItemInPurchaseList),
-					a.rebuildCount,
-					a.countInvCheck
+					botName,
+					tostring(bot.currBuyingItemInPurchaseList),
+					bot.rebuildCount,
+					bot.countInvCheck
 				)
 			end
-			a.countInvCheck = 0
-			a2()
-			a.purchaseListInReverseOrder[#a.purchaseListInReverseOrder] = nil
-		elseif w > a.lastInvCheck + 1.0 then
-			a.lastInvCheck = w
-			if C > 0 or D > 0 then
-				a.countInvCheck = 0
-			elseif a.rebuildCount < 5 and b ~= "npc_dota_hero_lone_druid" then
-				a.rebuildCount = a.rebuildCount + 1
-				for J = 0, 14 do
-					local b6 = a:GetItemInSlot(J)
-					if b6 then
-						local b7 = b6:GetName()
-						if string.find(b7, "recipe") then
-							local b8 = string.gsub(b7, "item_recipe_", "item_")
-							local b9 = c[b8] or c.GetComponentList(b8)
-							if b9 and #b9 > 0 then
-								for O, am in pairs(b9) do
-									if not string.find(am, "recipe") and not c.IsItemInHero(am) then
-										table.insert(a.currBuyingBasicItemList, 1, am)
+			bot.countInvCheck = 0
+			ResetBuyState()
+			bot.purchaseListInReverseOrder[#bot.purchaseListInReverseOrder] = nil
+		elseif now > bot.lastInvCheck + 1.0 then
+			bot.lastInvCheck = now
+			if courierValue > 0 or stashValue > 0 then
+				bot.countInvCheck = 0
+			elseif bot.rebuildCount < 5 and botName ~= "npc_dota_hero_lone_druid" then
+				bot.rebuildCount = bot.rebuildCount + 1
+				for slot = 0, 14 do
+					local item = bot:GetItemInSlot(slot)
+					if item then
+						local itemName = item:GetName()
+						if string.find(itemName, "recipe") then
+							local parentName = string.gsub(itemName, "item_recipe_", "item_")
+							local components = Item[parentName] or Item.GetComponentList(parentName)
+							if components and #components > 0 then
+								for _, component in pairs(components) do
+									if not string.find(component, "recipe") and not Item.IsItemInHero(component) then
+										table.insert(bot.currBuyingBasicItemList, 1, component)
 									end
 								end
-								if #a.currBuyingBasicItemList > 0 then
-									a.currBuyingRequiredCounts = L(a.currBuyingBasicItemList)
+								if #bot.currBuyingBasicItemList > 0 then
+									bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
 									break
 								end
 							end
 						end
 					end
 				end
-				local ba = c.GetReducedPurchaseList(a, a.currBuyingBasicItemRefList)
-				for O, bb in pairs(ba) do
-					if not c.IsItemInHero(bb) then
-						a.currBuyingBasicItemList[#a.currBuyingBasicItemList + 1] = bb
+				local reducedList = Item.GetReducedPurchaseList(bot, bot.currBuyingBasicItemRefList)
+				for _, itemName in pairs(reducedList) do
+					if not Item.IsItemInHero(itemName) then
+						bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList + 1] = itemName
 					end
 				end
-				a.currBuyingRequiredCounts = L(a.currBuyingBasicItemList)
-				W()
+				bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
+				NextBasicItem()
 			else
-				a.countInvCheck = a.countInvCheck + 1
+				bot.countInvCheck = bot.countInvCheck + 1
 			end
 		end
-	elseif #a.currBuyingBasicItemList > 0 then
-		if a.currBuyingBasicItem == nil then
-			a.currBuyingBasicItem = W()
+	elseif #bot.currBuyingBasicItemList > 0 then
+		if bot.currBuyingBasicItem == nil then
+			bot.currBuyingBasicItem = NextBasicItem()
 		else
 			local function buyOpening()
 				if GetGameMode() == 23 then
-					aa()
+					BuyBasicItemTurbo()
 				else
-					a3()
+					BuyBasicItem()
 				end
 			end
 			-- One think at the fountain buys the whole starting kit, before rune mode walks out.
-			if E <= 1000 and w < 20 then
+			if fountainDistance <= 1000 and now < 20 then
 				for _ = 1, 8 do
-					if #a.currBuyingBasicItemList == 0 then
+					if #bot.currBuyingBasicItemList == 0 then
 						break
 					end
-					local gold = a:GetGold()
+					local gold = bot:GetGold()
 					buyOpening()
-					if a:GetGold() >= gold then
+					if bot:GetGold() >= gold then
 						break
 					end
 				end
@@ -2352,14 +2351,14 @@ function ItemPurchaseThink()
 				buyOpening()
 			end
 		end
-		if w < 20 and E <= 1000 and (D or 0) == 0 then
-			local waiting = #a.currBuyingBasicItemList > 0
+		if now < 20 and fountainDistance <= 1000 and (stashValue or 0) == 0 then
+			local waiting = #bot.currBuyingBasicItemList > 0
 			local cost = 0
-			if waiting and a.currBuyingBasicItem ~= nil then
-				cost = GetItemCost(a.currBuyingBasicItem) or 0
+			if waiting and bot.currBuyingBasicItem ~= nil then
+				cost = GetItemCost(bot.currBuyingBasicItem) or 0
 			end
-			if not waiting or a:GetGold() < cost or c.GetEmptyInventoryAmount(a) < 1 then
-				a._openingShopDone = true
+			if not waiting or bot:GetGold() < cost or Item.GetEmptyInventoryAmount(bot) < 1 then
+				bot._openingShopDone = true
 			end
 		end
 	end
@@ -2380,11 +2379,11 @@ end
 local UNUSED_SELL = { item_helm_of_iron_will = 0, item_circlet = 15 * 60 }
 local function NeededLater(name)
 	local list = {}
-	for _, it in ipairs(a.purchaseListInReverseOrder or {}) do
+	for _, it in ipairs(bot.purchaseListInReverseOrder or {}) do
 		list[#list + 1] = it
 	end
-	if a.currBuyingItemInPurchaseList ~= nil then
-		list[#list + 1] = a.currBuyingItemInPurchaseList
+	if bot.currBuyingItemInPurchaseList ~= nil then
+		list[#list + 1] = bot.currBuyingItemInPurchaseList
 	end
 	for _, it in ipairs(list) do
 		if it == name then
@@ -2397,23 +2396,23 @@ local function NeededLater(name)
 		local none = setmetatable({}, { __index = function()
 			return 0
 		end })
-		local ok, parts = pcall(c.GetBasicItems, { it }, none)
+		local ok, parts = pcall(Item.GetBasicItems, { it }, none)
 		if ok and type(parts) == "table" then
-			for _, p in ipairs(parts) do
-				if p == name then
+			for _, part in ipairs(parts) do
+				if part == name then
 					return true
 				end
 			end
 		end
 	end
 	-- Parts still to buy for the item being built right now.
-	for _, p in ipairs(a.currBuyingBasicItemList or {}) do
-		if p == name then
+	for _, part in ipairs(bot.currBuyingBasicItemList or {}) do
+		if part == name then
 			return true
 		end
 	end
-	for _, p in ipairs(a.currBuyingBasicItemRefList or {}) do
-		if p == name then
+	for _, part in ipairs(bot.currBuyingBasicItemRefList or {}) do
+		if part == name then
 			return true
 		end
 	end
@@ -2425,21 +2424,21 @@ local function MarkedForSale()
 		if type(list) ~= "table" then
 			return
 		end
-		for k = 2, #list, 2 do
-			if a:FindItemSlot(list[k - 1]) >= 0 then
-				marks[list[k]] = "pair:" .. list[k - 1]
+		for i = 2, #list, 2 do
+			if bot:FindItemSlot(list[i - 1]) >= 0 then
+				marks[list[i]] = "pair:" .. list[i - 1]
 			end
 		end
 	end
-	pairs2(c.sSellList)
-	pairs2(j)
-	if c.HasItem(a, "item_travel_boots") or c.HasItem(a, "item_travel_boots_2") then
-		for _, boots in ipairs(c["tEarlyBoots"] or {}) do
+	pairs2(Item.sSellList)
+	pairs2(sellList)
+	if Item.HasItem(bot, "item_travel_boots") or Item.HasItem(bot, "item_travel_boots_2") then
+		for _, boots in ipairs(Item["tEarlyBoots"] or {}) do
 			marks[boots] = "travel-boots"
 		end
 	end
 	for name, after in pairs(UNUSED_SELL) do
-		if DotaTime() >= (tonumber(after) or 0) and a:FindItemSlot(name) >= 0 and not NeededLater(name) then
+		if DotaTime() >= (tonumber(after) or 0) and bot:FindItemSlot(name) >= 0 and not NeededLater(name) then
 			marks[name] = "unused"
 		end
 	end
@@ -2447,24 +2446,24 @@ local function MarkedForSale()
 end
 function SellMarkedItems()
 	local now = DotaTime()
-	if now < (a._sellMarkAt or -999) + 1 then
+	if now < (bot._sellMarkAt or -999) + 1 then
 		return
 	end
-	a._sellMarkAt = now
-	local dF, dS, dD = a:DistanceFromFountain(), a:DistanceFromSecretShop(), a:DistanceFromSideShop()
+	bot._sellMarkAt = now
+	local fountainDist, secretShopDist, sideShopDist = bot:DistanceFromFountain(), bot:DistanceFromSecretShop(), bot:DistanceFromSideShop()
 	-- DistanceFromSideShop() is -2147483648 on this map (no side shops; game 018 sell-failed
 	-- lines), so "<= 200" passed everywhere and sells were tried far from any shop. Only a real,
 	-- non-negative distance counts.
-	local atShop = (dF >= 0 and dF <= 500) or (dS >= 0 and dS <= 200) or (dD >= 0 and dD <= 200)
+	local atShop = (fountainDist >= 0 and fountainDist <= 500) or (secretShopDist >= 0 and secretShopDist <= 200) or (sideShopDist >= 0 and sideShopDist <= 200)
 	-- Something waits to be sold: the fountain TP-out rule holds while this is set (game 031,
 	-- 66:48: Medusa walked home to 1942 from the fountain and teleported out at once, and kept her
 	-- Power Treads next to Boots of Travel; the sale needs the fountain within 500).
 	local okM, marks = pcall(MarkedForSale)
-	a._sellPending = false
+	bot._sellPending = false
 	if okM and marks ~= nil then
 		for name in pairs(marks) do
-			if a:FindItemSlot(name) >= 0 and now >= (a._sellBlock ~= nil and a._sellBlock[name] or -999) then
-				a._sellPending = true
+			if bot:FindItemSlot(name) >= 0 and now >= (bot._sellBlock ~= nil and bot._sellBlock[name] or -999) then
+				bot._sellPending = true
 				break
 			end
 		end
@@ -2476,14 +2475,14 @@ function SellMarkedItems()
 	-- to 13 minutes (Magnus Helm of Iron Will 173 times, Medusa Power Treads 172) with no error
 	-- line, far from the fountain. The item still in the bag 1s after the order counts as failed:
 	-- logged once with the shop distances and where it is (sell-failed), then left alone for 30s.
-	a._sellBlock = a._sellBlock or {}
-	local last = a._sellTry
+	bot._sellBlock = bot._sellBlock or {}
+	local last = bot._sellTry
 	if last ~= nil and now - last.at >= 1 then
-		a._sellTry = nil
-		local slot0 = a:FindItemSlot(last.name)
+		bot._sellTry = nil
+		local slot0 = bot:FindItemSlot(last.name)
 		if slot0 >= 0 then
-			a._sellBlock[last.name] = now + 30
-			local me = a:GetLocation()
+			bot._sellBlock[last.name] = now + 30
+			local myLocation = bot:GetLocation()
 			local function shopAt(kind)
 				local okL, loc = pcall(GetShopLocation, GetTeam(), kind)
 				if okL and loc ~= nil then
@@ -2494,14 +2493,14 @@ function SellMarkedItems()
 			pcall(print, string.format(
 				"[OHA-ITEM] t=%.0f %s sell-failed %s slot=%d at=%.0f,%.0f fountain=%d secret=%d side=%d shops secret=%s secret2=%s side=%s side2=%s",
 				now,
-				(string.gsub(b, "npc_dota_hero_", "")),
+				(string.gsub(botName, "npc_dota_hero_", "")),
 				(string.gsub(last.name, "^item_", "")),
 				slot0,
-				me.x,
-				me.y,
-				math.floor(dF),
-				math.floor(dS),
-				math.floor(dD),
+				myLocation.x,
+				myLocation.y,
+				math.floor(fountainDist),
+				math.floor(secretShopDist),
+				math.floor(sideShopDist),
 				shopAt(SHOP_SECRET),
 				shopAt(SHOP_SECRET2),
 				shopAt(SHOP_SIDE),
@@ -2510,41 +2509,41 @@ function SellMarkedItems()
 		end
 	end
 	for name, why in pairs(MarkedForSale()) do
-		local slot = a:FindItemSlot(name)
-		if slot >= 0 and slot <= 14 and now >= (a._sellBlock[name] or -999) then
-			local it = a:GetItemInSlot(slot)
+		local slot = bot:FindItemSlot(name)
+		if slot >= 0 and slot <= 14 and now >= (bot._sellBlock[name] or -999) then
+			local it = bot:GetItemInSlot(slot)
 			if it ~= nil then
-				a._sellTry = { name = name, at = now }
-				a:ActionImmediate_SellItem(it)
+				bot._sellTry = { name = name, at = now }
+				bot:ActionImmediate_SellItem(it)
 				return
 			end
 		end
 	end
 end
-function SetPairedItems(bc)
-	for k = 2, #bc, 2 do
-		local bd = a:FindItemSlot(bc[k - 1])
-		local be = a:FindItemSlot(bc[k])
-		if bd >= 0 and be >= 0 then
-			a:ActionImmediate_SellItem(a:GetItemInSlot(be))
+function SetPairedItems(sellPairs)
+	for i = 2, #sellPairs, 2 do
+		local firstSlot = bot:FindItemSlot(sellPairs[i - 1])
+		local secondSlot = bot:FindItemSlot(sellPairs[i])
+		if firstSlot >= 0 and secondSlot >= 0 then
+			bot:ActionImmediate_SellItem(bot:GetItemInSlot(secondSlot))
 		end
 	end
 end
-function IsThereHealingInStash(G)
-	local bf = 0
-	for k = 9, 14 do
-		local ap = G:GetItemInSlot(k)
-		if ap ~= nil then
+function IsThereHealingInStash(unit)
+	local healingCount = 0
+	for slot = 9, 14 do
+		local item = unit:GetItemInSlot(slot)
+		if item ~= nil then
 			if
-				string.find(ap:GetName(), "item_flask")
-				or string.find(ap:GetName(), "item_tango")
-				or string.find(ap:GetName(), "item_bottle")
+				string.find(item:GetName(), "item_flask")
+				or string.find(item:GetName(), "item_tango")
+				or string.find(item:GetName(), "item_bottle")
 			then
-				bf = bf + 1
+				healingCount = healingCount + 1
 			end
 		end
 	end
-	return bf > 0
+	return healingCount > 0
 end
 -- Engine entry points report their own errors. Unwrapped, an error here showed only as
 -- "Script Runtime Error: error in error handling" (every bot at -89s), with no message.
@@ -2557,9 +2556,9 @@ local function OHA_Guard(name, fn)
 	return function(...)
 		local ok, err = pcall(fn, ...)
 		if not ok then
-			local n = (OHA_ERR_COUNT[name] or 0) + 1
-			OHA_ERR_COUNT[name] = n
-			if n <= 3 then
+			local errorCount = (OHA_ERR_COUNT[name] or 0) + 1
+			OHA_ERR_COUNT[name] = errorCount
+			if errorCount <= 3 then
 				local hero = "?"
 				pcall(function()
 					hero = GetBot():GetUnitName()
@@ -2570,5 +2569,5 @@ local function OHA_Guard(name, fn)
 	end
 end
 ItemPurchaseThink = OHA_Guard("ItemPurchaseThink", ItemPurchaseThink)
-g.ItemPurchaseThink = ItemPurchaseThink
-return g
+ItemPurchase.ItemPurchaseThink = ItemPurchaseThink
+return ItemPurchase

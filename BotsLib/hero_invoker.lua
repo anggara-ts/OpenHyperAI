@@ -1,31 +1,31 @@
 -- Invoker: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local f = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local g = c.Skill.GetTalentList(b)
-local h = c.Skill.GetAbilityList(b)
-local i = c.Item.GetRoleItemsBuyList(b)
-local j = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	-- 7.41b replaced +1 Orb Levels (right) with Forged Spirit armor reduction; take +Chaos Meteors (left).
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 -- 8 levels per orb: 7.41b's extra points at levels 6, 12 and 18 fund the 8th orb level.
-local k = {
+local tAllAbilityBuildList = {
 	{ 2, 1, 2, 1, 3, 1, 2, 1, 2, 2, 3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 1, 2, 1, 3 },
 	{ 3, 1, 3, 1, 2, 3, 1, 3, 1, 3, 2, 3, 2, 3, 2, 2, 2, 2, 1, 1, 1, 3, 1, 2 },
 }
-local l = k[1]
-local m = c.Skill.GetTalentBuild(j[1])
-local n = {}
+local nAbilityBuildList = tAllAbilityBuildList[1]
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
+local sRoleItemsBuyList = {}
 -- 7.41: Invoker's Aghanim's Scepter and Shard stay inert until he activates them and picks one
 -- of three upgrades. Tested (games 016 and 017): bought, they sit in the inventory as castable
 -- items with no buff; cast by the bot, nothing changes (same abilities, still inert). The bot API
 -- cannot make the pick, so he does not buy them.
-n["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_ranged_carry_outfit",
 	"item_urn_of_shadows",
 	"item_spirit_vessel",
@@ -40,7 +40,7 @@ n["pos_2"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-n["pos_2_qe"] = {
+sRoleItemsBuyList["pos_2_qe"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_null_talisman",
@@ -58,25 +58,25 @@ n["pos_2_qe"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-n["pos_1"] = n["pos_2"]
-n["pos_3"] = n["pos_2"]
-n["pos_4"] = n["pos_2"]
-n["pos_5"] = n["pos_2"]
-a["sBuyList"] = n[i]
-if e["GameStates"]["invoker"] == nil then
-	if (i == "pos_2" or i == "pos_1") and RandomInt(1, 9) >= 3 then
-		e["GameStates"]["invoker"] = { roleType = "pos_2_qe" }
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_2"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+if Utils["GameStates"]["invoker"] == nil then
+	if (sRole == "pos_2" or sRole == "pos_1") and RandomInt(1, 9) >= 3 then
+		Utils["GameStates"]["invoker"] = { roleType = "pos_2_qe" }
 	else
-		e["GameStates"]["invoker"] = { roleType = "pos_2" }
+		Utils["GameStates"]["invoker"] = { roleType = "pos_2" }
 	end
 else
-	if e["GameStates"]["invoker"].roleType == "pos_2_qe" then
-		a["sBuyList"] = n["pos_2_qe"]
-		l = k[2]
-		m = c.Skill.GetTalentBuild(j[2])
+	if Utils["GameStates"]["invoker"].roleType == "pos_2_qe" then
+		X["sBuyList"] = sRoleItemsBuyList["pos_2_qe"]
+		nAbilityBuildList = tAllAbilityBuildList[2]
+		nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 	end
 end
-a["sSellList"] = {
+X["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
 	"item_sheepstick",
@@ -84,100 +84,100 @@ a["sSellList"] = {
 	"item_octarine_core",
 	"item_null_talisman",
 }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-l, m, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(l, m, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(h, l, g, m)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(o)
-	if e.IsUnitWithName(o, "forged_spirit") then
-		botTarget = c.GetProperTarget(b)
-		local p = o:GetAttackTarget()
-		if p == nil then
-			o:GetTarget()
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	if Utils.IsUnitWithName(hMinionUnit, "forged_spirit") then
+		botTarget = Fu.GetProperTarget(bot)
+		local attackTarget = hMinionUnit:GetAttackTarget()
+		if attackTarget == nil then
+			hMinionUnit:GetTarget()
 		end
-		local q = b:GetNearbyTowers(700, true)
-		if botTarget ~= nil and (#q < 1 or c.GetHP(botTarget) < 0.2) then
+		local enemyTowers = bot:GetNearbyTowers(700, true)
+		if botTarget ~= nil and (#enemyTowers < 1 or Fu.GetHP(botTarget) < 0.2) then
 			if botTarget ~= nil then
-				o:Action_AttackUnit(botTarget, false)
+				hMinionUnit:Action_AttackUnit(botTarget, false)
 				return
 			end
 		end
-		if p ~= nil and (#q < 1 or c.GetHP(p) < 0.2) then
-			if p ~= nil then
-				o:Action_AttackUnit(p, false)
+		if attackTarget ~= nil and (#enemyTowers < 1 or Fu.GetHP(attackTarget) < 0.2) then
+			if attackTarget ~= nil then
+				hMinionUnit:Action_AttackUnit(attackTarget, false)
 				return
 			end
-			f.MinionThink(o)
+			Minion.MinionThink(hMinionUnit)
 		end
-		if c.GetHP(o) < 0.5 and botTarget ~= nil and c.IsInRange(o, botTarget, botTarget:GetAttackRange()) then
-			o:Action_MoveToLocation(c.GetTeamFountain())
+		if Fu.GetHP(hMinionUnit) < 0.5 and botTarget ~= nil and Fu.IsInRange(hMinionUnit, botTarget, botTarget:GetAttackRange()) then
+			hMinionUnit:Action_MoveToLocation(Fu.GetTeamFountain())
 			return
 		end
-		if c.IsLaning(b) or c.IsFarming(b) then
-			if GetUnitToUnitDistance(o, b) > 500 then
-				o:Action_AttackMove(b:GetLocation() + RandomVector(220))
+		if Fu.IsLaning(bot) or Fu.IsFarming(bot) then
+			if GetUnitToUnitDistance(hMinionUnit, bot) > 500 then
+				hMinionUnit:Action_AttackMove(bot:GetLocation() + RandomVector(220))
 			end
 		end
 	else
-		f.MinionThink(o)
+		Minion.MinionThink(hMinionUnit)
 	end
 end
-local r = SafeAbility(b:GetAbilityByName("invoker_quas"), "invoker_quas", "invoker")
-local s = SafeAbility(b:GetAbilityByName("invoker_wex"), "invoker_wex", "invoker")
-local t = SafeAbility(b:GetAbilityByName("invoker_exort"), "invoker_exort", "invoker")
-local u = SafeAbility(b:GetAbilityByName("invoker_invoke"), "invoker_invoke", "invoker")
-local v = SafeAbility(b:GetAbilityByName("invoker_cold_snap"), "invoker_cold_snap", "invoker")
-local w = SafeAbility(b:GetAbilityByName("invoker_ghost_walk"), "invoker_ghost_walk", "invoker")
-local x = SafeAbility(b:GetAbilityByName("invoker_tornado"), "invoker_tornado", "invoker")
-local y = SafeAbility(b:GetAbilityByName("invoker_emp"), "invoker_emp", "invoker")
-local z = SafeAbility(b:GetAbilityByName("invoker_alacrity"), "invoker_alacrity", "invoker")
-local A = SafeAbility(b:GetAbilityByName("invoker_chaos_meteor"), "invoker_chaos_meteor", "invoker")
-local B = SafeAbility(b:GetAbilityByName("invoker_sun_strike"), "invoker_sun_strike", "invoker")
-local C = SafeAbility(b:GetAbilityByName("invoker_forge_spirit"), "invoker_forge_spirit", "invoker")
-local D = SafeAbility(b:GetAbilityByName("invoker_ice_wall"), "invoker_ice_wall", "invoker")
-local E = SafeAbility(b:GetAbilityByName("invoker_deafening_blast"), "invoker_deafening_blast", "invoker")
-local F = "Cataclysm"
-local G = "modifier_wind_waker"
-local H = "modifier_item_wind_waker"
-local I = "modifier_item_cyclone"
-local J = "modifier_eul_cyclone"
-local K = "modifier_invoker_cold_snap"
-local L = "modifier_invoker_cold_snap_freeze"
-local M = "modifier_invoker_ghost_walk_self"
-local N = "modifier_invoker_ghost_walk_enemy"
-local O = "modifier_invoker_tornado"
-local P = "modifier_invoker_emp"
-local Q = "modifier_invoker_emp_pull_thinker"
-local R = "modifier_invoker_emp_pull"
-local S = "modifier_invoker_alacrity"
-local T = "modifier_invoker_chaos_meteor_land"
-local U = "modifier_invoker_chaos_meteor_burn"
-local V = "modifier_invoker_ice_wall_thinker"
-local W = "modifier_invoker_ice_wall_slow_aura"
-local X = "modifier_invoker_deafening_blast_disarm"
-local Y = "modifier_invoker_attack_visuals"
-local Z = {
-	O,
+local quasAbility = SafeAbility(bot:GetAbilityByName("invoker_quas"), "invoker_quas", "invoker")
+local wexAbility = SafeAbility(bot:GetAbilityByName("invoker_wex"), "invoker_wex", "invoker")
+local exortAbility = SafeAbility(bot:GetAbilityByName("invoker_exort"), "invoker_exort", "invoker")
+local invokeAbility = SafeAbility(bot:GetAbilityByName("invoker_invoke"), "invoker_invoke", "invoker")
+local coldSnapAbility = SafeAbility(bot:GetAbilityByName("invoker_cold_snap"), "invoker_cold_snap", "invoker")
+local ghostWalkAbility = SafeAbility(bot:GetAbilityByName("invoker_ghost_walk"), "invoker_ghost_walk", "invoker")
+local tornadoAbility = SafeAbility(bot:GetAbilityByName("invoker_tornado"), "invoker_tornado", "invoker")
+local empAbility = SafeAbility(bot:GetAbilityByName("invoker_emp"), "invoker_emp", "invoker")
+local alacrityAbility = SafeAbility(bot:GetAbilityByName("invoker_alacrity"), "invoker_alacrity", "invoker")
+local chaosMeteorAbility = SafeAbility(bot:GetAbilityByName("invoker_chaos_meteor"), "invoker_chaos_meteor", "invoker")
+local sunstrikeAbility = SafeAbility(bot:GetAbilityByName("invoker_sun_strike"), "invoker_sun_strike", "invoker")
+local forgeSpiritAbility = SafeAbility(bot:GetAbilityByName("invoker_forge_spirit"), "invoker_forge_spirit", "invoker")
+local iceWallAbility = SafeAbility(bot:GetAbilityByName("invoker_ice_wall"), "invoker_ice_wall", "invoker")
+local deafeningBlastAbility = SafeAbility(bot:GetAbilityByName("invoker_deafening_blast"), "invoker_deafening_blast", "invoker")
+local cataclysmName = "Cataclysm"
+local modifierWindWaker = "modifier_wind_waker"
+local modifierItemWindWaker = "modifier_item_wind_waker"
+local modifierItemCyclone = "modifier_item_cyclone"
+local modifierEulCyclone = "modifier_eul_cyclone"
+local modifierColdSnap = "modifier_invoker_cold_snap"
+local modifierColdSnapFreeze = "modifier_invoker_cold_snap_freeze"
+local modifierGhostWalkSelf = "modifier_invoker_ghost_walk_self"
+local modifierGhostWalkEnemy = "modifier_invoker_ghost_walk_enemy"
+local modifierTornado = "modifier_invoker_tornado"
+local modifierEmp = "modifier_invoker_emp"
+local modifierEmpPullThinker = "modifier_invoker_emp_pull_thinker"
+local modifierEmpPull = "modifier_invoker_emp_pull"
+local modifierAlacrity = "modifier_invoker_alacrity"
+local modifierChaosMeteorLand = "modifier_invoker_chaos_meteor_land"
+local modifierChaosMeteorBurn = "modifier_invoker_chaos_meteor_burn"
+local modifierIceWallThinker = "modifier_invoker_ice_wall_thinker"
+local modifierIceWallSlowAura = "modifier_invoker_ice_wall_slow_aura"
+local modifierDeafeningBlastDisarm = "modifier_invoker_deafening_blast_disarm"
+local modifierAttackVisuals = "modifier_invoker_attack_visuals"
+local airborneModifiers = {
+	modifierTornado,
 	"modifier_item_cyclone",
 	"modifier_eul_cyclone",
 	"modifier_wind_waker",
 	"modifier_item_wind_waker",
 	"modifier_brewmaster_storm_cyclone",
 }
-local _, a0
-local a1
-local a2, a3
-local a4, a5
-local a6, a7
-local a8, a9
-local aa, ab
-local ac
-local ad
-local ae, af
-local ag = {
+local coldSnapDesire, coldSnapTarget
+local ghostWalkDesire
+local tornadoDesire, tornadoLocation
+local empDesire, empLocation
+local alacrityDesire, alacrityTarget
+local chaosMeteorDesire, chaosMeteorLocation
+local sunstrikeDesire, sunstrikeLocation
+local forgeSpiritDesire
+local iceWallDesire
+local deafeningBlastDesire, deafeningBlastLocation
+local unusedSpellWeights = {
 	ColdSnap = 20,
 	GhostWalk = 35,
 	Tornado = 30,
@@ -191,7 +191,7 @@ local ag = {
 	Cataclysm = 100,
 	Verified = {},
 }
-local ah = {
+local lastCastTime = {
 	ColdSnap = -100,
 	GhostWalk = -100,
 	Tornado = -100,
@@ -204,7 +204,7 @@ local ah = {
 	DeafeningBlast = -100,
 	Cataclysm = -100,
 }
-local ai = {
+local spellKeyByAbilityName = {
 	invoker_cold_snap = "ColdSnap",
 	invoker_ghost_walk = "GhostWalk",
 	invoker_tornado = "Tornado",
@@ -216,596 +216,596 @@ local ai = {
 	invoker_ice_wall = "IceWall",
 	invoker_deafening_blast = "DeafeningBlast",
 }
-local aj = { "Right Click Combo", true }
-local ak = { "Eul/Cyclone, Meteor & Blast Combo", true }
-local al = { "Tornado, Meteor & Blast Combo", true }
-local am = { "DoT Combo", true }
-local an = { "Tornado & emp", true }
-local ao = { "Eul/Cyclone, Cold Snap Combo", true }
-local ap = { "Cold Snap Combo", true }
-local aq = { "Fixed Position Combo", true }
-local ar = { "Slowed Combo", true }
-local as = { "Instance Helper", true }
-local at = { "Kill Steal", true }
-local au = { "Linken Breaker", true }
-local av = { "Interrupt", true }
-local aw = { "Spell Protection", true }
-local ax = { "Defend", true }
-local ay = { "Ice Wall Helper", true }
-local az = { "Tornado & Sunstrike/Cataclysm", true }
-local aA
-local aB
+local comboRightClick = { "Right Click Combo", true }
+local comboCycloneMeteorBlast = { "Eul/Cyclone, Meteor & Blast Combo", true }
+local comboTornadoMeteorBlast = { "Tornado, Meteor & Blast Combo", true }
+local comboDot = { "DoT Combo", true }
+local comboTornadoEmp = { "Tornado & emp", true }
+local comboCycloneColdSnap = { "Eul/Cyclone, Cold Snap Combo", true }
+local comboColdSnap = { "Cold Snap Combo", true }
+local comboFixedPosition = { "Fixed Position Combo", true }
+local comboSlowed = { "Slowed Combo", true }
+local optionInstanceHelper = { "Instance Helper", true }
+local optionKillSteal = { "Kill Steal", true }
+local optionLinkenBreaker = { "Linken Breaker", true }
+local optionInterrupt = { "Interrupt", true }
+local optionSpellProtection = { "Spell Protection", true }
+local optionDefend = { "Defend", true }
+local optionIceWallHelper = { "Ice Wall Helper", true }
+local comboTornadoSunstrike = { "Tornado & Sunstrike/Cataclysm", true }
+local empDelay
+local tornadoLiftDuration
 local botTarget
-local aC = 280
-local aD = -1
-local aE, aF, aG
-local aH
-local aI
-local aJ
-local aK
-local aL
-local aM
-function a.SkillsComplement()
+local laningManaReserve = 280
+local lastMana = -1
+local nearbyEnemies, nearbyAllies, isLaningPhase
+local isEngaging
+local isRetreating
+local isAttacking
+local hpRatio
+local mpRatio
+local isTeamFight
+function X.SkillsComplement()
 	CheckAbilityUsage()
-	if c.CanNotUseAbility(b) then
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local aN = d.Build(b)
-	aH = aN.isEngaging
-	aI = aN.isRetreating
-	aJ = c.IsAttacking(b)
-	aK = aN.hp
-	aL = aN.mp
-	aM = aN.isTeamFight
-	aE = c.GetNearbyHeroes(b, 1600, true)
-	aF = c.GetNearbyHeroes(b, 1600, false)
-	aG = c.IsInLaningPhase(b)
-	if b:HasModifier(M) and not b:HasModifier("modifier_item_dustofappearance") and aI then
+	local context = AbilityContext.Build(bot)
+	isEngaging = context.isEngaging
+	isRetreating = context.isRetreating
+	isAttacking = Fu.IsAttacking(bot)
+	hpRatio = context.hp
+	mpRatio = context.mp
+	isTeamFight = context.isTeamFight
+	nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true)
+	nearbyAllies = Fu.GetNearbyHeroes(bot, 1600, false)
+	isLaningPhase = Fu.IsInLaningPhase(bot)
+	if bot:HasModifier(modifierGhostWalkSelf) and not bot:HasModifier("modifier_item_dustofappearance") and isRetreating then
 		return
 	end
-	botTarget = aN.target
-	aB = x:GetSpecialValueFloat("lift_duration")
+	botTarget = context.target
+	tornadoLiftDuration = tornadoAbility:GetSpecialValueFloat("lift_duration")
 	ConsiderFirstSpell()
-	a.ConsiderClearActions()
-	a.ConsiderPreInvoke()
-	CataclysmDesire = a.ConsiderCataclysm()
+	X.ConsiderClearActions()
+	X.ConsiderPreInvoke()
+	CataclysmDesire = X.ConsiderCataclysm()
 	if CataclysmDesire > 0 then
-		a.CastInvokerSpell(F)
+		X.CastInvokerSpell(cataclysmName)
 		return
 	end
-	aa, ab = a.ConsiderSunstrike()
-	if aa > 0 then
-		a.CastInvokerSpell(B, ab)
+	sunstrikeDesire, sunstrikeLocation = X.ConsiderSunstrike()
+	if sunstrikeDesire > 0 then
+		X.CastInvokerSpell(sunstrikeAbility, sunstrikeLocation)
 		return
 	end
-	a1 = a.ConsiderGhostWalk()
-	if a1 > 0 then
-		a.CastInvokerSpell(w)
+	ghostWalkDesire = X.ConsiderGhostWalk()
+	if ghostWalkDesire > 0 then
+		X.CastInvokerSpell(ghostWalkAbility)
 		return
 	end
-	local aO = 2
-	if s:GetLevel() >= 4 then
-		a2, a3 = a.ConsiderTornado()
-		if a2 > 0 then
-			a.CastInvokerSpell(x, a3)
+	local comboWindow = 2
+	if wexAbility:GetLevel() >= 4 then
+		tornadoDesire, tornadoLocation = X.ConsiderTornado()
+		if tornadoDesire > 0 then
+			X.CastInvokerSpell(tornadoAbility, tornadoLocation)
 			return
 		end
-		a4, a5 = a.ConsiderEMP()
-		if a4 > 0 then
-			a.CastInvokerSpell(y, a5)
-			return
-		end
-	end
-	if t:GetLevel() >= 4 then
-		a8, a9 = a.ConsiderChaosMeteor()
-		if a8 > 0 then
-			a.CastInvokerSpell(A, a9)
-			return
-		end
-		ae, af = a.ConsiderDeafeningBlast()
-		if ae > 0 then
-			a.CastInvokerSpell(E, af)
+		empDesire, empLocation = X.ConsiderEMP()
+		if empDesire > 0 then
+			X.CastInvokerSpell(empAbility, empLocation)
 			return
 		end
 	end
-	if DotaTime() - ah["Tornado"] <= aO then
-		a4, a5 = a.ConsiderEMP()
-		if a4 > 0 then
-			a.CastInvokerSpell(y, a5)
+	if exortAbility:GetLevel() >= 4 then
+		chaosMeteorDesire, chaosMeteorLocation = X.ConsiderChaosMeteor()
+		if chaosMeteorDesire > 0 then
+			X.CastInvokerSpell(chaosMeteorAbility, chaosMeteorLocation)
 			return
 		end
-		a8, a9 = a.ConsiderChaosMeteor()
-		if a8 > 0 then
-			a.CastInvokerSpell(A, a9)
+		deafeningBlastDesire, deafeningBlastLocation = X.ConsiderDeafeningBlast()
+		if deafeningBlastDesire > 0 then
+			X.CastInvokerSpell(deafeningBlastAbility, deafeningBlastLocation)
 			return
 		end
 	end
-	if DotaTime() - ah["ChaosMeteor"] <= aO then
-		ae, af = a.ConsiderDeafeningBlast()
-		if ae > 0 then
-			a.CastInvokerSpell(E, af)
+	if DotaTime() - lastCastTime["Tornado"] <= comboWindow then
+		empDesire, empLocation = X.ConsiderEMP()
+		if empDesire > 0 then
+			X.CastInvokerSpell(empAbility, empLocation)
 			return
 		end
-		CataclysmDesire = a.ConsiderCataclysm()
+		chaosMeteorDesire, chaosMeteorLocation = X.ConsiderChaosMeteor()
+		if chaosMeteorDesire > 0 then
+			X.CastInvokerSpell(chaosMeteorAbility, chaosMeteorLocation)
+			return
+		end
+	end
+	if DotaTime() - lastCastTime["ChaosMeteor"] <= comboWindow then
+		deafeningBlastDesire, deafeningBlastLocation = X.ConsiderDeafeningBlast()
+		if deafeningBlastDesire > 0 then
+			X.CastInvokerSpell(deafeningBlastAbility, deafeningBlastLocation)
+			return
+		end
+		CataclysmDesire = X.ConsiderCataclysm()
 		if CataclysmDesire > 0 then
-			a.CastInvokerSpell(F)
+			X.CastInvokerSpell(cataclysmName)
 			return
 		end
-		_, a0 = a.ConsiderColdSnap()
-		if _ > 0 then
-			a.CastInvokerSpell(v, a0)
-			return
-		end
-	end
-	if DotaTime() - ah["ColdSnap"] <= aO then
-		a6, a7 = a.ConsiderAlacrity()
-		if a6 > 0 then
-			a.CastInvokerSpell(z, a7)
-			return
-		end
-		a8, a9 = a.ConsiderChaosMeteor()
-		if a8 > 0 then
-			a.CastInvokerSpell(A, a9)
-			return
-		end
-		a2, a3 = a.ConsiderTornado()
-		if a2 > 0 then
-			a.CastInvokerSpell(x, a3)
+		coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+		if coldSnapDesire > 0 then
+			X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
 			return
 		end
 	end
-	if DotaTime() - ah["Alacrity"] <= aO then
-		_, a0 = a.ConsiderColdSnap()
-		if _ > 0 then
-			a.CastInvokerSpell(v, a0)
+	if DotaTime() - lastCastTime["ColdSnap"] <= comboWindow then
+		alacrityDesire, alacrityTarget = X.ConsiderAlacrity()
+		if alacrityDesire > 0 then
+			X.CastInvokerSpell(alacrityAbility, alacrityTarget)
 			return
 		end
-		ac = a.ConsiderForgeSpirit()
-		if ac > 0 then
-			a.CastInvokerSpell(C)
+		chaosMeteorDesire, chaosMeteorLocation = X.ConsiderChaosMeteor()
+		if chaosMeteorDesire > 0 then
+			X.CastInvokerSpell(chaosMeteorAbility, chaosMeteorLocation)
 			return
 		end
-	end
-	if DotaTime() - ah["ForgeSpirit"] <= aO then
-		_, a0 = a.ConsiderColdSnap()
-		if _ > 0 then
-			a.CastInvokerSpell(v, a0)
-			return
-		end
-		a6, a7 = a.ConsiderAlacrity()
-		if a6 > 0 then
-			a.CastInvokerSpell(z, a7)
+		tornadoDesire, tornadoLocation = X.ConsiderTornado()
+		if tornadoDesire > 0 then
+			X.CastInvokerSpell(tornadoAbility, tornadoLocation)
 			return
 		end
 	end
-	if DotaTime() - ah["IceWall"] <= aO then
-		_, a0 = a.ConsiderColdSnap()
-		if _ > 0 then
-			a.CastInvokerSpell(v, a0)
+	if DotaTime() - lastCastTime["Alacrity"] <= comboWindow then
+		coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+		if coldSnapDesire > 0 then
+			X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
 			return
 		end
-		a8, a9 = a.ConsiderChaosMeteor()
-		if a8 > 0 then
-			a.CastInvokerSpell(A, a9)
-			return
-		end
-		a4, a5 = a.ConsiderEMP()
-		if a4 > 0 then
-			a.CastInvokerSpell(y, a5)
+		forgeSpiritDesire = X.ConsiderForgeSpirit()
+		if forgeSpiritDesire > 0 then
+			X.CastInvokerSpell(forgeSpiritAbility)
 			return
 		end
 	end
-	if DotaTime() - ah["DeafeningBlast"] <= aO then
-		aa, ab = a.ConsiderSunstrike()
-		if aa > 0 then
-			a.CastInvokerSpell(B, ab)
+	if DotaTime() - lastCastTime["ForgeSpirit"] <= comboWindow then
+		coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+		if coldSnapDesire > 0 then
+			X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
 			return
 		end
-		_, a0 = a.ConsiderColdSnap()
-		if _ > 0 then
-			a.CastInvokerSpell(v, a0)
+		alacrityDesire, alacrityTarget = X.ConsiderAlacrity()
+		if alacrityDesire > 0 then
+			X.CastInvokerSpell(alacrityAbility, alacrityTarget)
 			return
 		end
 	end
-	ac = a.ConsiderForgeSpirit()
-	if ac > 0 then
-		a.CastInvokerSpell(C)
+	if DotaTime() - lastCastTime["IceWall"] <= comboWindow then
+		coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+		if coldSnapDesire > 0 then
+			X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
+			return
+		end
+		chaosMeteorDesire, chaosMeteorLocation = X.ConsiderChaosMeteor()
+		if chaosMeteorDesire > 0 then
+			X.CastInvokerSpell(chaosMeteorAbility, chaosMeteorLocation)
+			return
+		end
+		empDesire, empLocation = X.ConsiderEMP()
+		if empDesire > 0 then
+			X.CastInvokerSpell(empAbility, empLocation)
+			return
+		end
+	end
+	if DotaTime() - lastCastTime["DeafeningBlast"] <= comboWindow then
+		sunstrikeDesire, sunstrikeLocation = X.ConsiderSunstrike()
+		if sunstrikeDesire > 0 then
+			X.CastInvokerSpell(sunstrikeAbility, sunstrikeLocation)
+			return
+		end
+		coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+		if coldSnapDesire > 0 then
+			X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
+			return
+		end
+	end
+	forgeSpiritDesire = X.ConsiderForgeSpirit()
+	if forgeSpiritDesire > 0 then
+		X.CastInvokerSpell(forgeSpiritAbility)
 		return
 	end
-	_, a0 = a.ConsiderColdSnap()
-	if _ > 0 then
-		a.CastInvokerSpell(v, a0)
+	coldSnapDesire, coldSnapTarget = X.ConsiderColdSnap()
+	if coldSnapDesire > 0 then
+		X.CastInvokerSpell(coldSnapAbility, coldSnapTarget)
 		return
 	end
-	a6, a7 = a.ConsiderAlacrity()
-	if a6 > 0 then
-		a.CastInvokerSpell(z, a7)
+	alacrityDesire, alacrityTarget = X.ConsiderAlacrity()
+	if alacrityDesire > 0 then
+		X.CastInvokerSpell(alacrityAbility, alacrityTarget)
 		return
 	end
-	a2, a3 = a.ConsiderTornado()
-	if a2 > 0 then
-		a.CastInvokerSpell(x, a3)
+	tornadoDesire, tornadoLocation = X.ConsiderTornado()
+	if tornadoDesire > 0 then
+		X.CastInvokerSpell(tornadoAbility, tornadoLocation)
 		return
 	end
-	a4, a5 = a.ConsiderEMP()
-	if a4 > 0 then
-		a.CastInvokerSpell(y, a5)
+	empDesire, empLocation = X.ConsiderEMP()
+	if empDesire > 0 then
+		X.CastInvokerSpell(empAbility, empLocation)
 		return
 	end
-	ad = a.ConsiderIceWall()
-	if ad > 0 then
-		a.CastInvokerSpell(D)
+	iceWallDesire = X.ConsiderIceWall()
+	if iceWallDesire > 0 then
+		X.CastInvokerSpell(iceWallAbility)
 		return
 	end
 	if
-		aG
-		and b:GetLevel() >= 2
-		and b:GetLevel() <= 12
-		and aK > 0.75
-		and #aE <= #aF
-		and not aI
-		and not aH
-		and not aM
+		isLaningPhase
+		and bot:GetLevel() >= 2
+		and bot:GetLevel() <= 12
+		and hpRatio > 0.75
+		and #nearbyEnemies <= #nearbyAllies
+		and not isRetreating
+		and not isEngaging
+		and not isTeamFight
 	then
-		local aP = b:GetNearbyLaneCreeps(300, true)
-		local q = b:GetNearbyTowers(700, true)
-		if aP ~= nil and #aP > 3 and q ~= nil and #q >= 1 then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(300, true)
+		local enemyTowers = bot:GetNearbyTowers(700, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps > 3 and enemyTowers ~= nil and #enemyTowers >= 1 then
 			return
 		end
-		for aQ, aR in pairs(aE) do
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(aR)
-				and aK >= c.GetHP(aR)
-				and b:GetAttackTarget() ~= aR
-				and (b:HasModifier(S) or aR:HasModifier(L) or aR:HasModifier(U))
+				Fu.IsValidHero(enemyHero)
+				and hpRatio >= Fu.GetHP(enemyHero)
+				and bot:GetAttackTarget() ~= enemyHero
+				and (bot:HasModifier(modifierAlacrity) or enemyHero:HasModifier(modifierColdSnapFreeze) or enemyHero:HasModifier(modifierChaosMeteorBurn))
 			then
-				b:ActionQueue_AttackUnit(aR, true)
+				bot:ActionQueue_AttackUnit(enemyHero, true)
 				return
 			end
 		end
 	end
 end
-function a.ConsiderInvoke()
-	if not u:IsFullyCastable() then
+function X.ConsiderInvoke()
+	if not invokeAbility:IsFullyCastable() then
 		return
 	end
 end
-local aS = 0
-function a.ConsiderPreInvoke()
-	if r:IsTrained() and s:IsTrained() and t:IsTrained() then
-		local aT = b:GetAbilityInSlot(3)
-		local aU = b:GetAbilityInSlot(4)
-		if aT ~= nil and aU ~= nil and not aT:IsFullyCastable() and aU:IsFullyCastable() and u:IsFullyCastable() then
-			if aU == v then
-				a.InvokeActualSpell(v)
-			elseif aU == x then
-				a.InvokeActualSpell(x)
-			elseif aU == w then
-				a.InvokeActualSpell(w)
-			elseif aU == D then
-				a.InvokeActualSpell(D)
-			elseif aU == y then
-				a.InvokeActualSpell(y)
-			elseif aU == z then
-				a.InvokeActualSpell(z)
-			elseif aU == B then
-				a.InvokeActualSpell(B)
-			elseif aU == C then
-				a.InvokeActualSpell(C)
-			elseif aU == A then
-				a.InvokeActualSpell(A)
-			elseif aU == E then
-				a.InvokeActualSpell(E)
+local lastPreInvokeTime = 0
+function X.ConsiderPreInvoke()
+	if quasAbility:IsTrained() and wexAbility:IsTrained() and exortAbility:IsTrained() then
+		local firstSpellSlot = bot:GetAbilityInSlot(3)
+		local secondSpellSlot = bot:GetAbilityInSlot(4)
+		if firstSpellSlot ~= nil and secondSpellSlot ~= nil and not firstSpellSlot:IsFullyCastable() and secondSpellSlot:IsFullyCastable() and invokeAbility:IsFullyCastable() then
+			if secondSpellSlot == coldSnapAbility then
+				X.InvokeActualSpell(coldSnapAbility)
+			elseif secondSpellSlot == tornadoAbility then
+				X.InvokeActualSpell(tornadoAbility)
+			elseif secondSpellSlot == ghostWalkAbility then
+				X.InvokeActualSpell(ghostWalkAbility)
+			elseif secondSpellSlot == iceWallAbility then
+				X.InvokeActualSpell(iceWallAbility)
+			elseif secondSpellSlot == empAbility then
+				X.InvokeActualSpell(empAbility)
+			elseif secondSpellSlot == alacrityAbility then
+				X.InvokeActualSpell(alacrityAbility)
+			elseif secondSpellSlot == sunstrikeAbility then
+				X.InvokeActualSpell(sunstrikeAbility)
+			elseif secondSpellSlot == forgeSpiritAbility then
+				X.InvokeActualSpell(forgeSpiritAbility)
+			elseif secondSpellSlot == chaosMeteorAbility then
+				X.InvokeActualSpell(chaosMeteorAbility)
+			elseif secondSpellSlot == deafeningBlastAbility then
+				X.InvokeActualSpell(deafeningBlastAbility)
 			end
 		end
 	end
-	if DotaTime() - aS > 1 then
-		if aH and not aJ and not b:WasRecentlyDamagedByAnyHero(4) and u:IsFullyCastable() then
-			if aE == nil or #aE <= 0 then
-				if a.CanAbilityPossiblyBeCasted(x) and not a.IsAbilityAvailableOnSlots(x) then
+	if DotaTime() - lastPreInvokeTime > 1 then
+		if isEngaging and not isAttacking and not bot:WasRecentlyDamagedByAnyHero(4) and invokeAbility:IsFullyCastable() then
+			if nearbyEnemies == nil or #nearbyEnemies <= 0 then
+				if X.CanAbilityPossiblyBeCasted(tornadoAbility) and not X.IsAbilityAvailableOnSlots(tornadoAbility) then
 					log("Invoke Tornado as idel spell")
-					a.InvokeActualSpell(x)
+					X.InvokeActualSpell(tornadoAbility)
 				end
-				if a.CanAbilityPossiblyBeCasted(v) and not a.IsAbilityAvailableOnSlots(v) then
+				if X.CanAbilityPossiblyBeCasted(coldSnapAbility) and not X.IsAbilityAvailableOnSlots(coldSnapAbility) then
 					log("Invoke ColdSnap as idel spell")
-					a.InvokeActualSpell(v)
+					X.InvokeActualSpell(coldSnapAbility)
 				end
 			end
 		end
-		if aK < 0.6 then
+		if hpRatio < 0.6 then
 			if
-				s:IsTrained()
-				and aI
+				wexAbility:IsTrained()
+				and isRetreating
 				and (
-					b:HasModifier("modifier_invoker_quas_instance") or b:HasModifier("modifier_invoker_exort_instance")
+					bot:HasModifier("modifier_invoker_quas_instance") or bot:HasModifier("modifier_invoker_exort_instance")
 				)
 			then
-				a.QueueElements(s, s, s)
+				X.QueueElements(wexAbility, wexAbility, wexAbility)
 			elseif
-				r:IsTrained()
-				and (b:HasModifier("modifier_invoker_wex_instance") or b:HasModifier("modifier_invoker_exort_instance"))
+				quasAbility:IsTrained()
+				and (bot:HasModifier("modifier_invoker_wex_instance") or bot:HasModifier("modifier_invoker_exort_instance"))
 			then
-				a.QueueElements(r, r, r)
+				X.QueueElements(quasAbility, quasAbility, quasAbility)
 			end
 		else
-			if s:IsTrained() then
+			if wexAbility:IsTrained() then
 				if
-					(not t:IsTrained() or s:GetLevel() >= t:GetLevel())
+					(not exortAbility:IsTrained() or wexAbility:GetLevel() >= exortAbility:GetLevel())
 					and (
-						b:HasModifier("modifier_invoker_quas_instance")
-						or b:HasModifier("modifier_invoker_exort_instance")
+						bot:HasModifier("modifier_invoker_quas_instance")
+						or bot:HasModifier("modifier_invoker_exort_instance")
 					)
 				then
-					a.QueueElements(s, s, s)
+					X.QueueElements(wexAbility, wexAbility, wexAbility)
 				elseif
-					b:HasModifier("modifier_invoker_quas_instance") or b:HasModifier("modifier_invoker_wex_instance")
+					bot:HasModifier("modifier_invoker_quas_instance") or bot:HasModifier("modifier_invoker_wex_instance")
 				then
-					a.QueueElements(t, t, t)
+					X.QueueElements(exortAbility, exortAbility, exortAbility)
 				end
 			elseif
-				t:IsTrained()
-				and (b:HasModifier("modifier_invoker_quas_instance") or b:HasModifier("modifier_invoker_wex_instance"))
+				exortAbility:IsTrained()
+				and (bot:HasModifier("modifier_invoker_quas_instance") or bot:HasModifier("modifier_invoker_wex_instance"))
 			then
-				a.QueueElements(t, t, t)
+				X.QueueElements(exortAbility, exortAbility, exortAbility)
 			end
 		end
-		aS = DotaTime()
+		lastPreInvokeTime = DotaTime()
 	end
 end
-function a.InvokeElements(aV, aW, aX)
-	b:ActionPush_UseAbility(aV)
-	b:ActionPush_UseAbility(aW)
-	b:ActionPush_UseAbility(aX)
+function X.InvokeElements(element1, element2, element3)
+	bot:ActionPush_UseAbility(element1)
+	bot:ActionPush_UseAbility(element2)
+	bot:ActionPush_UseAbility(element3)
 end
-function a.QueueElements(aV, aW, aX)
-	b:ActionQueue_UseAbility(aV)
-	b:ActionQueue_UseAbility(aW)
-	b:ActionQueue_UseAbility(aX)
+function X.QueueElements(element1, element2, element3)
+	bot:ActionQueue_UseAbility(element1)
+	bot:ActionQueue_UseAbility(element2)
+	bot:ActionQueue_UseAbility(element3)
 end
-function a.CanUseRefresherShard()
-	local aY = A:GetManaCost()
-	local aZ = B:GetManaCost()
+function X.CanUseRefresherShard()
+	local chaosMeteorManaCost = chaosMeteorAbility:GetManaCost()
+	local sunstrikeManaCost = sunstrikeAbility:GetManaCost()
 	if
-		B:GetCooldownTimeRemaining() >= 10
-		and (B:GetCooldownTimeRemaining() / B:GetCooldown() <= 0.7 or a.CanAbilityPossiblyBeCasted(F))
-		and a.IsAbilityAvailableOnSlots(B)
-		and b:GetMana() >= aZ * 2 + aZ
+		sunstrikeAbility:GetCooldownTimeRemaining() >= 10
+		and (sunstrikeAbility:GetCooldownTimeRemaining() / sunstrikeAbility:GetCooldown() <= 0.7 or X.CanAbilityPossiblyBeCasted(cataclysmName))
+		and X.IsAbilityAvailableOnSlots(sunstrikeAbility)
+		and bot:GetMana() >= sunstrikeManaCost * 2 + sunstrikeManaCost
 	then
-		local a_, aQ = a.GoodTimeToUseCataclysmGlobally()
-		if a_ > 0 then
+		local cataclysmDesire, _ = X.GoodTimeToUseCataclysmGlobally()
+		if cataclysmDesire > 0 then
 			return true
 		end
 	end
 	if
-		A:GetCooldownTimeRemaining() >= 10
-		and A:GetCooldownTimeRemaining() / A:GetCooldown() <= 0.7
-		and a.IsAbilityAvailableOnSlots(A)
-		and #aE > 0
-		and (aH or c.IsInTeamFight(b))
-		and b:GetMana() >= aY * 2 + aY
+		chaosMeteorAbility:GetCooldownTimeRemaining() >= 10
+		and chaosMeteorAbility:GetCooldownTimeRemaining() / chaosMeteorAbility:GetCooldown() <= 0.7
+		and X.IsAbilityAvailableOnSlots(chaosMeteorAbility)
+		and #nearbyEnemies > 0
+		and (isEngaging or Fu.IsInTeamFight(bot))
+		and bot:GetMana() >= chaosMeteorManaCost * 2 + chaosMeteorManaCost
 	then
 		return true
 	end
 	return false
 end
-function a.ConsiderClearActions()
+function X.ConsiderClearActions()
 	if DotaTime() <= 10 then
 		return
 	end
-	local b0 = b:NumQueuedActions()
-	if b0 > 0 then
-		if b0 >= 6 then
+	local queuedActionCount = bot:NumQueuedActions()
+	if queuedActionCount > 0 then
+		if queuedActionCount >= 6 then
 			log("Clear Invokers queued actions")
-			b:Action_ClearActions(false)
+			bot:Action_ClearActions(false)
 			return
 		end
-		for b1 = 1, b0 do
-			local b2 = b:GetQueuedActionType(b1)
-			log("Enqueued actions i=%s, type=%s", b1, b2)
-			if b2 == -1 then
+		for i = 1, queuedActionCount do
+			local actionType = bot:GetQueuedActionType(i)
+			log("Enqueued actions i=%s, type=%s", i, actionType)
+			if actionType == -1 then
 				log("Invokers has queued invalid action (-1). Clear action queue.")
-				b:Action_ClearActions(false)
+				bot:Action_ClearActions(false)
 				return
 			end
 		end
 	end
 end
-function a.CastInvokerSpell(b3, b4)
-	local b5
-	if type(b3) == "string" and b3 == "Cataclysm" then
-		b5 = b3
-		b3 = B
+function X.CastInvokerSpell(ability, target)
+	local abilityName
+	if type(ability) == "string" and ability == "Cataclysm" then
+		abilityName = ability
+		ability = sunstrikeAbility
 	else
-		b5 = b3:GetName()
+		abilityName = ability:GetName()
 	end
-	log("%s - Invoker checking to cast %s", DotaTime(), b5)
-	if a.IsAbilityReadyForInvoke(b3) then
-		a.InvokeActualSpell(b3)
+	log("%s - Invoker checking to cast %s", DotaTime(), abilityName)
+	if X.IsAbilityReadyForInvoke(ability) then
+		X.InvokeActualSpell(ability)
 	end
-	if a.IsAbilityReadyForCast(b3) then
-		log("%s - Invoker has it on slot, going to cast %s", DotaTime(), b5)
-		b:Action_ClearActions(false)
-		if b5 == F then
-			b:ActionQueue_UseAbilityOnEntity(b3, b)
-		elseif b3 == C or b3 == D or b3 == w then
-			b:ActionQueue_UseAbility(b3)
+	if X.IsAbilityReadyForCast(ability) then
+		log("%s - Invoker has it on slot, going to cast %s", DotaTime(), abilityName)
+		bot:Action_ClearActions(false)
+		if abilityName == cataclysmName then
+			bot:ActionQueue_UseAbilityOnEntity(ability, bot)
+		elseif ability == forgeSpiritAbility or ability == iceWallAbility or ability == ghostWalkAbility then
+			bot:ActionQueue_UseAbility(ability)
 		-- Radial (no-target) Deafening Blast only with its talent, special_bonus_unique_invoker_2 (datafeed),
 		-- not at any level 25: the default talent build takes the other level-25 talent, and a no-target
 		-- order for the point-cast blast does nothing.
-		elseif b3 == E and (function()
-			local tal = b:GetAbilityByName("special_bonus_unique_invoker_2")
-			return tal ~= nil and tal:IsTrained()
+		elseif ability == deafeningBlastAbility and (function()
+			local radialBlastTalent = bot:GetAbilityByName("special_bonus_unique_invoker_2")
+			return radialBlastTalent ~= nil and radialBlastTalent:IsTrained()
 		end)() then
-			b:ActionQueue_UseAbility(b3)
-		elseif b3 == E or b3 == B or b3 == A or b3 == y or b3 == x then
-			b:ActionQueue_UseAbilityOnLocation(b3, b4)
-		elseif b3 == z or b3 == v then
-			b:ActionQueue_UseAbilityOnEntity(b3, b4)
+			bot:ActionQueue_UseAbility(ability)
+		elseif ability == deafeningBlastAbility or ability == sunstrikeAbility or ability == chaosMeteorAbility or ability == empAbility or ability == tornadoAbility then
+			bot:ActionQueue_UseAbilityOnLocation(ability, target)
+		elseif ability == alacrityAbility or ability == coldSnapAbility then
+			bot:ActionQueue_UseAbilityOnEntity(ability, target)
 		else
-			log("%s - [ERROR] Tried to cast unsupported spell: %s", DotaTime(), b5)
+			log("%s - [ERROR] Tried to cast unsupported spell: %s", DotaTime(), abilityName)
 			log("Stack Trace:", debug.traceback())
 		end
-		log("%s - Invoker tried to cast %s", DotaTime(), b5)
+		log("%s - Invoker tried to cast %s", DotaTime(), abilityName)
 	else
 	end
 end
-function a.ConsiderColdSnap()
-	if not a.CanAbilityPossiblyBeCasted(v) then
+function X.ConsiderColdSnap()
+	if not X.CanAbilityPossiblyBeCasted(coldSnapAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local b6 = 60
-	local b7 = c.GetProperCastRange(false, b, v:GetCastRange())
-	for aQ, aR in pairs(aE) do
+	local rangeBuffer = 60
+	local castRange = Fu.GetProperCastRange(false, bot, coldSnapAbility:GetCastRange())
+	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(aR)
-			and c.CanCastOnNonMagicImmune(aR)
-			and c.IsInRange(b, aR, b7 - b6)
-			and (not aG or aG and c.GetManaAfter(v:GetManaCost()) > 0.5 or c.GetHP(aR) < 0.5)
-			and (aR:IsChanneling() or aR:HasModifier("modifier_item_urn_damage") or aR:HasModifier(
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange - rangeBuffer)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(coldSnapAbility:GetManaCost()) > 0.5 or Fu.GetHP(enemyHero) < 0.5)
+			and (enemyHero:IsChanneling() or enemyHero:HasModifier("modifier_item_urn_damage") or enemyHero:HasModifier(
 				"modifier_item_spirit_vessel_damage"
-			) or aR:HasModifier("modifier_invoker_chaos_meteor_burn") or c.IsChasingTarget(b, aR))
-			and not c.IsSuspiciousIllusion(aR)
+			) or enemyHero:HasModifier("modifier_invoker_chaos_meteor_burn") or Fu.IsChasingTarget(bot, enemyHero))
+			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
-			return BOT_ACTION_DESIRE_HIGH, aR
+			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end
-	if aH then
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsInRange(b, botTarget, b7 - b6)
-			and not c.IsSuspiciousIllusion(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange - rangeBuffer)
+			and not Fu.IsSuspiciousIllusion(botTarget)
 			and (
-				not aG
-				or aG and c.GetManaAfter(v:GetManaCost()) > 0.5 and aJ
-				or aG and aL > 0.5 and c.IsAttacking(botTarget)
-				or c.GetHP(botTarget) < 0.5
+				not isLaningPhase
+				or isLaningPhase and Fu.GetManaAfter(coldSnapAbility:GetManaCost()) > 0.5 and isAttacking
+				or isLaningPhase and mpRatio > 0.5 and Fu.IsAttacking(botTarget)
+				or Fu.GetHP(botTarget) < 0.5
 			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if c.IsLaning(b) then
-		local aR
-		if aE ~= nil and #aE >= 1 then
-			aR = aE[1]
+	if Fu.IsLaning(bot) then
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
 		if
-			c.IsValidHero(aR)
-			and c.CanCastOnNonMagicImmune(aR)
-			and c.IsInRange(b, aR, b:GetAttackRange() - b6)
-			and not c.IsSuspiciousIllusion(aR)
-			and b:GetMana() - v:GetManaCost() >= aC
-			and (c.GetManaAfter(v:GetManaCost()) > 0.4 and aJ or aL > 0.5 and c.IsAttacking(aR))
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, bot:GetAttackRange() - rangeBuffer)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and bot:GetMana() - coldSnapAbility:GetManaCost() >= laningManaReserve
+			and (Fu.GetManaAfter(coldSnapAbility:GetManaCost()) > 0.4 and isAttacking or mpRatio > 0.5 and Fu.IsAttacking(enemyHero))
 		then
-			return BOT_ACTION_DESIRE_HIGH, aR, "对线消耗:" .. c.Chat.GetNormName(aR)
+			return BOT_ACTION_DESIRE_HIGH, enemyHero, "对线消耗:" .. Fu.Chat.GetNormName(enemyHero)
 		end
 	end
-	if aI then
-		local aR
-		if aE ~= nil and #aE >= 1 then
-			aR = aE[1]
+	if isRetreating then
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
 		if
-			c.IsValidHero(aR)
-			and c.CanCastOnNonMagicImmune(aR)
-			and c.IsChasingTarget(aR, b)
-			and GetUnitToUnitDistance(aR, b) > aR:GetAttackRange() - 200
-			and c.IsInRange(b, aR, b7 - b6)
-			and not c.IsSuspiciousIllusion(aR)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsChasingTarget(enemyHero, bot)
+			and GetUnitToUnitDistance(enemyHero, bot) > enemyHero:GetAttackRange() - 200
+			and Fu.IsInRange(bot, enemyHero, castRange - rangeBuffer)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
-			if b:WasRecentlyDamagedByAnyHero(2) then
-				return BOT_ACTION_DESIRE_HIGH, aR
+			if bot:WasRecentlyDamagedByAnyHero(2) then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(botTarget) and c.IsInRange(b, botTarget, b7) then
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, castRange) then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderGhostWalk()
-	if not a.CanAbilityPossiblyBeCasted(w) then
+function X.ConsiderGhostWalk()
+	if not X.CanAbilityPossiblyBeCasted(ghostWalkAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if aI or aK <= 0.4 and #aE >= #aF then
-		for aQ, aR in pairs(aE) do
+	if isRetreating or hpRatio <= 0.4 and #nearbyEnemies >= #nearbyAllies then
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(aR)
-				and (c.IsChasingTarget(aR, b) or GetUnitToUnitDistance(aR, b) < aR:GetAttackRange() + 100)
-				and (aG and b:WasRecentlyDamagedByAnyHero(2) and aK < 0.7 or not aG)
-				and not aJ
+				Fu.IsValidHero(enemyHero)
+				and (Fu.IsChasingTarget(enemyHero, bot) or GetUnitToUnitDistance(enemyHero, bot) < enemyHero:GetAttackRange() + 100)
+				and (isLaningPhase and bot:WasRecentlyDamagedByAnyHero(2) and hpRatio < 0.7 or not isLaningPhase)
+				and not isAttacking
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if c.IsStunProjectileIncoming(b, 1200) then
+	if Fu.IsStunProjectileIncoming(bot, 1200) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if #aE >= 2 and #aE > #aF and c.IsValidHero(aE[1]) and aE[1]:GetLevel() >= b:GetLevel() - 2 then
+	if #nearbyEnemies >= 2 and #nearbyEnemies > #nearbyAllies and Fu.IsValidHero(nearbyEnemies[1]) and nearbyEnemies[1]:GetLevel() >= bot:GetLevel() - 2 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderTornado()
-	local aO = 4
+function X.ConsiderTornado()
+	local comboWindow = 4
 	if
-		not a.CanAbilityPossiblyBeCasted(x)
+		not X.CanAbilityPossiblyBeCasted(tornadoAbility)
 		or (
-			DotaTime() - ah["ChaosMeteor"] <= aO
-			or DotaTime() - ah["DeafeningBlast"] <= aO
-			or DotaTime() - ah["Sunstrike"] <= aO
-			or DotaTime() - ah["Cataclysm"] <= aO
+			DotaTime() - lastCastTime["ChaosMeteor"] <= comboWindow
+			or DotaTime() - lastCastTime["DeafeningBlast"] <= comboWindow
+			or DotaTime() - lastCastTime["Sunstrike"] <= comboWindow
+			or DotaTime() - lastCastTime["Cataclysm"] <= comboWindow
 		)
 	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local b7 = c.GetProperCastRange(false, b, x:GetCastRange())
-	local b8 = x:GetCastPoint()
-	local b9 = x:GetSpecialValueInt("area_of_effect")
-	local ba = x:GetSpecialValueInt("travel_speed")
-	if aM then
-		local bb = b:FindAoELocation(true, true, b:GetLocation(), b7, b9, b8, 0)
-		local bc = c.GetEnemiesNearLoc(bb.targetloc, b9)
-		local bd = c.GetAlliesNearLoc(bb.targetloc, b9)
-		local be = c.GetCenterOfUnits(bc)
-		local bf = GetUnitToLocationDistance(b, be)
+	local castRange = Fu.GetProperCastRange(false, bot, tornadoAbility:GetCastRange())
+	local castPoint = tornadoAbility:GetCastPoint()
+	local radius = tornadoAbility:GetSpecialValueInt("area_of_effect")
+	local travelSpeed = tornadoAbility:GetSpecialValueInt("travel_speed")
+	if isTeamFight then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
+		local alliesInRadius = Fu.GetAlliesNearLoc(aoeLocation.targetloc, radius)
+		local enemyCenter = Fu.GetCenterOfUnits(enemiesInRadius)
+		local distanceToCenter = GetUnitToLocationDistance(bot, enemyCenter)
 		if
-			#bc >= 2
-			and #bd < #bc
-			and not c.IsLocationInChrono(be)
-			and not c.IsLocationInBlackHole(be)
-			and bf <= b7
-			and bf > b:GetAttackRange()
+			#enemiesInRadius >= 2
+			and #alliesInRadius < #enemiesInRadius
+			and not Fu.IsLocationInChrono(enemyCenter)
+			and not Fu.IsLocationInBlackHole(enemyCenter)
+			and distanceToCenter <= castRange
+			and distanceToCenter > bot:GetAttackRange()
 		then
-			return BOT_ACTION_DESIRE_HIGH, be
+			return BOT_ACTION_DESIRE_HIGH, enemyCenter
 		end
 	end
 	if
 		botTarget ~= nil
 		and botTarget:IsChanneling()
-		and c.IsValidHero(botTarget)
-		and c.CanCastOnNonMagicImmune(botTarget)
-		and c.IsInRange(b, botTarget, b7)
+		and Fu.IsValidHero(botTarget)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
 	then
 		return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 	end
-	if aH then
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsInRange(b, botTarget, b7)
-			and (not aG or aG and c.GetManaAfter(x:GetManaCost()) > 0.5 or c.GetHP(botTarget) < 0.5)
-			and not c.IsInRange(b, botTarget, b:GetAttackRange())
-			and not c.IsSuspiciousIllusion(botTarget)
-			and not c.IsDisabled(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(tornadoAbility:GetManaCost()) > 0.5 or Fu.GetHP(botTarget) < 0.5)
+			and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
 			and not botTarget:HasModifier("modifier_brewmaster_storm_cyclone")
 			and not botTarget:HasModifier("modifier_enigma_black_hole_pull")
 			and not botTarget:HasModifier("modifier_eul_cyclone")
@@ -814,770 +814,768 @@ function a.ConsiderTornado()
 			and not botTarget:HasModifier("modifier_invoker_chaos_meteor_burn")
 			and not botTarget:HasModifier("modifier_invoker_deafening_blast_disarm")
 		then
-			if c.IsRunning(botTarget) then
-				local bg = GetUnitToUnitDistance(b, botTarget) / ba + b8
-				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(botTarget, bg)
+			if Fu.IsRunning(botTarget) then
+				local delay = GetUnitToUnitDistance(bot, botTarget) / travelSpeed + castPoint
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(botTarget, delay)
 			else
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	if c.IsLaning(b) and b:GetMana() - x:GetManaCost() >= aC then
-		local aR
-		if aE ~= nil and #aE <= 2 and aE[1] ~= nil then
-			aR = aE[1]
+	if Fu.IsLaning(bot) and bot:GetMana() - tornadoAbility:GetManaCost() >= laningManaReserve then
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies <= 2 and nearbyEnemies[1] ~= nil then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
-		if aR ~= nil and aL > 0.7 then
-			local bg = GetUnitToUnitDistance(b, aR) / ba + b8
-			return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(aR, bg), "对线消耗"
+		if enemyHero ~= nil and mpRatio > 0.7 then
+			local delay = GetUnitToUnitDistance(bot, enemyHero) / travelSpeed + castPoint
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, delay), "对线消耗"
 		end
 	end
-	if aI then
-		local aR
-		if aE ~= nil and #aE >= 1 and aE[1] ~= nil then
-			aR = aE[1]
+	if isRetreating then
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and nearbyEnemies[1] ~= nil then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, 0
 		end
 		if
-			c.IsValidHero(aR)
-			and c.CanCastOnNonMagicImmune(aR)
-			and c.IsChasingTarget(aR, b)
-			and c.IsInRange(b, aR, b7 - 200)
-			and (not aG or aG and aK < 0.7)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsChasingTarget(enemyHero, bot)
+			and Fu.IsInRange(bot, enemyHero, castRange - 200)
+			and (not isLaningPhase or isLaningPhase and hpRatio < 0.7)
 		then
-			if b:WasRecentlyDamagedByAnyHero(3) then
-				local bh = c.GetEnemiesNearLoc(aR:GetLocation(), b9)
-				if bh ~= nil and #bh >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(bh)
+			if bot:WasRecentlyDamagedByAnyHero(3) then
+				local enemiesNearTarget = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), radius)
+				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
+					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 				else
-					local bg = GetUnitToUnitDistance(b, aR) / ba + b8
-					return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(aR, bg)
+					local delay = GetUnitToUnitDistance(bot, enemyHero) / travelSpeed + castPoint
+					return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, delay)
 				end
 			end
 		end
 	end
-	if c.IsDefending(b) then
-		local bb = b:FindAoELocation(true, true, b:GetLocation(), b7, b9, b8, 0)
-		local bc = c.GetEnemiesNearLoc(bb.targetloc, b9)
+	if Fu.IsDefending(bot) then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if
-			bc ~= nil
-			and #bc >= 1
-			and not c.IsLocationInChrono(bb.targetloc)
-			and not c.IsLocationInBlackHole(bb.targetloc)
+			enemiesInRadius ~= nil
+			and #enemiesInRadius >= 1
+			and not Fu.IsLocationInChrono(aoeLocation.targetloc)
+			and not Fu.IsLocationInBlackHole(aoeLocation.targetloc)
 		then
-			return BOT_ACTION_DESIRE_HIGH, bb.targetloc
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderEMP()
-	if not a.CanAbilityPossiblyBeCasted(y) then
+function X.ConsiderEMP()
+	if not X.CanAbilityPossiblyBeCasted(empAbility) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	aA = y:GetSpecialValueFloat("delay")
-	local b7 = y:GetCastRange()
-	local b8 = y:GetCastPoint()
-	local b9 = y:GetSpecialValueInt("area_of_effect")
-	local bg = aA + b8
-	if c.IsInTeamFight(b, 1300) then
-		local bb = b:FindAoELocation(true, true, b:GetLocation(), b7, b9, bg, 0)
-		if bb.count >= 2 and GetUnitToLocationDistance(b, bb.targetloc) <= b7 then
-			return BOT_ACTION_DESIRE_HIGH, bb.targetloc
+	empDelay = empAbility:GetSpecialValueFloat("delay")
+	local castRange = empAbility:GetCastRange()
+	local castPoint = empAbility:GetCastPoint()
+	local radius = empAbility:GetSpecialValueInt("area_of_effect")
+	local delay = empDelay + castPoint
+	if Fu.IsInTeamFight(bot, 1300) then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, delay, 0)
+		if aoeLocation.count >= 2 and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
-	if aH then
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and (not aG or aG and c.GetManaAfter(y:GetManaCost()) > 0.5 or c.GetHP(botTarget) < 0.5)
-			and c.IsInRange(b, botTarget, b7)
-			and not c.IsSuspiciousIllusion(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(empAbility:GetManaCost()) > 0.5 or Fu.GetHP(botTarget) < 0.5)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_brewmaster_storm_cyclone")
 			and not botTarget:HasModifier("modifier_eul_cyclone")
 		then
-			local bb = b:FindAoELocation(true, true, b:GetLocation(), b7, b9, bg, 0)
-			if bb.count >= 1 and GetUnitToLocationDistance(b, bb.targetloc) <= b7 then
-				return BOT_ACTION_DESIRE_HIGH, bb.targetloc
+			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, delay, 0)
+			if aoeLocation.count >= 1 and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange then
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 		end
 	end
 	if
-		c.IsValidHero(botTarget)
-		and c.CanCastOnNonMagicImmune(botTarget)
-		and c.IsInRange(b, botTarget, b7)
-		and (not aG or aG and c.GetManaAfter(y:GetManaCost()) > 0.5 or c.GetHP(botTarget) < 0.5)
-		and botTarget:HasModifier(O)
+		Fu.IsValidHero(botTarget)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+		and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(empAbility:GetManaCost()) > 0.5 or Fu.GetHP(botTarget) < 0.5)
+		and botTarget:HasModifier(modifierTornado)
 	then
-		return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(botTarget, bg)
+		return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(botTarget, delay)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderAlacrity()
-	if not a.CanAbilityPossiblyBeCasted(z) then
+function X.ConsiderAlacrity()
+	if not X.CanAbilityPossiblyBeCasted(alacrityAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local b7 = c.GetProperCastRange(false, b, z:GetCastRange())
-	local bi = b
-	local bj = 0
-	local aF = c.GetNearbyHeroes(b, b7, false)
-	for aQ, bk in pairs(aF) do
+	local castRange = Fu.GetProperCastRange(false, bot, alacrityAbility:GetCastRange())
+	local bestAlly = bot
+	local bestAttackDamage = 0
+	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false)
+	for _, allyHero in pairs(alliesInRange) do
 		if
-			c.IsValidHero(bk)
-			and c.IsAttacking(bk)
-			and not bk:IsIllusion()
-			and not c.IsDisabled(bk)
-			and not c.IsWithoutTarget(bk)
-			and not bk:HasModifier("modifier_invoker_alacrity")
-			and bk:GetAttackDamage() > bj
+			Fu.IsValidHero(allyHero)
+			and Fu.IsAttacking(allyHero)
+			and not allyHero:IsIllusion()
+			and not Fu.IsDisabled(allyHero)
+			and not Fu.IsWithoutTarget(allyHero)
+			and not allyHero:HasModifier("modifier_invoker_alacrity")
+			and allyHero:GetAttackDamage() > bestAttackDamage
 		then
-			bi = bk
-			bj = bk:GetAttackDamage()
+			bestAlly = allyHero
+			bestAttackDamage = allyHero:GetAttackDamage()
 		end
 	end
-	if aH then
+	if isEngaging then
 		if
-			c.IsValidTarget(botTarget)
-			and aJ
-			and c.CanBeAttacked(botTarget)
-			and not c.IsSuspiciousIllusion(botTarget)
-			and (not aG or aG and c.GetManaAfter(z:GetManaCost()) > 0.5 or c.GetHP(botTarget) < 0.5)
+			Fu.IsValidTarget(botTarget)
+			and isAttacking
+			and Fu.CanBeAttacked(botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(alacrityAbility:GetManaCost()) > 0.5 or Fu.GetHP(botTarget) < 0.5)
 			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
 			and not botTarget:HasModifier("modifier_brewmaster_storm_cyclone")
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			if
-				c.IsInRange(bi, botTarget, b7)
-				and (aE ~= nil and #aE >= 2 and not a.CanAbilityPossiblyBeCasted(A) or aE ~= nil and #aE == 1)
+				Fu.IsInRange(bestAlly, botTarget, castRange)
+				and (nearbyEnemies ~= nil and #nearbyEnemies >= 2 and not X.CanAbilityPossiblyBeCasted(chaosMeteorAbility) or nearbyEnemies ~= nil and #nearbyEnemies == 1)
 			then
-				return BOT_ACTION_DESIRE_HIGH, bi
+				return BOT_ACTION_DESIRE_HIGH, bestAlly
 			end
 		end
 	end
-	if c.IsPushing(b) then
-		local aP = b:GetNearbyLaneCreeps(700, true)
-		if aP ~= nil and #aP >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsPushing(bot) then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(700, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
-		local q = b:GetNearbyTowers(700, true)
-		if q ~= nil and #q >= 1 and bi ~= nil then
-			local bl = bi:GetAttackTarget()
-			if c.IsValidBuilding(bl) and c.IsAttacking(bi) and not bi:HasModifier("modifier_invoker_alacrity") then
-				return BOT_ACTION_DESIRE_HIGH, bi
+		local enemyTowers = bot:GetNearbyTowers(700, true)
+		if enemyTowers ~= nil and #enemyTowers >= 1 and bestAlly ~= nil then
+			local allyAttackTarget = bestAlly:GetAttackTarget()
+			if Fu.IsValidBuilding(allyAttackTarget) and Fu.IsAttacking(bestAlly) and not bestAlly:HasModifier("modifier_invoker_alacrity") then
+				return BOT_ACTION_DESIRE_HIGH, bestAlly
 			end
 		end
 	end
-	if c.IsLaning(b) and b:GetMana() - z:GetManaCost() >= aC then
-		local aP = b:GetNearbyLaneCreeps(700, true)
-		if aP ~= nil and #aP >= 2 and aJ then
-			return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsLaning(bot) and bot:GetMana() - alacrityAbility:GetManaCost() >= laningManaReserve then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(700, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 2 and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
-		local aR
-		if aE ~= nil and #aE <= 2 and aE[1] ~= nil then
-			aR = aE[1]
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies <= 2 and nearbyEnemies[1] ~= nil then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
-		if c.IsValidHero(aR) and c.CanCastOnNonMagicImmune(aR) and aJ and botTarget == aR then
-			return BOT_ACTION_DESIRE_HIGH, b, "对线消耗:" .. c.Chat.GetNormName(aR)
+		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and isAttacking and botTarget == enemyHero then
+			return BOT_ACTION_DESIRE_HIGH, bot, "对线消耗:" .. Fu.Chat.GetNormName(enemyHero)
 		end
 	end
-	if c.IsFarming(b) then
-		if aJ then
-			return BOT_ACTION_DESIRE_HIGH, b
+	if Fu.IsFarming(bot) then
+		if isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
-	if c.IsDoingRoshan(b) and bi ~= nil then
-		if c.IsRoshan(botTarget) and c.IsInRange(bi, botTarget, 1000) and aJ then
-			return BOT_ACTION_DESIRE_HIGH, bi
+	if Fu.IsDoingRoshan(bot) and bestAlly ~= nil then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bestAlly, botTarget, 1000) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, bestAlly
 		end
 	end
-	if c.IsDoingTormentor(b) and bi ~= nil then
-		if c.IsTormentor(botTarget) and c.IsInRange(bi, botTarget, 1000) and aJ then
-			return BOT_ACTION_DESIRE_HIGH, bi
+	if Fu.IsDoingTormentor(bot) and bestAlly ~= nil then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bestAlly, botTarget, 1000) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, bestAlly
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderCmToTarget(b4, bg, bm, b9)
+function X.ConsiderCmToTarget(target, delay, travelDistance, radius)
 	if
 		(
-				c.IsValidHero(b4)
-				or c.IsValidTarget(b4) and (c.Unit.IsUnitWithName(b4, "roshan") or c.Unit.IsUnitWithName(b4, "boss"))
+				Fu.IsValidHero(target)
+				or Fu.IsValidTarget(target) and (Fu.Unit.IsUnitWithName(target, "roshan") or Fu.Unit.IsUnitWithName(target, "boss"))
 			)
-			and c.CanCastOnNonMagicImmune(b4)
-			and not c.IsSuspiciousIllusion(b4)
-			and (not aG or aG and c.GetManaAfter(A:GetManaCost()) > 0.5 or c.GetHP(b4) < 0.5)
-			and not b4:HasModifier("modifier_abaddon_borrowed_time")
+			and Fu.CanCastOnNonMagicImmune(target)
+			and not Fu.IsSuspiciousIllusion(target)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(chaosMeteorAbility:GetManaCost()) > 0.5 or Fu.GetHP(target) < 0.5)
+			and not target:HasModifier("modifier_abaddon_borrowed_time")
 			-- Steady movement is an alternative to the HP window only. It used to be OR'ed with the
 			-- whole condition, so any enemy walking straight got a Meteor, magic immune, an
 			-- illusion or with laning mana under half included.
-			and (c.GetHP(b4) <= 0.9 and c.GetHP(b4) > 0.15 or b4:GetMovementDirectionStability() >= 0.75)
+			and (Fu.GetHP(target) <= 0.9 and Fu.GetHP(target) > 0.15 or target:GetMovementDirectionStability() >= 0.75)
 	then
-		if b4:HasModifier(O) then
-			if DotaTime() >= ah["Tornado"] + aB - bg then
-				return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(b4:GetLocation(), b4)
+		if target:HasModifier(modifierTornado) then
+			if DotaTime() >= lastCastTime["Tornado"] + tornadoLiftDuration - delay then
+				return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(target:GetLocation(), target)
 			end
-		elseif a.CheckTempModifiers(Z, b4, bg) > 0 then
-			return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(b4:GetLocation(), b4)
+		elseif X.CheckTempModifiers(airborneModifiers, target, delay) > 0 then
+			return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(target:GetLocation(), target)
 		end
-		if b4:IsStunned() or b4:IsRooted() or b4:IsHexed() or b4:IsChanneling() or a.IsUnderLongDurationStun(b4) then
-			if c.IsRunning(b4) then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(b4, bg)
+		if target:IsStunned() or target:IsRooted() or target:IsHexed() or target:IsChanneling() or X.IsUnderLongDurationStun(target) then
+			if Fu.IsRunning(target) then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(target, delay)
 			end
 		end
-		local bb = b:FindAoELocation(true, true, b:GetLocation(), bm, b9, bg, 0)
-		if bb.count >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(bb.targetloc, b4)
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), travelDistance, radius, delay, 0)
+		if aoeLocation.count >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(aoeLocation.targetloc, target)
 		end
-		return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(c.GetCorrectLoc(b4, bg), b4)
+		return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(Fu.GetCorrectLoc(target, delay), target)
 	end
 	return 0, nil
 end
-function a.ConsiderChaosMeteor()
-	if not a.CanAbilityPossiblyBeCasted(A) then
+function X.ConsiderChaosMeteor()
+	if not X.CanAbilityPossiblyBeCasted(chaosMeteorAbility) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local b7 = c.GetProperCastRange(false, b, A:GetCastRange())
-	local bn = A:GetSpecialValueFloat("land_time")
-	local b9 = A:GetSpecialValueInt("area_of_effect")
-	local bm = A:GetSpecialValueInt("travel_distance")
-	local bg = bn
-	if DotaTime() - ah["Tornado"] <= aB - bn then
+	local castRange = Fu.GetProperCastRange(false, bot, chaosMeteorAbility:GetCastRange())
+	local landTime = chaosMeteorAbility:GetSpecialValueFloat("land_time")
+	local radius = chaosMeteorAbility:GetSpecialValueInt("area_of_effect")
+	local travelDistance = chaosMeteorAbility:GetSpecialValueInt("travel_distance")
+	local delay = landTime
+	if DotaTime() - lastCastTime["Tornado"] <= tornadoLiftDuration - landTime then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if aM then
-		local bb = c.GetAoeEnemyHeroLocation(b, b7, b9, 2)
-		if bb ~= nil and GetUnitToLocationDistance(b, bb) <= b7 and c.GetEnemiesAroundLoc(bb, b9) >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(bb, nil)
+	if isTeamFight then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
+		if aoeLocation ~= nil and GetUnitToLocationDistance(bot, aoeLocation) <= castRange and Fu.GetEnemiesAroundLoc(aoeLocation, radius) >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(aoeLocation, nil)
 		end
 	end
-	if not aI then
-		for aQ, aR in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
-			if c.IsInRange(b, aR, b7) then
-				local bo, b4 = a.ConsiderCmToTarget(aR, bg, bm, b9)
-				if bo > 0 then
-					return bo, b4
+	if not isRetreating then
+		for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+			if Fu.IsInRange(bot, enemyHero, castRange) then
+				local desire, target = X.ConsiderCmToTarget(enemyHero, delay, travelDistance, radius)
+				if desire > 0 then
+					return desire, target
 				end
 			end
 		end
 	end
-	if aH and c.IsValidTarget(botTarget) and aJ and c.IsInRange(b, botTarget, b7) then
-		local bo, b4 = a.ConsiderCmToTarget(botTarget, bg, bm, b9)
-		if bo > 0 then
-			return bo, b4
+	if isEngaging and Fu.IsValidTarget(botTarget) and isAttacking and Fu.IsInRange(bot, botTarget, castRange) then
+		local desire, target = X.ConsiderCmToTarget(botTarget, delay, travelDistance, radius)
+		if desire > 0 then
+			return desire, target
 		end
 	end
-	if c.IsLaning(b) then
-		local aP = b:GetNearbyLaneCreeps(1400, true)
-		if aP ~= nil and #aP >= 5 then
-			local bp = b:FindAoELocation(true, false, b:GetLocation(), b7, b9, 0, 500)
-			if bp.count >= 3 then
-				return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(bp.targetloc, nil)
+	if Fu.IsLaning(bot) then
+		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1400, true)
+		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 5 then
+			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 500)
+			if creepAoeLocation.count >= 3 then
+				return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(creepAoeLocation.targetloc, nil)
 			end
 		end
-		local aR
-		if aE ~= nil and #aE <= 2 and aE[1] ~= nil then
-			aR = aE[1]
+		local enemyHero
+		if nearbyEnemies ~= nil and #nearbyEnemies <= 2 and nearbyEnemies[1] ~= nil then
+			enemyHero = nearbyEnemies[1]
 		else
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
 		if
-			c.IsValidHero(aR)
-			and aJ
-			and c.CanCastOnNonMagicImmune(aR)
-			and c.IsInRange(b, aR, b7)
-			and not c.IsSuspiciousIllusion(aR)
-			and c.GetHP(aR) <= 0.8
+			Fu.IsValidHero(enemyHero)
+			and isAttacking
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and Fu.GetHP(enemyHero) <= 0.8
 		then
-			if c.IsRunning(aR) then
-				return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(c.GetCorrectLoc(aR, bg), aR)
+			if Fu.IsRunning(enemyHero) then
+				return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(Fu.GetCorrectLoc(enemyHero, delay), enemyHero)
 			else
-				return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(aR:GetLocation(), aR)
+				return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(enemyHero:GetLocation(), enemyHero)
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(botTarget) and c.IsInRange(b, botTarget, b7) and aJ then
-			return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(botTarget:GetLocation(), botTarget)
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(botTarget:GetLocation(), botTarget)
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(botTarget) and c.IsInRange(b, botTarget, 700) and aJ then
-			return BOT_ACTION_DESIRE_HIGH, a.AdjustCMLocation(botTarget:GetLocation(), botTarget)
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 700) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, X.AdjustCMLocation(botTarget:GetLocation(), botTarget)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.AdjustCMLocation(bq, b4)
-	if b4 == nil or c.IsChasingTarget(b, b4) then
-		return bq
+function X.AdjustCMLocation(location, target)
+	if target == nil or Fu.IsChasingTarget(bot, target) then
+		return location
 	end
-	local br = 250
-	local bs = GetUnitToUnitDistance(b, b4)
-	if b4:IsFacingLocation(b:GetLocation(), 20) and c.IsRunning(b4) and bs < br then
-		return e.GetOffsetLocationTowardsTargetLocation(b4:GetLocation(), b:GetLocation(), bs + 120)
+	local offsetDistance = 250
+	local distanceToTarget = GetUnitToUnitDistance(bot, target)
+	if target:IsFacingLocation(bot:GetLocation(), 20) and Fu.IsRunning(target) and distanceToTarget < offsetDistance then
+		return Utils.GetOffsetLocationTowardsTargetLocation(target:GetLocation(), bot:GetLocation(), distanceToTarget + 120)
 	end
-	if bs < br + 50 then
-		return bq
+	if distanceToTarget < offsetDistance + 50 then
+		return location
 	end
-	return e.GetOffsetLocationTowardsTargetLocation(bq, b:GetLocation(), br)
+	return Utils.GetOffsetLocationTowardsTargetLocation(location, bot:GetLocation(), offsetDistance)
 end
-function a.CheckTempModifiers(bt, botTarget, bg)
-	local bu = 0
-	if botTarget == nil then
-		return BOT_ACTION_DESIRE_NONE, bu
+function X.CheckTempModifiers(modifierList, target, delay)
+	local modifierCount = 0
+	if target == nil then
+		return BOT_ACTION_DESIRE_NONE, modifierCount
 	end
-	for aQ, bv in pairs(bt) do
-		if botTarget:HasModifier(bv) then
-			bu = bu + 1
-			local bw = c.GetModifierTime(botTarget, bv)
-			log("%s - Target has modifier %s, the remaining time: %s seconds, delay: %s", DotaTime(), bv, bw, bg)
-			if bw > 0 and bw <= bg then
+	for _, modifierName in pairs(modifierList) do
+		if target:HasModifier(modifierName) then
+			modifierCount = modifierCount + 1
+			local remainingTime = Fu.GetModifierTime(target, modifierName)
+			log("%s - Target has modifier %s, the remaining time: %s seconds, delay: %s", DotaTime(), modifierName, remainingTime, delay)
+			if remainingTime > 0 and remainingTime <= delay then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
-	if bu == 0 then
+	if modifierCount == 0 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderCataclysm()
+function X.ConsiderCataclysm()
 	-- Cataclysm (Sun Strike cast on himself) is an Aghanim's Scepter upgrade, and he no longer
 	-- buys Scepter. Without it this rule, first in his spell order, would spend Sun Strike on his
 	-- own spot (or an invalid order).
-	if not b:HasScepter() then
+	if not bot:HasScepter() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if not a.CanAbilityPossiblyBeCasted(F) then
+	if not X.CanAbilityPossiblyBeCasted(cataclysmName) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local bo, aQ = a.GoodTimeToUseCataclysmGlobally()
-	if bo > 0 then
+	local desire, _ = X.GoodTimeToUseCataclysmGlobally()
+	if desire > 0 then
 		return BOT_ACTION_DESIRE_HIGH, 0
 	end
-	local b8 = B:GetCastPoint()
-	local bg = B:GetSpecialValueFloat("delay") + b8
-	if aH then
+	local castPoint = sunstrikeAbility:GetCastPoint()
+	local delay = sunstrikeAbility:GetSpecialValueFloat("delay") + castPoint
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.GetHP(botTarget) <= 0.85
-			and not c.IsSuspiciousIllusion(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.GetHP(botTarget) <= 0.85
+			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
 			and not botTarget:HasModifier("modifier_brewmaster_storm_cyclone")
 			and not botTarget:HasModifier("modifier_eul_cyclone")
-			and not botTarget:HasModifier(O)
+			and not botTarget:HasModifier(modifierTornado)
 			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
 			and not botTarget:HasModifier("modifier_item_aeon_disk_buff")
-			and (a.IsUnderLongDurationStun(botTarget) or botTarget:IsStunned() or botTarget:IsRooted())
+			and (X.IsUnderLongDurationStun(botTarget) or botTarget:IsStunned() or botTarget:IsRooted())
 		then
 			return BOT_ACTION_DESIRE_HIGH, 0
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.GoodTimeToUseCataclysmGlobally()
-	local bx = B:GetSpecialValueInt("damage")
-	local b8 = B:GetCastPoint()
-	local bg = B:GetSpecialValueFloat("delay") + b8
-	for aQ, aR in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
+function X.GoodTimeToUseCataclysmGlobally()
+	local damage = sunstrikeAbility:GetSpecialValueInt("damage")
+	local castPoint = sunstrikeAbility:GetCastPoint()
+	local delay = sunstrikeAbility:GetSpecialValueFloat("delay") + castPoint
+	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
 		if
-			c.IsValidHero(aR)
-			and bx * 2 > aR:GetHealth()
-			and not c.IsSuspiciousIllusion(aR)
-			and (a.IsUnderLongDurationStun(aR) or aR:IsStunned() or aR:IsRooted())
+			Fu.IsValidHero(enemyHero)
+			and damage * 2 > enemyHero:GetHealth()
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and (X.IsUnderLongDurationStun(enemyHero) or enemyHero:IsStunned() or enemyHero:IsRooted())
 		then
 			return BOT_ACTION_DESIRE_HIGH, 0
 		end
 		if
-			c.IsValidHero(aR)
-			and not aR:HasModifier("modifier_abaddon_borrowed_time")
-			and not aR:HasModifier("modifier_brewmaster_storm_cyclone")
-			and not aR:HasModifier("modifier_dazzle_shallow_grave")
-			and not aR:HasModifier("modifier_eul_cyclone")
-			and not aR:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not aR:HasModifier("modifier_oracle_false_promise_timer")
-			and not aR:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not aR:HasModifier("modifier_item_aeon_disk_buff")
-			and not c.IsSuspiciousIllusion(aR)
-			and (a.IsUnderLongDurationStun(aR) or aR:IsStunned() or aR:IsRooted())
+			Fu.IsValidHero(enemyHero)
+			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemyHero:HasModifier("modifier_brewmaster_storm_cyclone")
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_eul_cyclone")
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
+			and not enemyHero:HasModifier("modifier_item_aeon_disk_buff")
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and (X.IsUnderLongDurationStun(enemyHero) or enemyHero:IsStunned() or enemyHero:IsRooted())
 		then
 			return BOT_ACTION_DESIRE_HIGH, 0
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.IsUnderLongDurationStun(aR)
-	return aR:HasModifier("modifier_bane_fiends_grip")
-		or aR:HasModifier("modifier_legion_commander_duel")
-		or aR:HasModifier("modifier_enigma_black_hole_pull")
-		or aR:HasModifier("modifier_faceless_void_chronosphere_freeze")
-		or aR:HasModifier("modifier_magnataur_reverse_polarity")
-		or aR:HasModifier("modifier_tidehunter_ravage")
+function X.IsUnderLongDurationStun(enemyHero)
+	return enemyHero:HasModifier("modifier_bane_fiends_grip")
+		or enemyHero:HasModifier("modifier_legion_commander_duel")
+		or enemyHero:HasModifier("modifier_enigma_black_hole_pull")
+		or enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
+		or enemyHero:HasModifier("modifier_magnataur_reverse_polarity")
+		or enemyHero:HasModifier("modifier_tidehunter_ravage")
 end
-function a.ConsiderSunstrike()
-	if not a.CanAbilityPossiblyBeCasted(B) then
+function X.ConsiderSunstrike()
+	if not X.CanAbilityPossiblyBeCasted(sunstrikeAbility) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if DotaTime() - (ah["Tornado"] or 0) <= (aB or 0) then
+	if DotaTime() - (lastCastTime["Tornado"] or 0) <= (tornadoLiftDuration or 0) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local bg = B:GetSpecialValueFloat("delay")
-	local bx = B:GetSpecialValueInt("damage")
-	local by = b:GetAttackRange()
-	local bz = GetUnitList(UNIT_LIST_ENEMY_HEROES)
-	for aQ, aR in pairs(bz) do
+	local delay = sunstrikeAbility:GetSpecialValueFloat("delay")
+	local damage = sunstrikeAbility:GetSpecialValueInt("damage")
+	local attackRange = bot:GetAttackRange()
+	local enemyHeroes = GetUnitList(UNIT_LIST_ENEMY_HEROES)
+	for _, enemyHero in pairs(enemyHeroes) do
 		if
-			c.IsValidHero(aR)
-			and not c.IsSuspiciousIllusion(aR)
-			and c.CanCastOnNonMagicImmune(aR)
-			and not aR:HasModifier("modifier_abaddon_borrowed_time")
-			and not aR:HasModifier("modifier_brewmaster_storm_cyclone")
-			and not aR:HasModifier("modifier_dazzle_shallow_grave")
-			and not aR:HasModifier("modifier_eul_cyclone")
-			and not aR:HasModifier(O)
-			and not aR:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not aR:HasModifier("modifier_oracle_false_promise_timer")
-			and not aR:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not aR:HasModifier("modifier_item_aeon_disk_buff")
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemyHero:HasModifier("modifier_brewmaster_storm_cyclone")
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_eul_cyclone")
+			and not enemyHero:HasModifier(modifierTornado)
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
+			and not enemyHero:HasModifier("modifier_item_aeon_disk_buff")
 		then
-			local bA = aR:GetMovementDirectionStability()
-			local bB = RemapValClamped(bA, 0.0, 1.0, 0.0, bg)
-			local bC = bB
-			if aR:HasModifier("modifier_teleporting") then
-				local bw = c.GetModifierTime(aR, "modifier_teleporting")
-				if bw ~= nil and bw > bg + 0.05 then
-					if bx > aR:GetHealth() then
-						return BOT_ACTION_DESIRE_HIGH, aR:GetLocation()
+			local directionStability = enemyHero:GetMovementDirectionStability()
+			local predictionDelay = RemapValClamped(directionStability, 0.0, 1.0, 0.0, delay)
+			local unusedDelay = predictionDelay
+			if enemyHero:HasModifier("modifier_teleporting") then
+				local remainingTime = Fu.GetModifierTime(enemyHero, "modifier_teleporting")
+				if remainingTime ~= nil and remainingTime > delay + 0.05 then
+					if damage > enemyHero:GetHealth() then
+						return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 					end
 				else
-					if bx > aR:GetHealth() then
-						return BOT_ACTION_DESIRE_HIGH, e.GetEnemyFountainTpPoint()
+					if damage > enemyHero:GetHealth() then
+						return BOT_ACTION_DESIRE_HIGH, Utils.GetEnemyFountainTpPoint()
 					end
 				end
 			end
-			if bx > aR:GetHealth() and GetUnitToUnitDistance(b, aR) > by + 50 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(aR, bg)
+			if damage > enemyHero:GetHealth() and GetUnitToUnitDistance(bot, enemyHero) > attackRange + 50 then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, delay)
 			end
 			if
-				#c.GetHeroesNearLocation(false, aR:GetLocation(), 600) >= 1
-				and GetUnitToUnitDistance(b, aR) > by + 50
-				and c.GetHP(aR) < 0.4
+				#Fu.GetHeroesNearLocation(false, enemyHero:GetLocation(), 600) >= 1
+				and GetUnitToUnitDistance(bot, enemyHero) > attackRange + 50
+				and Fu.GetHP(enemyHero) < 0.4
 			then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(aR, bg)
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, delay)
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) and c.IsRoshan(botTarget) and aJ then
+	if Fu.IsDoingRoshan(bot) and Fu.IsRoshan(botTarget) and isAttacking then
 		return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 	end
-	if c.IsDoingTormentor(b) and c.IsTormentor(botTarget) and aJ then
+	if Fu.IsDoingTormentor(bot) and Fu.IsTormentor(botTarget) and isAttacking then
 		return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderForgeSpirit()
-	if not a.CanAbilityPossiblyBeCasted(C) then
+function X.ConsiderForgeSpirit()
+	if not X.CanAbilityPossiblyBeCasted(forgeSpiritAbility) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if aH then
-		if c.IsValidTarget(botTarget) and c.IsInRange(b, botTarget, 1200) then
+	if isEngaging then
+		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, 1200) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if (c.IsLaning(b) or c.IsFarming(b)) and aJ and b:GetMana() - C:GetManaCost() >= aC then
+	if (Fu.IsLaning(bot) or Fu.IsFarming(bot)) and isAttacking and bot:GetMana() - forgeSpiritAbility:GetManaCost() >= laningManaReserve then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		if aJ then
+	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
+		if isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(botTarget) and aJ then
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(botTarget) and aJ then
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderIceWall()
-	if not a.CanAbilityPossiblyBeCasted(D) then
+function X.ConsiderIceWall()
+	if not X.CanAbilityPossiblyBeCasted(iceWallAbility) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local bD = D:GetSpecialValueInt("wall_place_distance")
-	local bE = 300
-	local b7 = 300
-	local b9 = 1000
-	if aH then
+	local wallPlaceDistance = iceWallAbility:GetSpecialValueInt("wall_place_distance")
+	local engageRange = 300
+	local castRange = 300
+	local radius = 1000
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, bE)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsRunning(botTarget)
-			and (not aG or aG and aL > 0.7 or c.GetHP(botTarget) < 0.3)
-			and b:IsFacingLocation(botTarget:GetLocation(), 30)
-			and not c.IsSuspiciousIllusion(botTarget)
-			and not c.IsDisabled(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, engageRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsRunning(botTarget)
+			and (not isLaningPhase or isLaningPhase and mpRatio > 0.7 or Fu.GetHP(botTarget) < 0.3)
+			and bot:IsFacingLocation(botTarget:GetLocation(), 30)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if
-			aE ~= nil
-			and #aE >= 1
-			and c.IsValidHero(aE[1])
-			and a.CheckTempModifiers(Z, aE[1], 1) > 0
-			and c.IsInRange(b, aE[1], bE)
-			and (not aG or aG and aL > 0.7 or c.GetHP(aE[1]) < 0.3)
-			and c.CanCastOnNonMagicImmune(aE[1])
-			and b:IsFacingLocation(aE[1]:GetLocation(), 30)
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and X.CheckTempModifiers(airborneModifiers, nearbyEnemies[1], 1) > 0
+			and Fu.IsInRange(bot, nearbyEnemies[1], engageRange)
+			and (not isLaningPhase or isLaningPhase and mpRatio > 0.7 or Fu.GetHP(nearbyEnemies[1]) < 0.3)
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+			and bot:IsFacingLocation(nearbyEnemies[1]:GetLocation(), 30)
 		then
-			return BOT_ACTION_DESIRE_HIGH, aE[1]:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 		end
 	end
-	if aM then
-		local bb = c.GetAoeEnemyHeroLocation(b, b7, b9, 2)
-		if bb ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, bb
+	if isTeamFight then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
+		if aoeLocation ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation
 		end
-		if aE ~= nil then
-			for aQ, aR in pairs(aE) do
-				if c.IsValidHero(aR) and c.CanCastOnNonMagicImmune(aR) and c.IsInRange(b, aR, bE) then
-					return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(aR, 0.5)
+		if nearbyEnemies ~= nil then
+			for _, enemyHero in pairs(nearbyEnemies) do
+				if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsInRange(bot, enemyHero, engageRange) then
+					return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, 0.5)
 				end
 				if
-					a.CheckTempModifiers(Z, aR, 1) > 0
-					and c.IsInRange(b, aR, bE)
-					and c.CanCastOnNonMagicImmune(aR)
-					and b:IsFacingLocation(aR:GetLocation(), 30)
+					X.CheckTempModifiers(airborneModifiers, enemyHero, 1) > 0
+					and Fu.IsInRange(bot, enemyHero, engageRange)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+					and bot:IsFacingLocation(enemyHero:GetLocation(), 30)
 				then
-					return BOT_ACTION_DESIRE_HIGH, aR:GetLocation()
+					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
 		end
 	end
-	if aI then
+	if isRetreating then
 		if
-			aE ~= nil
-			and #aE >= 1
-			and c.IsValidHero(aE[1])
-			and c.IsInRange(b, aE[1], bE)
-			and c.CanCastOnNonMagicImmune(aE[1])
-			and c.IsChasingTarget(aE[1], b)
-			and b:WasRecentlyDamagedByAnyHero(2)
-			and not c.IsSuspiciousIllusion(aE[1])
-			and not c.IsDisabled(aE[1])
-			and (aK < 0.6 or c.GetTotalEstimatedDamageToTarget(aE, b) > b:GetHealth())
-			and not aG
-			and b:IsFacingLocation(c.GetTeamFountain(), 30)
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], engageRange)
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+			and Fu.IsChasingTarget(nearbyEnemies[1], bot)
+			and bot:WasRecentlyDamagedByAnyHero(2)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and not Fu.IsDisabled(nearbyEnemies[1])
+			and (hpRatio < 0.6 or Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot) > bot:GetHealth())
+			and not isLaningPhase
+			and bot:IsFacingLocation(Fu.GetTeamFountain(), 30)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderDeafeningBlast()
-	if not a.CanAbilityPossiblyBeCasted(E) then
+function X.ConsiderDeafeningBlast()
+	if not X.CanAbilityPossiblyBeCasted(deafeningBlastAbility) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local b7 = c.GetProperCastRange(false, b, E:GetCastRange())
-	local b8 = E:GetCastPoint()
-	local bx = E:GetSpecialValueInt("damage")
-	local b9 = E:GetSpecialValueInt("radius_end")
-	local ba = E:GetSpecialValueInt("travel_speed")
-	if ba == nil then
-		ba = 1000
+	local castRange = Fu.GetProperCastRange(false, bot, deafeningBlastAbility:GetCastRange())
+	local castPoint = deafeningBlastAbility:GetCastPoint()
+	local damage = deafeningBlastAbility:GetSpecialValueInt("damage")
+	local radius = deafeningBlastAbility:GetSpecialValueInt("radius_end")
+	local travelSpeed = deafeningBlastAbility:GetSpecialValueInt("travel_speed")
+	if travelSpeed == nil then
+		travelSpeed = 1000
 	end
-	local bb = b:FindAoELocation(true, true, b:GetLocation(), b7, b9, b8, 0)
-	if c.IsInTeamFight(b, 1500) then
-		local bc = c.GetEnemiesNearLoc(bb.targetloc, b9)
-		local be = c.GetCenterOfUnits(bc)
-		if bc ~= nil and #bc >= 2 and not c.IsLocationInChrono(be) and GetUnitToLocationDistance(b, be) <= b7 then
-			return BOT_ACTION_DESIRE_HIGH, be
+	local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
+	if Fu.IsInTeamFight(bot, 1500) then
+		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
+		local enemyCenter = Fu.GetCenterOfUnits(enemiesInRadius)
+		if enemiesInRadius ~= nil and #enemiesInRadius >= 2 and not Fu.IsLocationInChrono(enemyCenter) and GetUnitToLocationDistance(bot, enemyCenter) <= castRange then
+			return BOT_ACTION_DESIRE_HIGH, enemyCenter
 		end
 	end
-	if aH then
+	if isEngaging then
 		if
-			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsInRange(b, botTarget, b7)
-			and (not aG or aG and c.GetManaAfter(E:GetManaCost()) > 0.5 or c.GetHP(botTarget) < 0.5)
-			and not c.IsSuspiciousIllusion(botTarget)
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and (not isLaningPhase or isLaningPhase and Fu.GetManaAfter(deafeningBlastAbility:GetManaCost()) > 0.5 or Fu.GetHP(botTarget) < 0.5)
+			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_brewmaster_storm_cyclone")
 			and not botTarget:HasModifier("modifier_eul_cyclone")
 			and (
 				botTarget:HasModifier("modifier_invoker_chaos_meteor_burn")
-				or b:IsFacingLocation(botTarget:GetLocation(), 30) and #aF >= #aE
+				or bot:IsFacingLocation(botTarget:GetLocation(), 30) and #nearbyAllies >= #nearbyEnemies
 			)
 		then
-			local bg = GetUnitToUnitDistance(b, botTarget) / ba + b8
-			if botTarget:HasModifier(O) then
-				if DotaTime() >= ah["Tornado"] + aB - bg then
+			local delay = GetUnitToUnitDistance(bot, botTarget) / travelSpeed + castPoint
+			if botTarget:HasModifier(modifierTornado) then
+				if DotaTime() >= lastCastTime["Tornado"] + tornadoLiftDuration - delay then
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
-			elseif a.CheckTempModifiers(Z, botTarget, bg) > 0 then
+			elseif X.CheckTempModifiers(airborneModifiers, botTarget, delay) > 0 then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
-			if c.IsRunning(botTarget) then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(botTarget, bg)
+			if Fu.IsRunning(botTarget) then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(botTarget, delay)
 			end
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if
-		aI
-		and c.IsValidHero(aE[1])
-		and c.IsChasingTarget(aE[1], b)
-		and b:WasRecentlyDamagedByAnyHero(2)
-		and c.IsInRange(b, aE[1], b7 - 300)
+		isRetreating
+		and Fu.IsValidHero(nearbyEnemies[1])
+		and Fu.IsChasingTarget(nearbyEnemies[1], bot)
+		and bot:WasRecentlyDamagedByAnyHero(2)
+		and Fu.IsInRange(bot, nearbyEnemies[1], castRange - 300)
 	then
-		return BOT_ACTION_DESIRE_HIGH, aE[1]:GetLocation()
+		return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 	end
-	for aQ, bF in pairs(aE) do
+	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(bF)
-			and c.CanCastOnNonMagicImmune(bF)
-			and c.Utils.IsWithoutSpellShield(bF)
-			and c.CanKillTarget(bF, bx, DAMAGE_TYPE_MAGICAL)
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.Utils.IsWithoutSpellShield(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
 		then
-			local bg = GetUnitToUnitDistance(b, bF) / ba + b8
-			return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(bF, bg)
+			local delay = GetUnitToUnitDistance(bot, enemyHero) / travelSpeed + castPoint
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, delay)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function ConsiderFirstSpell()
-	if b:GetLevel() == 1 then
-		if r:IsTrained() and not a.IsAbilityAvailableOnSlots(v) then
-			a.InvokeSpell(r, r, r)
-		elseif s:IsTrained() and not a.IsAbilityAvailableOnSlots(y) then
-			a.InvokeSpell(s, s, s)
-		elseif t:IsTrained() and not a.IsAbilityAvailableOnSlots(B) then
-			a.InvokeSpell(t, t, t)
+	if bot:GetLevel() == 1 then
+		if quasAbility:IsTrained() and not X.IsAbilityAvailableOnSlots(coldSnapAbility) then
+			X.InvokeSpell(quasAbility, quasAbility, quasAbility)
+		elseif wexAbility:IsTrained() and not X.IsAbilityAvailableOnSlots(empAbility) then
+			X.InvokeSpell(wexAbility, wexAbility, wexAbility)
+		elseif exortAbility:IsTrained() and not X.IsAbilityAvailableOnSlots(sunstrikeAbility) then
+			X.InvokeSpell(exortAbility, exortAbility, exortAbility)
 		end
 		return
 	end
 end
-function a.InvokeActualSpell(b3)
-	local bG
-	if type(b3) == "string" and b3 == "Cataclysm" then
-		bG = b3
+function X.InvokeActualSpell(ability)
+	local abilityName
+	if type(ability) == "string" and ability == "Cataclysm" then
+		abilityName = ability
 	else
-		bG = b3:GetName()
+		abilityName = ability:GetName()
 	end
-	log("%s - Invoker going to invoke %s", DotaTime(), bG)
-	if bG == F or b3 == B then
-		a.InvokeSpell(t, t, t)
-	elseif b3 == E then
-		a.InvokeSpell(r, s, t)
-	elseif b3 == A then
-		a.InvokeSpell(t, t, s)
-	elseif b3 == C then
-		a.InvokeSpell(t, t, r)
-	elseif b3 == z then
-		a.InvokeSpell(s, s, t)
-	elseif b3 == y then
-		a.InvokeSpell(s, s, s)
-	elseif b3 == D then
-		a.InvokeSpell(r, r, t)
-	elseif b3 == w then
-		a.InvokeSpell(r, r, s)
-	elseif b3 == x then
-		a.InvokeSpell(s, s, r)
-	elseif b3 == v then
-		a.InvokeSpell(r, r, r)
+	log("%s - Invoker going to invoke %s", DotaTime(), abilityName)
+	if abilityName == cataclysmName or ability == sunstrikeAbility then
+		X.InvokeSpell(exortAbility, exortAbility, exortAbility)
+	elseif ability == deafeningBlastAbility then
+		X.InvokeSpell(quasAbility, wexAbility, exortAbility)
+	elseif ability == chaosMeteorAbility then
+		X.InvokeSpell(exortAbility, exortAbility, wexAbility)
+	elseif ability == forgeSpiritAbility then
+		X.InvokeSpell(exortAbility, exortAbility, quasAbility)
+	elseif ability == alacrityAbility then
+		X.InvokeSpell(wexAbility, wexAbility, exortAbility)
+	elseif ability == empAbility then
+		X.InvokeSpell(wexAbility, wexAbility, wexAbility)
+	elseif ability == iceWallAbility then
+		X.InvokeSpell(quasAbility, quasAbility, exortAbility)
+	elseif ability == ghostWalkAbility then
+		X.InvokeSpell(quasAbility, quasAbility, wexAbility)
+	elseif ability == tornadoAbility then
+		X.InvokeSpell(wexAbility, wexAbility, quasAbility)
+	elseif ability == coldSnapAbility then
+		X.InvokeSpell(quasAbility, quasAbility, quasAbility)
 	else
-		log("[ERROR] Tried to invoke unsupported ability: %s", bG)
+		log("[ERROR] Tried to invoke unsupported ability: %s", abilityName)
 		log("Stack Trace:", debug.traceback())
 	end
-	log("%s - Invoker tried to invoke %s", DotaTime(), bG)
+	log("%s - Invoker tried to invoke %s", DotaTime(), abilityName)
 end
-function a.InvokeSpell(aV, aW, aX)
-	b:ActionPush_UseAbility(u)
-	b:ActionPush_UseAbility(aV)
-	b:ActionPush_UseAbility(aW)
-	b:ActionPush_UseAbility(aX)
+function X.InvokeSpell(element1, element2, element3)
+	bot:ActionPush_UseAbility(invokeAbility)
+	bot:ActionPush_UseAbility(element1)
+	bot:ActionPush_UseAbility(element2)
+	bot:ActionPush_UseAbility(element3)
 end
-function a.IsAbilityReadyForInvoke(b3)
-	return not a.IsAbilityAvailableOnSlots(b3) and a.CanAbilityPossiblyBeCasted(b3) and u:IsFullyCastable()
+function X.IsAbilityReadyForInvoke(ability)
+	return not X.IsAbilityAvailableOnSlots(ability) and X.CanAbilityPossiblyBeCasted(ability) and invokeAbility:IsFullyCastable()
 end
-function a.IsAbilityReadyForCast(b3)
-	return a.IsAbilityAvailableOnSlots(b3) and b3:IsFullyCastable()
+function X.IsAbilityReadyForCast(ability)
+	return X.IsAbilityAvailableOnSlots(ability) and ability:IsFullyCastable()
 end
-function a.CanAbilityPossiblyBeCasted(bH)
-	local b5, bI
-	if type(bH) == "string" and bH == "Cataclysm" then
-		b5 = bH
-		bI = B
+function X.CanAbilityPossiblyBeCasted(ability)
+	local castAbility
+	if type(ability) == "string" and ability == "Cataclysm" then
+		castAbility = sunstrikeAbility
 	else
-		b5 = ai[bH:GetName()]
-		bI = bH
+		castAbility = ability
 	end
-	if not a.HaveElementsTrainedToInvokeAbility(bH) then
+	if not X.HaveElementsTrainedToInvokeAbility(ability) then
 		return false
 	end
-	return bI:IsFullyCastable()
+	return castAbility:IsFullyCastable()
 end
-function a.HaveElementsTrainedToInvokeAbility(b3)
-	if type(b3) == "string" and b3 == F then
-		return b:HasScepter() and a.HaveElementsTrainedToInvokeAbility(B)
-	elseif b3 == E then
-		return r:IsTrained() and s:IsTrained() and t:IsTrained()
-	elseif b3 == A then
-		return s:IsTrained() and t:IsTrained()
-	elseif b3 == C then
-		return r:IsTrained() and t:IsTrained()
-	elseif b3 == B then
-		return t:IsTrained()
-	elseif b3 == z then
-		return s:IsTrained() and t:IsTrained()
-	elseif b3 == y then
-		return s:IsTrained()
-	elseif b3 == D then
-		return r:IsTrained() and t:IsTrained()
-	elseif b3 == w then
-		return r:IsTrained() and s:IsTrained()
-	elseif b3 == x then
-		return r:IsTrained() and s:IsTrained()
-	elseif b3 == v then
-		return r:IsTrained()
+function X.HaveElementsTrainedToInvokeAbility(ability)
+	if type(ability) == "string" and ability == cataclysmName then
+		return bot:HasScepter() and X.HaveElementsTrainedToInvokeAbility(sunstrikeAbility)
+	elseif ability == deafeningBlastAbility then
+		return quasAbility:IsTrained() and wexAbility:IsTrained() and exortAbility:IsTrained()
+	elseif ability == chaosMeteorAbility then
+		return wexAbility:IsTrained() and exortAbility:IsTrained()
+	elseif ability == forgeSpiritAbility then
+		return quasAbility:IsTrained() and exortAbility:IsTrained()
+	elseif ability == sunstrikeAbility then
+		return exortAbility:IsTrained()
+	elseif ability == alacrityAbility then
+		return wexAbility:IsTrained() and exortAbility:IsTrained()
+	elseif ability == empAbility then
+		return wexAbility:IsTrained()
+	elseif ability == iceWallAbility then
+		return quasAbility:IsTrained() and exortAbility:IsTrained()
+	elseif ability == ghostWalkAbility then
+		return quasAbility:IsTrained() and wexAbility:IsTrained()
+	elseif ability == tornadoAbility then
+		return quasAbility:IsTrained() and wexAbility:IsTrained()
+	elseif ability == coldSnapAbility then
+		return quasAbility:IsTrained()
 	else
 		log("[ERROR] Checks invokability on an unsupported ability")
 		log("Stack Trace:", debug.traceback())
 	end
 	return nil
 end
-function a.IsAbilityAvailableOnSlots(b3)
-	return not b3:IsHidden()
+function X.IsAbilityAvailableOnSlots(ability)
+	return not ability:IsHidden()
 end
 function CheckAbilityUsage()
-	local bJ = { b:GetAbilityInSlot(3), b:GetAbilityInSlot(4) }
-	for b1, b3 in pairs(bJ) do
-		local bK = b3:GetCooldownTimeRemaining() / b3:GetCooldown()
-		local bL = 0.9
-		if a.IsAbilityAvailableOnSlots(b3) and not b3:IsCooldownReady() and bK >= bL then
-			local b5 = ai[b3:GetName()]
-			local bM = DotaTime() - ah[b5]
-			if DotaTime() - ah[b5] <= 1 or bM >= b3:GetCooldown() * 0.5 or ah[b5] == -100 then
-				local bN = aD - b3:GetManaCost()
-				local bO = 20
-				if b:GetMana() <= bN + bO and b:GetMana() >= bN - bO then
-					if b3 == B and b3:GetCooldownTimeRemaining() > 50 then
-						b5 = "Cataclysm"
+	local spellSlots = { bot:GetAbilityInSlot(3), bot:GetAbilityInSlot(4) }
+	for _, ability in pairs(spellSlots) do
+		local cooldownRatio = ability:GetCooldownTimeRemaining() / ability:GetCooldown()
+		local cooldownThreshold = 0.9
+		if X.IsAbilityAvailableOnSlots(ability) and not ability:IsCooldownReady() and cooldownRatio >= cooldownThreshold then
+			local abilityName = spellKeyByAbilityName[ability:GetName()]
+			local timeSinceCast = DotaTime() - lastCastTime[abilityName]
+			if DotaTime() - lastCastTime[abilityName] <= 1 or timeSinceCast >= ability:GetCooldown() * 0.5 or lastCastTime[abilityName] == -100 then
+				local expectedMana = lastMana - ability:GetManaCost()
+				local manaTolerance = 20
+				if bot:GetMana() <= expectedMana + manaTolerance and bot:GetMana() >= expectedMana - manaTolerance then
+					if ability == sunstrikeAbility and ability:GetCooldownTimeRemaining() > 50 then
+						abilityName = "Cataclysm"
 					end
-					log("%s - Invoker just used ability %s, reset the cooldown tracking time.", DotaTime(), b5)
-					ah[b5] = DotaTime()
+					log("%s - Invoker just used ability %s, reset the cooldown tracking time.", DotaTime(), abilityName)
+					lastCastTime[abilityName] = DotaTime()
 				end
 			end
 		end
 	end
-	aD = b:GetMana()
+	lastMana = bot:GetMana()
 end
-return a
+return X

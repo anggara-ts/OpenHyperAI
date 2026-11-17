@@ -1,28 +1,28 @@
 -- Kunkka: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
-local k
-local l
-if h == "pos_2" then
-	k = j[1]
-	l = c.Skill.GetTalentBuild(i[1])
+local tAllAbilityBuildList = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local nAbilityBuildList
+local nTalentBuildList
+if sRole == "pos_2" then
+	nAbilityBuildList = tAllAbilityBuildList[1]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 else
-	k = j[2]
-	l = c.Skill.GetTalentBuild(i[2])
+	nAbilityBuildList = tAllAbilityBuildList[2]
+	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
-local m = {}
-m["pos_2"] = {
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -45,7 +45,7 @@ m["pos_2"] = {
 	"item_travel_boots_2",
 	"item_moon_shard",
 }
-m["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
@@ -66,10 +66,10 @@ m["pos_3"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_1"] = m["pos_3"]
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
 -- Support builds: Hand of Midas, Basher, MKB, Assault Cuirass and Abyssal Blade were carry items on a pos 4/5
 -- support; swapped for save/utility items (Force Staff, Lotus Orb, Scythe of Vyse).
-m["pos_4"] = {
+sRoleItemsBuyList["pos_4"] = {
 	"item_priest_outfit",
 	"item_mekansm",
 	"item_glimmer_cape",
@@ -83,7 +83,7 @@ m["pos_4"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_priest_outfit",
 	"item_mekansm",
 	"item_glimmer_cape",
@@ -97,391 +97,386 @@ m["pos_5"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "kunkka")
-local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "kunkka")
-local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "kunkka")
-local r = SafeAbility(b:GetAbilityByName("kunkka_return"), "kunkka_return", "kunkka")
-local s = SafeAbility(b:GetAbilityByName("kunkka_tidal_wave"), "kunkka_tidal_wave", "kunkka")
-local t = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "kunkka")
-local u, v
-local w, x
-local y, z
-local A, B
-local C
-local D
-local E, F
-local G, H, I
-local J, K, L
-local M, N, O
-local P, Q, R, S, T
-local U = 0
-local V = 0
-local W = 0
-local X = 2.25
-local Y = 3.35
-local Z = 1.95
-function a.SkillsComplement()
-	if not b:IsAlive() then
-		U = 0
-		V = 0
-		W = 0
+local torrentAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "kunkka")
+local tidebringerAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "kunkka")
+local xMarksAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "kunkka")
+local returnAbility = SafeAbility(bot:GetAbilityByName("kunkka_return"), "kunkka_return", "kunkka")
+local tidalWaveAbility = SafeAbility(bot:GetAbilityByName("kunkka_tidal_wave"), "kunkka_tidal_wave", "kunkka")
+local ghostshipAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "kunkka")
+local torrentDesire, torrentLocation
+local tidebringerDesire, tidebringerTarget
+local xMarksDesire, xMarksTarget
+local tidalWaveDesire, tidalWaveLocation
+local unusedDesire
+local unusedTarget
+local ghostshipDesire, ghostshipLocation
+local combo1Desire, combo1Target, combo1Location
+local combo2Desire, combo2Target, combo2Location
+local combo3Desire, combo3Target, combo3Location
+local combo1StartTime = 0
+local combo2StartTime = 0
+local combo3StartTime = 0
+local combo1ReturnDelay = 2.25
+local combo2ReturnDelay = 3.35
+local combo3ReturnDelay = 1.95
+function X.SkillsComplement()
+	if not bot:IsAlive() then
+		combo1StartTime = 0
+		combo2StartTime = 0
+		combo3StartTime = 0
 	end
-	if c.CanNotUseAbility(b) or b:IsInvisible() then
+	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
-	local _ = d.Build(b)
-	P = 240
-	Q = _.mp
-	R = _.hp
-	S = _.level
-	T = _.enemies
+	-- none of its fields are read here; kept for its side effect (the [OHA-CORNERED] log)
+	AbilityContext.Build(bot)
 	if
-		r:IsHidden() == false
-		and r:IsFullyCastable()
-		and (W ~= 0 and DotaTime() >= W + Z or U ~= 0 and DotaTime() >= U + X or V ~= 0 and DotaTime() >= V + Y)
+		returnAbility:IsHidden() == false
+		and returnAbility:IsFullyCastable()
+		and (combo3StartTime ~= 0 and DotaTime() >= combo3StartTime + combo3ReturnDelay or combo1StartTime ~= 0 and DotaTime() >= combo1StartTime + combo1ReturnDelay or combo2StartTime ~= 0 and DotaTime() >= combo2StartTime + combo2ReturnDelay)
 	then
-		U = 0
-		V = 0
-		W = 0
-		b:Action_UseAbility(r)
+		combo1StartTime = 0
+		combo2StartTime = 0
+		combo3StartTime = 0
+		bot:Action_UseAbility(returnAbility)
 		return
 	end
-	if r:IsHidden() == true or q:IsFullyCastable() then
-		U = 0
-		V = 0
-		W = 0
+	if returnAbility:IsHidden() == true or xMarksAbility:IsFullyCastable() then
+		combo1StartTime = 0
+		combo2StartTime = 0
+		combo3StartTime = 0
 	end
-	if U ~= 0 or V ~= 0 or W ~= 0 then -- was "V ~= 0" twice; W is the X + Torrent combo timer
+	if combo1StartTime ~= 0 or combo2StartTime ~= 0 or combo3StartTime ~= 0 then -- was "combo2StartTime ~= 0" twice; combo3StartTime is the X + Torrent combo timer
 		return
 	end
-	G, H, I = a.ConsiderCombo1()
-	if G > 0 then
-		U = DotaTime()
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(q, H)
-		b:ActionQueue_UseAbilityOnLocation(t, I)
-		b:ActionQueue_UseAbilityOnLocation(o, I)
+	combo1Desire, combo1Target, combo1Location = X.ConsiderCombo1()
+	if combo1Desire > 0 then
+		combo1StartTime = DotaTime()
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(xMarksAbility, combo1Target)
+		bot:ActionQueue_UseAbilityOnLocation(ghostshipAbility, combo1Location)
+		bot:ActionQueue_UseAbilityOnLocation(torrentAbility, combo1Location)
 		return
 	end
-	J, K, L = a.ConsiderCombo2()
-	if J > 0 then
-		V = DotaTime()
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(q, K)
-		b:ActionQueue_UseAbilityOnLocation(t, L)
+	combo2Desire, combo2Target, combo2Location = X.ConsiderCombo2()
+	if combo2Desire > 0 then
+		combo2StartTime = DotaTime()
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(xMarksAbility, combo2Target)
+		bot:ActionQueue_UseAbilityOnLocation(ghostshipAbility, combo2Location)
 		return
 	end
-	M, N, O = a.ConsiderCombo3()
-	if M > 0 then
-		W = DotaTime()
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(q, N)
-		b:ActionQueue_UseAbilityOnLocation(o, O)
+	combo3Desire, combo3Target, combo3Location = X.ConsiderCombo3()
+	if combo3Desire > 0 then
+		combo3StartTime = DotaTime()
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(xMarksAbility, combo3Target)
+		bot:ActionQueue_UseAbilityOnLocation(torrentAbility, combo3Location)
 		return
 	end
-	u, v = a.ConsiderQ()
-	if u > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(o, v)
+	torrentDesire, torrentLocation = X.ConsiderQ()
+	if torrentDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(torrentAbility, torrentLocation)
 		return
 	end
-	y, z = a.ConsiderE()
-	if y > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(q, z)
+	xMarksDesire, xMarksTarget = X.ConsiderE()
+	if xMarksDesire > 0 then
+		Fu.SetQueuePtToINT(bot, false)
+		bot:ActionQueue_UseAbilityOnEntity(xMarksAbility, xMarksTarget)
 		return
 	end
-	E, F = a.ConsiderR()
-	if E > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(t, F)
+	ghostshipDesire, ghostshipLocation = X.ConsiderR()
+	if ghostshipDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(ghostshipAbility, ghostshipLocation)
 		return
 	end
-	A, B = a.ConsiderAS()
-	if A > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnLocation(s, B)
+	tidalWaveDesire, tidalWaveLocation = X.ConsiderAS()
+	if tidalWaveDesire > 0 then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(tidalWaveAbility, tidalWaveLocation)
 		return
 	end
-	w, x = a.ConsiderW()
-	if w > 0 then
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnEntity(p, x)
+	tidebringerDesire, tidebringerTarget = X.ConsiderW()
+	if tidebringerDesire > 0 then
+		bot:Action_ClearActions(false)
+		bot:ActionQueue_UseAbilityOnEntity(tidebringerAbility, tidebringerTarget)
 		return
 	end
 end
-function a.GetTowardsFountainLocation(a0, a1)
-	local a2 = {}
+function X.GetTowardsFountainLocation(location, distance)
+	local towardsLocation = {}
 	if GetTeam() == TEAM_RADIANT then
-		a2[1] = a0[1] - a1 / math.sqrt(2)
-		a2[2] = a0[2] - a1 / math.sqrt(2)
+		towardsLocation[1] = location[1] - distance / math.sqrt(2)
+		towardsLocation[2] = location[2] - distance / math.sqrt(2)
 	end
 	if GetTeam() == TEAM_DIRE then
-		a2[1] = a0[1] + a1 / math.sqrt(2)
-		a2[2] = a0[2] + a1 / math.sqrt(2)
+		towardsLocation[1] = location[1] + distance / math.sqrt(2)
+		towardsLocation[2] = location[2] + distance / math.sqrt(2)
 	end
-	return Vector(a2[1], a2[2])
+	return Vector(towardsLocation[1], towardsLocation[2])
 end
-function a.ConsiderCombo1()
-	if not o:IsFullyCastable() or not q:IsFullyCastable() or not t:IsFullyCastable() then
+function X.ConsiderCombo1()
+	if not torrentAbility:IsFullyCastable() or not xMarksAbility:IsFullyCastable() or not ghostshipAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a3 = b:GetMana()
-	local a4 = o:GetManaCost() + q:GetManaCost() + t:GetManaCost()
-	if a4 > a3 then
+	local mana = bot:GetMana()
+	local comboManaCost = torrentAbility:GetManaCost() + xMarksAbility:GetManaCost() + ghostshipAbility:GetManaCost()
+	if comboManaCost > mana then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a5 = q:GetCastRange() + 38
-	if c.IsGoingOnSomeone(b) then
-		local a6 = b:GetTarget()
+	local castRange = xMarksAbility:GetCastRange() + 38
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = bot:GetTarget()
 		if
-			c.IsValidHero(a6)
-			and c.CanCastOnNonMagicImmune(a6)
-			and GetUnitToUnitDistance(a6, b) > a5 / 2
-			and GetUnitToUnitDistance(a6, b) < a5
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and GetUnitToUnitDistance(target, bot) > castRange / 2
+			and GetUnitToUnitDistance(target, bot) < castRange
 		then
-			return BOT_ACTION_DESIRE_HIGH, a6, c.GetFaceTowardDistanceLocation(a6, 30)
+			return BOT_ACTION_DESIRE_HIGH, target, Fu.GetFaceTowardDistanceLocation(target, 30)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderCombo2()
-	if not t:IsFullyCastable() or not q:IsFullyCastable() then
+function X.ConsiderCombo2()
+	if not ghostshipAbility:IsFullyCastable() or not xMarksAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil, {}
 	end
-	local a3 = b:GetMana()
-	local a4 = t:GetManaCost() + q:GetManaCost()
-	if a4 > a3 then
+	local mana = bot:GetMana()
+	local comboManaCost = ghostshipAbility:GetManaCost() + xMarksAbility:GetManaCost()
+	if comboManaCost > mana then
 		return BOT_ACTION_DESIRE_NONE, nil, {}
 	end
-	local a5 = q:GetCastRange() + 38
-	if c.IsGoingOnSomeone(b) then
-		local a6 = b:GetTarget()
-		if c.IsValidHero(a6) and c.CanCastOnNonMagicImmune(a6) and GetUnitToUnitDistance(a6, b) < a5 then
-			return BOT_ACTION_DESIRE_HIGH, a6, a6:GetLocation()
+	local castRange = xMarksAbility:GetCastRange() + 38
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = bot:GetTarget()
+		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and GetUnitToUnitDistance(target, bot) < castRange then
+			return BOT_ACTION_DESIRE_HIGH, target, target:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, {}
 end
-function a.ConsiderCombo3()
-	if not o:IsFullyCastable() or not q:IsFullyCastable() or t:IsFullyCastable() then
+function X.ConsiderCombo3()
+	if not torrentAbility:IsFullyCastable() or not xMarksAbility:IsFullyCastable() or ghostshipAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil, {}
 	end
-	local a3 = b:GetMana()
-	local a4 = o:GetManaCost() + q:GetManaCost()
-	if a4 > a3 then
+	local mana = bot:GetMana()
+	local comboManaCost = torrentAbility:GetManaCost() + xMarksAbility:GetManaCost()
+	if comboManaCost > mana then
 		return BOT_ACTION_DESIRE_NONE, nil, {}
 	end
-	local a5 = q:GetCastRange() + 38
-	local a7 = c.GetNearbyHeroes(b, a5 + 200, true, BOT_MODE_NONE)
-	for a8, a9 in pairs(a7) do
-		if a9:IsChanneling() then
-			return BOT_ACTION_DESIRE_MODERATE, a9, a9:GetLocation()
+	local castRange = xMarksAbility:GetCastRange() + 38
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
+		if enemy:IsChanneling() then
+			return BOT_ACTION_DESIRE_MODERATE, enemy, enemy:GetLocation()
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
-		local a6 = b:GetTarget()
-		if c.IsValidHero(a6) and c.CanCastOnNonMagicImmune(a6) and GetUnitToUnitDistance(a6, b) < a5 then
-			return BOT_ACTION_DESIRE_HIGH, a6, c.GetFaceTowardDistanceLocation(a6, 40)
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = bot:GetTarget()
+		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and GetUnitToUnitDistance(target, bot) < castRange then
+			return BOT_ACTION_DESIRE_HIGH, target, Fu.GetFaceTowardDistanceLocation(target, 40)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, {}
 end
-function a.ConsiderQ()
-	if not o:IsFullyCastable() then
+function X.ConsiderQ()
+	if not torrentAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local aa = o:GetCastPoint()
-	local ab = o:GetSpecialValueFloat("delay")
-	if b:GetActiveMode() == BOT_MODE_ROSHAN then
-		local a6 = b:GetAttackTarget()
-		if c.IsRoshan(a6) and c.CanCastOnMagicImmune(a6) and c.IsInRange(a6, b, 600) then
-			return BOT_ACTION_DESIRE_LOW, a6:GetLocation()
+	local castPoint = torrentAbility:GetCastPoint()
+	local torrentDelay = torrentAbility:GetSpecialValueFloat("delay")
+	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
+		local target = bot:GetAttackTarget()
+		if Fu.IsRoshan(target) and Fu.CanCastOnMagicImmune(target) and Fu.IsInRange(target, bot, 600) then
+			return BOT_ACTION_DESIRE_LOW, target:GetLocation()
 		end
 	end
-	if c.IsRetreating(b) then
-		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-		for a8, a9 in pairs(a7) do
-			if b:WasRecentlyDamagedByHero(a9, 1.0) then
-				return BOT_ACTION_DESIRE_MODERATE, a9:GetExtrapolatedLocation((ab + aa) * 0.68)
+	if Fu.IsRetreating(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		for _, enemy in pairs(nearbyEnemies) do
+			if bot:WasRecentlyDamagedByHero(enemy, 1.0) then
+				return BOT_ACTION_DESIRE_MODERATE, enemy:GetExtrapolatedLocation((torrentDelay + castPoint) * 0.68)
 			end
 		end
 	end
-	local a7 = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
-	for a8, a9 in pairs(a7) do
-		if a9:IsChanneling() then
-			if DotaTime() >= (b._kunkkaLogAt or -999) then
-				b._kunkkaLogAt = DotaTime() + 3
-				pcall(print, string.format("[OHA-KUNKKA] t=%.0f torrent-channel target=%s", DotaTime(), a9:GetUnitName()))
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
+		if enemy:IsChanneling() then
+			if DotaTime() >= (bot._kunkkaLogAt or -999) then
+				bot._kunkkaLogAt = DotaTime() + 3
+				pcall(print, string.format("[OHA-KUNKKA] t=%.0f torrent-channel target=%s", DotaTime(), enemy:GetUnitName()))
 			end
-			return BOT_ACTION_DESIRE_MODERATE, a9:GetLocation()
+			return BOT_ACTION_DESIRE_MODERATE, enemy:GetLocation()
 		end
 	end
 	-- Hold Torrent for the X combos only after the retreat and channel-cut checks above: the hold used
 	-- to come first, so with X ready (level 3+) Kunkka never Torrented to escape or to cut a channel,
 	-- and Combo3 (X + Torrent on a channeller) is also off while Ghostship is ready.
-	if q:GetLevel() >= 3 and q:IsFullyCastable() and b:GetMana() > 160 then
+	if xMarksAbility:GetLevel() >= 3 and xMarksAbility:IsFullyCastable() and bot:GetMana() > 160 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if c.IsGoingOnSomeone(b) then
-		local a6 = b:GetTarget()
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = bot:GetTarget()
 		if
-			c.IsValidHero(a6)
-			and not c.IsRunning(a6)
-			and not c.IsMoving(a6)
-			and c.CanCastOnNonMagicImmune(a6)
-			and GetUnitToUnitDistance(a6, b) < 700
+			Fu.IsValidHero(target)
+			and not Fu.IsRunning(target)
+			and not Fu.IsMoving(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and GetUnitToUnitDistance(target, bot) < 700
 		then
-			return BOT_ACTION_DESIRE_HIGH, a6:GetExtrapolatedLocation((ab + aa) * 0.68)
+			return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation((torrentDelay + castPoint) * 0.68)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, {}
 end
-function a.ConsiderE()
-	if not q:IsFullyCastable() or o:IsFullyCastable() or t:IsFullyCastable() then
+function X.ConsiderE()
+	if not xMarksAbility:IsFullyCastable() or torrentAbility:IsFullyCastable() or ghostshipAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a5 = q:GetCastRange()
-	if c.IsRetreating(b) then
-		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-		for a8, a9 in pairs(a7) do
-			if b:WasRecentlyDamagedByHero(a9, 1.0) and c.CanCastOnNonMagicImmune(a9) then
-				return BOT_ACTION_DESIRE_MODERATE, a9
+	local castRange = xMarksAbility:GetCastRange()
+	if Fu.IsRetreating(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		for _, enemy in pairs(nearbyEnemies) do
+			if bot:WasRecentlyDamagedByHero(enemy, 1.0) and Fu.CanCastOnNonMagicImmune(enemy) then
+				return BOT_ACTION_DESIRE_MODERATE, enemy
 			end
 		end
 	end
-	local a7 = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-	for a8, a9 in pairs(a7) do
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
 		-- X alone on a channelling enemy was a wasted cast: nothing in this branch triggers Return, so the
 		-- enemy was sent back to the spot it was already channelling on. Removed; Torrent covers channels.
 		-- Range and magic-immunity checks added (X range is 550-1000, this list reaches 1200).
 		if
-			b:GetActiveMode() == BOT_MODE_ATTACK
-			and #a7 == 1
-			and b:GetLevel() >= 6
-			and c.IsInRange(b, a9, a5)
-			and c.CanCastOnNonMagicImmune(a9)
-			and b:IsFacingLocation(a9:GetLocation(), 30)
-			and a9:IsFacingLocation(c.GetEnemyFountain(), 30)
+			bot:GetActiveMode() == BOT_MODE_ATTACK
+			and #nearbyEnemies == 1
+			and bot:GetLevel() >= 6
+			and Fu.IsInRange(bot, enemy, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and bot:IsFacingLocation(enemy:GetLocation(), 30)
+			and enemy:IsFacingLocation(Fu.GetEnemyFountain(), 30)
 		then
-			return BOT_ACTION_DESIRE_MODERATE, a9
+			return BOT_ACTION_DESIRE_MODERATE, enemy
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderR()
+function X.ConsiderR()
 	-- Ghostship alone was blocked whenever X was ready. The X combos only run while going on someone,
 	-- so in a fight in any other mode (defending, retreating) Ghostship was never cast. Only defer to
 	-- the combos when they can actually run.
-	if not t:IsFullyCastable() or q:IsFullyCastable() and c.IsGoingOnSomeone(b) then
+	if not ghostshipAbility:IsFullyCastable() or xMarksAbility:IsFullyCastable() and Fu.IsGoingOnSomeone(bot) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a5 = t:GetCastRange()
-	local ac = t:GetSpecialValueInt("ghostship_width")
+	local castRange = ghostshipAbility:GetCastRange()
+	local ghostshipWidth = ghostshipAbility:GetSpecialValueInt("ghostship_width")
 	-- The retreat Ghostship keeps the old X gate (only while X is on cooldown), so the looser gate
 	-- above does not spend the ultimate on every retreat.
-	if c.IsRetreating(b) and not q:IsFullyCastable() then
-		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-		for a8, a9 in pairs(a7) do
-			if b:WasRecentlyDamagedByHero(a9, 1.0) then
-				return BOT_ACTION_DESIRE_MODERATE, a.GetTowardsFountainLocation(b:GetLocation(), a5 - 200)
+	if Fu.IsRetreating(bot) and not xMarksAbility:IsFullyCastable() then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+		for _, enemy in pairs(nearbyEnemies) do
+			if bot:WasRecentlyDamagedByHero(enemy, 1.0) then
+				return BOT_ACTION_DESIRE_MODERATE, X.GetTowardsFountainLocation(bot:GetLocation(), castRange - 200)
 			end
 		end
 	end
-	local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
-	for a8, a9 in pairs(a7) do
-		if a9:IsChanneling() then
-			return BOT_ACTION_DESIRE_MODERATE, a9:GetLocation()
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
+		if enemy:IsChanneling() then
+			return BOT_ACTION_DESIRE_MODERATE, enemy:GetLocation()
 		end
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local ad = b:FindAoELocation(true, true, b:GetLocation(), a5 * 0.8, ac, 0.8, 0)
-		local ae = c.GetEnemyList(b, 1200)
-		if ad.count >= 3 and #ae >= 2 then
-			return BOT_ACTION_DESIRE_MODERATE, ad.targetloc
+	if Fu.IsInTeamFight(bot, 1200) then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange * 0.8, ghostshipWidth, 0.8, 0)
+		local enemyList = Fu.GetEnemyList(bot, 1200)
+		if aoe.count >= 3 and #enemyList >= 2 then
+			return BOT_ACTION_DESIRE_MODERATE, aoe.targetloc
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderW()
-	if not c.IsRunning(b) or p == nil or not p:IsFullyCastable() then
+function X.ConsiderW()
+	if not Fu.IsRunning(bot) or tidebringerAbility == nil or not tidebringerAbility:IsFullyCastable() then
 		return 0
 	end
-	local a6 = c.GetProperTarget(b)
-	if not c.IsValid(a6) then
+	local target = Fu.GetProperTarget(bot)
+	if not Fu.IsValid(target) then
 		return 0
 	end
-	local af = b:GetAttackRange() + 40
-	if af < 200 then
-		af = 200
+	local attackRange = bot:GetAttackRange() + 40
+	if attackRange < 200 then
+		attackRange = 200
 	end
-	local ag = a.GetNearbyUnit(b, a6)
+	local frontUnit = X.GetNearbyUnit(bot, target)
 	-- Only stop to cleave a unit in front when the cleave (cleave_distance 650-1025, game KV) reaches the
 	-- real target; it used to fire whenever the target was out of attack range, which stalled chases.
-	local cleave = p:GetSpecialValueInt("cleave_distance")
-	if c.IsValid(ag) and GetUnitToUnitDistance(a6, b) > af and GetUnitToUnitDistance(ag, a6) <= cleave * 0.8 then
-		return BOT_ACTION_DESIRE_HIGH, ag
+	local cleave = tidebringerAbility:GetSpecialValueInt("cleave_distance")
+	if Fu.IsValid(frontUnit) and GetUnitToUnitDistance(target, bot) > attackRange and GetUnitToUnitDistance(frontUnit, target) <= cleave * 0.8 then
+		return BOT_ACTION_DESIRE_HIGH, frontUnit
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.GetNearbyUnit(b, a6)
-	if b:IsFacingLocation(a6:GetLocation(), 39) then
-		local ah = b:GetNearbyCreeps(240, true)
-		for a8, ai in pairs(ah) do
-			if c.IsValid(ai) and b:IsFacingLocation(ai:GetLocation(), 38) then
-				return ai
+function X.GetNearbyUnit(bot, target)
+	if bot:IsFacingLocation(target:GetLocation(), 39) then
+		local nearbyCreeps = bot:GetNearbyCreeps(240, true)
+		for _, creep in pairs(nearbyCreeps) do
+			if Fu.IsValid(creep) and bot:IsFacingLocation(creep:GetLocation(), 38) then
+				return creep
 			end
 		end
-		local aj = c.GetNearbyHeroes(b, 240, true, BOT_MODE_NONE)
-		for a8, ak in pairs(aj) do
-			if c.IsValid(ak) and b:IsFacingLocation(ak:GetLocation(), 38) then
-				return ak
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 240, true, BOT_MODE_NONE)
+		for _, enemy in pairs(nearbyEnemies) do
+			if Fu.IsValid(enemy) and bot:IsFacingLocation(enemy:GetLocation(), 38) then
+				return enemy
 			end
 		end
 	end
 	return nil
 end
-function a.ConsiderAS()
-	if not s:IsTrained() or not s:IsFullyCastable() then
+function X.ConsiderAS()
+	if not tidalWaveAbility:IsTrained() or not tidalWaveAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local ac = 350
-	local a5 = 750
-	local aa = s:GetCastPoint()
-	local al = s:GetManaCost()
-	if c.IsRetreating(b) then
-		local am = c.GetNearbyHeroes(b, a5, true, BOT_MODE_NONE)
-		local an = am[1]
-		if c.IsValidHero(an) and c.CanCastOnNonMagicImmune(an) then
-			return BOT_ACTION_DESIRE_HIGH, an:GetLocation()
+	local radius = 350
+	local castRange = 750
+	local castPoint = tidalWaveAbility:GetCastPoint()
+	local manaCost = tidalWaveAbility:GetManaCost()
+	if Fu.IsRetreating(bot) then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+		local target = nearbyEnemies[1]
+		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) then
+			return BOT_ACTION_DESIRE_HIGH, target:GetLocation()
 		end
 	end
-	if c.IsInTeamFight(b, 1400) then
-		local ao = c.GetAoeEnemyHeroLocation(b, a5, ac, 2)
-		if ao ~= nil then
-			local ap = b:GetLocation() + b:GetLocation() - ao
-			return BOT_ACTION_DESIRE_HIGH, ao
+	if Fu.IsInTeamFight(bot, 1400) then
+		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
+		if aoeLocation ~= nil then
+			local mirroredLocation = bot:GetLocation() + bot:GetLocation() - aoeLocation
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation
 		end
 	end
-	if c.IsGoingOnSomeone(b) then
-		local an = c.GetProperTarget(b)
-		if c.IsValidHero(an) and c.IsInRange(b, an, 400) and c.CanCastOnNonMagicImmune(an) then
-			local ap = b:GetLocation() + b:GetLocation() - an:GetLocation()
-			return BOT_ACTION_DESIRE_HIGH, ap
+	if Fu.IsGoingOnSomeone(bot) then
+		local target = Fu.GetProperTarget(bot)
+		if Fu.IsValidHero(target) and Fu.IsInRange(bot, target, 400) and Fu.CanCastOnNonMagicImmune(target) then
+			local mirroredLocation = bot:GetLocation() + bot:GetLocation() - target:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, mirroredLocation
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-return a
+return X

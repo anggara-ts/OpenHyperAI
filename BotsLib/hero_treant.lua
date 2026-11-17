@@ -1,18 +1,18 @@
 -- Treant: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 1, 3, 1, 3, 6, 3, 1, 1, 3, 6, 2, 2, 2, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_4"] = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local tAllAbilityBuildList = { { 2, 1, 3, 1, 3, 6, 3, 1, 1, 3, 6, 2, 2, 2, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_4"] = {
 	"item_double_tango",
 	"item_faerie_fire",
 	"item_wind_lace",
@@ -30,7 +30,7 @@ m["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_enchanted_mango",
@@ -51,7 +51,7 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_3"] = {
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_enchanted_mango",
@@ -71,7 +71,7 @@ m["pos_3"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_1"] = {
+sRoleItemsBuyList["pos_1"] = {
 	"item_bristleback_outfit",
 	"item_aghanims_shard",
 	"item_blade_mail",
@@ -83,282 +83,279 @@ m["pos_1"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-m["pos_2"] = m["pos_1"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
-a["LastStandSpells"] = { { name = "treant_overgrowth", kind = "none" } }
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+X["LastStandSpells"] = { { name = "treant_overgrowth", kind = "none" } }
+X["bDeafaultItem"] = false
+function X.MinionThink(minionUnit)
+	Minion.MinionThink(minionUnit)
 end
-local o = false
-local p = SafeAbility(b:GetAbilityByName("treant_natures_grasp"), "treant_natures_grasp", "treant")
-local q = SafeAbility(b:GetAbilityByName("treant_leech_seed"), "treant_leech_seed", "treant")
-local r = SafeAbility(b:GetAbilityByName("treant_living_armor"), "treant_living_armor", "treant")
-local s = SafeAbility(b:GetAbilityByName("treant_eyes_in_the_forest"), "treant_eyes_in_the_forest", "treant")
-local t = SafeAbility(b:GetAbilityByName("treant_overgrowth"), "treant_overgrowth", "treant")
-local u, v
-local w, x
-local y, z
-local A, B
-local C
-local D
-local E, F
-local G
-local H
-local I
-local J
-local K
-function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
+local naturesGraspAbility = SafeAbility(bot:GetAbilityByName("treant_natures_grasp"), "treant_natures_grasp", "treant")
+local leechSeedAbility = SafeAbility(bot:GetAbilityByName("treant_leech_seed"), "treant_leech_seed", "treant")
+local livingArmorAbility = SafeAbility(bot:GetAbilityByName("treant_living_armor"), "treant_living_armor", "treant")
+local eyesInTheForestAbility = SafeAbility(bot:GetAbilityByName("treant_eyes_in_the_forest"), "treant_eyes_in_the_forest", "treant")
+local overgrowthAbility = SafeAbility(bot:GetAbilityByName("treant_overgrowth"), "treant_overgrowth", "treant")
+local naturesGraspDesire, naturesGraspLocation
+local leechSeedDesire, leechSeedTarget
+local livingArmorDesire, livingArmorTarget
+local eyesInTheForestDesire, eyesInTheForestTree
+local overgrowthDesire
+local blinkItem
+local blinkOvergrowthDesire, blinkOvergrowthLocation
+local botTarget
+local isEngaging
+local isAttacking
+local hpRatio
+local isInTeamFight
+function X.SkillsComplement()
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	local L = d.Build(b)
-	H = L.isEngaging
-	I = c.IsAttacking(b)
-	J = L.hp
-	K = L.isTeamFight
-	E, F = a.ConsiderBlinkOvergrowth()
-	if E > 0 then
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnLocation(D, F)
-		b:ActionQueue_Delay(0.1)
-		b:ActionQueue_UseAbility(t)
+	local abilityContext = AbilityContext.Build(bot)
+	isEngaging = abilityContext.isEngaging
+	isAttacking = Fu.IsAttacking(bot)
+	hpRatio = abilityContext.hp
+	isInTeamFight = abilityContext.isTeamFight
+	blinkOvergrowthDesire, blinkOvergrowthLocation = X.ConsiderBlinkOvergrowth()
+	if blinkOvergrowthDesire > 0 then
+		bot:Action_ClearActions(false)
+		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkOvergrowthLocation)
+		bot:ActionQueue_Delay(0.1)
+		bot:ActionQueue_UseAbility(overgrowthAbility)
 		return
 	end
-	C = a.ConsiderOvergrowth()
-	if C > 0 then
-		b:Action_UseAbility(t)
+	overgrowthDesire = X.ConsiderOvergrowth()
+	if overgrowthDesire > 0 then
+		bot:Action_UseAbility(overgrowthAbility)
 		return
 	end
-	u, v = a.ConsiderNaturesGrasp()
-	if u > 0 then
-		b:Action_UseAbilityOnLocation(p, v)
+	naturesGraspDesire, naturesGraspLocation = X.ConsiderNaturesGrasp()
+	if naturesGraspDesire > 0 then
+		bot:Action_UseAbilityOnLocation(naturesGraspAbility, naturesGraspLocation)
 		return
 	end
-	w, x = a.ConsiderLeechSeed()
+	leechSeedDesire, leechSeedTarget = X.ConsiderLeechSeed()
 	-- datafeed: Leech Seed is now unit-target only (behavior 135176 = unit target + autocast +
-	-- attack, range 150); the old point-cast path (o) could never be used, so it always casts on a unit.
-	if w > 0 and c.IsValid(x) then
-		o = false
-		b:Action_UseAbilityOnEntity(q, x)
+	-- attack, range 150); the old point-cast path could never be used, so it always casts on a unit.
+	if leechSeedDesire > 0 and Fu.IsValid(leechSeedTarget) then
+		bot:Action_UseAbilityOnEntity(leechSeedAbility, leechSeedTarget)
 		return
 	end
-	A, B = a.ConsiderEyesInTheForest()
-	if A > 0 then
-		b:Action_UseAbilityOnTree(s, B)
+	eyesInTheForestDesire, eyesInTheForestTree = X.ConsiderEyesInTheForest()
+	if eyesInTheForestDesire > 0 then
+		bot:Action_UseAbilityOnTree(eyesInTheForestAbility, eyesInTheForestTree)
 		return
 	end
-	y, z = a.ConsiderLivingArmor()
-	if y > 0 then
-		b:Action_UseAbilityOnEntity(r, z)
+	livingArmorDesire, livingArmorTarget = X.ConsiderLivingArmor()
+	if livingArmorDesire > 0 then
+		bot:Action_UseAbilityOnEntity(livingArmorAbility, livingArmorTarget)
 		return
 	end
 end
-function a.ConsiderNaturesGrasp()
-	if not p:IsFullyCastable() then
+function X.ConsiderNaturesGrasp()
+	if not naturesGraspAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local M = c.GetProperCastRange(false, b, p:GetCastRange())
-	local N = p:GetSpecialValueInt("latch_range")
-	G = c.GetProperTarget(b)
-	if K then
-		local O = b:FindAoELocation(true, true, b:GetLocation(), M, N, 0, 0)
-		local P = c.GetEnemiesNearLoc(O.targetloc, N)
-		if P ~= nil and #P >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, O.targetloc
+	local castRange = Fu.GetProperCastRange(false, bot, naturesGraspAbility:GetCastRange())
+	local latchRange = naturesGraspAbility:GetSpecialValueInt("latch_range")
+	botTarget = Fu.GetProperTarget(bot)
+	if isInTeamFight then
+		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, latchRange, 0, 0)
+		local enemiesInAoe = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, latchRange)
+		if enemiesInAoe ~= nil and #enemiesInAoe >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
-	if H then
+	if isEngaging then
 		if
-			c.IsValidTarget(G)
-			and c.CanCastOnNonMagicImmune(G)
-			and c.IsInRange(b, G, M)
-			and not c.IsSuspiciousIllusion(G)
-			and not c.IsDisabled(G)
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not c.IsLocationInChrono(G:GetLocation())
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not Fu.IsLocationInChrono(botTarget:GetLocation())
 		then
-			local Q = c.GetNearbyHeroes(G, 1200, true, BOT_MODE_NONE)
-			local R = c.GetNearbyHeroes(G, 1200, false, BOT_MODE_NONE)
-			if Q ~= nil and R ~= nil and #Q >= #R then
-				return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	if c.IsRetreating(b) then
-		local Q = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			Q ~= nil
-			and P
-			and c.IsValidHero(P[1])
-			and c.CanCastOnNonMagicImmune(P[1])
-			and c.IsChasingTarget(P[1], b)
-			and not c.IsSuspiciousIllusion(P[1])
-			and not c.IsDisabled(P[1])
-			and not P[1]:HasModifier("modifier_necrolyte_reapers_scythe")
+			nearbyAllies ~= nil
+			and nearbyEnemies
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+			and Fu.IsChasingTarget(nearbyEnemies[1], bot)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and not Fu.IsDisabled(nearbyEnemies[1])
+			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			local R = c.GetNearbyHeroes(P[1], 1000, false, BOT_MODE_NONE)
-			if R ~= nil and (#R > #Q or J < 0.75 and b:WasRecentlyDamagedByAnyHero(1)) then
-				return BOT_ACTION_DESIRE_HIGH, P[1]:GetLocation()
+			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1000, false, BOT_MODE_NONE)
+			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or hpRatio < 0.75 and bot:WasRecentlyDamagedByAnyHero(1)) then
+				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 			end
 		end
 	end
-	if c.IsDefending(b) then
-		local O = b:FindAoELocation(true, false, b:GetLocation(), M, N, 0, 0)
-		local S = b:GetNearbyLaneCreeps(M, true)
-		if S ~= nil and #S >= 3 and O.count >= 3 and c.CanBeAttacked(S[1]) then
-			return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(S)
+	if Fu.IsDefending(bot) then
+		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, latchRange, 0, 0)
+		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
+		if laneCreeps ~= nil and #laneCreeps >= 3 and aoeLocation.count >= 3 and Fu.CanBeAttacked(laneCreeps[1]) then
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
-		O = b:FindAoELocation(true, true, b:GetLocation(), M, N, 0, 0)
-		if O.count >= 1 then
-			return BOT_ACTION_DESIRE_HIGH, O.targetloc
+		aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, latchRange, 0, 0)
+		if aoeLocation.count >= 1 then
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
-	if c.IsLaning(b) then
-		local T = c.GetStrongestUnit(M, b, true, false, 5)
+	if Fu.IsLaning(bot) then
+		local strongestUnit = Fu.GetStrongestUnit(castRange, bot, true, false, 5)
 		if
-			c.IsValidTarget(T)
-			and c.CanCastOnNonMagicImmune(T)
-			and not c.IsSuspiciousIllusion(T)
-			and not T:HasModifier("modifier_abaddon_borrowed_time")
-			and not T:HasModifier("modifier_dazzle_shallow_grave")
-			and not T:HasModifier("modifier_necrolyte_reapers_scythe")
-			and c.GetMP(b) > 0.75
+			Fu.IsValidTarget(strongestUnit)
+			and Fu.CanCastOnNonMagicImmune(strongestUnit)
+			and not Fu.IsSuspiciousIllusion(strongestUnit)
+			and not strongestUnit:HasModifier("modifier_abaddon_borrowed_time")
+			and not strongestUnit:HasModifier("modifier_dazzle_shallow_grave")
+			and not strongestUnit:HasModifier("modifier_necrolyte_reapers_scythe")
+			and Fu.GetMP(bot) > 0.75
 		then
-			return BOT_ACTION_DESIRE_HIGH, T:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, strongestUnit:GetLocation()
 		end
-		if not c.IsInLaningPhase() then
-			local O = b:FindAoELocation(true, false, b:GetLocation(), M, N, 0, 0)
-			local S = b:GetNearbyLaneCreeps(M, true)
-			if S ~= nil and #S >= 3 and O.count >= 3 and c.CanBeAttacked(S[1]) then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(S)
+		if not Fu.IsInLaningPhase() then
+			local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, latchRange, 0, 0)
+			local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
+			if laneCreeps ~= nil and #laneCreeps >= 3 and aoeLocation.count >= 3 and Fu.CanBeAttacked(laneCreeps[1]) then
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(G) and c.CanCastOnNonMagicImmune(G) and c.IsInRange(b, G, 500) and I then
-			return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(G) and c.IsInRange(b, G, 500) and I then
-			return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderLeechSeed()
-	if not q:IsFullyCastable() then
+function X.ConsiderLeechSeed()
+	if not leechSeedAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local M = c.GetProperCastRange(false, b, q:GetCastRange())
-	G = c.GetProperTarget(b)
-	local N = q:GetSpecialValueInt("radius")
-	if H then
-		o = false
-		if c.IsValidHero(G) and c.CanCastOnNonMagicImmune(G) and not c.IsChasingTarget(b, G) then
-			local O = b:FindAoELocation(true, true, G:GetLocation(), 0, N, 0, 0)
+	local castRange = Fu.GetProperCastRange(false, bot, leechSeedAbility:GetCastRange())
+	botTarget = Fu.GetProperTarget(bot)
+	local radius = leechSeedAbility:GetSpecialValueInt("radius")
+	if isEngaging then
+		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and not Fu.IsChasingTarget(bot, botTarget) then
+			local aoeLocation = bot:FindAoELocation(true, true, botTarget:GetLocation(), 0, radius, 0, 0)
 			-- datafeed: unit-target now, so seed the hero itself (it was a point cast on the group).
-			if O.count >= 2 and c.IsInRange(b, G, M) then
-				return BOT_ACTION_DESIRE_HIGH, G
+			if aoeLocation.count >= 2 and Fu.IsInRange(bot, botTarget, castRange) then
+				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end
-		local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
-		local U = nil
-		local V = 0
-		for W, X in pairs(P) do
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		local bestTarget = nil
+		local highestDamage = 0
+		for _, enemyHero in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(X)
-				and c.CanCastOnNonMagicImmune(X)
-				and c.IsInRange(b, X, M)
-				and not c.IsSuspiciousIllusion(X)
-				and not c.IsDisabled(X)
-				and not X:HasModifier("modifier_abaddon_borrowed_time")
-				and not X:HasModifier("modifier_dazzle_shallow_grave")
-				and not X:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not X:HasModifier("modifier_treant_natures_grasp_damage")
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemyHero:HasModifier("modifier_treant_natures_grasp_damage")
 			then
-				local Q = c.GetNearbyHeroes(X, 1200, true, BOT_MODE_NONE)
-				local R = c.GetNearbyHeroes(X, 1200, false, BOT_MODE_NONE)
-				local Y = X:GetEstimatedDamageToTarget(false, b, 5, DAMAGE_TYPE_ALL)
-				if Q ~= nil and R ~= nil and #Q >= #R and Y > V then
-					V = Y
-					U = X
+				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(false, bot, 5, DAMAGE_TYPE_ALL)
+				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy and estimatedDamage > highestDamage then
+					highestDamage = estimatedDamage
+					bestTarget = enemyHero
 				end
 			end
 		end
-		if U ~= nil then
-			return BOT_ACTION_DESIRE_MODERATE, U
+		if bestTarget ~= nil then
+			return BOT_ACTION_DESIRE_MODERATE, bestTarget
 		end
 	end
-	if c.IsRetreating(b) then
-		local Q = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
-		local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	if Fu.IsRetreating(bot) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		if
-			Q ~= nil
-			and P
-			and c.IsValidHero(P[1])
-			and c.CanCastOnNonMagicImmune(P[1])
-			and c.IsInRange(b, P[1], M)
-			and c.IsChasingTarget(P[1], b)
-			and not c.IsSuspiciousIllusion(P[1])
-			and not c.IsDisabled(P[1])
-			and not P[1]:HasModifier("modifier_treant_natures_grasp_damage")
+			nearbyAllies ~= nil
+			and nearbyEnemies
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], castRange)
+			and Fu.IsChasingTarget(nearbyEnemies[1], bot)
+			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+			and not Fu.IsDisabled(nearbyEnemies[1])
+			and not nearbyEnemies[1]:HasModifier("modifier_treant_natures_grasp_damage")
 		then
-			if #P > #Q or J < 0.75 and b:WasRecentlyDamagedByAnyHero(1.5) then
-				return BOT_ACTION_DESIRE_HIGH, P[1]
+			if #nearbyEnemies > #nearbyAllies or hpRatio < 0.75 and bot:WasRecentlyDamagedByAnyHero(1.5) then
+				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(G) and c.CanCastOnNonMagicImmune(G) and c.IsInRange(b, G, 500) and I then
+	if Fu.IsDoingRoshan(bot) then
+		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
 			-- datafeed: unit-target now; seed Roshan instead of a point at Treant's feet.
-			return BOT_ACTION_DESIRE_HIGH, G
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if c.IsDoingTormentor(b) then
-		if c.IsTormentor(G) and c.IsInRange(b, G, 500) and I then
-			return BOT_ACTION_DESIRE_HIGH, G
+	if Fu.IsDoingTormentor(bot) then
+		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderLivingArmor()
-	if not r:IsFullyCastable() then
+function X.ConsiderLivingArmor()
+	if not livingArmorAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local Z = nil
-	local _ = 0
+	local strongestAlly = nil
+	local highestPower = 0
 	-- In a fight an ally being focused comes first: the pick below takes the ally with the most
 	-- offensive power, at any HP, so a dying support never got the block. Under 50% HP and hit by a
 	-- hero in the last 2s, lowest HP first. Logged: [OHA-TREANT] armor-save.
-	if H or c.IsInTeamFight(b, 1600) then
+	if isEngaging or Fu.IsInTeamFight(bot, 1600) then
 		local save, saveHP = nil, 0.5
-		for W, a0 in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+		for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE) or {}) do
 			if
-				c.IsValidHero(a0)
-				and not c.IsMeepoClone(a0)
-				and not a0:IsIllusion()
-				and not a0:HasModifier("modifier_arc_warden_tempest_double")
-				and not a0:HasModifier("modifier_treant_living_armor")
-				and c.GetHP(a0) < saveHP
-				and a0:WasRecentlyDamagedByAnyHero(2)
+				Fu.IsValidHero(allyHero)
+				and not Fu.IsMeepoClone(allyHero)
+				and not allyHero:IsIllusion()
+				and not allyHero:HasModifier("modifier_arc_warden_tempest_double")
+				and not allyHero:HasModifier("modifier_treant_living_armor")
+				and Fu.GetHP(allyHero) < saveHP
+				and allyHero:WasRecentlyDamagedByAnyHero(2)
 			then
-				save, saveHP = a0, c.GetHP(a0)
+				save, saveHP = allyHero, Fu.GetHP(allyHero)
 			end
 		end
 		if save ~= nil then
-			if DotaTime() >= (b._treantArmorLogAt or -999) then
-				b._treantArmorLogAt = DotaTime() + 5
+			if DotaTime() >= (bot._treantArmorLogAt or -999) then
+				bot._treantArmorLogAt = DotaTime() + 5
 				pcall(print, string.format(
 					"[OHA-TREANT] t=%.0f armor-save ally=%s hp=%.2f",
 					DotaTime(),
@@ -369,136 +366,136 @@ function a.ConsiderLivingArmor()
 			return BOT_ACTION_DESIRE_HIGH, save
 		end
 	end
-	if H or c.IsInTeamFight(b, 1600) then
-		local Q = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
-		for W, a0 in pairs(Q) do
+	if isEngaging or Fu.IsInTeamFight(bot, 1600) then
+		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
+		for _, allyHero in pairs(nearbyAllies) do
 			if
-				c.IsValidHero(a0)
-				and not c.IsMeepoClone(a0)
-				and not a0:IsIllusion()
-				and not a0:HasModifier("modifier_arc_warden_tempest_double")
-				and not a0:HasModifier("modifier_treant_living_armor")
-				and not a0:HasModifier("modifier_fountain_aura")
+				Fu.IsValidHero(allyHero)
+				and not Fu.IsMeepoClone(allyHero)
+				and not allyHero:IsIllusion()
+				and not allyHero:HasModifier("modifier_arc_warden_tempest_double")
+				and not allyHero:HasModifier("modifier_treant_living_armor")
+				and not allyHero:HasModifier("modifier_fountain_aura")
 			then
-				if _ < a0:GetOffensivePower() then
-					_ = a0:GetOffensivePower()
-					Z = a0
+				if highestPower < allyHero:GetOffensivePower() then
+					highestPower = allyHero:GetOffensivePower()
+					strongestAlly = allyHero
 				end
 			end
 		end
 	end
-	if Z ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, Z
+	if strongestAlly ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, strongestAlly
 	end
-	local a1 = nil
-	local a2 = 0.7
-	for W, a0 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
+	local weakestAlly = nil
+	local lowestHpRatio = 0.7
+	for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
 		if
-			c.IsValidHero(a0)
-			and not c.IsMeepoClone(a0)
-			and not a0:IsIllusion()
-			and not a0:HasModifier("modifier_arc_warden_tempest_double")
-			and not a0:HasModifier("modifier_treant_living_armor")
-			and not a0:HasModifier("modifier_fountain_aura")
+			Fu.IsValidHero(allyHero)
+			and not Fu.IsMeepoClone(allyHero)
+			and not allyHero:IsIllusion()
+			and not allyHero:HasModifier("modifier_arc_warden_tempest_double")
+			and not allyHero:HasModifier("modifier_treant_living_armor")
+			and not allyHero:HasModifier("modifier_fountain_aura")
 		then
-			if c.GetHP(a0) < a2 and c.GetHP(a0) < 0.7 then
-				a2 = c.GetHP(a0)
-				a1 = a0
+			if Fu.GetHP(allyHero) < lowestHpRatio and Fu.GetHP(allyHero) < 0.7 then
+				lowestHpRatio = Fu.GetHP(allyHero)
+				weakestAlly = allyHero
 			end
 		end
 	end
-	if a1 ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, a1
+	if weakestAlly ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, weakestAlly
 	end
-	local a3 = nil
-	local a4 = 0.8
-	for W, a5 in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS)) do
-		if c.IsValidBuilding(a5) and not a5:HasModifier("modifier_treant_living_armor") then
-			if a5:GetHealth() / a5:GetMaxHealth() < a4 and a5:GetHealth() / a5:GetMaxHealth() < 0.8 then
-				a4 = a5:GetHealth() / a5:GetMaxHealth()
-				a3 = a5
+	local weakestBuilding = nil
+	local lowestBuildingHpRatio = 0.8
+	for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS)) do
+		if Fu.IsValidBuilding(building) and not building:HasModifier("modifier_treant_living_armor") then
+			if building:GetHealth() / building:GetMaxHealth() < lowestBuildingHpRatio and building:GetHealth() / building:GetMaxHealth() < 0.8 then
+				lowestBuildingHpRatio = building:GetHealth() / building:GetMaxHealth()
+				weakestBuilding = building
 			end
 		end
 	end
-	if a3 ~= nil then
-		return BOT_ACTION_DESIRE_HIGH, a3
+	if weakestBuilding ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, weakestBuilding
 	end
 	if
-		J < 0.75
-		and not b:HasModifier("modifier_treant_living_armor")
-		and not b:HasModifier("modifier_fountain_aura")
+		hpRatio < 0.75
+		and not bot:HasModifier("modifier_treant_living_armor")
+		and not bot:HasModifier("modifier_fountain_aura")
 	then
-		return BOT_ACTION_DESIRE_HIGH, b
+		return BOT_ACTION_DESIRE_HIGH, bot
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderOvergrowth()
-	if not t:IsFullyCastable() then
+function X.ConsiderOvergrowth()
+	if not overgrowthAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local N = t:GetSpecialValueInt("radius")
-	-- K (2+ allies in attack mode) used to be required, so Overgrowth stayed unused when Treant
+	local radius = overgrowthAbility:GetSpecialValueInt("radius")
+	-- isInTeamFight (2+ allies in attack mode) used to be required, so Overgrowth stayed unused when Treant
 	-- was going in on someone with fewer allies in attack mode, or caught by 3 enemies while
 	-- defending. Now: 2+ enemies in radius (datafeed 800) in a fight or while engaging, or 3+ anytime.
 	-- Logged: [OHA-TREANT] overgrowth.
-	local P = c.GetEnemiesNearLoc(b:GetLocation(), N)
+	local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 	if
-		P ~= nil
-		and (#P >= 3 or #P >= 2 and (K or H))
-		and not c.IsLocationInChrono(b:GetLocation())
-		and not c.IsLocationInBlackHole(b:GetLocation())
+		nearbyEnemies ~= nil
+		and (#nearbyEnemies >= 3 or #nearbyEnemies >= 2 and (isInTeamFight or isEngaging))
+		and not Fu.IsLocationInChrono(bot:GetLocation())
+		and not Fu.IsLocationInBlackHole(bot:GetLocation())
 	then
-		if not K and DotaTime() >= (b._treantOvergrowthLogAt or -999) then
-			b._treantOvergrowthLogAt = DotaTime() + 10
+		if not isInTeamFight and DotaTime() >= (bot._treantOvergrowthLogAt or -999) then
+			bot._treantOvergrowthLogAt = DotaTime() + 10
 			pcall(print, string.format(
 				"[OHA-TREANT] t=%.0f overgrowth enemies=%d engaging=%s (not a team fight)",
 				DotaTime(),
-				#P,
-				tostring(H)
+				#nearbyEnemies,
+				tostring(isEngaging)
 			))
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderEyesInTheForest()
-	if not s:IsTrained() or not s:IsFullyCastable() then
+function X.ConsiderEyesInTheForest()
+	if not eyesInTheForestAbility:IsTrained() or not eyesInTheForestAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local M = c.GetProperCastRange(false, b, s:GetCastRange())
-	local N = s:GetSpecialValueInt("vision_aoe")
-	G = c.GetProperTarget(b)
-	if H then
+	local castRange = Fu.GetProperCastRange(false, bot, eyesInTheForestAbility:GetCastRange())
+	local visionRadius = eyesInTheForestAbility:GetSpecialValueInt("vision_aoe")
+	botTarget = Fu.GetProperTarget(bot)
+	if isEngaging then
 		if
-			c.IsValidTarget(G)
-			and c.IsInRange(b, G, N)
-			and not c.IsSuspiciousIllusion(G)
-			and not G:HasModifier("modifier_treant_eyes_in_the_forest")
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, visionRadius)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and not botTarget:HasModifier("modifier_treant_eyes_in_the_forest")
 		then
-			local Q = c.GetNearbyHeroes(G, 1200, true, BOT_MODE_NONE)
-			local R = c.GetNearbyHeroes(G, 1200, false, BOT_MODE_NONE)
-			local a6 = b:GetNearbyTrees(M)
-			if Q ~= nil and R ~= nil and #Q >= #R and #Q >= 1 and a6 ~= nil and #a6 >= 1 then
-				return BOT_ACTION_DESIRE_HIGH, a6[1]
+			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
+			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
+			local nearbyTrees = bot:GetNearbyTrees(castRange)
+			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and #alliesNearTarget >= 1 and nearbyTrees ~= nil and #nearbyTrees >= 1 then
+				return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderBlinkOvergrowth()
+function X.ConsiderBlinkOvergrowth()
 	if CanDoBlinkOvergrowth() then
-		local N = t:GetSpecialValueInt("radius")
-		if K then
-			local O = b:FindAoELocation(true, true, b:GetLocation(), 1199, N, 0, 0)
-			local P = c.GetEnemiesNearLoc(O.targetloc, N)
+		local radius = overgrowthAbility:GetSpecialValueInt("radius")
+		if isInTeamFight then
+			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), 1199, radius, 0, 0)
+			local enemiesInAoe = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 			if
-				P ~= nil
-				and #P >= 2
-				and not c.IsLocationInChrono(O.targetloc)
-				and not c.IsLocationInBlackHole(O.targetloc)
-				and GetUnitToLocationDistance(b, O.targetloc) > 600
+				enemiesInAoe ~= nil
+				and #enemiesInAoe >= 2
+				and not Fu.IsLocationInChrono(aoeLocation.targetloc)
+				and not Fu.IsLocationInBlackHole(aoeLocation.targetloc)
+				and GetUnitToLocationDistance(bot, aoeLocation.targetloc) > 600
 			then
-				return BOT_ACTION_DESIRE_HIGH, O.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 		end
 	end
@@ -507,37 +504,37 @@ end
 function CanDoBlinkOvergrowth()
 	-- datafeed item_blink: blink_damage_cooldown 3, so Blink cannot be used within 3s of hero damage;
 	-- the queued Overgrowth would then go off where Treant stood (not verified in a game).
-	if t:IsFullyCastable() and HasBlink() and not b:WasRecentlyDamagedByAnyHero(3.0) then
-		local a7 = t:GetManaCost()
-		if b:GetMana() >= a7 then
-			b.shouldBlink = true
+	if overgrowthAbility:IsFullyCastable() and HasBlink() and not bot:WasRecentlyDamagedByAnyHero(3.0) then
+		local manaCost = overgrowthAbility:GetManaCost()
+		if bot:GetMana() >= manaCost then
+			bot.shouldBlink = true
 			return true
 		end
 	end
-	b.shouldBlink = false
+	bot.shouldBlink = false
 	return false
 end
 function HasBlink()
-	local a8 = nil
-	for a9 = 0, 5 do
-		local aa = b:GetItemInSlot(a9)
+	local foundBlink = nil
+	for slot = 0, 5 do
+		local item = bot:GetItemInSlot(slot)
 		if
-			aa ~= nil
+			item ~= nil
 			and (
-				aa:GetName() == "item_blink"
-				or aa:GetName() == "item_overwhelming_blink"
-				or aa:GetName() == "item_arcane_blink"
-				or aa:GetName() == "item_swift_blink"
+				item:GetName() == "item_blink"
+				or item:GetName() == "item_overwhelming_blink"
+				or item:GetName() == "item_arcane_blink"
+				or item:GetName() == "item_swift_blink"
 			)
 		then
-			a8 = aa
+			foundBlink = item
 			break
 		end
 	end
-	if a8 ~= nil and a8:IsFullyCastable() then
-		D = a8
+	if foundBlink ~= nil and foundBlink:IsFullyCastable() then
+		blinkItem = foundBlink
 		return true
 	end
 	return false
 end
-return a
+return X

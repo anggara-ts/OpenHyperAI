@@ -1,18 +1,18 @@
 -- Phoenix: skill build, item build, and ability use for this hero.
-local a = {}
-local b = GetBot()
-local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
-local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
-local h = c.Item.GetRoleItemsBuyList(b)
-local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
-local k = c.Skill.GetRandomBuild(j)
-local l = c.Skill.GetTalentBuild(i)
-local m = {}
-m["pos_4"] = {
+local X = {}
+local bot = GetBot()
+local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local sTalentList = Fu.Skill.GetTalentList(bot)
+local sAbilityList = Fu.Skill.GetAbilityList(bot)
+local sRole = Fu.Item.GetRoleItemsBuyList(bot)
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
+local tAllAbilityBuildList = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
+local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local sRoleItemsBuyList = {}
+sRoleItemsBuyList["pos_4"] = {
 	"item_double_tango",
 	"item_double_branches",
 	"item_blood_grenade",
@@ -32,7 +32,7 @@ m["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
-m["pos_5"] = {
+sRoleItemsBuyList["pos_5"] = {
 	"item_blood_grenade",
 	"item_mage_outfit",
 	"item_ancient_janggo",
@@ -47,7 +47,7 @@ m["pos_5"] = {
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-m["pos_2"] = {
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_bracer",
@@ -64,347 +64,347 @@ m["pos_2"] = {
 	"item_travel_boots_2",
 	"item_moon_shard",
 }
-m["pos_1"] = m["pos_2"]
-m["pos_3"] = m["pos_2"]
-a["sBuyList"] = m[h]
-a["sSellList"] = { "item_heart", "item_magic_wand" }
-if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
-	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
+X["sBuyList"] = sRoleItemsBuyList[sRole]
+X["sSellList"] = { "item_heart", "item_magic_wand" }
+if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
+	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
-a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-a["bDeafaultAbility"] = false
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
+X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
-a["LastStandSpells"] = { { name = "phoenix_supernova", kind = "none" } }
-a["bDeafaultItem"] = false
-function a.MinionThink(n)
-	e.MinionThink(n)
+X["LastStandSpells"] = { { name = "phoenix_supernova", kind = "none" } }
+X["bDeafaultItem"] = false
+function X.MinionThink(hMinionUnit)
+	Minion.MinionThink(hMinionUnit)
 end
-local o = SafeAbility(b:GetAbilityByName("phoenix_icarus_dive"), "phoenix_icarus_dive", "phoenix")
-local p = SafeAbility(b:GetAbilityByName("phoenix_icarus_dive_stop"), "phoenix_icarus_dive_stop", "phoenix")
-local q = SafeAbility(b:GetAbilityByName("phoenix_fire_spirits"), "phoenix_fire_spirits", "phoenix")
-local r = SafeAbility(b:GetAbilityByName("phoenix_launch_fire_spirit"), "phoenix_launch_fire_spirit", "phoenix")
-local s = SafeAbility(b:GetAbilityByName("phoenix_sun_ray"), "phoenix_sun_ray", "phoenix")
-local t = SafeAbility(b:GetAbilityByName("phoenix_sun_ray_stop"), "phoenix_sun_ray_stop", "phoenix")
-local u = SafeAbility(b:GetAbilityByName("phoenix_sun_ray_toggle_move"), "phoenix_sun_ray_toggle_move", "phoenix")
-local v = SafeAbility(b:GetAbilityByName("phoenix_supernova"), "phoenix_supernova", "phoenix")
-local w, x
-local y
-local z
-local A, B
-local C, D
-local E
-local F, G
-local H, I
-local J = -1
-local K = 2
-local L = 0
-if b.sun_ray_target == nil then
-	b.sun_ray_target = b
+local icarusDiveAbility = SafeAbility(bot:GetAbilityByName("phoenix_icarus_dive"), "phoenix_icarus_dive", "phoenix")
+local icarusDiveStopAbility = SafeAbility(bot:GetAbilityByName("phoenix_icarus_dive_stop"), "phoenix_icarus_dive_stop", "phoenix")
+local fireSpiritsAbility = SafeAbility(bot:GetAbilityByName("phoenix_fire_spirits"), "phoenix_fire_spirits", "phoenix")
+local launchFireSpiritAbility = SafeAbility(bot:GetAbilityByName("phoenix_launch_fire_spirit"), "phoenix_launch_fire_spirit", "phoenix")
+local sunRayAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray"), "phoenix_sun_ray", "phoenix")
+local sunRayStopAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray_stop"), "phoenix_sun_ray_stop", "phoenix")
+local sunRayToggleMoveAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray_toggle_move"), "phoenix_sun_ray_toggle_move", "phoenix")
+local supernovaAbility = SafeAbility(bot:GetAbilityByName("phoenix_supernova"), "phoenix_supernova", "phoenix")
+local icarusDiveDesire, icarusDiveLocation
+local icarusDiveStopDesire
+local fireSpiritsDesire
+local launchFireSpiritDesire, launchFireSpiritLocation
+local sunRayDesire, sunRayLocation
+local sunRayStopDesire
+local toggleMovementDesire, toggleMovementState
+local supernovaDesire, supernovaTarget
+local lastDiveTime = -1
+local diveDuration = 2
+local lastLaunchTime = 0
+if bot.sun_ray_target == nil then
+	bot.sun_ray_target = bot
 end
-local M
-local N
-local O
-local P
-function a.SkillsComplement()
-	local Q = d.Build(b)
-	N = Q.isEngaging
-	O = c.IsAttacking(b)
-	P = Q.hp
+local botTarget
+local isGoingOnSomeone
+local isAttacking
+local hpRatio
+function X.SkillsComplement()
+	local context = AbilityContext.Build(bot)
+	isGoingOnSomeone = context.isEngaging
+	isAttacking = Fu.IsAttacking(bot)
+	hpRatio = context.hp
 	-- Sun Ray / dive stop + ray move must run while channeling.
 	-- CanNotUseAbility() is true during channels, which previously blocked stop forever
 	-- (Phoenix stood still on low HP until the ray finished).
-	E = a.ConsiderSunRayStop()
-	if E > 0 then
-		b:Action_UseAbility(t)
-		b.sun_ray_engage = false
-		b.sun_ray_heal_ally = false
+	sunRayStopDesire = X.ConsiderSunRayStop()
+	if sunRayStopDesire > 0 then
+		bot:Action_UseAbility(sunRayStopAbility)
+		bot.sun_ray_engage = false
+		bot.sun_ray_heal_ally = false
 		return
 	end
-	F, G = a.ConsiderToggleMovement()
-	if F > 0 then
-		if G == "on" then
-			if not u:GetToggleState() then
-				b:Action_UseAbility(u)
+	toggleMovementDesire, toggleMovementState = X.ConsiderToggleMovement()
+	if toggleMovementDesire > 0 then
+		if toggleMovementState == "on" then
+			if not sunRayToggleMoveAbility:GetToggleState() then
+				bot:Action_UseAbility(sunRayToggleMoveAbility)
 			end
 		else
-			if u:GetToggleState() then
-				b:Action_UseAbility(u)
+			if sunRayToggleMoveAbility:GetToggleState() then
+				bot:Action_UseAbility(sunRayToggleMoveAbility)
 			end
 		end
 		return
 	end
 	-- Root the Sun Ray target with Rod of Atos so it cannot walk out of the beam. Runs here
 	-- because the busy check below is true during the ray and blocks the shared item logic.
-	local atos, atosTarget = a.ConsiderAtosOnSunRay()
+	local atos, atosTarget = X.ConsiderAtosOnSunRay()
 	if atos ~= nil then
-		b:Action_UseAbilityOnEntity(atos, atosTarget)
+		bot:Action_UseAbilityOnEntity(atos, atosTarget)
 		return
 	end
 	-- Fire Spirits work during Sun Ray too, but the busy check below blocked them for the
 	-- whole beam. During the ray, only against enemy heroes and with HP to spare (the cast
 	-- costs a share of HP on top of the ray's own cost).
-	if b:HasModifier("modifier_phoenix_sun_ray") and (P or c.GetHP(b)) > 0.35 then
-		local spiritRange = c.GetProperCastRange(false, b, q:GetCastRange())
-		local foes = b:GetNearbyHeroes(math.min(spiritRange, 1600), true, BOT_MODE_NONE) or {}
+	if bot:HasModifier("modifier_phoenix_sun_ray") and (hpRatio or Fu.GetHP(bot)) > 0.35 then
+		local spiritRange = Fu.GetProperCastRange(false, bot, fireSpiritsAbility:GetCastRange())
+		local foes = bot:GetNearbyHeroes(math.min(spiritRange, 1600), true, BOT_MODE_NONE) or {}
 		if #foes > 0 then
-			if a.ConsiderFireSpirits() > 0 then
-				a.LogSunRaySpirits("summon", foes[1])
-				b:Action_UseAbility(q)
+			if X.ConsiderFireSpirits() > 0 then
+				X.LogSunRaySpirits("summon", foes[1])
+				bot:Action_UseAbility(fireSpiritsAbility)
 				return
 			end
-			local launch, loc = a.ConsiderFireSpiritsLaunch()
+			local launch, loc = X.ConsiderFireSpiritsLaunch()
 			if launch > 0 and loc ~= nil then
-				local hit = c.GetEnemiesNearLoc(loc, q:GetSpecialValueInt("radius") + 150)
+				local hit = Fu.GetEnemiesNearLoc(loc, fireSpiritsAbility:GetSpecialValueInt("radius") + 150)
 				if hit ~= nil and #hit >= 1 then
-					a.LogSunRaySpirits("launch", hit[1])
-					b:Action_UseAbilityOnLocation(r, loc)
-					L = DotaTime()
+					X.LogSunRaySpirits("launch", hit[1])
+					bot:Action_UseAbilityOnLocation(launchFireSpiritAbility, loc)
+					lastLaunchTime = DotaTime()
 					return
 				end
 			end
 		end
 	end
-	y = a.ConsiderIcarusDiveStop()
-	if y > 0 then
-		b:Action_UseAbility(p)
-		b.icarus_dive_stuck = false
+	icarusDiveStopDesire = X.ConsiderIcarusDiveStop()
+	if icarusDiveStopDesire > 0 then
+		bot:Action_UseAbility(icarusDiveStopAbility)
+		bot.icarus_dive_stuck = false
 		return
 	end
-	if c.CanNotUseAbility(b) then
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	z = a.ConsiderFireSpirits()
-	if z > 0 then
-		b:Action_UseAbility(q)
+	fireSpiritsDesire = X.ConsiderFireSpirits()
+	if fireSpiritsDesire > 0 then
+		bot:Action_UseAbility(fireSpiritsAbility)
 		return
 	end
-	A, B, ETA = a.ConsiderFireSpiritsLaunch()
-	if A > 0 then
-		b:Action_UseAbilityOnLocation(r, B)
-		L = DotaTime()
+	launchFireSpiritDesire, launchFireSpiritLocation, ETA = X.ConsiderFireSpiritsLaunch()
+	if launchFireSpiritDesire > 0 then
+		bot:Action_UseAbilityOnLocation(launchFireSpiritAbility, launchFireSpiritLocation)
+		lastLaunchTime = DotaTime()
 		return
 	end
-	H, I, AllyCast = a.ConsiderSupernova()
-	if H > 0 then
-		if string.find(GetBot():GetUnitName(), "phoenix") and b:HasScepter() and AllyCast then
-			b:Action_UseAbilityOnEntity(v, I)
+	supernovaDesire, supernovaTarget, AllyCast = X.ConsiderSupernova()
+	if supernovaDesire > 0 then
+		if string.find(GetBot():GetUnitName(), "phoenix") and bot:HasScepter() and AllyCast then
+			bot:Action_UseAbilityOnEntity(supernovaAbility, supernovaTarget)
 			return
 		else
-			if c.CanCastAbility(q) then
-				b:ActionQueue_UseAbility(q)
-				local R = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-				for S, T in pairs(R) do
+			if Fu.CanCastAbility(fireSpiritsAbility) then
+				bot:ActionQueue_UseAbility(fireSpiritsAbility)
+				local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+				for _, enemy in pairs(nearbyEnemies) do
 					if
-						c.IsValidHero(T)
-						and c.IsInRange(b, T, q:GetCastRange())
-						and c.CanCastOnNonMagicImmune(T)
-						and not c.IsEnemyChronosphereInLocation(T:GetLocation())
-						and not c.IsEnemyBlackHoleInLocation(T:GetLocation())
-						and not T:HasModifier("modifier_necrolyte_reapers_scythe")
-						and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+						Fu.IsValidHero(enemy)
+						and Fu.IsInRange(bot, enemy, fireSpiritsAbility:GetCastRange())
+						and Fu.CanCastOnNonMagicImmune(enemy)
+						and not Fu.IsEnemyChronosphereInLocation(enemy:GetLocation())
+						and not Fu.IsEnemyBlackHoleInLocation(enemy:GetLocation())
+						and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
+						and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
 					then
-						b:ActionQueue_UseAbilityOnLocation(r, T:GetLocation())
+						bot:ActionQueue_UseAbilityOnLocation(launchFireSpiritAbility, enemy:GetLocation())
 					end
 				end
-				b:ActionQueue_UseAbility(v)
+				bot:ActionQueue_UseAbility(supernovaAbility)
 				return
 			else
-				b:Action_UseAbility(v)
+				bot:Action_UseAbility(supernovaAbility)
 				return
 			end
 		end
 	end
-	w, x = a.ConsiderIcarusDive()
-	if w > 0 then
-		b:Action_UseAbilityOnLocation(o, x)
-		J = DotaTime()
+	icarusDiveDesire, icarusDiveLocation = X.ConsiderIcarusDive()
+	if icarusDiveDesire > 0 then
+		bot:Action_UseAbilityOnLocation(icarusDiveAbility, icarusDiveLocation)
+		lastDiveTime = DotaTime()
 		return
 	end
-	C, D = a.ConsiderSunRay()
-	if C > 0 then
-		b:Action_UseAbilityOnLocation(s, D)
+	sunRayDesire, sunRayLocation = X.ConsiderSunRay()
+	if sunRayDesire > 0 then
+		bot:Action_UseAbilityOnLocation(sunRayAbility, sunRayLocation)
 		return
 	end
 end
-function a.ConsiderIcarusDive()
+function X.ConsiderIcarusDive()
 	if
-		not c.CanCastAbility(o)
-		or b:IsRooted()
-		or b:HasModifier("modifier_phoenix_icarus_dive")
-		or b:HasModifier("modifier_phoenix_supernova_hiding")
-		or b:HasModifier("modifier_bloodseeker_rupture")
+		not Fu.CanCastAbility(icarusDiveAbility)
+		or bot:IsRooted()
+		or bot:HasModifier("modifier_phoenix_icarus_dive")
+		or bot:HasModifier("modifier_phoenix_supernova_hiding")
+		or bot:HasModifier("modifier_bloodseeker_rupture")
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	-- Not diving now: clear the reason flags so a past retreat dive does not make the next engage
 	-- dive stop halfway (they were never reset before).
-	b.icarus_dive_kill, b.icarus_dive_engage, b.icarus_dive_stuck, b.icarus_dive_retreat = false, false, false, false
-	local U = o:GetSpecialValueInt("dash_length")
-	local V = o:GetSpecialValueInt("dash_width")
-	local W = o:GetSpecialValueInt("hp_cost_perc") / 100 * b:GetHealth()
-	local X = o:GetSpecialValueInt("damage_per_second") * o:GetSpecialValueFloat("burn_duration")
-	local Y = (b:GetHealth() - W) / b:GetMaxHealth()
-	M = c.GetProperTarget(b)
-	local Z = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local R = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	for S, _ in pairs(R) do
+	bot.icarus_dive_kill, bot.icarus_dive_engage, bot.icarus_dive_stuck, bot.icarus_dive_retreat = false, false, false, false
+	local dashLength = icarusDiveAbility:GetSpecialValueInt("dash_length")
+	local dashWidth = icarusDiveAbility:GetSpecialValueInt("dash_width")
+	local hpCost = icarusDiveAbility:GetSpecialValueInt("hp_cost_perc") / 100 * bot:GetHealth()
+	local damage = icarusDiveAbility:GetSpecialValueInt("damage_per_second") * icarusDiveAbility:GetSpecialValueFloat("burn_duration")
+	local hpAfterCast = (bot:GetHealth() - hpCost) / bot:GetMaxHealth()
+	botTarget = Fu.GetProperTarget(bot)
+	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(_)
-			and c.IsInRange(b, _, U)
-			and c.CanCastOnNonMagicImmune(_)
-			and c.CanKillTarget(_, X, DAMAGE_TYPE_MAGICAL)
-			and not _:HasModifier("modifier_abaddon_borrowed_time")
-			and not _:HasModifier("modifier_dazzle_shallow_grave")
-			and not _:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not _:HasModifier("modifier_oracle_false_promise_timer")
-			and not c.IsEnemyChronosphereInLocation(_:GetLocation())
-			and not c.IsEnemyBlackHoleInLocation(_:GetLocation())
-			and Y > 0.4
+			Fu.IsValidHero(enemy)
+			and Fu.IsInRange(bot, enemy, dashLength)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and Fu.CanKillTarget(enemy, damage, DAMAGE_TYPE_MAGICAL)
+			and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			and not Fu.IsEnemyChronosphereInLocation(enemy:GetLocation())
+			and not Fu.IsEnemyBlackHoleInLocation(enemy:GetLocation())
+			and hpAfterCast > 0.4
 		then
-			b.icarus_dive_kill = true
-			return BOT_ACTION_DESIRE_HIGH, _:GetLocation()
+			bot.icarus_dive_kill = true
+			return BOT_ACTION_DESIRE_HIGH, enemy:GetLocation()
 		end
 	end
-	if c.IsStuck(b) then
-		b.icarus_dive_stuck = true
-		return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), U)
+	if Fu.IsStuck(bot) then
+		bot.icarus_dive_stuck = true
+		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), dashLength)
 	end
-	if c.IsInTeamFight(b, 1200) then
-		local a0 = b:FindAoELocation(true, true, b:GetLocation(), U, V / 1.5, 0, 0)
+	if Fu.IsInTeamFight(bot, 1200) then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), dashLength, dashWidth / 1.5, 0, 0)
 		if
-			a0.count >= 2
-			and not c.IsEnemyChronosphereInLocation(a0.targetloc)
-			and not c.IsEnemyBlackHoleInLocation(a0.targetloc)
-			and Y > 0.3
+			aoe.count >= 2
+			and not Fu.IsEnemyChronosphereInLocation(aoe.targetloc)
+			and not Fu.IsEnemyBlackHoleInLocation(aoe.targetloc)
+			and hpAfterCast > 0.3
 		then
-			b.icarus_dive_engage = true
-			return BOT_ACTION_DESIRE_HIGH, a0.targetloc
+			bot.icarus_dive_engage = true
+			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 		end
 	end
-	if N then
+	if isGoingOnSomeone then
 		if
-			c.IsValidTarget(M)
-			and c.CanCastOnNonMagicImmune(M)
-			and c.IsInRange(b, M, U)
-			and not c.IsEnemyChronosphereInLocation(M:GetLocation())
-			and not c.IsEnemyBlackHoleInLocation(M:GetLocation())
-			and not M:HasModifier("modifier_necrolyte_reapers_scythe")
-			and Y > 0.3
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, dashLength)
+			and not Fu.IsEnemyChronosphereInLocation(botTarget:GetLocation())
+			and not Fu.IsEnemyBlackHoleInLocation(botTarget:GetLocation())
+			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
+			and hpAfterCast > 0.3
 		then
-			if #Z >= #R + 1 then
-				b.icarus_dive_engage = true
-				return BOT_ACTION_DESIRE_HIGH, M:GetLocation()
+			if #nearbyAllies >= #nearbyEnemies + 1 then
+				bot.icarus_dive_engage = true
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	if c.IsRetreating(b) and b:GetActiveModeDesire() > 0.75 and not c.IsSuspiciousIllusion(b) then
-		for S, T in pairs(R) do
+	if Fu.IsRetreating(bot) and bot:GetActiveModeDesire() > 0.75 and not Fu.IsSuspiciousIllusion(bot) then
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and not c.IsSuspiciousIllusion(T)
-				and b:WasRecentlyDamagedByHero(T, 3.0)
-				and Y > 0.15
+				Fu.IsValidHero(enemy)
+				and not Fu.IsSuspiciousIllusion(enemy)
+				and bot:WasRecentlyDamagedByHero(enemy, 3.0)
+				and hpAfterCast > 0.15
 			then
-				b.icarus_dive_retreat = true
-				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), U)
+				bot.icarus_dive_retreat = true
+				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), dashLength)
 			end
 		end
-		if P < 0.5 and b:WasRecentlyDamagedByTower(2.5) and Y > 0.2 then
-			b.icarus_dive_retreat = true
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetTeamFountain(), U)
+		if hpRatio < 0.5 and bot:WasRecentlyDamagedByTower(2.5) and hpAfterCast > 0.2 then
+			bot.icarus_dive_retreat = true
+			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), dashLength)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderIcarusDiveStop()
+function X.ConsiderIcarusDiveStop()
 	-- Stop only exists DURING the dive: the old guard returned when Phoenix had the dive modifier, so Stop
 	-- never fired and a retreat dive (an arc of dive_duration 2s) carried Phoenix back to where it started.
 	if
-		not c.CanCastAbility(p)
-		or not b:HasModifier("modifier_phoenix_icarus_dive")
-		or b:HasModifier("modifier_phoenix_supernova_hiding")
+		not Fu.CanCastAbility(icarusDiveStopAbility)
+		or not bot:HasModifier("modifier_phoenix_icarus_dive")
+		or bot:HasModifier("modifier_phoenix_supernova_hiding")
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if b.icarus_dive_kill or b.icarus_dive_engage then
-		if DotaTime() > J + K then
+	if bot.icarus_dive_kill or bot.icarus_dive_engage then
+		if DotaTime() > lastDiveTime + diveDuration then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if b.icarus_dive_stuck or b.icarus_dive_retreat then
+	if bot.icarus_dive_stuck or bot.icarus_dive_retreat then
 		-- Half of the 2s arc is the far end, nearest the fountain.
-		if DotaTime() > J + K / 2 then
-			if DotaTime() >= (b._diveStopLogAt or -999) then
-				b._diveStopLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), c.GetHP(b)))
+		if DotaTime() > lastDiveTime + diveDuration / 2 then
+			if DotaTime() >= (bot._diveStopLogAt or -999) then
+				bot._diveStopLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), Fu.GetHP(bot)))
 			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderFireSpirits()
+function X.ConsiderFireSpirits()
 	if
-		not c.CanCastAbility(q)
-		or b:HasModifier("modifier_phoenix_icarus_dive")
-		or b:HasModifier("modifier_phoenix_supernova_hiding")
-		or b:HasModifier("modifier_phoenix_fire_spirit_count")
+		not Fu.CanCastAbility(fireSpiritsAbility)
+		or bot:HasModifier("modifier_phoenix_icarus_dive")
+		or bot:HasModifier("modifier_phoenix_supernova_hiding")
+		or bot:HasModifier("modifier_phoenix_fire_spirit_count")
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local a1 = c.GetProperCastRange(false, b, q:GetCastRange())
-	local a2 = q:GetSpecialValueInt("radius")
-	local W = q:GetSpecialValueInt("hp_cost_perc") / 100 * b:GetHealth()
-	local X = q:GetSpecialValueInt("damage_per_second") * q:GetSpecialValueFloat("duration")
-	local a3 = q:GetSpecialValueInt("spirit_speed")
-	local Y = (b:GetHealth() - W) / b:GetMaxHealth()
-	M = c.GetProperTarget(b)
-	local Z = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local R = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	for S, _ in pairs(R) do
+	local castRange = Fu.GetProperCastRange(false, bot, fireSpiritsAbility:GetCastRange())
+	local radius = fireSpiritsAbility:GetSpecialValueInt("radius")
+	local hpCost = fireSpiritsAbility:GetSpecialValueInt("hp_cost_perc") / 100 * bot:GetHealth()
+	local damage = fireSpiritsAbility:GetSpecialValueInt("damage_per_second") * fireSpiritsAbility:GetSpecialValueFloat("duration")
+	local spiritSpeed = fireSpiritsAbility:GetSpecialValueInt("spirit_speed")
+	local hpAfterCast = (bot:GetHealth() - hpCost) / bot:GetMaxHealth()
+	botTarget = Fu.GetProperTarget(bot)
+	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(_)
-			and c.IsInRange(b, _, a1)
-			and c.CanCastOnNonMagicImmune(_)
-			and c.CanKillTarget(_, X, DAMAGE_TYPE_MAGICAL)
-			and not _:HasModifier("modifier_abaddon_borrowed_time")
-			and not _:HasModifier("modifier_dazzle_shallow_grave")
-			and not _:HasModifier("modifier_oracle_false_promise_timer")
-			and not _:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not _:HasModifier("modifier_phoenix_fire_spirit_burn")
-			and Y > 0.25
+			Fu.IsValidHero(enemy)
+			and Fu.IsInRange(bot, enemy, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and Fu.CanKillTarget(enemy, damage, DAMAGE_TYPE_MAGICAL)
+			and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemy:HasModifier("modifier_templar_assassin_refraction_absorb")
+			and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
+			and hpAfterCast > 0.25
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if N then
-		local a4 = nil
-		local a5 = 0
-		for S, T in pairs(R) do
+	if isGoingOnSomeone then
+		local strongestEnemy = nil
+		local maxDps = 0
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and c.IsInRange(b, T, a1)
-				and c.CanCastOnNonMagicImmune(T)
-				and not c.IsEnemyChronosphereInLocation(T:GetLocation())
-				and not c.IsEnemyBlackHoleInLocation(T:GetLocation())
-				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+				Fu.IsValidHero(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not Fu.IsEnemyChronosphereInLocation(enemy:GetLocation())
+				and not Fu.IsEnemyBlackHoleInLocation(enemy:GetLocation())
+				and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
 			then
-				local a6 = T:GetAttackDamage() * T:GetAttackSpeed()
-				if a6 > a5 then
-					a4 = T
-					a5 = a6
+				local dps = enemy:GetAttackDamage() * enemy:GetAttackSpeed()
+				if dps > maxDps then
+					strongestEnemy = enemy
+					maxDps = dps
 				end
 			end
 		end
-		if a4 ~= nil then
-			if c.IsInLaningPhase() then
-				for S, a7 in pairs(Z) do
+		if strongestEnemy ~= nil then
+			if Fu.IsInLaningPhase() then
+				for _, ally in pairs(nearbyAllies) do
 					if
-						c.IsValidHero(a7)
-						and not a7:IsIllusion()
-						and (c.IsAttacking(a4) == a7 or c.IsChasingTarget(a4, a7) or a4:GetAttackTarget() == a7)
+						Fu.IsValidHero(ally)
+						and not ally:IsIllusion()
+						and (Fu.IsAttacking(strongestEnemy) == ally or Fu.IsChasingTarget(strongestEnemy, ally) or strongestEnemy:GetAttackTarget() == ally)
 					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
@@ -415,493 +415,493 @@ function a.ConsiderFireSpirits()
 		end
 	end
 	-- Laning: harass a farming enemy core (last-hits / near wave), not only when they hit an ally.
-	if c.IsInLaningPhase() and Y > 0.4 and c.GetMP(b) > 0.2 and not c.IsRetreating(b) then
-		for S, T in pairs(R) do
+	if Fu.IsInLaningPhase() and hpAfterCast > 0.4 and Fu.GetMP(bot) > 0.2 and not Fu.IsRetreating(bot) then
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and c.IsCore(T)
-				and not c.IsSuspiciousIllusion(T)
-				and c.IsInRange(b, T, a1)
-				and c.CanCastOnNonMagicImmune(T)
-				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
-				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+				Fu.IsValidHero(enemy)
+				and Fu.IsCore(enemy)
+				and not Fu.IsSuspiciousIllusion(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
+				and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local atk = T:GetAttackTarget()
+				local atk = enemy:GetAttackTarget()
 				local farming = atk ~= nil
 					and not atk:IsNull()
 					and atk:IsAlive()
 					and not atk:IsHero()
-					and atk:GetTeam() ~= T:GetTeam()
-				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+					and atk:GetTeam() ~= enemy:GetTeam()
+				local nearWave = #enemy:GetNearbyLaneCreeps(500, true) >= 1
 				if farming or nearWave then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
 		end
 	end
-	local a8 = b:GetNearbyLaneCreeps(math.min(a1, 1600), true)
-	if (c.IsPushing(b) or c.IsDefending(b)) and not c.IsThereNonSelfCoreNearby(1200) then
+	local laneCreeps = bot:GetNearbyLaneCreeps(math.min(castRange, 1600), true)
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not Fu.IsThereNonSelfCoreNearby(1200) then
 		if
-			#a8 >= 4
-			and c.CanBeAttacked(a8[1])
-			and not c.IsRunning(a8[1])
-			and #R == 0
-			and c.GetMP(b) > 0.35
-			and Y > 0.5
-			and not c.DoesSomeoneHaveModifier(a8, "modifier_phoenix_fire_spirit_burn")
+			#laneCreeps >= 4
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+			and #nearbyEnemies == 0
+			and Fu.GetMP(bot) > 0.35
+			and hpAfterCast > 0.5
+			and not Fu.DoesSomeoneHaveModifier(laneCreeps, "modifier_phoenix_fire_spirit_burn")
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsFarming(b) and c.GetMP(b) > 0.35 and Y > 0.4 then
-		local a9 = b:GetNearbyNeutralCreeps(math.min(a1, 1600))
+	if Fu.IsFarming(bot) and Fu.GetMP(bot) > 0.35 and hpAfterCast > 0.4 then
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(math.min(castRange, 1600))
 		if
-			(#a9 >= 2 or #a9 >= 1 and a9[1]:IsAncientCreep())
-			and not c.DoesSomeoneHaveModifier(a9, "modifier_phoenix_fire_spirit_burn")
+			(#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep())
+			and not Fu.DoesSomeoneHaveModifier(neutralCreeps, "modifier_phoenix_fire_spirit_burn")
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if
-			#a8 >= 3
-			and not c.DoesSomeoneHaveModifier(a8, "modifier_phoenix_fire_spirit_burn")
-			and not c.IsThereNonSelfCoreNearby(1200)
-		then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if c.IsDoingRoshan(b) then
-		if
-			c.IsRoshan(M)
-			and c.CanCastOnNonMagicImmune(M)
-			and c.CanBeAttacked(M)
-			and c.GetHP(M) > 0.25
-			and c.IsInRange(b, M, a1)
-			and O
-			and Y > 0.6
-			and not M:HasModifier("modifier_phoenix_fire_spirit_burn")
+			#laneCreeps >= 3
+			and not Fu.DoesSomeoneHaveModifier(laneCreeps, "modifier_phoenix_fire_spirit_burn")
+			and not Fu.IsThereNonSelfCoreNearby(1200)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingTormentor(b) then
+	if Fu.IsDoingRoshan(bot) then
 		if
-			c.IsTormentor(M)
-			and c.IsInRange(b, M, a1)
-			and O
-			and Y > 0.7
-			and not M:HasModifier("modifier_phoenix_fire_spirit_burn")
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.GetHP(botTarget) > 0.25
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and hpAfterCast > 0.6
+			and not botTarget:HasModifier("modifier_phoenix_fire_spirit_burn")
+		then
+			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
+	if Fu.IsDoingTormentor(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and hpAfterCast > 0.7
+			and not botTarget:HasModifier("modifier_phoenix_fire_spirit_burn")
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderFireSpiritsLaunch()
+function X.ConsiderFireSpiritsLaunch()
 	if
-		not c.CanCastAbility(r)
-		or b:HasModifier("modifier_phoenix_icarus_dive")
-		or b:HasModifier("modifier_phoenix_supernova_hiding")
+		not Fu.CanCastAbility(launchFireSpiritAbility)
+		or bot:HasModifier("modifier_phoenix_icarus_dive")
+		or bot:HasModifier("modifier_phoenix_supernova_hiding")
 	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local a1 = q:GetCastRange()
-	local a2 = q:GetSpecialValueInt("radius")
-	local a3 = q:GetSpecialValueInt("spirit_speed")
+	local castRange = fireSpiritsAbility:GetCastRange()
+	local radius = fireSpiritsAbility:GetSpecialValueInt("radius")
+	local spiritSpeed = fireSpiritsAbility:GetSpecialValueInt("spirit_speed")
 	-- datafeed: Fire Spirits' burn length is "duration" (4); "burn_duration" is Icarus Dive's key and read 0 here
-	local aa = q:GetSpecialValueFloat("duration")
-	local X = q:GetSpecialValueInt("damage_per_second") * aa
-	M = c.GetProperTarget(b)
-	local Z = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local R = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	for S, _ in pairs(R) do
+	local burnDuration = fireSpiritsAbility:GetSpecialValueFloat("duration")
+	local damage = fireSpiritsAbility:GetSpecialValueInt("damage_per_second") * burnDuration
+	botTarget = Fu.GetProperTarget(bot)
+	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	for _, enemy in pairs(nearbyEnemies) do
 		if
-			c.IsValidHero(_)
-			and c.IsInRange(b, _, a1)
-			and c.CanCastOnNonMagicImmune(_)
-			and c.CanKillTarget(_, X, DAMAGE_TYPE_MAGICAL)
-			and not _:HasModifier("modifier_abaddon_borrowed_time")
-			and not _:HasModifier("modifier_dazzle_shallow_grave")
-			and not _:HasModifier("modifier_oracle_false_promise_timer")
-			and not _:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not _:HasModifier("modifier_phoenix_fire_spirit_burn")
+			Fu.IsValidHero(enemy)
+			and Fu.IsInRange(bot, enemy, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and Fu.CanKillTarget(enemy, damage, DAMAGE_TYPE_MAGICAL)
+			and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			and not enemy:HasModifier("modifier_templar_assassin_refraction_absorb")
+			and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
 		then
-			local ab = GetUnitToUnitDistance(b, _) / a3
-			local ac = c.GetCorrectLoc(_, ab)
-			local a0 = b:FindAoELocation(true, true, ac, a1, a2, 0, 0)
-			if ab > a.GetModifierTime(_, "modifier_phoenix_fire_spirit_burn") then
-				if a0.count >= 2 then
-					return BOT_ACTION_DESIRE_HIGH, a0.targetloc
+			local travelTime = GetUnitToUnitDistance(bot, enemy) / spiritSpeed
+			local predictedLocation = Fu.GetCorrectLoc(enemy, travelTime)
+			local aoe = bot:FindAoELocation(true, true, predictedLocation, castRange, radius, 0, 0)
+			if travelTime > X.GetModifierTime(enemy, "modifier_phoenix_fire_spirit_burn") then
+				if aoe.count >= 2 then
+					return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 				else
-					return BOT_ACTION_DESIRE_HIGH, ac
+					return BOT_ACTION_DESIRE_HIGH, predictedLocation
 				end
 			end
 		end
 	end
-	if N then
-		local a4 = nil
-		local a5 = 0
-		for S, T in pairs(R) do
+	if isGoingOnSomeone then
+		local strongestEnemy = nil
+		local maxDps = 0
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and c.IsInRange(b, T, a1)
-				and c.CanCastOnNonMagicImmune(T)
-				and not c.IsEnemyChronosphereInLocation(T:GetLocation())
-				and not c.IsEnemyBlackHoleInLocation(T:GetLocation())
-				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+				Fu.IsValidHero(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not Fu.IsEnemyChronosphereInLocation(enemy:GetLocation())
+				and not Fu.IsEnemyBlackHoleInLocation(enemy:GetLocation())
+				and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
+				and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
 			then
-				local a6 = T:GetAttackDamage() * T:GetAttackSpeed()
-				if a6 > a5 then
-					a4 = T
-					a5 = a6
+				local dps = enemy:GetAttackDamage() * enemy:GetAttackSpeed()
+				if dps > maxDps then
+					strongestEnemy = enemy
+					maxDps = dps
 				end
 			end
 		end
-		if a4 ~= nil then
-			local ab = GetUnitToUnitDistance(b, a4) / a3
-			local ac = c.GetCorrectLoc(a4, ab)
-			local a0 = b:FindAoELocation(true, true, ac, a1, a2, 0, 0)
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(a4, "modifier_phoenix_fire_spirit_burn") then
-				if c.IsInLaningPhase() then
-					for S, a7 in pairs(Z) do
+		if strongestEnemy ~= nil then
+			local travelTime = GetUnitToUnitDistance(bot, strongestEnemy) / spiritSpeed
+			local predictedLocation = Fu.GetCorrectLoc(strongestEnemy, travelTime)
+			local aoe = bot:FindAoELocation(true, true, predictedLocation, castRange, radius, 0, 0)
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(strongestEnemy, "modifier_phoenix_fire_spirit_burn") then
+				if Fu.IsInLaningPhase() then
+					for _, ally in pairs(nearbyAllies) do
 						if
-							c.IsValidHero(a7)
-							and not a7:IsIllusion()
-							and (c.IsAttacking(a4) == a7 or c.IsChasingTarget(a4, a7) or a4:GetAttackTarget() == a7)
+							Fu.IsValidHero(ally)
+							and not ally:IsIllusion()
+							and (Fu.IsAttacking(strongestEnemy) == ally or Fu.IsChasingTarget(strongestEnemy, ally) or strongestEnemy:GetAttackTarget() == ally)
 						then
-							if a0.count >= 2 then
-								return BOT_ACTION_DESIRE_HIGH, a0.targetloc
+							if aoe.count >= 2 then
+								return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 							else
-								return BOT_ACTION_DESIRE_HIGH, ac
+								return BOT_ACTION_DESIRE_HIGH, predictedLocation
 							end
 						end
 					end
 				else
-					if a0.count >= 2 then
-						return BOT_ACTION_DESIRE_HIGH, a0.targetloc
+					if aoe.count >= 2 then
+						return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 					else
-						return BOT_ACTION_DESIRE_HIGH, ac
+						return BOT_ACTION_DESIRE_HIGH, predictedLocation
 					end
 				end
 			end
 		end
 	end
 	-- Laning: launch spirits onto farming enemy cores.
-	if c.IsInLaningPhase() and not c.IsRetreating(b) then
-		for S, T in pairs(R) do
+	if Fu.IsInLaningPhase() and not Fu.IsRetreating(bot) then
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and c.IsCore(T)
-				and not c.IsSuspiciousIllusion(T)
-				and c.IsInRange(b, T, a1)
-				and c.CanCastOnNonMagicImmune(T)
-				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+				Fu.IsValidHero(enemy)
+				and Fu.IsCore(enemy)
+				and not Fu.IsSuspiciousIllusion(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not enemy:HasModifier("modifier_phoenix_fire_spirit_burn")
 			then
-				local atk = T:GetAttackTarget()
+				local atk = enemy:GetAttackTarget()
 				local farming = atk ~= nil
 					and not atk:IsNull()
 					and atk:IsAlive()
 					and not atk:IsHero()
-					and atk:GetTeam() ~= T:GetTeam()
-				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+					and atk:GetTeam() ~= enemy:GetTeam()
+				local nearWave = #enemy:GetNearbyLaneCreeps(500, true) >= 1
 				if farming or nearWave then
-					local ab = GetUnitToUnitDistance(b, T) / a3
-					local ac = c.GetCorrectLoc(T, ab)
-					if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(T, "modifier_phoenix_fire_spirit_burn") then
-						return BOT_ACTION_DESIRE_HIGH, ac
+					local travelTime = GetUnitToUnitDistance(bot, enemy) / spiritSpeed
+					local predictedLocation = Fu.GetCorrectLoc(enemy, travelTime)
+					if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(enemy, "modifier_phoenix_fire_spirit_burn") then
+						return BOT_ACTION_DESIRE_HIGH, predictedLocation
 					end
 				end
 			end
 		end
 	end
-	local a8 = b:GetNearbyLaneCreeps(math.min(a1, 1600), true)
-	local ad = c.GetCenterOfUnits(a8)
-	if (c.IsPushing(b) or c.IsDefending(b)) and not c.IsThereNonSelfCoreNearby(1200) then
-		if #a8 >= 4 and c.CanBeAttacked(a8[1]) and not c.IsRunning(a8[1]) and #R == 0 then
-			local ab = GetUnitToLocationDistance(b, ad) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(a8[1], "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, ad
+	local laneCreeps = bot:GetNearbyLaneCreeps(math.min(castRange, 1600), true)
+	local laneCreepCenter = Fu.GetCenterOfUnits(laneCreeps)
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if #laneCreeps >= 4 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and #nearbyEnemies == 0 then
+			local travelTime = GetUnitToLocationDistance(bot, laneCreepCenter) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, laneCreepCenter
 			end
 		end
 	end
-	if c.IsFarming(b) then
-		local a9 = b:GetNearbyNeutralCreeps(math.min(a1, 1600))
-		local ae = c.GetCenterOfUnits(a9)
-		if (#a9 >= 2 or #a9 >= 1 and a9[1]:IsAncientCreep()) and not c.IsRunning(b) then
-			local ab = GetUnitToLocationDistance(b, ae) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(a9[1], "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, ae
+	if Fu.IsFarming(bot) then
+		local neutralCreeps = bot:GetNearbyNeutralCreeps(math.min(castRange, 1600))
+		local neutralCreepCenter = Fu.GetCenterOfUnits(neutralCreeps)
+		if (#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep()) and not Fu.IsRunning(bot) then
+			local travelTime = GetUnitToLocationDistance(bot, neutralCreepCenter) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(neutralCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, neutralCreepCenter
 			end
 		end
-		if #a8 >= 3 and c.CanBeAttacked(a8[1]) and not c.IsRunning(a8[1]) and not c.IsThereNonSelfCoreNearby(1200) then
-			local ab = GetUnitToLocationDistance(b, ad) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(a8[1], "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, ad
+		if #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and not Fu.IsThereNonSelfCoreNearby(1200) then
+			local travelTime = GetUnitToLocationDistance(bot, laneCreepCenter) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, laneCreepCenter
 			end
 		end
 	end
-	if c.IsDoingRoshan(b) then
+	if Fu.IsDoingRoshan(bot) then
 		if
-			c.IsRoshan(M)
-			and c.CanCastOnNonMagicImmune(M)
-			and c.CanBeAttacked(M)
-			and c.GetHP(M) > 0.25
-			and c.IsInRange(b, M, a1)
-			and O
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.GetHP(botTarget) > 0.25
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
 		then
-			local ab = GetUnitToUnitDistance(b, M) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(M, "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, M:GetLocation()
+			local travelTime = GetUnitToUnitDistance(bot, botTarget) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	if c.IsDoingTormentor(b) then
+	if Fu.IsDoingTormentor(bot) then
 		if
-			c.IsTormentor(M)
-			and c.IsInRange(b, M, a1)
-			and O
-			and not M:HasModifier("modifier_phoenix_fire_spirit_burn")
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and not botTarget:HasModifier("modifier_phoenix_fire_spirit_burn")
 		then
-			local ab = GetUnitToUnitDistance(b, M) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(M, "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, M:GetLocation()
+			local travelTime = GetUnitToUnitDistance(bot, botTarget) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
 	end
-	local af = b:GetNearbyCreeps(a1, true)
-	if c.IsValid(af[2]) and c.CanBeAttacked(af[2]) and not c.IsRunning(af[2]) then
-		local a0 = b:FindAoELocation(true, false, c.GetCenterOfUnits(af), a2, a2, 0, 0)
-		if a0.count >= 3 then
-			local ab = GetUnitToLocationDistance(b, a0.targetloc) / a3
-			if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(af[2], "modifier_phoenix_fire_spirit_burn") then
-				return BOT_ACTION_DESIRE_HIGH, a0.targetloc
+	local nearbyCreeps = bot:GetNearbyCreeps(castRange, true)
+	if Fu.IsValid(nearbyCreeps[2]) and Fu.CanBeAttacked(nearbyCreeps[2]) and not Fu.IsRunning(nearbyCreeps[2]) then
+		local aoe = bot:FindAoELocation(true, false, Fu.GetCenterOfUnits(nearbyCreeps), radius, radius, 0, 0)
+		if aoe.count >= 3 then
+			local travelTime = GetUnitToLocationDistance(bot, aoe.targetloc) / spiritSpeed
+			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(nearbyCreeps[2], "modifier_phoenix_fire_spirit_burn") then
+				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function a.ConsiderSunRay()
+function X.ConsiderSunRay()
 	if
-		not c.CanCastAbility(s)
-		or b:HasModifier("modifier_phoenix_icarus_dive")
-		or b:HasModifier("modifier_phoenix_sun_ray")
+		not Fu.CanCastAbility(sunRayAbility)
+		or bot:HasModifier("modifier_phoenix_icarus_dive")
+		or bot:HasModifier("modifier_phoenix_sun_ray")
 	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local a1 = c.GetProperCastRange(false, b, s:GetCastRange())
-	local ag = P
-	local R = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	if N then
-		local a4 = nil
-		local ah = 99999
-		local ai = c.GetSpecialModeAllies(b, 900, BOT_MODE_ATTACK)
-		for S, T in pairs(R) do
+	local castRange = Fu.GetProperCastRange(false, bot, sunRayAbility:GetCastRange())
+	local currentHp = hpRatio
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	if isGoingOnSomeone then
+		local weakestEnemy = nil
+		local lowestHealth = 99999
+		local attackingAllies = Fu.GetSpecialModeAllies(bot, 900, BOT_MODE_ATTACK)
+		for _, enemy in pairs(nearbyEnemies) do
 			if
-				c.IsValidHero(T)
-				and c.IsInRange(b, T, a1 * 0.8)
-				and c.CanCastOnNonMagicImmune(T)
-				and not T:HasModifier("modifier_abaddon_borrowed_time")
-				and not T:HasModifier("modifier_dazzle_shallow_grave")
-				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
-				and ag > 0.4
+				Fu.IsValidHero(enemy)
+				and Fu.IsInRange(bot, enemy, castRange * 0.8)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemy:HasModifier("modifier_necrolyte_reapers_scythe")
+				and currentHp > 0.4
 			then
-				local aj = T:GetHealth()
-				if aj < ah then
-					a4 = T
-					ah = aj
+				local health = enemy:GetHealth()
+				if health < lowestHealth then
+					weakestEnemy = enemy
+					lowestHealth = health
 				end
 			end
 		end
-		if a4 ~= nil and #ai >= 2 then
-			b.sun_ray_engage = true
-			b.sun_ray_target = a4
-			return BOT_ACTION_DESIRE_HIGH, a4:GetLocation()
+		if weakestEnemy ~= nil and #attackingAllies >= 2 then
+			bot.sun_ray_engage = true
+			bot.sun_ray_target = weakestEnemy
+			return BOT_ACTION_DESIRE_HIGH, weakestEnemy:GetLocation()
 		end
 	end
-	local ak = b:GetNearbyHeroes(a1, false, BOT_MODE_NONE)
-	for S, al in pairs(ak) do
+	local nearbyAllies = bot:GetNearbyHeroes(castRange, false, BOT_MODE_NONE)
+	for _, ally in pairs(nearbyAllies) do
 		if
-			c.IsValidHero(al)
-			and c.IsCore(al)
-			and c.GetHP(al) < 0.5
-			and al:WasRecentlyDamagedByAnyHero(3.5)
-			and not al:IsIllusion()
-			and ag > 0.38
-			and not (c.IsRetreating(b) and c.IsRealInvisible(b))
+			Fu.IsValidHero(ally)
+			and Fu.IsCore(ally)
+			and Fu.GetHP(ally) < 0.5
+			and ally:WasRecentlyDamagedByAnyHero(3.5)
+			and not ally:IsIllusion()
+			and currentHp > 0.38
+			and not (Fu.IsRetreating(bot) and Fu.IsRealInvisible(bot))
 		then
 			if
-				not c.IsRunning(al)
-				or al:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				or al:HasModifier("modifier_enigma_black_hole_pull")
+				not Fu.IsRunning(ally)
+				or ally:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				or ally:HasModifier("modifier_enigma_black_hole_pull")
 			then
-				b.sun_ray_heal_ally = true
-				b.sun_ray_target = al
-				return BOT_ACTION_DESIRE_HIGH, al:GetLocation()
+				bot.sun_ray_heal_ally = true
+				bot.sun_ray_target = ally
+				return BOT_ACTION_DESIRE_HIGH, ally:GetLocation()
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 -- [OHA-PHOENIX] sun-ray-spirits summon|launch, at most once per 2s per kind.
-function a.LogSunRaySpirits(kind, target)
-	b._sunRaySpiritsLogAt = b._sunRaySpiritsLogAt or {}
-	if DotaTime() < (b._sunRaySpiritsLogAt[kind] or -999) then
+function X.LogSunRaySpirits(kind, target)
+	bot._sunRaySpiritsLogAt = bot._sunRaySpiritsLogAt or {}
+	if DotaTime() < (bot._sunRaySpiritsLogAt[kind] or -999) then
 		return
 	end
-	b._sunRaySpiritsLogAt[kind] = DotaTime() + 2
+	bot._sunRaySpiritsLogAt[kind] = DotaTime() + 2
 	pcall(print, string.format(
 		"[OHA-PHOENIX] t=%.0f sun-ray-spirits %s target=%s hp=%.2f",
 		DotaTime(),
 		kind,
 		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		c.GetHP(b)
+		Fu.GetHP(bot)
 	))
 end
 -- Rod of Atos and the enemy to root while an engage Sun Ray is on it, or nil.
-function a.ConsiderAtosOnSunRay()
-	if not b.sun_ray_engage or not b:HasModifier("modifier_phoenix_sun_ray") then
+function X.ConsiderAtosOnSunRay()
+	if not bot.sun_ray_engage or not bot:HasModifier("modifier_phoenix_sun_ray") then
 		return nil
 	end
-	local T = b.sun_ray_target
-	if not c.IsValidHero(T) or T:GetTeam() == b:GetTeam() or c.IsSuspiciousIllusion(T) then
+	local sunRayTarget = bot.sun_ray_target
+	if not Fu.IsValidHero(sunRayTarget) or sunRayTarget:GetTeam() == bot:GetTeam() or Fu.IsSuspiciousIllusion(sunRayTarget) then
 		return nil
 	end
-	local slot = b:FindItemSlot("item_rod_of_atos")
+	local slot = bot:FindItemSlot("item_rod_of_atos")
 	if slot < 0 or slot > 5 then
 		return nil
 	end
-	local atos = b:GetItemInSlot(slot)
+	local atos = bot:GetItemInSlot(slot)
 	if atos == nil or not atos:IsFullyCastable() then
 		return nil
 	end
-	local range = c.GetProperCastRange(false, b, atos:GetCastRange())
+	local range = Fu.GetProperCastRange(false, bot, atos:GetCastRange())
 	if
-		not c.IsInRange(b, T, range)
-		or not c.CanCastOnNonMagicImmune(T)
-		or c.IsDisabled(T)
-		or T:IsRooted()
+		not Fu.IsInRange(bot, sunRayTarget, range)
+		or not Fu.CanCastOnNonMagicImmune(sunRayTarget)
+		or Fu.IsDisabled(sunRayTarget)
+		or sunRayTarget:IsRooted()
 	then
 		return nil
 	end
 	pcall(print, string.format(
 		"[OHA-PHOENIX] t=%.0f atos-sun-ray target=%s hp=%.2f dist=%d",
 		DotaTime(),
-		(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
-		c.GetHP(T),
-		math.floor(GetUnitToUnitDistance(b, T))
+		(string.gsub(sunRayTarget:GetUnitName(), "npc_dota_hero_", "")),
+		Fu.GetHP(sunRayTarget),
+		math.floor(GetUnitToUnitDistance(bot, sunRayTarget))
 	))
-	return atos, T
+	return atos, sunRayTarget
 end
-function a.ConsiderSunRayStop()
-	if not c.CanCastAbility(t) or b:HasModifier("modifier_phoenix_icarus_dive") then
+function X.ConsiderSunRayStop()
+	if not Fu.CanCastAbility(sunRayStopAbility) or bot:HasModifier("modifier_phoenix_icarus_dive") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if not b:HasModifier("modifier_phoenix_sun_ray") then
+	if not bot:HasModifier("modifier_phoenix_sun_ray") then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local Z = c.GetAlliesNearLoc(b:GetLocation(), 1600)
-	local R = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	local ag = P or c.GetHP(b)
-	local underFire = b:WasRecentlyDamagedByAnyHero(2.0) or a.IsBeingAttackedByRealHero(R, b)
+	local nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
+	local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600)
+	local currentHp = hpRatio or Fu.GetHP(bot)
+	local underFire = bot:WasRecentlyDamagedByAnyHero(2.0) or X.IsBeingAttackedByRealHero(nearbyEnemies, bot)
 	-- Abort early so retreat / dive can run instead of standing still.
-	if c.IsRetreating(b) and underFire then
+	if Fu.IsRetreating(bot) and underFire then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if underFire and ag < 0.4 then
+	if underFire and currentHp < 0.4 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if ag < 0.28 then
+	if currentHp < 0.28 then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if b.sun_ray_engage then
-		if underFire and ag < 0.35 or #Z + 1 < #R or #R == 0 or #Z == 0 and #R == 0 then
+	if bot.sun_ray_engage then
+		if underFire and currentHp < 0.35 or #nearbyAllies + 1 < #nearbyEnemies or #nearbyEnemies == 0 or #nearbyAllies == 0 and #nearbyEnemies == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if b.sun_ray_heal_ally then
-		if underFire and ag < 0.35 then
+	if bot.sun_ray_heal_ally then
+		if underFire and currentHp < 0.35 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if math.floor(DotaTime()) % 2 == 0 then
-		if c.IsValidHero(b.sun_ray_target) and not b:IsFacingLocation(b.sun_ray_target:GetLocation(), 45) then
+		if Fu.IsValidHero(bot.sun_ray_target) and not bot:IsFacingLocation(bot.sun_ray_target:GetLocation(), 45) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderToggleMovement()
+function X.ConsiderToggleMovement()
 	if
-		not c.CanCastAbility(u)
-		or not b:HasModifier("modifier_phoenix_sun_ray")
-		or b:HasModifier("modifier_phoenix_supernova_hiding")
-		or b:IsRooted()
+		not Fu.CanCastAbility(sunRayToggleMoveAbility)
+		or not bot:HasModifier("modifier_phoenix_sun_ray")
+		or bot:HasModifier("modifier_phoenix_supernova_hiding")
+		or bot:IsRooted()
 	then
 		return BOT_ACTION_DESIRE_NONE, ""
 	end
-	local am = 1150
-	if c.IsValidHero(b.sun_ray_target) then
-		if not c.IsInRange(b, b.sun_ray_target, am) then
-			if u:GetToggleState() == false then
+	local followRange = 1150
+	if Fu.IsValidHero(bot.sun_ray_target) then
+		if not Fu.IsInRange(bot, bot.sun_ray_target, followRange) then
+			if sunRayToggleMoveAbility:GetToggleState() == false then
 				return BOT_ACTION_DESIRE_HIGH, "on"
 			end
 			return BOT_ACTION_DESIRE_NONE, ""
 		end
 	end
-	if u:GetToggleState() == true then
+	if sunRayToggleMoveAbility:GetToggleState() == true then
 		return BOT_ACTION_DESIRE_HIGH, "off"
 	end
 	return BOT_ACTION_DESIRE_NONE, ""
 end
-function a.ConsiderSupernova()
-	if not c.CanCastAbility(v) or b:HasModifier("modifier_phoenix_supernova_hiding") then
+function X.ConsiderSupernova()
+	if not Fu.CanCastAbility(supernovaAbility) or bot:HasModifier("modifier_phoenix_supernova_hiding") then
 		return BOT_ACTION_DESIRE_NONE, nil, false
 	end
-	local a1 = c.GetProperCastRange(false, b, v:GetCastRange())
-	local a2 = v:GetSpecialValueInt("aura_radius")
-	if c.IsInTeamFight(b, 1200) then
-		local an = c.GetAlliesNearLoc(b:GetLocation(), 1200)
-		local ao = c.GetEnemiesNearLoc(b:GetLocation(), a2 / 2 + 250)
-		if #ao >= 2 then
-			if string.find(GetBot():GetUnitName(), "phoenix") and b:HasScepter() then
-				local near = c.GetAlliesNearLoc(b:GetLocation(), a1)
-				for S, al in pairs(near) do
+	local castRange = Fu.GetProperCastRange(false, bot, supernovaAbility:GetCastRange())
+	local auraRadius = supernovaAbility:GetSpecialValueInt("aura_radius")
+	if Fu.IsInTeamFight(bot, 1200) then
+		local nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
+		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), auraRadius / 2 + 250)
+		if #nearbyEnemies >= 2 then
+			if string.find(GetBot():GetUnitName(), "phoenix") and bot:HasScepter() then
+				local near = Fu.GetAlliesNearLoc(bot:GetLocation(), castRange)
+				for _, ally in pairs(near) do
 					if
-						c.IsValidHero(al)
-						and not c.IsAttacking(al)
-						and c.GetHP(al) < 0.25
-						and al:WasRecentlyDamagedByAnyHero(3.0)
+						Fu.IsValidHero(ally)
+						and not Fu.IsAttacking(ally)
+						and Fu.GetHP(ally) < 0.25
+						and ally:WasRecentlyDamagedByAnyHero(3.0)
 					then
-						return BOT_ACTION_DESIRE_HIGH, al, true
+						return BOT_ACTION_DESIRE_HIGH, ally, true
 					end
 				end
 			end
 			-- With Scepter and no ally to save, still self-cast: the old else-branch meant a
 			-- Scepter Phoenix never cast Supernova in a fight unless an ally was low.
-			if not (#an >= #ao + 2) then
+			if #nearbyAllies < #nearbyEnemies + 2 then
 				return BOT_ACTION_DESIRE_HIGH, nil, false
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, false
 end
-function a.IsBeingAttackedByRealHero(ap, aq)
-	for S, T in pairs(ap) do
+function X.IsBeingAttackedByRealHero(enemies, unit)
+	for _, enemy in pairs(enemies) do
 		if
-			c.IsValidHero(T)
-			and not c.IsSuspiciousIllusion(T)
-			and (T:GetAttackTarget() == aq or c.IsChasingTarget(T, aq))
+			Fu.IsValidHero(enemy)
+			and not Fu.IsSuspiciousIllusion(enemy)
+			and (enemy:GetAttackTarget() == unit or Fu.IsChasingTarget(enemy, unit))
 		then
 			return true
 		end
 	end
 	return false
 end
-function a.GetModifierTime(ar, as)
-	if ar:HasModifier(as) then
-		return ar:GetModifierRemainingDuration(ar:GetModifierByName(as))
+function X.GetModifierTime(unit, modifierName)
+	if unit:HasModifier(modifierName) then
+		return unit:GetModifierRemainingDuration(unit:GetModifierByName(modifierName))
 	else
 		return 0
 	end
 end
-return a
+return X

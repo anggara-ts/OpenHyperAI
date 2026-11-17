@@ -458,11 +458,6 @@ function X.ConsiderThunderStrike()
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
-			return BOT_ACTION_DESIRE_HIGH, botTarget
-		end
-	end
 	local nearbyNeutrals = bot:GetNearbyNeutralCreeps(castRange)
 	for _, creep in pairs(nearbyNeutrals) do
 		if
@@ -747,7 +742,8 @@ function X.ConsiderKineticField()
 						end
 					end
 					if
-						Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange)
+						Fu.IsInRange(bot, botTarget, castRange + radius)
+						and not Fu.IsInRange(bot, botTarget, castRange)
 					then
 						enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius * 0.8)
 						if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then

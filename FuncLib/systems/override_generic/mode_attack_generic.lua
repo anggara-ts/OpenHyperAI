@@ -1,5 +1,7 @@
 -- Override for the built-in mode_attack_generic mode.
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+-- Kiting lives there now, shared with the per-think hook for heroes on Valve's attack mode.
+local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
 local AttackHelpers = {}
 local bot = GetBot()
 local attackTarget = { unit = nil, id = -1, location = nil, locationFuture = nil, hidden1 = false, hidden2 = false }
@@ -17,6 +19,47 @@ function AttackMode.OnEnd()
 	attackTarget.locationFuture = nil
 	attackTarget.hidden1 = false
 	attackTarget.hidden2 = false
+end
+-- The ally-follow desires (0.65) are skipped:
+--   withdraw: farm is walking this bot out of the enemy half (bot._farmWithdrawUntil, set each think by
+--     mode_farm_generic.lua), unless a hero is hitting the bot itself;
+--   siege: a base siege is on (defend.lua Defend.GetBaseSiege, kept 10s) and the place to follow to is
+--     over 3000 from the sieged building and over 4000 from our Ancient.
+-- Returns the reason, or nil.
+local FOLLOW_SIEGE_DIST, FOLLOW_ANCIENT_DIST = 3000, 4000
+local function FollowSkipWhy(loc)
+	if (bot._farmWithdrawUntil or -1) > DotaTime() and not bot:WasRecentlyDamagedByAnyHero(1.5) then
+		return "withdraw"
+	end
+	local states = Fu.Utils.GameStates
+	local siege = states ~= nil and states.baseSiege or nil
+	if loc ~= nil and siege ~= nil and DotaTime() - siege.at <= 10 then
+		local ancient = GetAncient(GetTeam())
+		if
+			Fu.GetDistance(loc, siege.loc) > FOLLOW_SIEGE_DIST
+			and (ancient == nil or GetUnitToLocationDistance(ancient, loc) > FOLLOW_ANCIENT_DIST)
+		then
+			return "siege"
+		end
+	end
+	return nil
+end
+local function LogFollowSkip(why, allyHero, loc)
+	if DotaTime() < (bot._followSkipWhyLogAt or -999) then
+		return
+	end
+	bot._followSkipWhyLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-ATTACK] t=%.0f %s follow-skip why=%s ally=%s dist=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			why,
+			(string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToLocationDistance(bot, loc)
+		)
+	)
 end
 function AttackMode.GetDesire()
 	if not bot:IsAlive() or bot:IsIllusion() or bot:HasModifier("modifier_fountain_fury_swipes_damage_increase") then
@@ -344,13 +387,48 @@ function AttackMode.GetDesire()
 					end
 				end
 				if Fu.IsValidHero(allyTarget) and not Fu.IsSuspiciousIllusion(allyTarget) then
+					local far = GetUnitToUnitDistance(bot, allyTarget)
+					-- The outnumbered gate above counts around this bot, so from 2000-4000 away it always
+					-- passed (game 037: 50 follows beyond 1600, e.g. Kez and Hoodwink walking 2100-2400
+					-- onto Dawnbreaker at t=2197 with 5 Dire there; all died). Count at the fight.
+					if far > 1200 and not finishKill then
+						local fightLoc = allyTarget:GetLocation()
+						local enemiesAtFight = math.max(
+							#Fu.GetEnemiesNearLoc(fightLoc, 1400),
+							#(Fu.GetLastSeenEnemiesNearLoc(fightLoc, 1400) or {})
+						)
+						local alliesAtFight = #Fu.GetAlliesNearLoc(fightLoc, 1400)
+						if enemiesAtFight >= alliesAtFight + 2 or alliesAtFight <= 1 and enemiesAtFight >= 3 then
+							if DotaTime() >= (bot._followSkipLogAt or -999) then
+								bot._followSkipLogAt = DotaTime() + 5
+								pcall(
+									print,
+									string.format(
+										"[OHA-ATTACK] t=%.0f %s follow-skip lost-fight ally=%s target=%s dist=%d enemiesThere=%d alliesThere=%d",
+										DotaTime(),
+										(string.gsub(botName, "npc_dota_hero_", "")),
+										(string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", "")),
+										(string.gsub(allyTarget:GetUnitName(), "npc_dota_hero_", "")),
+										far,
+										enemiesAtFight,
+										alliesAtFight
+									)
+								)
+							end
+							goto continue_ally_follow
+						end
+					end
+					local skipWhy = FollowSkipWhy(allyTarget:GetLocation())
+					if skipWhy ~= nil then
+						LogFollowSkip(skipWhy, allyHero, allyTarget:GetLocation())
+						goto continue_ally_follow
+					end
 					attackTarget.unit = allyTarget
 					bot:SetTarget(attackTarget.unit)
 					-- This is the 0.65 (VERYHIGH 0.6 + 0.05) attack with no enemy near: following an ally
 					-- up to 11s of walking away. Think used to drop a target beyond 1200 (skipNextDesire = true), so
 					-- the next desire read 0 and the bot flipped attack/assemble (game 036, Primal Beast,
 					-- 20 changes at 41:41). Think now walks to it; logged here.
-					local far = GetUnitToUnitDistance(bot, allyTarget)
 					if far > 1200 and DotaTime() >= (bot._flipSrcLogAt or -999) then
 						bot._flipSrcLogAt = DotaTime() + 5
 						pcall(
@@ -368,9 +446,38 @@ function AttackMode.GetDesire()
 					return BOT_MODE_DESIRE_VERYHIGH + 0.05
 				end
 				if Fu.IsInRange(bot, allyHero, 1000) and #enemiesNearby == 0 then
-					attackTarget.location = allyHero:GetLocation()
-					attackTarget.hidden1 = true
-					return BOT_MODE_DESIRE_VERYHIGH + 0.05
+					-- "Ally in attack mode with no target" is not a fight. Game 037: Kez and Hoodwink (the
+					-- two override users) stood 46 apart in attack 0.65 with no enemy for 30s (t=1978-2009,
+					-- also t=616 and 918): each walked to the other because the other was in attack mode.
+					-- Follow only when the ally is really fighting.
+					local allyLoc = allyHero:GetLocation()
+					local allyFighting = allyHero:WasRecentlyDamagedByAnyHero(3.0)
+						or #Fu.GetEnemiesNearLoc(allyLoc, 1200) > 0
+						or #(Fu.GetLastSeenEnemiesNearLoc(allyLoc, 1200) or {}) > 0
+					local skipWhy = allyFighting and FollowSkipWhy(allyLoc) or nil
+					if skipWhy ~= nil then
+						LogFollowSkip(skipWhy, allyHero, allyLoc)
+						goto continue_ally_follow
+					end
+					if allyFighting then
+						attackTarget.location = allyLoc
+						attackTarget.hidden1 = true
+						return BOT_MODE_DESIRE_VERYHIGH + 0.05
+					end
+					if DotaTime() >= (bot._followIdleLogAt or -999) then
+						bot._followIdleLogAt = DotaTime() + 10
+						pcall(
+							print,
+							string.format(
+								"[OHA-ATTACK] t=%.0f %s follow-skip no-fight ally=%s allyMode=%d dist=%d",
+								DotaTime(),
+								(string.gsub(botName, "npc_dota_hero_", "")),
+								(string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", "")),
+								allyHero:GetActiveMode(),
+								GetUnitToUnitDistance(bot, allyHero)
+							)
+						)
+					end
 				end
 				for i = 1, 5 do
 					local teammate = GetTeamMember(i)
@@ -378,7 +485,10 @@ function AttackMode.GetDesire()
 						local ping = teammate:GetMostRecentPing()
 						if ping ~= nil and ping.normal_ping and GameTime() < ping.time + 5.5 then
 							local enemiesNearPing = Fu.GetEnemiesNearLoc(ping.location, 300)
-							if Fu.IsValidHero(enemiesNearPing[1]) then
+							local skipWhy = FollowSkipWhy(ping.location)
+							if Fu.IsValidHero(enemiesNearPing[1]) and skipWhy ~= nil then
+								LogFollowSkip(skipWhy, allyHero, ping.location)
+							elseif Fu.IsValidHero(enemiesNearPing[1]) then
 								attackTarget.location = ping.location
 								-- Think only walks to attackTarget.location with hidden1 set; without it this
 								-- desire did nothing and dropped to 0 next think.
@@ -415,74 +525,6 @@ function AttackMode.GetDesire()
 		end
 	end
 	return BOT_MODE_DESIRE_NONE
-end
--- Kiting (test, user request 2026-11-17; revert if it costs damage): a ranged bot fighting a melee
--- hero steps away between attacks instead of standing still. Only inside a window that cannot
--- cancel an attack: it is not known whether GetLastAttackTime is the start of the attack or the
--- moment it is released, so the window assumes the worst of both:
---   from  last + point + BUF        (wind-up surely over even if "last" is the start)
---   until last + spa - point - BUF  (next wind-up can start even if "last" is the release)
--- point = GetAttackPoint / GetAttackSpeed as in combat.lua GetAttackProDelayTime, at least 0.25s.
-local KITE_BUF = 0.1
-local kiteLogAt = -99
-local function TryKite(meleeEnemy)
-	local range = bot:GetAttackRange()
-	if range <= 320 or not Fu.IsValidHero(meleeEnemy) or meleeEnemy:GetAttackRange() > 320 then
-		return false
-	end
-	if Fu.IsDisabled(meleeEnemy) or meleeEnemy:IsRooted() or bot:IsRooted() or Fu.IsSuspiciousIllusion(meleeEnemy) then
-		return false
-	end
-	local dist = GetUnitToUnitDistance(bot, meleeEnemy)
-	-- The melee hero has to be a threat: on us, chasing us, or close.
-	if
-		not (
-			meleeEnemy:GetAttackTarget() == bot
-			or Fu.IsChasingTarget(meleeEnemy, bot)
-			or dist < meleeEnemy:GetAttackRange() + 150
-		)
-	then
-		return false
-	end
-	-- Step back but stay in our attack range, so the next attack needs no walk back.
-	local step = math.min(250, range - dist - 30)
-	if step < 60 then
-		return false
-	end
-	-- Never cut a wind-up that is playing now (attack activity 1503, as in combat.lua).
-	if bot:GetAnimActivity() == 1503 and bot:GetAnimCycle() < bot:GetAttackPoint() + 0.05 then
-		return false
-	end
-	local spa = bot:GetSecondsPerAttack()
-	local point = math.max(bot:GetAttackPoint() / math.max(bot:GetAttackSpeed(), 0.1), 0.25)
-	local since = GameTime() - bot:GetLastAttackTime()
-	local from, to = point + KITE_BUF, spa - point - KITE_BUF
-	if to - from < 0.15 or since < from or since > to then
-		return false
-	end
-	local away = Fu.VectorAway(bot:GetLocation(), meleeEnemy:GetLocation(), step)
-	if not IsLocationPassable(away) then
-		return false
-	end
-	bot:Action_MoveToLocation(away)
-	if DotaTime() >= kiteLogAt + 2 then
-		kiteLogAt = DotaTime()
-		print(
-			string.format(
-				"[OHA-KITE] t=%.0f %s from %s dist=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
-				DotaTime(),
-				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-				(string.gsub(meleeEnemy:GetUnitName(), "npc_dota_hero_", "")),
-				dist,
-				step,
-				since,
-				from,
-				to,
-				spa
-			)
-		)
-	end
-	return true
 end
 function AttackMode.Think()
 	if Fu.CanNotUseAction(bot) then
@@ -548,7 +590,7 @@ function AttackMode.Think()
 			bot:Action_MoveToLocation(Fu.VectorTowards(attackTarget.unit:GetLocation(), botLocation, attackRange / 2))
 			return
 		end
-		if TryKite(attackTarget.unit) then
+		if SpecialUnits.TryKite(bot, attackTarget.unit) then
 			return
 		end
 		bot:Action_AttackUnit(attackTarget.unit, false)

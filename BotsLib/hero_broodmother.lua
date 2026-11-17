@@ -252,7 +252,7 @@ function X.ConsiderSpinWeb()
 			and #laneCreeps >= 4
 			and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius)
 		then
-			return BOT_MODE_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then

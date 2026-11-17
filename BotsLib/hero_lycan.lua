@@ -117,7 +117,6 @@ local wolfBiteAbility = SafeAbility(bot:GetAbilityByName("lycan_wolf_bite"), "ly
 local shapeshiftAbility = SafeAbility(bot:GetAbilityByName("lycan_shapeshift"), "lycan_shapeshift", "lycan")
 local summonWolvesDesire
 local howlDesire
-local wolfBiteDesire, wolfBiteTarget
 local shapeshiftDesire
 local botTarget
 local isGoingOnSomeone

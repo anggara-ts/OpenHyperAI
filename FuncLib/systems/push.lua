@@ -30,7 +30,7 @@ end
 local Push = {}
 local refreshThreatState, getGameState, getLocationState, getUnitState, discountLaneCost, getLaneTargetBuilding, humanPingSeconds, enemyAncient, lastThreatTick, teamPushLane, enemyHeroesAtAncient, enemyHeroesOnHighGround, laneFrontHasEnemies, wasDefendPinged, recentDefendTime, maxPushDesire, lockedPushLane, lockedPushLaneUntil, isBotOnlyGame, pushAfterDefendUntil, lastDefendDesire, pushAfterDefendSeconds, stateCacheSeconds, gameStateCache, locationStateCache, unitStateCache, ancientThreatRadius, laneTargetCache
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Barracks = Dota.Barracks
 local BotMode = Dota.BotMode
 local BotModeDesire = Dota.BotModeDesire
@@ -117,7 +117,7 @@ local getGlobalLocationState = Cache.getGlobalLocationState
 local getCachedAlliesNearLoc = Cache.getCachedAlliesNearLoc
 local getCachedEnemiesNearLoc = Cache.getCachedEnemiesNearLoc
 local autoCleanupCache = Cache.autoCleanupCache
-local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local NativeOperators = require(GetScriptDirectory() .. "/FuncLib/lib/native_operators")
 local add = NativeOperators.add
 local CacheKeys = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
 function refreshThreatState(team)
@@ -355,6 +355,51 @@ function Push.GetPushDesireHelper(bot, lane)
 		bot:Action_AttackUnit(enemyAncient, true)
 		return 0.6
 	end
+	-- Game 037 (30:34 and 33:36, 3-0 each): with all five Dire alive and Dire ahead, the lock capped
+	-- push to 0.40 at the Dire bottom T2 and the bots stayed there (capped push was still their top
+	-- mode) until Dire came. Behind (enemy net worth 2000+ higher, or our average level 1+ lower) with
+	-- every enemy alive and the lane's next target a T2 or deeper: no push on that lane. An Aegis push
+	-- still goes. The per-lane flag (GameStates.enemyHalfOff[lane]) also walks farm off the enemy half
+	-- on that lane for 20s (mode_farm_generic).
+	do
+		local enemyPlayers = #GetTeamPlayers(GetOpposingTeam())
+		local allEnemiesAlive = enemyPlayers > 0 and gameState.aliveEnemyCount >= enemyPlayers
+		local behindNetworth = (gameState.enemyNetworth or 0) > (gameState.teamNetworth or 0) + 2000
+		local behindLevel = Fu.GetAverageLevel(true) >= (gameState.averageLevel or 0) + 1
+		local tier = Push.GetLaneBuildingTier(lane)
+		if
+			allEnemiesAlive
+			and gameState.aliveEnemyCount >= gameState.aliveAllyCount
+			and (behindNetworth or behindLevel)
+			and tier >= 2
+			and not (gameState.hasAegis and gameState.aliveAllyCount >= 4)
+			and not gameState.isLaningPhase
+		then
+			Fu.Utils.GameStates = Fu.Utils.GameStates or {}
+			Fu.Utils.GameStates.enemyHalfOff = Fu.Utils.GameStates.enemyHalfOff or {}
+			Fu.Utils.GameStates.enemyHalfOff[lane] = DotaTime() + 20
+			if DotaTime() >= (bot._pushBehindLogAt or -999) and not Fu.IsMeepoClone(bot) then
+				bot._pushBehindLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-PUSH] t=%.0f %s behind-stop lane=%s tier=%d alive=%d/%d nw=%d/%d lvl=%.1f/%.1f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(lane),
+						tier,
+						gameState.aliveAllyCount,
+						gameState.aliveEnemyCount,
+						math.floor(gameState.teamNetworth or 0),
+						math.floor(gameState.enemyNetworth or 0),
+						gameState.averageLevel or 0,
+						Fu.GetAverageLevel(true)
+					)
+				)
+			end
+			return BotModeDesire.None
+		end
+	end
 	local attackTarget = bot:GetAttackTarget()
 	-- Wait for creeps instead of fully dropping push when glyph/backdoor is up.
 	if Fu.IsValidBuilding(attackTarget) and Push.HasBackdoorProtect(attackTarget) then
@@ -469,7 +514,7 @@ function Push.GetPushDesireHelper(bot, lane)
 						lockDesire, capReason = 0.15, "group-hurt"
 					end
 				end
-				if capReason ~= nil and DotaTime() >= (bot._pushLockCapLogAt or -999) then
+				if capReason ~= nil and DotaTime() >= (bot._pushLockCapLogAt or -999) and not Fu.IsMeepoClone(bot) then
 					bot._pushLockCapLogAt = DotaTime() + 5
 					pcall(
 						print,

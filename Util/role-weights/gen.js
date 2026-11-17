@@ -27,9 +27,9 @@ for (const l of fs.readFileSync(D + "/dotabuff_7d.txt", "utf8").trim().split(/\r
   if (!npc) throw new Error("no npc for " + name);
   stats[npc] = { name, roles: rest.trim().split(/\s+/).map(s => { const m = s.match(/^([SABCD])([\d.]+)\/([\d.]+)$/); return { tier: m[1], wr: +m[2], pr: +m[3] }; }) };
 }
-// Key -> npc from ts_libs/dota/heroes.lua
+// Key -> npc from FuncLib/dota/heroes.lua
 const key2npc = {};
-for (const m of fs.readFileSync(REPO + "/ts_libs/dota/heroes.lua", "utf8").matchAll(/a\.HeroName\.(\w+)\s*=\s*"([^"]+)"/g)) key2npc[m[1]] = m[2];
+for (const m of fs.readFileSync(REPO + "/FuncLib/dota/heroes.lua", "utf8").matchAll(/\w+\.HeroName\.(\w+)\s*=\s*"([^"]+)"/g)) key2npc[m[1]] = m[2];
 
 function weights(s) {
   const prs = s.roles.map(r => r.pr), max = Math.max(...prs), sum = prs.reduce((a, b) => a + b, 0);

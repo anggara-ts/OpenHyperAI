@@ -1,0 +1,4 @@
+# Line endings: LF everywhere (the index already stores LF; StyLua and CI expect LF), CRLF only for
+# Windows batch files. Without this, core.autocrlf=true checkouts produce CRLF files that StyLua flags.
+* text=auto eol=lf
+*.bat text eol=crlf

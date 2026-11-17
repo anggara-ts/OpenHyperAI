@@ -599,7 +599,7 @@ function X.ConsiderE()
 				and allyHero:GetAttackDamage() > minAttackDamage
 			then
 				targetAlly = allyHero
-				maxAttackDamage = allyHero:GetAttackDamage()
+				minAttackDamage = allyHero:GetAttackDamage()
 			end
 		end
 		if targetAlly ~= nil then
@@ -675,7 +675,6 @@ function X.ConsiderD()
 		+ unrefinedFireblastAbility:GetSpecialValueFloat("str_multiplier")
 			* bot:GetAttributeValue(ATTRIBUTE_STRENGTH)
 	local damageType = DAMAGE_TYPE_MAGICAL
-	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 	local enemiesInSearchRange = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)
 	if manaCost / bot:GetMaxMana() > 0.45 and hpRatio > 0.25 then

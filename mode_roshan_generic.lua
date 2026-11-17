@@ -15,9 +15,7 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
 local ObjectiveTravel = require(GetScriptDirectory() .. "/FuncLib/systems/objective_travel")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
-local initialDesire = 0.0
 local isRoshanAlive = false
-local loadTime = DotaTime()
 Fu.Utils.GameStates = Fu.Utils.GameStates or {}
 Fu.Utils.GameStates.roshHandle = Fu.Utils.GameStates.roshHandle or nil
 local roshanAliveSince = 0
@@ -62,7 +60,6 @@ local function AdjustDesireForHealth(desire)
 	end
 	return desire
 end
-local unusedTimer = 0
 local lastLogTime = 0
 local function RoshLog(fmt, ...)
 	pcall(

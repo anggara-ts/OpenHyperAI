@@ -32,7 +32,6 @@ local hasHumanAlly = false
 local tormentorStartTime = 0
 local tormentorCooldownUntil = 0
 local tormentorTimeout = 60
-local unusedFiveMinutes = 5 * 60
 local lastDebugLogTime = 0
 local nextWaitMoveTime = 0
 local lastScoutCheckTime = 0
@@ -184,6 +183,26 @@ function GetDesireHelper()
 		)
 	then
 		return BOT_MODE_DESIRE_NONE, "base_threatened"
+	end
+	-- Base siege (defend.lua Defend.GetBaseSiege, kept 10s after the last sighting): stay home.
+	do
+		local states = Fu.Utils.GameStates
+		local siege = states ~= nil and states.baseSiege or nil
+		if siege ~= nil and DotaTime() - siege.at <= 10 then
+			if bot.tormentor_state == true and DotaTime() >= (bot._tormentorStayLogAt or -999) then
+				bot._tormentorStayLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-TORMENTOR] t=%.0f %s stay why=base-siege(%d)",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						siege.n
+					)
+				)
+			end
+			return BOT_MODE_DESIRE_NONE, "base_siege"
+		end
 	end
 	-- Not only the Ancient and T3s: a lane we should defend or enemy heroes at any of our towers
 	-- or barracks keeps us home (game 036, bottom T2 lost at 31:18 during a Tormentor call).

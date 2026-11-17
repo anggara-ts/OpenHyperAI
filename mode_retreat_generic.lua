@@ -5,7 +5,6 @@ local bot = GetBot()
 local hpRatio, mpRatio, botName, botHealth, healthRegen, manaRegen, botLocation, botTarget
 local botLevel, activeMode
 local allyHeroes, enemyHeroes
-local unusedValue = 0
 local loneDruidAegisAt = 0
 local runStartTime = 0
 local runDuration = 0
@@ -44,7 +43,7 @@ local function RefreshNearby()
 			Fu.IsValid(unit)
 			and unit:GetTeam() ~= TEAM_NEUTRAL
 			and unit:GetTeam() ~= TEAM_NONE
-			and not string.find(botName, "lone_druid_bear")
+			and not string.find(unit:GetUnitName(), "lone_druid_bear")
 			and not unit:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not unit:HasModifier("modifier_dazzle_nothl_projection_physical_body_debuff")
 			and not unit:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
@@ -139,6 +138,35 @@ end
 -- Valve's built-in evasive mode switches this retreat logic off (tag 142). Game 036: 30 of 50
 -- Radiant deaths ended in it, 0 of 47 Dire. Log what is around the bot when it starts, to find
 -- the trigger. No behaviour change.
+-- Is a linear projectile / avoidance zone ours? Game 037: the log listed allied Earthbind and
+-- Impale. true = allied, false = enemy, nil = unknown (kept, marked "?").
+local function IsAlliedSource(source)
+	local caster = source.caster
+	if caster ~= nil and caster.GetTeam ~= nil then
+		local ok, team = pcall(caster.GetTeam, caster)
+		if ok and team ~= nil then
+			return team == GetTeam()
+		end
+	end
+	local playerId = source.playerid or source.player
+	if type(playerId) == "number" and playerId >= 0 then
+		return GetTeamForPlayer(playerId) == GetTeam()
+	end
+	-- Field names above are not verified for linear projectiles. Ability names start with the
+	-- hero name (meepo_earthbind, lion_impale): match them against our heroes.
+	local abilityName = source.ability ~= nil and source.ability:GetName() or nil
+	if abilityName ~= nil then
+		for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+			if Fu.IsValid(ally) then
+				local short = string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")
+				if string.sub(abilityName, 1, #short + 1) == short .. "_" then
+					return true
+				end
+			end
+		end
+	end
+	return nil
+end
 local function LogEvasiveEntry()
 	local now = DotaTime()
 	local evasiveSince = bot._evasiveSince
@@ -147,6 +175,11 @@ local function LogEvasiveEntry()
 		return
 	end
 	if now < (bot._evasiveLogAt or -999) then
+		return
+	end
+	-- Game 037: 57 of 261 entries were printed at respawn (foes empty, hp=1.00): the active mode
+	-- still reads evasive from before the death. Nothing within 2s of a death or a respawn.
+	if now - math.max(bot._retreatDeadAt or -999, bot._retreatResumeAt or -999) < 2 then
 		return
 	end
 	bot._evasiveLogAt = now + 3
@@ -168,7 +201,7 @@ local function LogEvasiveEntry()
 		return bot:GetIncomingTrackingProjectiles()
 	end)
 	for _, projectile in pairs(okTracking and trackingProjectiles or {}) do
-		if projectile ~= nil and not projectile.is_attack then
+		if projectile ~= nil and not projectile.is_attack and IsAlliedSource(projectile) ~= true then
 			local casterName = projectile.caster ~= nil
 					and (string.gsub(projectile.caster:GetUnitName(), "npc_dota_hero_", ""))
 				or "?"
@@ -185,7 +218,11 @@ local function LogEvasiveEntry()
 			and projectile.location ~= nil
 			and GetUnitToLocationDistance(bot, projectile.location) <= 1500
 		then
-			linearNames[#linearNames + 1] = (projectile.ability ~= nil and projectile.ability:GetName() or "?")
+			local allied = IsAlliedSource(projectile)
+			if allied ~= true then
+				linearNames[#linearNames + 1] = (projectile.ability ~= nil and projectile.ability:GetName() or "?")
+					.. (allied == nil and "?" or "")
+			end
 		end
 	end
 	local zoneNames = {}
@@ -196,10 +233,17 @@ local function LogEvasiveEntry()
 			and zone.location ~= nil
 			and GetUnitToLocationDistance(bot, zone.location) <= (zone.radius or 0) + 300
 		then
-			zoneNames[#zoneNames + 1] = (zone.ability ~= nil and zone.ability:GetName() or "?")
-				.. "/"
-				.. tostring(zone.radius)
+			local allied = IsAlliedSource(zone)
+			if allied ~= true then
+				zoneNames[#zoneNames + 1] = (zone.ability ~= nil and zone.ability:GetName() or "?")
+					.. "/"
+					.. tostring(zone.radius)
+					.. (allied == nil and "?" or "")
+			end
 		end
+	end
+	if #enemyNames == 0 and #trackingNames == 0 and #linearNames == 0 and #zoneNames == 0 then
+		return
 	end
 	pcall(
 		print,
@@ -216,10 +260,159 @@ local function LogEvasiveEntry()
 		)
 	)
 end
+local function HeroName()
+	return (string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
+end
+local function CountRealHeroes(radius, enemy)
+	local count = 0
+	for _, hero in pairs(bot:GetNearbyHeroes(radius, enemy, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(hero) and not Fu.IsSuspiciousIllusion(hero) and not Fu.IsMeepoClone(hero) then
+			count = count + 1
+		end
+	end
+	return count
+end
+-- Valve's evasive mode turns this file off (tag 142). Game 037: 33 of 52 Radiant deaths ended in it,
+-- and those bots lost ground to the fountain in their last 3.5s (retreat deaths gained ~200). Low
+-- (under 40%) with enemy heroes near and outnumbered or being hit: retreat above evasive (it reads
+-- up to 1.00 as the active mode, and the active mode reads ~10% above its desire: 1.25 clears
+-- even a raw 1.00 with that bonus). Held 3s once retreat is the active mode, renewed while under
+-- 50% HP with an enemy hero near or a hero hit, so evasive cannot take the next think back.
+local function OverEvasiveDesire()
+	local now = DotaTime()
+	local hp = Fu.GetHP(bot)
+	local enemyN = CountRealHeroes(1200, true)
+	local allyN = CountRealHeroes(1200, false)
+	local hit = bot:WasRecentlyDamagedByAnyHero(1.5)
+	local holding = bot._overEvasiveUntil ~= nil and now < bot._overEvasiveUntil and activeMode == BOT_MODE_RETREAT
+	local start = activeMode == BOT_MODE_EVASIVE_MANEUVERS and hp < 0.4 and enemyN >= 1 and (enemyN > allyN or hit)
+	if start or holding and hp < 0.5 and (enemyN >= 1 or hit) then
+		bot._overEvasiveUntil = now + 3
+		if now >= (bot._overEvasiveLogAt or -999) then
+			bot._overEvasiveLogAt = now + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s over-evasive %s hp=%.2f enemies=%d allies=%d hit=%s mode=%d desire=%.2f",
+					now,
+					HeroName(),
+					start and "start" or "hold",
+					hp,
+					enemyN,
+					allyN,
+					tostring(hit),
+					activeMode or -1,
+					BOT_DESIRE_OVERRIDE * 1.25
+				)
+			)
+		end
+		return BOT_DESIRE_OVERRIDE * 1.25
+	end
+	bot._overEvasiveUntil = nil
+	return 0
+end
+-- Monkey King's Jingu charges heal 20-80% of each hit (game data, lifesteal): like Satanic's Unholy
+-- Rage (tag 142), don't back off while they last and he is hitting a hero in an even fight. The
+-- override attack mode had this as an attack bonus, but Monkey King does not load that file.
+local function JinguFightOn()
+	if
+		bot:GetUnitName() ~= "npc_dota_hero_monkey_king"
+		or not bot:HasModifier("modifier_monkey_king_quadruple_tap_bonuses")
+		or Fu.GetHP(bot) <= 0.3
+	then
+		return false
+	end
+	local target = bot:GetAttackTarget()
+	if
+		not Fu.IsValidHero(target)
+		or GetUnitToUnitDistance(bot, target) > bot:GetAttackRange() + 150
+		or CountRealHeroes(1200, true) > CountRealHeroes(1200, false)
+	then
+		return false
+	end
+	if DotaTime() >= (bot._jinguFightLogAt or -999) then
+		bot._jinguFightLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-MONKEY_KING] t=%.0f jingu-fight retreat-skip hp=%.2f target=%s charges=%d",
+				DotaTime(),
+				Fu.GetHP(bot),
+				(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+				Fu.GetModifierCount(bot, "modifier_monkey_king_quadruple_tap_bonuses")
+			)
+		)
+	end
+	return true
+end
+-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
+-- It returned 0.7 (BOT_MODE_DESIRE_ABSOLUTE) while attack sits at 0.95, so it never won a
+-- fight (game 036: 28 deaths straight out of attack mode). Below 60% HP it returns 0.98,
+-- like the disarmed rule; above that it stays 0.7. Not while defending our Ancient.
+-- It applied only while attack/roam was the active mode, so once it won, retreat dropped and
+-- attack won back (game 037, Kez t=2319-2332: attack 0.65 / retreat 0.98, 29 changes in 13s).
+-- Now held for 3s while retreat is active, renewed while still outnumbered under 70% HP.
+-- Returns desire, tag (201 start, 202 held).
+local function HardRetreatDesire(lastStand)
+	if lastStand then
+		bot._hardRetreatUntil = nil
+		return 0, 201
+	end
+	local now = DotaTime()
+	local alliesNearby = Fu.GetAllyCount(bot, 1400)
+	local enemiesNearby = Fu.GetEnemyCount(bot, 1400)
+	local lastSeen = Fu.GetLastSeenEnemiesNearLoc and Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
+	local pressure = math.max(enemiesNearby, #lastSeen)
+	local freeKill = Fu.ShouldFinishCommittedKill(bot, botTarget)
+	local outnumbered = alliesNearby <= 1 and pressure >= 2
+		or pressure >= alliesNearby + 1 and not Fu.WeAreStronger(bot, 1400)
+	local attacking = activeMode == BOT_MODE_ATTACK
+		or activeMode == BOT_MODE_TEAM_ROAM
+		or activeMode == BOT_MODE_ROAM
+		or Fu.IsGoingOnSomeone(bot)
+	local holding = bot._hardRetreatUntil ~= nil and now < bot._hardRetreatUntil and activeMode == BOT_MODE_RETREAT
+	if freeKill or not outnumbered or not attacking and not holding then
+		bot._hardRetreatUntil = nil
+		return 0, 201
+	end
+	if hpRatio < 0.6 or holding and hpRatio < 0.7 then
+		bot._hardRetreatUntil = now + 3
+		if now >= (bot._hardRetreatLogAt or -999) then
+			bot._hardRetreatLogAt = now + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s hard-retreat %s hp=%.2f allies=%d pressure=%d mode=%d",
+					now,
+					HeroName(),
+					holding and "hold" or "over-attack",
+					hpRatio,
+					alliesNearby,
+					pressure,
+					activeMode or -1
+				)
+			)
+		end
+		return 0.98, holding and 202 or 201
+	end
+	bot._hardRetreatUntil = nil
+	return BOT_MODE_DESIRE_ABSOLUTE, 201
+end
 function GetDesire()
+	-- Death and respawn times, for the evasive logger; the retreat holds end with the death.
+	local now = DotaTime()
+	if not bot:IsAlive() then
+		bot._retreatDeadAt = now
+		bot._hardRetreatUntil = nil
+		bot._overEvasiveUntil = nil
+	end
+	if now - (bot._retreatDesireAt or -999) > 1.5 then
+		bot._retreatResumeAt = now
+	end
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
+	bot._retreatDesireAt = now
 	retreatLine = 0
 	local desire = GetDesireHelper()
 	-- A healthy bot wanting to retreat: say which rule (game 014, 35:30: Medusa at full HP and
@@ -255,15 +448,26 @@ function GetDesireHelper()
 		or bot:HasModifier("modifier_dazzle_nothl_projection_soul_clone")
 		or bot:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
 		or bot:HasModifier("modifier_item_helm_of_the_undying_active")
-		or activeMode == BOT_MODE_EVASIVE_MANEUVERS
 		or bot:GetUnitName() == "npc_dota_hero_lone_druid" and bot:HasModifier("modifier_fountain_aura_buff") and DotaTime() < 0
 		or bot:HasModifier("modifier_item_satanic_unholy")
 		or Fu.GetModifierTime(bot, "modifier_abaddon_borrowed_time") > 2
 		or Fu.GetModifierTime(bot, "modifier_muerta_pierce_the_veil_buff") > 2
 		or Fu.GetModifierTime(bot, "modifier_dazzle_shallow_grave") > 3
 		or Fu.GetModifierTime(bot, "modifier_oracle_false_promise_timer") > 3
+		or JinguFightOn()
 	then
+		bot._hardRetreatUntil = nil
+		bot._overEvasiveUntil = nil
 		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
+	end
+	if activeMode == BOT_MODE_EVASIVE_MANEUVERS or bot._overEvasiveUntil ~= nil then
+		local overEvasive = OverEvasiveDesire()
+		if overEvasive > 0 then
+			return RetreatTag(144, overEvasive)
+		end
+		if activeMode == BOT_MODE_EVASIVE_MANEUVERS then
+			return RetreatTag(142, BOT_MODE_DESIRE_NONE)
+		end
 	end
 	-- Disarmed in a fight: game 029, 29:25, Mirana, disarmed by Techies' Reactive Tazer, 46% HP,
 	-- 4 enemies near, stood idle in attack mode (0.95). 2+ enemy heroes within 1200 under 60% HP,
@@ -294,6 +498,13 @@ function GetDesireHelper()
 	local enemyLaneCreeps = nearby.enemyLaneCreeps1200
 	local weAreStronger = Fu.WeAreStronger(bot, 1600)
 	local isInTeamFight = Fu.IsInTeamFight(bot, 1200)
+	-- A hard retreat in progress (below) keeps priority over the rules in between.
+	if bot._hardRetreatUntil ~= nil then
+		local held, heldTag = HardRetreatDesire(hpRatio >= 0.4 and AncientLastStand())
+		if held > 0.9 then
+			return RetreatTag(heldTag, held)
+		end
+	end
 	-- Abort early tower-dive chase (e.g. gold-rune bait under T1).
 	local towerDiveRetreat = Retreat.RetreatWhenTowerTargetedDesire()
 	if towerDiveRetreat > 0 then
@@ -321,46 +532,9 @@ function GetDesireHelper()
 		return RetreatTag(184, unitRun)
 	end
 	local lastStand = hpRatio >= 0.4 and AncientLastStand()
-	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
-	-- It returned 0.7 (BOT_MODE_DESIRE_ABSOLUTE) while attack sits at 0.95, so it never won a
-	-- fight (game 036: 28 deaths straight out of attack mode). Below 60% HP it now returns 0.98,
-	-- like the disarmed rule; above that it stays 0.7. Not while defending our Ancient.
-	if not lastStand then
-		local alliesNearby = Fu.GetAllyCount(bot, 1400)
-		local enemiesNearby = Fu.GetEnemyCount(bot, 1400)
-		local lastSeen = Fu.GetLastSeenEnemiesNearLoc and Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
-		local pressure = math.max(enemiesNearby, #lastSeen)
-		local freeKill = Fu.ShouldFinishCommittedKill(bot, botTarget)
-		if
-			not freeKill
-			and (alliesNearby <= 1 and pressure >= 2 or pressure >= alliesNearby + 1 and not Fu.WeAreStronger(bot, 1400))
-			and (
-				activeMode == BOT_MODE_ATTACK
-				or activeMode == BOT_MODE_TEAM_ROAM
-				or activeMode == BOT_MODE_ROAM
-				or Fu.IsGoingOnSomeone(bot)
-			)
-		then
-			if hpRatio < 0.6 then
-				if DotaTime() >= (bot._hardRetreatLogAt or -999) then
-					bot._hardRetreatLogAt = DotaTime() + 3
-					pcall(
-						print,
-						string.format(
-							"[OHA-RETREAT] t=%.0f %s hard-retreat over-attack hp=%.2f allies=%d pressure=%d mode=%d",
-							DotaTime(),
-							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-							hpRatio,
-							alliesNearby,
-							pressure,
-							activeMode or -1
-						)
-					)
-				end
-				return RetreatTag(201, 0.98)
-			end
-			return RetreatTag(201, BOT_MODE_DESIRE_ABSOLUTE)
-		end
+	local hardRetreat, hardRetreatTag = HardRetreatDesire(lastStand)
+	if hardRetreat > 0 then
+		return RetreatTag(hardRetreatTag, hardRetreat)
 	end
 	if
 		activeMode == BOT_MODE_ROSHAN

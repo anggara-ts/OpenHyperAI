@@ -3,7 +3,9 @@
 -- [OHA-*] diagnostics for behaviour already confirmed working in test games. Muted so the
 -- console log shows what still needs work. Delete a line here to bring that log back.
 local OHA_MUTED = {
-	"^%[OHA%-LANE%]", -- laning standoff / last hits
+	-- Only the 20s laning summary (standoff / last hits). lasthit-skip, harass-step, summons-step-back and
+	-- go-home print again: the whole tag was muted, so game 037 could not show them working.
+	"^%[OHA%-LANE%] t=%S+ %S+ pos=%d",
 	"^%[OHA%-TUSK%] t=%S+ snowball%-launch", -- early launch (median 0.6s)
 	"^%[OHA%-TUSK%] t=%S+ punch ", -- Tag Team before Punch
 	"^%[OHA%-TUSK%] t=%S+ tag%-team ",
@@ -22,6 +24,23 @@ local OHA_MUTED = {
 	"^%[OHA%-MEDUSA%]",
 	"^%[OHA%-WARLOCK%]",
 	"^%[OHA%-QUILL%]",
+	-- Proven in games 038/039 (PRs #4 and #5); muted 2026-11-18. Still printed: the triggers of the enemy-half
+	-- withdraw, hard-retreat, group-up, flips/stuck (#12), swaps/pull-check/forage (#15), Puck (#36) and lasthit-skip.
+	"^%[OHA%-EVASIVE%] t=%S+ %S+ enter", -- 193-212 per game, never without a cause
+	"^%[OHA%-RETREAT%] t=%S+ %S+ over%-evasive",
+	"^%[OHA%-PUSH%] t=%S+ %S+ behind%-stop", -- 152-211 per game
+	"^%[OHA%-FARM%] t=%S+ %S+ base%-siege%-hold", -- 116-134 per game
+	"^%[OHA%-FARM%] t=%S+ %S+ enemy%-half%-withdraw why=finish", -- the repeat while walking back
+	"^%[OHA%-ATTACK%] t=%S+ %S+ follow%-skip",
+	"^%[OHA%-KITE%]",
+	"^%[OHA%-MONKEY_KING%] t=%S+ spring%-skip", -- 127 per game
+	"^%[OHA%-NS%] t=%S+ feast result",
+	"^%[OHA%-MEEPO%] t=%S+ %S+ rune%-skip",
+	"^%[OHA%-MEEPO%] t=%S+ %S+ farm%-skip",
+	"^%[OHA%-LANE%] t=%S+ %S+ harass%-step",
+	"^%[OHA%-SHREDDER%] t=%S+ retreat",
+	"^%[OHA%-EMBER_SPIRIT%] t=%S+ retreat to remnant",
+	"^%[OHA%-TUSK%] t=%S+ buddies%-retreat",
 }
 if _G.OHA_RAW_PRINT == nil then
 	_G.OHA_RAW_PRINT = print

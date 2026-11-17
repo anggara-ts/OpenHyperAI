@@ -487,9 +487,6 @@ function X.ConsiderSpectralSlug()
 			if Fu.WillKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL, hitDelay) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
-			if enemyHero:HasModifier("modifier_abaddon_borrowed_time") then
-				return BOT_ACTION_DESIRE_HIGH, enemyHero
-			end
 			local alliesTargetingEnemy = Fu.GetHeroesTargetingUnit(nearbyAllies, enemyHero)
 			if Fu.IsGoingOnSomeone(bot) then
 				if

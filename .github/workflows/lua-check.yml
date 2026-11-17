@@ -2,7 +2,7 @@ name: Lua check
 
 on:
   push:
-    branches: [main, "release-*", update-mechanism-7.41f, plugin-fretbots]
+    branches: [main, "release-*", "fix/**", "feat/**", "chore/**", "docs/**", plugin-fretbots]
   pull_request:
   workflow_dispatch:
 
@@ -30,6 +30,18 @@ jobs:
           done < <(git ls-files -z -- '*.lua')
           echo "checked $n files, $fail failed"
           [ "$fail" -eq 0 ]
+
+  tests:
+    name: Tests (LuaJIT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LuaJIT
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
+      - name: Run Tests/run.lua
+        run: |
+          luajit -v
+          luajit Tests/run.lua
 
   lint:
     name: Lint (luacheck)

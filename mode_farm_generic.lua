@@ -8,7 +8,6 @@ then
 	return
 end
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
-local Version = require(GetScriptDirectory() .. "/FuncLib/systems/version")
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomizeGeneral = require(GetScriptDirectory() .. "/Customize/general")
 local FarmDefend = require(GetScriptDirectory() .. "/FuncLib/systems/farm_defend")
@@ -42,13 +41,8 @@ local isOfflaner = false
 local isMidlaner = false
 local isCarry = false
 local team = GetTeam()
-local unusedFlag = false
 local enemyHumanCount, enemyBotCount = Fu.Utils.NumHumanBotPlayersInTeam(GetOpposingTeam())
 local allyHumanCount, allyBotCount = Fu.Utils.NumHumanBotPlayersInTeam(team)
-local unusedCounter = 0
-local unusedMin = 1
-local unusedMax = 6
-local unusedFlag2 = false
 local lastCacheCleanupTime = -100
 local modeLocaleKeys = {
 	[BOT_MODE_LANING] = "mode_laning",
@@ -85,6 +79,134 @@ end
 if bot.farmLocation == nil then
 	bot.farmLocation = bot:GetLocation()
 end
+-- [OHA-FARM] lines, at most one per 5s per bot.
+local function FarmLog(fmt, ...)
+	if DotaTime() < (bot._farmOhaLogAt or -999) then
+		return
+	end
+	bot._farmOhaLogAt = DotaTime() + 5
+	pcall(print, string.format(fmt, ...))
+end
+local function ShortName(unit)
+	return (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
+end
+-- Base siege (FuncLib/systems/defend.lua Defend.GetBaseSiege: 3+ enemy heroes at a T3, barracks,
+-- T4 or the Ancient, kept 10s after the last sighting).
+local function BaseSiege()
+	local states = Fu.Utils.GameStates
+	local siege = states ~= nil and states.baseSiege or nil
+	if siege ~= nil and DotaTime() - siege.at <= 10 then
+		return siege
+	end
+	return nil
+end
+-- Game 037 (30:34 and 33:36, 3-0 each): farm (lane creeps at the Dire T2) kept heroes on the Dire
+-- side with all five Dire alive and Dire ahead. On the enemy side (Fu.IsInEnemyArea) after the
+-- laning phase, farm walks the bot back to our nearest tower when: push found us behind on the lane
+-- he is on (push.lua sets GameStates.enemyHalfOff[lane] for 20s), we have fewer heroes alive (lost
+-- the last fight), or enemies seen near outnumber allies near. A started walk goes on until he is
+-- within 600 of the tower point (25s at most), so he does not turn around at the IsInEnemyArea line.
+local FARM_WITHDRAW_DESIRE = 0.5
+-- A lane push.lua found us behind on (flag still set), or nil.
+local function BehindLaneNear(radius)
+	local states = Fu.Utils.GameStates
+	if states == nil or states.enemyHalfOff == nil then
+		return nil
+	end
+	for lane, untilAt in pairs(states.enemyHalfOff) do
+		if
+			untilAt > DotaTime() and (radius == nil or GetAmountAlongLane(lane, bot:GetLocation()).distance <= radius)
+		then
+			return lane
+		end
+	end
+	return nil
+end
+local function EnemyHalfWithdrawWhy()
+	if Fu.IsInLaningPhase() or DotaTime() < 10 * 60 or not Fu.IsInEnemyArea(bot) then
+		return nil
+	end
+	local aliveAllies = Fu.GetNumOfAliveHeroes(false)
+	local aliveEnemies = Fu.GetNumOfAliveHeroes(true)
+	if Fu.DoesTeamHaveAegis() and aliveAllies >= 4 then
+		return nil
+	end
+	if BehindLaneNear(2500) ~= nil then
+		return "behind"
+	end
+	if aliveEnemies > aliveAllies then
+		return "fewer-alive"
+	end
+	local enemiesNear = #Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2500)
+	local alliesNear = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
+	if enemiesNear > alliesNear then
+		return "outnumbered"
+	end
+	return nil
+end
+local function NearestOwnTower()
+	local best, bestDistance = nil, math.huge
+	for _, towerId in ipairs({
+		TOWER_TOP_1,
+		TOWER_TOP_2,
+		TOWER_TOP_3,
+		TOWER_MID_1,
+		TOWER_MID_2,
+		TOWER_MID_3,
+		TOWER_BOT_1,
+		TOWER_BOT_2,
+		TOWER_BOT_3,
+	}) do
+		local tower = GetTower(GetTeam(), towerId)
+		if tower ~= nil and tower:IsAlive() then
+			local distance = GetUnitToUnitDistance(bot, tower)
+			if distance < bestDistance then
+				best, bestDistance = tower, distance
+			end
+		end
+	end
+	if best == nil then
+		return GetAncient(GetTeam()):GetLocation()
+	end
+	return Fu.AdjustLocationWithOffsetTowardsFountain(best:GetLocation(), 400)
+end
+-- Meepo: another body with an enemy hero within 1200 that took hero damage in the last 3s (as
+-- mode_rune_generic.lua RuneMode.MeepoBodyInFight), unless that fight is clearly lost: 2+ enemy
+-- heroes there and more than our heroes there (Meepo bodies count as one). Returns the body and
+-- the two counts, or nil.
+local function MeepoBodyInFight()
+	for _, meepo in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			meepo ~= bot
+			and Fu.IsValidHero(meepo)
+			and meepo:GetUnitName() == "npc_dota_hero_meepo"
+			and meepo:WasRecentlyDamagedByAnyHero(3.0)
+		then
+			local enemies = 0
+			for _, enemy in ipairs(meepo:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) do
+				if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) then
+					enemies = enemies + 1
+				end
+			end
+			if enemies >= 1 then
+				local allies = 1
+				for _, ally in ipairs(meepo:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) do
+					if
+						Fu.IsValidHero(ally)
+						and not ally:IsIllusion()
+						and ally:GetUnitName() ~= "npc_dota_hero_meepo"
+					then
+						allies = allies + 1
+					end
+				end
+				if enemies < 2 or enemies <= allies then
+					return meepo, enemies, allies
+				end
+			end
+		end
+	end
+	return nil
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
@@ -102,12 +224,40 @@ function GetDesire()
 			end
 		end
 	end
+	-- Meepo: no farming while another body fights (losing one body kills them all).
+	if bot:GetUnitName() == "npc_dota_hero_meepo" then
+		local fightBody, enemies, allies = MeepoBodyInFight()
+		if fightBody ~= nil then
+			if DotaTime() >= (bot._meepoFarmSkipLogAt or -999) then
+				bot._meepoFarmSkipLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f %s farm-skip body-in-fight dist=%d enemies=%d allies=%d",
+						DotaTime(),
+						Fu.IsMeepoClone(bot) and "clone" or "main",
+						GetUnitToUnitDistance(bot, fightBody),
+						enemies,
+						allies
+					)
+				)
+			end
+			return 0
+		end
+	end
 	local ok, desire = pcall(GetDesireHelper)
 	if not ok then
 		if IsDebug then
 			log("[FARM-ERROR] %s %s", bot:GetUnitName(), tostring(desire))
 		end
 		return BOT_MODE_DESIRE_VERYLOW
+	end
+	-- The enemy-half withdraw (GetDesireHelper) skips the push/defend/frequency scaling below: it is a
+	-- walk home, not farming. Under 70% HP it fades out (retreat takes it from there).
+	if bot._farmExitReason == "enemy_half_withdraw" and (bot._farmWithdrawUntil or -1) > DotaTime() then
+		bot._farmCommitUntil = nil
+		bot._farmCommitFloor = nil
+		return desire * RemapValClamped(Fu.GetHP(bot), 0.3, 0.7, 0, 1)
 	end
 	Fu.Utils["GameStates"] = Fu.Utils["GameStates"] or {}
 	Fu.Utils["GameStates"]["defendPings"] = Fu.Utils["GameStates"]["defendPings"] or { pingedTime = GameTime() }
@@ -168,6 +318,27 @@ function GetDesire()
 	end
 	if bot._farmCommitUntil and DotaTime() <= bot._farmCommitUntil then
 		desire = math.max(desire, bot._farmCommitFloor or 0)
+	end
+	-- Game 037, 24:09-27:28: Night Stalker and Hoodwink farmed (Hoodwink TP'd out to farm at t=1572)
+	-- while 3-5 Dire took our bottom T2/T3, and the rest died one at a time. No farming during a base
+	-- siege; defend's group-up (defend.lua) takes over.
+	local siege = BaseSiege()
+	if siege ~= nil then
+		bot._farmCommitUntil = nil
+		bot._farmCommitFloor = nil
+		if desire > 0 then
+			FarmLog(
+				"[OHA-FARM] t=%.0f %s base-siege-hold siege=%d at=%.0f,%.0f dist=%d farm=%.2f",
+				DotaTime(),
+				ShortName(bot),
+				siege.n,
+				siege.loc.x,
+				siege.loc.y,
+				math.floor(GetUnitToLocationDistance(bot, siege.loc)),
+				desire
+			)
+		end
+		return BOT_MODE_DESIRE_NONE
 	end
 	-- A defend call already treats one hero on the high ground as a base fight.
 	-- The 3s farm lock must not put him back in the jungle after that call.
@@ -292,6 +463,42 @@ function GetDesireHelper()
 		bot._farmExitReason = "too_early"
 		return 0.0
 	end
+	local withdrawWhy = EnemyHalfWithdrawWhy()
+	if
+		withdrawWhy == nil
+		and bot._farmWithdrawTo ~= nil
+		and DotaTime() - (bot._farmWithdrawStart or -99) <= 25
+		and GetUnitToLocationDistance(bot, bot._farmWithdrawTo) > 600
+	then
+		withdrawWhy = "finish"
+	end
+	if withdrawWhy ~= nil and bot:IsAlive() then
+		preferredCamp = nil
+		if bot._farmWithdrawTo == nil or DotaTime() - (bot._farmWithdrawStart or -99) > 25 then
+			bot._farmWithdrawTo = NearestOwnTower()
+			bot._farmWithdrawStart = DotaTime()
+		end
+		local to = bot._farmWithdrawTo
+		bot.farmLocation = to
+		bot._farmWithdrawUntil = DotaTime() + 1
+		bot._farmExitReason = "enemy_half_withdraw"
+		FarmLog(
+			"[OHA-FARM] t=%.0f %s enemy-half-withdraw why=%s mode=%s at=%.0f,%.0f to=%.0f,%.0f alive=%d/%d",
+			DotaTime(),
+			ShortName(bot),
+			withdrawWhy,
+			tostring(bot:GetActiveMode()),
+			bot:GetLocation().x,
+			bot:GetLocation().y,
+			to.x,
+			to.y,
+			Fu.GetNumOfAliveHeroes(false),
+			Fu.GetNumOfAliveHeroes(true)
+		)
+		return FARM_WITHDRAW_DESIRE
+	end
+	bot._farmWithdrawUntil = nil
+	bot._farmWithdrawTo = nil
 	local maxDefendDesire =
 		math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
 	if maxDefendDesire > 0.5 then
@@ -408,6 +615,28 @@ function GetDesireHelper()
 		Fu.Role["hasRefreshDone"] = false
 	end
 	availableCamps = Fu.Role["availableCampTable"]
+	-- While behind (push.lua flag) or with fewer heroes alive: own-side camps and lane creeps only, so
+	-- farm does not walk the bot straight back into the enemy half after a withdraw.
+	local keepOwnSide = not Fu.IsInLaningPhase() and (BehindLaneNear(nil) ~= nil or aliveEnemyCount > aliveAllyCount)
+	if keepOwnSide then
+		local ownCamps = {}
+		for _, camp in ipairs(availableCamps or {}) do
+			if not Fu.Site.IsEnemyCamp(camp) then
+				ownCamps[#ownCamps + 1] = camp
+			end
+		end
+		availableCamps = ownCamps
+		if preferredCamp ~= nil and Fu.Site.IsEnemyCamp(preferredCamp) then
+			FarmLog(
+				"[OHA-FARM] t=%.0f %s enemy-camp-drop at=%.0f,%.0f",
+				DotaTime(),
+				ShortName(bot),
+				preferredCamp.cattr.location.x,
+				preferredCamp.cattr.location.y
+			)
+			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+		end
+	end
 	if isAlive and bot:HasModifier("modifier_arc_warden_tempest_double") then
 		if roshanAlive then
 			for _, allyHero in pairs(alliesNearRoshan) do
@@ -578,6 +807,18 @@ function GetDesireHelper()
 			laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
 			if #laneCreeps == 0 and Fu.IsInAllyArea(bot) and FarmMode.IsNearLaneFront(bot) then
 				laneCreeps = bot:GetNearbyLaneCreeps(1600, false)
+			end
+		end
+		if keepOwnSide and #laneCreeps > 0 then
+			local center = Fu.GetCenterOfUnits(laneCreeps)
+			local ourAncient, theirAncient = GetAncient(GetTeam()), GetAncient(GetOpposingTeam())
+			if
+				ourAncient ~= nil
+				and theirAncient ~= nil
+				and GetUnitToLocationDistance(theirAncient, center) + 1280
+					< GetUnitToLocationDistance(ourAncient, center)
+			then
+				laneCreeps = {}
 			end
 		end
 		if #laneCreeps > 0 then
@@ -799,6 +1040,11 @@ function Think()
 		end
 	end
 	if Fu.CanNotUseAction(bot) then
+		return
+	end
+	-- Enemy-half withdraw (GetDesireHelper): walk to our nearest tower, no stopping for creeps.
+	if (bot._farmWithdrawUntil or -1) > DotaTime() and bot._farmWithdrawTo ~= nil then
+		bot:Action_MoveToLocation(bot._farmWithdrawTo)
 		return
 	end
 	if Fu.GetHP(bot) < 0.35 and bot:WasRecentlyDamagedByAnyHero(3.0) then

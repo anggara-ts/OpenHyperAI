@@ -14,7 +14,7 @@ function X.ConsiderStolenSpell(ability)
 	local abilityName = ability:GetName()
 	if abilityName == "abaddon_aphotic_shield" then
 		aphoticShieldAbility = ability
-		AphoticShieldDesire, AphoticShieldTarget = X.ConsiderAphoticShield()
+		local AphoticShieldDesire, AphoticShieldTarget = X.ConsiderAphoticShield()
 		if AphoticShieldDesire > 0 then
 			bot:Action_UseAbilityOnEntity(aphoticShieldAbility, AphoticShieldTarget)
 			return
@@ -22,7 +22,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "abaddon_death_coil" then
 		mistCoilAbility = ability
-		MistCoilDesire, MistCoilTarget = X.ConsiderMistCoil()
+		local MistCoilDesire, MistCoilTarget = X.ConsiderMistCoil()
 		if MistCoilDesire > 0 then
 			bot:Action_UseAbilityOnEntity(mistCoilAbility, MistCoilTarget)
 			return

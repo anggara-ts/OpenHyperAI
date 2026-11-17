@@ -4,6 +4,7 @@ local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/ut
 local X = {}
 local bot
 local lanes = { LANE_TOP, LANE_MID, LANE_BOT }
+local lastLaneLogTime = -100
 function X.Think(ownerBot, minion)
 	if not MinionUtils.IsValidUnit(minion) then
 		return
@@ -77,7 +78,7 @@ function X.ConsiderRetreat(minion, hTarget)
 	return nil
 end
 function X.IsTargetInShouldAimToAttackRange(minion, target, maxDistance)
-	if not MinionUtils.IsValidUnit(hTarget) then
+	if not MinionUtils.IsValidUnit(target) then
 		return false
 	end
 	return GetUnitToUnitDistance(minion, target) <= minion:GetAttackRange()
@@ -173,15 +174,26 @@ function X.ConsiderMove(minion)
 		return BOT_MODE_DESIRE_NONE, nil
 	end
 	local minionName = minion:GetUnitName()
-	if string.find(minionName, "terrorblade") or string.find(minionName, "naga_siren") then
+	if
+		(string.find(minionName, "terrorblade") or string.find(minionName, "naga_siren")) and not Fu.IsInLaningPhase()
+	then
+		-- Used to return on the first lane every time (always top). Now each illusion takes a lane no
+		-- other illusion of the hero holds; with all three taken it falls through to follow the hero.
 		for i = 1, #lanes do
-			local laneLocation = Fu.GetClosestTeamLane(minion)
 			if not X.IsMinionInLane(minion, lanes[i]) then
-				laneLocation = GetLaneFrontLocation(GetTeam(), lanes[i], 0)
-			end
-			if not Fu.IsInLaningPhase() then
+				if minion.to_farm_lane ~= lanes[i] and DotaTime() > lastLaneLogTime + 5 then
+					lastLaneLogTime = DotaTime()
+					print(
+						string.format(
+							"[OHA-ILLUSION] t=%.0f %s illusion farms lane %d",
+							DotaTime(),
+							minionName,
+							lanes[i]
+						)
+					)
+				end
 				minion.to_farm_lane = lanes[i]
-				return BOT_ACTION_DESIRE_HIGH, laneLocation
+				return BOT_ACTION_DESIRE_HIGH, GetLaneFrontLocation(GetTeam(), lanes[i], 0)
 			end
 		end
 	end

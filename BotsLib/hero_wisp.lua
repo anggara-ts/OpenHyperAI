@@ -1,6 +1,6 @@
 -- Wisp: skill build, item build, and ability use for this hero.
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local BotActionDesire = Dota.BotActionDesire
 local BotMode = Dota.BotMode
 local UnitType = Dota.UnitType

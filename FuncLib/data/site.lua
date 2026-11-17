@@ -90,7 +90,7 @@ local function arraySplice(self, ...)
 	return removed
 end
 local Site = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local BotModeDesire = Dota.BotModeDesire
 local UnitType = Dota.UnitType
 local BotMode = Dota.BotMode
@@ -398,8 +398,8 @@ Site.IsEnemyCamp = function(camp)
 end
 local campBehindGatesCache = {}
 Site.IsCampBehindEnemyGates = function(camp)
-	local cacheKey = camp.idx ~= nil and String(nil, camp.idx)
-		or (camp.cattr and camp.cattr.idx ~= nil and String(nil, camp.cattr.idx) or nil)
+	local cacheKey = camp.idx ~= nil and tostring(camp.idx)
+		or (camp.cattr and camp.cattr.idx ~= nil and tostring(camp.cattr.idx) or nil)
 	if cacheKey ~= nil and campBehindGatesCache[cacheKey] ~= nil then
 		return campBehindGatesCache[cacheKey]
 	end
@@ -511,7 +511,7 @@ Site.GetClosestNeutralSpwan = function(bot, camps)
 		if
 			Site.IsTheClosestOne(bot, camp.cattr.location)
 			and distance < closestDistance
-			and (not Site.IsAncientCamp(camp) or bot:GetLevel() >= 10 and bot.GetArmor() >= 6)
+			and (not Site.IsAncientCamp(camp) or bot:GetLevel() >= 10 and bot:GetArmor() >= 6)
 		then
 			closestDistance = distance
 			closestCamp = camp
@@ -522,8 +522,9 @@ end
 Site.IsTheClosestOne = function(bot, location)
 	local closestDistance = GetUnitToLocationDistance(bot, location)
 	local closestBot = bot
-	for _, playerId in ipairs(GetTeamPlayers(GetTeam())) do
-		local teammate = GetTeamMember(playerId)
+	-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review).
+	for slot = 1, #GetTeamPlayers(GetTeam()) do
+		local teammate = GetTeamMember(slot)
 		if teammate and teammate:IsAlive() and teammate:GetActiveMode() == BotMode.Farm then
 			local teammateDistance = GetUnitToLocationDistance(teammate, location)
 			if teammateDistance < closestDistance then

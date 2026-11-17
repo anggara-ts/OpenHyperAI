@@ -625,10 +625,22 @@ local function EnemyInLotusRing(bot, loc)
 	return false
 end
 
+-- A Meepo body that is not the team-slot hero: its per-bot debug lines repeat the main Meepo's.
+local function IsMeepoCloneBot(bot)
+	if bot:GetUnitName() ~= "npc_dota_hero_meepo" then
+		return false
+	end
+	for slot = 1, 5 do
+		if GetTeamMember(slot) == bot then
+			return false
+		end
+	end
+	return true
+end
 -- Attack or cast without leaving the pluck ring. Standing still is only for the pickup itself.
 local function MarkLotusDo(bot, name)
 	bot._lotusDo = name
-	if name == bot._lotusDoPrev then
+	if name == bot._lotusDoPrev or IsMeepoCloneBot(bot) then
 		return
 	end
 	bot._lotusDoPrev = name
@@ -1019,12 +1031,17 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				inLotus = false
 			end
 			local function note(why)
-				-- [OHA-LOTUS] reason line whenever this bot's lotus reason changes in the window.
-				-- The per-second debug lives in mode_lotus_pool_generic.lua, which never runs (no
-				-- such bot mode in this game version), so game 018 had no record of why no Radiant
-				-- bot went for the 3:00 lotus beside Doom.
-				if why ~= bot._lotusWhyLogged then
-					bot._lotusWhyLogged = why
+				-- [OHA-LOTUS] reason line when this bot's lotus decision flips between going (pass-by,
+				-- beside, contest, walk) and not going; the "not going" line carries the reason. Game 037
+				-- printed every reason change (723 flips, Meepo bodies 153), so now only the flip, and
+				-- Meepo clones stay quiet. (mode_lotus_pool_generic.lua never runs: no such bot mode.)
+				local going = why == "pass-by" or why == "beside" or why == "contest" or why == "walk"
+				if going ~= (bot._lotusGoingLogged == true) then
+					bot._lotusGoingLogged = going
+				else
+					going = nil
+				end
+				if going ~= nil and not IsMeepoCloneBot(bot) then
 					pcall(
 						print,
 						string.format(

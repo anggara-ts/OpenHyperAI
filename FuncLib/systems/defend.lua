@@ -41,7 +41,7 @@ end
 local Defend = {}
 local getDefendState, getGameState, getLaneState, getUnitLists, locationKey, locationRadiusKey, countRecentlySeenEnemies, isAliveBuilding, isBaseDefenseActive, isDefendingOtherLane, getWeightedEnemyCount, getMostThreatenedLane, getClosestPosition, noOtherTravelBootsDefender, getHighGroundWaitPoint, pingForDefense, localizationLoaded, Localization, humanPingSeconds, maxDefendDesire, ancientThreatRadius, baseDefenseSeconds, enemyCountCacheSeconds, lastSeenSeconds, ourTeam, threatLaneLock, baseDefenseUntil, travelBootsDefenderTime, enemyCountCache, stateCacheSeconds, gameStateCache, laneStateCache, unitListCache
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local Barracks = Dota.Barracks
 local BotMode = Dota.BotMode
 local BotModeDesire = Dota.BotModeDesire
@@ -49,7 +49,7 @@ local Lane = Dota.Lane
 local Team = Dota.Team
 local Tower = Dota.Tower
 local UnitType = Dota.UnitType
-local NativeOperators = require(GetScriptDirectory() .. "/ts_libs/utils/native-operators")
+local NativeOperators = require(GetScriptDirectory() .. "/FuncLib/lib/native_operators")
 local vectorAdd = NativeOperators.add
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local getLocationToLocationDistance = Utils.GetLocationToLocationDistance
@@ -378,6 +378,96 @@ local function BaseThreatLane(team, fallback)
 	return fallback, "fallback"
 end
 local laneNames = { [Lane.Top] = "top", [Lane.Mid] = "mid", [Lane.Bot] = "bot" }
+-- Base siege: 3+ enemy heroes seen (last 5s) within 1800 of one of our T3s, barracks, T4s or the
+-- Ancient. Kept for 10s after the last sighting, since vision on them flickers (game 037, t=1567-1572:
+-- hg=5, then Hoodwink TP'd out to farm). Shared in Fu.Utils.GameStates.baseSiege, read by farm and
+-- by the TP rules in ability_item_usage_generic.
+local BASE_SIEGE_HEROES = 3
+local BASE_SIEGE_HOLD = 10
+local function BaseSiegeBuildings(team)
+	local list = {}
+	for _, entry in ipairs({
+		{ GetTower(team, Tower.Top3), Lane.Top },
+		{ GetTower(team, Tower.Mid3), Lane.Mid },
+		{ GetTower(team, Tower.Bot3), Lane.Bot },
+		{ GetBarracks(team, Barracks.TopMelee), Lane.Top },
+		{ GetBarracks(team, Barracks.TopRanged), Lane.Top },
+		{ GetBarracks(team, Barracks.MidMelee), Lane.Mid },
+		{ GetBarracks(team, Barracks.MidRanged), Lane.Mid },
+		{ GetBarracks(team, Barracks.BotMelee), Lane.Bot },
+		{ GetBarracks(team, Barracks.BotRanged), Lane.Bot },
+		{ GetTower(team, Tower.Base1), nil },
+		{ GetTower(team, Tower.Base2), nil },
+		{ GetAncient(team), nil },
+	}) do
+		if isAliveBuilding(entry[1]) then
+			list[#list + 1] = entry
+		end
+	end
+	return list
+end
+function Defend.GetBaseSiege()
+	Fu.Utils.GameStates = Fu.Utils.GameStates or {}
+	local states = Fu.Utils.GameStates
+	local now = DotaTime()
+	if now - (states.baseSiegeCheckAt or -99) >= 0.5 then
+		states.baseSiegeCheckAt = now
+		local best, bestEntry = 0, nil
+		for _, entry in ipairs(BaseSiegeBuildings(GetTeam())) do
+			local n = countRecentlySeenEnemies(entry[1]:GetLocation(), 1800, 5)
+			if n > best then
+				best, bestEntry = n, entry
+			end
+		end
+		if best >= BASE_SIEGE_HEROES and bestEntry ~= nil then
+			states.baseSiege = { n = best, loc = bestEntry[1]:GetLocation(), lane = bestEntry[2], at = now }
+		end
+	end
+	local siege = states.baseSiege
+	if siege ~= nil and now - siege.at <= BASE_SIEGE_HOLD then
+		return siege
+	end
+	return nil
+end
+-- Where heroes gather before taking on a siege: 900 from our Ancient toward the fountain (the T4s).
+local function GroupUpPoint(team)
+	local ancient = GetAncient(team)
+	if ancient == nil then
+		return nil
+	end
+	return Fu.AdjustLocationWithOffsetTowardsFountain(ancient:GetLocation(), 900)
+end
+-- Game 037, 24:09-27:28 (15-2): heroes went into the siege one at a time, by TP, by walking from
+-- the fountain after respawn, and from the jungle. A bot away from the siege (over 1800 from it)
+-- waits at the group point until 3 allies are with him (him included, within 1600 of him or of the
+-- point), or 2 allies are already at the siege or teleporting to it.
+local function SiegeGroupUp(bot, siege)
+	local point = GroupUpPoint(GetTeam())
+	if point == nil or GetUnitToLocationDistance(bot, siege.loc) <= 1800 then
+		return nil
+	end
+	local grouped, engaged = 1, 0
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local ally = GetTeamMember(i)
+		if ally ~= nil and ally ~= bot and ally:IsAlive() and not ally:IsIllusion() then
+			if GetUnitToUnitDistance(ally, bot) <= 1600 or GetUnitToLocationDistance(ally, point) <= 1600 then
+				grouped = grouped + 1
+			elseif GetUnitToLocationDistance(ally, siege.loc) <= 1800 then
+				engaged = engaged + 1
+			end
+		end
+	end
+	for _, playerId in ipairs(Fu.Utils.GetAllyIdsInTpToLocation(siege.loc, 2500)) do
+		if playerId ~= bot:GetPlayerID() then
+			engaged = engaged + 1
+		end
+	end
+	if grouped >= 3 or engaged >= 2 then
+		return nil
+	end
+	return { point = point, grouped = grouped, engaged = engaged }
+end
+local GROUP_UP_DESIRE = 0.7
 function getClosestPosition(positions, location)
 	local closestPosition = nil
 	local closestDistance = math.huge
@@ -910,6 +1000,43 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			)
 		)
 	end
+	-- Group up before taking on a base siege (SiegeGroupUp). 0.7: above the 0.65 attack "follow ally"
+	-- that pulled heroes in from 2000-4000 away, and above farm's usual 0.6.
+	local siege = Defend.GetBaseSiege()
+	if siege ~= nil and not lastStand and not ancientLow and Fu.GetHP(bot) >= 0.3 then
+		local group = SiegeGroupUp(bot, siege)
+		if group ~= nil then
+			local siegeLane = siege.lane or threatLane
+			bot._defendGroupUpUntil = DotaTime() + 1
+			bot._defendGroupUpPoint = group.point
+			if DotaTime() >= (bot._groupUpLogAt or -999) then
+				bot._groupUpLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-DEFEND] t=%.0f %s group-up lane=%s siege=%d at=%.0f,%.0f grouped=%d engaged=%d dist=%d fountainDist=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(laneNames[siegeLane]),
+						siege.n,
+						siege.loc.x,
+						siege.loc.y,
+						group.grouped,
+						group.engaged,
+						math.floor(GetUnitToLocationDistance(bot, group.point)),
+						math.floor(bot:DistanceFromFountain())
+					)
+				)
+			end
+			if lane ~= siegeLane then
+				return DefNone(bot, "group-up-other-lane")
+			end
+			defendState.defendLoc = group.point
+			bot.laneToDefend = lane
+			bot._defendWhy = "group-up"
+			return GROUP_UP_DESIRE
+		end
+	end
 	local outnumbered = not ancientLow
 		and not lastStand
 		and gameState.aliveEnemyCount >= 3
@@ -1022,7 +1149,7 @@ function Defend.GetDefendDesireHelper(bot, lane)
 		local why
 		baseLane, why = BaseThreatLane(gameState.team, threatLane)
 		if baseLane ~= nil and lane ~= baseLane then
-			if DotaTime() >= (bot._baseLaneLogAt or -999) then
+			if DotaTime() >= (bot._baseLaneLogAt or -999) and not Fu.IsMeepoClone(bot) then
 				bot._baseLaneLogAt = DotaTime() + 5
 				pcall(
 					print,
@@ -1441,7 +1568,7 @@ local function LogBaseDefense(bot, defendLane, desire, why, gameState)
 	bot._defendLaneDesire[defendLane] = desire
 	bot._defendLaneWhy[defendLane] = why
 	local now = DotaTime()
-	if now < (bot._defendLogAt or -999) then
+	if now < (bot._defendLogAt or -999) or Fu.IsMeepoClone(bot) then
 		return
 	end
 	local threat = ReadBaseThreat(gameState)
@@ -1491,6 +1618,9 @@ function Defend.GetDefendDesire(bot, lane)
 		return BotModeDesire.None
 	end
 	bot._defendWhy = "?"
+	-- Refresh the base-siege latch every think (farm and the TP rules read it), also when the
+	-- helper returns early.
+	Defend.GetBaseSiege()
 	local desire = math.min(Defend.GetDefendDesireHelper(bot, lane), 1)
 	local why = bot._defendWhy or "?"
 	local defendLoc = getDefendState(bot).defendLoc or GetLaneFrontLocation(ourTeam, lane, 0)
@@ -1571,8 +1701,63 @@ function Defend.DefendThink(bot, lane)
 	end
 	local botLocation = bot:GetLocation()
 	local safeDefendLoc = Fu.AdjustLocationWithOffsetTowardsFountain(defendState.defendLoc, 300)
+	-- Group-up (GetDefendDesireHelper): go to the group point (by TP if far) and hold there; hit an
+	-- enemy hero that comes within reach.
+	if (bot._defendGroupUpUntil or -1) > DotaTime() and bot._defendGroupUpPoint ~= nil then
+		local point = bot._defendGroupUpPoint
+		if not bot._roshDipActive and considerTPToTarget(bot, point, true) then
+			return
+		end
+		local reach = math.max(700, bot:GetAttackRange() + 150)
+		local closeEnemies = bot:GetNearbyHeroes(reach, true, BotMode.None) or {}
+		if
+			Fu.IsValidHero(closeEnemies[1])
+			and Fu.CanBeAttacked(closeEnemies[1])
+			and GetUnitToLocationDistance(bot, point) <= 1200
+		then
+			bot:Action_AttackUnit(closeEnemies[1], true)
+			return
+		end
+		if GetUnitToLocationDistance(bot, point) > 300 then
+			bot:Action_MoveToLocation(vectorAdd(point, Fu.RandomForwardVector(150)))
+		end
+		return
+	end
 	local isOwnLane = not Fu.IsInLaningPhase() or Fu.GetExpectedLane(bot) == lane
-	if isOwnLane and not bot._roshDipActive and considerTPToTarget(bot, defendState.defendLoc, true) then
+	-- A lone TP into 3+ enemy heroes waits until 2 allies are there or teleporting there (game 037:
+	-- Kez, Meepo, Night Stalker and Hoodwink TP'd into the bottom siege one after another).
+	local tpHold = false
+	do
+		local enemiesThere = #Fu.GetLastSeenEnemiesNearLoc(defendState.defendLoc, 2000)
+		if enemiesThere >= 3 and GetUnitToLocationDistance(bot, defendState.defendLoc) > 4000 then
+			local alliesThere = #Fu.Utils.GetAllyIdsInTpToLocation(defendState.defendLoc, 2500)
+			for _, ally in ipairs(Fu.GetAlliesNearLoc(defendState.defendLoc, 2000)) do
+				if ally ~= bot then
+					alliesThere = alliesThere + 1
+				end
+			end
+			if alliesThere < 2 then
+				tpHold = true
+				if DotaTime() >= (bot._defendTpHoldLogAt or -999) then
+					bot._defendTpHoldLogAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-TP] t=%.0f %s defend-tp hold lane=%s enemies=%d allies=%d to=%.0f,%.0f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(laneNames[lane]),
+							enemiesThere,
+							alliesThere,
+							defendState.defendLoc.x,
+							defendState.defendLoc.y
+						)
+					)
+				end
+			end
+		end
+	end
+	if isOwnLane and not tpHold and not bot._roshDipActive and considerTPToTarget(bot, defendState.defendLoc, true) then
 		return
 	end
 	local distanceToDefendLoc = GetUnitToLocationDistance(bot, defendState.defendLoc)

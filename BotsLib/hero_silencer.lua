@@ -192,10 +192,11 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnLocation(curseOfTheSilentAbility, curseLocation)
 		return
 	end
-	lastWordDesire, lastWordTarget, AoE = X.ConsiderE()
+	local lastWordIsAoe
+	lastWordDesire, lastWordTarget, lastWordIsAoe = X.ConsiderE()
 	if lastWordDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
-		if AoE then
+		if lastWordIsAoe then
 			bot:ActionQueue_UseAbilityOnLocation(lastWordAbility, lastWordTarget)
 		else
 			bot:ActionQueue_UseAbilityOnEntity(lastWordAbility, lastWordTarget)
@@ -234,7 +235,9 @@ function X.ConsiderQ()
 	local heroAoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 	local creepKillAoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, totalDamage)
 	local creepAoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
-	if creepAoe == nil or Fu.GetInLocLaneCreepCount(bot, 1600, radius, creepAoe.targetloc) <= 2 then
+	if creepAoe == nil then
+		creepAoe = { count = 0 }
+	elseif Fu.GetInLocLaneCreepCount(bot, 1600, radius, creepAoe.targetloc) <= 2 then
 		creepAoe.count = 0
 	end
 	if heroKillAoe.count ~= nil and heroKillAoe.count >= 1 then
@@ -424,8 +427,7 @@ function X.ConsiderW()
 		and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, botTarget, attackRange + 29))
 	then
 		if not botTarget:IsAttackImmune() and GetUnitToUnitDistance(bot, botTarget) < attackRange + 99 then
-			nTargetUint = botTarget
-			return BOT_ACTION_DESIRE_HIGH, nTargetUint
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	if bot:GetActiveMode() == BOT_MODE_LANING and #nearbyEnemyTowers == 0 then
@@ -511,8 +513,7 @@ function X.ConsiderW()
 			and not Fu.IsRoshan(farNeutrals[1])
 			and (not farNeutrals[1]:IsAncientCreep() or attackDamage > 180)
 		then
-			nTargetUint = farNeutrals[1]
-			return BOT_ACTION_DESIRE_HIGH, nTargetUint
+			return BOT_ACTION_DESIRE_HIGH, farNeutrals[1]
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) and not glaivesOfWisdomAbility:GetAutoCastState() then

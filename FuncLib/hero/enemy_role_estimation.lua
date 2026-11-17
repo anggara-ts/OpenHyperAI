@@ -48,7 +48,7 @@ local function unpackSpread(packed)
 end
 local EnemyRoleEstimation = {}
 local calculateNetWorth, calculateOffensivePower, normalizeScores, OFFENSIVE_ITEM_VALUES, NET_WORTH_WEIGHT, OFFENSIVE_POWER_WEIGHT, LEVEL_WEIGHT
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local UnitType = Dota.UnitType
 local AttributeType = Dota.AttributeType
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")

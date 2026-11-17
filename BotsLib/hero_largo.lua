@@ -213,7 +213,7 @@ function X.ConsiderCatchLick()
 				local allyTarget = Fu.GetProperTarget(allyHero)
 				if
 					Fu.IsValidHero(allyTarget)
-					and allyTarget:IsFacingLocation(allyTarget:GetLocation(), 15)
+					and allyHero:IsFacingLocation(allyTarget:GetLocation(), 15)
 					and GetUnitToUnitDistance(allyHero, allyTarget) > allyHero:GetAttackRange() + 50
 					and GetUnitToUnitDistance(allyHero, allyTarget) < allyHero:GetAttackRange() + 700
 					and not Fu.IsSuspiciousIllusion(allyTarget)

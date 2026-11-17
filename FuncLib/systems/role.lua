@@ -1,6 +1,6 @@
 -- Shared bot system: role.
 local Role = {}
-local Dota = require(GetScriptDirectory() .. "/ts_libs/dota/index")
+local Dota = require(GetScriptDirectory() .. "/FuncLib/dota/index")
 local GameMode = Dota.GameMode
 local GameState = Dota.GameState
 local Lane = Dota.Lane
@@ -214,7 +214,7 @@ Role.GetReplyMemberID = function()
 			i = i + 1
 		end
 	end
-	Role.replyMemberID = teamPlayerIds[RandomInt(humanCount + 1, playerCount) + 1]
+	Role.replyMemberID = teamPlayerIds[RandomInt(humanCount + 1, playerCount)]
 	return Role.replyMemberID
 end
 Role.memberIDIndexTable = nil

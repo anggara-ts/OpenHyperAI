@@ -9,6 +9,7 @@ local friendlyShadowAbility
 local trackAbility
 local botTarget
 local mpRatio, hpRatio, botLevel, nearbyEnemies, nearbyAllies
+local lastSneakLogTime = -999
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -23,7 +24,7 @@ function X.ConsiderStolenSpell(ability)
 	nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
 	if abilityName == "bounty_hunter_wind_walk" then
 		shadowWalkAbility = ability
-		ShadowWalkDesire = X.ConsiderShadowWalk()
+		local ShadowWalkDesire = X.ConsiderShadowWalk()
 		if ShadowWalkDesire > 0 then
 			bot:Action_UseAbility(shadowWalkAbility)
 			return
@@ -31,7 +32,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "bounty_hunter_wind_walk_ally" then
 		friendlyShadowAbility = ability
-		FriendlyShadowDesire, FriendlyShadowTarget = X.ConsiderFriendlyShadow()
+		local FriendlyShadowDesire, FriendlyShadowTarget = X.ConsiderFriendlyShadow()
 		if FriendlyShadowDesire > 0 then
 			bot:Action_UseAbilityOnEntity(friendlyShadowAbility, FriendlyShadowTarget)
 			return
@@ -39,7 +40,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "bounty_hunter_track" then
 		trackAbility = ability
-		TrackDesire, TrackTarget = X.ConsiderTrack()
+		local TrackDesire, TrackTarget = X.ConsiderTrack()
 		if TrackDesire > 0 then
 			bot:Action_UseAbilityOnEntity(trackAbility, TrackTarget)
 			return
@@ -47,9 +48,10 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "bounty_hunter_shuriken_toss" then
 		shurikenTossAbility = ability
-		ShurikenTossDesire, ShurikenTossTarget = X.ConsiderShurikenToss()
+		local ShurikenTossDesire, ShurikenTossTarget = X.ConsiderShurikenToss()
 		if ShurikenTossDesire > 0 then
-			bot:ActionQueue_UseAbilityOnEntity(shurikenTossAbility, shurikenTossAbility)
+			-- fix: the target was the ability handle itself
+			bot:ActionQueue_UseAbilityOnEntity(shurikenTossAbility, ShurikenTossTarget)
 			return
 		end
 	end
@@ -144,7 +146,8 @@ function X.ConsiderShurikenToss()
 			if botTarget:HasModifier("modifier_bounty_hunter_track") then
 				for _, enemyUnit in pairs(nearbyEnemyUnits) do
 					if
-						Fu.IsInRange(enemyUnit, npcEnemy, bounceRadius - 100)
+						-- fix: read npcEnemy outside its loop (nil global); the bounce is measured from the target
+						Fu.IsInRange(enemyUnit, botTarget, bounceRadius - 100)
 						and not enemyUnit:IsMagicImmune()
 						and Fu.CanCastOnTargetAdvanced(enemyUnit)
 						and not enemyUnit:HasModifier("modifier_bounty_hunter_track")
@@ -241,10 +244,23 @@ function X.ConsiderShadowWalk()
 	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if Fu.IsInEnemyArea(bot) and botLevel >= 7 and mpRatio >= 280 then
+	-- fix: mpRatio is the mana fraction (0-1), so "mpRatio >= 280" was never true, and "enemyTowers == 0" compared the
+	-- tower table with a number. Same rule as hero_bounty_hunter.lua: 280 mana, no enemy hero or tower within 1600.
+	if Fu.IsInEnemyArea(bot) and botLevel >= 7 and bot:GetMana() >= 280 and not Fu.IsRealInvisible(bot) then
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 		local enemyTowers = bot:GetNearbyTowers(1600, true)
-		if #enemyHeroes == 0 and enemyTowers == 0 then
+		if enemyHeroes ~= nil and #enemyHeroes == 0 and enemyTowers ~= nil and #enemyTowers == 0 then
+			if DotaTime() >= lastSneakLogTime + 10 then
+				lastSneakLogTime = DotaTime()
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUBICK] t=%.0f stolen shadow walk in enemy area mana=%d",
+						DotaTime(),
+						bot:GetMana()
+					)
+				)
+			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

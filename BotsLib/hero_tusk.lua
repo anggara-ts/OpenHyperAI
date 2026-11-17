@@ -313,6 +313,23 @@ function X.ConsiderIceShards()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 -- [OHA-TUSK] shards why=kill|fight|engage|gank, at most once per 3s.
+-- [OHA-TUSK] Drinking Buddies away from a chaser while retreating (this branch read allies before).
+function X.LogBuddies(chaser, ally, enemyCount)
+	if DotaTime() < (bot._tuskBuddiesLogAt or -999) then
+		return
+	end
+	bot._tuskBuddiesLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-TUSK] t=%.0f buddies-retreat chaser=%s ally=%s enemies=%d",
+			DotaTime(),
+			(string.gsub(chaser:GetUnitName(), "npc_dota_hero_", "")),
+			(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+			enemyCount
+		)
+	)
+end
 function X.LogShards(why, target)
 	if DotaTime() < (bot._tuskShardsLogAt or -999) then
 		return
@@ -436,18 +453,19 @@ function X.ConsiderDrinkingBuddies()
 			end
 		end
 	end
-	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
+	-- Enemies (was allies): the loop below looks for heroes chasing Tusk, and compares their count to ours.
+	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	if
 		isRetreating
 		and not Fu.IsRealInvisible(bot)
 		and not bot:HasModifier("modifier_fountain_aura_buff")
 		and #alliesInRange > 1
 	then
-		for _, hero in pairs(nearbyAllies) do
+		for _, hero in pairs(nearbyEnemies) do
 			if Fu.IsValidHero(hero) and Fu.IsInRange(bot, hero, 800) and Fu.IsChasingTarget(hero, bot) then
 				if
 					bot:WasRecentlyDamagedByAnyHero(3.0) and not Fu.IsSuspiciousIllusion(hero)
-					or #alliesInRange + 2 <= #nearbyAllies
+					or #alliesInRange + 2 <= #nearbyEnemies
 				then
 					for _, allyHero in pairs(alliesInRange) do
 						if
@@ -459,6 +477,7 @@ function X.ConsiderDrinkingBuddies()
 							and GetUnitToLocationDistance(hero, (bot:GetLocation() + allyHero:GetLocation()) / 2)
 								> 500
 						then
+							X.LogBuddies(hero, allyHero, #nearbyEnemies)
 							return BOT_ACTION_DESIRE_HIGH, allyHero
 						end
 					end

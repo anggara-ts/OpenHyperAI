@@ -145,14 +145,10 @@ function X.GetMineSpotsBeforeTowerFall()
 	local spots = {}
 	for towerIndex = 1, #towerOrder do
 		local tower = GetTower(GetTeam(), towerOrder[towerIndex])
-		if
-			tower ~= nil
-			or (
-				tower == GetTower(GetTeam(), TOWER_TOP_3) == nil
-				or tower == GetTower(GetTeam(), TOWER_MID_3) == nil
-				or tower == GetTower(GetTeam(), TOWER_BOT_3) == nil
-			)
-		then
+		-- Was also "or (tower == GetTower(GetTeam(), TOWER_TOP_3) == nil or ...MID_3... or ...BOT_3...)": Lua reads
+		-- that as (tower == GetTower(...)) == nil, a boolean compared with nil, so it was always false. Dropped
+		-- without guessing what it meant; behaviour is unchanged (spots only for towers still standing).
+		if tower ~= nil then
 			if
 				tower == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
 				or tower == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil

@@ -25,7 +25,7 @@ function X.ConsiderStolenSpell(ability)
 	end
 	if abilityName == "centaur_work_horse" then
 		workHorseAbility = ability
-		WorkHorseDesire, HitchARideTarget = X.ConsiderWorkHorse()
+		WorkHorseDesire = X.ConsiderWorkHorse()
 		if WorkHorseDesire > 0 then
 			bot:Action_UseAbility(workHorseAbility)
 			return
@@ -96,7 +96,13 @@ function X.ConsiderHoofStomp()
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
-				if stampedeAbility:IsTrained() and stampedeAbility:IsFullyCastable() then
+				-- Stampede is nil unless it was stolen too.
+				if
+					stampedeAbility ~= nil
+					and not stampedeAbility:IsNull()
+					and stampedeAbility:IsTrained()
+					and stampedeAbility:IsFullyCastable()
+				then
 					if bot:GetMana() - hoofStompAbility:GetManaCost() > stampedeAbility:GetManaCost() then
 						return BOT_ACTION_DESIRE_HIGH
 					end
@@ -263,7 +269,8 @@ function X.ConsiderDoubleEdge()
 			and Fu.IsAttacking(bot)
 			and bot:GetHealth() > damage * 1.5
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Return the target: the caller casts Double Edge on it (nil target before).
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
@@ -274,7 +281,7 @@ function X.ConsiderDoubleEdge()
 			and bot:GetHealth() > damage * 1.5
 			and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.45
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

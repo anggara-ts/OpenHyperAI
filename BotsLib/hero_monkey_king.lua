@@ -134,7 +134,8 @@ local function LogJingu()
 		jinguOn = isActive
 		print(
 			string.format(
-				"[OHA-MONKEY_KING] jingu %s charges=%d hp=%.2f",
+				"[OHA-MONKEY_KING] t=%.0f jingu %s charges=%d hp=%.2f",
+				DotaTime(),
 				isActive and "active" or "ended",
 				Fu.GetModifierCount(bot, "modifier_monkey_king_quadruple_tap_bonuses"),
 				Fu.GetHP(bot)
@@ -147,10 +148,82 @@ local function LogJingu()
 		if stacks > 0 and (attackTarget ~= jinguLogTarget or stacks ~= jinguLogStacks) then
 			jinguLogTarget, jinguLogStacks = attackTarget, stacks
 			print(
-				string.format("[OHA-MONKEY_KING] jingu counter target=%s stacks=%d", attackTarget:GetUnitName(), stacks)
+				string.format(
+					"[OHA-MONKEY_KING] t=%.0f jingu counter target=%s stacks=%d",
+					DotaTime(),
+					attackTarget:GetUnitName(),
+					stacks
+				)
 			)
 		end
 	end
+end
+-- Jingu Mastery (game data): required_hits 4 (3 with the talent) on the same hero within
+-- counter_duration gives 4 empowered attacks (bonus damage and lifesteal). The counter sits on the
+-- enemy, so keep hitting the marked hero. This lived in the override attack mode, which Monkey King
+-- does not load (game 037: dead code). Runs every think, whatever the mode picked as target.
+local function JinguFocus()
+	if
+		Fu.CanNotUseAction(bot)
+		or bot:IsDisarmed()
+		or not Fu.IsGoingOnSomeone(bot)
+		or bot:HasModifier("modifier_monkey_king_quadruple_tap_bonuses")
+		-- Perched (Primal Spring is activated only then; on the ground it shows not-activated) or
+		-- just hopped: an attack order would drop him off the tree and waste the Spring engage.
+		or primalSpringAbility:IsTrained() and primalSpringAbility:IsActivated()
+		or DotaTime() - (bot._mkTreeDanceAt or -999) <= 4
+	then
+		return false
+	end
+	local current = bot:GetAttackTarget()
+	local currentIsHero = Fu.IsValidHero(current)
+	local currentStacks = currentIsHero and Fu.GetModifierCount(current, "modifier_monkey_king_quadruple_tap_counter")
+		or 0
+	if currentStacks > 0 then
+		return false
+	end
+	local best, bestStacks = nil, 0
+	local range = bot:GetAttackRange() + 150
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, math.min(range, 1600), true, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and enemyHero ~= current
+			and Fu.CanBeAttacked(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not enemyHero:HasModifier("modifier_item_blade_mail_reflect")
+		then
+			local stacks = Fu.GetModifierCount(enemyHero, "modifier_monkey_king_quadruple_tap_counter")
+			if stacks > bestStacks then
+				best, bestStacks = enemyHero, stacks
+			end
+		end
+	end
+	-- Off a creep (or nothing): any marked hero. Off an unmarked hero: one 2+ hits along.
+	if best == nil or currentIsHero and bestStacks < 2 then
+		return false
+	end
+	-- Never cut a wind-up that is playing now (attack activity 1503, as in combat.lua).
+	if bot:GetAnimActivity() == 1503 and bot:GetAnimCycle() < bot:GetAttackPoint() + 0.05 then
+		return false
+	end
+	bot:SetTarget(best)
+	bot:Action_AttackUnit(best, true)
+	if DotaTime() >= (bot._mkJinguFocusLogAt or -99) then
+		bot._mkJinguFocusLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-MONKEY_KING] t=%.0f jingu-focus target=%s stacks=%d was=%s mode=%d",
+				DotaTime(),
+				(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
+				bestStacks,
+				current ~= nil and not current:IsNull() and (string.gsub(current:GetUnitName(), "npc_dota_hero_", ""))
+					or "none",
+				bot:GetActiveMode()
+			)
+		)
+	end
+	return true
 end
 -- Game 036: engage hops 3-5s apart (1476/1479/1482, 2643/2646, 2703/2708) with no Primal Spring in
 -- between (cooldown 18-12s, game data). For 4s after an engage hop, say why Spring was not cast.
@@ -171,10 +244,75 @@ local function SpringSkip(why)
 		)
 	end
 end
+-- Game 037: 96 "cannot-use-ability" skips with Spring ready (cd=0.0) for the whole 4s after a hop.
+-- CanNotUseAbility ORs a dozen states; name the ones that hold, and once per hop list his modifiers
+-- (to see the perched state).
+local function CannotUseAbilityWhy()
+	local parts = {}
+	local function add(flag, name)
+		if flag then
+			parts[#parts + 1] = name
+		end
+	end
+	add(bot:NumQueuedActions() > 0, "queued" .. bot:NumQueuedActions())
+	add(bot:IsInvulnerable(), "invuln")
+	add(bot:IsCastingAbility(), "casting")
+	add(bot:IsUsingAbility(), "using")
+	add(bot:IsChanneling(), "channel")
+	add(bot:IsSilenced(), "silenced")
+	add(bot:IsStunned(), "stunned")
+	add(bot:IsHexed(), "hexed")
+	add(bot:IsNightmared(), "nightmared")
+	add(bot:HasModifier("modifier_doom_bringer_doom"), "doom")
+	add(bot:HasModifier("modifier_item_forcestaff_active"), "forcestaff")
+	local why = "cannot-use-ability(" .. table.concat(parts, "+") .. ")"
+	local now = DotaTime()
+	if now - (bot._mkTreeDanceAt or -999) <= 4 and (bot._mkModsLoggedFor or -1) ~= bot._mkTreeDanceAt then
+		bot._mkModsLoggedFor = bot._mkTreeDanceAt
+		local active = bot:GetCurrentActiveAbility()
+		local mods = {}
+		for i = 0, bot:NumModifiers() - 1 do
+			mods[#mods + 1] = tostring(bot:GetModifierName(i))
+		end
+		why = why
+			.. " active="
+			.. (active ~= nil and tostring(active:GetName()) or "none")
+			.. " mods="
+			.. table.concat(mods, ",")
+	end
+	return why
+end
+-- Wukong's Command: the old line printed when the order was decided, and repeats inside the
+-- 100/90/80s cooldown (game data) showed some orders never went off. Log the order once, and
+-- the cast when the cooldown has started.
+local function LogWukongPending()
+	local orderAt = bot._mkWukongOrderAt
+	if orderAt == nil then
+		return
+	end
+	if wukongsCommandAbility:GetCooldownTimeRemaining() > 0 then
+		bot._mkWukongOrderAt = nil
+		pcall(print, string.format("[OHA-MONKEY_KING] t=%.0f wukong cast ordered=%.0f", DotaTime(), orderAt))
+	elseif DotaTime() - orderAt > 3 then
+		bot._mkWukongOrderAt = nil
+		pcall(print, string.format("[OHA-MONKEY_KING] t=%.0f wukong no-cast ordered=%.0f", DotaTime(), orderAt))
+	end
+end
 function X.SkillsComplement()
 	LogJingu()
+	LogWukongPending()
+	-- Attacks still work when silenced or hexed, so this comes before the ability gate; a spell
+	-- cast below replaces the attack order.
+	local okFocus, focusErr = pcall(JinguFocus)
+	if not okFocus and not bot._mkJinguFocusErr then
+		bot._mkJinguFocusErr = true
+		pcall(print, string.format("[OHA-MONKEY_KING] t=%.0f jingu-focus error %s", DotaTime(), tostring(focusErr)))
+	end
 	if Fu.CanNotUseAbility(bot) then
-		SpringSkip("cannot-use-ability")
+		local now = DotaTime()
+		if now - (bot._mkTreeDanceAt or -999) <= 4 and now >= (bot._mkSpringSkipLogAt or -99) then
+			SpringSkip(CannotUseAbilityWhy())
+		end
 		return
 	end
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
@@ -185,8 +323,9 @@ function X.SkillsComplement()
 	isInTeamFight = Fu.IsInTeamFight(bot, 1200)
 	wukongsCommandDesire, wukongsCommandLocation = X.ConsiderWukongsCommand()
 	if wukongsCommandDesire > 0 then
-		-- Game 036: FPS hitch at 35:29 with no script cause found; log the cast to line it up next time.
-		print(string.format("[OHA-MONKEY_KING] wukong cast t=%.0f", DotaTime()))
+		if bot._mkWukongOrderAt == nil then
+			bot._mkWukongOrderAt = DotaTime()
+		end
 		bot:Action_UseAbilityOnLocation(wukongsCommandAbility, wukongsCommandLocation)
 		return
 	end
@@ -514,7 +653,7 @@ function X.ConsiderTreeDance()
 				and bot:DistanceFromFountain() > 1000
 			then
 				local nearbyTrees = bot:GetNearbyTrees(castRange)
-				local escapeTree = GetFurthestTree(nearbyTrees)
+				local escapeTree = X.GetTreeNearestOurAncient(nearbyTrees)
 				if
 					escapeTree ~= nil
 					and (
@@ -702,7 +841,8 @@ function X.ConsiderWukongsCommand()
 	if isInTeamFight then
 		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius / 2, 1, 0)
 		if aoe.count >= 2 then
-			local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
+			-- fix: count enemies at the cast location (was around the bot)
+			local nearbyEnemies = Fu.GetEnemiesNearLoc(aoe.targetloc, radius)
 			if
 				nearbyEnemies ~= nil
 				and #nearbyEnemies >= 2
@@ -733,7 +873,8 @@ function X.ConsiderWukongsCommand()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
-function GetFurthestTree(trees)
+-- Escape tree for Tree Dance: the one nearest our ancient (was the global GetFurthestTree).
+function X.GetTreeNearestOurAncient(trees)
 	if GetAncient(GetTeam()) == nil then
 		return nil
 	end

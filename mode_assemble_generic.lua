@@ -287,7 +287,48 @@ function Think()
 					end
 				end
 			end
+			-- No lone TP into 3+ enemy heroes (game 037, 24:09-27:28: heroes TP'd into the bottom siege
+			-- one at a time), and none away from our base while it is under siege (defend.lua GetBaseSiege).
+			local holdWhy = nil
 			if nearestTower ~= nil and nearestDistance < 3000 then
+				local towerLoc = nearestTower:GetLocation()
+				local states = Fu.Utils.GameStates
+				local siege = states ~= nil and states.baseSiege or nil
+				local ancient = GetAncient(GetTeam())
+				if
+					siege ~= nil
+					and DotaTime() - siege.at <= 10
+					and ancient ~= nil
+					and GetUnitToLocationDistance(ancient, towerLoc) > 5000
+				then
+					holdWhy = "base-siege"
+				elseif #Fu.GetLastSeenEnemiesNearLoc(towerLoc, 1800) >= 3 then
+					local allies = #Fu.Utils.GetAllyIdsInTpToLocation(towerLoc, 2500)
+					for _, ally in pairs(Fu.GetAlliesNearLoc(towerLoc, 1800)) do
+						if ally ~= bot then
+							allies = allies + 1
+						end
+					end
+					if allies < 2 then
+						holdWhy = "lone-into-3+"
+					end
+				end
+			end
+			if holdWhy ~= nil and DotaTime() >= (bot._assembleTpHoldLogAt or -999) then
+				bot._assembleTpHoldLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-TP] t=%.0f %s assemble-tp hold why=%s to=%.0f,%.0f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						holdWhy,
+						nearestTower:GetLocation().x,
+						nearestTower:GetLocation().y
+					)
+				)
+			end
+			if nearestTower ~= nil and nearestDistance < 3000 and holdWhy == nil then
 				log(
 					"[TP] %s t=%.0f ASSEMBLE tp to building at (%.0f,%.0f)",
 					bot:GetUnitName(),

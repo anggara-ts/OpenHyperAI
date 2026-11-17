@@ -1,5 +1,10 @@
 -- Fretbots server-side helper: Chat.
-local a = require("bots.ts_libs.utils.json")
+-- The bot script moved its JSON library from ts_libs/utils/json to FuncLib/lib/json (2026-11-17);
+-- try the new path first and fall back to the old one for older bot script versions.
+local okJson, a = pcall(require, "bots.FuncLib.lib.json")
+if not okJson then
+	a = require("bots.ts_libs.utils.json")
+end
 local b = require("bots.FuncLib.systems.version")
 local c = require("bots.FuncLib.systems.utils")
 local d = require("bots.FuncLib.data.team_names")

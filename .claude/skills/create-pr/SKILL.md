@@ -7,7 +7,8 @@ description: Finish work on an OpenHyperAI branch and open or update its PR - ch
 
 Rules: `AGENTS.md` (Branches and pull requests, Commits, Checks, Logging). Checklist:
 
-1. **Branch.** Work on the issue's branch (from `Util/issue-prs.js`) or a new `<fix|feat|docs|chore>/<topic>`
+1. **Branch.** Start the issue with `node Util/issue-prs.js <N>` (branch + draft PR), reuse its existing PR branch, or
+   make a new `<fix|feat|docs|chore>/<topic>`
    from `origin/main`. If `main` moved, `git merge origin/main` first (merge commits are allowed; never
    force-push).
 2. **Code rules.** Readable names, no new globals, team slots not player IDs, guard nil handles, Dota facts from

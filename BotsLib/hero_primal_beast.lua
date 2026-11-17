@@ -460,6 +460,31 @@ function a.ConsiderRockThrow()
 			return BOT_ACTION_DESIRE_HIGH, W.targetloc
 		end
 	end
+	-- Game data: 325 damage, 1.4s stun in 225, min range 550, travel 0.65-1.75s (taken as growing with
+	-- distance over 550-1800). Was never thrown to start a fight or to stop a chaser.
+	local function Flight(Q)
+		local d = Clamp(GetUnitToUnitDistance(b, Q), a4, 1800)
+		return a2 + r:GetSpecialValueFloat("min_travel_time") + (d - a4) / math.max(1800 - a4, 1) * (a3 - r:GetSpecialValueFloat("min_travel_time"))
+	end
+	local function Usable(Q)
+		return c.IsValidHero(Q)
+			and c.CanCastOnNonMagicImmune(Q)
+			and not c.IsSuspiciousIllusion(Q)
+			and not c.IsInRange(b, Q, a4)
+			and c.IsInRange(b, Q, a1)
+	end
+	if I and Usable(u) and not u:HasModifier("modifier_necrolyte_reapers_scythe") then
+		print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=engage target=%s dist=%d", u:GetUnitName(), GetUnitToUnitDistance(b, u)))
+		return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(u, Flight(u))
+	end
+	if J then
+		for P, Q in pairs(v) do
+			if Usable(Q) and c.IsInRange(b, Q, 1200) and (b:WasRecentlyDamagedByHero(Q, 2.0) or c.IsChasingTarget(Q, b)) then
+				print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=retreat target=%s dist=%d", Q:GetUnitName(), GetUnitToUnitDistance(b, Q)))
+				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(Q, Flight(Q))
+			end
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderPulverize()

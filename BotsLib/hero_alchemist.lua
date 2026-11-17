@@ -14,10 +14,10 @@ local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_1"] = {
 	"item_bristleback_outfit",
+	"item_soul_ring",
 	"item_radiance",
 	"item_travel_boots",
-	"item_blade_mail",
-	"item_heavens_halberd",
+	"item_assault",
 	"item_blink",
 	"item_black_king_bar",
 	"item_aghanims_shard",
@@ -99,6 +99,11 @@ function a.SkillsComplement()
 	end
 	v = a.ConsiderUnstableConcoction()
 	if v > 0 then
+		-- [OHA-ALCHEMIST]: the brew start (never happened before the cast-range fix), throttled to 10s.
+		if DotaTime() >= (b._alchBrewLogAt or -999) then
+			b._alchBrewLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-ALCHEMIST] t=%.0f concoction start range=%d brewRange=%d", DotaTime(), q:GetCastRange(), p:GetCastRange()))
+		end
 		b:Action_UseAbility(p)
 		D = DotaTime()
 		return
@@ -134,12 +139,14 @@ function a.ConsiderAcidSpray()
 	end
 	if F then
 		local P = c.GetNearbyHeroes(b, 900, false, BOT_MODE_NONE)
+		-- fix: nInRangeEnemy was an undefined global here, so engaging never used Acid Spray
+		local nInRangeEnemy = c.GetNearbyHeroes(b, 900, true, BOT_MODE_NONE)
 		if
 			c.IsValidTarget(E)
 			and c.CanCastOnNonMagicImmune(E)
 			and c.IsInRange(b, E, K)
-			and c.IsAttacking(E)
-			and E:IsFacingLocation(b:GetLocation(), 45)
+			-- fix: dropped "target attacking and facing Alchemist": Acid Spray (armor reduction) was then
+			-- never thrown on a target that runs, the usual case when Alchemist engages.
 			and not c.IsSuspiciousIllusion(E)
 			and not E:HasModifier("modifier_dazzle_shallow_grave")
 			and P ~= nil
@@ -219,7 +226,10 @@ function a.ConsiderUnstableConcoction()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local K = p:GetCastRange()
+	-- fix: Unstable Concoction is NO_TARGET with no AbilityCastRange (game data), so p:GetCastRange()
+	-- was 0 and every check below (K, K - 200, K - 175) found nobody: the brew was never started.
+	-- Use the throw's range (775), which is where the brew has to land.
+	local K = q:GetCastRange()
 	local V = p:GetSpecialValueInt("max_damage")
 	local W = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
 	for X, Y in pairs(W) do
@@ -366,8 +376,18 @@ function a.ConsiderUnstableConcoctionThrow()
 			end
 		end
 	end
-	if W ~= nil and #W >= 1 and DotaTime() >= D + B then
-		return BOT_ACTION_DESIRE_HIGH, W[1]
+	-- Fallback: any hero in range. Game data (throw): brew_time 5.0 for the full stun/damage
+	-- (max_stun 1.75-3.25 vs min 0.25), brew_explosion 7.0. It used the 2s gate (B), so whenever an
+	-- enemy was in range it threw at ~2s, ahead of the 4.25s (C) kill/engage branches above. The 2s
+	-- throw stays only for the retreat case (G) above.
+	if W ~= nil and #W >= 1 and DotaTime() >= D + C then
+		for _, Y in pairs(W) do
+			if c.IsValidHero(Y) and c.CanCastOnNonMagicImmune(Y) and not c.IsSuspiciousIllusion(Y) then
+				print(string.format("[OHA-ALCHEMIST] concoction throw why=fallback target=%s brewed=%.1fs",
+					Y:GetUnitName(), DotaTime() - D))
+				return BOT_ACTION_DESIRE_HIGH, Y
+			end
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 3, 2, 3, 2, 3, 6, 1, 1, 1, 1, 6, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+-- Build 1 took Earth Splitter only at level 9 and rank 2 at 16; ultimate now at levels 6/12 (entries 6/11).
+local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k
 local l = c.Skill.GetTalentBuild(i[1])
 if h == "pos_1" then
@@ -33,18 +34,19 @@ m["pos_1"] = {
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
+-- Phase Boots (sven outfit), Shard and Scepter early: the three most played Elder Titan items.
 m["pos_3"] = {
-	"item_tank_outfit",
+	"item_sven_outfit",
 	"item_vanguard",
 	"item_crimson_guard",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_heavens_halberd",
 	"item_shivas_guard",
 	"item_assault",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_heart",
-	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
 m["pos_2"] = m["pos_1"]
@@ -52,32 +54,32 @@ m["pos_4"] = {
 	"item_priest_outfit",
 	"item_mekansm",
 	"item_glimmer_cape",
+	"item_aghanims_shard",
 	"item_guardian_greaves",
+	"item_ultimate_scepter",
 	"item_spirit_vessel",
 	"item_lotus_orb",
 	"item_gungir",
-	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_mystic_staff",
 	"item_ultimate_scepter_2",
 	"item_shivas_guard",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 m["pos_5"] = {
 	"item_mage_outfit",
 	"item_glimmer_cape",
+	"item_aghanims_shard",
 	"item_pavise",
 	"item_solar_crest",
+	"item_ultimate_scepter",
 	"item_lotus_orb",
 	"item_pipe",
 	"item_spirit_vessel",
-	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_mystic_staff",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_aghanims_shard",
 	"item_sheepstick",
 }
 a["sBuyList"] = m[h]
@@ -243,12 +245,20 @@ function ConsiderEarthSplitter()
 	if b:IsCastingAbility() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local X = s:GetSpecialValueInt("AbilityCastRange")
+	-- Earth Splitter's cast range (2400) is a top-level AbilityCastRange, not an AbilityValues key,
+	-- so GetSpecialValueInt("AbilityCastRange") read 0: no enemy was ever "in range" and the AoE
+	-- search ran around Elder Titan's own feet. Read the real cast range.
+	local X = s:GetCastRange()
+	if X == nil or X <= 0 then
+		X = 2400
+	end
 	local a3 = 300
 	local a4 = 3.14
 	if c.IsInTeamFight(b, 1600) or K or c.IsPushing(b) then
 		for E, a5 in pairs(u) do
-			if c.IsValidHero(a5) and c.CanCastOnNonMagicImmune(a5) and c.IsInRange(b, a5, X) and B(a5, 1.8) then
+			-- The crack lands crack_time (2.72s) after the cast, so the hold must outlast that (was 1.8).
+			if c.IsValidHero(a5) and c.CanCastOnNonMagicImmune(a5) and c.IsInRange(b, a5, X) and B(a5, 2.8) then
+				pcall(print, string.format("[OHA-ELDERTITAN] t=%.0f splitter on held %s", DotaTime(), a5:GetUnitName()))
 				return BOT_ACTION_DESIRE_VERYHIGH, a5:GetLocation()
 			end
 		end
@@ -317,13 +327,34 @@ function ConsiderEchoStomp(a9)
 		end
 	end
 	if L or K or c.IsPushing(b) or c.IsDefending(b) then
+		-- No IsChasingTarget here: it needs the target to be running, so a stunned target (the
+		-- best moment to stomp) never passed.
 		if
 			c.IsValidHero(t)
-			and c.IsChasingTarget(b, t)
+			and c.CanCastOnNonMagicImmune(t)
 			and c.IsInRange(a9, t, aa)
 			and (c.IsDisabled(t) or t:GetCurrentMovementSpeed() <= 250 or z(t))
 		then
 			return BOT_ACTION_DESIRE_HIGH
+		end
+		-- Two or more heroes well inside the radius in a fight: the stomp (0.4s + 1.3s channel)
+		-- sleeps them even if they are not disabled first. It used to need 3 already-disabled heroes.
+		if L or K then
+			local deep = 0
+			for E, a5 in pairs(ac) do
+				if
+					c.IsValidHero(a5)
+					and c.CanCastOnNonMagicImmune(a5)
+					and not c.IsSuspiciousIllusion(a5)
+					and c.IsInRange(a9, a5, aa - 150)
+				then
+					deep = deep + 1
+				end
+			end
+			if deep >= 2 then
+				pcall(print, string.format("[OHA-ELDERTITAN] t=%.0f stomp heroes=%d", DotaTime(), deep))
+				return BOT_ACTION_DESIRE_HIGH
+			end
 		end
 		local ae = 0
 		for E, a5 in pairs(ac) do

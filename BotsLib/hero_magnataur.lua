@@ -8,16 +8,18 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
+-- Ultimate ranks need levels 6/12/18: entry 10 (level 11) and entry 14 (level 16) could not take
+-- it, so those points went to the fallback. Moved to entry 11 (level 12) / entry 15.
 local j = {
-	["pos_2"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 6, 2, 3, 3, 3, 6 },
-	["pos_3"] = { 1, 3, 1, 2, 1, 6, 1, 2, 2, 6, 2, 3, 3, 3, 6 },
-	["pos_4"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 6, 2 },
-	["pos_5"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 6, 2 },
+	-- Shockwave maxed first, Skewer second, Empower last (Dotabuff most picked order).
+	["pos_2"] = { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 },
+	["pos_3"] = { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 },
+	["pos_4"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 2, 6 },
+	["pos_5"] = { 1, 3, 1, 2, 1, 6, 1, 2, 3, 3, 6, 3, 2, 2, 6 },
 }
-local k = j[h] or { 1, 3, 2, 2, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }
+local k = j[h] or { 1, 3, 2, 2, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_lotus_orb", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
@@ -64,6 +66,7 @@ o["pos_2"] = {
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 o["pos_4"] = {
 	"item_priest_outfit",
 	"item_hand_of_midas",
@@ -75,9 +78,7 @@ o["pos_4"] = {
 	"item_black_king_bar",
 	"item_sheepstick",
 	"item_aghanims_shard",
-	"item_travel_boots",
 	"item_arcane_blink",
-	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
@@ -106,6 +107,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "magnataur_reverse_polarity", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(p)
 	e.MinionThink(p)
@@ -133,6 +136,33 @@ local J
 local K
 local L
 local M
+-- Where a Skewer started at fromLoc should end: toward the nearest allied hero (not Magnus) at least
+-- 300 away from fromLoc, else toward the escape location. If the ally list includes Magnus himself
+-- (the file's own `ally ~= b` guards assume it can), the old "last ally in the list" could be Magnus,
+-- giving a zero-length Skewer onto his own spot, and the escape fallback (#X == 0) could never run.
+local function SkewerDestination(fromLoc, skewerRange)
+	local towardLoc = nil
+	local nearest = math.huge
+	for _, ally in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(ally) and ally ~= b and not ally:IsIllusion() then
+			local dist = GetUnitToLocationDistance(ally, fromLoc)
+			if dist >= 300 and dist < nearest then
+				nearest = dist
+				towardLoc = ally:GetLocation()
+			end
+		end
+	end
+	if towardLoc == nil then
+		towardLoc = c.GetEscapeLoc()
+	end
+	return c.Utils.GetOffsetLocationTowardsTargetLocation(fromLoc, towardLoc, skewerRange)
+end
+local function LogCombo(what)
+	if DotaTime() >= (b._ohaMagnusComboLogAt or -999) then
+		b._ohaMagnusComboLogAt = DotaTime() + 5
+		pcall(print, string.format("[OHA-MAGNUS] t=%.0f %s", DotaTime(), what))
+	end
+end
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
@@ -151,10 +181,10 @@ function a.SkillsComplement()
 		b:ActionQueue_Delay(0.1)
 		b:ActionQueue_UseAbility(u)
 		b:ActionQueue_Delay(0.3)
-		z, A = a.ConsiderSkewer2()
-		if z > 0 then
-			b:ActionQueue_UseAbilityOnLocation(s, A)
-		end
+		-- Was ConsiderSkewer2(), evaluated now at the pre-blink spot (no enemy within 145 there), so the
+		-- Skewer after Blink + RP was never queued. Aim it from the blink spot E toward allies instead.
+		b:ActionQueue_UseAbilityOnLocation(s, SkewerDestination(E, s:GetSpecialValueInt("range")))
+		LogCombo("blink + RP + skewer")
 		return
 	end
 	G = a.ConsiderBlinkForSkewer()
@@ -165,10 +195,9 @@ function a.SkillsComplement()
 		end
 		b:ActionQueue_UseAbilityOnLocation(D, E)
 		b:ActionQueue_Delay(0.1)
-		z, A = a.ConsiderSkewer2()
-		if z > 0 then
-			b:ActionQueue_UseAbilityOnLocation(s, A)
-		end
+		-- Same pre-blink evaluation bug as above: Skewer from the blink spot (on the target) to allies.
+		b:ActionQueue_UseAbilityOnLocation(s, SkewerDestination(E, s:GetSpecialValueInt("range")))
+		LogCombo("blink + skewer")
 		return
 	end
 	F = a.ConsiderBlinkRP()
@@ -216,14 +245,14 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(s, A)
 		return
 	end
-	v, w = a.ConsiderShockwave()
-	if v > 0 then
-		b:Action_UseAbilityOnLocation(q, w)
-		return
-	end
 	x, y = a.ConsiderEmpower()
 	if x > 0 then
 		b:Action_UseAbilityOnEntity(r, y)
+		return
+	end
+	v, w = a.ConsiderShockwave()
+	if v > 0 then
+		b:Action_UseAbilityOnLocation(q, w)
 		return
 	end
 end
@@ -353,70 +382,36 @@ function a.ConsiderEmpower()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local N = c.GetProperCastRange(false, b, r:GetCastRange())
-	local a6 = b:GetAttackRange()
-	I = c.GetProperTarget(b)
-	local a7 = nil
-	local a8 = 0
-	local a3 = c.GetNearbyHeroes(b, N, false, BOT_MODE_NONE)
-	for U, a4 in pairs(a3) do
-		if
-			c.IsValidHero(a4)
-			and a4 ~= b
-			and c.IsCore(a4)
-			and not a4:IsIllusion()
-			and not c.IsDisabled(a4)
-			and not c.IsWithoutTarget(a4)
-			and not a4:HasModifier("modifier_magnataur_empower")
-			and a4:GetAttackDamage() * a4:GetAttackSpeed() > a8
-		then
-			a7 = a4
-			a8 = a4:GetAttackDamage() * a4:GetAttackSpeed()
+	-- Casting on an ally also empowers Magnus. Keep enough mana to still Reverse Polarity.
+	if u ~= nil and u:GetLevel() > 0 and u:GetCooldownTimeRemaining() < 2 then
+		if b:GetMana() < r:GetManaCost() + u:GetManaCost() + 30 then
+			return BOT_ACTION_DESIRE_NONE, nil
 		end
 	end
-	if J then
-		local X = c.GetNearbyHeroes(b, N + 200, false, BOT_MODE_NONE)
-		local Y = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	local N = c.GetProperCastRange(false, b, r:GetCastRange())
+	local best = nil
+	local bestScore = -1
+	local allies = c.GetNearbyHeroes(b, N, false, BOT_MODE_NONE)
+	for _, ally in pairs(allies) do
 		if
-			c.IsValidTarget(I)
-			and c.CanBeAttacked(I)
-			and not c.IsSuspiciousIllusion(I)
-			and not I:HasModifier("modifier_dazzle_shallow_grave")
-			and not I:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and X ~= nil
-			and Y
-			and #X >= #Y
+			c.IsValidHero(ally)
+			and ally ~= b
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and not ally:HasModifier("modifier_magnataur_empower")
 		then
-			if a7 ~= nil and c.IsInRange(a7, I, a7:GetAttackRange() + 100) and c.IsInRange(b, a7, N) then
-				return BOT_ACTION_DESIRE_HIGH, a7
+			local score = ally:GetAttackDamage() * ally:GetAttackSpeed()
+			if c.IsCore(ally) then
+				score = score + 10000
+			end
+			if score > bestScore then
+				bestScore = score
+				best = ally
 			end
 		end
 	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local a1 = b:GetNearbyLaneCreeps(600, true)
-		if a1 ~= nil and #a1 >= 4 and a7 ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-		local a9 = b:GetNearbyTowers(700, true)
-		if
-			a9 ~= nil
-			and #a9 > 0
-			and a7 ~= nil
-			and c.IsInRange(a7, a9[1], a7:GetAttackRange() + 100)
-			and c.IsInRange(b, a7, N)
-		then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-	end
-	if c.IsDoingRoshan(b) and a7 ~= nil then
-		if c.IsRoshan(I) and c.IsInRange(b, I, 500) and c.IsAttacking(a7) then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
-	end
-	if c.IsDoingTormentor(b) and a7 ~= nil then
-		if c.IsTormentor(I) and c.IsInRange(b, I, 400) and c.IsAttacking(a7) then
-			return BOT_ACTION_DESIRE_HIGH, a7
-		end
+	if best ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, best
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
@@ -447,11 +442,9 @@ function a.ConsiderSkewer()
 			and #X >= #Y
 		then
 			if c.IsEnemyBetweenMeAndLocation(b, c.GetEscapeLoc(), aa) and c.IsInRange(b, I, P) then
-				if #X >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, X[#X]:GetLocation(), aa)
-				else
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEscapeLoc(), aa)
-				end
+				-- X[#X] could be Magnus himself (see SkewerDestination). Skewer toward a real ally, else
+				-- toward safety.
+				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(b:GetLocation(), aa)
 			end
 			if
 				c.IsRunning(b)
@@ -649,11 +642,8 @@ function a.ConsiderSkewer2()
 			and #X >= #Y
 		then
 			if c.IsEnemyBetweenMeAndLocation(b, c.GetEscapeLoc(), aa) and c.IsInRange(b, V, P) then
-				if #X >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, X[#X]:GetLocation(), aa)
-				else
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetEscapeLoc(), aa)
-				end
+				-- Same Magnus-in-his-own-ally-list bug as in ConsiderSkewer.
+				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(b:GetLocation(), aa)
 			end
 		end
 	end

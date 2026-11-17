@@ -44,7 +44,6 @@ local N = -90
 local O = -90
 local P = -90
 local Q = -90
-local R = -90
 local S = -90
 local T = -90
 local U = 0
@@ -66,6 +65,32 @@ local function a2(a3)
 	m = a3
 	a:SetTarget(a3)
 	a1 = DotaTime() + a0
+end
+-- Drop sticky chase when outnumbered / alone after enemy backup arrives.
+local function ShouldAbortStickyEngage(bot, target)
+	if not g.IsValidHero(target) then
+		return true
+	end
+	-- Finish a one-hit kill even when more enemies are nearby.
+	if g.ShouldFinishCommittedKill(bot, target) then
+		return false
+	end
+	local allies = g.GetAllyCount(bot, 1400)
+	local enemies = g.GetEnemyCount(bot, 1400)
+	local lastSeen = g.GetLastSeenEnemiesNearLoc and g.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
+	local pressure = math.max(enemies, #lastSeen)
+	if allies <= 1 and pressure >= 2 then
+		return true
+	end
+	if pressure >= allies + 1 and not g.WeAreStronger(bot, 1400) then
+		return true
+	end
+	return false
+end
+local function ClearEngageTarget()
+	m = nil
+	a1 = -90
+	a:SetTarget(nil)
 end
 local function a4(a5)
 	if g.IsPushing(a) then
@@ -135,6 +160,10 @@ function GetDesireHelper()
 	w = false
 	if a:IsInvulnerable() or not a:IsHero() or not a:IsAlive() or not string.find(b, "hero") or a:IsIllusion() then
 		return BOT_MODE_DESIRE_NONE
+	end
+	local dropDesire = h.RoshanDropDesire(a)
+	if dropDesire > 0 then
+		return dropDesire
 	end
 	if g.IsInLaningPhase() then
 		if DotaTime() < H and G ~= nil then
@@ -311,7 +340,7 @@ function GetDesireHelper()
 	local aw = j.GetDesire(a)
 	if aw > 0 then
 		w = true
-		-- Deward / high-priority special targets: don't dump desire just because HP isn't full.
+		-- Deward / serpent-escape / high-priority specials: keep desire even if HP isn't full.
 		if aw >= 0.95 then
 			return aw
 		end
@@ -476,6 +505,9 @@ function Think()
 	if g.CanNotUseAction(a) then
 		return
 	end
+	if h.TryPickupRoshanDrop(a) then
+		return
+	end
 	if F and G ~= nil then
 		a:Action_MoveToLocation(G + RandomVector(50))
 		return
@@ -575,6 +607,10 @@ function Think()
 		y = g.CheckBotIdleState()
 	end
 	if g.Utils.IsValidUnit(m) and (z or u or t) then
+		if g.IsValidHero(m) and ShouldAbortStickyEngage(a, m) then
+			ClearEngageTarget()
+			return
+		end
 		local aO = GetUnitToUnitDistance(a, m)
 		local aQ = a:GetAttackRange()
 		if aQ >= 400 and aO > aQ + 100 then
@@ -616,7 +652,11 @@ function k.SupportFindTarget()
 			return aW, BOT_DESIRE_OVERRIDE * 1.5
 		end
 		if aW:IsHero() and not g.IsInLaningPhase() and (a:GetCurrentMovementSpeed() < 300 or aY >= 25) then
-			return aW, BOT_DESIRE_OVERRIDE * 1.2
+			if ShouldAbortStickyEngage(a, aW) then
+				ClearEngageTarget()
+				return nil, 0
+			end
+			return aW, BOT_MODE_DESIRE_ABSOLUTE
 		end
 		if g.IsPushing(a) and not aW:IsHero() then
 			return nil, 0
@@ -735,7 +775,11 @@ function k.CarryFindTarget()
 					return nil, BOT_MODE_DESIRE_NONE
 				end
 			end
-			return aW, BOT_DESIRE_OVERRIDE * 1.2
+			if ShouldAbortStickyEngage(a, aW) then
+				ClearEngageTarget()
+				return nil, 0
+			end
+			return aW, BOT_MODE_DESIRE_ABSOLUTE
 		end
 		if g.IsPushing(a) and not aW:IsHero() then
 			return nil, 0
@@ -1085,10 +1129,24 @@ function k.CanNotUseAttack(bD)
 		or bD:IsStunned()
 		or bD:IsDisarmed()
 		or bD:IsHexed()
-		or bD:IsRooted()
+		-- Not IsRooted: a rooted hero still attacks what is in range.
 		or k.WillBreakInvisible(bD)
 end
 function k.WillBreakInvisible(bD)
+	-- Game 031, 46:50: under Moonlight Shadow Doom hit OD with Infernal Blade, faded again and then
+	-- stood still: an invisible bot was treated as unable to attack. Moonlight Shadow is an engage,
+	-- and going on someone or in a team fight any invisibility is fine to attack out of.
+	if bD:IsInvisible() then
+		if bD:HasModifier("modifier_mirana_moonlight_shadow") then
+			return false
+		end
+		local okF, fighting = pcall(function()
+			return g.IsGoingOnSomeone(bD) or g.IsInTeamFight(bD, 1200)
+		end)
+		if okF and fighting then
+			return false
+		end
+	end
 	local bE = {
 		["npc_dota_hero_riki"] = true,
 		["npc_dota_hero_phantom_assassin"] = true,
@@ -1575,14 +1633,10 @@ function ItemOpsDesire()
 			if cs ~= nil then
 				local ct = cs.item:GetName()
 				if not g.Utils.SetContains(ct) and not g.Utils.HasValue(h["tEarlyConsumableItem"], ct) then
-					if ct == "item_aegis" and g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
-						if g.Item.GetEmptyNonBackpackInventoryAmount(a) == 0 then
-							local cu = g.Item.GetMainInvLessValItemSlot(a)
-							local cv = g.Item.GetEmptyBackpackSlot(a)
-							if cu ~= -1 and cv ~= -1 then
-								a:ActionImmediate_SwapItems(cv, cu)
-							end
-						end
+					if
+						(ct == "item_aegis" or ct == "item_roshans_banner")
+						and h.ShouldClaimRoshanDrop(a, cs.location, ct)
+					then
 						J = cs
 					end
 					if ct == "item_cheese" and g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
@@ -1606,6 +1660,7 @@ function ItemOpsDesire()
 						and ct ~= "item_ward_observer"
 						and ct ~= "item_ward_sentry"
 						and ct ~= "item_ward_dispenser"
+						and h.RoshanClaimKind(ct) == nil
 					then
 						J = cs
 					end
@@ -1624,12 +1679,10 @@ function ItemOpsDesire()
 		N = DotaTime()
 	end
 	TrySellOrDropItem()
-	SwapSmokeSupport()
 	TrySwapInvItemForCheese()
 	TrySwapInvItemForRefresherShard()
 	TrySwapInvItemForClarity()
 	TrySwapInvItemForFlask()
-	TrySwapInvItemForSmoke()
 	TrySwapInvItemForMoonshard()
 end
 function ItemOpsThink()
@@ -1641,7 +1694,11 @@ function ItemOpsThink()
 				c.AddToSet(L, J.item)
 			end
 			if not c.SetContains(ct) and not c.HasValue(h["tEarlyConsumableItem"], ct) then
-				if ct == "item_aegis" or ct == "item_cheese" then
+				if ct == "item_aegis" or ct == "item_roshans_banner" then
+					if h.ShouldClaimRoshanDrop(a, J.location, ct) then
+						GoPickUpItem(J)
+					end
+				elseif ct == "item_cheese" then
 					if g.GetPosition(a) <= 3 and not g.HasItem(a, "item_aegis") then
 						GoPickUpItem(J)
 					end
@@ -1660,20 +1717,6 @@ function GoPickUpItem(cy)
 		M = M + 1
 		a:Action_PickUpItem(cy.item)
 		return
-	end
-end
-function SwapSmokeSupport()
-	if g.IsDoingRoshan(a) then
-		local ay = a:GetAttackTarget()
-		if g.IsRoshan(ay) and g.IsAttacking(a) then
-			local cA = a:FindItemSlot("item_smoke_of_deceit")
-			if a:GetItemSlotType(cA) == ITEM_SLOT_TYPE_BACKPACK then
-				local cB = g.FindLeastExpensiveItemSlot()
-				if cB ~= -1 then
-					a:ActionImmediate_SwapItems(cA, cB)
-				end
-			end
-		end
 	end
 end
 function TrySwapInvItemForClarity()
@@ -1698,18 +1741,6 @@ function TrySwapInvItemForFlask()
 			end
 		end
 		Q = DotaTime()
-	end
-end
-function TrySwapInvItemForSmoke()
-	if DotaTime() >= R + 15 then
-		local cC = a:FindItemSlot("item_smoke_of_deceit")
-		if cC and a:GetItemSlotType(cC) == ITEM_SLOT_TYPE_BACKPACK then
-			local cu = g.Item.GetMainInvLessValItemSlot(a)
-			if cu ~= -1 then
-				a:ActionImmediate_SwapItems(cC, cu)
-			end
-		end
-		R = DotaTime()
 	end
 end
 function TrySwapInvItemForMoonshard()
@@ -1755,13 +1786,17 @@ function TrySellOrDropItem()
 			for an = 1, #h["tEarlyConsumableItem"] do
 				local ct = h["tEarlyConsumableItem"][an]
 				local cE = a:FindItemSlot(ct)
-				if cE >= 6 and cE <= 8 then
-					local cz = a:DistanceFromFountain()
-					if cz <= 300 then
-						a:ActionImmediate_SellItem(a:GetItemInSlot(cE))
-					elseif cz >= 3000 then
-						a:Action_DropItem(a:GetItemInSlot(cE), a:GetLocation())
-					end
+				-- Sell only. A consumable dropped in the field was picked straight back up
+				-- (by the engine's own item mode, nothing of ours picks these), then dropped
+				-- again 3s later: Bristleback looped a Clarity at 55:30.
+				if cE >= 6 and cE <= 8 and a:DistanceFromFountain() <= 300 then
+					pcall(print, string.format(
+						"[OHA-ITEM] t=%.0f %s consumable-sold %s",
+						DotaTime(),
+						(string.gsub(a:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(ct, "^item_", ""))
+					))
+					a:ActionImmediate_SellItem(a:GetItemInSlot(cE))
 				end
 			end
 		end
@@ -1785,6 +1820,8 @@ function g.FindLeastExpensiveItemSlot()
 	end
 	return cG
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "team_roam", BOT_MODE_TEAM_ROAM)
 if SafeCall then
 	local cH = GetDesire
 	local cI = Think

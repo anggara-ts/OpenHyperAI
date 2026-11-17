@@ -14,6 +14,7 @@ then
 end
 local d = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local e = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
+local ObjectiveTravel = require(GetScriptDirectory() .. "/FuncLib/systems/objective_travel")
 local f = nil
 local g = 0
 local h = 0
@@ -164,6 +165,19 @@ function GetDesireHelper()
 	then
 		return BOT_MODE_DESIRE_NONE, "base_threatened"
 	end
+	-- Not only the Ancient and T3s: a lane we should defend or enemy heroes at any of our towers
+	-- or barracks keeps us home (game 036, bottom T2 lost at 31:18 during a Tormentor call).
+	do
+		local why = d.OurLaneThreatened()
+		if why ~= nil then
+			if b.tormentor_state == true and DotaTime() >= (b._tormentorStayLogAt or -999) then
+				b._tormentorStayLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-TORMENTOR] t=%.0f %s stay why=%s", DotaTime(),
+					(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")), why))
+			end
+			return BOT_MODE_DESIRE_NONE, "lane_threatened"
+		end
+	end
 	E = E / 3
 	F = F / 2
 	if F < 11 then
@@ -308,6 +322,10 @@ function Think()
 			b:Action_MoveToLocation(g)
 			return
 		end
+		-- Far from the Tormentor gather spot: TP or Twin Gate when clearly faster.
+		if GetUnitToLocationDistance(b, h) > 3000 and ObjectiveTravel.Go(b, h, "tormentor") then
+			return
+		end
 		if DotaTime() >= s then
 			b:Action_MoveToLocation(h + RandomVector(300))
 			s = DotaTime() + RandomFloat(0.05, 0.2)
@@ -315,6 +333,9 @@ function Think()
 		end
 	else
 		if GetUnitToLocationDistance(b, g) > b:GetAttackRange() + 50 then
+			if GetUnitToLocationDistance(b, g) > 3000 and ObjectiveTravel.Go(b, g, "tormentor") then
+				return
+			end
 			b:Action_MoveToLocation(g)
 			return
 		else
@@ -378,11 +399,65 @@ function a.IsEnoughAllies(_, a0)
 			end
 		end
 	end
+	-- Acks: who the gather waits for. An ally counts when at the spot, in Tormentor mode (bots),
+	-- or in the first 5s of the call. One that stayed in another mode after that declined, and
+	-- the four-with-two-cores bar drops to the allies who are coming (a core busy elsewhere
+	-- used to hold the whole group).
+	if b.tormentor_state then
+		b._tormentorCallAt = b._tormentorCallAt or DotaTime()
+	else
+		b._tormentorCallAt = nil
+	end
+	local callAge = DotaTime() - (b._tormentorCallAt or DotaTime())
+	local avail, availCores = 0, 0
+	local declined = {}
+	for G = 1, 5 do
+		local H = GetTeamMember(G)
+		if H ~= nil and H:IsAlive() then
+			local here = GetUnitToLocationDistance(H, h) <= 1600 or GetUnitToLocationDistance(H, g) <= 900
+			if here or H == b or (H:IsBot() and d.IsDoingTormentor(H)) or callAge < 5 then
+				avail = avail + 1
+				if d.IsCore(H) then
+					availCores = availCores + 1
+				end
+			else
+				declined[#declined + 1] = (string.gsub(H:GetUnitName(), "npc_dota_hero_", ""))
+			end
+		end
+	end
+	local needCores = math.min(2, math.max(1, availCores))
+	local allComing = a1 >= math.max(3, avail) and a2 >= needCores
+	if a0 >= 1600 and #declined > 0 and DotaTime() >= (b._tormentorAckLogAt or -999) then
+		b._tormentorAckLogAt = DotaTime() + 10
+		pcall(print, string.format(
+			"[OHA-TORMENTOR] t=%.0f %s gather here=%d/%d cores=%d/%d declined=%s",
+			DotaTime(),
+			(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+			a1,
+			avail,
+			a2,
+			needCores,
+			table.concat(declined, ",")
+		))
+	end
+	-- Four heroes with two cores waited ~75s for the fifth (28:00) while a creep wave grew on
+	-- our high ground. Once four with two cores have been gathered for 20s, they start.
+	-- One timer for the whole gather. Only the wide waiting-spot check (1600) resets it, so the
+	-- closer check at the Tormentor (900) does not start a second 20s wait.
+	if a1 >= 4 and a2 >= 2 then
+		b._tormentorGatherSince = b._tormentorGatherSince or DotaTime()
+	elseif a0 >= 1600 then
+		b._tormentorGatherSince = nil
+	end
+	local since = b._tormentorGatherSince
+	local waitedLong = since ~= nil and DotaTime() - since >= 20 and a1 >= 4 and a2 >= 2
 	return (
 		b.tormentor_kill_time == 0 and a1 >= 5
 		or b.tormentor_kill_time == 0 and a1 >= 4 and a2 >= 3 and a3 >= 1
+		or b.tormentor_kill_time == 0 and waitedLong
 		or b.tormentor_kill_time > 0 and a1 >= 3
-	) and a2 >= 2
+		or allComing
+	) and a2 >= needCores
 end
 function a.GetClosestBot()
 	local a4 = d.GetAlliesNearLoc(h, 2800)

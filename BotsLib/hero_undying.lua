@@ -11,24 +11,25 @@ local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10
 local j = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_pipe", "item_lotus_orb" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
+-- One pair of boots in this build (user rule; Util/boots-check.js).
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 o["pos_4"] = {
 	"item_blood_grenade",
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_magic_wand",
 	"item_arcane_boots",
 	"item_essence_distiller",
 	"item_crimson_guard",
 	"item_guardian_greaves",
 	"item_aghanims_shard",
-	"item_heavens_halberd",
+	"item_blade_mail",
 	"item_lotus_orb",
-	"item_travel_boots",
 	"item_assault",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 o["pos_5"] = {
 	"item_blood_grenade",
@@ -37,10 +38,10 @@ o["pos_5"] = {
 	"item_glimmer_cape",
 	"item_boots_of_bearing",
 	"item_pipe",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_lotus_orb",
-	"item_gungir",
 	"item_shivas_guard",
 	"item_sheepstick",
 	"item_moon_shard",
@@ -63,7 +64,7 @@ o["pos_1"] = {
 o["pos_2"] = o["pos_1"]
 o["pos_3"] = {
 	"item_tank_outfit",
-	"item_hand_of_midas",
+	"item_blade_mail",
 	"item_crimson_guard",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
@@ -261,20 +262,65 @@ function a.ConsiderSoulRip()
 		then
 			local O = c.GetEnemiesNearLoc(b:GetLocation(), I)
 			local T = b:GetNearbyCreeps(I, true)
-			if O ~= nil and #O >= 1 then
-				J = J * #O
+			-- datafeed: damage_per_unit for each unit, up to max_units. It multiplied heroes by
+			-- creeps (and kept growing J across the loop), and then returned Undying himself, so
+			-- the "kill" cast healed him. Aim it at the enemy, within cast range.
+			local units = (O ~= nil and #O or 0) + (T ~= nil and #T or 0)
+			local maxUnits = r:GetSpecialValueInt("max_units")
+			if maxUnits ~= nil and maxUnits > 0 then
+				units = math.min(units, maxUnits)
 			end
-			if T ~= nil and #T >= 1 then
-				J = J * #T
+			if c.IsInRange(b, N, H) and c.CanKillTarget(N, J * units, DAMAGE_TYPE_MAGICAL) then
+				return BOT_ACTION_DESIRE_HIGH, N
 			end
-			if c.CanKillTarget(N, J, DAMAGE_TYPE_MAGICAL) then
-				return BOT_ACTION_DESIRE_HIGH, b
+		end
+	end
+	-- Save heal (new): an ally other than Undying under hero attack below 40% HP. Before this the
+	-- heal went to allies only while Undying was engaging, or with 4+ enemy creeps around, so a
+	-- dove lane partner got nothing. datafeed: damage_per_unit per unit within radius (1300), up to
+	-- max_units; note "Does rip from spell immune allies", so allied creeps are counted (that they
+	-- add to the heal is not verified in a game). Logged: [OHA-UNDYING] save-rip.
+	do
+		local units = #(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {})
+			+ #(b:GetNearbyCreeps(I, true) or {})
+			+ #(b:GetNearbyCreeps(I, false) or {})
+		local maxUnits = r:GetSpecialValueInt("max_units")
+		if maxUnits ~= nil and maxUnits > 0 then
+			units = math.min(units, maxUnits)
+		end
+		local save, saveHP = nil, 0.4
+		if units >= 2 then
+			for M, W in pairs(c.GetNearbyHeroes(b, H, false, BOT_MODE_NONE) or {}) do
+				if
+					W ~= b
+					and c.IsValidHero(W)
+					and not W:IsIllusion()
+					and not c.IsMeepoClone(W)
+					and c.GetHP(W) < saveHP
+					and W:WasRecentlyDamagedByAnyHero(2)
+				then
+					save, saveHP = W, c.GetHP(W)
+				end
 			end
+		end
+		if save ~= nil then
+			if DotaTime() >= (b._undyingSaveLogAt or -999) then
+				b._undyingSaveLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-UNDYING] t=%.0f save-rip ally=%s hp=%.2f units=%d heal=%d",
+					DotaTime(),
+					(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
+					saveHP,
+					units,
+					J * units
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, save
 		end
 	end
 	if c.IsGoingOnSomeone(b, 1200) then
 		local U = nil
-		local V = 1000
+		local V = math.huge -- was 1000 (absolute HP): no ally above 1000 HP was ever healed
 		local Q = c.GetNearbyHeroes(b, H, false, BOT_MODE_NONE)
 		for M, W in pairs(Q) do
 			if c.IsValidHero(W) and not c.IsSuspiciousIllusion(W) then
@@ -327,7 +373,7 @@ function a.ConsiderSoulRip()
 	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
 		if (c.IsRoshan(B) or c.IsTormentor(B)) and c.IsInRange(b, B, I) and C then
 			local U = nil
-			local V = 1000
+			local V = math.huge -- was 1000 (absolute HP): no ally above 1000 HP was ever healed
 			local Q = c.GetNearbyHeroes(b, H, false, BOT_MODE_NONE)
 			for M, W in pairs(Q) do
 				if c.IsValidHero(W) and not c.IsSuspiciousIllusion(W) then
@@ -344,7 +390,7 @@ function a.ConsiderSoulRip()
 		end
 	end
 	local U = nil
-	local V = 1000
+	local V = math.huge -- was 1000 (absolute HP): no ally above 1000 HP was ever healed
 	local Q = c.GetNearbyHeroes(b, H, false, BOT_MODE_NONE)
 	for M, W in pairs(Q) do
 		if c.IsValidHero(W) and not c.IsSuspiciousIllusion(W) then
@@ -374,6 +420,14 @@ function a.ConsiderTombstone()
 			local _ = c.GetCenterOfUnits(O)
 			if c.IsLocationInChrono(_) or c.IsLocationInBlackHole(_) or c.IsLocationInArena(_, I / 2) then
 				return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			end
+			-- datafeed: zombies spawn by every enemy within radius (1200) of the Tombstone, cast range
+			-- 500. Aiming at the enemies' centre made Undying walk into them to plant it; plant it
+			-- toward them, no farther than the cast range, so it stays out of their reach.
+			local castRange = s:GetCastRange()
+			local dist = GetUnitToLocationDistance(b, _)
+			if dist > castRange then
+				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, _, castRange)
 			end
 			return BOT_ACTION_DESIRE_HIGH, _
 		end

@@ -1,4 +1,41 @@
 -- Shared bot system: global overrides.
+
+-- [OHA-*] diagnostics for behaviour already confirmed working in test games. Muted so the
+-- console log shows what still needs work. Delete a line here to bring that log back.
+local OHA_MUTED = {
+	"^%[OHA%-LANE%]", -- laning standoff / last hits
+	"^%[OHA%-TUSK%] t=%S+ snowball%-launch", -- early launch (median 0.6s)
+	"^%[OHA%-TUSK%] t=%S+ punch ", -- Tag Team before Punch
+	"^%[OHA%-TUSK%] t=%S+ tag%-team ",
+	"^%[OHA%-TUSK%] t=%S+ wave%-", -- Ice Shards / Snowball wave clear
+	"^%[OHA%-TUSK%] t=%S+ escape%-snowball",
+	"^%[OHA%-TECHIES%] t=%S+ combo ",
+	"^%[OHA%-TECHIES%] t=%S+ tower ",
+	"^%[OHA%-TECHIES%] t=%S+ tazer%-held",
+	"^%[OHA%-ITEM%] t=%S+ %S+ grenade%-throw",
+	-- grenade-moved unmuted: game 034, Abaddon's grenade ended in the backpack with a branch in the bag.
+	"^%[OHA%-ITEM%] t=%S+ %S+ swap%-", -- engine ignores bot swaps; known
+	"^%[OHA%-BUY%] t=%S+ %S+ recipe%-hold", -- courier waits, every 4s
+	"^%[OHA%-FIGHT%] t=%S+ %S+ push %S+ lane=", -- post-kill push floor, every 4s
+	"^%[OHA%-FIGHT%] t=%S+ %S+ rosh %S+ was=",
+	"^%[OHA%-RETREAT%] t=%S+ %S+ summons",
+	"^%[OHA%-MEDUSA%]",
+	"^%[OHA%-WARLOCK%]",
+	"^%[OHA%-QUILL%]",
+}
+if _G.OHA_RAW_PRINT == nil then
+	_G.OHA_RAW_PRINT = print
+	print = function(msg, ...)
+		if type(msg) == "string" and string.sub(msg, 1, 5) == "[OHA-" then
+			for i = 1, #OHA_MUTED do
+				if string.find(msg, OHA_MUTED[i]) then
+					return
+				end
+			end
+		end
+		return _G.OHA_RAW_PRINT(msg, ...)
+	end
+end
 if package and package.path then
 	local a = GetScriptDirectory()
 	if not string.find(package.path, a, 1, true) then
@@ -214,9 +251,48 @@ function GetTeamPlayers(F, G)
 	return H
 end
 IsDebug = b.DebugMode
+local SafeCallPerf = nil
+local function LoadSafeCallPerf()
+	if SafeCallPerf ~= nil then
+		return SafeCallPerf
+	end
+	SafeCallPerf = false
+	local ok, mt = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+	if ok and mt and mt.PerfEnabled and mt.PerfEnabled() and mt.PerfSample then
+		SafeCallPerf = mt
+	end
+	return SafeCallPerf
+end
+-- A mode Think that runs during a cast point or a channel replaces it with its own order. Game 029,
+-- 27:48: Techies' escape Blast Off (1s cast point) was cancelled while he was in a defend mode.
+-- Every mode Think wrapped here (name ending in _Think) is skipped while the bot casts or
+-- channels; farm, ward, Roshan and lotus Thinks call OhaCastGuard themselves.
+function OhaCastGuard(bot)
+	if bot == nil or not bot:IsAlive() then
+		return false
+	end
+	return bot:IsCastingAbility() or bot:IsChanneling()
+end
 function SafeCall(O, P, Q)
+	local isThink = type(Q) == "string" and string.sub(Q, -6) == "_Think"
 	return function(...)
+		if isThink then
+			local okG, guarded = pcall(function()
+				return OhaCastGuard(GetBot())
+			end)
+			if okG and guarded then
+				return P
+			end
+		end
+		local perf = LoadSafeCallPerf()
+		local t0 = nil
+		if perf and RealTime then
+			t0 = RealTime()
+		end
 		local n, R, S, T = pcall(O, ...)
+		if t0 ~= nil and perf then
+			perf.PerfSample(Q or "SafeCall", RealTime() - t0)
+		end
 		if n then
 			return R, S, T
 		end
@@ -225,6 +301,31 @@ function SafeCall(O, P, Q)
 			U = GetBot():GetUnitName() .. " "
 		end)
 		log("[ERROR] %s%s: %s", U, Q or "unknown", tostring(R))
+		-- log() is silent unless debug is on, so these errors were never seen. Print the first 3
+		-- per wrapped function as [OHA-ERROR].
+		_G.OHA_SAFECALL_ERRS = _G.OHA_SAFECALL_ERRS or {}
+		local key = Q or "unknown"
+		local n = (_G.OHA_SAFECALL_ERRS[key] or 0) + 1
+		_G.OHA_SAFECALL_ERRS[key] = n
+		if n <= 3 then
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s%s: %s", DotaTime(), U, key, tostring(R)))
+		end
+		-- First error only: run it once more under xpcall to print the stack trace (the line
+		-- above names only the innermost line, e.g. utils.lua:525). Kept off the hot path.
+		if n == 1 and debug ~= nil and debug.traceback ~= nil then
+			local args = { ... }
+			local nargs = select("#", ...)
+			local unpackFn = unpack or table.unpack
+			local okTb, tb = xpcall(function()
+				return O(unpackFn(args, 1, nargs))
+			end, function(e)
+				local ok, t = pcall(debug.traceback, tostring(e), 2)
+				return ok and t or tostring(e)
+			end)
+			if not okTb then
+				pcall(print, "[OHA-ERROR] trace " .. key .. ": " .. (string.gsub(tostring(tb), "\n", " | ")))
+			end
+		end
 		return P
 	end
 end
@@ -294,6 +395,10 @@ function CDOTA_Bot_Script:IsIllusion()
 	if not self:CanBeSeen() then
 		return nil
 	end
+	-- The engine only answers for teammates and logs a warning on every other call.
+	if self:GetTeam() ~= GetTeam() then
+		return self:HasModifier("modifier_illusion")
+	end
 	return a7(self)
 end
 local a8 = CDOTA_Bot_Script.HasModifier
@@ -302,6 +407,14 @@ function CDOTA_Bot_Script:HasModifier(a9)
 		return false
 	end
 	return a8(self, a9)
+end
+-- Lotus pools report CanBeSeen() while fogged, then NumModifiers logs a warning.
+local lotusPoolNumModifiers = CDOTA_Bot_Script.NumModifiers
+function CDOTA_Bot_Script:NumModifiers()
+	if self ~= nil and self.GetUnitName ~= nil and self:GetUnitName() == "npc_dota_lotus_pool" then
+		return 0
+	end
+	return lotusPoolNumModifiers(self)
 end
 local aa = CDOTA_Bot_Script.GetLocation
 function CDOTA_Bot_Script:GetLocation()
@@ -487,21 +600,120 @@ if aD then
 		return aD(aw)
 	end
 end
+-- Map and system abilities every hero carries hidden: outpost capture (ability_capture),
+-- lamps, Twin Gates (twin_gate_portal_warp), Underlord portals, plus/seasonal. They are
+-- meant to be cast while hidden; refusing them left heroes standing at an outpost forever.
+local function IsHiddenByDesign(av)
+	local ok, name = pcall(function()
+		return av:GetName()
+	end)
+	if not ok or type(name) ~= "string" then
+		return false
+	end
+	return string.sub(name, 1, 8) == "ability_"
+		or string.find(name, "_portal_warp", 1, true) ~= nil
+		or string.sub(name, 1, 5) == "plus_"
+		or string.sub(name, 1, 9) == "seasonal_"
+end
+-- Filled in below, once CastRefused exists.
+local CastRefusedEarly = function() end
 local aE = CDOTA_Bot_Script.Action_UseAbility
 function CDOTA_Bot_Script:Action_UseAbility(av)
-	if av == nil or av:IsHidden() then
-		log("[WARN] Action_UseAbility called on nil/hidden ability for %s", self:GetUnitName())
+	if av == nil or av:IsHidden() and not IsHiddenByDesign(av) then
+		CastRefusedEarly(self, av, "Action_UseAbility")
 		return nil
 	end
 	return aE(self, av)
 end
 local aF = CDOTA_Bot_Script.ActionPush_UseAbility
 function CDOTA_Bot_Script:ActionPush_UseAbility(av)
-	if av == nil or av:IsHidden() then
-		log("[WARN] ActionPush_UseAbility called on nil/hidden ability for %s", self:GetUnitName())
+	if av == nil or av:IsHidden() and not IsHiddenByDesign(av) then
+		CastRefusedEarly(self, av, "ActionPush_UseAbility")
 		return nil
 	end
 	return aF(self, av)
+end
+-- Every targeted or queued cast refuses a hidden ability or a missing/wrong target before it
+-- reaches the server. A hidden ability (Minefield Sign without Scepter) still reports
+-- IsFullyCastable, so a hero kept ordering it every think and stood still.
+local castRefusedAt = {}
+local function CastRefused(self, av, method, why)
+	local name = "nil"
+	if av ~= nil then
+		local ok, n = pcall(function()
+			return av:GetName()
+		end)
+		name = ok and tostring(n) or "?"
+	end
+	local hero = (string.gsub(tostring(self:GetUnitName()), "npc_dota_hero_", ""))
+	local key = hero .. "|" .. name .. "|" .. why
+	if DotaTime() < (castRefusedAt[key] or -999) then
+		return
+	end
+	castRefusedAt[key] = DotaTime() + 30
+	pcall(print, string.format("[OHA-CAST] t=%.0f %s %s %s refused=%s", DotaTime(), hero, method, name, why))
+end
+CastRefusedEarly = function(self, av, method)
+	CastRefused(self, av, method, av == nil and "nil-ability" or "hidden")
+end
+local function IsVector(v)
+	if v == nil then
+		return false
+	end
+	local ok, x = pcall(function()
+		return v.x
+	end)
+	return ok and type(x) == "number"
+end
+local function GuardCast(method, targetKind)
+	local original = CDOTA_Bot_Script[method]
+	if original == nil then
+		return
+	end
+	CDOTA_Bot_Script[method] = function(self, av, target, ...)
+		if av == nil then
+			CastRefused(self, av, method, "nil-ability")
+			return nil
+		end
+		local okHidden, hidden = pcall(function()
+			return av:IsHidden()
+		end)
+		if okHidden and hidden and not IsHiddenByDesign(av) then
+			CastRefused(self, av, method, "hidden")
+			return nil
+		end
+		if targetKind == "location" and not IsVector(target) then
+			CastRefused(self, av, method, target == nil and "nil-location" or "not-a-location")
+			return nil
+		end
+		if targetKind == "entity" and (target == nil or IsVector(target)) then
+			CastRefused(self, av, method, target == nil and "nil-target" or "location-as-target")
+			return nil
+		end
+		if targetKind == "tree" and target == nil then
+			CastRefused(self, av, method, "nil-tree")
+			return nil
+		end
+		-- A no-target cast takes only the ability. Do not hand the engine an extra nil.
+		if targetKind == "none" then
+			return original(self, av)
+		end
+		return original(self, av, target, ...)
+	end
+end
+for _, spec in ipairs({
+	{ "Action_UseAbilityOnLocation", "location" },
+	{ "ActionQueue_UseAbilityOnLocation", "location" },
+	{ "ActionPush_UseAbilityOnLocation", "location" },
+	{ "Action_UseAbilityOnEntity", "entity" },
+	{ "ActionQueue_UseAbilityOnEntity", "entity" },
+	{ "ActionPush_UseAbilityOnEntity", "entity" },
+	{ "Action_UseAbilityOnTree", "tree" },
+	{ "ActionQueue_UseAbilityOnTree", "tree" },
+	{ "ActionPush_UseAbilityOnTree", "tree" },
+	{ "ActionQueue_UseAbility", "none" },
+}) do
+	GuardCast(spec[1], spec[2])
 end
 local aG = CDOTA_Bot_Script.Action_AttackUnit
 function CDOTA_Bot_Script:Action_AttackUnit(aH, aI)
@@ -540,16 +752,172 @@ function CDOTA_Bot_Script:GetAttackRange()
 	return aL(self)
 end
 local aM = CDOTA_Bot_Script.ActionImmediate_SwapItems
+-- Gap between two swaps of the same pair of items: the game puts an item moved out of the
+-- backpack on a 6s cooldown, plus 5s, so two routines that want opposite slots for the same
+-- items cannot ping-pong them and keep both on cooldown.
 local aN = 6 + 5
-function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
-	local aQ = self:GetUnitName()
-	if self.itemSwapTime == nil then
-		self.itemSwapTime = 0
+-- Backpack items allowed into the main inventory during a fight (names without "item_").
+local SWAP_IN_DURING_FIGHT = {
+	dust = true,
+	cheese = true,
+	famango = true,
+	great_famango = true,
+	greater_famango = true,
+	roshans_banner = true,
+	refresher_shard = true,
+	blood_grenade = true,
+	foragers_health = true,
+	foragers_stats = true,
+	foragers_mana = true,
+	gem = true,
+}
+local function SwapMovesBranchToBackpack(self, fromSlot, toSlot)
+	if toSlot < 6 or toSlot > 8 then
+		return false
 	end
-	if #(self:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}) == 0 and DotaTime() - self.itemSwapTime > aN then
-		self.itemSwapTime = DotaTime()
+	local it = self:GetItemInSlot(fromSlot)
+	if it == nil or it:GetName() ~= "item_branches" then
+		return false
+	end
+	local other = self:GetItemInSlot(toSlot)
+	-- The grenade is only throwable from the main inventory. A branch can sit in the backpack for it.
+	if other ~= nil and other:GetName() == "item_blood_grenade" then
+		return false
+	end
+	return true
+end
+local function SlotName(unit, slot)
+	local it = unit:GetItemInSlot(slot)
+	return it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
+end
+-- [OHA-ITEM]: every swap that touches the blood grenade, and why a blocked one was refused.
+-- Swaps logged: the grenade, and (game 031: the banner never left the backpack in 24 tries, with
+-- nothing in the log) the banner, Dust and Forager mushrooms.
+local SWAP_WATCH = {
+	blood_grenade = true,
+	roshans_banner = true,
+	dust = true,
+	foragers_health = true,
+	foragers_stats = true,
+	foragers_mana = true,
+	cheese = true,
+	famango = true,
+	great_famango = true,
+	greater_famango = true,
+	refresher_shard = true,
+	gem = true,
+}
+local function LogGrenadeSwap(self, aO, aP, result)
+	local a, b = SlotName(self, aO), SlotName(self, aP)
+	if not SWAP_WATCH[a] and not SWAP_WATCH[b] then
+		return
+	end
+	if result ~= "ok" then
+		local key = result .. aO .. ":" .. aP
+		if self._grenadeSwapLogKey == key and DotaTime() < (self._grenadeSwapLogAt or -999) then
+			return
+		end
+		self._grenadeSwapLogKey = key
+		self._grenadeSwapLogAt = DotaTime() + 5
+	end
+	pcall(print, string.format(
+		"[OHA-ITEM] t=%.0f %s swap %d(%s)<->%d(%s) %s",
+		DotaTime(),
+		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+		aO,
+		a,
+		aP,
+		b,
+		result
+	))
+end
+-- Checks the last swap half a second later: did the two items actually trade places?
+-- Logged for every swap that touched the grenade, and for the first 6 other swaps per bot,
+-- to show whether backpack swaps work at all. Call once per think.
+function VerifyLastSwap(self)
+	local check = self._swapCheck
+	if check == nil or DotaTime() < check.at + 0.5 then
+		return
+	end
+	self._swapCheck = nil
+	if check.nameA == "-" and check.nameB == "-" then
+		return
+	end
+	local done = SlotName(self, check.a) == check.nameB and SlotName(self, check.b) == check.nameA
+	local grenade = check.nameA == "blood_grenade" or check.nameB == "blood_grenade"
+	if not done and grenade and not check.reversed then
+		self._swapTryReverse = true
+	end
+	self._swapChecksLogged = self._swapChecksLogged or 0
+	if not grenade then
+		if self._swapChecksLogged >= 6 then
+			return
+		end
+		self._swapChecksLogged = self._swapChecksLogged + 1
+	end
+	pcall(print, string.format(
+		"[OHA-ITEM] t=%.0f %s %s %d(%s)<->%d(%s)%s now=%s,%s",
+		DotaTime(),
+		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+		done and "swap-done" or "swap-noop",
+		check.a,
+		check.nameA,
+		check.b,
+		check.nameB,
+		check.reversed and " reversed" or "",
+		SlotName(self, check.a),
+		SlotName(self, check.b)
+	))
+end
+function CDOTA_Bot_Script:ActionImmediate_SwapItems(aO, aP)
+	local forced = self._swapDespiteEnemies
+	self._swapDespiteEnemies = nil
+	-- A swap that must not wait for the 11s gap (the banner at the enemy base).
+	local urgent = self._swapDespiteCooldown
+	self._swapDespiteCooldown = nil
+	-- A branch parked for any other item gets pulled straight back, and that round trip
+	-- leaves it on cooldown. The grenade is the exception: it has to stay throwable.
+	if SwapMovesBranchToBackpack(self, aO, aP) or SwapMovesBranchToBackpack(self, aP, aO) then
+		LogGrenadeSwap(self, aO, aP, "blocked-branch-rule")
+		return nil
+	end
+	-- The gap is per pair of items. It used to be one timer for every swap, so a routine that kept
+	-- retrying one pair held up all the others (game 033: a Clarity/Dust swap that never took
+	-- effect restarted it every 6-13s for 26 minutes). A pair that has not swapped yet starts in
+	-- the past, so the pregame swap of a grenade bought into a full bag goes through at once.
+	local nameA, nameB = SlotName(self, aO), SlotName(self, aP)
+	local pairKey = nameA < nameB and (nameA .. "|" .. nameB) or (nameB .. "|" .. nameA)
+	self._swapPairTime = self._swapPairTime or {}
+	-- Hold swaps only during a fight. An item that comes out of the backpack cannot be used for 6s
+	-- and the one sent in cannot be used at all, so a fight is the wrong moment to reshuffle. Any
+	-- enemy hero within 1000 used to block every swap, which meant almost none in the laning stage
+	-- (game 032: 67 logged swaps refused for enemies).
+	local enemies = #(self:GetNearbyHeroes(700, true, BOT_MODE_NONE) or {})
+	local mode = self:GetActiveMode()
+	local fighting = self:WasRecentlyDamagedByAnyHero(3.0)
+		or enemies > 0
+			and (mode == BOT_MODE_ATTACK or mode == BOT_MODE_RETREAT or mode == BOT_MODE_TEAM_ROAM or mode == BOT_MODE_DEFEND_ALLY)
+	-- Items that are worth bringing in mid-fight: used once and soon, and never moved back out
+	-- (they are all in sCanNotSwitchItems, so no other routine picks them to make room).
+	local incoming = (aO >= 6 and aO <= 8 and aP <= 5) and nameA or ((aP >= 6 and aP <= 8 and aO <= 5) and nameB or nil)
+	local fightOk = fighting and incoming ~= nil and SWAP_IN_DURING_FIGHT[incoming] == true
+	local cooldown = aN - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
+	if (forced or not fighting or fightOk) and (cooldown < 0 or urgent) then
+		self._swapPairTime[pairKey] = DotaTime()
+		-- After a swap the engine ignored, try the slots the other way round once.
+		local reversed = self._swapTryReverse == true
+		self._swapTryReverse = nil
+		LogGrenadeSwap(self, aO, aP, (forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or ""))
+		self._swapCheck = { a = aO, b = aP, nameA = nameA, nameB = nameB, at = DotaTime(), reversed = reversed }
+		if reversed then
+			return aM(self, aP, aO)
+		end
 		return aM(self, aO, aP)
+	end
+	if cooldown >= 0 then
+		LogGrenadeSwap(self, aO, aP, string.format("blocked-cooldown(%.0fs)", cooldown))
 	else
+		LogGrenadeSwap(self, aO, aP, string.format("blocked-fight(enemies=%d)", enemies))
 	end
 	return nil
 end

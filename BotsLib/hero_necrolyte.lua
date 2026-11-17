@@ -49,7 +49,8 @@ n["pos_2"] = {
 n["pos_3"] = {
 	"item_mage_outfit",
 	"item_shadow_amulet",
-	"item_veil_of_discord",
+	-- Radiance: bought in nearly every Necrophos game (Dotabuff, last patch); Veil was not.
+	"item_radiance",
 	m,
 	"item_glimmer_cape",
 	"item_crellas_crozier",
@@ -180,7 +181,9 @@ function a.ConsiderW()
 	if c.IsWithoutTarget(b) and c.GetAttackProjectileDamageByRange(b, 1600) >= b:GetHealth() then
 		return BOT_ACTION_DESIRE_MODERATE
 	end
-	if c.IsGoingOnSomeone(b) and false then
+	-- Was switched off with "and false". Datafeed: Ghost Shroud emits a 700 slow aura, so a lone running
+	-- target out of reach is chased with it.
+	if c.IsGoingOnSomeone(b) then
 		local M = b:GetTarget()
 		if
 			c.IsValidHero(M)
@@ -435,6 +438,35 @@ function a.ConsiderAS()
 	local ac = r:GetCastPoint()
 	local ad = r:GetManaCost()
 	local L = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
+	-- Escape: Death Seeker also targets allies and Necrophos travels to the target (datafeed; root
+	-- disables it, game data). Retreating under 50% HP and just hit by a hero: fly to the allied hero or
+	-- creep in cast range that is nearest our fountain, if that is 300+ nearer than he is. It was only
+	-- ever cast on enemies, so it pulled him into fights and never out of one.
+	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(2.0) and C < 0.5 and not b:IsRooted() then
+		local friends = c.CombineTwoTable(c.GetNearbyHeroes(b, O, false, BOT_MODE_NONE) or {}, b:GetNearbyCreeps(O, false) or {})
+		local best, bestD = nil, c.GetDistanceFromAllyFountain(b) - 300
+		for U, a5 in pairs(friends) do
+			if c.IsValid(a5) and a5 ~= b and GetUnitToUnitDistance(b, a5) > 300 then
+				local dd = c.GetDistanceFromAllyFountain(a5)
+				if dd < bestD then
+					best, bestD = a5, dd
+				end
+			end
+		end
+		if best ~= nil then
+			if DotaTime() >= (b._necroSeekLogAt or -999) then
+				b._necroSeekLogAt = DotaTime() + 3
+				pcall(print, string.format(
+					"[OHA-NECRO] t=%.0f death-seeker-escape to=%s dist=%d hp=%.2f",
+					DotaTime(),
+					best:GetUnitName(),
+					math.floor(GetUnitToUnitDistance(b, best)),
+					C
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
 	if c.IsInTeamFight(b, 1400) and #L >= 3 then
 		local ae = nil
 		local af = 2

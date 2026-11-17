@@ -1,3 +1,5 @@
+-- [OHA-DOOM] logs off: the behaviour they traced works (game 029).
+local print = function() end
 -- Doom Bringer: skill build, item build, and ability use for this hero.
 local a = {}
 local b = GetBot()
@@ -21,8 +23,7 @@ else
 	k = j[2]
 	l = c.Skill.GetTalentBuild(i[2])
 end
-local m = { "item_crimson_guard", "item_pipe", "item_lotus_orb", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_2"] = {
 	"item_tango",
@@ -63,7 +64,7 @@ o["pos_3"] = {
 	n,
 	"item_aghanims_shard",
 	"item_overwhelming_blink",
-	"item_refresher",
+	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
@@ -88,7 +89,7 @@ local s = SafeAbility(b:GetAbilityByName("doom_bringer_infernal_blade"), "doom_b
 local t = SafeAbility(b:GetAbilityByName("doom_bringer_doom"), "doom_bringer_doom", "doom_bringer")
 local u = SafeAbility(b:GetAbilityByName("doom_bringer_empty1"), "doom_bringer_empty1", "doom_bringer")
 local v = SafeAbility(b:GetAbilityByName("doom_bringer_empty2"), "doom_bringer_empty2", "doom_bringer")
-local w = SafeAbility(b:GetAbilityByName("special_bonus_unique_doom_2"), "special_bonus_unique_doom_2", "doom_bringer")
+-- datafeed: special_bonus_unique_doom_2 is no longer a Doom talent (Ancient Devour moved to the Shard)
 local x, y
 local z
 local A, B
@@ -118,8 +119,38 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnEntity(s, B)
 		return
 	end
-	z = a.ConsiderScorchedEarth()
+	-- Abilities taken with Devour. ConsiderDevourAbility existed but was never called, so stolen
+	-- creep skills went unused. The slots change after each Devour, so look them up by name.
+	for slot = 0, 10 do
+		local stolen = b:GetAbilityInSlot(slot)
+		if stolen ~= nil and not stolen:IsNull() and a.IsStolenAbility(stolen) then
+			local want, target, kind
+			if DEVOUR_ABILITIES[stolen:GetName()] then
+				want, target, kind = a.ConsiderDevourAbility(stolen)
+			else
+				want, target, kind = a.ConsiderGenericDevourAbility(stolen)
+			end
+			if want ~= nil and want > 0 then
+				if kind == "unit" and target ~= nil then
+					b:Action_UseAbilityOnEntity(stolen, target)
+				elseif kind == "point" and target ~= nil then
+					b:Action_UseAbilityOnLocation(stolen, target:GetLocation())
+				else
+					b:Action_UseAbility(stolen)
+				end
+				return
+			end
+		end
+	end
+	local scorchWhy
+	z, scorchWhy = a.ConsiderScorchedEarth()
 	if z > 0 then
+		pcall(print, string.format(
+			"[OHA-DOOM] t=%.0f scorched why=%s hp=%.2f",
+			DotaTime(),
+			tostring(scorchWhy or "?"),
+			c.GetHP(b)
+		))
 		b:Action_UseAbility(r)
 		return
 	end
@@ -133,53 +164,36 @@ function a.ConsiderDevour()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
+	-- Game data: creep_level 4/5/6/6 is the highest creep level Devour can eat at each skill level;
+	-- ancients only with the Shard (can_target_ancient). Old code took the most-HP neutral with no level
+	-- check (refused order every think when it was above the cap) or simply the first creep listed.
 	local N = q:GetSpecialValueInt("creep_level")
-	local O = b:GetNearbyCreeps(1200, true)
+	if N <= 0 then
+		N = ({ 4, 5, 6, 6 })[math.max(1, math.min(4, q:GetLevel()))]
+	end
+	local canAncient = q:GetSpecialValueInt("can_target_ancient") > 0 or c.HasAghanimsShard(b)
 	if not K then
 		local P = b:GetNearbyTowers(1600, true)
-		local Q = a.GetRangedOrSiegeCreep(O, N)
-		if Q ~= nil then
-			if
-				c.IsLaning(b)
-				and P ~= nil
-				and (#P == 0 or #P >= 1 and c.IsValidBuilding(P[1]) and GetUnitToUnitDistance(Q, P[1]) > 700)
-			then
-				return BOT_ACTION_DESIRE_HIGH, Q
-			end
-		end
-		for R, S in pairs(O) do
+		-- Lane creeps next to an enemy tower are skipped, as before.
+		local O = {}
+		for _, S in pairs(b:GetNearbyCreeps(1200, true) or {}) do
 			if
 				c.IsValid(S)
-				and c.CanBeAttacked(S)
-				and S:GetLevel() <= N
-				and not c.IsRoshan(S)
-				and not c.IsTormentor(S)
+				and (
+					S:GetTeam() == TEAM_NEUTRAL
+					or P == nil
+					or #P == 0
+					or not c.IsValidBuilding(P[1])
+					or GetUnitToUnitDistance(S, P[1]) > 700
+				)
 			then
-				if
-					c.IsInLaningPhase()
-					and S:GetTeam() ~= b:GetTeam()
-					and S:GetTeam() ~= TEAM_NEUTRAL
-					and P ~= nil
-					and (#P == 0 or #P >= 1 and c.IsValidBuilding(P[1]) and GetUnitToUnitDistance(S, P[1]) > 700)
-				then
-					return BOT_ACTION_DESIRE_HIGH, S
-				end
-				Q = nil
-				if S and S:GetTeam() == TEAM_NEUTRAL then
-					Q = c.GetMostHpUnit(O)
-				end
-				if Q ~= nil then
-					if Q:IsAncientCreep() and w:IsTrained() then
-						return BOT_ACTION_DESIRE_HIGH, Q
-					end
-					if not Q:IsAncientCreep() then
-						return BOT_ACTION_DESIRE_HIGH, Q
-					end
-				end
-				if not S:IsAncientCreep() then
-					return BOT_ACTION_DESIRE_HIGH, S
-				end
+				O[#O + 1] = S
 			end
+		end
+		-- Highest level, then highest max HP, within the level cap.
+		local Q = c.GetBestCreepToEat(O, N, canAncient)
+		if Q ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, Q
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -188,12 +202,13 @@ function a.ConsiderScorchedEarth()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Valve data: 666 radius damage to enemies; Doom alone gets +7-10% move speed and +6.66 HP
+	-- regen, for 10-16s. So it is both a chase and an escape spell.
 	local T = r:GetSpecialValueInt("radius")
 	if J then
 		if
 			c.IsValidTarget(I)
 			and c.CanCastOnNonMagicImmune(I)
-			and c.IsInRange(b, I, T + 150)
 			and not c.IsSuspiciousIllusion(I)
 			and not I:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not I:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
@@ -201,33 +216,43 @@ function a.ConsiderScorchedEarth()
 			local U = c.GetNearbyHeroes(I, 1200, true, BOT_MODE_NONE)
 			local V = c.GetNearbyHeroes(I, 1200, false, BOT_MODE_NONE)
 			if U ~= nil and V ~= nil and #U >= #V then
-				return BOT_ACTION_DESIRE_HIGH
+				-- In the burn: damage. Up to 1200 and running from him: the speed closes the gap
+				-- (it used to need the target inside 816).
+				if c.IsInRange(b, I, T + 150) then
+					return BOT_ACTION_DESIRE_HIGH, "chase-burn"
+				end
+				if c.IsInRange(b, I, 1200) and c.IsChasingTarget(b, I) then
+					return BOT_ACTION_DESIRE_HIGH, "chase-speed"
+				end
 			end
 		end
 	end
-	if K and b:GetActiveModeDesire() >= 0.75 then
-		local V = c.GetNearbyHeroes(b, T + 200, true, BOT_MODE_NONE)
-		for R, W in pairs(V) do
+	-- Escape: speed and regen. Any enemy hero chasing within 1200, or hit by a hero in the last
+	-- 3s. It used to need retreat desire 0.75+, the chaser inside 866, and either being
+	-- outnumbered by 2 or hit in the last 2s.
+	if K then
+		if b:WasRecentlyDamagedByAnyHero(3) then
+			return BOT_ACTION_DESIRE_HIGH, "escape-hit"
+		end
+		for R, W in pairs(c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}) do
 			if
 				c.IsValidHero(W)
-				and c.CanCastOnNonMagicImmune(W)
 				and c.IsChasingTarget(W, b)
 				and not c.IsSuspiciousIllusion(W)
 				and not c.IsDisabled(W)
-				and not W:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local U = c.GetNearbyHeroes(W, 1200, true, BOT_MODE_NONE)
-				local X = c.GetNearbyHeroes(W, 1200, false, BOT_MODE_NONE)
-				if U ~= nil and X ~= nil and (#X > #U + 1 or b:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH
-				end
+				return BOT_ACTION_DESIRE_HIGH, "escape-chased"
 			end
+		end
+		if c.GetHP(b) < 0.4 and #(c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) or {}) > 0 then
+			return BOT_ACTION_DESIRE_HIGH, "escape-low-hp"
 		end
 	end
 	if c.IsFarming(b) then
 		local O = b:GetNearbyCreeps(T, true)
 		if
-			nEnemyLaneCreeps ~= nil
+			-- fix: tested an undefined global (nEnemyLaneCreeps), so farming never used Scorched Earth
+			O ~= nil
 			and (#O >= 3 or #O >= 2 and O[1]:IsAncientCreep())
 			and c.CanBeAttacked(O[1])
 			and L
@@ -265,7 +290,8 @@ function a.ConsiderInfernalBlade()
 	end
 	local Y = s:GetCastRange()
 	local Z = s:GetSpecialValueInt("burn_damage")
-	local _ = s:GetSpecialValueInt("burn_damage_pct") / 100
+	-- datafeed: burn_damage_pct is fractional (0.5/1.75/3/4.25), GetSpecialValueInt truncated it
+	local _ = s:GetSpecialValueFloat("burn_damage_pct") / 100
 	local a0 = s:GetSpecialValueInt("burn_duration")
 	local a1 = c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE)
 	for R, W in pairs(a1) do
@@ -276,12 +302,10 @@ function a.ConsiderInfernalBlade()
 			and not c.IsSuspiciousIllusion(W)
 		then
 			local P = W:GetNearbyTowers(700, false)
-			if W:IsChanneling() then
-				if c.IsInLaningPhase() then
-					if P ~= nil and #P == 0 then
-						return BOT_ACTION_DESIRE_HIGH, W
-					end
-				else
+			-- A TP is checked by its modifier too, as everywhere else in the project: IsChanneling()
+			-- alone missed an enemy TP in range at 32:30.
+			if W:IsChanneling() or W:HasModifier("modifier_teleporting") then
+				if not c.IsInLaningPhase() or P ~= nil and #P == 0 then
 					return BOT_ACTION_DESIRE_HIGH, W
 				end
 			end
@@ -438,7 +462,126 @@ function a.ConsiderDoom()
 			end
 		end
 	end
+	-- Retreat: Doom was cast only while engaging. Doom silences its target (datafeed: "prevents them
+	-- from casting spells"), so when Doom is low and being hit, put it on the chaser hurting him
+	-- most, so the chaser cannot stun or blink after him.
+	if K and c.GetHP(b) < 0.5 and b:WasRecentlyDamagedByAnyHero(2) then
+		local best, bestDmg = nil, 0
+		for R, W in pairs(c.GetNearbyHeroes(b, 550, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(W)
+				and c.CanCastOnTargetAdvanced(W)
+				and c.IsChasingTarget(W, b)
+				and c.CanCastOnMagicImmune(W)
+				and not c.IsHaveAegis(W) -- same guards as the engage branch
+				and not c.IsSuspiciousIllusion(W)
+				and not W:HasModifier("modifier_doom_bringer_doom")
+				and not W:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				local dmg = W:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_ALL)
+				if dmg > bestDmg then
+					best, bestDmg = W, dmg
+				end
+			end
+		end
+		if best ~= nil then
+			if DotaTime() >= (b._doomRetreatLogAt or -999) then
+				b._doomRetreatLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DOOM] t=%.0f doom retreat target=%s hp=%.2f", DotaTime(), best:GetUnitName(), c.GetHP(b)))
+			end
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+DEVOUR_ABILITIES = {
+	centaur_khan_war_stomp = true,
+	fel_beast_haunt = true,
+	giant_wolf_intimidate = true,
+	harpy_scout_take_off = true,
+	harpy_storm_chain_lightning = true,
+	satyr_trickster_purge = true,
+}
+-- A Devoured creep ability: not one of Doom's own, not a map/system ability, not hidden.
+function a.IsStolenAbility(ab)
+	local name = ab:GetName()
+	if type(name) ~= "string" or ab:IsHidden() or ab:IsPassive() then
+		return false
+	end
+	if string.sub(name, 1, 13) == "doom_bringer_" or string.sub(name, 1, 14) == "special_bonus_" then
+		return false
+	end
+	for _, prefix in ipairs({ "ability_", "plus_", "seasonal_", "twin_gate" }) do
+		if string.sub(name, 1, #prefix) == prefix then
+			return false
+		end
+	end
+	return true
+end
+-- Any other Devoured creep ability, judged by its own target type and team (read from the game,
+-- so no creep ability names are hard-coded). Toggles and autocasts are left alone.
+function a.ConsiderGenericDevourAbility(ab)
+	if not ab:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local behavior = ab:GetBehavior()
+	local has = function(flag)
+		return flag ~= nil and c.CheckBitfieldFlag(behavior, flag)
+	end
+	-- Behavior flags: no target 4, unit 8, point 16, toggle 512, autocast 4096 (checked on known
+	-- abilities: Echo Slam, Fissure, Split Shot, Walrus Punch). Friendly target team is 1.
+	if has(512) or has(4096) then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local okTeam, team = pcall(function()
+		return ab:GetTargetTeam()
+	end)
+	local friendly = okTeam and team == 1
+	local range = ab:GetCastRange()
+	if range == nil or range < 150 then
+		range = 350
+	end
+	range = c.GetProperCastRange(false, b, range)
+	local foesNear = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+	if has(8) and friendly then
+		if #foesNear == 0 then
+			return BOT_ACTION_DESIRE_NONE, nil, ""
+		end
+		local best, bestHp = nil, 0.5
+		for _, ally in pairs(c.GetNearbyHeroes(b, range, false, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(ally) and not ally:IsIllusion() and c.GetHP(ally) < bestHp then
+				best, bestHp = ally, c.GetHP(ally)
+			end
+		end
+		if best ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, best, "unit"
+		end
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	local target = nil
+	if (J or c.IsInTeamFight(b, 1200)) and c.IsValidHero(I) and not c.IsSuspiciousIllusion(I) then
+		target = I
+	elseif K then
+		for _, foe in pairs(foesNear) do
+			if c.IsValidHero(foe) and not c.IsSuspiciousIllusion(foe) and c.IsChasingTarget(foe, b) then
+				target = foe
+				break
+			end
+		end
+	end
+	if target == nil or not c.CanCastOnNonMagicImmune(target) then
+		return BOT_ACTION_DESIRE_NONE, nil, ""
+	end
+	if has(8) and c.IsInRange(b, target, range + 100) then
+		return BOT_ACTION_DESIRE_HIGH, target, "unit"
+	end
+	if has(16) and c.IsInRange(b, target, range + 100) then
+		return BOT_ACTION_DESIRE_HIGH, target, "point"
+	end
+	if has(4) and c.IsInRange(b, target, 350) then
+		return BOT_ACTION_DESIRE_HIGH, nil, ""
+	end
+	return BOT_ACTION_DESIRE_NONE, nil, ""
 end
 function a.ConsiderDevourAbility(a8)
 	if a8:IsPassive() or not a8:IsFullyCastable() then
@@ -724,9 +867,8 @@ function a.ConsiderDevourAbility(a8)
 				and not c.IsSuspiciousIllusion(ad)
 			then
 				if c.IsDisabled(ad) or ad:HasModifier("modifier_bounty_hunter_track") then
-					return BOT_ACTION_DESIRE_HIGH, b, "unit"
+					return BOT_ACTION_DESIRE_HIGH, ad, "unit"
 				end
-				return BOT_ACTION_DESIRE_HIGH, ad, "unit"
 			end
 		end
 		local a1 = c.GetNearbyHeroes(b, Y, true, BOT_MODE_NONE)
@@ -787,21 +929,6 @@ function a.ConsiderDevourAbility(a8)
 			end
 		end
 	end
-	return BOT_ACTION_DESIRE_HIGH, nil, ""
-end
-function a.GetRangedOrSiegeCreep(O, ae)
-	for R, S in pairs(O) do
-		if
-			c.IsValid(S)
-			and c.CanBeAttacked(S)
-			and S:GetLevel() <= ae
-			and (c.IsKeyWordUnit("siege", S) or c.IsKeyWordUnit("ranged", S))
-			and not c.IsRoshan(S)
-			and not c.IsTormentor(S)
-		then
-			return S
-		end
-	end
-	return nil
+	return BOT_ACTION_DESIRE_NONE, nil, ""
 end
 return a

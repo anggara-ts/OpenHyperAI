@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 3, 2, 2, 3, 6, 3, 3, 2, 2, 1, 6, 1, 1, 6 } }
+-- Life Break moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
+local j = { { 1, 3, 2, 2, 3, 6, 3, 3, 2, 2, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -18,12 +19,12 @@ m["pos_2"] = {
 	"item_gauntlets",
 	"item_gauntlets",
 	"item_gauntlets",
-	"item_boots",
+	"item_power_treads",
 	"item_armlet",
 	"item_black_king_bar",
-	"item_sange",
+	"item_blink",
 	"item_ultimate_scepter",
-	"item_heavens_halberd",
+	"item_sange_and_yasha",
 	"item_travel_boots",
 	"item_satanic",
 	"item_aghanims_shard",
@@ -381,7 +382,9 @@ function a.ConsiderR()
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			-- Life Break pierces spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES and
+			-- FLAG_MAGIC_IMMUNE_ENEMIES); it was held whenever the target popped BKB.
+			and c.CanCastOnMagicImmune(botTarget)
 			and (c.IsInRange(b, botTarget, K + 88) or c.IsInRange(b, botTarget, b:GetAttackRange() + 99))
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "R进攻" .. c.Chat.GetNormName(botTarget)

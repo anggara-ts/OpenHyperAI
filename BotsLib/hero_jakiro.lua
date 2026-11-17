@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+-- Liquid Fire first (Dotabuff most picked order), Ice Path at 4 and 8, Dual Breath from 9.
+local j = { { 3, 1, 3, 2, 3, 6, 3, 2, 1, 1, 6, 1, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -35,7 +36,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_cyclone",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_moon_shard",
@@ -48,8 +49,8 @@ m["pos_5"] = {
 	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_boots_of_bearing",
-	"item_pipe",
-	"item_shivas_guard",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_sheepstick",
 	"item_wind_waker",
@@ -85,6 +86,8 @@ a["sSellList"] = {
 	"item_magic_wand",
 	"item_skadi",
 	"item_witch_blade",
+	"item_ultimate_scepter",
+	"item_urn_of_shadows",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mage" }, {}
@@ -99,7 +102,8 @@ end
 local o = SafeAbility(b:GetAbilityByName("jakiro_dual_breath"), "jakiro_dual_breath", "jakiro")
 local p = SafeAbility(b:GetAbilityByName("jakiro_ice_path"), "jakiro_ice_path", "jakiro")
 local q = SafeAbility(b:GetAbilityByName("jakiro_liquid_fire"), "jakiro_liquid_fire", "jakiro")
-local r = SafeAbility(b:GetAbilityByName("jakiro_liquid_frost"), "jakiro_liquid_frost", "jakiro")
+-- datafeed: the internal name of Liquid Frost is jakiro_liquid_ice ("jakiro_liquid_frost" does not exist)
+local r = SafeAbility(b:GetAbilityByName("jakiro_liquid_ice"), "jakiro_liquid_ice", "jakiro")
 local s = SafeAbility(b:GetAbilityByName("jakiro_macropyre"), "jakiro_macropyre", "jakiro")
 local t, u
 local v, w
@@ -393,38 +397,8 @@ function a.ConsiderAS()
 		F = 1300
 	end
 	local D = c.GetProperTarget(b)
-	local X = b:GetAttackTarget()
-	local M = b:GetNearbyHeroes(F, true, BOT_MODE_NONE)
-	if c.IsValidBuilding(X) and c.IsInRange(X, b, F) then
-		return BOT_ACTION_DESIRE_HIGH, X
-	end
-	if X == nil and #M == 0 then
-		local a8 = b:GetNearbyTowers(F + 36, true)
-		local a9 = b:GetNearbyBarracks(F + 36, true)
-		local aa = a8[1]
-		if aa == nil then
-			aa = a9[1]
-		end
-		if
-			aa ~= nil
-			and not aa:IsAttackImmune()
-			and not aa:IsInvulnerable()
-			and not aa:HasModifier("modifier_fountain_glyph")
-			and not aa:HasModifier("modifier_backdoor_protection_active")
-		then
-			return BOT_ACTION_DESIRE_HIGH, aa
-		end
-	end
-	if c.IsPushing(b) or c.IsDefending(b) then
-		local ab = b:GetNearbyTowers(F, true)
-		if c.IsValidBuilding(ab[1]) and c.CanBeAttacked(ab[1]) then
-			return BOT_ACTION_DESIRE_HIGH, ab[1]
-		end
-		local ac = b:GetNearbyBarracks(F, true)
-		if c.IsValidBuilding(ac[1]) and c.CanBeAttacked(ac[1]) then
-			return BOT_ACTION_DESIRE_HIGH, ac[1]
-		end
-	end
+	-- datafeed: Liquid Frost "does not apply to buildings", so the tower/barracks branches copied from
+	-- Liquid Fire (ConsiderE, which already covers buildings) were removed; heroes only.
 	if c.IsGoingOnSomeone(b) then
 		if c.IsValidHero(D) and c.CanCastOnNonMagicImmune(D) and c.IsInRange(D, b, F) then
 			return BOT_ACTION_DESIRE_HIGH, D
@@ -442,7 +416,8 @@ function a.ConsiderR()
 	end
 	local G = s:GetCastPoint()
 	local H = s:GetManaCost()
-	local I = s:GetSpecialValueInt("path_radius")
+	-- datafeed: Macropyre has no "path_radius" (it read 0, killing the AoE checks); half its "path_width" (500)
+	local I = s:GetSpecialValueInt("path_width") / 2
 	local L = s:GetSpecialValueInt("damage")
 	local D = c.GetProperTarget(b)
 	local M = b:GetNearbyHeroes(F, true, BOT_MODE_NONE)

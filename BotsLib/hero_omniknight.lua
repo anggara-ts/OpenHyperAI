@@ -12,7 +12,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 3, 1, 3, 1, 3, 1, 1, 3, 2, 6, 6, 2, 2, 2, 6 }, { 3, 1, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+local j = { { 3, 1, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 3, 1, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = j[1]
 if h == "pos_1" then
 	k = j[1]
@@ -37,8 +37,7 @@ elseif h == "pos_4" or h == "pos_5" then
 else
 	l = c.Skill.GetTalentBuild(i[1])
 end
-local m = { "item_crimson_guard", "item_pipe", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
@@ -66,12 +65,15 @@ o["pos_3"] = {
 o["pos_1"] = o["pos_3"]
 o["pos_2"] = o["pos_3"]
 o["pos_4"] = {
+	-- Arcane Boots (priest outfit) into Guardian Greaves, plus Holy Locket, instead of a second pair of
+	-- boots (Tranquil -> Boots of Bearing): Arcane 47%, Greaves 46%, Locket 22% of his matches (Dotabuff,
+	-- last patch); Tranquil and Bearing are not in his top 25.
 	"item_priest_outfit",
-	"item_tranquil_boots",
+	"item_holy_locket",
 	"item_solar_crest",
 	"item_glimmer_cape",
 	"item_blink",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_aghanims_shard",
 	"item_consecrated_wraps",
 	"item_sheepstick",
@@ -82,11 +84,13 @@ o["pos_4"] = {
 }
 o["pos_5"] = {
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves and a Blink Dagger instead of Tranquil ->
+	-- Boots of Bearing (Drum): Arcane 47%, Greaves 46%, Blink 55% of his matches (Dotabuff, last patch).
+	"item_crystal_maiden_outfit",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_consecrated_wraps",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_ultimate_scepter",
 	"item_cyclone",
@@ -382,7 +386,8 @@ function a.ConsiderW()
 	local U = 0
 	local V = DAMAGE_TYPE_MAGICAL
 	local ag = r:GetSpecialValueInt("duration")
-	local ah = r:GetSpecialValueInt("hp_regen") * ag
+	-- datafeed: the Martyr regen key is "base_hpregen" ("hp_regen" read 0, so the missing-HP checks always passed)
+	local ah = r:GetSpecialValueInt("base_hpregen") * ag
 	local _ = nil
 	local a0 = nil
 	for a2, a6 in pairs(L) do
@@ -611,6 +616,21 @@ function a.ConsiderR()
 				local as = c.GetNearbyHeroes(a6, R, false, BOT_MODE_ATTACK)
 				local at = c.GetNearbyHeroes(a6, R, false, BOT_MODE_RETREAT)
 				if #as >= 2 or #as >= 1 and #at >= 2 then
+					return BOT_ACTION_DESIRE_HIGH
+				end
+				-- One ally running alone: the counts above are of his own team, so a lone retreating
+				-- hero was never saved. Under 30% HP with 2+ enemy heroes within 900 of him, Guardian
+				-- Angel (immunity from physical damage, datafeed) covers his escape.
+				if c.GetHP(a6) < 0.3 and #(c.GetEnemiesNearLoc(a6:GetLocation(), 900) or {}) >= 2 then
+					if DotaTime() >= (b._omniGaLogAt or -999) then
+						b._omniGaLogAt = DotaTime() + 3
+						pcall(print, string.format(
+							"[OHA-OMNI] t=%.0f angel-save ally=%s hp=%.2f",
+							DotaTime(),
+							(string.gsub(a6:GetUnitName(), "npc_dota_hero_", "")),
+							c.GetHP(a6)
+						))
+					end
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

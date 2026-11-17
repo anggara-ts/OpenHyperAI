@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+-- Catchy Lick maxed first, Frogstomp second, Croak of Genius last (Dotabuff most picked order).
+local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
 local k
 local l
 if h == "pos_5" then
@@ -26,12 +27,12 @@ m["pos_4"] = {
 	"item_enchanted_mango",
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_force_staff",
+	"item_soul_ring",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_hurricane_pike",
+	"item_lotus_orb",
 	"item_shivas_guard",
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
@@ -46,26 +47,27 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_boots",
 	"item_urn_of_shadows",
-	"item_tranquil_boots",
-	"item_pipe",
+	"item_arcane_boots",
+	"item_soul_ring",
 	"item_spirit_vessel",
 	"item_glimmer_cape",
-	"item_pavise",
+	"item_holy_locket",
 	"item_solar_crest",
-	"item_boots_of_bearing",
+	"item_ultimate_scepter",
 	"item_octarine_core",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 m["pos_3"] = {
 	"item_mage_outfit",
 	"item_glimmer_cape",
 	"item_boots_of_bearing",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_veil_of_discord",
+	"item_kaya_and_sange",
 	"item_cyclone",
 	"item_shivas_guard",
 	"item_refresher",
@@ -73,7 +75,6 @@ m["pos_3"] = {
 	"item_sheepstick",
 	"item_wind_waker",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 m["pos_2"] = {
 	"item_crystal_maiden_outfit",
@@ -263,7 +264,10 @@ function a.ConsiderCatchLick()
 				or c.GetModifierTime(S, "modifier_warlock_fatal_bonds") > 2
 				or c.GetModifierTime(S, "modifier_arc_warden_flux") > 2 and X
 				or c.GetModifierTime(S, "modifier_venomancer_venomous_gale") > 2 and X
-				or c.GetModifierTime(S, "modifier_stunned") > 2
+				-- Stun only when the lick is a strong dispel: it is a basic dispel (strong_dispel 0 in the
+				-- game KV, no talent changes it) and a stun needs a strong dispel, so licking a stunned
+				-- ally only moved it and wasted the cast.
+				or o:GetSpecialValueInt("strong_dispel") > 0 and c.GetModifierTime(S, "modifier_stunned") > 2
 			then
 				return BOT_ACTION_DESIRE_HIGH, S
 			end

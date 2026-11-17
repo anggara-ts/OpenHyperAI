@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 3, 1, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local j = { { 2, 3, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -28,12 +28,12 @@ m["pos_1"] = {
 	"item_travel_boots_2",
 }
 m["pos_3"] = {
-	"item_tank_outfit",
-	"item_crimson_guard",
+	"item_sven_outfit",
 	"item_blade_mail",
 	"item_blink",
+	"item_crimson_guard",
 	"item_aghanims_shard",
-	"item_heavens_halberd",
+	"item_black_king_bar",
 	"item_travel_boots",
 	"item_assault",
 	"item_ultimate_scepter_2",
@@ -53,6 +53,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "axe_berserkers_call", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -90,6 +92,16 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnEntity(r, B)
 		return
 	end
+	-- fix (missing combo): Blink + Berserker's Call, the Axe initiation. Before this only the generic
+	-- item code blinked him (to a random spot near one target) and Call waited for the next think.
+	local blinkCallDesire, blinkCallLoc = a.ConsiderBlinkCall()
+	if blinkCallDesire > 0 then
+		b:Action_ClearActions(false)
+		b:ActionQueue_UseAbilityOnLocation(b.Blink, blinkCallLoc)
+		b:ActionQueue_Delay(0.1)
+		b:ActionQueue_UseAbility(o)
+		return
+	end
 	u, v = a.ConsiderQ()
 	if u > 0 then
 		c.SetQueuePtToINT(b, true)
@@ -120,8 +132,10 @@ function a.ConsiderQ()
 	local S = c.GetAroundEnemyHeroList(M - 50)
 	local T = nil
 	local U = nil
+	-- fix: Berserker's Call is SPELL_IMMUNITY_ENEMIES_YES (game data): it taunts magic-immune heroes,
+	-- so a BKB no longer blocks the channel interrupt or the engage Call.
 	for V, W in pairs(S) do
-		if W:IsChanneling() and not W:IsMagicImmune() then
+		if W:IsChanneling() and c.CanCastOnMagicImmune(W) then
 			T = W
 			U = "Q-打断" .. c.Chat.GetNormName(T)
 			return BOT_ACTION_DESIRE_HIGH, U
@@ -131,12 +145,25 @@ function a.ConsiderQ()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, M - 90)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.CanCastOnMagicImmune(botTarget)
 			and not c.IsDisabled(botTarget)
 		then
 			T = botTarget
 			U = "Q-先手" .. c.Chat.GetNormName(T)
 			return BOT_ACTION_DESIRE_HIGH, U
+		end
+	end
+	-- fix: in a fight Call only ever went on the chosen target. Call whenever 2+ enemy heroes are inside it.
+	if c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) then
+		local heroesInCall = 0
+		for V, W in pairs(S) do
+			if c.IsValidHero(W) and c.CanCastOnMagicImmune(W) and not c.IsSuspiciousIllusion(W) and not c.IsDisabled(W) then
+				heroesInCall = heroesInCall + 1
+			end
+		end
+		if heroesInCall >= 2 then
+			a.LogAxe("call-multi heroes=" .. heroesInCall)
+			return BOT_ACTION_DESIRE_HIGH, "Q-multi"
 		end
 	end
 	if
@@ -194,7 +221,8 @@ function a.ConsiderW()
 	local P = p:GetManaCost()
 	local Z = p:GetSpecialValueInt("duration")
 	local Q = p:GetSpecialValueInt("damage_per_second") * Z
-	local R = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Battle Hunger deals pure damage (damage 4), not magical.
+	local R = DAMAGE_TYPE_PURE
 	local S = c.GetAroundEnemyHeroList(N)
 	local _ = c.GetAroundEnemyHeroList(N + 200)
 	local T = nil
@@ -204,7 +232,7 @@ function a.ConsiderW()
 			c.IsValid(W)
 			and c.CanCastOnNonMagicImmune(W)
 			and c.CanCastOnTargetAdvanced(W)
-			and c.WillMagicKillTarget(b, W, Q, Z)
+			and c.WillKillTarget(W, Q, R, Z)
 			and not W:HasModifier("modifier_axe_battle_hunger_self")
 		then
 			T = W
@@ -324,9 +352,11 @@ function a.ConsiderR()
 	local M = 600
 	local O = r:GetCastPoint()
 	local P = r:GetManaCost()
-	local a5 = 150 + 100 * L
-	if t:IsTrained() then
-		a5 = a5 + t:GetSpecialValueInt("value")
+	-- datafeed: Culling Blade damage is 275/375/475 pure (the old hard-coded 250/350/450 was low). The talent
+	-- is no longer added: f[5] is now +15 Strength, not Culling Blade damage.
+	local a5 = r:GetSpecialValueInt("damage")
+	if a5 <= 0 then
+		a5 = 175 + 100 * L
 	end
 	local R = DAMAGE_TYPE_PURE
 	local S = c.GetAroundEnemyHeroList(N)
@@ -340,7 +370,7 @@ function a.ConsiderR()
 			and W:GetHealth() + W:GetHealthRegen() * 0.8 < a5
 			and not c.IsHaveAegis(W)
 			and not W:IsInvulnerable()
-			and not W:IsMagicImmune()
+			-- datafeed: Culling Blade pierces debuff immunity (immunity 3), so magic-immune heroes are valid targets.
 			and not a.HasSpecialModifier(W)
 			and not a.IsKillBotAntiMage(W)
 		then
@@ -350,6 +380,55 @@ function a.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-AXE]: new casts (multi-hero Call, Blink-Call), at most once per 10s per reason.
+function a.LogAxe(why)
+	b._axeLogAt = b._axeLogAt or {}
+	local key = string.match(why, "^%S+") or why
+	if DotaTime() < (b._axeLogAt[key] or -999) then
+		return
+	end
+	b._axeLogAt[key] = DotaTime() + 10
+	pcall(print, string.format("[OHA-AXE] t=%.0f %s hp=%.2f", DotaTime(), why, c.GetHP(b)))
+end
+-- Blink (item, range 1200) into 2+ enemy heroes, or onto the engage target, then Call at once.
+function a.ConsiderBlinkCall()
+	if not o:IsFullyCastable() or b:GetMana() < o:GetManaCost() or b:IsRooted() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not (c.IsGoingOnSomeone(b) or c.IsInTeamFight(b, 1200)) or c.GetHP(b) < 0.4 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not c.CanBlinkDagger(b) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local callRadius = o:GetSpecialValueInt("radius")
+	local blinkRange = 1150
+	local spot = nil
+	local aoe = b:FindAoELocation(true, true, b:GetLocation(), blinkRange, callRadius - 50, 0, 0)
+	if aoe.count >= 2 and GetUnitToLocationDistance(b, aoe.targetloc) > callRadius then
+		spot = aoe.targetloc
+	elseif
+		c.IsGoingOnSomeone(b)
+		and c.IsValidHero(botTarget)
+		and c.CanCastOnMagicImmune(botTarget)
+		and not c.IsSuspiciousIllusion(botTarget)
+		and not c.IsDisabled(botTarget)
+		and c.IsInRange(b, botTarget, blinkRange)
+		and not c.IsInRange(b, botTarget, callRadius + 100)
+	then
+		spot = botTarget:GetLocation()
+	end
+	if spot == nil or not IsLocationPassable(spot) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local alliesThere = c.GetAlliesNearLoc(spot, 1600)
+	local enemiesThere = c.GetEnemiesNearLoc(spot, 1200)
+	if alliesThere == nil or enemiesThere == nil or #alliesThere + 1 < #enemiesThere then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	a.LogAxe("blink-call enemies=" .. #enemiesThere .. " allies=" .. #alliesThere)
+	return BOT_ACTION_DESIRE_HIGH, spot
 end
 function a.HasSpecialModifier(W)
 	if

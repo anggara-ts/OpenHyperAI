@@ -11,7 +11,9 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 2, 3, 2, 3, 2, 6, 2, 1, 1, 1, 1, 6, 3, 3, 6 } }
+-- j[2] (pos 4/5): Impetus first, then Nature's Attendants, Enchant last, as Dotabuff's most picked
+-- order (the support Enchantress there is a right-click Impetus build: Treads, Pike, Scepter).
+local j = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local k = j[1]
 if h == "pos_3" then
 	k = j[1]
@@ -65,7 +67,7 @@ o["pos_4"] = {
 	"item_guardian_greaves",
 	"item_hurricane_pike",
 	"item_aghanims_shard",
-	"item_mage_slayer",
+	"item_ultimate_scepter",
 	"item_moon_shard",
 	"item_bloodthorn",
 	"item_sheepstick",
@@ -85,7 +87,7 @@ o["pos_5"] = {
 	"item_hurricane_pike",
 	"item_aghanims_shard",
 	"item_boots_of_bearing",
-	"item_moon_shard",
+	"item_ultimate_scepter",
 	"item_bloodthorn",
 	"item_sheepstick",
 	"item_ultimate_scepter_2",
@@ -256,7 +258,10 @@ function a.ConsiderEnchant()
 		local R = c.GetNearbyHeroes(Q, K, true, BOT_MODE_NONE)
 		if
 			c.IsRetreating(Q)
+			and R ~= nil
 			and c.IsValidHero(R[1])
+			-- Enchant does not pierce spell immunity: do not waste it on a BKB'd chaser.
+			and c.CanCastOnNonMagicImmune(R[1])
 			and not c.IsSuspiciousIllusion(R[1])
 			and not c.IsDisabled(R[1])
 		then
@@ -309,6 +314,20 @@ function a.ConsiderNaturesAttendant()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
+	-- Also heal in a fight, not only when running: she below half, or a hurt ally hero inside the
+	-- wisp radius (datafeed: heals Enchantress and friendly units nearby).
+	if D or c.IsInTeamFight(b, 1200) then
+		local healRadius = s:GetSpecialValueInt("radius")
+		if c.GetHP(b) < 0.5 and b:WasRecentlyDamagedByAnyHero(3.0) then
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		for _, ally in pairs(c.GetNearbyHeroes(b, healRadius, false, BOT_MODE_NONE) or {}) do
+			if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() and c.GetHP(ally) < 0.45 then
+				pcall(print, string.format("[OHA-ENCHANTRESS] t=%.0f attendants for %s hp=%.2f", DotaTime(), ally:GetUnitName(), c.GetHP(ally)))
+				return BOT_ACTION_DESIRE_HIGH
+			end
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderSproink()
@@ -318,8 +337,14 @@ function a.ConsiderSproink()
 	local H = b:GetAttackRange()
 	local O = c.GetNearbyHeroes(b, H + 100, false, BOT_MODE_NONE)
 	local V = c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE)
-	local W = q:GetSpecialValueFloat("value") / 100
+	-- datafeed: Impetus damage per distance is "distance_damage_pct"; "value" read 0, so the kill check never passed
+	local W = q:GetSpecialValueFloat("distance_damage_pct") / 100
 	C = c.GetProperTarget(b)
+	-- Sproink dodges incoming projectiles (datafeed): use it on an incoming stun projectile.
+	if c.IsStunProjectileIncoming(b, 400) then
+		pcall(print, string.format("[OHA-ENCHANTRESS] t=%.0f sproink dodge", DotaTime()))
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	for P, X in pairs(V) do
 		if
 			c.IsValidHero(X)
@@ -376,22 +401,25 @@ function a.ConsiderLittleFriends()
 			return BOT_ACTION_DESIRE_HIGH, X
 		end
 	end
-	if c.IsGoingOnSomeone(b, 1200) then
+	-- Engage: root the fight target (datafeed: Little Friends roots the enemy and every creep in
+	-- 1200 attacks it). The old branch read npcTarget / nInRangeAlly / nTargetInRangeEnemy before
+	-- they were defined (nil globals), so it never fired.
+	if D then
+		local tgt = c.GetProperTarget(b)
+		local allies = c.GetNearbyHeroes(b, K + 150, false, BOT_MODE_NONE) or {}
+		local foes = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE) or {}
 		if
-			c.IsValidTarget(npcTarget)
-			and nInRangeAlly ~= nil
-			and nInRangeEnemy
-			and #nInRangeAlly >= #nInRangeEnemy
-			and #nTargetInRangeEnemy >= 1
-			and not c.IsSuspiciousIllusion(npcTarget)
-			and not npcTarget:HasModifier("modifier_abaddon_borrowed_time")
-			and not npcTarget:HasModifier("modifier_faceless_void_chronosphere")
+			c.IsValidHero(tgt)
+			and c.CanCastOnNonMagicImmune(tgt)
+			and c.IsInRange(b, tgt, K)
+			and #allies >= #foes
+			and not c.IsSuspiciousIllusion(tgt)
+			and not c.IsDisabled(tgt)
+			and not tgt:HasModifier("modifier_abaddon_borrowed_time")
+			and not tgt:HasModifier("modifier_faceless_void_chronosphere")
 		then
-			local C = c.GetStrongestUnit(K, b, true, false, N)
-			local nTargetInRangeEnemy = c.GetNearbyHeroes(C, Y, true, BOT_MODE_NONE)
-			local nInRangeAlly = c.GetNearbyHeroes(b, K + 150, false, BOT_MODE_NONE)
-			local nInRangeEnemy = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
-			return BOT_ACTION_DESIRE_HIGH, C
+			pcall(print, string.format("[OHA-ENCHANTRESS] t=%.0f little friends engage %s", DotaTime(), tgt:GetUnitName()))
+			return BOT_ACTION_DESIRE_HIGH, tgt
 		end
 	end
 	if E then

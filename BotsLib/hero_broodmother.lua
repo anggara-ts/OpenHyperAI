@@ -32,9 +32,9 @@ m["pos_2"] = {
 	"item_orchid",
 	"item_bloodthorn",
 	"item_black_king_bar",
-	"item_sheepstick",
+	"item_manta",
 	"item_aghanims_shard",
-	"item_nullifier",
+	"item_butterfly",
 	"item_skadi",
 	"item_travel_boots_2",
 	"item_moon_shard",
@@ -51,9 +51,9 @@ m["pos_3"] = {
 	"item_orchid",
 	"item_bloodthorn",
 	"item_black_king_bar",
-	"item_assault",
+	"item_manta",
 	"item_aghanims_shard",
-	"item_sheepstick",
+	"item_assault",
 	"item_skadi",
 	"item_travel_boots_2",
 	"item_moon_shard",
@@ -273,6 +273,29 @@ function a.ConsiderSpawnSpiderlings()
 		then
 			return BOT_ACTION_DESIRE_HIGH, Q
 		end
+	end
+	-- fix: on heroes Spawn Spiderlings was only a finisher. Engaging, throw it at the target for its
+	-- damage (220-420) and slow (25-45% for 4s, game data); cooldown is only 7-9s.
+	local spiderTarget = c.GetProperTarget(b)
+	if
+		z
+		and c.IsValidHero(spiderTarget)
+		and c.IsInRange(b, spiderTarget, H)
+		and c.CanCastOnNonMagicImmune(spiderTarget)
+		and c.CanCastOnTargetAdvanced(spiderTarget)
+		and not c.IsSuspiciousIllusion(spiderTarget)
+		and not spiderTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
+		and c.GetManaAfter(q:GetManaCost()) > 0.2
+	then
+		if DotaTime() >= (b._broodSpawnLogAt or -999) then
+			b._broodSpawnLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-BROODMOTHER] t=%.0f spiderlings engage %s",
+				DotaTime(),
+				(string.gsub(spiderTarget:GetUnitName(), "npc_dota_hero_", ""))
+			))
+		end
+		return BOT_ACTION_DESIRE_HIGH, spiderTarget
 	end
 	local G = b:GetNearbyLaneCreeps(H, true)
 	for P, R in pairs(G) do

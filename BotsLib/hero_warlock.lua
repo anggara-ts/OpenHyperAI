@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 } }
+local j = { { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -36,14 +36,14 @@ m["pos_5"] = {
 	"item_double_branches",
 	"item_blood_grenade",
 	"item_magic_wand",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_pipe",
 	"item_aghanims_shard",
 	"item_force_staff",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
-	"item_boots_of_bearing",
+	"item_aether_lens",
 	"item_refresher",
 	"item_octarine_core",
 	"item_ultimate_scepter_2",
@@ -71,15 +71,16 @@ m["pos_2"] = {
 	"item_mage_outfit",
 	"item_shadow_amulet",
 	"item_kaya",
-	"item_veil_of_discord",
+	-- Scepter and Refresher come before Shiva's (they replaced Veil of Discord and an early
+	-- Maelstrom that sat idle on a hero who barely right-clicks).
+	"item_ultimate_scepter",
 	"item_glimmer_cape",
 	"item_kaya_and_sange",
-	"item_maelstrom",
+	"item_refresher",
 	"item_shivas_guard",
 	"item_aghanims_shard",
 	"item_gungir",
 	"item_sheepstick",
-	"item_refresher",
 	"item_heart",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -94,6 +95,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "warlock_rain_of_chaos", kind = "point" } }
 a["bDeafaultItem"] = true
 local n = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "warlock")
 local o = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "warlock")
@@ -180,7 +183,9 @@ function a.ConsiderR()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if n:IsFullyCastable() and b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 then
+	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
+	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
+	if b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 and a.ConsiderQ() > 0 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local M = q:GetCastRange() + I
@@ -209,7 +214,9 @@ function a.ConsiderRFR()
 	if not q:IsFullyCastable() or J == nil or not J:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if n:IsFullyCastable() and b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 then
+	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
+	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
+	if b:GetMana() >= n:GetManaCost() + q:GetManaCost() and F > 0.5 and a.ConsiderQ() > 0 then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if b:GetMana() < q:GetManaCost() * 2 + J:GetManaCost() then
@@ -234,7 +241,10 @@ function a.ConsiderE()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if q:IsFullyCastable() or n:IsFullyCastable() or o:IsFullyCastable() then
+	-- Only the ult holds Upheaval now (the channel blocks every cast until it ends). Bonds and Shadow
+	-- Word are considered first in SkillsComplement and return when they cast, so a ready-but-unused
+	-- Bonds or Word (no target for them) only kept Upheaval from ever going out.
+	if q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local M = p:GetCastRange() + 30 + I
@@ -244,7 +254,27 @@ function a.ConsiderE()
 	if c.IsInTeamFight(b, 1200) then
 		local R = b:FindAoELocation(true, true, b:GetLocation(), M, P / 2, 0, 0)
 		if R.count >= 2 then
-			return BOT_ACTION_DESIRE_LOW, R.targetloc
+			-- Upheaval does not pierce spell immunity (npc data: SPELL_IMMUNITY_ENEMIES_NO): with the
+			-- Bonds/Word gate gone, do not start a 10-16s channel unless 2+ of those heroes can be hit.
+			local hittable = 0
+			for _, foe in pairs(c.GetEnemiesNearLoc(R.targetloc, P / 2)) do
+				if c.IsValidHero(foe) and c.CanCastOnNonMagicImmune(foe) then
+					hittable = hittable + 1
+				end
+			end
+			if hittable >= 2 then
+				if DotaTime() >= (b._upheavalLogAt or -999) then
+					b._upheavalLogAt = DotaTime() + 15
+					pcall(print, string.format(
+						"[OHA-WARLOCK] t=%.0f upheaval heroes=%d bondsReady=%s wordReady=%s",
+						DotaTime(),
+						hittable,
+						tostring(n:IsFullyCastable()),
+						tostring(o:IsFullyCastable())
+					))
+				end
+				return BOT_ACTION_DESIRE_LOW, R.targetloc
+			end
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
@@ -344,6 +374,38 @@ function a.ConsiderQ()
 	local O = n:GetManaCost()
 	local P = n:GetSpecialValueInt("search_aoe")
 	local a5 = n:GetSpecialValueInt("count")
+	-- Grouped enemy heroes: Bonds first, on the hero nearest the middle of the group. Every
+	-- linked hero then shares the Chaotic Offering stun, the golem's hits and the follow-up.
+	local cluster = b:FindAoELocation(true, true, b:GetLocation(), M, P, 0, 0)
+	if cluster ~= nil and cluster.count >= 2 then
+		local best, bestDist = nil, math.huge
+		for _, foe in pairs(c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(foe)
+				and c.CanCastOnNonMagicImmune(foe)
+				and c.CanCastOnTargetAdvanced(foe)
+				and not c.IsSuspiciousIllusion(foe)
+			then
+				local dist = GetUnitToLocationDistance(foe, cluster.targetloc)
+				if dist < bestDist then
+					best, bestDist = foe, dist
+				end
+			end
+		end
+		if best ~= nil then
+			if DotaTime() >= (b._bondsLogAt or -999) then
+				b._bondsLogAt = DotaTime() + 10
+				pcall(print, string.format(
+					"[OHA-WARLOCK] t=%.0f fatal-bonds grouped=%d target=%s ultReady=%s",
+					DotaTime(),
+					cluster.count,
+					(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(q:IsFullyCastable())
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
 	if c.IsInTeamFight(b, 1000) then
 		local R = b:FindAoELocation(true, true, b:GetLocation(), M, P, 0, 0)
 		if R.count >= 2 then
@@ -355,7 +417,9 @@ function a.ConsiderQ()
 	end
 	if c.IsRetreating(b) then
 		local a4 = c.GetVulnerableWeakestUnit(b, true, true, M - 100)
-		if a4 ~= nil and c.GetUnitAllyCountAroundEnemyTarget(a4, P) >= 3 then
+		-- Bonds links enemy units, so count enemies around him (GetUnitAllyCountAroundEnemyTarget
+		-- counted our own units), as the engage branch below does.
+		if a4 ~= nil and c.GetAroundTargetEnemyUnitCount(a4, P) >= 3 then
 			return BOT_ACTION_DESIRE_HIGH, a4
 		end
 	end

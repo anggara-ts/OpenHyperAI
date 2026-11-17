@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 3, 1, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, {
+local j = { { 2, 3, 3, 1, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, {
 	2,
 	1,
 	1,
@@ -65,19 +65,19 @@ m["pos_2"] = {
 	"item_null_talisman",
 	"item_magic_wand",
 	"item_boots",
-	"item_arcane_boots",
-	"item_orchid",
+	"item_travel_boots",
+	"item_yasha_and_kaya",
 	"item_maelstrom",
-	"item_mjollnir",
 	"item_black_king_bar",
-	"item_bloodthorn",
+	"item_ultimate_scepter",
+	"item_mjollnir",
+	"item_aghanims_shard",
+	"item_blink",
 	"item_invis_sword",
 	"item_silver_edge",
-	"item_sheepstick",
+	"item_sphere",
 	"item_moon_shard",
-	"item_travel_boots",
 	"item_travel_boots_2",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 }
 m["pos_3"] = {
@@ -203,7 +203,8 @@ function a.ConsiderQ()
 	local N = o:GetCastRange() + D
 	local O = o:GetCastPoint()
 	local P = o:GetManaCost()
-	local Q = o:GetSpecialValueInt("AbilityDamage")
+	-- datafeed: Dragon Slave damage is "dragon_slave_damage" (65/125/185/245); it has no AbilityDamage (read 0).
+	local Q = o:GetSpecialValueInt("dragon_slave_damage")
 	local R = o:GetSpecialValueInt("dragon_slave_width_end")
 	local S = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N - 80, true, BOT_MODE_NONE)
@@ -250,7 +251,18 @@ function a.ConsiderQ()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
-		if c.IsValidHero(botTarget) and c.CanCastOnNonMagicImmune(botTarget) and c.IsInRange(botTarget, b, N - 80) then
+		-- Light Strike Array first when it is up and the target is in its range and not disabled:
+		-- this branch fired first (Q is checked before W), so the stun came after Dragon Slave.
+		local lsaFirst = p:IsFullyCastable()
+			and c.IsValidHero(botTarget)
+			and c.IsInRange(b, botTarget, p:GetCastRange() + D - 30)
+			and not c.IsDisabled(botTarget)
+		if
+			c.IsValidHero(botTarget)
+			and c.CanCastOnNonMagicImmune(botTarget)
+			and c.IsInRange(botTarget, b, N - 80)
+			and not lsaFirst
+		then
 			if M >= 2 or H > 0.68 or c.GetHP(botTarget) < 0.38 then
 				U = botTarget:GetExtrapolatedLocation(O)
 				if c.IsInLocRange(b, U, N) then
@@ -473,7 +485,8 @@ function a.ConsiderR()
 	local O = r:GetCastPoint()
 	local P = r:GetManaCost()
 	local Q = r:GetSpecialValueInt("damage")
-	local S = b:HasScepter() and DAMAGE_TYPE_PURE or DAMAGE_TYPE_MAGICAL
+	-- datafeed: Laguna Blade is magical (2) with no Scepter upgrade (the Scepter now grants Flame Cloak).
+	local S = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N + 80, true, BOT_MODE_NONE)
 	local a6 = c.GetNearbyHeroes(b, N + 240, true, BOT_MODE_NONE)
 	for V, W in pairs(a6) do
@@ -510,11 +523,8 @@ function a.ConsiderR()
 end
 function a.CanCastAbilityROnTarget(aa)
 	if c.CanCastOnTargetAdvanced(aa) and not aa:HasModifier("modifier_arc_warden_tempest_double") then
-		if b:HasScepter() then
-			return c.CanCastOnMagicImmune(aa)
-		else
-			return c.CanCastOnNonMagicImmune(aa)
-		end
+		-- datafeed: Laguna has no Scepter upgrade any more, so it never goes through magic immunity.
+		return c.CanCastOnNonMagicImmune(aa)
 	end
 	return false
 end
@@ -526,6 +536,24 @@ function a.ConsiderFlameCloak()
 	local ac = c.GetNearbyHeroes(b, ab, true, BOT_MODE_NONE)
 	local ad = c.GetNearbyHeroes(b, ab, false, BOT_MODE_NONE)
 	if c.IsRetreating(b) and (ac ~= nil and ad ~= nil and #ac >= #ad) and not c.WeAreStronger(b, ab) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Before Laguna Blade: Flame Cloak gives 35% spell amp (Valve data), and it is ordered before
+	-- ConsiderR, so the blade gets the amp. It only went with 2+ enemies in attack range.
+	if
+		c.IsGoingOnSomeone(b)
+		and r:IsFullyCastable()
+		and b:GetMana() >= s:GetManaCost() + r:GetManaCost()
+		and c.IsValidHero(botTarget)
+		and not c.IsSuspiciousIllusion(botTarget)
+		and a.CanCastAbilityROnTarget(botTarget)
+		and c.IsInRange(b, botTarget, r:GetCastRange() + D)
+		and c.GetHP(botTarget) < 0.6
+	then
+		if DotaTime() >= (b._cloakLogAt or -999) then
+			b._cloakLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-LINA] t=%.0f flame cloak before laguna", DotaTime()))
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if c.IsGoingOnSomeone(b) and (ac ~= nil and #ac >= 2) then

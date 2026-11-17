@@ -19,19 +19,19 @@ m["pos_2"] = {
 	"item_quelling_blade",
 	"item_bottle",
 	"item_magic_wand",
-	"item_boots",
+	"item_power_treads",
 	"item_urn_of_shadows",
 	"item_spirit_vessel",
 	"item_blade_mail",
-	"item_heart",
+	"item_kaya_and_sange",
 	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_travel_boots",
 	"item_shivas_guard",
 	"item_octarine_core",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	"item_sheepstick",
-	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
 m["pos_1"] = {
@@ -138,6 +138,18 @@ local J = 0
 local K
 local L
 local M
+-- One throttled log line per kind, so the new casts below can be seen in a game.
+local esLogAt = {}
+local function LogES(kind, fmt, ...)
+	if DotaTime() < (esLogAt[kind] or -999) then
+		return
+	end
+	esLogAt[kind] = DotaTime() + 5
+	local ok, msg = pcall(string.format, "[OHA-EARTHSPIRIT] t=%.0f " .. kind .. " " .. fmt, DotaTime(), ...)
+	if ok then
+		pcall(print, msg)
+	end
+end
 function a.SkillsComplement()
 	local N = d.Build(b)
 	L = N.isEngaging
@@ -187,7 +199,8 @@ function a.SkillsComplement()
 			end
 		end
 	end
-	C, D, E = a.ConsiderGeomagneticGrip()
+	local onAlly
+	C, D, E, onAlly = a.ConsiderGeomagneticGrip()
 	if C > 0 then
 		if E then
 			b:Action_ClearActions(false)
@@ -195,7 +208,9 @@ function a.SkillsComplement()
 			b:ActionQueue_UseAbilityOnLocation(q, D)
 			return
 		else
-			if c.HasAghanimsShard(b) then
+			-- Ally pull is a unit-target cast; it used to depend on Shard, but the base spell
+			-- already targets allies (shard only adds range/speed).
+			if onAlly == true then
 				b:Action_UseAbilityOnEntity(q, D)
 			else
 				b:Action_UseAbilityOnLocation(q, D)
@@ -214,46 +229,63 @@ function a.ConsiderBoulderSmash()
 	local R = o:GetSpecialValueInt("rock_damage")
 	local S = IsStoneNearby(b:GetLocation(), P)
 	local T = b:GetMana() / b:GetMaxMana()
+	-- Rock reach: a smashed remnant travels rock_distance (2000). The kill and engage scans used
+	-- the smash cast range (150), so the remnant kick only ever fired at melee range.
+	local rockReach = math.min(o:GetSpecialValueInt("rock_distance"), 1600)
+	if rockReach <= 0 then
+		rockReach = 1600
+	end
 	local U = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
-	local V = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
+	-- Kick an enemy in melee range into a real ally. The ally list includes Earth Spirit himself,
+	-- so V[#V] could be his own spot (kick toward his feet). A ground cast also kicks a remnant
+	-- within 200 first (datafeed), so skip this when one is next to him.
+	local kickTo = nil
+	for _, ally in pairs(c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}) do
+		if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() then
+			kickTo = ally
+			break
+		end
+	end
 	for W, X in pairs(U) do
 		if
-			c.IsValidHero(X)
+			kickTo ~= nil
+			and not IsStoneNearby(b:GetLocation(), o:GetSpecialValueInt("rock_search_aoe"))
+			and c.IsValidHero(X)
 			and c.CanCastOnNonMagicImmune(X)
 			and c.IsInRange(b, X, P)
 			and not c.IsSuspiciousIllusion(X)
 		then
-			if V ~= nil and #V >= 1 then
-				return BOT_ACTION_DESIRE_HIGH, V[#V]:GetLocation(), false, true
-			else
-				return BOT_ACTION_DESIRE_HIGH, GetAncient(GetTeam()):GetLocation(), false, true
-			end
+			LogES("kick", "enemy=%s into ally=%s", X:GetUnitName(), kickTo:GetUnitName())
+			return BOT_ACTION_DESIRE_HIGH, kickTo:GetLocation(), false, true
 		end
 	end
 	if S then
-		local Y = c.GetNearbyHeroes(b, math.min(O, 1600), true, BOT_MODE_NONE)
+		local Y = c.GetNearbyHeroes(b, rockReach, true, BOT_MODE_NONE)
 		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
 		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
 			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q)
 			return BOT_ACTION_DESIRE_HIGH, _, false, true
 		end
 	elseif J >= 1 then
-		local Y = c.GetNearbyHeroes(b, math.min(O, 1600), true, BOT_MODE_NONE)
+		local Y = c.GetNearbyHeroes(b, rockReach, true, BOT_MODE_NONE)
 		local Z = c.GetCanBeKilledUnit(Y, R, DAMAGE_TYPE_MAGICAL, false)
 		if Z ~= nil and not c.IsSuspiciousIllusion(Z) then
 			local _ = c.GetCorrectLoc(Z, GetUnitToUnitDistance(b, Z) / Q)
+			LogES("smash", "kill target=%s dist=%d", Z:GetUnitName(), math.floor(GetUnitToUnitDistance(b, Z)))
 			return BOT_ACTION_DESIRE_HIGH, _, true, false
 		end
 	end
 	if L then
 		K = c.GetProperTarget(b)
+		-- Engage kick: remnant at the target from up to 1200 (was the 150 cast range).
 		if
 			c.IsValidTarget(K)
 			and c.CanCastOnNonMagicImmune(K)
-			and c.IsInRange(b, K, math.min(O, 1600))
+			and c.IsInRange(b, K, math.min(rockReach, 1200))
 			and not c.IsSuspiciousIllusion(K)
 		then
 			local _ = c.GetCorrectLoc(K, GetUnitToUnitDistance(b, K) / Q)
+			LogES("smash", "engage target=%s dist=%d", K:GetUnitName(), math.floor(GetUnitToUnitDistance(b, K)))
 			if S then
 				return BOT_ACTION_DESIRE_HIGH, _, false, true
 			elseif J >= 1 then
@@ -298,8 +330,8 @@ function a.ConsiderRollingBoulder()
 	local a4 = p:GetSpecialValueFloat("delay")
 	local Q = p:GetSpecialValueInt("rock_speed")
 	local R = p:GetSpecialValueInt("damage")
-	local T = b:GetMana()
-	b:GetMaxMana()
+	-- Mana ratio (was raw mana, so the "T > 0.88" travel roll below passed at any mana).
+	local T = b:GetMana() / b:GetMaxMana()
 	local a5 = math.min(a3 * 2, 1600)
 	local a6 = a3
 	if J >= 1 then
@@ -307,11 +339,11 @@ function a.ConsiderRollingBoulder()
 	end
 	local Y = c.GetNearbyHeroes(b, math.min(a6, 1600), true, BOT_MODE_NONE)
 	for W, X in pairs(Y) do
+		-- Parenthesised: the channel case used to skip the illusion and already-rolling checks.
 		if
-			X:CanBeSeen() and X:IsChanneling()
-			or c.IsCastingUltimateAbility(X)
-				and not c.IsSuspiciousIllusion(X)
-				and not b:HasModifier("modifier_earth_spirit_rolling_boulder_caster")
+			(X:CanBeSeen() and X:IsChanneling() or c.IsCastingUltimateAbility(X))
+			and not c.IsSuspiciousIllusion(X)
+			and not b:HasModifier("modifier_earth_spirit_rolling_boulder_caster")
 		then
 			local _ = c.GetCorrectLoc(X, GetUnitToUnitDistance(b, X) / Q + a4)
 			if IsStoneInPath(_, GetUnitToUnitDistance(b, X)) or J == 0 then
@@ -429,21 +461,32 @@ function a.ConsiderGeomagneticGrip()
 	local ad = q:GetCastPoint()
 	local T = b:GetMana() / b:GetMaxMana()
 	local R = q:GetSpecialValueInt("rock_damage")
-	if c.HasAghanimsShard(b) then
-		local ae = c.GetNearbyHeroes(b, O, false, BOT_MODE_NONE)
-		local af = c.GetNearbyHeroes(b, 300, false, BOT_MODE_NONE)
-		for W, ag in pairs(ae) do
-			if c.GetHP(ag) < 0.4 and c.IsInRange(b, ag, O) and not c.IsInRange(b, ag, O - 250) and #af == 0 then
-				return BOT_ACTION_DESIRE_HIGH, ag, false
-			end
+	-- Ally save. Grip pulls allied heroes without Shard (datafeed: "cast range is reduced when
+	-- targeting an ally"; cast_range_heroes 550-700, Shard +50%). It used to be Shard-only, used
+	-- the remnant range (1000-1300) and required no ally within 300 of Earth Spirit, but that list
+	-- includes himself, so it never fired. Now: a hurt or fleeing ally being hit by heroes, an enemy
+	-- hero near him, between 300 and the hero cast range, while Earth Spirit is not running himself.
+	local heroRange = q:GetSpecialValueInt("cast_range_heroes")
+	if heroRange <= 0 then
+		heroRange = 550
+	end
+	if not M then
+		for W, ag in pairs(c.GetNearbyHeroes(b, heroRange, false, BOT_MODE_NONE) or {}) do
 			if
-				c.IsRetreating(ag)
+				ag ~= b
+				and c.IsValidHero(ag)
+				and not ag:IsIllusion()
+				and c.IsInRange(b, ag, heroRange)
+				and not c.IsInRange(b, ag, 300)
 				and ag:WasRecentlyDamagedByAnyHero(2.0)
-				and c.IsInRange(b, ag, O)
-				and not c.IsInRange(b, ag, O - 250)
-				and #af == 0
+				and (c.GetHP(ag) < 0.4 or c.IsRetreating(ag))
+				and not ag:HasModifier("modifier_faceless_void_chronosphere_freeze")
+				and not ag:HasModifier("modifier_enigma_black_hole_pull")
+				and not ag:HasModifier("modifier_legion_commander_duel")
+				and #(c.GetEnemiesNearLoc(ag:GetLocation(), 700) or {}) >= 1
 			then
-				return BOT_ACTION_DESIRE_HIGH, ag, false
+				LogES("grip", "save ally=%s hp=%.2f dist=%d", ag:GetUnitName(), c.GetHP(ag), math.floor(GetUnitToUnitDistance(b, ag)))
+				return BOT_ACTION_DESIRE_HIGH, ag, false, true
 			end
 		end
 	end
@@ -464,14 +507,16 @@ function a.ConsiderGeomagneticGrip()
 			c.IsValidTarget(K)
 			and c.CanCastOnNonMagicImmune(K)
 			and c.IsInRange(b, K, O)
-			and c.CanKillTarget(K, R, DAMAGE_TYPE_MAGICAL)
+			-- Also for the silence, not only when it kills (a pulled remnant silences whoever it hits).
+			and (c.CanKillTarget(K, R, DAMAGE_TYPE_MAGICAL) or not K:IsSilenced() and not c.IsDisabled(K))
 			and not c.IsSuspiciousIllusion(K)
 		then
 			local ai = c.GetNearbyHeroes(K, O, false, BOT_MODE_NONE)
 			local aj = c.GetNearbyHeroes(K, O, true, BOT_MODE_NONE)
 			if ai ~= nil and aj ~= nil and #ai >= #aj then
 				local _ = c.GetCorrectLoc(K, ad)
-				local ah = IsStoneNearTarget(Z)
+				-- Check the stone near the engage target K; Z (kill-scan result) can be nil here and crash.
+				local ah = IsStoneNearTarget(K)
 				if ah then
 					return BOT_ACTION_DESIRE_HIGH, _, false
 				elseif J >= 1 then

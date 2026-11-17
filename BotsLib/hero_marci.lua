@@ -11,7 +11,8 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+-- Rebound maxed first, Dispose second, Bodyguard last (Dotabuff most picked order).
+local j = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local k
 local l
 if h == "pos_1" then
@@ -31,15 +32,15 @@ m["pos_1"] = {
 	"item_phase_boots",
 	"item_magic_wand",
 	"item_armlet",
-	"item_bfury",
+	"item_blink",
 	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_basher",
 	"item_greater_crit",
-	"item_satanic",
+	"item_ultimate_scepter",
 	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
 m["pos_3"] = {
@@ -50,7 +51,7 @@ m["pos_3"] = {
 	"item_quelling_blade",
 	"item_phase_boots",
 	"item_magic_wand",
-	"item_bfury",
+	"item_blink",
 	"item_heavens_halberd",
 	"item_black_king_bar",
 	"item_assault",
@@ -95,9 +96,11 @@ m["pos_5"] = {
 }
 a["sBuyList"] = m[h]
 local n = {}
-n["pos_1"] = { "item_magic_wand", "item_greater_crit", "item_armlet", "item_abyssal_blade" }
+-- Pairs are { owned, sold }: the old order sold Daedalus once she held a Wand, Abyssal once she held
+-- Armlet, and Nullifier once she held a Wand. Swapped so the late item replaces the early one.
+n["pos_1"] = { "item_greater_crit", "item_magic_wand", "item_abyssal_blade", "item_armlet" }
 n["pos_2"] = n["pos_1"]
-n["pos_3"] = { "item_magic_wand", "item_nullifier" }
+n["pos_3"] = { "item_nullifier", "item_magic_wand" }
 n["pos_4"] = { "item_quelling_blade" }
 n["pos_5"] = { "item_quelling_blade" }
 a["sSellList"] = n[h] or {}
@@ -117,13 +120,11 @@ function a.MinionThink(o)
 end
 local p = SafeAbility(b:GetAbilityByName("marci_grapple"), "marci_grapple", "marci")
 local q = SafeAbility(b:GetAbilityByName("marci_companion_run"), "marci_companion_run", "marci")
-local r = SafeAbility(b:GetAbilityByName("marci_guardian"), "marci_guardian", "marci")
 local s = SafeAbility(b:GetAbilityByName("marci_unleash"), "marci_unleash", "marci")
 local t = SafeAbility(b:GetAbilityByName("marci_bodyguard"), "marci_bodyguard", "marci")
 local u = SafeAbility(b:GetAbilityByName("marci_special_delivery"), "marci_special_delivery", "marci")
 local v, w
 local x, y
-local z, A
 local B
 local C, D
 local E
@@ -156,12 +157,6 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnEntity(q, y)
 		return
 	end
-	z, A = a.ConsiderSidekick()
-	if z > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(r, A)
-		return
-	end
 	C, D = a.ConsiderBodyguard()
 	if C > 0 then
 		c.SetQueuePtToINT(b, false)
@@ -175,6 +170,31 @@ function a.ConsiderBodyguard()
 	end
 	local K = c.GetProperCastRange(false, b, t:GetCastRange())
 	local L = b:GetNearbyLaneCreeps(1200, true)
+	-- Save: Bodyguard puts a shared all-damage barrier on the partner (datafeed: shared_barrier
+	-- 90/160/230/300), but it was only cast from Marci's own state, never for an ally under fire.
+	for _, ally in pairs(I) do
+		if
+			c.IsValidHero(ally)
+			and b ~= ally
+			and not ally:IsIllusion()
+			and not c.IsMeepoClone(ally)
+			and c.IsInRange(b, ally, K)
+			and c.GetHP(ally) < 0.5
+			and ally:WasRecentlyDamagedByAnyHero(1.5)
+			and not ally:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			if DotaTime() >= (b._ohaMarciGuardLogAt or -999) then
+				b._ohaMarciGuardLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-MARCI] t=%.0f bodyguard save on %s hp=%.2f",
+					DotaTime(),
+					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+					c.GetHP(ally)
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, ally
+		end
+	end
 	if
 		c.IsGoingOnSomeone(b) and b:WasRecentlyDamagedByAnyHero(5.0)
 		or c.IsPushing(b) and #J > 0
@@ -335,8 +355,20 @@ function a.ConsiderRebound()
 							and not c.IsSuspiciousIllusion(U)
 							and not c.IsDisabled(U)
 						then
+							-- Was returning the enemy U: Rebound targets allied units only (enemies only
+							-- with Shard), so the escape cast failed or jumped Marci onto the chaser.
+							-- Jump to the ally P that is on the way to the fountain.
 							if #J > #I or b:WasRecentlyDamagedByHero(U, 3.0) then
-								return BOT_ACTION_DESIRE_HIGH, U
+								-- Landing direction can't be set (no vector-target order); log to check it.
+								if DotaTime() >= (b._ohaMarciReboundLogAt or -999) then
+									b._ohaMarciReboundLogAt = DotaTime() + 5
+									pcall(print, string.format(
+										"[OHA-MARCI] t=%.0f rebound escape via %s",
+										DotaTime(),
+										P:GetUnitName()
+									))
+								end
+								return BOT_ACTION_DESIRE_HIGH, P
 							end
 						end
 					end
@@ -405,58 +437,22 @@ function a.ConsiderRebound()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderSidekick()
-	if not c.CanCastAbility(r) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local K = c.GetProperCastRange(false, b, r:GetCastRange())
-	local a7 = b:GetNearbyLaneCreeps(1200, true)
-	if
-		c.IsGoingOnSomeone(b)
-		or c.IsPushing(b)
-		or c.IsDefending(b)
-		or c.IsLaning(b) and #a7 >= 3
-		or c.IsDoingRoshan(b) and c.IsRoshan(G) and c.IsInRange(b, G, 800) and c.IsAttacking(b) and c.CanBeAttacked(G)
-		or c.IsDoingTormentor(b)
-			and c.IsTormentor(G)
-			and c.IsInRange(b, G, 800)
-			and c.IsAttacking(b)
-			and c.CanBeAttacked(G)
-	then
-		local I = b:GetNearbyHeroes(K, false, BOT_MODE_NONE)
-		local M = nil
-		local a8 = 0
-		for O, P in pairs(I) do
-			if
-				c.IsValidHero(P)
-				and b ~= P
-				and c.IsInRange(b, P, K)
-				and not P:IsIllusion()
-				and not c.IsMeepoClone(P)
-				and not P:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not P:HasModifier("modifier_marci_guardian_buff")
-				and not P:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local a9 = P:GetAttackDamage() * P:GetAttackSpeed()
-				if a9 > a8 then
-					a8 = a9
-					M = P
-				end
-			end
-		end
-		if M ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, M
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
 function a.ConsiderUnleash()
 	if not c.CanCastAbility(s) then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local aa = s:GetSpecialValueInt("pulse_damage")
 	local ab = s:GetSpecialValueInt("charges_per_flurry")
-	if c.IsInTeamFight(b, 800) then
+	-- Was: any team fight with an enemy core within 1600, so the 16 s Unleash could start while Marci
+	-- was still walking in and lose seconds of it. Now an enemy hero must be within 500.
+	local enemyClose = false
+	for O, a6 in pairs(J) do
+		if c.IsValidHero(a6) and not c.IsSuspiciousIllusion(a6) and c.IsInRange(b, a6, 500) then
+			enemyClose = true
+			break
+		end
+	end
+	if c.IsInTeamFight(b, 800) and enemyClose then
 		local ac = 0
 		for O, a6 in pairs(J) do
 			if c.IsValidHero(a6) and c.IsCore(a6) then

@@ -22,9 +22,9 @@ n["pos_4"] = {
 	"item_aether_lens",
 	"item_blink",
 	m,
+	"item_aghanims_shard",
 	"item_guardian_greaves",
 	"item_ultimate_scepter",
-	"item_aeon_disk",
 	"item_octarine_core",
 	"item_ultimate_scepter_2",
 	"item_arcane_blink",
@@ -38,12 +38,12 @@ n["pos_5"] = {
 	"item_blood_grenade",
 	"item_magic_wand",
 	"item_boots",
-	"item_tranquil_boots",
+	"item_arcane_boots",
+	"item_aether_lens",
+	"item_blink",
 	"item_glimmer_cape",
-	"item_pipe",
 	"item_aghanims_shard",
 	"item_force_staff",
-	"item_boots_of_bearing",
 	"item_cyclone",
 	"item_lotus_orb",
 	"item_gungir",
@@ -107,8 +107,22 @@ function a.SkillsComplement()
 	local J = d.Build(b)
 	H = J.isEngaging
 	I = J.isTeamFight
+	-- An enemy under our Disruption: Shadow Poison on the spot right away (Valve data: "Shadow
+	-- Poison can affect units under Disruption"); the normal rule waited for the target to show.
+	if a.ConsiderPoisonDisrupted() then
+		return
+	end
 	v, w = a.ConsiderDisruption()
 	if v > 0 then
+		if c.IsValidHero(w) and w:GetTeam() ~= GetTeam() then
+			local okD, dur = pcall(function()
+				return p:GetSpecialValueFloat("disruption_duration")
+			end)
+			b._disrupted = {
+				loc = w:GetLocation(),
+				untilAt = DotaTime() + math.max(0, p:GetCastPoint()) + ((okD and type(dur) == "number" and dur > 0) and dur or 2.75),
+			}
+		end
 		b:Action_UseAbilityOnEntity(p, w)
 		return
 	end
@@ -137,6 +151,25 @@ function a.SkillsComplement()
 		b:Action_UseAbility(s)
 		return
 	end
+end
+function a.ConsiderPoisonDisrupted()
+	local st = b._disrupted
+	if st == nil then
+		return false
+	end
+	if DotaTime() > st.untilAt then
+		b._disrupted = nil
+		return false
+	end
+	if not r:IsFullyCastable() then
+		return false
+	end
+	local range = c.GetProperCastRange(false, b, r:GetCastRange())
+	if GetUnitToLocationDistance(b, st.loc) > range then
+		return false
+	end
+	b:Action_UseAbilityOnLocation(r, st.loc)
+	return true
 end
 function a.ConsiderDisruption()
 	if not p:IsFullyCastable() then
@@ -343,7 +376,9 @@ function a.ConsiderShadowPoisonRelease()
 		if c.IsValidHero(enemyHero) and c.IsInRange(enemyHero, b, 3000) and not c.IsSuspiciousIllusion(enemyHero) then
 			local Z = c.GetModifierCount(enemyHero, "modifier_shadow_demon_shadow_poison")
 			local _ = r:GetSpecialValueFloat("stack_damage")
-			if Z >= 5 or Z > 0 and c.CanKillTarget(enemyHero, _ * Z * Y[Z], DAMAGE_TYPE_MAGICAL) then
+			-- datafeed: release deals 1/2/4/8/16 times the stack damage for 1-5 stacks. The extra "* Z"
+			-- overrated it (3 stacks counted 12x instead of 4x), so Release fired early on targets it could not kill.
+			if Z >= 5 or Z > 0 and c.CanKillTarget(enemyHero, _ * Y[Z], DAMAGE_TYPE_MAGICAL) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -364,7 +399,7 @@ function a.ConsiderShadowPoison()
 			c.IsValidTarget(G)
 			and c.CanCastOnNonMagicImmune(G)
 			and not c.IsSuspiciousIllusion(G)
-			and not G:HasModifier("modifier_dazzle_shallow_graves")
+			and not G:HasModifier("modifier_dazzle_shallow_grave") -- fix: modifier name typo ("graves")
 			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			if c.IsInRange(b, G, K / 2 - 150) then
@@ -497,13 +532,14 @@ function a.ConsiderDemonicCleanse()
 	end
 	local K = c.GetProperCastRange(false, b, t:GetCastRange())
 	if I then
-		local R = c.GetEnemiesNearLoc(b:GetLocation(), K + 200)
+		-- datafeed: Demonic Cleanse targets allies (target_team 1). It scanned enemies, required
+		-- disabled AND taunted, and returned an undefined global; cleanse a disabled ally instead.
+		local R = c.GetAlliesNearLoc(b:GetLocation(), K)
 		for N, P in pairs(R) do
 			if
 				c.IsValidHero(P)
-				and c.IsDisabled(P)
-				and c.IsTaunted(P)
-				and not c.IsSuspiciousIllusion(P)
+				and (c.IsDisabled(P) or c.IsTaunted(P))
+				and not P:IsIllusion()
 				and not P:HasModifier("modifier_abaddon_borrowed_time")
 				and not P:HasModifier("modifier_dazzle_shallow_grave")
 				and not P:HasModifier("modifier_doom_bringer_doom")
@@ -512,7 +548,7 @@ function a.ConsiderDemonicCleanse()
 				and not P:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not P:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				return BOT_ACTION_DESIRE_HIGH, enemyHero
+				return BOT_ACTION_DESIRE_HIGH, P
 			end
 		end
 	end

@@ -5,13 +5,23 @@ local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
-local g = c.Skill.GetAbilityList(b)
+-- Fixed list by name. GetAbilityList skips only abilities that are both unlearnable and hidden at
+-- spawn, so Primal Spring (slot 3) and Mischief (slot 5) could shift Jingu Mastery's index; the
+-- old arrays had 16 entries, the ultimate first at level 9 and 5 points in one basic ability.
+local g = {
+	"monkey_king_boundless_strike",
+	"monkey_king_tree_dance",
+	"monkey_king_jingu_mastery",
+	[6] = "monkey_king_wukongs_command",
+}
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 4, 4, 2, 4, 2, 2, 2, 6, 1, 1, 1, 4, 2, 6, 6 }, { 4, 1, 4, 2, 4, 1, 4, 1, 1, 6, 2, 2, 2, 2, 6, 6 } }
+-- User call: one point in each basic ability at levels 1-3, Jingu Mastery maxed, ultimate at
+-- 6/12/18, then Boundless Strike, Tree Dance last.
+local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 }, { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k
 local l
 if h == "pos_1" then
@@ -105,8 +115,38 @@ local L
 local M
 local N
 local O
+-- In-game check: is the Jingu buff seen, and do the counter stacks build on the hero he hits?
+local jinguOn, jinguLogTarget, jinguLogStacks = false, nil, 0
+local function LogJingu()
+	local on = b:HasModifier("modifier_monkey_king_quadruple_tap_bonuses")
+	if on ~= jinguOn then
+		jinguOn = on
+		print(string.format("[OHA-MONKEY_KING] jingu %s charges=%d hp=%.2f", on and "active" or "ended",
+			c.GetModifierCount(b, "modifier_monkey_king_quadruple_tap_bonuses"), c.GetHP(b)))
+	end
+	local tgt = b:GetAttackTarget()
+	if c.IsValidHero(tgt) then
+		local st = c.GetModifierCount(tgt, "modifier_monkey_king_quadruple_tap_counter")
+		if st > 0 and (tgt ~= jinguLogTarget or st ~= jinguLogStacks) then
+			jinguLogTarget, jinguLogStacks = tgt, st
+			print(string.format("[OHA-MONKEY_KING] jingu counter target=%s stacks=%d", tgt:GetUnitName(), st))
+		end
+	end
+end
+-- Game 036: engage hops 3-5s apart (1476/1479/1482, 2643/2646, 2703/2708) with no Primal Spring in
+-- between (cooldown 18-12s, game data). For 4s after an engage hop, say why Spring was not cast.
+local function SpringSkip(why)
+	local now = DotaTime()
+	if now - (b._mkTreeDanceAt or -999) <= 4 and now >= (b._mkSpringSkipLogAt or -99) then
+		b._mkSpringSkipLogAt = now + 1
+		print(string.format("[OHA-MONKEY_KING] t=%.0f spring-skip why=%s hidden=%s cd=%.1f mana=%d/%d",
+			now, why, tostring(q:IsHidden()), q:GetCooldownTimeRemaining(), b:GetMana(), q:GetManaCost()))
+	end
+end
 function a.SkillsComplement()
+	LogJingu()
 	if c.CanNotUseAbility(b) then
+		SpringSkip("cannot-use-ability")
 		return
 	end
 	J = c.IsGoingOnSomeone(b)
@@ -117,6 +157,8 @@ function a.SkillsComplement()
 	O = c.IsInTeamFight(b, 1200)
 	E, F = a.ConsiderWukongsCommand()
 	if E > 0 then
+		-- Game 036: FPS hitch at 35:29 with no script cause found; log the cast to line it up next time.
+		print(string.format("[OHA-MONKEY_KING] wukong cast t=%.0f", DotaTime()))
 		b:Action_UseAbilityOnLocation(u, F)
 		return
 	end
@@ -169,8 +211,9 @@ function a.ConsiderBoundlessStrike()
 			if V:IsChanneling() or c.IsCastingUltimateAbility(V) then
 				return BOT_ACTION_DESIRE_HIGH, V:GetLocation()
 			end
+			-- datafeed: Boundless Strike deals physical damage (a crit on his attack), not magical.
 			if
-				c.CanKillTarget(V, S, DAMAGE_TYPE_MAGICAL)
+				c.CanKillTarget(V, S, DAMAGE_TYPE_PHYSICAL)
 				and not V:HasModifier("modifier_abaddon_borrowed_time")
 				and not V:HasModifier("modifier_dazzle_shallow_grave")
 				and not V:HasModifier("modifier_oracle_false_promise_timer")
@@ -180,13 +223,40 @@ function a.ConsiderBoundlessStrike()
 			end
 		end
 	end
+	-- Was: two heroes inside a 150 circle AND two enemies within 150 of Monkey King himself, which
+	-- almost never holds. The staff stuns along a line (datafeed): strike_radius is the line's
+	-- half-width and the cast range its length. Aim at the enemy whose line catches the most heroes.
 	if O then
-		local W = b:FindAoELocation(true, true, b:GetLocation(), P, R, Q, 0)
-		if W.count >= 2 then
-			local X = c.GetEnemiesNearLoc(b:GetLocation(), R)
-			if X ~= nil and #X >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, W.targetloc
+		local me = b:GetLocation()
+		local len = o:GetSpecialValueInt("strike_cast_range")
+		if len == nil or len <= 0 then
+			len = P
+		end
+		local bestLoc, bestN = nil, 0
+		for U, V in pairs(T) do
+			if c.IsValidHero(V) and c.CanCastOnNonMagicImmune(V) and not c.IsSuspiciousIllusion(V) then
+				local aim = V:GetExtrapolatedLocation(Q)
+				local tip = me + (aim - me):Normalized() * len
+				local n = 0
+				for _, X in pairs(T) do
+					if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) then
+						local hit = PointToLineDistance(me, tip, X:GetExtrapolatedLocation(Q))
+						if hit ~= nil and hit.within and hit.distance <= R + 25 then
+							n = n + 1
+						end
+					end
+				end
+				if n > bestN then
+					bestLoc, bestN = aim, n
+				end
 			end
+		end
+		if bestLoc ~= nil and bestN >= 2 then
+			if DotaTime() >= (b._strikeLineLogAt or -999) then
+				b._strikeLineLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-MONKEY_KING] t=%.0f boundless-strike line heroes=%d", DotaTime(), bestN))
+			end
+			return BOT_ACTION_DESIRE_HIGH, bestLoc
 		end
 	end
 	if J then
@@ -309,7 +379,13 @@ function a.ConsiderTreeDance()
 	if T == nil then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if J and q:IsFullyCastable() then
+	-- Was "J and q:IsFullyCastable()": Primal Spring is only gained while perched (datafeed), so
+	-- from the ground this either never held, or (perched) it held again and Tree Dance (cooldown
+	-- 0.9 to 0, checked before Spring) hopped to the next tree instead of springing. Now: Spring
+	-- trained, off cooldown and affordable; no new hop for 3s after one, so Spring gets its turn;
+	-- and the tree must be within Spring's range of the target (it was just the first tree found).
+	local springReady = q:IsTrained() and q:GetCooldownTimeRemaining() <= 0 and b:GetMana() >= q:GetManaCost()
+	if J and springReady and DotaTime() - (b._mkTreeDanceAt or -999) > 3 then
 		local Y = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
 		if
 			c.IsValidTarget(I)
@@ -321,15 +397,27 @@ function a.ConsiderTreeDance()
 		then
 			local a8 = b:GetNearbyTrees(P)
 			local Z = c.GetNearbyHeroes(I, 1000, false, BOT_MODE_NONE)
-			if
-				Y ~= nil
-				and Z ~= nil
-				and #Y >= #Z
-				and a8 ~= nil
-				and #a8 >= 1
-				and (IsLocationVisible(GetTreeLocation(a8[1])) or IsLocationPassable(GetTreeLocation(a8[1])))
-			then
-				return BOT_ACTION_DESIRE_HIGH, a8[1]
+			local springRange = q:GetCastRange()
+			if springRange == nil or springRange <= 0 then
+				springRange = 800
+			end
+			local tree, treeDist = nil, math.huge
+			for U, an in pairs(a8 or {}) do
+				local tl = GetTreeLocation(an)
+				local d0 = GetUnitToLocationDistance(I, tl)
+				if d0 <= springRange - 100 and d0 < treeDist and (IsLocationVisible(tl) or IsLocationPassable(tl)) then
+					tree, treeDist = an, d0
+				end
+			end
+			if Y ~= nil and Z ~= nil and #Y >= #Z and tree ~= nil then
+				b._mkTreeDanceAt = DotaTime()
+				pcall(print, string.format(
+					"[OHA-MONKEY_KING] t=%.0f tree-dance engage target=%s tree-to-target=%d",
+					DotaTime(),
+					(string.gsub(I:GetUnitName(), "npc_dota_hero_", "")),
+					math.floor(treeDist)
+				))
+				return BOT_ACTION_DESIRE_HIGH, tree
 			end
 		end
 	end
@@ -390,15 +478,20 @@ function a.ConsiderTreeDance()
 end
 function a.ConsiderPrimalSpring()
 	if q:IsHidden() or not q:IsFullyCastable() or not q:IsActivated() then
+		SpringSkip(q:IsHidden() and "hidden" or not q:IsActivated() and "not-activated" or "not-castable")
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local aa = q:GetSpecialValueInt("max_distance")
+	-- Primal Spring has no "max_distance" value (game KV: only impact_damage/slow/radius; the leap
+	-- range is its AbilityCastRange, 800), so the old lookup read 0 and the spring never aimed anywhere.
+	local aa = q:GetCastRange()
 	local ab = q:GetChannelTime()
 	local R = q:GetSpecialValueInt("impact_radius")
 	if O then
 		local W = b:FindAoELocation(true, true, b:GetLocation(), aa, R, ab, 0)
 		if W.count >= 2 then
-			local X = c.GetEnemiesNearLoc(b:GetLocation(), R)
+			-- Was enemies within impact_radius of Monkey King himself, not of the landing spot (up to
+			-- 800 away), so a group out there never counted.
+			local X = c.GetEnemiesNearLoc(W.targetloc, R)
 			if X ~= nil and #X >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, W.targetloc
 			end
@@ -420,7 +513,12 @@ function a.ConsiderPrimalSpring()
 			if Y ~= nil and Z ~= nil and #Y >= #Z then
 				return BOT_ACTION_DESIRE_HIGH, ac:GetExtrapolatedLocation(ab)
 			end
+			SpringSkip(string.format("outnumbered(%d<%d)", Y ~= nil and #Y or -1, Z ~= nil and #Z or -1))
+		else
+			SpringSkip("no-target-in-" .. tostring(aa))
 		end
+	else
+		SpringSkip("not-going-on-someone")
 	end
 	if K then
 		local Y = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)

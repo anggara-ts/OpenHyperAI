@@ -16,7 +16,7 @@ m["pos_1"] = {
 	"item_bristleback_outfit",
 	"item_armlet",
 	"item_aghanims_shard",
-	"item_heavens_halberd",
+	"item_echo_sabre",
 	"item_manta",
 	"item_orchid",
 	"item_bloodthorn",
@@ -33,7 +33,7 @@ m["pos_3"] = {
 	"item_aghanims_shard",
 	"item_crimson_guard",
 	"item_armlet",
-	"item_heavens_halberd",
+	"item_echo_sabre",
 	"item_assault",
 	"item_travel_boots",
 	"item_manta",
@@ -136,7 +136,9 @@ function a.ConsiderQ()
 	local F = o:GetCastRange()
 	local G = o:GetCastPoint()
 	local H = o:GetLevel()
-	local I = 30 + H * 30 + 120 * 0.38
+	-- datafeed: damage is random between damage_min (90/120/150/180) and damage_max; a sure kill needs the
+	-- minimum (the old hard-coded formula ran above it)
+	local I = o:GetSpecialValueInt("damage_min")
 	local J = c.GetNearbyHeroes(b, F + 99, true, BOT_MODE_NONE)
 	local K = c.GetNearbyHeroes(b, 880, true, BOT_MODE_NONE)
 	if #J > 0 then
@@ -280,7 +282,8 @@ function a.ConsiderW()
 			and (c.IsEarlyGame() or c.IsMidGame())
 			and c.GetManaAfter(q:GetManaCost()) > 0.35
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- fix: Reality Rift is unit-target (behavior 8); this returned no target
+			return BOT_ACTION_DESIRE_HIGH, y
 		end
 	end
 	if c.IsDoingTormentor(b) then
@@ -292,7 +295,8 @@ function a.ConsiderW()
 			and c.IsAttacking(b)
 			and (c.IsEarlyGame() or c.IsMidGame())
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- fix: Reality Rift is unit-target (behavior 8); this returned no target
+			return BOT_ACTION_DESIRE_HIGH, y
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE

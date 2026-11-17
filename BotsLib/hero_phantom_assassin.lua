@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 1, 5, 1, 6, 2, 2, 2, 1, 6, 5, 5, 5, 6 } }
+local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 5, 6, 5, 5, 5, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -453,6 +453,16 @@ function a.ConsiderW()
 	return 0
 end
 function a.ConsiderE()
+	-- Dodge: Blur disjoints incoming projectiles (datafeed), so a stun projectile on its way is cast
+	-- out of the air, near a tower too. It was only used to hide, never to dodge. 1000 range: Blur has
+	-- a 0.3s cast point (game data), and any projectile already in flight is dodged.
+	if q:IsFullyCastable() and not b:IsInvisible() and c.IsStunProjectileIncoming(b, 1000) then
+		if DotaTime() >= (b._paBlurLogAt or -999) then
+			b._paBlurLogAt = DotaTime() + 3
+			pcall(print, string.format("[OHA-PA] t=%.0f blur-disjoint hp=%.2f", DotaTime(), c.GetHP(b)))
+		end
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	local an = b:GetNearbyTowers(878, true)
 	if not q:IsFullyCastable() or b:IsInvisible() or #an >= 1 or b:DistanceFromFountain() < 600 then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -467,7 +477,8 @@ function a.ConsiderE()
 		local ao = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local R = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local an = b:GetNearbyTowers(1600, true)
-		if #ao == 0 and #R <= 2 and an == 0 then
+		-- "an" is the tower list: compare its length. The old "an == 0" compared a table with 0 and was always false.
+		if #ao == 0 and #R <= 2 and #an == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

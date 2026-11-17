@@ -2,6 +2,7 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
@@ -19,9 +20,9 @@ m["pos_4"] = {
 	"item_force_staff",
 	"item_mekansm",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_hurricane_pike",
 	"item_shivas_guard",
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
@@ -37,18 +38,19 @@ m["pos_5"] = {
 	"item_boots",
 	"item_urn_of_shadows",
 	"item_tranquil_boots",
+	"item_glimmer_cape",
+	"item_blink",
+	"item_aghanims_shard",
 	"item_pipe",
 	"item_spirit_vessel",
-	"item_glimmer_cape",
-	"item_pavise",
 	"item_solar_crest",
 	"item_boots_of_bearing",
 	"item_octarine_core",
 	"item_sheepstick",
-	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
+-- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 m["pos_3"] = {
 	"item_mage_outfit",
 	"item_glimmer_cape",
@@ -63,38 +65,35 @@ m["pos_3"] = {
 	"item_sheepstick",
 	"item_wind_waker",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 m["pos_2"] = {
 	"item_crystal_maiden_outfit",
-	"item_kaya",
 	"item_force_staff",
-	"item_kaya_and_sange",
-	"item_rod_of_atos",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_kaya",
+	"item_meteor_hammer",
+	"item_rod_of_atos",
 	"item_hurricane_pike",
 	"item_shivas_guard",
 	"item_octarine_core",
 	"item_gungir",
 	"item_moon_shard",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
 m["pos_1"] = {
 	"item_crystal_maiden_outfit",
-	"item_kaya",
 	"item_force_staff",
-	"item_kaya_and_sange",
-	"item_dagon_2",
-	"item_rod_of_atos",
 	"item_aghanims_shard",
-	"item_dagon_5",
+	"item_ultimate_scepter",
+	"item_kaya",
+	"item_meteor_hammer",
+	"item_rod_of_atos",
+	"item_gungir",
 	"item_hurricane_pike",
 	"item_shivas_guard",
-	"item_gungir",
 	"item_moon_shard",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
@@ -106,6 +105,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = true
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "lich_chain_frost", kind = "unit" } }
 a["bDeafaultItem"] = true
 function a.MinionThink(n)
 	if e.IsValidUnit(n) and n:GetUnitName() ~= "npc_dota_lich_ice_spire" then
@@ -115,7 +116,9 @@ end
 local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "lich")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "lich")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "lich")
-local r = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "lich")
+-- Ice Spire by name: datafeed lists it as Shard-granted (hidden until then), and the innate Sacrifice
+-- (lich_death_charge) can take slot index 4, so sAbilityList[4] isn't reliable.
+local r = SafeAbility(b:GetAbilityByName("lich_ice_spire"), "lich_ice_spire", "lich")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "lich")
 local t = SafeAbility(b:GetAbilityByName("lich_death_charge"), "lich_death_charge", "lich")
 local u = SafeAbility(b:GetAbilityByName(f[1]), "sTalentList[1]", "lich")
@@ -130,7 +133,16 @@ local G, H
 local I, J
 local K = 0
 local L, M, N, O, P, Q
+-- Sacrifice charges from the shared tracker (2 charges, 120s each, none when learned).
+function a.SacrificeCharges()
+	return ChargeTracker.Count(b, t) or 0
+end
 function a.SkillsComplement()
+	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
+	-- below stops everything during a channel, so the weave runs first.
+	if a.ConsiderGazeWeave() then
+		return
+	end
 	if c.CanNotUseAbility(b) or b:IsInvisible() then
 		return
 	end
@@ -143,6 +155,28 @@ function a.SkillsComplement()
 	botTarget = R.target
 	P = R.enemies
 	Q = R.allies
+	-- Sacrifice first: with both charges up it goes at once, so the Frost Blast pokes below do not
+	-- keep pushing it back.
+	I, J = a.ConsiderSacrifice()
+	if I > 0 then
+		pcall(ChargeTracker.Issued, b, t, J)
+		c.SetQueuePtToINT(b, true)
+		b:ActionQueue_UseAbilityOnEntity(t, J)
+		return
+	end
+	-- Ice Spire beside a lone target before Chain Frost, so the orb bounces between them.
+	local spireCombo = a.ConsiderSpireCombo()
+	if spireCombo ~= nil then
+		c.SetQueuePtToINT(b, true)
+		b:ActionQueue_UseAbilityOnLocation(r, spireCombo)
+		return
+	end
+	-- Frost Shield on our Ice Spire right after Chain Frost (before Frost Blast pokes).
+	local shieldSpire = a.ConsiderSpireShield()
+	if shieldSpire ~= nil then
+		b:Action_UseAbilityOnEntity(p, shieldSpire)
+		return
+	end
 	E, F = a.ConsiderR()
 	if E > 0 then
 		c.SetQueuePtToINT(b, true)
@@ -164,6 +198,8 @@ function a.SkillsComplement()
 	C, D = a.ConsiderE()
 	if C > 0 then
 		c.SetQueuePtToINT(b, true)
+		b._gazeAt = DotaTime()
+		b._gazeTarget = D
 		if b:HasScepter() then
 			b:ActionQueue_UseAbilityOnLocation(q, D:GetLocation())
 		else
@@ -177,12 +213,14 @@ function a.SkillsComplement()
 		b:ActionQueue_UseAbilityOnLocation(r, H)
 		return
 	end
-	I, J = a.ConsiderSacrifice()
-	if I > 0 then
-		c.SetQueuePtToINT(b, true)
-		b:ActionQueue_UseAbilityOnEntity(t, J)
-		return
-	end
+end
+-- Frost Blast on creeps only while he keeps the mana for one more Frost Blast and a Frost Shield
+-- after the cast, so he can still answer a gank or an engage (user: he blasted waves until
+-- he was out of mana).
+local function CreepManaOk()
+	local blast = o:GetManaCost() or 0
+	local shield = (p:IsTrained() and p:GetManaCost()) or 0
+	return b:GetMana() - blast >= blast + shield
 end
 function a.ConsiderQ()
 	if not o:IsFullyCastable() then
@@ -196,7 +234,7 @@ function a.ConsiderQ()
 	end
 	local V = o:GetCastPoint()
 	local W = o:GetManaCost()
-	local X = S * 50
+	local X = o:GetSpecialValueInt("damage") -- datafeed: primary-target damage 40/80/120/160 (was S * 50)
 	local Y = o:GetSpecialValueInt("aoe_damage")
 	if v:IsTrained() then
 		Y = Y + v:GetSpecialValueInt("value")
@@ -284,6 +322,7 @@ function a.ConsiderQ()
 					if
 						c.IsKeyWordUnit("ranged", ag)
 						and b:GetMana() > 330
+						and CreepManaOk()
 						and c.WillKillTarget(ag, Z, _, V)
 						and not c.IsAllysTarget(ag)
 					then
@@ -291,6 +330,7 @@ function a.ConsiderQ()
 					end
 					if
 						b:GetMana() > 400
+						and CreepManaOk()
 						and c.IsKeyWordUnit("melee", ag)
 						and c.WillKillTarget(ag, Z, _, V)
 						and not c.WillKillTarget(ag, Z * 0.5, _, V)
@@ -327,36 +367,51 @@ function a.ConsiderQ()
 			end
 		end
 	end
+	-- Jungle: Frost Blast hits the target plus everything within 200 (Valve data: 40-160 on the
+	-- target, 80-200 area). It needed level 3, 3+ neutrals, a 600+ HP target with 3 units around
+	-- it, and Lich already facing it, so it almost never went. Now: level 2+, the neutral with
+	-- the most others around it (2+ units hit), the hit worth it (their HP at least twice the
+	-- area damage), and mana kept (30%, or 20% with a Sacrifice charge to refill).
 	if
 		c.IsFarming(b)
-		and S >= 3
-		and c.IsAllowedToSpam(b, W)
+		and S >= 2
 		and #P == 0
 		and (#Q <= 1 or c.IsCore(b))
 		and not (c.IsPushing(b) or c.IsDefending(b))
 	then
-		local ah = b:GetNearbyNeutralCreeps(T + 100)
-		if #ah >= 3 then
-			for a4, ag in pairs(ah) do
-				if
-					c.IsValid(ag)
-					and b:IsFacingLocation(ag:GetLocation(), 30)
-					and ag:GetHealth() >= 600
-					and ag:GetMagicResist() < 0.3
-					and c.GetAroundTargetEnemyUnitCount(ag, a0) >= 3
-				then
-					return BOT_ACTION_DESIRE_HIGH, ag, "Q-打野:" .. #ah
+		local keep = (a.SacrificeCharges and a.SacrificeCharges() or 0) >= 1 and 0.2 or 0.3
+		if c.GetManaAfter(W) >= keep and CreepManaOk() then
+			local aoe = o:GetSpecialValueInt("aoe_damage")
+			local best, bestHit, bestHp = nil, 1, 0
+			for a4, ag in pairs(b:GetNearbyNeutralCreeps(T + 100) or {}) do
+				if c.IsValid(ag) and ag:GetMagicResist() < 0.5 and c.CanBeAttacked(ag) then
+					local hit, hp = 0, 0
+					for a5, other in pairs(b:GetNearbyNeutralCreeps(T + 400) or {}) do
+						if c.IsValid(other) and GetUnitToUnitDistance(ag, other) <= a0 then
+							hit = hit + 1
+							hp = hp + math.min(other:GetHealth(), aoe)
+						end
+					end
+					if hit >= 2 and hp >= aoe * 2 and (hit > bestHit or hit == bestHit and hp > bestHp) then
+						best, bestHit, bestHp = ag, hit, hp
+					end
 				end
+			end
+			if best ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, best, "Q-jungle:" .. bestHit
 			end
 		end
 	end
+	-- Was "(pushing ... and #Q <= 1) or IsCore": a core Lich (pos 1) passed in any mode with no
+	-- mana check and blasted every wave. Now pushing, defending or farming for everyone, a core
+	-- may do it with more allies around, and the mana reserve applies.
 	if
 		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
-			and c.IsAllowedToSpam(b, 30)
-			and S >= 3
-			and #P == 0
-			and #Q <= 1
-		or c.IsCore(b)
+		and c.IsAllowedToSpam(b, 30)
+		and S >= 3
+		and #P == 0
+		and (#Q <= 1 or c.IsCore(b))
+		and CreepManaOk()
 	then
 		local af = b:GetNearbyLaneCreeps(999, true)
 		local ai = b:GetNearbyLaneCreeps(888, false)
@@ -523,6 +578,18 @@ function a.ConsiderW()
 				end
 			end
 		end
+		-- Ally (or Lich) being hit by a hero outside a team fight and not retreating, e.g. harassed in
+		-- lane: no case covered it. Frost Shield cuts 45-60% of attack damage (Valve data).
+		if
+			c.IsValidHero(am)
+			and am:WasRecentlyDamagedByAnyHero(1.5)
+			and c.GetHP(am) < 0.6
+			and #(c.GetNearbyHeroes(am, 700, true, BOT_MODE_NONE) or {}) >= 1
+			and not am:HasModifier("modifier_lich_frost_shield")
+		then
+			a.LogLich("shield-harassed", am)
+			return BOT_ACTION_DESIRE_HIGH, am, "W-harassed"
+		end
 		if c.IsGoingOnSomeone(am) then
 			local ax = c.GetProperTarget(am)
 			if c.IsValidHero(ax) and c.CanCastOnNonMagicImmune(ax) and c.IsInRange(am, ax, a0) then
@@ -538,16 +605,20 @@ function a.ConsiderW()
 				end
 			end
 		end
-		if c.IsPushing(am) and S >= 4 and c.IsAllowedToSpam(b, W) and #Q <= 2 and #P == 0 then
+		-- Waves and camps: the shield's tick damages everything around the ally. It needed
+		-- level 4, at most two allies, and 4+ creeps, and defending was not covered at all
+		-- (game 016: never cast while defending top). Now level 2+, pushing or defending, 3+
+		-- creeps around the ally, any number of allies, mana kept as before.
+		if (c.IsPushing(am) or c.IsDefending(am)) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 and CreepManaOk() then
 			local ay = am:GetNearbyLaneCreeps(a0, true)
-			if #ay >= 4 and not ay[1]:HasModifier("modifier_fountain_glyph") then
-				return BOT_ACTION_DESIRE_HIGH, am, "W-带线推进" .. #ay
+			if #ay >= 3 and not ay[1]:HasModifier("modifier_fountain_glyph") then
+				return BOT_ACTION_DESIRE_HIGH, am, "W-wave" .. #ay
 			end
 		end
-		if c.IsFarming(am) and S >= 4 and c.IsAllowedToSpam(b, W) and #Q <= 3 and #P == 0 then
+		if c.IsFarming(am) and S >= 2 and c.IsAllowedToSpam(b, W) and #P == 0 and CreepManaOk() then
 			local ay = am:GetNearbyNeutralCreeps(a0)
-			if #ay >= 4 and ay[1]:GetMagicResist() < 0.3 then
-				return BOT_ACTION_DESIRE_HIGH, am, "W-打野" .. #ay
+			if #ay >= 3 and ay[1]:GetMagicResist() < 0.3 then
+				return BOT_ACTION_DESIRE_HIGH, am, "W-camp" .. #ay
 			end
 		end
 		if x:IsTrained() and c.IsAllowedToSpam(b, W) and #P == 0 then
@@ -587,8 +658,16 @@ function a.ConsiderE()
 		if #a2 >= 2 or #Q >= 3 then
 			local az = nil
 			local aA = 0
+			-- In-range filter added: the best one was picked from T+420 and then dropped when out of
+			-- range, so Gaze was skipped while a reachable enemy stood next to Lich.
 			for a4, a5 in pairs(a2) do
-				if c.IsValid(a5) and c.CanCastOnNonMagicImmune(a5) and not c.IsDisabled(a5) and not a5:IsDisarmed() then
+				if
+					c.IsValid(a5)
+					and c.IsInRange(b, a5, T + 50)
+					and c.CanCastOnNonMagicImmune(a5)
+					and not c.IsDisabled(a5)
+					and not a5:IsDisarmed()
+				then
 					local aB = a5:GetEstimatedDamageToTarget(false, b, 3.0, DAMAGE_TYPE_PHYSICAL)
 					if aB > aA then
 						aA = aB
@@ -621,6 +700,38 @@ function a.ConsiderE()
 			and not botTarget:IsDisarmed()
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "E-肉山"
+		end
+	end
+	-- Mana: Gaze drains 25% of the target's current mana (Valve data). When Frost Blast and Frost
+	-- Shield have used the pool up, take it from an enemy hero, or a ranged creep with no hero near.
+	-- Not under an enemy tower or when outnumbered: he stands still for the channel.
+	local blastCost = o:GetManaCost() + p:GetManaCost()
+	if b:GetMana() < blastCost and #(b:GetNearbyTowers(900, true) or {}) == 0 then
+		local foes = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE) or {}
+		local friends = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE) or {}
+		local best, bestMana = nil, 150
+		for a4, a5 in pairs(foes) do
+			if
+				c.IsValidHero(a5)
+				and c.CanCastOnNonMagicImmune(a5)
+				and not c.IsSuspiciousIllusion(a5)
+				and c.IsInRange(b, a5, T)
+				and a5:GetMana() > bestMana
+			then
+				best, bestMana = a5, a5:GetMana()
+			end
+		end
+		if best ~= nil and #friends >= #foes then
+			a.LogLich("gaze-mana", best)
+			return BOT_ACTION_DESIRE_HIGH, best, "E-mana"
+		end
+		if #foes == 0 then
+			for a4, cr in pairs(b:GetNearbyLaneCreeps(T, true) or {}) do
+				if c.IsValid(cr) and c.IsKeyWordUnit("ranged", cr) and cr:GetMana() >= 60 then
+					a.LogLich("gaze-mana-creep", cr)
+					return BOT_ACTION_DESIRE_HIGH, cr, "E-mana-creep"
+				end
+			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -661,6 +772,16 @@ function a.ConsiderR()
 					return BOT_ACTION_DESIRE_HIGH, a5, "R-Aoe:" .. c.Chat.GetNormName(a5)
 				end
 			end
+		end
+	end
+	-- Our Ice Spire beside a lone target: the orb bounces between them (Valve data: Chain Frost can
+	-- bounce to the Spire when no other enemy is in range).
+	if c.IsValidHero(botTarget) and c.CanCastOnNonMagicImmune(botTarget) and c.IsInRange(b, botTarget, T) then
+		local spire = a.GetOwnSpire()
+		if spire ~= nil and GetUnitToUnitDistance(spire, botTarget) <= s:GetSpecialValueInt("jump_range") then
+			b._chainAt = DotaTime()
+			a.LogLich("chain-spire", botTarget)
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "R-spire"
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
@@ -724,6 +845,135 @@ function a.ConsiderAS()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- [OHA-LICH] lines, at most once per 3s per kind.
+function a.LogLich(kind, target)
+	b._lichLogAt = b._lichLogAt or {}
+	if DotaTime() < (b._lichLogAt[kind] or -999) then
+		return
+	end
+	b._lichLogAt[kind] = DotaTime() + 3
+	pcall(print, string.format(
+		"[OHA-LICH] t=%.0f %s target=%s mp=%.2f",
+		DotaTime(),
+		kind,
+		target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		c.GetMP(b)
+	))
+end
+-- Frost Shield on our Ice Spire: each shield tick heals it by one hero hit (Valve data). Cast
+-- when the spire has lost HP (a Chain Frost bounce costs it a hit, so that is covered too) or
+-- enemy heroes or creeps are within 700 of it, and no shield of ours is on it. It used to
+-- need an enemy hero within 700 and ran after Frost Blast, so a spire chipped by creeps or by the
+-- Chain Frost bounce was never shielded. He walks up to 400 extra to reach it, not when retreating.
+function a.ConsiderSpireShield()
+	if not p:IsFullyCastable() then
+		return nil
+	end
+	local spire = a.GetOwnSpire()
+	if spire == nil then
+		return nil
+	end
+	local reach = p:GetCastRange() + K + (c.IsRetreating(b) and 0 or 400)
+	if GetUnitToUnitDistance(b, spire) > reach then
+		return nil
+	end
+	local duration = p:GetSpecialValueFloat("duration")
+	if duration == nil or duration <= 0 then
+		duration = 4
+	end
+	if DotaTime() < (b._spireShieldAt or -999) + duration then
+		return nil
+	end
+	local damaged = spire:GetHealth() < spire:GetMaxHealth()
+	local loc = spire:GetLocation()
+	local busy = #(c.GetEnemiesNearLoc(loc, 700) or {}) >= 1 or #(spire:GetNearbyCreeps(700, true) or {}) >= 1
+	if not (damaged or busy) then
+		return nil
+	end
+	b._spireShieldAt = DotaTime()
+	a.LogLich(damaged and "shield-spire damaged" or "shield-spire", nil)
+	return spire
+end
+-- Our own Ice Spire, if one stands.
+function a.GetOwnSpire()
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
+		if c.IsValid(u) and u:GetUnitName() == "npc_dota_lich_ice_spire" then
+			return u
+		end
+	end
+	return nil
+end
+-- Ice Spire within Chain Frost's bounce range of a lone target (no other enemy hero within 1200),
+-- when Chain Frost is up with mana for both. Returns the spot or nil.
+function a.ConsiderSpireCombo()
+	if not r:IsTrained() or r:IsHidden() or not r:IsFullyCastable() or not s:IsFullyCastable() then
+		return nil
+	end
+	if b:GetMana() < r:GetManaCost() + s:GetManaCost() or a.GetOwnSpire() ~= nil then
+		return nil
+	end
+	if not c.IsGoingOnSomeone(b) or not c.IsValidHero(botTarget) or c.IsSuspiciousIllusion(botTarget) then
+		return nil
+	end
+	if not c.IsInRange(b, botTarget, r:GetCastRange()) then
+		return nil
+	end
+	local others = c.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE) or {}
+	if #others > 1 then
+		return nil
+	end
+	-- 250 from the target toward Lich: inside the 550 bounce range and in the spire's slow.
+	local spot = c.Utils.GetOffsetLocationTowardsTargetLocation(botTarget:GetLocation(), b:GetLocation(), 250)
+	a.LogLich("spire-combo", botTarget)
+	return spot
+end
+-- Scepter only: while channeling Sinister Gaze, cast Ice Spire, Chain Frost or Frost Shield on the
+-- spire. Orders are sent directly; whether the engine keeps the channel is what the log will show.
+function a.ConsiderGazeWeave()
+	if not b:HasScepter() or not b:IsChanneling() or DotaTime() - (b._gazeAt or -99) > 2.5 then
+		return false
+	end
+	if b:IsStunned() or b:IsSilenced() or b:IsHexed() then
+		return false
+	end
+	local target = b._gazeTarget
+	if not c.IsValidHero(target) then
+		return false
+	end
+	if r:IsTrained() and not r:IsHidden() and r:IsFullyCastable() and a.GetOwnSpire() == nil and c.IsInRange(b, target, r:GetCastRange()) then
+		a.LogLich("gaze-weave-spire", target)
+		b:Action_UseAbilityOnLocation(r, target:GetLocation())
+		return true
+	end
+	-- Chain Frost during the Gaze only when it is worth its cooldown: another enemy within the
+	-- bounce range of the target, our Ice Spire beside it, or the target below 50% HP. It went on
+	-- a lone, healthy Techies at 54:40 (game 017).
+	local jump = s:GetSpecialValueInt("jump_range")
+	if jump == nil or jump <= 0 then
+		jump = 550
+	end
+	local others = 0
+	for _, e0 in pairs(c.GetNearbyHeroes(target, jump, false, BOT_MODE_NONE) or {}) do
+		if e0 ~= target and c.IsValidHero(e0) then
+			others = others + 1
+		end
+	end
+	local spireNear = a.GetOwnSpire() ~= nil and GetUnitToUnitDistance(a.GetOwnSpire(), target) <= jump
+	local chainWorth = others >= 1 or spireNear or c.GetHP(target) < 0.5
+	if chainWorth and s:IsFullyCastable() and c.IsInRange(b, target, s:GetCastRange()) then
+		a.LogLich("gaze-weave-chain", target)
+		b._chainAt = DotaTime()
+		b:Action_UseAbilityOnEntity(s, target)
+		return true
+	end
+	local spire = a.GetOwnSpire()
+	if spire ~= nil and p:IsFullyCastable() and GetUnitToUnitDistance(b, spire) <= p:GetCastRange() then
+		a.LogLich("gaze-weave-shield", nil)
+		b:Action_UseAbilityOnEntity(p, spire)
+		return true
+	end
+	return false
+end
 function a.ConsiderSacrifice()
 	if not c.CanCastAbility(t) then
 		return BOT_ACTION_DESIRE_NONE
@@ -732,22 +982,75 @@ function a.ConsiderSacrifice()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local T = t:GetCastRange()
+	-- Both charges up (2 max, 120s each, Valve data): use one now even at full mana. It denies an
+	-- allied creep and gives 69% of its experience. Prefer a creep the enemy is about to kill.
+	-- Charges from our own tracker (the API has no ability-charge read). Not with an enemy hero
+	-- near: a fight wants Chain Frost, not a 0.4s cast on his own creep.
+	local charges = a.SacrificeCharges()
+	-- In lane an enemy hero is almost always within 1200, which blocked this rule; 600 is a hero
+	-- right on him.
+	local enemyNear = #(c.GetNearbyHeroes(b, 600, true, BOT_MODE_NONE) or {}) > 0
+	if charges ~= nil and charges >= 2 and not enemyNear and not c.IsInTeamFight(b, 1200) then
+		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
+		for a4, ag in pairs(b:GetNearbyLaneCreeps(Min(T + 300, 1600), false) or {}) do
+			if c.IsValid(ag) and c.CanBeAttacked(ag) then
+				local hp = ag:GetHealth() / math.max(1, ag:GetMaxHealth())
+				if hp < denyHp then
+					deny, denyHp = ag, hp
+				end
+				if ag:GetHealth() > anyHp then
+					any, anyHp = ag, ag:GetHealth()
+				end
+			end
+		end
+		local pick = deny or any
+		if pick ~= nil then
+			a.LogLich((deny ~= nil and "sacrifice-deny" or "sacrifice-full") .. " charges=" .. tostring(charges), nil)
+			return BOT_ACTION_DESIRE_HIGH, pick
+		end
+	end
+	-- Both charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
+	-- 118s and 174s after laning).
+	if charges ~= nil and charges >= 2 and DotaTime() >= (b._sac2SkipLogAt or -999) then
+		b._sac2SkipLogAt = DotaTime() + 15
+		local why = enemyNear and "enemy-within-600"
+			or c.IsInTeamFight(b, 1200) and "team-fight"
+			or "no-allied-lane-creep-in-" .. tostring(Min(T + 300, 1600))
+		pcall(print, string.format("[OHA-LICH] t=%.0f sacrifice2-skip why=%s mp=%.2f", DotaTime(), why, c.GetMP(b)))
+	end
+	-- Mana (below 50%): 42% of the creep's current HP (Valve data), so the creep with the most HP,
+	-- siege creeps included (they come back as lane creeps). The old per-level bonus is not in the
+	-- data and is gone.
 	local aG = t:GetSpecialValueInt("active_mana_restore_pct_of_health") / 100
-	local aH = 3 / 100
 	local aI = b:GetNearbyLaneCreeps(Min(T + 300, 1600), false)
-	if c.GetMP(b) < 0.5 then
+	-- Game 014: with a charge and 11-14% mana he waited 85s, because 150 mana needs a creep with
+	-- 357+ HP and laning creeps rarely have that. Now 100+ below 50% mana, any 40+ below 25%.
+	local mp = c.GetMP(b)
+	if mp < 0.5 then
+		local need = mp < 0.25 and 40 or 100
 		local aJ = nil
 		local aK = 0
 		for a4, ag in pairs(aI) do
 			if c.IsValid(ag) and c.CanBeAttacked(ag) then
-				local aL = ag:GetHealth() * (aG + b:GetLevel() * aH)
-				if aL >= 200 and aL > aK then
+				local aL = ag:GetHealth() * aG
+				if aL > aK then
 					aJ = ag
 					aK = aL
 				end
 			end
 		end
+		if aJ ~= nil and aK < need then
+			if DotaTime() >= (b._sacSkipLogAt or -999) then
+				b._sacSkipLogAt = DotaTime() + 10
+				pcall(print, string.format(
+					"[OHA-LICH] t=%.0f sacrifice-skip best=%.0f need=%d creeps=%d mp=%.2f",
+					DotaTime(), aK, need, #aI, mp
+				))
+			end
+			aJ = nil
+		end
 		if aJ then
+			a.LogLich("sacrifice-mana charges=" .. tostring(charges) .. " gain=" .. string.format("%.0f", aK), nil)
 			return BOT_ACTION_DESIRE_HIGH, aJ
 		end
 	end

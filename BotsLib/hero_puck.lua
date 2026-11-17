@@ -68,6 +68,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "puck_dream_coil", kind = "point" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(o)
 	e.MinionThink(o)
@@ -358,7 +360,8 @@ function a.ConsiderPhaseShift()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local a1 = r:GetSpecialValueInt("duration")
+	-- datafeed: Phase Shift duration is fractional (1/1.75/2.5/3.25s).
+	local a1 = r:GetSpecialValueFloat("duration")
 	if c.IsStunProjectileIncoming(b, 600) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
@@ -371,13 +374,26 @@ function a.ConsiderPhaseShift()
 		end
 	end
 	if H then
-		local a2 = b:GetItemInSlot(b:FindItemSlot("item_blink"))
-		if a2 ~= nil and a2:GetCooldownTimeRemaining() < a1 then
+		-- Phase only to wait out a short blink lockout (damage puts Blink on a 3s cooldown) with an enemy
+		-- near: a READY blink (cooldown 0) also passed "< duration", so Puck stood in Phase Shift
+		-- instead of blinking away. The build buys Overwhelming Blink, so look for it too.
+		local a2slot = b:FindItemSlot("item_blink")
+		if a2slot < 0 then
+			a2slot = b:FindItemSlot("item_overwhelming_blink")
+		end
+		local a2 = a2slot >= 0 and a2slot <= 5 and b:GetItemInSlot(a2slot) or nil
+		if
+			a2 ~= nil
+			and a2:GetCooldownTimeRemaining() > 0
+			and a2:GetCooldownTimeRemaining() < a1
+			and b:WasRecentlyDamagedByAnyHero(1.0)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		local a3 = GetLinearProjectiles()
 		for P, a4 in pairs(a3) do
-			if a4 ~= nil and a4.ability:GetName() == "puck_illusory_orb" then
+			-- ability can be nil on a linear projectile (hero_ancient_apparition guards it too)
+			if a4 ~= nil and a4.ability ~= nil and a4.ability:GetName() == "puck_illusory_orb" then
 				if GetUnitToLocationDistance(b, a4.location) < 300 then
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -407,6 +423,7 @@ function a.ConsiderEtherealJaunt()
 				for P, a4 in pairs(a3) do
 					if
 						a4 ~= nil
+						and a4.ability ~= nil
 						and a4.ability:GetName() == "puck_illusory_orb"
 						and not c.IsLocationInChrono(a4.location)
 					then
@@ -438,7 +455,12 @@ function a.ConsiderEtherealJaunt()
 	if H and E then
 		local a3 = GetLinearProjectiles()
 		for P, a4 in pairs(a3) do
-			if a4.ability:GetName() == "puck_illusory_orb" and not c.IsLocationInChrono(a4.location) then
+			if
+				a4 ~= nil
+				and a4.ability ~= nil
+				and a4.ability:GetName() == "puck_illusory_orb"
+				and not c.IsLocationInChrono(a4.location)
+			then
 				if GetUnitToLocationDistance(b, a4.location) > 600 then
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -446,6 +468,20 @@ function a.ConsiderEtherealJaunt()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-PUCK] pick-off Dream Coil on a lone target, at most once per 10s.
+function a.LogCoil(why, target)
+	if DotaTime() < (b._coilLogAt or -999) then
+		return
+	end
+	b._coilLogAt = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-PUCK] t=%.0f coil why=%s target=%s hp=%.2f",
+		DotaTime(),
+		why,
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		c.GetHP(target)
+	))
 end
 function a.ConsiderDreamCoil()
 	if not t:IsFullyCastable() or b:HasModifier("modifier_puck_phase_shift") then
@@ -481,18 +517,23 @@ function a.ConsiderDreamCoil()
 			and not a8:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not a8:HasModifier("modifier_oracle_false_promise_timer")
 		then
-			local T = c.GetNearbyHeroes(b, 1000, false, BOT_MODE_NONE)
+			-- T was Puck's own allies again (same list as S), so "#T == 0" could never hold and this
+			-- pick-off coil never fired. T = enemy heroes near the target (the target included):
+			-- coil a lone target.
+			local T = c.GetEnemiesNearLoc(a8:GetLocation(), 1000)
 			if S ~= nil and T and #S >= #T then
-				if #S == 1 and #T == 0 and c.GetHP(a8) > 0.55 and I then
+				if #S == 1 and #T <= 1 and c.GetHP(a8) > 0.55 and I then
+					a.LogCoil("solo", a8)
 					return BOT_ACTION_DESIRE_HIGH, a8:GetLocation()
 				end
 				if
-					#S == 2
-					and #T == 0
+					#S >= 2
+					and #T <= 1
 					and c.GetHP(a8) > 0.2
 					and c.IsRunning(a8)
 					and not a8:IsFacingLocation(b:GetLocation(), 90)
 				then
+					a.LogCoil("runner", a8)
 					return BOT_ACTION_DESIRE_HIGH, a8:GetLocation()
 				end
 			end
@@ -531,10 +572,19 @@ end
 function a.ConsiderPhaseOrb()
 	if CanDoPhaseOrb() then
 		local K = c.GetProperCastRange(false, b, p:GetCastRange())
-		local a1 = r:GetSpecialValueInt("duration")
+		-- datafeed: Phase Shift duration is 1/1.75/2.5/3.25s; read as a float so the Jaunt delay is not cut short.
+		local a1 = r:GetSpecialValueFloat("duration")
 		local a0 = c.GetEnemiesNearLoc(b:GetLocation(), 800)
 		local S = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		if a0 ~= nil and #a0 >= 2 and S ~= nil and #a0 >= #S then
+		-- Escape combo only when fleeing or hurt: without this Puck orbed away from every even 2v2+
+		-- fight (it runs first, before Dream Coil) even while it was the one attacking.
+		if
+			a0 ~= nil
+			and #a0 >= 2
+			and S ~= nil
+			and #a0 >= #S
+			and (H or c.GetHP(b) < 0.4 and b:WasRecentlyDamagedByAnyHero(2))
+		then
 			local R = c.GetEscapeLoc()
 			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, R, K), a1
 		end

@@ -12,7 +12,8 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, {
+-- j[1] (pos 1/2): Nature's Call first, then Teleportation, Sprout last (Dotabuff most picked order).
+local j = { { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, {
 	2,
 	1,
 	1,
@@ -123,6 +124,7 @@ m["pos_4"] = {
 	"item_sheepstick",
 	"item_moon_shard",
 }
+-- One pair of boots in this build (user rule; Util/boots-check.js).
 m["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
@@ -135,7 +137,7 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_mekansm",
 	"item_spirit_vessel",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_ultimate_scepter",
 	"item_orchid",
 	"item_heavens_halberd",
@@ -148,10 +150,10 @@ a["sBuyList"] = m[h]
 a["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
-	"item_null_talisman",
 	"item_ultimate_scepter",
-	"item_magic_wand",
+	"item_null_talisman",
 	"item_cyclone",
+	"item_magic_wand",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
@@ -193,6 +195,7 @@ function a.SkillsComplement()
 	end
 	local B, C, D = a.ConsiderSproutCall()
 	if B > 0 and C ~= nil then
+		pcall(print, string.format("[OHA-FURION] t=%.0f sprout-call dist=%.0f", DotaTime(), GetUnitToLocationDistance(b, D)))
 		b:Action_ClearActions(true)
 		b:ActionQueue_UseAbilityOnEntity(o, C)
 		b:ActionQueue_Delay(0.35 + 0.44)
@@ -201,6 +204,16 @@ function a.SkillsComplement()
 	end
 	local E, F = a.ConsiderTeleportation()
 	if E > 0 then
+		pcall(print, string.format(
+			"[OHA-FURION] t=%.0f teleport to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
+			DotaTime(),
+			F.x,
+			F.y,
+			GetUnitToLocationDistance(b, F),
+			c.GetHP(b),
+			b:GetActiveMode(),
+			#(c.GetEnemiesNearLoc(F, 1200) or {})
+		))
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(p, F)
 		b.useProphetTP = false
@@ -309,8 +322,11 @@ function a.ConsiderTeleportation()
 	if c.IsStuck(b) then
 		return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 	end
+	-- Game 031, 12:01: at 21% HP he teleported to a fight and fed OD. Joining a fight, a gank, a
+	-- push, a defense, Roshan or a Tormentor needs half HP; below it only the fountain is a target.
+	local fitToJoin = c.GetHP(b) >= 0.5
 	local _ = c.GetTeamFightLocation(b)
-	if _ ~= nil and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500) then
+	if fitToJoin and _ ~= nil and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500) then
 		local a0 = GetUnitToLocationDistance(b, _)
 		local a1 = a0 / Z
 		if a1 > Y + 2 then
@@ -323,7 +339,8 @@ function a.ConsiderTeleportation()
 	for a3 = 1, #GetTeamPlayers(GetTeam()) do
 		local W = GetTeamMember(a3)
 		if
-			c.IsValidHero(W)
+			fitToJoin
+			and c.IsValidHero(W)
 			and c.IsGoingOnSomeone(W)
 			and not W:IsIllusion()
 			and (not c.IsCore(b) or not c.IsInLaningPhase() or b:GetNetWorth() > 3500)
@@ -360,6 +377,9 @@ function a.ConsiderTeleportation()
 				return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 			end
 		end
+	end
+	if not fitToJoin then
+		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if c.IsPushing(b) and not y and #x == 0 then
 		local a8 = b:GetAssignedLane()
@@ -534,18 +554,20 @@ function a.ConsiderSproutCall()
 	end
 	local N = c.GetProperCastRange(false, b, o:GetCastRange())
 	local ae = b:GetNearbyLaneCreeps(N, true)
+	-- Sprout is cast on Furion, so its trees ring him; Nature's Call only converts trees within its
+	-- area (150-375) of the point. Calling at the creep centre (up to 850 away) found none of the
+	-- sprouted trees. Call on Furion, as the farming case already does.
 	if (c.IsPushing(b) or c.IsDefending(b)) and ae and #ae >= 4 and c.CanBeAttacked(ae[1]) then
-		local ac = c.GetCenterOfUnits(ae)
-		return BOT_ACTION_DESIRE_HIGH, b, ac
+		return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 	end
 	if c.IsFarming(b) and y then
 		local af = b:GetNearbyNeutralCreeps(N)
 		if af and c.IsValid(af[1]) and (#af >= 3 or #af >= 2 and af[1]:IsAncientCreep()) then
 			return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 		end
+		-- Same as the push case: call where the sprouted trees are (around Furion).
 		if ae and #ae >= 3 and c.CanBeAttacked(ae[1]) then
-			local ac = c.GetCenterOfUnits(ae)
-			return BOT_ACTION_DESIRE_HIGH, b, ac
+			return BOT_ACTION_DESIRE_HIGH, b, b:GetLocation()
 		end
 	end
 	if c.IsLaning(b) and y then

@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 5, 4, 2, 2, 6, 2, 5, 5, 5, 6, 4, 4, 4, 6 } }
+local j = { { 2, 5, 4, 4, 2, 6, 2, 4, 4, 2, 6, 5, 5, 5, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -71,6 +71,20 @@ local B
 local C
 local D
 function a.SkillsComplement()
+	-- [OHA-TROLL] Battle Trance cast check: the npc file gives it no AbilityBehavior (datafeed
+	-- behavior 0, target team both, range 525), so it is unverified that a no-target order casts it.
+	-- 1s after an order, print whether the cooldown started (at most once per 10s).
+	if b._trollTranceAt ~= nil and DotaTime() > b._trollTranceAt + 1 then
+		if DotaTime() >= (b._trollTranceLogAt or -999) then
+			b._trollTranceLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-TROLL] t=%.0f battle-trance order cooldownStarted=%s",
+				DotaTime(),
+				tostring(s:GetCooldownTimeRemaining() > 0)
+			))
+		end
+		b._trollTranceAt = nil
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -82,6 +96,7 @@ function a.SkillsComplement()
 	y = c.GetProperTarget(b)
 	x = a.ConsiderBattleTrance()
 	if x > 0 then
+		b._trollTranceAt = b._trollTranceAt or DotaTime()
 		b:Action_UseAbility(s)
 		return
 	end
@@ -109,7 +124,12 @@ function a.ConsiderBerserkersRage(p)
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local E = p:GetSpecialValueInt("bonus_range")
-	local F = p:GetSpecialValueInt("bonus_move_speed")
+	-- datafeed: bonus_move_speed (melee form) is on the passive Berserker's Rage. p is the Battle
+	-- Stance toggle here (slot 0), which has no such key, so F read 0 and the retreat stance swap
+	-- below (enemy faster than Troll, slower than Troll + F) could never fire.
+	local rage = b:GetAbilityByName("troll_warlord_berserkers_rage")
+	local F = (rage ~= nil and not rage:IsNull()) and rage:GetSpecialValueInt("bonus_move_speed")
+		or p:GetSpecialValueInt("bonus_move_speed")
 	local G = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 	if z then
 		if c.IsValidTarget(y) and not c.IsSuspiciousIllusion(y) then
@@ -206,7 +226,9 @@ function a.ConsiderBerserkersRage(p)
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderWhirlingAxesRanged()
-	if not q:IsFullyCastable() then
+	-- CanCastAbility also rejects an unlearned or hidden ability. Whether a stance hides one of the
+	-- axes is not verified; if it does, the order failed and the caller returned before the melee axes.
+	if not c.CanCastAbility(q) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local N = c.GetProperCastRange(false, b, q:GetCastRange())
@@ -258,7 +280,8 @@ function a.ConsiderWhirlingAxesRanged()
 			and c.IsValidHero(I[1])
 			and c.CanCastOnNonMagicImmune(I[1])
 			and c.IsChasingTarget(I[1], b)
-			and B
+			-- "and B" (Troll in his attack animation) removed: a fleeing Troll is not attacking,
+			-- so the slow on the chaser almost never went out.
 			and not c.IsSuspiciousIllusion(I[1])
 			and not c.IsDisabled(I[1])
 			and not I[1]:HasModifier("modifier_enigma_black_hole_pull")
@@ -342,11 +365,7 @@ function a.ConsiderWhirlingAxesRanged()
 			return BOT_ACTION_DESIRE_HIGH, I[1]:GetLocation()
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(y) and c.CanCastOnNonMagicImmune(y) and c.IsInRange(b, y, 500) and B then
-			return BOT_ACTION_DESIRE_HIGH, y:GetLocation()
-		end
-	end
+	-- Roshan branch removed: datafeed note "Does not affect Roshan" (both axes), a wasted cast.
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(y) and c.IsInRange(b, y, 500) and B then
 			return BOT_ACTION_DESIRE_HIGH, y:GetLocation()
@@ -355,11 +374,14 @@ function a.ConsiderWhirlingAxesRanged()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function a.ConsiderWhirlingAxesMelee()
-	if not r:IsFullyCastable() then
+	-- CanCastAbility: also rejects the unlearned / hidden melee axes (see the ranged axes).
+	if not c.CanCastAbility(r) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local P = q:GetSpecialValueInt("max_range")
-	local R = q:GetSpecialValueInt("damage")
+	-- datafeed: max_range and damage belong to Whirling Axes (Melee) (r); read from the ranged
+	-- axes (q) they were 0, so the search radius was 0.
+	local P = r:GetSpecialValueInt("max_range")
+	local R = r:GetSpecialValueInt("damage")
 	local G = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
 	for L, M in pairs(G) do
 		if
@@ -474,11 +496,7 @@ function a.ConsiderWhirlingAxesMelee()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if c.IsDoingRoshan(b) then
-		if c.IsRoshan(y) and c.CanCastOnNonMagicImmune(y) and c.IsInRange(b, y, 500) and B then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
+	-- Roshan branch removed: datafeed note "Does not affect Roshan" (both axes), a wasted cast.
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(y) and c.IsInRange(b, y, 500) and B then
 			return BOT_ACTION_DESIRE_HIGH

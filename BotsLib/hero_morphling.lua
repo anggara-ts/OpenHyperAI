@@ -23,6 +23,7 @@ else
 	m = c.Skill.GetTalentBuild(j[1])
 end
 local n = {}
+-- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 n["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
@@ -38,9 +39,10 @@ n["pos_1"] = {
 	"item_greater_crit",
 	"item_skadi",
 	"item_moon_shard",
-	"item_satanic",
+	"item_hydras_breath",
 	"item_ultimate_scepter_2",
 }
+-- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 n["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
@@ -55,7 +57,7 @@ n["pos_2"] = {
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_greater_crit",
-	"item_disperser",
+	"item_hydras_breath",
 	"item_moon_shard",
 	"item_satanic",
 	"item_ultimate_scepter_2",
@@ -64,7 +66,7 @@ n["pos_3"] = n["pos_1"]
 n["pos_4"] = n["pos_1"]
 n["pos_5"] = n["pos_1"]
 a["sBuyList"] = n[i]
-a["sSellList"] = { "item_magic_wand", "item_circlet", "item_satanic", "item_vladmir" }
+a["sSellList"] = { "item_magic_wand", "item_circlet", "item_hydras_breath", "item_vladmir" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
 end
@@ -77,14 +79,12 @@ function a.MinionThink(o)
 end
 local p = SafeAbility(b:GetAbilityByName("morphling_waveform"), "morphling_waveform", "morphling")
 local q = SafeAbility(b:GetAbilityByName("morphling_adaptive_strike_agi"), "morphling_adaptive_strike_agi", "morphling")
-local r = SafeAbility(b:GetAbilityByName("morphling_adaptive_strike_str"), "morphling_adaptive_strike_str", "morphling")
 local s = SafeAbility(b:GetAbilityByName("morphling_morph_agi"), "morphling_morph_agi", "morphling")
 local t = SafeAbility(b:GetAbilityByName("morphling_morph_str"), "morphling_morph_str", "morphling")
 local u = SafeAbility(b:GetAbilityByName("morphling_replicate"), "morphling_replicate", "morphling")
 local v = SafeAbility(b:GetAbilityByName("morphling_morph_replicate"), "morphling_morph_replicate", "morphling")
 local w, x
 local y, z
-local A, B
 local C
 local D, E
 local F = ""
@@ -256,11 +256,6 @@ function a.SkillsComplement()
 			b:ActionQueue_UseAbilityOnLocation(p, x)
 			return
 		end
-		A, B = a.ConsiderAdaptiveStrikeSTR()
-		if A > 0 then
-			b:Action_UseAbilityOnEntity(r, B)
-			return
-		end
 		y, z = a.ConsiderAdaptiveStrikeAGI()
 		if y > 0 then
 			c.SetQueuePtToINT(b, false)
@@ -283,7 +278,8 @@ function a.ConsiderWaveform()
 	local ae = c.GetProperCastRange(false, b, p:GetCastRange())
 	local af = p:GetCastPoint()
 	local ag = p:GetSpecialValueInt("speed")
-	local ah = p:GetSpecialValueInt("#AbilityDamage")
+	-- datafeed: Waveform damage is AbilityDamage 75/150/225/300; "#AbilityDamage" is not a special value key.
+	local ah = p:GetAbilityDamage()
 	local ai = p:GetSpecialValueInt("width")
 	local aj = p:GetManaCost()
 	local ak = c.GetManaAfter(aj)
@@ -437,14 +433,26 @@ function a.ConsiderAdaptiveStrikeAGI()
 			and c.CanCastOnTargetAdvanced(au)
 		then
 			local aF = GetUnitToUnitDistance(b, au) / ag + af
-			if aD > aC * 1.5 then
-				if au:HasModifier("modifier_teleporting") then
-					if c.GetModifierTime(au, "modifier_teleporting") > aF then
-						return BOT_ACTION_DESIRE_HIGH, au
-					end
-				elseif au:IsChanneling() and ak > am and not c.IsRealInvisible(b) and not _ then
-					return BOT_ACTION_DESIRE_HIGH, au
+			-- Interrupt a TP or channel at any attribute split: the stun is 0.5s even at minimum (stun_min,
+			-- game data). It needed Strength 50% above Agility, which a carry Morphling almost never has.
+			local interrupt = false
+			if au:HasModifier("modifier_teleporting") then
+				interrupt = c.GetModifierTime(au, "modifier_teleporting") > aF
+			elseif au:IsChanneling() and ak > am and not c.IsRealInvisible(b) and not _ then
+				interrupt = true
+			end
+			if interrupt then
+				if DotaTime() >= (b._morphIntLogAt or -999) then
+					b._morphIntLogAt = DotaTime() + 3
+					pcall(print, string.format(
+						"[OHA-MORPH] t=%.0f strike-interrupt target=%s agi=%d str=%d",
+						DotaTime(),
+						(string.gsub(au:GetUnitName(), "npc_dota_hero_", "")),
+						math.floor(aC),
+						math.floor(aD)
+					))
 				end
+				return BOT_ACTION_DESIRE_HIGH, au
 			end
 			if
 				c.WillKillTarget(au, ah, DAMAGE_TYPE_MAGICAL, aF)
@@ -578,32 +586,8 @@ function a.ConsiderAdaptiveStrikeAGI()
 	end
 	if c.IsDoingTormentor(b) and aE then
 		if c.IsTormentor(G) and c.IsInRange(b, G, ae) and a0 and ak > al then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderAdaptiveStrikeSTR()
-	if not c.CanCastAbility(r) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local ae = c.GetProperCastRange(false, b, r:GetCastRange())
-	local K = b:GetNearbyHeroes(ae, true, BOT_MODE_NONE)
-	for at, au in pairs(K) do
-		if c.IsValidHero(au) and c.CanCastOnNonMagicImmune(au) and au:IsChanneling() then
-			return BOT_ACTION_DESIRE_HIGH, au
-		end
-	end
-	if _ and not c.IsRealInvisible(b) and b:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE then
-		local a2 = b:GetNearbyHeroes(ae, true, BOT_MODE_NONE)
-		for at, au in pairs(a2) do
-			if c.IsValidHero(au) and c.CanCastOnNonMagicImmune(au) and not c.IsDisabled(au) then
-				local aN = au:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
-				local aO = au:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if aN ~= nil and aO ~= nil and (#aO > #aN or b:WasRecentlyDamagedByAnyHero(1.5)) then
-					return BOT_ACTION_DESIRE_HIGH, au
-				end
-			end
+			-- Return the Tormentor: the caller casts on the second value, which was nil here.
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

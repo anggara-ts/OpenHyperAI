@@ -137,10 +137,9 @@ function a.ConsiderQ()
 	local S = o:GetAbilityDamage()
 	local T = DAMAGE_TYPE_MAGICAL
 	local U = c.GetAroundEnemyHeroList(P)
+	-- sTalentList[8] is special_bonus_unique_riki_9 (+500 Blink Strike range, game files), not a Smoke Screen
+	-- radius talent, so adding it here made the smoke AoE search 925 wide for a 425 cloud. Radius as read.
 	local V = o:GetSpecialValueInt("radius")
-	if v:IsTrained() then
-		V = V + v:GetSpecialValueInt("value")
-	end
 	local W = nil
 	for X, Y in pairs(L) do
 		if
@@ -203,22 +202,26 @@ function a.ConsiderW()
 		return 0
 	end
 	local O = p:GetLevel()
+	-- sTalentList[6] is special_bonus_unique_riki_5 (Blink Strike cooldown -1, game files), not a range talent;
+	-- the range talent (riki_9) is an AbilityCastRange bonus, left to GetCastRange().
 	local P = p:GetCastRange() + E
-	if u:IsTrained() then
-		P = P + u:GetSpecialValueInt("value")
-	end
 	local Q = p:GetCastPoint()
 	local R = p:GetManaCost()
 	local _ = b:GetAttackDamage()
-	if s:IsTrained() then
-		local a0 = s:GetSpecialValueFloat("damage_multiplier")
+	-- datafeed: Backstab is now the innate riki_innate_backstab (damage_multiplier 0.55); the ultimate (riki_backstab,
+	-- Cloak and Dagger) has no damage_multiplier, so the bonus read 0.
+	local aBS = b:GetAbilityByName("riki_innate_backstab")
+	if aBS ~= nil then
+		local a0 = aBS:GetSpecialValueFloat("damage_multiplier")
 		if t:IsTrained() then
 			a0 = a0 + t:GetSpecialValueFloat("value")
 		end
 		_ = _ + b:GetAttributeValue(ATTRIBUTE_AGILITY) * a0
 	end
 	local S = p:GetSpecialValueInt("bonus_damage")
-	local T = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Blink Strike damage is physical (1), so its bonus_damage goes in the physical slot of
+	-- WillMixedDamageKillTarget below (it was counted as magical).
+	local T = DAMAGE_TYPE_PHYSICAL
 	local U = c.GetAroundEnemyHeroList(P)
 	local a1 = c.GetNumOfAliveHeroes(true)
 	local W = nil
@@ -230,8 +233,8 @@ function a.ConsiderW()
 			and c.CanCastOnTargetAdvanced(Y)
 			and c.IsInRange(b, Y, P + 100)
 			and (
-				c.WillMixedDamageKillTarget(Y, _, S, 0, Q)
-				or Y:IsChanneling() and c.WillMixedDamageKillTarget(Y, _ * 3, S, 0, Q * 3)
+				c.WillMixedDamageKillTarget(Y, _ + S, 0, 0, Q)
+				or Y:IsChanneling() and c.WillMixedDamageKillTarget(Y, _ * 3 + S, 0, 0, Q * 3)
 			)
 		then
 			W = Y
@@ -333,7 +336,7 @@ function a.ConsiderW()
 				c.IsValid(aj)
 				and c.IsKeyWordUnit(ai, aj)
 				and not aj:HasModifier("modifier_fountain_glyph")
-				and c.WillMixedDamageKillTarget(aj, _, S, 0, Q)
+				and c.WillMixedDamageKillTarget(aj, _ + S, 0, 0, Q)
 				and not c.CanKillTarget(aj, b:GetAttackDamage() * 1.3, DAMAGE_TYPE_PHYSICAL)
 			then
 				W = aj
@@ -387,7 +390,7 @@ function a.ConsiderE()
 	local S = q:GetAbilityDamage()
 	local T = DAMAGE_TYPE_MAGICAL
 	local U = c.GetAroundEnemyHeroList(P)
-	local V = q:GetSpecialValueInt("range")
+	local V = q:GetSpecialValueInt("radius") -- datafeed: Tricks of the Trade has "radius" (425), no "range" (read 0)
 	local am = c.GetLocationTowardDistanceLocation(b, c.GetTeamFountain(), P)
 	local W = nil
 	if
@@ -424,7 +427,9 @@ function a.ConsiderE()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderAS()
-	if not r:IsTrained() or not r:IsFullyCastable() then
+	-- datafeed: Riki has no Shard active any more (the Shard upgrades Smoke Screen), so sAbilityList[4] is the passive
+	-- innate Backstab or nothing. CanCastAbility skips passive/hidden/untrained abilities instead of ordering a cast.
+	if not c.CanCastAbility(r) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local V = 700

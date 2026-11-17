@@ -21,9 +21,9 @@ m["pos_1"] = {
 	"item_wraith_band",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_maelstrom",
+	"item_bfury",
 	"item_manta",
-	"item_mjollnir",
+	"item_ultimate_scepter",
 	"item_skadi",
 	"item_aghanims_shard",
 	"item_basher",
@@ -59,7 +59,9 @@ local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "juggernaut")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "juggernaut")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "juggernaut")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "juggernaut")
-local s = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "juggernaut")
+-- datafeed: Swift Slash is granted by Aghanim's Scepter; fetch it by name, since entry 4 of the ability list is
+-- not guaranteed to be it (the hero also has the innate Bladeform).
+local s = SafeAbility(b:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
 local t = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "juggernaut")
 local u = SafeAbility(b:GetAbilityByName(f[6]), "sTalentList[6]", "juggernaut")
 local v, w
@@ -241,6 +243,9 @@ function a.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Omnislash and Swift Slash pierce spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
+-- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR/ConsiderD check CanCastOnMagicImmune; they were held
+-- on any target under BKB.
 function a.ConsiderR()
 	if
 		not r:IsFullyCastable()
@@ -262,7 +267,7 @@ function a.ConsiderR()
 	local X = nil
 	if c.IsStunProjectileIncoming(b, 1000) then
 		for Z, _ in pairs(V) do
-			if c.IsValid(_) and c.CanCastOnNonMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
+			if c.IsValid(_) and c.CanCastOnMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
 				W = _
 				X = "R-防御:" .. c.Chat.GetNormName(W)
 				return BOT_ACTION_DESIRE_HIGH, W, X
@@ -276,7 +281,7 @@ function a.ConsiderR()
 			and (botTarget:GetHealth() > b:GetAttackDamage() * 4 or J < 0.2 or #V >= 2)
 		then
 			for Z, _ in pairs(U) do
-				if c.IsValid(_) and c.CanCastOnNonMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
+				if c.IsValid(_) and c.CanCastOnMagicImmune(_) and c.CanCastOnTargetAdvanced(_) then
 					W = _
 					X = "R-攻击:" .. c.Chat.GetNormName(W)
 					return BOT_ACTION_DESIRE_HIGH, W, X
@@ -289,7 +294,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(_)
 				and b:WasRecentlyDamagedByHero(_, 5.0)
-				and c.CanCastOnNonMagicImmune(_)
+				and c.CanCastOnMagicImmune(_)
 				and c.CanCastOnTargetAdvanced(_)
 			then
 				W = _
@@ -326,7 +331,7 @@ function a.ConsiderD()
 				if
 					c.IsValid(_)
 					and c.IsInRange(botTarget, _, 425)
-					and c.CanCastOnNonMagicImmune(_)
+					and c.CanCastOnMagicImmune(_)
 					and c.CanCastOnTargetAdvanced(_)
 				then
 					W = _
@@ -341,7 +346,7 @@ function a.ConsiderD()
 			if
 				c.IsValid(_)
 				and b:WasRecentlyDamagedByHero(_, 2.0)
-				and c.CanCastOnNonMagicImmune(_)
+				and c.CanCastOnMagicImmune(_)
 				and c.CanCastOnTargetAdvanced(_)
 			then
 				W = _

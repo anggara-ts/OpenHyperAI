@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 3, 2, 1, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -94,14 +94,14 @@ n["pos_4"] = {
 	"item_boots",
 	"item_tranquil_boots",
 	"item_ancient_janggo",
-	"item_guardian_greaves",
-	"item_solar_crest",
-	"item_heavens_halberd",
-	"item_sheepstick",
-	"item_lotus_orb",
-	"item_moon_shard",
-	"item_assault",
+	"item_boots_of_bearing",
+	"item_spirit_vessel",
 	"item_aghanims_shard",
+	"item_cyclone",
+	"item_ultimate_scepter",
+	"item_lotus_orb",
+	"item_sheepstick",
+	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 n["pos_5"] = {
@@ -111,12 +111,12 @@ n["pos_5"] = {
 	"item_orb_of_frost",
 	"item_magic_wand",
 	"item_boots",
-	"item_arcane_boots",
+	"item_tranquil_boots",
 	"item_ancient_janggo",
 	"item_pipe",
-	"item_solar_crest",
+	"item_spirit_vessel",
 	"item_boots_of_bearing",
-	"item_heavens_halberd",
+	"item_cyclone",
 	"item_sheepstick",
 	"item_moon_shard",
 	"item_lotus_orb",
@@ -392,10 +392,17 @@ function a.ConsiderE()
 	then
 		return BOT_ACTION_DESIRE_HIGH, "E-隐身逃跑"
 	end
-	if c.IsInEnemyArea(b) and E >= 7 and G >= 280 then
+	-- fix: G is the mana fraction (0-1), so "G >= 280" was never true, and "a7 == 0" compared the tower
+	-- table with a number (never true either): he never went invisible to move in the enemy half.
+	-- Now: 280 mana kept, no enemy hero or tower within 1600.
+	if c.IsInEnemyArea(b) and E >= 7 and b:GetMana() >= 280 and not c.IsRealInvisible(b) then
 		local a6 = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 		local a7 = b:GetNearbyTowers(1600, true)
-		if #a6 == 0 and a7 == 0 then
+		if a6 ~= nil and #a6 == 0 and a7 ~= nil and #a7 == 0 then
+			if DotaTime() >= (b._bhSneakLogAt or -999) then
+				b._bhSneakLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-BOUNTY] t=%.0f shadow walk in enemy area mana=%d", DotaTime(), b:GetMana()))
+			end
 			return BOT_ACTION_DESIRE_HIGH, "E-潜行"
 		end
 	end

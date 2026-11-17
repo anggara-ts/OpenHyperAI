@@ -45,6 +45,73 @@ local _ = Y.GetLocationToLocationDistance
 local a0 = Y.RadiantFountainTpPoint
 local a1 = Y.DireFountainTpPoint
 local a2 = require(GetScriptDirectory() .. "/FuncLib/systems/cache")
+local KillWindow = require(GetScriptDirectory() .. "/FuncLib/systems/kill_window")
+-- Our base is being hit. A fresh kill must not pull the team away from it, since
+-- defend desire tops out at 0.6 and the kill floor is 0.91 or 0.99.
+local BASE_CREEP_RADIUS = 1600
+local baseThreat = { exposed = false, why = "" }
+local function ReadBaseThreat(ancient, heroesAtAncient, heroesOnHG)
+	local s = { exposed = false, why = "", creeps = 0, ancHP = 1 }
+	if ancient == nil or not ancient:IsAlive() then
+		return s
+	end
+	s.ancHP = ancient:GetHealth() / math.max(1, ancient:GetMaxHealth())
+	local loc = ancient:GetLocation()
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+		if unit ~= nil and unit:IsAlive() and GetUnitToLocationDistance(unit, loc) <= BASE_CREEP_RADIUS then
+			s.creeps = s.creeps + 1
+		end
+	end
+	local why = {}
+	if (heroesAtAncient or 0) >= 1 then
+		why[#why + 1] = "heroes=" .. heroesAtAncient
+	end
+	if (heroesOnHG or 0) >= 1 then
+		why[#why + 1] = "hg=" .. heroesOnHG
+	end
+	if s.ancHP < 0.95 then
+		why[#why + 1] = string.format("anc=%.2f", s.ancHP)
+	end
+	if s.creeps >= 2 then
+		why[#why + 1] = "creeps=" .. s.creeps
+	end
+	s.exposed = #why > 0
+	s.why = table.concat(why, ",")
+	s.heroes = (heroesAtAncient or 0) + (heroesOnHG or 0)
+	return s
+end
+-- Creeps only (no enemy hero at the Ancient or on high ground): only the allies closest to the
+-- Ancient stay for it, 1 (2 with 8+ creeps or the Ancient below 95%); the rest may take the kill
+-- push. Game 018: after Radiant lost barracks, super creeps kept 2+ creeps near the Ancient most
+-- of the time, so all five held 75 kill windows (54:55: Gyrocopter, Techies and Warlock dead,
+-- held for 4 creeps) and Dire lost no building after 47:28 while Radiant had 22 kills to 8.
+local function MustStayForBase(bot)
+	if not baseThreat.exposed then
+		return false
+	end
+	if (baseThreat.heroes or 0) >= 1 then
+		return true
+	end
+	local ancient = GetAncient(GetTeam())
+	if ancient == nil then
+		return true
+	end
+	local keep = ((baseThreat.creeps or 0) >= 8 or (baseThreat.ancHP or 1) < 0.95) and 2 or 1
+	local myDist = GetUnitToUnitDistance(bot, ancient)
+	local closer = 0
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			ally ~= nil
+			and ally ~= bot
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and GetUnitToUnitDistance(ally, ancient) < myDist
+		then
+			closer = closer + 1
+		end
+	end
+	return closer < keep
+end
 local a3 = a2.getGlobalGameState
 local a4 = a2.getGlobalLocationState
 local a5 = a2.getCachedAlliesNearLoc
@@ -63,6 +130,7 @@ function m(ab)
 	local ae = ad.ourAncient
 	w = ae ~= nil and O.Utils.CountEnemyHeroesNear(ae:GetLocation(), M) or 0
 	x = O.Utils.CountEnemyHeroesOnHighGround(ab)
+	baseThreat = ReadBaseThreat(ae, w, x)
 	y = {}
 	for af, ag in ipairs({ U.Top, U.Mid, U.Bot }) do
 		local ah = GetLaneFrontLocation(ab, ag, 0)
@@ -156,6 +224,18 @@ function l.GetPushDesireHelper(ao, ap)
 	local aq = a4()
 	local ab = ad.team
 	m(ab)
+	local kw = KillWindow.Tick()
+	local killOpen = kw.fresh >= 1
+		and not kw.buyback
+		and ad.aliveAllyCount > ad.aliveEnemyCount
+		and O.GetHP(ao) >= 0.3
+	local killPush = killOpen and w < 1 and not MustStayForBase(ao)
+	if killOpen and not killPush then
+		KillWindow.LogPushHeld(ao, ap, kw, baseThreat.why)
+	end
+	if kw.buyback then
+		return S.None
+	end
 	local ar = ao:GetActiveMode()
 	local as = ao:GetAssignedLane() == ap
 	t = ad.enemyAncient
@@ -336,7 +416,52 @@ function l.GetPushDesireHelper(ao, ap)
 		end
 		if C ~= nil and DotaTime() < D then
 			if ap == C then
-				return math.max(0.55, RemapValClamped(GetPushLaneDesire(ap), 0, 1, 0, B))
+				-- Game 036 (23:25, 30:01, 35:11): this lock returned before every later safety cap, so
+				-- four bots stayed on the Dire high ground with all 5 Dire alive and got wiped. The
+				-- caps now apply inside the lock: B already holds the HG / own-HP / 5-alive caps.
+				local lockD = math.max(0.55, RemapValClamped(GetPushLaneDesire(ap), 0, 1, 0, B))
+				local capWhy = nil
+				if B < lockD then
+					lockD, capWhy = B, "cap"
+				end
+				if #aA <= 1 and #aB >= 2 and lockD > 0.2 then
+					lockD, capWhy = 0.2, "alone-vs-2"
+				end
+				if t and l.GetLaneBuildingTier(ap) >= 2 and GetUnitToUnitDistance(ao, t) < 6000 and #aA < ad.aliveEnemyCount and lockD > 0.4 then
+					lockD, capWhy = 0.4, "fewer-than-alive"
+				end
+				if aE and #aA >= 2 then
+					local hurt, sum = 0, 0
+					for _, ay in ipairs(aA) do
+						if O.IsValidHero(ay) then
+							local hpA = O.GetHP(ay)
+							sum = sum + hpA
+							if hpA < 0.4 then
+								hurt = hurt + 1
+							end
+						end
+					end
+					if hurt >= 2 and sum / #aA < 0.6 and ad.aliveEnemyCount >= #aA - 2 and lockD > 0.15 then
+						lockD, capWhy = 0.15, "group-hurt"
+					end
+				end
+				if capWhy ~= nil and DotaTime() >= (ao._pushLockCapLogAt or -999) then
+					ao._pushLockCapLogAt = DotaTime() + 5
+					pcall(print, string.format(
+						"[OHA-PUSH] t=%.0f %s lock-capped lane=%s why=%s desire=%.2f allies=%d enemies=%d alive=%d/%d hg=%s",
+						DotaTime(),
+						(string.gsub(ao:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(ap),
+						capWhy,
+						lockD,
+						#aA,
+						#aB,
+						ad.aliveAllyCount,
+						ad.aliveEnemyCount,
+						tostring(aE)
+					))
+				end
+				return lockD
 			else
 				return S.None
 			end
@@ -372,7 +497,7 @@ function l.GetPushDesireHelper(ao, ap)
 	end
 	if t and l.GetLaneBuildingTier(ap) >= 2 then
 		local be = GetUnitToUnitDistance(ao, t)
-		if be < 6000 and #aA + 1 < aQ and b8 < 0.65 then
+		if be < 6000 and #aA + 1 < aQ and b8 < 0.65 and not (killPush and #aA >= 2 and #aB < #aA) then
 			return S.None
 		elseif be < 6000 and #aA < aQ then
 			B = math.min(B, 0.4)
@@ -398,6 +523,7 @@ function l.GetPushDesireHelper(ao, ap)
 	if #aA <= 1 and #aB >= 2 then
 		d = math.min(d, 0.2)
 	end
+	local groupHurt = false
 	if aE and #aA >= 2 then
 		local bl = 0
 		local bm = 0
@@ -413,6 +539,7 @@ function l.GetPushDesireHelper(ao, ap)
 		local bo = #aA > 0 and bm / #aA or 1
 		if bl >= 2 and bo < 0.6 and aQ >= #aA - 2 then
 			d = math.min(d, 0.15)
+			groupHurt = true
 		end
 	end
 	if E then
@@ -454,6 +581,19 @@ function l.GetPushDesireHelper(ao, ap)
 		end
 		if F[ap] and DotaTime() < F[ap] then
 			d = math.max(d, 0.45)
+		end
+	end
+	-- A fresh kill lifts the high-ground caps. Buyback already returned none above.
+	if killPush and not groupHurt and #aA >= 2 and #aB < #aA and (v == nil or v == ap) then
+		-- One death beats farm (VERYHIGH ~0.9) and loses to a close outpost (0.95).
+		-- Two deaths beat the outpost channel itself (0.98 on the point).
+		local floor = 0.91
+		if kw.fresh >= 2 and O.GetHP(ao) >= 0.4 then
+			floor = 0.99
+		end
+		if d < floor then
+			KillWindow.LogPush(ao, ap, d, floor, kw, O.GetHP(ao), ad.aliveAllyCount, ad.aliveEnemyCount)
+			d = floor
 		end
 	end
 	return d
@@ -1069,7 +1209,9 @@ function l.PushThink(ao, ap)
 	then
 		local dm = df[1]:GetAttackRange() + 200
 		local dn = false
-		if dd < 0.6 then
+		-- Also step out when an attack order on an allied creep failed to move the tower's aggro
+		-- in the last 6s (ability_item_usage_generic DeflectTowerAggro).
+		if dd < 0.6 or DotaTime() < (ao._deaggroFailedAt or -99) + 6 then
 			dn = true
 		else
 			local dp = df[1]:GetAttackDamage() * df[1]:GetAttackSpeed() * 5 - ao:GetHealthRegen() * 5
@@ -1109,12 +1251,26 @@ function l.PushThink(ao, ap)
 	end
 	do
 		local dx = ao:GetNearbyLaneCreeps(1200, true)
+		local creepOnMe = false
 		if dx then
 			for af, ci in ipairs(dx) do
 				if O.IsValid(ci) and ci:GetAttackTarget() == ao then
-					ao:Action_MoveToLocation(cu)
-					return
+					creepOnMe = true
+					break
 				end
+			end
+		end
+		if not creepOnMe then
+			creepOnMe = ao:WasRecentlyDamagedByCreep(1.0)
+		end
+		-- cu can be the hero's own spot once they are ahead of the wave, so moving there
+		-- left them standing in the creeps that were already hitting them.
+		if creepOnMe then
+			local heroes = ao:GetNearbyHeroes(1000, true, R.None) or {}
+			if #heroes == 0 then
+				local away = O.AdjustLocationWithOffsetTowardsFountain(ao:GetLocation(), 700)
+				ao:Action_MoveToLocation(away)
+				return
 			end
 		end
 	end
@@ -1228,6 +1384,14 @@ function l.PushThink(ao, ap)
 					break
 				end
 				if O.IsTormentor(ci) or O.IsRoshan(ci) then
+					dM = true
+					break
+				end
+				-- Game 032, 13:25: Techies, Pudge and OD, pushing mid, paced by a neutral camp next to
+				-- the Dire outpost (moved 98-215 in 10s): the nearby-creep list includes neutrals, so
+				-- they hit the camp, then walked back toward the lane. Pushing leaves neutrals alone
+				-- unless one is hitting this hero.
+				if ci:GetTeam() == TEAM_NEUTRAL and ci:GetAttackTarget() ~= ao then
 					dM = true
 					break
 				end

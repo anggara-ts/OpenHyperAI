@@ -38,8 +38,40 @@ m["pos_3"] = {
 }
 m["pos_1"] = m["pos_3"]
 m["pos_2"] = m["pos_3"]
-m["pos_4"] = m["pos_3"]
-m["pos_5"] = m["pos_3"]
+-- Support builds: Dotabuff 7-day meta has Spirit Breaker mostly at support-off (pos 4, S tier).
+m["pos_4"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_wind_lace",
+	"item_boots",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_invis_sword",
+	"item_aghanims_shard",
+	"item_black_king_bar",
+	"item_heavens_halberd",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+-- One pair of boots in this build (user rule; Util/boots-check.js).
+m["pos_5"] = {
+	"item_priest_outfit",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_glimmer_cape",
+	"item_aghanims_shard",
+	"item_force_staff",
+	"item_lotus_orb",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 a["sBuyList"] = m[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
@@ -105,9 +137,11 @@ function a.SkillsComplement()
 		b:Action_UseAbility(r)
 		return
 	end
-	y = a.ConsiderPlanarPocket()
-	if y > 0 then
-		b:Action_UseAbility(t)
+	-- datafeed: Planar Pocket is unit-target (behavior 8, target team both), not no-target
+	local pocketTarget
+	y, pocketTarget = a.ConsiderPlanarPocket()
+	if y > 0 and pocketTarget ~= nil then
+		b:Action_UseAbilityOnEntity(t, pocketTarget)
 		return
 	end
 	z, A = a.ConsiderNetherStrike()
@@ -142,8 +176,24 @@ function a.ConsiderChargeOfDarkness()
 	end
 	local L = c.GetTeamFightLocation(b)
 	if L ~= nil and GetUnitToLocationDistance(b, L) > 1600 and not c.IsInLaningPhase() then
-		if B ~= nil and #B >= 1 and not c.IsLocationInChrono(L) then
-			return BOT_ACTION_DESIRE_HIGH, B[1]
+		-- Review fix: this charged B[1], the nearest enemy within 1600 of Spirit Breaker, i.e. NOT
+		-- one at the fight (which is 1600+ away), and needed an enemy next to him to fire at all.
+		-- Charge (global cast range) an enemy hero standing at the fight instead.
+		if not c.IsLocationInChrono(L) and not E then
+			for _, J in pairs(c.GetEnemiesNearLoc(L, 1200)) do
+				if
+					c.IsValidHero(J)
+					and c.CanCastOnNonMagicImmune(J)
+					and not c.IsSuspiciousIllusion(J)
+					and not c.IsLocationInChrono(J:GetLocation())
+				then
+					if DotaTime() - (a.lastChargeLog or -99) > 10 then
+						a.lastChargeLog = DotaTime()
+						pcall(print, string.format("[OHA-SB] t=%.0f charge-fight target=%s dist=%d", DotaTime(), J:GetUnitName(), GetUnitToUnitDistance(b, J)))
+					end
+					return BOT_ACTION_DESIRE_HIGH, J
+				end
+			end
 		end
 	end
 	if D then
@@ -174,14 +224,26 @@ function a.ConsiderChargeOfDarkness()
 		end
 	end
 	if E and c.GetHP(b) < 0.5 and c.IsValidHero(B[1]) and c.IsInRange(b, B[1], 500) then
+		-- Review fix: the escape charge took the first creep 1600+ away in any direction, often
+		-- one deeper in enemy territory. Only charge a creep that is clearly nearer our escape spot.
+		local escape = c.GetEscapeLoc()
+		local myEscDist = GetUnitToLocationDistance(b, escape)
 		for I, Q in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS)) do
-			if c.IsValid(Q) and GetUnitToUnitDistance(Q, b) > 1600 then
+			if
+				c.IsValid(Q)
+				and GetUnitToUnitDistance(Q, b) > 1600
+				and GetUnitToLocationDistance(Q, escape) < myEscDist - 1000
+			then
 				b.chargeRetreat = true
 				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 		end
 		for I, Q in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
-			if c.IsValid(Q) and GetUnitToUnitDistance(Q, b) > 1600 then
+			if
+				c.IsValid(Q)
+				and GetUnitToUnitDistance(Q, b) > 1600
+				and GetUnitToLocationDistance(Q, escape) < myEscDist - 1000
+			then
 				b.chargeRetreat = true
 				return BOT_ACTION_DESIRE_HIGH, Q
 			end
@@ -206,7 +268,8 @@ function a.ConsiderChargeOfDarkness()
 			local S = b:GetNearbyLaneCreeps(H, true)
 			if S ~= nil and #S >= 3 and R.count >= 3 then
 				if c.CanBeAttacked(S[1]) then
-					return BOT_ACTION_DESIRE_HIGH, T[3]
+					-- fix: returned T[3] (neutral list, may be nil) instead of the lane creep S[3]
+					return BOT_ACTION_DESIRE_HIGH, S[3]
 				end
 			end
 		end
@@ -263,7 +326,8 @@ function a.ConsiderChargeOfDarkness()
 			then
 				local Z = GetUnitToUnitDistance(b, Y)
 				if (c.IsChasingTarget(X, Y) or c.IsAttacking(X)) and Z > 600 and Z < 1900 then
-					return BOT_ACTION_DESIRE_HIGH, C
+					-- fix: charge the ally's validated target Y, not our own (possibly nil) target C
+					return BOT_ACTION_DESIRE_HIGH, Y
 				end
 			end
 		end
@@ -308,7 +372,8 @@ function a.ConsiderNetherStrike()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local _ = u:GetCastRange()
-	local a0 = u:GetAbilityDamage()
+	-- datafeed: Nether Strike damage is the "damage" special value (150/250/350); there is no AbilityDamage
+	local a0 = u:GetSpecialValueInt("damage")
 	for I, J in pairs(B) do
 		if
 			c.IsValidHero(J)
@@ -364,19 +429,42 @@ function a.ConsiderNetherStrike()
 end
 function a.ConsiderPlanarPocket()
 	if not t:IsTrained() or not t:IsFullyCastable() or b:HasModifier("modifier_spirit_breaker_charge_of_darkness") then
-		return BOT_ACTION_DESIRE_NONE
+		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local H = t:GetSpecialValueInt("radius")
+	-- datafeed: cast range 700; Barathrum gets the magic resistance whichever hero is targeted
+	local castRange = c.GetProperCastRange(false, b, t:GetCastRange())
 	C = c.GetProperTarget(b)
 	if c.IsInTeamFight(b, 1200) then
 		local B = c.GetEnemiesNearLoc(b:GetLocation(), H)
 		if B ~= nil and #B >= 2 and b:WasRecentlyDamagedByAnyHero(1) then
-			return BOT_ACTION_DESIRE_HIGH
+			-- pocket the most hurt ally so enemy unit-target spells on it go to Spirit Breaker
+			local ally, allyHp = nil, 1
+			for _, X in pairs(c.GetNearbyHeroes(b, castRange, false, BOT_MODE_NONE) or {}) do
+				if
+					c.IsValidHero(X)
+					and X ~= b
+					and not X:IsIllusion()
+					and X:WasRecentlyDamagedByAnyHero(2)
+					and c.GetHP(X) < allyHp
+				then
+					ally, allyHp = X, c.GetHP(X)
+				end
+			end
+			if ally ~= nil then
+				return BOT_ACTION_DESIRE_HIGH, ally
+			end
+			-- no hurt ally: still cast for the magic resistance, on a nearby enemy hero
+			for _, W in pairs(B) do
+				if c.IsValidHero(W) and c.IsInRange(b, W, castRange) and not c.IsSuspiciousIllusion(W) then
+					return BOT_ACTION_DESIRE_HIGH, W
+				end
+			end
 		end
 	end
 	if D then
 		if
-			c.IsValidTarget(C)
+			c.IsValidHero(C) -- datafeed: Planar Pocket targets heroes only (target_type 1)
 			and c.CanCastOnNonMagicImmune(C)
 			and c.IsInRange(b, C, 600)
 			and b:WasRecentlyDamagedByAnyHero(1)
@@ -384,7 +472,7 @@ function a.ConsiderPlanarPocket()
 			and not c.IsSuspiciousIllusion(C)
 			and not c.IsDisabled(C)
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, C
 		end
 	end
 	if E then
@@ -400,10 +488,10 @@ function a.ConsiderPlanarPocket()
 		then
 			local O = c.GetNearbyHeroes(B[1], 1200, false, BOT_MODE_NONE)
 			if O ~= nil and (#O > #K or b:WasRecentlyDamagedByAnyHero(1)) then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, B[1]
 			end
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	return BOT_ACTION_DESIRE_NONE, nil
 end
 return a

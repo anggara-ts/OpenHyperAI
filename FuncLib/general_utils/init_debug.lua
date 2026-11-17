@@ -5,24 +5,49 @@ local function a(b)
 		local h = GetBot()
 		local i = h:GetUnitName()
 		local j, k = "game/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", ""), nil
+		-- The handlers only keep the message. Logging from inside them showed up as
+		-- "Script Runtime Error: error in error handling" for every bot at -89s (a per-hero
+		-- Customize file is optional, so a failed require is normal).
+		local loadErr = nil
 		local l, m = xpcall(function()
 			k = require(j)
 		end, function(n)
-			log("[WARN] When loading customized game file: %s", n)
+			loadErr = n
+			return n
 		end)
 		if not (l and k) then
 			j = GetScriptDirectory() .. "/Customize/hero/" .. string.gsub(i, "npc_dota_hero_", "")
 			l, m = xpcall(function()
 				k = require(j)
 			end, function(n)
-				log("[WARN] When loading customized file: %s", n)
+				loadErr = n
+				return n
 			end)
+		end
+		if not (l and k) and loadErr ~= nil then
+			pcall(log, "[WARN] No customized hero file for %s: %s", i, tostring(loadErr))
 		end
 		if l and k and k.Enable then
 			d = k.AbilityUpgrade
 			e = b.GetTalentBuildList(k.Talent)
 			f = k.PurchaseList
 			g = k.SellList
+		elseif type(f) == "table" then
+			local ok, applied = pcall(function()
+				return require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").ApplyTeamItems(h, f)
+			end)
+			if ok and type(applied) == "table" then
+				f = applied
+			else
+				log("[WARN] Team item plan failed for %s: %s", i, tostring(applied))
+				local kept = {}
+				for q = 1, #f do
+					if f[q] ~= "item_team_aura" then
+						kept[#kept + 1] = f[q]
+					end
+				end
+				f = kept
+			end
 		end
 		return d, e, f, g
 	end

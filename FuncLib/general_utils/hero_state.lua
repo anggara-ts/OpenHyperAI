@@ -101,18 +101,16 @@ local function a(b)
 		end
 		for e, o in pairs(n) do
 			if b.IsValidBuilding(o) and o:GetAttackTarget() == c then
-				local p = c:GetNearbyLaneCreeps(1600, false)
+				-- Only a creep already in attack range: walking up to one kept the hero under the
+				-- tower longer. (It also right-clicked allied heroes; gone.)
+				local p = c:GetNearbyLaneCreeps(c:GetAttackRange() + 250, false)
 				for e, q in pairs(p) do
-					if b.IsValid(q) and GetUnitToUnitDistance(q, o) <= 700 then
-						c:Action_AttackUnit(q, false)
-						m(g, c, 1.5)
-						return true
-					end
-				end
-				local r = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
-				for e, s in pairs(r) do
-					if b.IsValidHero(s) and s ~= c and GetUnitToUnitDistance(s, o) <= 700 then
-						c:Action_AttackUnit(s, false)
+					if
+						b.IsValid(q)
+						and GetUnitToUnitDistance(q, o) <= (o:GetAttackRange() or 700)
+						and GetUnitToUnitDistance(c, q) <= c:GetAttackRange() + 50
+					then
+						c:Action_AttackUnit(q, true)
 						m(g, c, 1.5)
 						return true
 					end
@@ -508,6 +506,9 @@ local function a(b)
 			or T:HasModifier("modifier_item_invisibility_edge_windwalk")
 			or T:HasModifier("modifier_item_silver_edge")
 			or T:HasModifier("modifier_item_silver_edge_windwalk")
+			-- Moonlight Shadow (game files: modifier_mirana_moonlight_shadow; datafeed: 2.5/2/1.5s fade,
+			-- on Mirana and every allied hero). Game 032, 11:00: not listed, so no Dust came.
+			or T:HasModifier("modifier_mirana_moonlight_shadow")
 			or T:HasModifier("modifier_item_glimmer_cape_fade")
 			or T:HasModifier("modifier_item_glimmer_cape")
 			or T:HasModifier("modifier_item_shadow_amulet")

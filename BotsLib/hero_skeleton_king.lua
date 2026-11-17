@@ -23,6 +23,7 @@ m["pos_1"] = {
 	"item_armlet",
 	"item_radiance",
 	"item_blink",
+	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_assault",
 	"item_ultimate_scepter",
@@ -31,7 +32,6 @@ m["pos_1"] = {
 	"item_abyssal_blade",
 	"item_travel_boots",
 	"item_moon_shard",
-	"item_refresher",
 	"item_travel_boots_2",
 }
 m["pos_3"] = {
@@ -45,11 +45,11 @@ m["pos_3"] = {
 	"item_phase_boots",
 	"item_radiance",
 	"item_blink",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
 	"item_assault",
 	"item_aghanims_shard",
 	"item_overwhelming_blink",
-	"item_refresher",
 	"item_ultimate_scepter_2",
 	"item_nullifier",
 	"item_travel_boots_2",
@@ -74,8 +74,9 @@ function a.MinionThink(n)
 end
 local o =
 	SafeAbility(b:GetAbilityByName("skeleton_king_hellfire_blast"), "skeleton_king_hellfire_blast", "skeleton_king")
-local p =
-	SafeAbility(b:GetAbilityByName("skeleton_king_spectral_blade"), "skeleton_king_spectral_blade", "skeleton_king")
+-- datafeed: skeleton_king_spectral_blade no longer exists; W is skeleton_king_bone_guard. The old
+-- fallback below never ran (the safe proxy's IsHidden() returns false), so ConsiderW could not cast it.
+local p = SafeAbility(b:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
 local q = SafeAbility(b:GetAbilityByName("skeleton_king_mortal_strike"), "skeleton_king_mortal_strike", "skeleton_king")
 local r = SafeAbility(b:GetAbilityByName("skeleton_king_reincarnation"), "skeleton_king_reincarnation", "skeleton_king")
 local s = SafeAbility(b:GetAbilityByName(f[5]), "sTalentList[5]", "skeleton_king")
@@ -287,6 +288,21 @@ function a.ConsiderW()
 	local L = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 	local T = c.GetProperTarget(b)
 	if c.IsValidHero(T) and #L == 1 and c.IsInRange(T, b, 650) and (W / Y >= 0.6 or t:IsTrained()) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Review fix: the fight case above needs exactly one enemy hero within 1600, so in a real
+	-- teamfight (2+ enemies) Bone Guard was never cast and the stored skeletons were wasted.
+	-- Spend them when fighting a hero target in range, whatever the enemy count.
+	if
+		(c.IsGoingOnSomeone(b) or c.IsInTeamFight(b, 1200))
+		and c.IsValidHero(T)
+		and c.IsInRange(T, b, 700)
+		and (W >= 2 or t:IsTrained())
+	then
+		if DotaTime() - (a.lastBoneGuardLog or -99) > 10 then
+			a.lastBoneGuardLog = DotaTime()
+			pcall(print, string.format("[OHA-WK] t=%.0f bone-guard fight charges=%d enemies=%d", DotaTime(), W, #L))
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if (W == Y or t:IsTrained()) and B >= 4 and (a.IsNearLaneFront(b) or c.IsFarming(b)) then

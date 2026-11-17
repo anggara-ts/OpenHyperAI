@@ -100,9 +100,26 @@ function r.GetDesire()
 			if a.IsDisabled(D) then
 				F = F * 3
 			end
-			if a.IsEarlyGame() then
-				if a.IsValidBuilding(z[1]) and a.IsInRange(D, z[1], 800) then
-					F = F * 0.5
+			-- Jingu Mastery (game data): required_hits 4 (3 with the talent) on the same hero within
+			-- counter_duration 5.5-10s gives 4 empowered attacks (+30-180 damage, 20-80% lifesteal). The
+			-- counter sits on the enemy: keep hitting the marked hero instead of switching targets.
+			if m == "npc_dota_hero_monkey_king" then
+				local jinguStacks = a.GetModifierCount(D, "modifier_monkey_king_quadruple_tap_counter")
+				if jinguStacks > 0 then
+					F = F * (1.5 + jinguStacks)
+				end
+			end
+			if a.IsEarlyGame() or a.IsInLaningPhase() then
+				if a.IsValidBuilding(z[1]) and a.IsInRange(D, z[1], 900) then
+					-- Hard reject tower-hugging bait (starting gold rune → dive).
+					if not a.CanKillTarget(D, c:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL) then
+						F = F * 0.05
+					else
+						F = F * 0.35
+					end
+				end
+				if a.IsValidBuilding(z[1]) and a.IsInRange(c, z[1], (z[1]:GetAttackRange() or 700) + 180) then
+					F = F * 0.05
 				end
 			end
 			local G = a.GetAlliesNearLoc(D:GetLocation(), 1200)
@@ -242,7 +259,13 @@ function r.GetDesire()
 					a0 = a0 + BOT_MODE_DESIRE_HIGH
 				end
 			end
-			if c:HasModifier("modifier_item_satanic_unholy") and a.IsInRange(c, d.unit, e - 75) and f < 0.6 then
+			-- Lifesteal windows: Satanic Unholy Rage (175% lifesteal, 6s) and Monkey King's Jingu charges
+			-- (20-80% lifesteal + bonus damage). Every hit heals and hurts, so fight while it lasts. Was
+			-- only below 60% HP and within attack range - 75, so it stopped as soon as the heal worked.
+			if
+				(c:HasModifier("modifier_item_satanic_unholy") or c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses"))
+				and a.IsInRange(c, d.unit, e + 150)
+			then
 				if #v >= #x and Z >= 1 / 3 or Z >= 0.8 then
 					a0 = a0 + BOT_MODE_DESIRE_HIGH
 				end
@@ -273,9 +296,34 @@ function r.GetDesire()
 		then
 			local a3 = a.GetProperTarget(S)
 			if a.IsGoingOnSomeone(S) then
+				-- Don't pile into a lost fight / solo chase when outnumbered.
+				-- Still commit when the target dies to one attack.
+				local finishKill = a.IsValidHero(a3) and a.ShouldFinishCommittedKill(c, a3)
+				if not finishKill then
+					local allyN = a.GetAllyCount(c, 1400)
+					local enemyN = a.GetEnemyCount(c, 1400)
+					if enemyN >= allyN + 1 and not a.WeAreStronger(c, 1400) then
+						goto continue_ally_follow
+					end
+					if allyN <= 1 and enemyN >= 2 then
+						goto continue_ally_follow
+					end
+				end
 				if a.IsValidHero(a3) and not a.IsSuspiciousIllusion(a3) then
 					d.unit = a3
 					c:SetTarget(d.unit)
+					-- This is the 0.65 (VERYHIGH 0.6 + 0.05) attack with no enemy near: following an ally
+					-- up to 11s of walking away. Think used to drop a target beyond 1200 (n = true), so
+					-- the next desire read 0 and the bot flipped attack/assemble (game 036, Primal Beast,
+					-- 20 changes at 41:41). Think now walks to it; logged here.
+					local far = GetUnitToUnitDistance(c, a3)
+					if far > 1200 and DotaTime() >= (c._flipSrcLogAt or -999) then
+						c._flipSrcLogAt = DotaTime() + 5
+						pcall(print, string.format("[OHA-FLIPSRC] t=%.0f %s attack=0.65 follow ally=%s target=%s dist=%d",
+							DotaTime(), (string.gsub(m, "npc_dota_hero_", "")),
+							(string.gsub(S:GetUnitName(), "npc_dota_hero_", "")),
+							(string.gsub(a3:GetUnitName(), "npc_dota_hero_", "")), far))
+					end
 					return BOT_MODE_DESIRE_VERYHIGH + 0.05
 				end
 				if a.IsInRange(c, S, 1000) and #x == 0 then
@@ -291,12 +339,16 @@ function r.GetDesire()
 							local a7 = a.GetEnemiesNearLoc(a6.location, 300)
 							if a.IsValidHero(a7[1]) then
 								d.location = a6.location
+								-- Think only walks to d.location with hidden1 set; without it this
+								-- desire did nothing and dropped to 0 next think.
+								d.hidden1 = true
 								return BOT_MODE_DESIRE_VERYHIGH + 0.05
 							end
 						end
 					end
 				end
 			end
+			::continue_ally_follow::
 		end
 	end
 	if #x == 0 then
@@ -322,6 +374,57 @@ function r.GetDesire()
 		end
 	end
 	return BOT_MODE_DESIRE_NONE
+end
+-- Kiting (test, user request 2026-11-17; revert if it costs damage): a ranged bot fighting a melee
+-- hero steps away between attacks instead of standing still. Only inside a window that cannot
+-- cancel an attack: it is not known whether GetLastAttackTime is the start of the attack or the
+-- moment it is released, so the window assumes the worst of both:
+--   from  last + point + BUF        (wind-up surely over even if "last" is the start)
+--   until last + spa - point - BUF  (next wind-up can start even if "last" is the release)
+-- point = GetAttackPoint / GetAttackSpeed as in combat.lua GetAttackProDelayTime, at least 0.25s.
+local KITE_BUF = 0.1
+local kiteLogAt = -99
+local function TryKite(t)
+	local range = c:GetAttackRange()
+	if range <= 320 or not a.IsValidHero(t) or t:GetAttackRange() > 320 then
+		return false
+	end
+	if a.IsDisabled(t) or t:IsRooted() or c:IsRooted() or a.IsSuspiciousIllusion(t) then
+		return false
+	end
+	local dist = GetUnitToUnitDistance(c, t)
+	-- The melee hero has to be a threat: on us, chasing us, or close.
+	if not (t:GetAttackTarget() == c or a.IsChasingTarget(t, c) or dist < t:GetAttackRange() + 150) then
+		return false
+	end
+	-- Step back but stay in our attack range, so the next attack needs no walk back.
+	local step = math.min(250, range - dist - 30)
+	if step < 60 then
+		return false
+	end
+	-- Never cut a wind-up that is playing now (attack activity 1503, as in combat.lua).
+	if c:GetAnimActivity() == 1503 and c:GetAnimCycle() < c:GetAttackPoint() + 0.05 then
+		return false
+	end
+	local spa = c:GetSecondsPerAttack()
+	local point = math.max(c:GetAttackPoint() / math.max(c:GetAttackSpeed(), 0.1), 0.25)
+	local since = GameTime() - c:GetLastAttackTime()
+	local from, to = point + KITE_BUF, spa - point - KITE_BUF
+	if to - from < 0.15 or since < from or since > to then
+		return false
+	end
+	local away = a.VectorAway(c:GetLocation(), t:GetLocation(), step)
+	if not IsLocationPassable(away) then
+		return false
+	end
+	c:Action_MoveToLocation(away)
+	if DotaTime() >= kiteLogAt + 2 then
+		kiteLogAt = DotaTime()
+		print(string.format("[OHA-KITE] t=%.0f %s from %s dist=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
+			DotaTime(), (string.gsub(c:GetUnitName(), "npc_dota_hero_", "")), (string.gsub(t:GetUnitName(), "npc_dota_hero_", "")),
+			dist, step, since, from, to, spa))
+	end
+	return true
 end
 function r.Think()
 	if a.CanNotUseAction(c) then
@@ -382,6 +485,9 @@ function r.Think()
 			c:Action_MoveToLocation(a.VectorTowards(d.unit:GetLocation(), l, e / 2))
 			return
 		end
+		if TryKite(d.unit) then
+			return
+		end
 		c:Action_AttackUnit(d.unit, false)
 		return
 	end
@@ -394,6 +500,12 @@ function r.Think()
 			c:Action_MoveToLocation(d.locationFuture)
 			return
 		end
+	end
+	-- An ally's fight target beyond 1200 (the ally-follow desire): walk there instead of
+	-- dropping the mode, which made the next desire 0 and the bot flip attack/assemble.
+	if a.IsValidHero(d.unit) and not a.IsSuspiciousIllusion(d.unit) then
+		c:Action_MoveToLocation(d.unit:GetLocation())
+		return
 	end
 	n = true
 end

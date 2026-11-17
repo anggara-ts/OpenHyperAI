@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local j = { { 1, 3, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -37,7 +37,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_blink",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_moon_shard",
@@ -45,13 +45,17 @@ m["pos_4"] = {
 	"item_sheepstick",
 }
 m["pos_5"] = {
+	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves, Aether Lens, Blink Dagger and
+	-- Aghanim's Shard instead of Tranquil -> Boots of Bearing (Drum), Pipe and an early Scepter: Arcane
+	-- 99% (#1), Blink 70%, Shard 65%, Aether 58%, Greaves 30% of his matches (Dotabuff, last patch);
+	-- Scepter, Pipe, Bearing and Drum are not in his top 25.
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_crystal_maiden_outfit",
+	"item_aether_lens",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
-	"item_pipe",
-	"item_ultimate_scepter",
+	"item_blink",
+	"item_guardian_greaves",
+	"item_aghanims_shard",
 	"item_cyclone",
 	"item_shivas_guard",
 	"item_sheepstick",
@@ -76,7 +80,9 @@ local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "oracle")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "oracle")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "oracle")
 local s = SafeAbility(b:GetAbilityByName(f[3]), "sTalentList[3]", "oracle")
-local t = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "oracle")
+-- datafeed: Rain of Destiny is the Shard ability "oracle_rain_of_destiny" (hidden + not learnable,
+-- so GetAbilityList skips it and g[4] can be the innate Prognosticate). Fetch it by name.
+local t = SafeAbility(b:GetAbilityByName("oracle_rain_of_destiny"), "oracle_rain_of_destiny", "oracle")
 local u, v
 local w, x
 local y, z
@@ -119,7 +125,8 @@ function a.SkillsComplement()
 	if u > 0 then
 		c.SetQueuePtToINT(b, true)
 		b:ActionQueue_UseAbilityOnEntity(o, v)
-		if q:IsFullyCastable() then
+		-- Purifying Flames after it on an enemy only: on an ally just dispelled it would be damage.
+		if q:IsFullyCastable() and v ~= nil and v.GetTeam ~= nil and v:GetTeam() ~= GetTeam() then
 			b:ActionQueue_UseAbilityOnEntity(q, v)
 		end
 		return
@@ -142,6 +149,24 @@ function a.ConsiderD()
 	local Q = t:GetAbilityDamage()
 	local R = DAMAGE_TYPE_MAGICAL
 	local S = 650
+	-- Heal (datafeed: allies in the rain heal and take more healing): in a fight, 2+ allied heroes under
+	-- 70% HP within 300 of a spot in range.
+	if c.IsInTeamFight(b, 1200) then
+		for _, ally in pairs(K or {}) do
+			if c.IsValidHero(ally) and c.GetHP(ally) < 0.7 and c.IsInRange(b, ally, N) then
+				local hurt = 0
+				for _, other in pairs(c.GetAlliesNearLoc(ally:GetLocation(), 300) or {}) do
+					if c.IsValidHero(other) and c.GetHP(other) < 0.7 then
+						hurt = hurt + 1
+					end
+				end
+				if hurt >= 2 then
+					pcall(print, string.format("[OHA-ORACLE] t=%.0f rain-heal allies=%d", DotaTime(), hurt))
+					return BOT_ACTION_DESIRE_HIGH, ally:GetLocation(), "D-Heal"
+				end
+			end
+		end
+	end
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
@@ -166,6 +191,21 @@ function a.ConsiderQ()
 	local R = DAMAGE_TYPE_MAGICAL
 	local S = 300
 	local T = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	-- Save (datafeed: on an ally it only dispels debuffs): an ally in range who is rooted or silenced
+	-- with an enemy hero within 900 of him.
+	for _, ally in pairs(K or {}) do
+		if
+			c.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and (ally:IsRooted() or ally:IsSilenced())
+			and not ally:IsMagicImmune()
+			and #(c.GetEnemiesNearLoc(ally:GetLocation(), 900) or {}) >= 1
+		then
+			pcall(print, string.format("[OHA-ORACLE] t=%.0f fortunes_end-dispel ally=%s", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))))
+			return BOT_ACTION_DESIRE_HIGH, ally, "Q-Dispel" .. c.Chat.GetNormName(ally)
+		end
+	end
 	if c.IsGoingOnSomeone(b) then
 		if c.IsValidHero(botTarget) and c.IsInRange(b, botTarget, N) and c.CanCastOnNonMagicImmune(botTarget) then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack" .. c.Chat.GetNormName(botTarget)
@@ -184,6 +224,24 @@ function a.ConsiderW()
 	local Q = p:GetAbilityDamage()
 	local R = DAMAGE_TYPE_MAGICAL
 	local T = c.GetNearbyHeroes(b, N, true, BOT_MODE_NONE)
+	-- Save: a hurt ally (under 60% HP, hit by a hero in the last 2s) with an enemy spell projectile
+	-- on its way gets Fate's Edict (100% magic resistance, datafeed); Purifying Flames then heals him
+	-- (ConsiderE's Edict rule).
+	for _, ally in pairs(K or {}) do
+		if
+			c.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and c.IsInRange(b, ally, N)
+			and c.GetHP(ally) < 0.6
+			and ally:WasRecentlyDamagedByAnyHero(2.0)
+			and c.IsNotAttackProjectileIncoming(ally, 900)
+			and not ally:IsMagicImmune()
+			and not ally:HasModifier("modifier_oracle_fates_edict")
+		then
+			pcall(print, string.format("[OHA-ORACLE] t=%.0f edict-save ally=%s hp=%.2f", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")), c.GetHP(ally)))
+			return BOT_ACTION_DESIRE_HIGH, ally, "W-Save" .. c.Chat.GetNormName(ally)
+		end
+	end
 	if c.IsInTeamFight(b, 900) and #J >= 3 then
 		local U = nil
 		local V = 0
@@ -207,11 +265,18 @@ function a.ConsiderW()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
+		-- Fate's Edict gives its target 100% magic resistance (datafeed), which blocks Oracle's own
+		-- Fortune's End and Purifying Flames and the team's magic burst on the hero being killed. Only on
+		-- that target while it is hitting one of our heroes and still above 50% HP; "attacking anything"
+		-- used to be enough.
+		local hitting = c.IsValidHero(botTarget) and botTarget:GetAttackTarget() or nil
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(b, botTarget, N)
 			and c.CanCastOnNonMagicImmune(botTarget)
-			and c.IsAttacking(botTarget)
+			and c.IsValidHero(hitting)
+			and hitting:GetTeam() == GetTeam()
+			and c.GetHP(botTarget) > 0.5
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Attack" .. c.Chat.GetNormName(botTarget)
 		end

@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 2, 2, 2, 2, 6, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,16 +21,16 @@ m["pos_1"] = {
 	"item_wraith_band",
 	"item_magic_wand",
 	"item_power_treads",
+	"item_falcon_blade",
 	"item_dragon_lance",
 	"item_manta",
 	"item_skadi",
+	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_greater_crit",
 	"item_butterfly",
-	"item_force_staff",
 	"item_hurricane_pike",
 	"item_moon_shard",
-	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = m["pos_1"]
@@ -262,8 +262,10 @@ function a.ConsiderSunder()
 	end
 	local H = t:GetCastRange()
 	local T = c.GetNearbyHeroes(b, H, true, BOT_MODE_NONE)
+	-- Review fix: Sunder went out even when the target's HP% was no higher than TB's (no gain).
+	-- Only swap when it actually gains TB health.
 	local U = c.GetMostHPPercent(T, true)
-	if E < 0.35 and U ~= nil and not c.IsSuspiciousIllusion(U) then
+	if E < 0.35 and U ~= nil and not c.IsSuspiciousIllusion(U) and c.GetHP(U) > E + 0.15 then
 		return BOT_ACTION_DESIRE_HIGH, U
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -272,11 +274,16 @@ function a.ConsiderDemonZeal()
 	if not r:IsTrained() or not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local V = b:GetHealth() * r:GetSpecialValueFloat("value")
+	-- datafeed: the HP cost is health_cost_pct (20%) of current HP; "value" no longer exists (read 0).
+	local V = b:GetHealth() * r:GetSpecialValueFloat("health_cost_pct") / 100
 	local G = b:GetAttackRange() + q:GetSpecialValueInt("bonus_range")
 	C = c.GetProperTarget(b)
+	-- datafeed: Demon Zeal can't be cast while in Metamorphosis (and Metamorphosis removes it), so
+	-- cast it outside Metamorphosis; it used to require the Metamorphosis modifier and never went out.
 	if
-		(b:GetHealth() - V) / b:GetMaxHealth() > 0.5 and b:HasModifier("modifier_terrorblade_metamorphosis_transform")
+		(b:GetHealth() - V) / b:GetMaxHealth() > 0.5
+		and not b:HasModifier("modifier_terrorblade_metamorphosis")
+		and not b:HasModifier("modifier_terrorblade_metamorphosis_transform")
 	then
 		if F then
 			local L = c.GetNearbyHeroes(b, G, true, BOT_MODE_NONE)

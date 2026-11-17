@@ -127,7 +127,8 @@ function a.ConsiderSpectralDagger()
 		if
 			c.IsValidHero(T)
 			and c.CanCastOnNonMagicImmune(T)
-			and c.CanKillTarget(T, P, DAMAGE_TYPE_PURE)
+			-- datafeed: Spectral Dagger deals magical damage (damage 2), not pure
+			and c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL)
 			and not c.IsSuspiciousIllusion(T)
 			and not T:HasModifier("modifier_abaddon_borrowed_time")
 			and not T:HasModifier("modifier_dazzle_shallow_grave")
@@ -136,7 +137,8 @@ function a.ConsiderSpectralDagger()
 			and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			if c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL) then
-				local U = GetUnitToUnitDistance(b, T) / Q + N
+				-- fix: U was a travel time, not a location; aim at the predicted position
+				local U = c.GetCorrectLoc(T, GetUnitToUnitDistance(b, T) / Q + N)
 				if c.IsInRange(b, T, M / 2 - 150) then
 					U = T:GetLocation()
 				end
@@ -200,7 +202,8 @@ function a.ConsiderSpectralDagger()
 				and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
 				if c.CanKillTarget(T, P, DAMAGE_TYPE_MAGICAL) then
-					local U = GetUnitToUnitDistance(b, T) / Q + N
+					-- fix: U was a travel time, not a location; aim at the predicted position
+					local U = c.GetCorrectLoc(T, GetUnitToUnitDistance(b, T) / Q + N)
 					if c.IsInRange(b, T, M / 2 - 150) then
 						U = T:GetLocation()
 					end
@@ -377,11 +380,16 @@ function a.ConsiderShadowStep()
 	end
 	D = q:GetSpecialValueFloat("duration")
 	local a8 = c.GetTeamFightLocation(b)
+	-- Review fix: Shadow Step has a 1000 cast range (game data AbilityCastRange), not global. Targets
+	-- up to 1600 away, and the far-fight branch below (fight > 1600 away), made Spectre walk across
+	-- the map to cast it. Only pick targets inside cast range; Haunt covers far fights.
+	local ssRange = c.GetProperCastRange(false, b, q:GetCastRange())
 	if I then
-		local a9 = c.GetVulnerableWeakestUnit(b, true, true, 1600)
+		local a9 = c.GetVulnerableWeakestUnit(b, true, true, ssRange)
 		if
 			c.IsValidTarget(a9)
 			and GetUnitToUnitDistance(b, a9) > 600
+			and GetUnitToUnitDistance(b, a9) <= ssRange
 			and not c.IsSuspiciousIllusion(a9)
 			and not c.IsLocationInChrono(a9:GetLocation())
 			and not c.IsLocationInBlackHole(a9:GetLocation())
@@ -408,6 +416,7 @@ function a.ConsiderShadowStep()
 		for S, T in pairs(R) do
 			if
 				c.IsValidHero(T)
+				and GetUnitToUnitDistance(b, T) <= ssRange -- Review fix: cast range, see above
 				and not c.IsSuspiciousIllusion(T)
 				and not c.IsLocationInChrono(T:GetLocation())
 				and not c.IsLocationInBlackHole(T:GetLocation())
@@ -428,7 +437,9 @@ function a.ConsiderShadowStep()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderHaunt()
-	if not r:IsTrained() or not r:IsFullyCastable() or r:IsHidden() or q:IsFullyCastable() or c.IsInLaningPhase() then
+	-- Review fix: Haunt waited for Shadow Step to be on cooldown, but Shadow Step only reaches 1000
+	-- and this case needs the ally fight 1300+ away, so a ready Shadow Step blocked Haunt for good.
+	if not r:IsTrained() or not r:IsFullyCastable() or r:IsHidden() or c.IsInLaningPhase() then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	G = r:GetSpecialValueFloat("duration")
@@ -448,6 +459,10 @@ function a.ConsiderHaunt()
 				local X = c.GetNearbyHeroes(a3, 1200, true, BOT_MODE_NONE)
 				local Y = c.GetNearbyHeroes(a3, 1200, false, BOT_MODE_NONE)
 				if X ~= nil and Y ~= nil and #X + 1 >= #Y and not (#X + 1 >= 2 and #Y <= 1) then
+					if DotaTime() - (a.lastHauntLog or -99) > 10 then
+						a.lastHauntLog = DotaTime()
+						pcall(print, string.format("[OHA-SPECTRE] t=%.0f haunt ally=%s target=%s step_ready=%s", DotaTime(), a3:GetUnitName(), a7:GetUnitName(), tostring(q:IsFullyCastable())))
+					end
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

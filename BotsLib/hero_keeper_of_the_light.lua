@@ -45,7 +45,7 @@ m["pos_2"] = {
 	"item_spirit_vessel",
 	"item_dagon_2",
 	"item_travel_boots",
-	"item_black_king_bar",
+	"item_ethereal_blade",
 	"item_octarine_core",
 	"item_dagon_5",
 	"item_kaya_and_sange",
@@ -94,7 +94,7 @@ m["pos_5"] = {
 	"item_moon_shard",
 }
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+a["sSellList"] = { "item_ethereal_blade", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mid" }, {}
 end
@@ -132,8 +132,6 @@ local s = SafeAbility(
 	"keeper_of_the_light_radiant_bind",
 	"keeper_of_the_light"
 )
-local t =
-	SafeAbility(b:GetAbilityByName("keeper_of_the_light_recall"), "keeper_of_the_light_recall", "keeper_of_the_light")
 local u = SafeAbility(
 	b:GetAbilityByName("keeper_of_the_light_will_o_wisp"),
 	"keeper_of_the_light_will_o_wisp",
@@ -149,7 +147,6 @@ local y
 local z, A
 local B, C
 local D, E
-local F, G
 local H, I
 local J
 local K = -100
@@ -158,7 +155,26 @@ local N
 local O
 local P
 local Q
+-- [OHA-KOTL] one line per new behaviour, at most once per 3s per kind.
+function a.LogKotl(what)
+	b._kotlLogAt = b._kotlLogAt or {}
+	if DotaTime() < (b._kotlLogAt[what] or -999) then
+		return
+	end
+	b._kotlLogAt[what] = DotaTime() + 3
+	pcall(print, string.format("[OHA-KOTL] t=%.0f %s", DotaTime(), what))
+end
 function a.SkillsComplement()
+	-- Illuminate is channelled, and CanNotUseAbility() is true for the whole channel (IsChanneling), so
+	-- the early release (Illuminate End) further down was never reached outside Spirit Form. Check it
+	-- here, before that early return, while Keeper is channelling.
+	if b:IsChanneling() and b.illuminate_status ~= nil and c.CanCastAbility(p) then
+		if a.ConsiderIlluminateEnd() > 0 then
+			a.LogKotl("illuminate-end why=" .. tostring(b.illuminate_status[1]))
+			b:Action_UseAbility(p)
+			return
+		end
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -187,11 +203,6 @@ function a.SkillsComplement()
 	s = SafeAbility(
 		b:GetAbilityByName("keeper_of_the_light_radiant_bind"),
 		"keeper_of_the_light_radiant_bind",
-		"keeper_of_the_light"
-	)
-	t = SafeAbility(
-		b:GetAbilityByName("keeper_of_the_light_recall"),
-		"keeper_of_the_light_recall",
 		"keeper_of_the_light"
 	)
 	u = SafeAbility(
@@ -244,11 +255,6 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnEntity(r, C)
 		return
 	end
-	F, G = a.ConsiderRecall()
-	if F > 0 then
-		b:Action_UseAbilityOnEntity(t, G)
-		return
-	end
 end
 function a.ConsiderIlluminate()
 	if not c.CanCastAbility(o) then
@@ -259,6 +265,9 @@ function a.ConsiderIlluminate()
 	local T = o:GetSpecialValueInt("radius")
 	local U = o:GetSpecialValueInt("total_damage")
 	local V = c.GetManaAfter(o:GetManaCost())
+	-- Illuminate is ready, so any earlier wave is over: drop its status, or a stale "kill"/"laning"
+	-- target could release this new cast early (only the kill and laning branches set a new status).
+	b.illuminate_status = nil
 	for W, X in pairs(M) do
 		if c.IsValidHero(X) and c.IsInRange(b, X, S) and c.CanCastOnNonMagicImmune(X) then
 			if
@@ -387,7 +396,8 @@ function a.ConsiderBlindingLight()
 	local T = q:GetSpecialValueInt("radius")
 	local a6 = q:GetLevel()
 	for W, X in pairs(M) do
-		if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) then
+		-- Range check added: M reaches 1600, so a killable enemy 1600 away made Keeper walk up to it.
+		if c.IsValidHero(X) and c.CanCastOnNonMagicImmune(X) and c.IsInRange(b, X, R) then
 			if
 				c.CanKillTarget(X, a4, DAMAGE_TYPE_MAGICAL)
 				and not X:HasModifier("modifier_abaddon_borrowed_time")
@@ -453,7 +463,11 @@ function a.ConsiderBlindingLight()
 				and not aa[1]:HasModifier("modifier_legion_commander_duel")
 				and not aa[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local a7 = c.VectorAway(aa[1]:GetLocation(), a9:GetLocation(), T * 0.4)
+				-- Blinding Light knocks units to the edge of the area (datafeed), i.e. away from its centre.
+				-- The centre used to be past the enemy (VectorAway), which knocked the chaser onto the
+				-- retreating ally. Put the centre between them so the chaser is knocked away from the ally.
+				local a7 = c.VectorTowards(aa[1]:GetLocation(), a9:GetLocation(), T * 0.4)
+				a.LogKotl("blind-save ally=" .. a9:GetUnitName() .. " enemy=" .. aa[1]:GetUnitName())
 				return BOT_ACTION_DESIRE_HIGH, a7
 			end
 		end
@@ -571,7 +585,9 @@ function a.ConsiderWillOWisp()
 	local R = c.GetProperCastRange(false, b, u:GetCastRange())
 	local T = u:GetSpecialValueInt("radius")
 	local a5 = u:GetCastPoint()
-	local ad = u:GetSpecialValueInt("duration")
+	-- Will-O-Wisp has no "duration" key (game KV), so the old "duration > 0.5" test read 0 and the
+	-- TP-cancel branch never fired. Its first pull comes after off_duration_initial (1.0s).
+	local ad = u:GetSpecialValueFloat("off_duration_initial")
 	for W, X in pairs(M) do
 		if
 			c.IsValidHero(X)
@@ -580,7 +596,8 @@ function a.ConsiderWillOWisp()
 			and X:HasModifier("modifier_teleporting")
 		then
 			local ae = c.GetModifierTime(X, "modifier_teleporting")
-			if ae > a5 and ad > 0.5 then
+			if ae > a5 + ad then
+				a.LogKotl("wisp-tp target=" .. X:GetUnitName())
 				return BOT_ACTION_DESIRE_HIGH, X:GetLocation()
 			end
 		end
@@ -617,47 +634,5 @@ function a.ConsiderSpiritForm()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderRecall()
-	if not c.CanCastAbility(t) then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local ag = t:GetSpecialValueInt("teleport_delay")
-	if ag == nil or ag == 0 then
-		ag = 3
-	end
-	for W, a9 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-		if c.IsValidHero(a9) and not a9:IsIllusion() and not c.IsMeepoClone(a9) then
-			local ah = c.IsEnemyHeroAroundLocation(a9:GetLocation(), 1600)
-			local aa = c.GetEnemiesNearLoc(a9:GetLocation(), 1600)
-			if not ah then
-				if
-					c.IsRetreating(a9)
-					and c.GetHP(a9) < 0.25
-					and #aa == 0
-					and a9:DistanceFromFountain() > 4500
-					and b:DistanceFromFountain() < 1600
-					and not a9:WasRecentlyDamagedByAnyHero(ag)
-				then
-					return BOT_ACTION_DESIRE_HIGH, a9
-				end
-				if
-					c.IsPushing(b)
-					and GetUnitToUnitDistance(b, a9) > 4000
-					and not c.IsFarming(a9)
-					and not c.IsLaning(a9)
-					and not c.IsDoingRoshan(a9)
-					and not c.IsDoingTormentor(a9)
-					and not c.IsDefending(a9)
-				then
-					local ac = c.GetAlliesNearLoc(b:GetLocation(), 1600)
-					if #ac >= 2 then
-						return BOT_ACTION_DESIRE_HIGH, a9
-					end
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
 end
 return a

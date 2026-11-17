@@ -119,12 +119,12 @@ m["pos_5"] = {
 	"item_enchanted_mango",
 	"item_enchanted_mango",
 	"item_blood_grenade",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_magic_wand",
 	"item_force_staff",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_boots_of_bearing",
+	"item_ultimate_scepter",
 	"item_pavise",
 	"item_solar_crest",
 	"item_aghanims_shard",
@@ -392,7 +392,8 @@ function a.ConsiderW()
 	if b:GetActiveMode() ~= BOT_MODE_RETREAT or b:GetActiveModeDesire() < 0.6 then
 		if c.IsValidHero(ad) then
 			if ad:GetHealth() <= a.sil_RealDamage(aa, ab, ad) then
-				return BOT_ACTION_DESIRE_HIGH, WeakestEnemy
+				-- fix: returned an undefined global (WeakestEnemy = nil); the checked target is ad
+				return BOT_ACTION_DESIRE_HIGH, ad
 			end
 		end
 	end
@@ -530,8 +531,12 @@ function a.ConsiderE()
 			and not as:HasModifier("modifier_troll_warlord_battle_trance")
 			and not as:HasModifier("modifier_ursa_enrage")
 		then
+			-- datafeed: extra damage = int_multiplier (1/1.5/2/2.5) x the INT difference. The old math.abs()
+			-- also counted a target with MORE INT as bonus, and the multiplier was left out. Negative
+			-- difference counted as 0 (the feed does not say how it is handled).
 			local M = ao
-				+ math.abs(b:GetAttributeValue(ATTRIBUTE_INTELLECT) - as:GetAttributeValue(ATTRIBUTE_INTELLECT))
+				+ q:GetSpecialValueFloat("int_multiplier")
+					* math.max(0, b:GetAttributeValue(ATTRIBUTE_INTELLECT) - as:GetAttributeValue(ATTRIBUTE_INTELLECT))
 			if c.CanKillTarget(as, M, DAMAGE_TYPE_MAGICAL) then
 				if ap then
 					local at = b:FindAoELocation(true, true, as:GetLocation(), 0, I, 0, 0)
@@ -656,6 +661,7 @@ function a.ConsiderR()
 			and c.CanCastOnNonMagicImmune(a7)
 			and not a7:HasModifier("modifier_teleporting")
 			and a7:GetHealth() > 500
+			and a.IsChannelingUltimate(a7)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -693,6 +699,23 @@ function a.ConsiderR()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Global Silence (120s) only to stop an ULTIMATE channel (Black Hole, Freezing Field, Death Ward...): any
+-- channel over 500 HP set it off before, e.g. a Life Drain, Shackles or a Tricks of the Trade.
+function a.IsChannelingUltimate(unit)
+	local ab = unit:GetCurrentActiveAbility()
+	if ab == nil or not ab:IsUltimate() then
+		return false
+	end
+	if DotaTime() >= (b._globalLogAt or -999) then
+		b._globalLogAt = DotaTime() + 10
+		pcall(print, string.format(
+			"[OHA-SILENCER] t=%.0f global-silence vs channel %s",
+			DotaTime(),
+			ab:GetName()
+		))
+	end
+	return true
+end
 function a.sil_GetWeakestUnit(aD)
 	local aE = nil
 	local aF = 10000
@@ -707,7 +730,8 @@ function a.sil_GetWeakestUnit(aD)
 	return aE, aF
 end
 function a.sil_RealDamage(aa, ab, aG)
-	local aH = aG:GetActualIncomingDamage(aa, DAMAGE_TYPE_PHYSICAL) + aG:GetActualIncomingDamage(ab, DAMAGE_TYPE_PURE)
+	-- datafeed: Glaives of Wisdom bonus damage is magical (damage 2), not pure
+	local aH = aG:GetActualIncomingDamage(aa, DAMAGE_TYPE_PHYSICAL) + aG:GetActualIncomingDamage(ab, DAMAGE_TYPE_MAGICAL)
 	return aH
 end
 return a

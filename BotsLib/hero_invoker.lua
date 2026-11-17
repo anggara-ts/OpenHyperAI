@@ -21,9 +21,10 @@ local k = {
 local l = k[1]
 local m = c.Skill.GetTalentBuild(j[1])
 local n = {}
--- 7.41: Invoker's Aghanim's Scepter and Shard stay inert until an upgrade is
--- manually chosen. Bot scripts cannot send that selection, so skip buying them
--- instead of spending gold on items the bot can never activate.
+-- 7.41: Invoker's Aghanim's Scepter and Shard stay inert until he activates them and picks one
+-- of three upgrades. Tested (games 016 and 017): bought, they sit in the inventory as castable
+-- items with no buff; cast by the bot, nothing changes (same abilities, still inert). The bot API
+-- cannot make the pick, so he does not buy them.
 n["pos_2"] = {
 	"item_ranged_carry_outfit",
 	"item_urn_of_shadows",
@@ -42,16 +43,16 @@ n["pos_2"] = {
 n["pos_2_qe"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_bracer",
+	"item_null_talisman",
 	"item_magic_wand",
 	"item_boots",
 	"item_hand_of_midas",
 	"item_power_treads",
-	"item_orchid",
+	"item_meteor_hammer",
 	"item_sphere",
 	"item_black_king_bar",
 	"item_travel_boots",
-	"item_bloodthorn",
+	"item_octarine_core",
 	"item_sheepstick",
 	"item_refresher",
 	"item_moon_shard",
@@ -78,10 +79,10 @@ end
 a["sSellList"] = {
 	"item_black_king_bar",
 	"item_quelling_blade",
-	"item_ultimate_scepter",
-	"item_magic_wand",
 	"item_sheepstick",
 	"item_hand_of_midas",
+	"item_octarine_core",
+	"item_null_talisman",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
@@ -628,7 +629,13 @@ function a.CastInvokerSpell(b3, b4)
 			b:ActionQueue_UseAbilityOnEntity(b3, b)
 		elseif b3 == C or b3 == D or b3 == w then
 			b:ActionQueue_UseAbility(b3)
-		elseif b3 == E and b:GetLevel() >= 25 then
+		-- Radial (no-target) Deafening Blast only with its talent, special_bonus_unique_invoker_2 (datafeed),
+		-- not at any level 25: the default talent build takes the other level-25 talent, and a no-target
+		-- order for the point-cast blast does nothing.
+		elseif b3 == E and (function()
+			local tal = b:GetAbilityByName("special_bonus_unique_invoker_2")
+			return tal ~= nil and tal:IsTrained()
+		end)() then
 			b:ActionQueue_UseAbility(b3)
 		elseif b3 == E or b3 == B or b3 == A or b3 == y or b3 == x then
 			b:ActionQueue_UseAbilityOnLocation(b3, b4)
@@ -1004,8 +1011,10 @@ function a.ConsiderCmToTarget(b4, bg, bm, b9)
 			and not c.IsSuspiciousIllusion(b4)
 			and (not aG or aG and c.GetManaAfter(A:GetManaCost()) > 0.5 or c.GetHP(b4) < 0.5)
 			and not b4:HasModifier("modifier_abaddon_borrowed_time")
-			and (c.GetHP(b4) <= 0.9 and c.GetHP(b4) > 0.15)
-		or b4:GetMovementDirectionStability() >= 0.75
+			-- Steady movement is an alternative to the HP window only. It used to be OR'ed with the
+			-- whole condition, so any enemy walking straight got a Meteor, magic immune, an
+			-- illusion or with laning mana under half included.
+			and (c.GetHP(b4) <= 0.9 and c.GetHP(b4) > 0.15 or b4:GetMovementDirectionStability() >= 0.75)
 	then
 		if b4:HasModifier(O) then
 			if DotaTime() >= ah["Tornado"] + aB - bg then
@@ -1137,6 +1146,12 @@ function a.CheckTempModifiers(bt, botTarget, bg)
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderCataclysm()
+	-- Cataclysm (Sun Strike cast on himself) is an Aghanim's Scepter upgrade, and he no longer
+	-- buys Scepter. Without it this rule, first in his spell order, would spend Sun Strike on his
+	-- own spot (or an invalid order).
+	if not b:HasScepter() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
 	if not a.CanAbilityPossiblyBeCasted(F) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end

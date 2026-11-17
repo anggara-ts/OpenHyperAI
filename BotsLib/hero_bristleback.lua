@@ -11,7 +11,18 @@ local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10
 local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = RandomInt(1, 9) > 6 and "item_black_king_bar" or "item_heavens_halberd"
+-- Heaven's Halberd only against heavy right-click damage that does not come through
+-- illusions; otherwise the slot is skipped. It used to be a random pick, a second BKB 1 in 3.
+local heavyPhysical, physicalHeroes = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").EnemyHeavyPhysical()
+local m = heavyPhysical and "item_heavens_halberd" or false
+if h == "pos_3" then
+	pcall(print, string.format(
+		"[OHA-BUY] t=%.0f bristleback halberd=%s physical=%s",
+		DotaTime(),
+		tostring(heavyPhysical),
+		table.concat(physicalHeroes, ",")
+	))
+end
 local n = {}
 n["pos_1"] = {
 	"item_tango",
@@ -38,15 +49,21 @@ n["pos_3"] = {
 	"item_quelling_blade",
 	"item_magic_wand",
 	"item_bracer",
-	"item_arcane_boots",
+	-- Boots, then Ring of Health for lane sustain, then the rest of Power Treads. Vanguard
+	-- uses the Ring, then Blade Mail, then the Vanguard upgrades to Crimson Guard.
+	"item_boots",
+	"item_ring_of_health",
+	"item_power_treads_str",
+	"item_vanguard",
 	"item_blade_mail",
 	"item_crimson_guard",
 	"item_black_king_bar",
+	"item_lotus_orb",
 	m,
 	"item_aghanims_shard",
-	"item_assault",
+	"item_consecrated_wraps",
 	"item_ultimate_scepter_2",
-	"item_wind_waker",
+	"item_heart",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
@@ -104,6 +121,14 @@ n["pos_5"] = {
 	"item_moon_shard",
 	"item_sheepstick",
 }
+-- Drop the skipped Halberd slot (false) so the list has no holes.
+for _, list in pairs(n) do
+	for idx = #list, 1, -1 do
+		if list[idx] == false then
+			table.remove(list, idx)
+		end
+	end
+end
 a["sBuyList"] = n[h]
 a["sSellList"] = {
 	"item_power_treads",
@@ -112,7 +137,7 @@ a["sSellList"] = {
 	"item_quelling_blade",
 	"item_satanic",
 	"item_magic_wand",
-	"item_assault",
+	"item_consecrated_wraps",
 	"item_bracer",
 	"item_assault",
 	"item_bottle",
@@ -214,6 +239,8 @@ function a.ConsiderViscousNasalGoo()
 	if K then
 		if
 			c.IsValidHero(G[1])
+			-- fix: no range check, so in a fight he walked up to 1600 toward G[1] to goo it
+			and c.IsInRange(b, G[1], O)
 			and c.CanBeAttacked(G[1])
 			and c.CanCastOnNonMagicImmune(G[1])
 			and not G[1]:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -294,6 +321,47 @@ function a.ConsiderViscousNasalGoo()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
+-- Enemy lane creeps in range that one spray kills. Damage is base plus 30 per quill stack
+-- already on the creep (capped at max_damage), physical, so armor applies.
+function a.QuillLaneKills(radius)
+	local base = q:GetSpecialValueInt("quill_base_damage")
+	if base == nil or base <= 0 then
+		return 0
+	end
+	local perStack = q:GetSpecialValueInt("quill_stack_damage") or 0
+	local maxDamage = q:GetSpecialValueInt("max_damage") or 0
+	local kills = 0
+	for M, N in pairs(b:GetNearbyLaneCreeps(radius, true) or {}) do
+		if c.IsValid(N) and c.CanBeAttacked(N) then
+			local stacks = c.GetModifierCount(N, "modifier_bristleback_quill_spray") or 0
+			local raw = base + perStack * stacks
+			if maxDamage > 0 then
+				raw = math.min(raw, maxDamage)
+			end
+			if N:GetHealth() <= N:GetActualIncomingDamage(raw, DAMAGE_TYPE_PHYSICAL) then
+				kills = kills + 1
+			end
+		end
+	end
+	return kills
+end
+-- [OHA-QUILL]: each Quill Spray cast with why, at most once per 10s per reason.
+function a.LogQuill(why, kills, heroes, mana)
+	b._quillLogAt = b._quillLogAt or {}
+	if DotaTime() < (b._quillLogAt[why] or -999) then
+		return
+	end
+	b._quillLogAt[why] = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-QUILL] t=%.0f %s %s kills=%d heroes=%d mana=%.2f",
+		DotaTime(),
+		(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")),
+		why,
+		kills,
+		heroes,
+		mana
+	))
+end
 function a.ConsiderQuillSpray()
 	if not c.CanCastAbility(q) then
 		return BOT_ACTION_DESIRE_NONE
@@ -329,6 +397,30 @@ function a.ConsiderQuillSpray()
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
+		end
+	end
+	local foesInRange = 0
+	for M, N in pairs(b:GetNearbyHeroes(T - 50, true, BOT_MODE_NONE) or {}) do
+		if c.IsValidHero(N) and c.CanBeAttacked(N) and not c.IsSuspiciousIllusion(N) then
+			foesInRange = foesInRange + 1
+		end
+	end
+	-- Engaging: any enemy hero inside the spray, not only the chosen target.
+	if H and foesInRange >= 1 then
+		a.LogQuill("engage", 0, foesInRange, Q)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Lane: 35 mana on a 3s cooldown. Finish creeps the quills will kill, and poke a laner
+	-- in range; a spell on a hero does not pull creep aggro the way a right-click does.
+	if c.IsInLaningPhase() and Q > 0.3 then
+		local kills = a.QuillLaneKills(T - 50)
+		if kills >= 2 or kills >= 1 and foesInRange >= 1 then
+			a.LogQuill("lane-lasthit", kills, foesInRange, Q)
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		if foesInRange >= 1 and Q > 0.5 then
+			a.LogQuill("lane-poke", kills, foesInRange, Q)
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	local U = b:GetNearbyCreeps(T, true)

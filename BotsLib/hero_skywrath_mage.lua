@@ -16,8 +16,8 @@ m["pos_4"] = {
 	"item_tango",
 	"item_tango",
 	"item_double_branches",
-	"item_faerie_fire",
 	"item_blood_grenade",
+	"item_null_talisman",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_rod_of_atos",
@@ -36,15 +36,15 @@ m["pos_5"] = {
 	"item_tango",
 	"item_tango",
 	"item_double_branches",
-	"item_faerie_fire",
 	"item_blood_grenade",
+	"item_null_talisman",
 	"item_magic_wand",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_pipe",
 	"item_rod_of_atos",
 	"item_aghanims_shard",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_ultimate_scepter",
 	"item_octarine_core",
 	"item_gungir",
@@ -161,7 +161,8 @@ function a.ConsiderQ()
 	local H = o:GetCastRange() + z
 	local I = o:GetCastPoint()
 	local J = o:GetManaCost()
-	local K = o:GetSpecialValueInt("bolt_damage") + b:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.6
+	-- datafeed: Arcane Bolt int_multiplier=1.5 (was 1.6)
+	local K = o:GetSpecialValueInt("bolt_damage") + b:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.5
 	local L = DAMAGE_TYPE_MAGICAL
 	local nInRangeEnemyHeroList = c.GetNearbyHeroes(b, math.min(H + 50, 1600), true, BOT_MODE_NONE)
 	local M = b:GetAttackDamage()
@@ -434,19 +435,33 @@ function a.ConsiderR()
 	end
 	if c.IsGoingOnSomeone(b) then
 		if c.IsValidHero(botTarget) and c.CanCastOnNonMagicImmune(botTarget) and c.IsInRange(b, botTarget, H + 200) then
-			if
-				not c.IsRunning(botTarget) and not c.IsMoving(botTarget)
-				or c.IsDisabled(botTarget)
-				or botTarget:GetCurrentMovementSpeed() < 180
-			then
+			-- Review fix: a standing or disabled target was flared 148 units ahead of where it faces,
+			-- near the edge of the 170 radius, so one step took it out. Centre on it then, and lead
+			-- the shot only for a slowed target that is still moving.
+			if (not c.IsRunning(botTarget) and not c.IsMoving(botTarget)) or c.IsDisabled(botTarget) then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "R进攻"
+			end
+			if botTarget:GetCurrentMovementSpeed() < 180 then
 				return BOT_ACTION_DESIRE_HIGH, c.GetFaceTowardDistanceLocation(botTarget, 148), "R进攻"
 			end
 		end
 	end
 	if c.IsRetreating(b) and D < 0.78 then
 		for N, O in pairs(nInRangeEnemyHeroList) do
-			if c.IsValid(O) and b:WasRecentlyDamagedByHero(O, 3.1) and c.CanCastOnNonMagicImmune(O) then
-				return BOT_ACTION_DESIRE_HIGH, c.GetFaceTowardDistanceLocation(O, 168), "R撤退"
+			-- Review fix: the ult (300-800 mana) was thrown at any chaser, which just walks out of the
+			-- 170 radius. Only flare a chaser that is disabled or slowed (e.g. by Concussive Shot).
+			if
+				c.IsValidHero(O)
+				and b:WasRecentlyDamagedByHero(O, 3.1)
+				and c.CanCastOnNonMagicImmune(O)
+				and (c.IsDisabled(O) or O:GetCurrentMovementSpeed() < 200)
+				and c.IsInRange(b, O, H)
+			then
+				if DotaTime() - (a.lastFlareLog or -99) > 10 then
+					a.lastFlareLog = DotaTime()
+					pcall(print, string.format("[OHA-SKYWRATH] t=%.0f flare-retreat target=%s ms=%d", DotaTime(), O:GetUnitName(), O:GetCurrentMovementSpeed()))
+				end
+				return BOT_ACTION_DESIRE_HIGH, O:GetLocation(), "R撤退"
 			end
 		end
 	end

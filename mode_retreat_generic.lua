@@ -91,14 +91,138 @@ local function A()
 	v.aegisNearby1200 = w(1200)
 	return v
 end
+-- Which return in GetDesireHelper decided the retreat desire (its line number in this file),
+-- for [OHA-RETREAT] below.
+local retreatLine = 0
+local function RetreatTag(line, v)
+	retreatLine = line
+	return v
+end
+-- Our Ancient is being fought over: enemy heroes seen within 1600 of it while it is hurt
+-- (under 95%) or both T4s are gone. Game 036, 55:00-55:28: Slark and Ogre left at full HP on
+-- low mana (tag 350) and the Ancient went from 0.77 to 0.13 with all five Radiant alive.
+local function AncientLastStand()
+	local anc = GetAncient(GetTeam())
+	if anc == nil or not anc:IsAlive() then
+		return false
+	end
+	if anc:GetHealth() >= 0.95 * anc:GetMaxHealth() then
+		for _, id in ipairs({ TOWER_BASE_1, TOWER_BASE_2 }) do
+			local tw = GetTower(GetTeam(), id)
+			if tw ~= nil and tw:IsAlive() then
+				return false
+			end
+		end
+	end
+	return #(b.GetEnemiesNearLoc(anc:GetLocation(), 1600) or {}) >= 1
+end
+local function LastStandLog(skipped)
+	if DotaTime() >= (c._lastStandLogAt or -999) then
+		c._lastStandLogAt = DotaTime() + 5
+		pcall(print, string.format(
+			"[OHA-DEFEND] t=%.0f %s ancient-last-stand retreat-skip=%s hp=%.2f mp=%.2f",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			skipped,
+			b.GetHP(c),
+			b.GetMP(c)
+		))
+	end
+end
+-- Valve's built-in evasive mode switches this retreat logic off (tag 142). Game 036: 30 of 50
+-- Radiant deaths ended in it, 0 of 47 Dire. Log what is around the bot when it starts, to find
+-- the trigger. No behaviour change.
+local function LogEvasiveEntry()
+	local now = DotaTime()
+	local was = c._evasiveSince
+	c._evasiveSince = now
+	if was ~= nil and now - was < 1.0 then
+		return
+	end
+	if now < (c._evasiveLogAt or -999) then
+		return
+	end
+	c._evasiveLogAt = now + 3
+	local foes, casting = {}, {}
+	for _, h in pairs(c:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}) do
+		if b.IsValidHero(h) then
+			local nm = (string.gsub(h:GetUnitName(), "npc_dota_hero_", ""))
+			foes[#foes + 1] = nm
+			local okA, ab = pcall(function()
+				return h:GetCurrentActiveAbility()
+			end)
+			if okA and ab ~= nil then
+				casting[#casting + 1] = nm .. ":" .. tostring(ab:GetName())
+			end
+		end
+	end
+	local tracking = {}
+	local okT, projs = pcall(function()
+		return c:GetIncomingTrackingProjectiles()
+	end)
+	for _, p in pairs(okT and projs or {}) do
+		if p ~= nil and not p.is_attack then
+			local who = p.caster ~= nil and (string.gsub(p.caster:GetUnitName(), "npc_dota_hero_", "")) or "?"
+			tracking[#tracking + 1] = who .. ":" .. (p.ability ~= nil and p.ability:GetName() or "?")
+		end
+	end
+	local linear = {}
+	local okL, lins = pcall(GetLinearProjectiles)
+	for _, p in pairs(okL and lins or {}) do
+		if p ~= nil and p.location ~= nil and GetUnitToLocationDistance(c, p.location) <= 1500 then
+			linear[#linear + 1] = (p.ability ~= nil and p.ability:GetName() or "?")
+		end
+	end
+	local zones = {}
+	local okZ, zs = pcall(GetAvoidanceZones)
+	for _, z in pairs(okZ and zs or {}) do
+		if z ~= nil and z.location ~= nil and GetUnitToLocationDistance(c, z.location) <= (z.radius or 0) + 300 then
+			zones[#zones + 1] = (z.ability ~= nil and z.ability:GetName() or "?") .. "/" .. tostring(z.radius)
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-EVASIVE] t=%.0f %s enter hp=%.2f foes=%s casting=%s tracking=%s linear=%s zones=%s",
+		now,
+		(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+		b.GetHP(c),
+		table.concat(foes, ","),
+		table.concat(casting, ","),
+		table.concat(tracking, ","),
+		table.concat(linear, ","),
+		table.concat(zones, ",")
+	))
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
-	return GetDesireHelper()
+	retreatLine = 0
+	local v = GetDesireHelper()
+	-- A healthy bot wanting to retreat: say which rule (game 014, 35:30: Medusa at full HP and
+	-- mana backed off from a 1v1 with OD, and nothing in the log said why). At most every 5s.
+	if type(v) == "number" and v >= 0.5 and c:IsAlive() and c:GetHealth() >= 0.8 * c:GetMaxHealth() then
+		if DotaTime() >= (c._retreatLogAt or -999) then
+			c._retreatLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-RETREAT] t=%.0f %s desire=%.2f line=%d hp=%.2f mp=%.2f enemies1200=%d allies1200=%d",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				v,
+				retreatLine,
+				c:GetHealth() / c:GetMaxHealth(),
+				c:GetMana() / math.max(1, c:GetMaxMana()),
+				#(c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}),
+				#(c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
+			))
+		end
+	end
+	return v
 end
 function GetDesireHelper()
 	m = c:GetActiveMode()
+	if m == BOT_MODE_EVASIVE_MANEUVERS and c:IsAlive() then
+		pcall(LogEvasiveEntry)
+	end
 	if
 		not c:IsAlive()
 		or c:HasModifier("modifier_dazzle_nothl_projection_soul_clone")
@@ -112,7 +236,17 @@ function GetDesireHelper()
 		or b.GetModifierTime(c, "modifier_dazzle_shallow_grave") > 3
 		or b.GetModifierTime(c, "modifier_oracle_false_promise_timer") > 3
 	then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
+	end
+	-- Disarmed in a fight: game 029, 29:25, Mirana, disarmed by Techies' Reactive Tazer, 46% HP,
+	-- 4 enemies near, stood idle in attack mode (0.95). 2+ enemy heroes within 1200 under 60% HP,
+	-- or 1 under 35%: retreat, above the attack mode.
+	if c:IsDisarmed() then
+		local foesD = #(c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+		local hpD = b.GetHP(c)
+		if foesD >= 2 and hpD < 0.6 or foesD >= 1 and hpD < 0.35 then
+			return RetreatTag(143, 0.98)
+		end
 	end
 	d = b.GetHP(c)
 	e = b.GetMP(c)
@@ -133,6 +267,66 @@ function GetDesireHelper()
 	local H = v.enemyLaneCreeps1200
 	local I = b.WeAreStronger(c, 1600)
 	local J = b.IsInTeamFight(c, 1200)
+	-- Abort early tower-dive chase (e.g. gold-rune bait under T1).
+	local towerDiveRetreat = a.RetreatWhenTowerTargetedDesire()
+	if towerDiveRetreat > 0 then
+		return RetreatTag(166, towerDiveRetreat)
+	end
+	-- Summons and illusions chewing on us: spiderlings, golems, eidolons, illusions whose next
+	-- 5s of damage is a big share of our HP. This check existed but nothing called it, so a
+	-- hero stood in a spiderling swarm until its HP alone was low enough to retreat.
+	local unitRun = a.GetUnitDesire(1000)
+	if unitRun > 0 then
+		if DotaTime() >= (c._unitRunLogAt or -999) then
+			c._unitRunLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-RETREAT] t=%.0f %s summons desire=%.2f by=%s hp=%.2f",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				unitRun,
+				tostring(c._unitRunBy),
+				d
+			))
+		end
+		return RetreatTag(184, unitRun)
+	end
+	local lastStand = d >= 0.4 and AncientLastStand()
+	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
+	-- It returned 0.7 (BOT_MODE_DESIRE_ABSOLUTE) while attack sits at 0.95, so it never won a
+	-- fight (game 036: 28 deaths straight out of attack mode). Below 60% HP it now returns 0.98,
+	-- like the disarmed rule; above that it stays 0.7. Not while defending our Ancient.
+	if not lastStand then
+		local alliesNearby = b.GetAllyCount(c, 1400)
+		local enemiesNearby = b.GetEnemyCount(c, 1400)
+		local lastSeen = b.GetLastSeenEnemiesNearLoc and b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 2000) or {}
+		local pressure = math.max(enemiesNearby, #lastSeen)
+		local freeKill = b.ShouldFinishCommittedKill(c, k)
+		if
+			not freeKill
+			and (
+				alliesNearby <= 1 and pressure >= 2
+				or pressure >= alliesNearby + 1 and not b.WeAreStronger(c, 1400)
+			)
+			and (m == BOT_MODE_ATTACK or m == BOT_MODE_TEAM_ROAM or m == BOT_MODE_ROAM or b.IsGoingOnSomeone(c))
+		then
+			if d < 0.6 then
+				if DotaTime() >= (c._hardRetreatLogAt or -999) then
+					c._hardRetreatLogAt = DotaTime() + 3
+					pcall(print, string.format(
+						"[OHA-RETREAT] t=%.0f %s hard-retreat over-attack hp=%.2f allies=%d pressure=%d mode=%d",
+						DotaTime(),
+						(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+						d,
+						alliesNearby,
+						pressure,
+						m or -1
+					))
+				end
+				return RetreatTag(201, 0.98)
+			end
+			return RetreatTag(201, BOT_MODE_DESIRE_ABSOLUTE)
+		end
+	end
 	if
 		m == BOT_MODE_ROSHAN
 		and not b.IsRoshanAlive()
@@ -140,11 +334,28 @@ function GetDesireHelper()
 		and IsLocationVisible(b.GetCurrentRoshanLocation())
 	then
 		if not v.aegisNearby1200 then
-			return BOT_MODE_DESIRE_MODERATE
+			return RetreatTag(211, BOT_MODE_DESIRE_MODERATE)
 		end
 	end
+	if b.ShouldLeaveRoshanFight(c) then
+		local pit = b.GetCurrentRoshanLocation()
+		if pit ~= nil and GetUnitToLocationDistance(c, pit) < 2500 then
+			return RetreatTag(217, BOT_MODE_DESIRE_ABSOLUTE)
+		end
+	end
+	if
+		b.IsDoingRoshan(c)
+		and c:WasRecentlyDamagedByAnyHero(2.0)
+		and not b.WeAreStronger(c, 1200)
+		and (
+			b.GetEnemyCount(c, 1400) >= 1
+			or #(b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 1400) or {}) >= 1
+		)
+	then
+		return RetreatTag(229, BOT_MODE_DESIRE_ABSOLUTE)
+	end
 	if (b.IsDoingRoshan(c) or b.IsDoingTormentor(c)) and d > 0.2 then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(232, BOT_MODE_DESIRE_NONE)
 	end
 	local K = b.GetEnemiesAroundAncient(c, 3200)
 	if K > 0 then
@@ -155,10 +366,10 @@ function GetDesireHelper()
 			local O = b.GetNumOfAliveHeroes(true)
 			if O <= N + 1 then
 				if N >= 2 and d > 0.15 then
-					return BOT_MODE_DESIRE_NONE
+					return RetreatTag(243, BOT_MODE_DESIRE_NONE)
 				end
 				if N >= 1 and d > 0.25 then
-					return BOT_MODE_DESIRE_LOW
+					return RetreatTag(246, BOT_MODE_DESIRE_LOW)
 				end
 			end
 		end
@@ -166,14 +377,14 @@ function GetDesireHelper()
 	if b.Utils.IsTeamPushingSecondTierOrHighGround(c) and d > 0.5 then
 		local P = c:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {}
 		if #P >= 2 then
-			return BOT_MODE_DESIRE_NONE
+			return RetreatTag(254, BOT_MODE_DESIRE_NONE)
 		end
 	end
 	if (c.isBear or f == "npc_dota_hero_lone_druid_bear") and not b.IsEarlyGame() then
 		if d >= 0.3 then
 			local Q = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 			if #Q >= 2 then
-				return BOT_MODE_DESIRE_NONE
+				return RetreatTag(261, BOT_MODE_DESIRE_NONE)
 			end
 		end
 	end
@@ -184,23 +395,23 @@ function GetDesireHelper()
 		and not c:WasRecentlyDamagedByAnyHero(1.0)
 		and not c:WasRecentlyDamagedByTower(1.0)
 	then
-		return BOT_MODE_DESIRE_NONE
+		return RetreatTag(272, BOT_MODE_DESIRE_NONE)
 	end
 	if J and f == "npc_dota_hero_skeleton_king" and l >= 6 then
 		local R = c:GetAbilityByName("skeleton_king_reincarnation")
 		if R:GetCooldownTimeRemaining() <= 1.0 and c:GetMana() >= 160 then
-			return BOT_MODE_DESIRE_NONE
+			return RetreatTag(277, BOT_MODE_DESIRE_NONE)
 		end
 	end
 	if DotaTime() < 0 and d < 1 then
 		for y, S in pairs(o) do
 			if b.IsValidHero(S) and not S:IsBot() then
-				return RemapValClamped(d, 1, 0.1, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE)
+				return RetreatTag(283, RemapValClamped(d, 1, 0.1, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE))
 			end
 		end
 	end
 	if f == "npc_dota_hero_lone_druid" and DotaTime() > 25 and DotaTime() < q + 6.5 then
-		return 3.33
+		return RetreatTag(288, 3.33)
 	end
 	local T = b.GetCurrentRoshanLocation()
 	if
@@ -211,7 +422,7 @@ function GetDesireHelper()
 	then
 		if v.aegisNearby1200 then
 			q = DotaTime()
-			return 3.33
+			return RetreatTag(299, 3.33)
 		end
 	end
 	if
@@ -219,7 +430,7 @@ function GetDesireHelper()
 		or not J and b.IsTargetedByEnemyWithModifier(o, "modifier_skeleton_king_reincarnation_scepter_active")
 		or not J and b.IsTargetedByEnemyWithModifier(o, "modifier_item_helm_of_the_undying_active")
 	then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return RetreatTag(307, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	-- A trancing Troll cannot die to damage. Trading hits only feeds his lifesteal.
 	for y, S in pairs(o) do
@@ -232,7 +443,7 @@ function GetDesireHelper()
 			and not c:HasModifier("modifier_ghost_state")
 			and d < 0.85
 		then
-			return RemapValClamped(d, 0.85, 0.3, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE)
+			return RetreatTag(320, RemapValClamped(d, 0.85, 0.3, BOT_MODE_DESIRE_HIGH, BOT_MODE_DESIRE_ABSOLUTE))
 		end
 	end
 	if
@@ -247,7 +458,7 @@ function GetDesireHelper()
 		)
 		or c:HasModifier("modifier_ice_blast") and not J and #o > #n
 	then
-		return BOT_MODE_DESIRE_ABSOLUTE
+		return RetreatTag(335, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	if f == "npc_dota_hero_huskar" and not c:HasModifier("modifier_item_spirit_vessel_damage") then
 		local U = c:GetAbilityByName("huskar_berserkers_blood")
@@ -262,31 +473,40 @@ function GetDesireHelper()
 	end
 	if c:DistanceFromFountain() <= 4000 and not J then
 		if d <= 0.6 or e < 0.4 then
-			return BOT_MODE_DESIRE_VERYHIGH
+			if lastStand then
+				LastStandLog("350")
+			else
+				return RetreatTag(350, BOT_MODE_DESIRE_VERYHIGH)
+			end
 		end
 	end
 	if c:HasModifier("modifier_fountain_aura_buff") then
 		local V = K and K > 0
 		if V then
 			if d <= 0.5 then
-				return BOT_MODE_DESIRE_ABSOLUTE
+				return RetreatTag(357, BOT_MODE_DESIRE_ABSOLUTE)
 			end
 		elseif d <= 0.9 or e <= 0.8 and f ~= "npc_dota_hero_huskar" then
-			return BOT_MODE_DESIRE_ABSOLUTE
+			-- Topping up in the fountain while the Ancient is being killed: leave above 60% HP.
+			if lastStand and d > 0.6 then
+				LastStandLog("360")
+			else
+				return RetreatTag(360, BOT_MODE_DESIRE_ABSOLUTE)
+			end
 		end
 		if #o > #n and not I and not b.CanBeAttacked(t) then
-			return BOT_MODE_DESIRE_HIGH
+			return RetreatTag(363, BOT_MODE_DESIRE_HIGH)
 		end
 	end
 	if b.IsInLaningPhase() or b.IsEarlyGame() and d < 0.35 then
 		local W = c:GetNearbyCreeps(600, true)
 		if b.IsGoingOnSomeone(c) and #W >= 4 and c:WasRecentlyDamagedByCreep(3.0) then
-			return BOT_MODE_DESIRE_VERYHIGH
+			return RetreatTag(369, BOT_MODE_DESIRE_VERYHIGH)
 		end
 	end
 	if c:IsAlive() and not c:HasModifier("modifier_fountain_aura_buff") then
 		if r ~= 0 and DotaTime() < r + s then
-			return BOT_DESIRE_OVERRIDE * 1.1
+			return RetreatTag(374, BOT_DESIRE_OVERRIDE * 1.1)
 		else
 			r = 0
 		end
@@ -295,12 +515,12 @@ function GetDesireHelper()
 			if r == 0 then
 				r = DotaTime()
 			end
-			return BOT_DESIRE_OVERRIDE * 1.1
+			return RetreatTag(383, BOT_DESIRE_OVERRIDE * 1.1)
 		end
 	end
 	local X = a.ConsiderCompleteItem()
 	if X > 0 then
-		return X
+		return RetreatTag(388, X)
 	end
 	local Y = #o
 	local Z = #n
@@ -384,6 +604,10 @@ function GetDesireHelper()
 			if c:HasModifier("modifier_item_satanic_unholy") then
 				a8 = a8 - GetAdjustedDesireValue(0.3)
 			end
+			-- Monkey King's Jingu charges: 20-80% lifesteal on hits, so stay in while above 20% HP.
+			if c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses") and b.GetHP(c) > 0.2 then
+				a8 = a8 - GetAdjustedDesireValue(0.2)
+			end
 			local U = c:GetAbilityByName("slark_shadow_dance")
 			if
 				b.CanCastAbility(U)
@@ -445,7 +669,26 @@ function GetDesireHelper()
 	if c:HasModifier("modifier_slark_shadow_dance_passive_regen") then
 		a8 = a8 - GetAdjustedDesireValue(0.25)
 	end
-	return Clamp(a8, 0.0, BOT_MODE_DESIRE_ABSOLUTE)
+	return RetreatTag(533, Clamp(a8, 0.0, BOT_MODE_DESIRE_ABSOLUTE))
+end
+-- A kill he is committed to: his target is in reach (attack range + 200) and disabled or below
+-- 40% HP, and he either has Satanic's Unholy Rage on or 35%+ HP. The enemy-base run rules
+-- below (barracks nearby, close to their Ancient) used to fire anyway, with no HP check: game
+-- 020, 58:46-58:56, Nature's Prophet had Lina trapped under their T3, popped Satanic and ran
+-- (retreat line 383 at 98% HP), then died.
+local function CommittedKill()
+	if not b.IsValidHero(k) or not b.CanBeAttacked(k) or b.IsSuspiciousIllusion(k) then
+		return false
+	end
+	if GetUnitToUnitDistance(c, k) > c:GetAttackRange() + 200 then
+		return false
+	end
+	if not (b.IsDisabled(k) or b.GetHP(k) < 0.4) then
+		return false
+	end
+	return c:HasModifier("modifier_item_satanic_unholy")
+		or c:HasModifier("modifier_monkey_king_quadruple_tap_bonuses") and b.GetHP(c) >= 0.2
+		or b.GetHP(c) >= 0.35
 end
 function a.ShouldRun()
 	if c:IsChanneling() or not c:IsAlive() then
@@ -517,18 +760,21 @@ function a.ShouldRun()
 	if ak < 1560 then
 		return 2
 	end
-	if DotaTime() > 30 and b.IsEarlyGame() then
+	if DotaTime() > 0 and b.IsEarlyGame() then
 		local al = c:GetAssignedLane()
 		local am = GetTeam()
 		local an = al == LANE_TOP and ak < (am == TEAM_RADIANT and 12000 or 9000)
 			or al == LANE_MID and ak < (am == TEAM_RADIANT and 9000 or 8000)
 			or al == LANE_BOT and ak < (am == TEAM_RADIANT and 8700 or 11500)
+		local aoEarly = c:GetNearbyTowers(950, true)
+		local diving = b.IsValidBuilding(aoEarly[1])
+			and GetUnitToUnitDistance(c, aoEarly[1]) < (aoEarly[1]:GetAttackRange() or 700) + 200
 		if
-			an
+			(an or diving)
 			and b.IsValidHero(k)
 			and b.CanBeAttacked(k)
 			and not b.IsSuspiciousIllusion(k)
-			and not b.CanKillTarget(k, c:GetAttackDamage() * 2.33, DAMAGE_TYPE_PHYSICAL)
+			and not b.CanKillTarget(k, c:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL)
 		then
 			return 2.88
 		end
@@ -537,12 +783,13 @@ function a.ShouldRun()
 	local ap = c:GetNearbyBarracks(900, true)
 	local O = b.GetNumOfAliveHeroes(true)
 	local aq = GetUnitToUnitDistance(c, u)
-	if #ap >= 1 and O >= 2 then
+	local committed = CommittedKill()
+	if #ap >= 1 and O >= 2 and not committed then
 		if #ao >= 2 or aq <= 1314 or ak <= 2828 then
 			return 2
 		end
 	end
-	if aq <= 2000 or ak <= 3000 then
+	if (aq <= 2000 or ak <= 3000) and not committed then
 		local ar = c:GetNearbyLaneCreeps(900, false)
 		local as = c:WasRecentlyDamagedByTower(3.0) and #ar < 2
 		if as or d < 0.9 then
@@ -569,14 +816,24 @@ function a.GetUnitDesire(au)
 			local aw = av:GetUnitName()
 			local ax = 0
 			local ay = b.IsChasingTarget(av, c) or av:GetAttackTarget() == c
-			if not av:HasModifier("modifier_arc_warden_tempest_double") and b.IsSuspiciousIllusion(av) then
-				local az = b.GetSameUnitType(c, 1600, aw, false)
+			-- Only a real illusion. The suspicion check alone matched real heroes (Razor, Chaos Knight).
+			if
+				not av:HasModifier("modifier_arc_warden_tempest_double")
+				and b.IsSuspiciousIllusion(av)
+				and av:IsIllusion()
+			then
+				-- Only illusions attacking or chasing this hero. Counting every illusion within 1600
+				-- sent full-HP heroes into retreat near a Phantom Lancer army (game 016: 55 of these
+				-- at 100% HP, Disruptor at 61:30-62:15).
+				local az = b.GetSameUnitType(c, 1600, aw, true)
 				ax = b.GetUnitListTotalAttackDamage(c, az, 5.0)
 				local aA = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aA / g > 0.5 then
 					if aA / g > 0.65 then
+						c._unitRunBy = aw
 						return 0.9
 					else
+						c._unitRunBy = aw
 						return 0.75
 					end
 				end
@@ -585,13 +842,16 @@ function a.GetUnitDesire(au)
 				ax = b.GetUnitListTotalAttackDamage(c, aB, 5.0)
 				local aC = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aC / g > 0.45 then
+					c._unitRunBy = aw
 					return 0.9
 				end
-			elseif string.find(aw, "spiderlings") and ay and not b.IsInTeamFight(c, 1600) then
+			elseif string.find(aw, "broodmother_spider") and ay and not b.IsInTeamFight(c, 1600) then
+				-- npc_dota_broodmother_spiderling / _spiderite. "spiderlings" (plural) never matched.
 				local aD = b.GetSameUnitType(c, 1600, aw, true)
 				ax = b.GetUnitListTotalAttackDamage(c, aD, 5.0)
 				local aE = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aE / g > 0.25 then
+					c._unitRunBy = aw
 					return 0.75
 				end
 			elseif string.find(aw, "eidolon") and ay and not b.IsInTeamFight(c, 1600) then
@@ -599,6 +859,7 @@ function a.GetUnitDesire(au)
 				ax = b.GetUnitListTotalAttackDamage(c, aF, 5.0)
 				local aG = c:GetActualIncomingDamage(ax, DAMAGE_TYPE_PHYSICAL) - h * 5.0
 				if aG / g > 0.25 then
+					c._unitRunBy = aw
 					return 0.9
 				end
 			end
@@ -610,24 +871,34 @@ function a.RetreatWhenTowerTargetedDesire()
 	if DotaTime() > 10 * 60 or b.IsInTeamFight(c, 1600) then
 		return 0
 	end
-	local G = c:GetNearbyTowers(800, true)
+	local G = c:GetNearbyTowers(900, true)
 	if b.IsValidBuilding(G[1]) and not b.IsPushing(c) then
-		if b.IsGoingOnSomeone(c) then
+		local tr = (G[1]:GetAttackRange() or 700) + 160
+		local underTower = GetUnitToUnitDistance(c, G[1]) < tr
+		if G[1]:GetAttackTarget() == c or c:WasRecentlyDamagedByTower(1.5) then
+			return BOT_MODE_DESIRE_ABSOLUTE
+		end
+		if underTower and (b.IsGoingOnSomeone(c) or m == BOT_MODE_ATTACK or m == BOT_MODE_RUNE) then
 			if
 				b.IsValidHero(k)
 				and not b.IsSuspiciousIllusion(k)
 				and not k:HasModifier("modifier_dazzle_shallow_grave")
 				and not k:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
+				-- Early game: never trade under T1 unless the kill is free.
+				if b.IsEarlyGame() or b.IsInLaningPhase() then
+					if not b.CanKillTarget(k, c:GetAttackDamage() * 1.8, DAMAGE_TYPE_PHYSICAL) then
+						return BOT_MODE_DESIRE_VERYHIGH
+					end
+				end
 				local aH = c:GetEstimatedDamageToTarget(true, k, 5.0, DAMAGE_TYPE_ALL) * 1.2
 				aH = k:GetActualIncomingDamage(aH, DAMAGE_TYPE_ALL)
-				if aH / k:GetHealth() < 0.88 then
+				if aH / math.max(k:GetHealth(), 1) < 0.88 then
 					return 0.9
 				end
+			else
+				return BOT_MODE_DESIRE_HIGH
 			end
-		end
-		if G[1]:GetAttackTarget() == c then
-			return 0.9
 		end
 	end
 	return 0
@@ -679,6 +950,12 @@ function a.ConsiderCompleteItem()
 	end
 	return 0
 end
+-- Retreat is held only below 60% HP. Game 030: held at any HP it kept healthy bots running 2s after
+-- the danger was gone. Game 031, 1:20-1:37: without it Earthshaker (30-57% HP, no enemy near)
+-- flipped retreat 0.70 / laning 0.30 27 times and stood in place.
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "retreat", BOT_MODE_RETREAT, function(bot)
+	return bot:GetHealth() < 0.6 * bot:GetMaxHealth()
+end)
 if SafeCall then
 	local aT = GetDesire
 	if aT then

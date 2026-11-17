@@ -428,10 +428,20 @@ function t.AnalyzeDebuffs(z)
 			repeat
 				if z:HasModifier(J) then
 					local M
-					if z.GetModifierRemainingDuration then
-						M = z.GetModifierRemainingDuration(J)
-					else
-						M = 999
+					-- Was z.GetModifierRemainingDuration(J): a dot call with a modifier name
+					-- ("called with 1 arguments - expected 2", game 015). The API takes the
+					-- modifier index from GetModifierByName.
+					M = 999
+					local okIdx, idx = pcall(function()
+						return z:GetModifierByName(J)
+					end)
+					if okIdx and type(idx) == "number" and idx >= 0 then
+						local okDur, dur = pcall(function()
+							return z:GetModifierRemainingDuration(idx)
+						end)
+						if okDur and type(dur) == "number" then
+							M = dur
+						end
 					end
 					local N = M
 					if N < 0.5 then
@@ -480,7 +490,7 @@ local function O(P)
 		local Q = 0
 		while Q < 6 do
 			local R = P:GetAbilityInSlot(Q)
-			if R and R:IsTrained() and not R.IsPassive() and R.IsCooldownReady() then
+			if R and R:IsTrained() and not R:IsPassive() and R:IsCooldownReady() then
 				return true
 			end
 			Q = Q + 1
@@ -488,11 +498,25 @@ local function O(P)
 	end
 	return false
 end
+-- Worth a self-dispel: humans and cores (pos 1-2) always; others not when the fight is hopeless.
+-- Was P.IsBot() / P.GetHealth() (dot calls): "IsBot called with 0 arguments" aborted
+-- ItemUsageThink every time this ran (game 014).
+local func_utils = nil
 local function S(P)
-	if not P.IsBot() or P.GetPosition and P.GetPosition() <= 2 then
+	if not P:IsBot() then
 		return true
 	end
-	local T = P.GetHealth() / P.GetMaxHealth()
+	if func_utils == nil then
+		local ok, m = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
+		func_utils = ok and m or false
+	end
+	local okPos, pos = pcall(function()
+		return func_utils and func_utils.GetPosition(P) or nil
+	end)
+	if okPos and type(pos) == "number" and pos <= 2 then
+		return true
+	end
+	local T = P:GetHealth() / P:GetMaxHealth()
 	local U = P:GetNearbyHeroes(1200, true, v.None)
 	local V = P:GetNearbyHeroes(1200, false, v.None)
 	if T < 0.1 and U and #U >= 3 and (not V or #V <= 1) then
@@ -534,7 +558,7 @@ function t.ShouldUseSelfDispelItem(P)
 				local a0 = P:FindItemSlot(Z)
 				if a0 >= 0 then
 					local a1 = P:GetItemInSlot(a0)
-					if a1 and a1.IsFullyCastable() then
+					if a1 and a1:IsFullyCastable() then
 						if Z == "item_black_king_bar" and W.worstSeverity < 6 then
 							_ = true
 							break
@@ -564,7 +588,7 @@ function t.ShouldUseAllyDispelItem(P)
 		return -1, nil
 	end
 	local a3 = P:GetItemInSlot(a2)
-	if not a3 or not a3.IsFullyCastable() then
+	if not a3 or not a3:IsFullyCastable() then
 		return -1, nil
 	end
 	local V = P:GetNearbyHeroes(900, false, v.None)
@@ -599,7 +623,7 @@ function t.ShouldUseAllyDispelItem(P)
 									or aa == "npc_dota_hero_necrolyte"
 									or aa == "npc_dota_hero_bane"
 								then
-									if a9.IsFacingLocation(a6:GetLocation(), 30) then
+									if a9:IsFacingLocation(a6:GetLocation(), 30) then
 										a4 = a6
 										a5 = 10
 									end
@@ -626,10 +650,10 @@ function t.ShouldMantaDodge(P)
 		return -1
 	end
 	local a1 = P:GetItemInSlot(ab)
-	if not a1 or not a1.IsFullyCastable() then
+	if not a1 or not a1:IsFullyCastable() then
 		return -1
 	end
-	local ac = P.GetIncomingTrackingProjectiles()
+	local ac = P:GetIncomingTrackingProjectiles()
 	if ac then
 		for H, ad in j(ac) do
 			if ad and ad.is_attack == false and ad.is_dodgeable then

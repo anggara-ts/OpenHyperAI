@@ -13,8 +13,13 @@ local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_2"] = {
-	"item_crystal_maiden_outfit",
-	"item_falcon_blade",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_bottle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads_int",
 	"item_witch_blade",
 	"item_kaya_and_sange",
 	"item_devastator",
@@ -141,11 +146,19 @@ function a.SkillsComplement()
 			b:Action_UseAbility(p)
 			return
 		else
-			if c.CanCastAbility(o) and o:GetManaCost() + p:GetManaCost() > b:GetMana() + 150 then
+			-- Review fix: the test was reversed (cost > mana + 150), so the Vortex+Remnant follow-up was
+			-- queued only when Storm could NOT pay for both. Queue it when he can, with 150 to spare.
+			if c.CanCastAbility(o) and o:GetManaCost() + p:GetManaCost() + 150 < b:GetMana() then
 				c.SetQueuePtToINT(b, true)
 				b:ActionQueue_UseAbilityOnEntity(p, v)
 				b:ActionQueue_Delay(0.3 + 0.77)
-				b:ActionQueue_UseAbility(o)
+				-- Review fix: Remnant is point-targeted (game data is_point_targeted, range 800) and every
+				-- other Remnant order here is a location order; drop it at Storm's spot, where Vortex pulls.
+				b:ActionQueue_UseAbilityOnLocation(o, b:GetLocation())
+				if DotaTime() - (a.lastVortexLog or -99) > 10 then
+					a.lastVortexLog = DotaTime()
+					pcall(print, string.format("[OHA-STORM] t=%.0f vortex-remnant target=%s mana=%d", DotaTime(), v:GetUnitName(), b:GetMana()))
+				end
 				return
 			else
 				b:Action_UseAbilityOnEntity(p, v)

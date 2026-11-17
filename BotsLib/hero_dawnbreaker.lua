@@ -20,13 +20,13 @@ m["pos_3"] = {
 	"item_bracer",
 	"item_phase_boots",
 	"item_soul_ring",
-	"item_echo_sabre",
+	"item_harpoon",
 	"item_desolator",
 	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_heavens_halberd",
 	"item_assault",
-	"item_harpoon",
+	"item_blade_mail",
 	"item_abyssal_blade",
 	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
@@ -95,7 +95,9 @@ local v, w
 local x
 local y, z
 local A
+-- Pending BKB after Solar Guardian lands (do not pop before channel — wastes duration).
 local B = false
+local BKBLandDeadline = -1
 local C = nil
 local D = -1
 local E = false
@@ -103,11 +105,36 @@ local F
 local G
 local H
 local I
+local function IsSolarGuardianInFlight()
+	return b:IsChanneling()
+		or b:HasModifier("modifier_dawnbreaker_solar_guardian_air_time")
+		or b:HasModifier("modifier_dawnbreaker_solar_guardian_airtime")
+end
 function a.SkillsComplement()
 	local J = d.Build(b)
 	G = J.isEngaging
 	H = J.isRetreating
 	I = J.hp
+	-- BKB after landing into the fight, not before ult cast.
+	if B then
+		if DotaTime() > BKBLandDeadline then
+			B = false
+		elseif
+			CanBKB()
+			and not b:IsMagicImmune()
+			and not IsSolarGuardianInFlight()
+			and not b:IsStunned()
+			and not b:IsHexed()
+			and not b:IsMuted()
+		then
+			local enemies = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
+			if enemies ~= nil and #enemies >= 1 then
+				b:Action_UseAbility(A)
+				B = false
+				return
+			end
+		end
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -134,10 +161,6 @@ function a.SkillsComplement()
 	end
 	y, z = a.ConsiderSolarGuardian()
 	if y > 0 then
-		if CanBKB() and B then
-			b:Action_UseAbility(A)
-			B = false
-		end
 		b:Action_UseAbilityOnLocation(r, z)
 		return
 	end
@@ -271,6 +294,9 @@ function a.ConsiderCelestialHammer()
 			and c.CanKillTarget(S, P, DAMAGE_TYPE_MAGICAL)
 		then
 			local a1 = GetUnitToUnitDistance(b, S) / K + N
+			-- E = true: this hammer flies at an enemy, so the retreat Converge must not pull her to
+			-- it (E kept the value of the last retreat throw).
+			E = true
 			return BOT_ACTION_DESIRE_HIGH, S:GetExtrapolatedLocation(a1)
 		end
 	end
@@ -290,6 +316,7 @@ function a.ConsiderCelestialHammer()
 			and #U >= #V
 		then
 			local a1 = GetUnitToUnitDistance(b, F) / K + N
+			E = true -- hammer at an enemy: no retreat Converge onto it (see the kill branch)
 			return BOT_ACTION_DESIRE_HIGH, F:GetExtrapolatedLocation(a1)
 		end
 	end
@@ -404,12 +431,41 @@ function a.ConsiderSolarGuardian()
 		if a7 ~= nil and #a7 >= 1 then
 			local a8 = a7[#a7]:GetNearbyHeroes(L, true, BOT_MODE_NONE)
 			if not IsTargetLocInBigUlt(a5) and (a8 ~= nil and #a8 >= 1) then
-				local a9 = b:FindAoELocation(false, true, a5, GetUnitToLocationDistance(b, a5), L, a6, 0)
-				local aa = b:FindAoELocation(true, true, a5, GetUnitToLocationDistance(b, a5), L, a6, 0)
+				-- Search around the fight (radius L), not within Dawnbreaker's distance to it: for a far
+				-- fight that radius spanned the map, so the ally cluster could be anywhere (even base).
+				-- The enemy check is also made at the chosen spot instead of a separate enemy cluster.
+				local a9 = b:FindAoELocation(false, true, a5, L, L, a6, 0)
+				local aaEnemies = a9 ~= nil and a9.targetloc ~= nil and c.GetEnemiesNearLoc(a9.targetloc, L) or {}
+				local aa = { count = #aaEnemies }
 				local V = c.GetNearbyHeroes(b, L, true, BOT_MODE_NONE)
 				if a9.count >= 1 and aa.count >= 1 then
-					if V ~= nil and #V >= 1 and not b:IsMagicImmune() then
+					-- Queue BKB for after channel+airtime land, not before cast.
+					if V ~= nil and #V >= 1 and not b:IsMagicImmune() and CanBKB() then
 						B = true
+						BKBLandDeadline = DotaTime() + a6 + 1.5
+					end
+					if DotaTime() >= (b._sgLogAt or -999) then
+						b._sgLogAt = DotaTime() + 5
+						-- allyDist: closest allied hero other than her to the spot, at current positions (the
+						-- ally count uses predicted positions and may include her; game 036 review).
+						local allyDist, allyName = -1, "-"
+						for _, al in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+							if c.IsValidHero(al) and al ~= b and not al:IsIllusion() then
+								local ad = GetUnitToLocationDistance(al, a9.targetloc)
+								if allyDist < 0 or ad < allyDist then
+									allyDist, allyName = ad, (string.gsub(al:GetUnitName(), "npc_dota_hero_", ""))
+								end
+							end
+						end
+						pcall(print, string.format(
+							"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s",
+							DotaTime(),
+							a9.count,
+							aa.count,
+							GetUnitToLocationDistance(b, a9.targetloc),
+							math.floor(allyDist),
+							allyName
+						))
 					end
 					return BOT_ACTION_DESIRE_HIGH, a9.targetloc
 				end

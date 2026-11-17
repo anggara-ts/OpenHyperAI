@@ -8,7 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 1, 1, 1, 6, 1, 2, 2, 2, 3, 6, 3, 3, 6 } }
+-- 1 Refraction, 2 Meld, 3 Psi Blades, 6 Psionic Trap. Dotabuff (2026-11-17): Meld at 1/3/5/7, Psi Blades
+-- at 2/4/8/9, and one early Refraction point (17-38% of players take it at each of levels 1-7),
+-- then Refraction maxed at 12-15. One Refraction at 3, so the bot is not without it until 11.
+local j = { { 2, 3, 1, 3, 2, 6, 2, 3, 3, 2, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = RandomInt(1, 9) > 6 and "item_sphere" or "item_black_king_bar"
@@ -30,7 +33,7 @@ n["pos_1"] = {
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_swift_blink",
-	"item_sheepstick",
+	"item_monkey_king_bar",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
@@ -53,7 +56,9 @@ function a.MinionThink(o)
 			e.IllusionThink(o)
 			return
 		else
-			local p = o:GetAbilityByName("templar_assassin_self_trap")
+			-- Safe proxy: the datafeed does not list templar_assassin_self_trap (a trap-unit ability), so if
+			-- it is gone a nil here would error on p:IsFullyCastable() every MinionThink.
+			local p = SafeAbility(o:GetAbilityByName("templar_assassin_self_trap"), "templar_assassin_self_trap", "templar_assassin")
 			local q =
 				SafeAbility(b:GetAbilityByName("templar_assassin_trap"), "templar_assassin_trap", "templar_assassin")
 			local r = 400
@@ -499,12 +504,21 @@ function a.TAConsiderTarget()
 	end
 	local az = c.GetNearbyHeroes(b, ay, true, BOT_MODE_NONE)
 	local aA = az[1]
+	-- Review fix: this read nInAttackRangeWeakestEnemyHero, a global that is never set (always nil),
+	-- so TA kept running after an out-of-range or untouchable target. Use the weakest attackable
+	-- hero in range (same helper as Sniper's ConsiderTarget), else the nearest one.
+	aA = c.GetAttackableWeakestUnit(b, ay, true, true) or aA
 	if
-		c.IsValidHero(nInAttackRangeWeakestEnemyHero)
-		and c.CanBeAttacked(nInAttackRangeWeakestEnemyHero)
+		c.IsValidHero(aA)
+		and aA ~= ab
+		and c.CanBeAttacked(aA)
 		and (GetUnitToUnitDistance(ab, b) > ay or c.HasForbiddenModifier(ab))
 	then
-		b:SetTarget(nInAttackRangeWeakestEnemyHero)
+		if DotaTime() - (a.lastRetargetLog or -99) > 10 then
+			a.lastRetargetLog = DotaTime()
+			pcall(print, string.format("[OHA-TA] t=%.0f retarget from=%s to=%s", DotaTime(), ab:GetUnitName(), aA:GetUnitName()))
+		end
+		b:SetTarget(aA)
 		return
 	end
 end

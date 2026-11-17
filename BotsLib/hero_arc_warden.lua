@@ -14,7 +14,7 @@ local k = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local l = { { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, { 3, 1, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, {
+local l = { { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, {
 	3,
 	1,
 	3,
@@ -95,7 +95,7 @@ if j == "Magical" then
 		"item_mjollnir",
 		"item_travel_boots",
 		"item_blink",
-		"item_octarine_core",
+		"item_manta",
 		"item_ultimate_scepter",
 		"item_orchid",
 		"item_sheepstick",
@@ -120,10 +120,10 @@ else
 		"item_travel_boots",
 		"item_orchid",
 		"item_manta",
-		"item_greater_crit",
+		"item_skadi",
 		"item_bloodthorn",
 		"item_moon_shard",
-		"item_skadi",
+		"item_sheepstick",
 		"item_travel_boots_2",
 		"item_aghanims_shard",
 		"item_ultimate_scepter_2",
@@ -307,6 +307,27 @@ function a.ConsiderMagneticField()
 				and GetUnitToUnitDistance(U[1], U[1]:GetAttackTarget()) <= U[1]:GetAttackRange() + 50
 				and not U[1]:HasModifier("modifier_arc_warden_magnetic_field")
 			then
+				-- fix: the ally group was found, then the field went on Arc's own spot; it is a
+				-- POINT spell (cast range 900, game data), so put it on the group.
+				return BOT_ACTION_DESIRE_HIGH, X.targetloc
+			end
+		end
+	end
+	-- fix: the field was never used to survive. It evades attacks from outside the field (datafeed;
+	-- 100% evasion, radius 300 in game data): drop it on himself when retreating from a ranged
+	-- hero that is right-clicking him from outside that radius.
+	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(1.5) and not b:HasModifier("modifier_arc_warden_magnetic_field") then
+		for _, chaser in pairs(c.GetNearbyHeroes(b, 900, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(chaser)
+				and not c.IsSuspiciousIllusion(chaser)
+				and chaser:GetAttackTarget() == b
+				and GetUnitToUnitDistance(b, chaser) > W + 50
+			then
+				if DotaTime() >= (b._arcFieldLogAt or -999) then
+					b._arcFieldLogAt = DotaTime() + 10
+					pcall(print, string.format("[OHA-ARC] t=%.0f magnetic field retreat hp=%.2f", DotaTime(), c.GetHP(b)))
+				end
 				return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
 			end
 		end
@@ -336,10 +357,10 @@ function a.ConsiderMagneticField()
 	if (c.IsDefending(b) or c.IsPushing(b)) and not b:HasModifier("modifier_arc_warden_magnetic_field") then
 		local a0 = b:GetNearbyLaneCreeps(888, true)
 		local a1 = b:GetNearbyTowers(888, true)
-		local a2
-		b:GetNearbyBarracks(888, true)
-		local a3
-		b:GetNearbyFillers(888, true)
+		-- fix: the results were never stored (a2/a3 stayed nil), so barracks and fillers never
+		-- triggered the field while pushing. Both methods exist ([OHA-API] dump).
+		local a2 = b:GetNearbyBarracks(888, true)
+		local a3 = b:GetNearbyFillers(888, true)
 		if F then
 			if a0 ~= nil and #a0 >= 3 or a1 ~= nil and #a1 >= 1 or a2 ~= nil and #a2 >= 1 or a3 ~= nil and #a3 >= 1 then
 				return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
@@ -380,9 +401,11 @@ function a.ConsiderSparkWraith()
 	end
 	local J = c.GetProperCastRange(false, b, s:GetCastRange())
 	local W = s:GetSpecialValueInt("radius")
-	local M = s:GetSpecialValueInt("spark_damage")
+	-- datafeed: the keys are now spark_damage_base and base_activation_delay (1.5s); the old
+	-- "spark_damage"/"activation_delay" read 0, so the kill check never fired and the lead was too short.
+	local M = s:GetSpecialValueInt("spark_damage_base")
 	local a5 = s:GetCastPoint()
-	local a6 = s:GetSpecialValueInt("activation_delay") + a5
+	local a6 = s:GetSpecialValueFloat("base_activation_delay") + a5
 	local N = c.GetNearbyHeroes(b, J, true, BOT_MODE_NONE)
 	for O, P in pairs(N) do
 		if

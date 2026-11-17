@@ -24,6 +24,7 @@ m["pos_2"] = {
 	"item_double_bracer",
 	"item_boots",
 	"item_vladmir",
+	"item_aghanims_shard",
 	"item_orchid",
 	"item_ancient_janggo",
 	"item_ultimate_scepter",
@@ -33,7 +34,6 @@ m["pos_2"] = {
 	"item_black_king_bar",
 	"item_sheepstick",
 	"item_ultimate_scepter_2",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 m["pos_3"] = {
@@ -45,6 +45,7 @@ m["pos_3"] = {
 	"item_double_bracer",
 	"item_boots",
 	"item_vladmir",
+	"item_aghanims_shard",
 	"item_orchid",
 	"item_ancient_janggo",
 	"item_ultimate_scepter",
@@ -54,7 +55,6 @@ m["pos_3"] = {
 	"item_black_king_bar",
 	"item_ultimate_scepter_2",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 m["pos_1"] = m["pos_3"]
@@ -263,7 +263,9 @@ function a.ConsiderSoulAssumption()
 				local M = c.GetNearbyHeroes(L, 1200, true, BOT_MODE_NONE)
 				local N = c.GetNearbyHeroes(L, 1200, false, BOT_MODE_NONE)
 				local X = L:GetHealth()
-				if M ~= nil and N ~= nil and #M >= #N and W < X then
+				-- Lowest-HP target: it read "W < X" with W = 20000, so only a hero above 20000 HP
+				-- qualified and the full-stack engage cast never fired.
+				if M ~= nil and N ~= nil and #M >= #N and X < W then
 					W = X
 					H = L
 				end
@@ -343,11 +345,11 @@ function a.ConsiderSilentAsTheGrave()
 	end
 	if c.IsRetreating(b) then
 		local J = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
+		-- Silent as the Grave is a no-target self cast, so the chaser's BKB or Linken's does not
+		-- matter; those checks only stopped the escape when the chaser had one.
 		for K, L in pairs(J) do
 			if
 				c.IsValidHero(L)
-				and c.CanCastOnNonMagicImmune(L)
-				and c.CanCastOnTargetAdvanced(L)
 				and c.IsChasingTarget(L, b)
 				and not c.IsSuspiciousIllusion(L)
 				and not c.IsDisabled(L)

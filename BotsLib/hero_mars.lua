@@ -11,8 +11,7 @@ local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10
 local j = { { 2, 1, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
@@ -68,6 +67,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "mars_arena_of_blood", kind = "point" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(p)
 	e.MinionThink(p)
@@ -138,7 +139,9 @@ function a.ConsiderSpearOfMars()
 	if not c.CanCastAbility(q) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local M = c.GetProperCastRange(false, b, q:GetSpecialValueInt("spear_range"))
+	-- Was GetProperCastRange(spear_range), which adds 200: targets 200 past where the spear stops
+	-- passed the range checks and the spear flew short. spear_range is the flight distance.
+	local M = q:GetSpecialValueInt("spear_range")
 	local N = q:GetCastPoint()
 	local O = q:GetSpecialValueInt("spear_width")
 	local P = q:GetSpecialValueInt("spear_speed")
@@ -499,7 +502,9 @@ function a.ConsiderArenaOfBlood()
 end
 function a.ConsiderSpearToAlly()
 	if a.CanSpearToAlly() then
-		local M = q:GetCastRange()
+		-- Was q:GetCastRange(): Spear has no AbilityCastRange in the game data (its reach is the
+		-- special value "spear_range", 900-1200), so the ally search radius could read 0.
+		local M = q:GetSpecialValueInt("spear_range")
 		local N = q:GetCastPoint()
 		local P = q:GetSpecialValueInt("spear_speed")
 		if H then
@@ -515,8 +520,26 @@ function a.ConsiderSpearToAlly()
 				local a7 = c.GetEnemiesNearLoc(G:GetLocation(), M)
 				local ad = a.GetFurthestAllyFromBot(X)
 				if #X >= #a7 and #X >= 2 and ad ~= nil then
-					local V = GetUnitToUnitDistance(b, G) / P / N
-					return BOT_ACTION_DESIRE_HIGH, ad:GetLocation(), c.GetCorrectLoc(G, V)
+					-- Was: blink onto the ally and throw at the target, which skewers the target AWAY
+					-- from the ally (the spear pushes along its flight). Blink to the far side of the
+					-- target instead and throw toward the ally, so the target is carried into the team.
+					-- Lead was dist / speed / cast point (divided by 0.25); blink is instant, so the
+					-- lead is just the cast point plus the short spear flight.
+					local tLoc = c.GetCorrectLoc(G, N + 0.1)
+					local dir = (tLoc - ad:GetLocation()):Normalized()
+					local blinkLoc = tLoc + dir * 150
+					if GetUnitToLocationDistance(b, blinkLoc) <= 1150 and IsLocationPassable(blinkLoc) then
+						if DotaTime() >= (b._spearAllyLogAt or -999) then
+							b._spearAllyLogAt = DotaTime() + 5
+							pcall(print, string.format(
+								"[OHA-MARS] t=%.0f blink-spear target=%s toward=%s",
+								DotaTime(),
+								(string.gsub(G:GetUnitName(), "npc_dota_hero_", "")),
+								(string.gsub(ad:GetUnitName(), "npc_dota_hero_", ""))
+							))
+						end
+						return BOT_ACTION_DESIRE_HIGH, ad:GetLocation(), blinkLoc
+					end
 				end
 			end
 		end
@@ -549,7 +572,11 @@ end
 function a.GetSpearToLocation(M, O, N, P, aj)
 	local ak = b:GetLocation()
 	local al = c.GetCorrectLoc(aj, GetUnitToUnitDistance(b, aj) / P + N)
-	local am = b:GetNearbyTrees(M * 0.6)
+	-- Was M * 0.6 (M = spear_range + 200): a tree or building behind the target only counted when
+	-- it was within ~650 of Mars, so a target past ~600 was never pinned. The skewered hero rides
+	-- the spear to the end of spear_range (Valve data), so anything up to spear_range pins.
+	local reach = math.min(q:GetSpecialValueInt("spear_range"), 1600)
+	local am = b:GetNearbyTrees(reach)
 	if DotaTime() < D + 7 then
 		return al
 	end
@@ -568,7 +595,7 @@ function a.GetSpearToLocation(M, O, N, P, aj)
 		end
 	end
 	for T, aq in pairs(GetUnitList(UNIT_LIST_ALL)) do
-		if c.IsValidBuilding(aq) and c.IsInRange(b, aq, M * 0.6) then
+		if c.IsValidBuilding(aq) and c.IsInRange(b, aq, reach) then
 			local ar = aq:GetLocation()
 			local ap = PointToLineDistance(ak, ar, al)
 			if

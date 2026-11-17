@@ -127,7 +127,11 @@ function a.ConsiderQ()
 		return 0
 	end
 	local E = o:GetLevel()
-	local F = 777
+	-- datafeed: Plasma Field radius is 700; the old 777 counted enemies the field never reaches.
+	local F = o:GetSpecialValueInt("radius")
+	if F <= 0 then
+		F = 700
+	end
 	local G = o:GetCastPoint()
 	local H = o:GetManaCost()
 	local I = o:GetAbilityDamage()
@@ -139,7 +143,9 @@ function a.ConsiderQ()
 	local O = c.GetNearbyHeroes(b, 1200, false, BOT_MODE_NONE)
 	local y = c.GetProperTarget(b)
 	for P, Q in pairs(M) do
-		if c.IsValidHero(Q) and c.CanCastOnMagicImmune(Q) then
+		-- Plasma Field is SPELL_IMMUNITY_ENEMIES_NO (game files): a BKB'd hero is not hit, so it should
+		-- not trigger the kill / retreat / fight casts.
+		if c.IsValidHero(Q) and c.CanCastOnNonMagicImmune(Q) then
 			local R = GetUnitToUnitDistance(b, Q)
 			local I = RemapValClamped(R, 0, F, J, K) * 2
 			if c.WillMagicKillTarget(b, Q, I, G + R / 636) then

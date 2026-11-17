@@ -8,7 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 2, 1, 2, 1, 2, 6, 1, 1, 3, 3, 3, 6, 6 } }
+-- 1 Split Shot, 2 Mystic Snake, 3 Gorgon's Grasp, 6 Stone Gaze. Snake maxed first (levels 1/3/5/7),
+-- Split Shot second, Grasp last (Dotabuff most picked order). The old order put Snake at levels 4
+-- and 5, which the hero level does not allow yet. Ultimate at entries 6/11/15 (levels 6/12/18).
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,28 +24,27 @@ m["pos_1"] = {
 	"item_ring_of_basilius",
 	"item_power_treads",
 	"item_manta",
-	"item_ultimate_scepter",
-	"item_skadi",
-	"item_force_staff",
+	"item_dragon_lance",
 	"item_hurricane_pike",
+	"item_skadi",
+	"item_aghanims_shard",
 	"item_butterfly",
-	"item_hydras_breath",
+	"item_ultimate_scepter",
 	"item_greater_crit",
 	"item_travel_boots",
-	"item_aghanims_shard",
-	"item_disperser",
+	"item_monkey_king_bar",
 	"item_moon_shard",
+	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = {
 	"item_medusa_outfit",
+	"item_dragon_lance",
+	"item_hurricane_pike",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_dragon_lance",
 	"item_manta",
 	"item_mjollnir",
-	"item_force_staff",
-	"item_hurricane_pike",
 	"item_travel_boots",
 	"item_skadi",
 	"item_ultimate_scepter_2",
@@ -62,6 +64,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "medusa_stone_gaze", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -128,7 +132,8 @@ function a.ConsiderGorgonGrasp()
 	local K = s:GetSpecialValueInt("delay")
 	local L = s:GetSpecialValueInt("damage")
 	local M = s:GetSpecialValueInt("damage_pers")
-	local N = s:GetSpecialValueInt("duration")
+	-- Float: duration is 0.8/1.2/1.6/2.0 (game data); the Int read gave 0/1/1/2 and undercounted the kill damage.
+	local N = s:GetSpecialValueFloat("duration")
 	G = c.GetProperTarget(b)
 	local O = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local P = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
@@ -199,11 +204,13 @@ function a.ConsiderQ()
 	local W = b:GetNearbyLaneCreeps(I, true)
 	local X = b:GetNearbyLaneCreeps(800, false)
 	G = c.GetProperTarget(b)
+	-- Off when only one enemy unit (hero or creep) is in Split Shot reach (attack range + 150,
+	-- Valve data): the extra arrows have nothing to hit and the main one loses damage.
+	local units = #U + #V
 	if
 		c.IsLaning(b)
-		or #U == 1
+		or units <= 1
 		or c.IsGoingOnSomeone(b) and c.IsValidHero(G) and T <= 2 and #U == 2
-		or #U == 0 and #V <= 1
 		or #U == 0 and #W >= 2 and #X >= 1 and T <= 3
 	then
 		if o:GetToggleState() then
@@ -259,6 +266,44 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Grouped heroes: the snake jumps between enemies within 450 and gains 25% per jump.
+	-- Start it on the hero nearest the middle of the group, in any fight, not only a team fight.
+	local group = b:FindAoELocation(true, true, b:GetLocation(), I, Z, 0, 0)
+	if group ~= nil and group.count >= 2 then
+		local best, bestDist = nil, math.huge
+		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a8)
+				and not c.IsSuspiciousIllusion(a8)
+				and c.CanCastOnNonMagicImmune(a8)
+				and c.CanCastOnTargetAdvanced(a8)
+			then
+				local dist = GetUnitToLocationDistance(a8, group.targetloc)
+				if dist < bestDist then
+					best, bestDist = a8, dist
+				end
+			end
+		end
+		if best ~= nil then
+			a.LogSnake("group", best, group.count)
+			return BOT_ACTION_DESIRE_HIGH, best
+		end
+	end
+	-- Lane poke: the snake gives back mana from what it hits, so a hero in range is worth it
+	-- while she keeps enough mana for Mana Shield.
+	if c.IsInLaningPhase() and c.GetManaAfter(p:GetManaCost()) >= 0.45 then
+		for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a8)
+				and not c.IsSuspiciousIllusion(a8)
+				and c.CanCastOnNonMagicImmune(a8)
+				and c.CanCastOnTargetAdvanced(a8)
+			then
+				a.LogSnake("lane-poke", a8, 1)
+				return BOT_ACTION_DESIRE_MODERATE, a8
+			end
+		end
+	end
 	if c.IsInTeamFight(b, 1200) then
 		local a9 = nil
 		local aa = 0
@@ -283,8 +328,10 @@ function a.ConsiderW()
 			if ad and c.IsInRange(ad, b, I + 50) then
 				return BOT_ACTION_DESIRE_HIGH, ad
 			end
+			-- Was "return ..., ad": ad is nil when no creep bounce exists, which sent a cast
+			-- with no target (refused=nil-target). The target itself is the fallback.
 			if c.IsInRange(ac, b, I + 50) then
-				return BOT_ACTION_DESIRE_HIGH, ad
+				return BOT_ACTION_DESIRE_HIGH, ac
 			end
 		end
 	end
@@ -329,22 +376,75 @@ function a.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- [OHA-MEDUSA]: Mystic Snake casts from the group and lane-poke rules, once per 10s per rule.
+function a.LogSnake(why, target, heroes)
+	b._snakeLogAt = b._snakeLogAt or {}
+	if DotaTime() < (b._snakeLogAt[why] or -999) then
+		return
+	end
+	b._snakeLogAt[why] = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-MEDUSA] t=%.0f mystic-snake why=%s target=%s heroes=%d mp=%.2f",
+		DotaTime(),
+		why,
+		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+		heroes,
+		c.GetMP(b)
+	))
+end
+-- [OHA-MEDUSA]: each Stone Gaze with why and how many heroes were looking at her.
+function a.LogGaze(why, looking)
+	pcall(print, string.format(
+		"[OHA-MEDUSA] t=%.0f stone-gaze why=%s looking=%d hp=%.2f mp=%.2f",
+		DotaTime(),
+		why,
+		looking,
+		c.GetHP(b),
+		c.GetMP(b)
+	))
+end
 function a.ConsiderR()
 	if not q:IsFullyCastable() then
 		return 0
 	end
 	local I = q:GetSpecialValueInt("radius")
+	if I == nil or I <= 0 then
+		I = 1200
+	end
 	local ak = b:GetAttackRange()
-	local al = false
-	local am = c.GetEnemyList(b, ak + 100)
-	for R, a8 in pairs(am) do
-		if a8:IsFacingLocation(b:GetLocation(), 50) then
-			al = true
-			break
+	-- Stone Gaze works on anyone in 1200 who looks at her: slowed at once, stone after 2s of
+	-- looking. A hero attacking or chasing her is looking at her by definition. The old gate
+	-- only counted enemies inside her attack range facing her within 50 degrees.
+	local looking = 0
+	for R, a8 in pairs(c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE) or {}) do
+		if
+			c.IsValidHero(a8)
+			and not c.IsSuspiciousIllusion(a8)
+			-- Was CanCastOnNonMagicImmune: Stone Gaze is SPELL_IMMUNITY_ENEMIES_YES in the game data
+			-- (it pierces debuff immunity), so a BKB carry hitting her counts as looking too.
+			and not a8:IsInvulnerable()
+			and (
+				a8:GetAttackTarget() == b
+				or c.IsChasingTarget(a8, b)
+				or a8:IsFacingLocation(b:GetLocation(), 45)
+			)
+		then
+			looking = looking + 1
 		end
 	end
-	if not al then
+	if looking == 0 then
 		return 0
+	end
+	local fighting = c.IsInTeamFight(b, 1200) or c.IsGoingOnSomeone(b) or b:WasRecentlyDamagedByAnyHero(2.0)
+	-- Two or more heroes looking at her in a fight: that is most of the ult's value.
+	if fighting and looking >= 2 then
+		a.LogGaze("group", looking)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Low and being hit: petrify the attacker and take the speed boost.
+	if looking >= 1 and C < 0.45 and b:WasRecentlyDamagedByAnyHero(2.0) then
+		a.LogGaze("survive", looking)
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	if c.IsRetreating(b) then
 		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)

@@ -12,7 +12,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }, {
+local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, {
 	2,
 	3,
 	2,
@@ -57,7 +57,7 @@ o["pos_1"] = {
 	"item_black_king_bar",
 	"item_mjollnir",
 	"item_greater_crit",
-	"item_ultimate_scepter",
+	"item_blink",
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_travel_boots",
@@ -81,7 +81,7 @@ o["pos_2"] = {
 	"item_black_king_bar",
 	"item_mjollnir",
 	"item_greater_crit",
-	"item_ultimate_scepter",
+	"item_blink",
 	"item_sheepstick",
 	"item_travel_boots",
 	"item_monkey_king_bar",
@@ -111,8 +111,33 @@ o["pos_3"] = {
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
-o["pos_4"] = o["pos_3"]
-o["pos_5"] = o["pos_3"]
+-- Support builds: Dotabuff 7-day meta has Windranger most often at support-off (pos 4).
+o["pos_4"] = {
+	"item_priest_outfit",
+	"item_arcane_boots",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_maelstrom",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_gungir",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+-- One pair of boots in this build (user rule; Util/boots-check.js).
+o["pos_5"] = {
+	"item_crystal_maiden_outfit",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_guardian_greaves",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 a["sBuyList"] = o[h]
 a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
@@ -130,6 +155,15 @@ local r = SafeAbility(b:GetAbilityByName("windrunner_powershot"), "windrunner_po
 local s = SafeAbility(b:GetAbilityByName("windrunner_windrun"), "windrunner_windrun", "windrunner")
 local t = SafeAbility(b:GetAbilityByName("windrunner_gale_force"), "windrunner_gale_force", "windrunner")
 local u = SafeAbility(b:GetAbilityByName("windrunner_focusfire"), "windrunner_focusfire", "windrunner")
+-- [OHA-WINDRUNNER] lines: throttled per reason, at most once per 5s.
+function a.LogWindrunner(why, fmt, ...)
+	b._wrLogAt = b._wrLogAt or {}
+	if DotaTime() < (b._wrLogAt[why] or -999) then
+		return
+	end
+	b._wrLogAt[why] = DotaTime() + 5
+	pcall(print, string.format("[OHA-WINDRUNNER] t=%.0f " .. why .. " " .. fmt, DotaTime(), ...))
+end
 local v, w
 local x, y
 local z
@@ -149,6 +183,10 @@ function a.SkillsComplement()
 	G = c.IsRetreating(b)
 	H = c.IsAttacking(b)
 	I = c.GetMP(b)
+	-- J (own HP) was read in ConsiderWindrun but never set: "J < 0.7" threw (nil compare), which
+	-- ended that think before Windrun's last cases and Gale Force whenever 2+ enemies were near
+	-- and one was attacking Windranger.
+	J = c.GetHP(b)
 	E = c.GetProperTarget(b)
 	v, w = a.ConsiderShackleShot()
 	if v > 0 then
@@ -200,6 +238,25 @@ function a.ConsiderShackleShot()
 		end
 	end
 	if F then
+		-- Own target first: the only fight case below needed a chase with 2 allies in attack mode
+		-- or a kill within the stun, so a gank on a standing or fighting hero never opened with
+		-- Shackleshot. Only cast when it latches (to a hero, tree or creep), never the 0.6s fail stun.
+		if
+			c.IsValidHero(E)
+			and c.CanCastOnNonMagicImmune(E)
+			and c.CanCastOnTargetAdvanced(E)
+			and c.IsInRange(b, E, K)
+			and not c.IsDisabled(E)
+			and not E:HasModifier("modifier_enigma_black_hole_pull")
+			and not E:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not E:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			local X = a.GetShackleTarget(b, E, L, M)
+			if X then
+				a.LogWindrunner("shackle-target", "target=%s via=%s", E:GetUnitName(), X:GetUnitName())
+				return BOT_ACTION_DESIRE_HIGH, X
+			end
+		end
 		local S = nil
 		local T = 0
 		for Q, U in pairs(P) do
@@ -504,7 +561,10 @@ function a.ConsiderFocusFire()
 	end
 	local K = c.GetProperCastRange(false, b, u:GetCastRange())
 	local aj = 1 + u:GetSpecialValueInt("focusfire_damage_reduction") / 100
-	local ak = u:GetDuration()
+	-- Kill check counted one attack per second of the 20s duration (damage * 20), so every hero
+	-- in range "died" and the ultimate went out whenever WeAreStronger, e.g. on a full-HP laner.
+	-- Now: attacks in about 5s, at twice the current rate for the bonus attack speed (estimate).
+	local ak = 10 / math.max(0.2, b:GetSecondsPerAttack())
 	local a2 = b:GetAttackDamage()
 	local O = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
 	local P = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)

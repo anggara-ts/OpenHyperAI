@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -17,9 +17,9 @@ m["pos_4"] = {
 	"item_urn_of_shadows",
 	"item_mekansm",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_guardian_greaves",
 	"item_spirit_vessel",
-	"item_shivas_guard",
 	"item_aghanims_shard",
 	"item_sheepstick",
 	"item_moon_shard",
@@ -28,14 +28,14 @@ m["pos_4"] = {
 m["pos_5"] = {
 	"item_blood_grenade",
 	"item_mage_outfit",
-	"item_ancient_janggo",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_blink",
 	"item_pipe",
-	"item_shivas_guard",
-	"item_cyclone",
-	"item_sheepstick",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_force_staff",
+	"item_sheepstick",
 	"item_wind_waker",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -58,7 +58,7 @@ m["pos_3"] = {
 m["pos_1"] = m["pos_3"]
 m["pos_2"] = m["pos_3"]
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_cyclone", "item_magic_wand", "item_shivas_guard", "item_magic_wand" }
+a["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_shivas_guard", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_mage" }, {}
 end
@@ -74,7 +74,13 @@ local p = 0
 local q = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "crystal_maiden")
 local r = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "crystal_maiden")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "crystal_maiden")
-local t = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "crystal_maiden")
+-- datafeed: Crystal Clone is granted by the Shard; fetch it by name, since entry 4 of the ability list is
+-- not guaranteed to be it (the hero also has the innate Glacial Guard).
+local t = SafeAbility(
+	b:GetAbilityByName("crystal_maiden_crystal_clone"),
+	"crystal_maiden_crystal_clone",
+	"crystal_maiden"
+)
 local u = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "crystal_maiden")
 local v = SafeAbility(
 	b:GetAbilityByName("crystal_maiden_brilliance_aura"),

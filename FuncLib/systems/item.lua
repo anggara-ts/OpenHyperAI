@@ -337,6 +337,17 @@ b["tEarlyConsumableItem"] = {
 b["tEarlyBoots"] = { "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
 b["sCanNotSwitchItems"] = {
 	"item_aegis",
+	-- Swapped in from the backpack for a push; other swaps must not send it back.
+	"item_roshans_banner",
+	-- Game 032: every swap that would move a Ward Dispenser into the backpack was sent and had no
+	-- effect (110 for Dust, 2 for the banner); wards are never the item moved out to make room.
+	"item_ward_dispenser",
+	"item_ward_observer",
+	"item_ward_sentry",
+	-- Swapped in to be eaten (game 032: Medusa's Vital Toadstool went back to the backpack).
+	"item_foragers_health",
+	"item_foragers_stats",
+	"item_foragers_mana",
 	"item_refresher_shard",
 	"item_cheese",
 	"item_bloodstone",
@@ -346,6 +357,14 @@ b["sCanNotSwitchItems"] = {
 	"item_famango",
 	"item_great_famango",
 	"item_greater_famango",
+	-- A branch is a wand component. Parking it and pulling it back starts the backpack cooldown.
+	"item_branches",
+	-- Thrown from the main inventory only. Do not park it to make room for something else.
+	"item_blood_grenade",
+	-- Cast from a main slot only. Game 033: Witch Doctor and Shadow Shaman tried to swap a backpack
+	-- Clarity in for their Dust every 6-13s from 7:21 to 33:39 (31 sent, none ever swapped back, so none took effect),
+	-- and each one restarted the 11s swap gap for every other swap.
+	"item_dust",
 }
 b["sSellList"] = {
 	"item_black_king_bar",
@@ -386,8 +405,6 @@ b["sSellList"] = {
 	"item_recipe_magic_wand",
 	"item_splintmail",
 	"item_chainmail",
-	"item_shawl",
-	"item_cloak",
 	"item_wizard_hat",
 	"item_circlet",
 }
@@ -584,9 +601,30 @@ local v = {
 	"item_new_5",
 	"item_new_6",
 }
-for h, w in pairs(v) do
-	b[w] = GetItemComponents(w)[1]
+-- The engine lists some recipes ahead of their ingredients. Buy the ingredients first.
+local function RecipesLast(parts)
+	if type(parts) ~= "table" then
+		return parts
+	end
+	local ordered = {}
+	for _, part in ipairs(parts) do
+		if not string.find(part, "item_recipe_", 1, true) then
+			ordered[#ordered + 1] = part
+		end
+	end
+	for _, part in ipairs(parts) do
+		if string.find(part, "item_recipe_", 1, true) then
+			ordered[#ordered + 1] = part
+		end
+	end
+	return ordered
 end
+for h, w in pairs(v) do
+	b[w] = RecipesLast(GetItemComponents(w)[1])
+end
+-- Boots of Travel 2 is Boots of Travel plus the recipe again (the recipe name the game reported
+-- for it in game 020's purchases). Spelled out so the planner keeps level 1 as a step toward it.
+b["item_travel_boots_2"] = { "item_travel_boots", "item_recipe_travel_boots" }
 b["item_phase_boots"] = { "item_blades_of_attack", "item_boots", "item_chainmail" }
 b["item_power_treads_agi"] = { "item_boots", "item_boots_of_elves", "item_gloves" }
 b["item_power_treads_int"] = { "item_boots", "item_robe", "item_gloves" }
@@ -594,6 +632,11 @@ b["item_power_treads_str"] = { "item_boots", "item_belt_of_strength", "item_glov
 b["item_power_treads"] = { "item_boots", "item_belt_of_strength", "item_gloves" }
 b["item_ultimate_scepter"] =
 	{ "item_point_booster", "item_ogre_axe", "item_blade_of_alacrity", "item_staff_of_wizardry" }
+-- Stick and two branches do not combine on their own. The recipe has to be bought
+-- with them, before the build moves on to boots.
+b["item_magic_wand"] = { "item_magic_stick", "item_branches", "item_branches", "item_recipe_magic_wand" }
+-- Claymore and Blades of Attack do not combine on their own.
+b["item_lesser_crit"] = { "item_claymore", "item_blades_of_attack", "item_recipe_lesser_crit" }
 b["item_yasha"] = { "item_boots_of_elves", "item_blade_of_alacrity", "item_recipe_yasha" }
 local x = {
 	["item_double_tango"] = "item_tango",
@@ -621,6 +664,9 @@ local x = {
 	["item_priest_outfit"] = "item_arcane_boots",
 }
 b["item_double_branches"] = { "item_branches", "item_branches" }
+-- Two Gauntlets as one build entry. Two separate "item_gauntlets" entries do not work: the
+-- second reads as done as soon as the first is owned.
+b["item_double_gauntlets"] = { "item_gauntlets", "item_gauntlets" }
 b["item_double_tango"] = { "item_tango", "item_tango" }
 b["item_double_clarity"] = { "item_clarity", "item_clarity" }
 b["item_double_flask"] = { "item_flask", "item_flask" }
@@ -656,9 +702,9 @@ b["item_medusa_outfit"] = {
 	"item_double_branches",
 	"item_null_talisman",
 	"item_null_talisman",
-	"item_power_treads_int",
 	"item_magic_stick",
 	"item_recipe_magic_wand",
+	"item_power_treads_int",
 }
 b["item_templar_assassin_outfit"] = {
 	"item_tango",
@@ -678,9 +724,9 @@ b["item_ranged_carry_outfit"] = {
 	"item_slippers",
 	"item_circlet",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_wraith_band",
 	"item_power_treads_agi",
-	"item_recipe_magic_wand",
 	"item_infused_raindrop",
 }
 b["item_melee_carry_outfit"] = {
@@ -728,10 +774,10 @@ b["item_huskar_outfit"] = {
 	"item_gauntlets",
 	"item_circlet",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_bracer",
 	"item_boots",
 	"item_bracer",
-	"item_recipe_magic_wand",
 	"item_blades_of_attack",
 	"item_chainmail",
 }
@@ -789,8 +835,8 @@ b["item_priest_outfit"] = {
 	"item_branches",
 	"item_magic_stick",
 	"item_branches",
-	"item_arcane_boots",
 	"item_recipe_magic_wand",
+	"item_arcane_boots",
 	"item_flask",
 	"item_urn_of_shadows",
 }
@@ -801,9 +847,9 @@ b["item_mage_outfit"] = {
 	"item_circlet",
 	"item_mantle",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_null_talisman",
 	"item_tranquil_boots",
-	"item_recipe_magic_wand",
 	"item_flask",
 }
 b["item_crystal_maiden_outfit"] = {
@@ -812,9 +858,9 @@ b["item_crystal_maiden_outfit"] = {
 	"item_circlet",
 	"item_mantle",
 	"item_magic_stick",
+	"item_recipe_magic_wand",
 	"item_recipe_null_talisman",
 	"item_arcane_boots",
-	"item_recipe_magic_wand",
 	"item_flask",
 }
 b["PvN_priest"] = {
@@ -1144,23 +1190,30 @@ function b.IsItemInTargetHero(y, E)
 	local H = E:FindItemSlot(y)
 	return H >= 0 and (H <= 8 or b.IsTopItem(y))
 end
-function b.GetBasicItems(I)
+-- Basic items still to buy for a list. Owned copies are counted, and each owned copy covers
+-- one entry only, so a recipe that needs two of a part (Soul Ring: two Gauntlets) buys the
+-- second one. The old single "last repeat item" flag was shared with every other call and
+-- often lost, so a Techies with one Gauntlets got only the Soul Ring recipe.
+function b.GetBasicItems(I, owned)
 	local E = GetBot()
+	owned = owned or {}
 	local J = {}
 	for A, i in pairs(I) do
-		local K = b.IsItemInHero(i)
-		if K == false or i == E.sLastRepeatItem then
-			if b[i] ~= nil then
-				for h, L in pairs(b.GetBasicItems(b[i])) do
-					J[#J + 1] = L
-				end
-			elseif b[i] == nil then
-				J[#J + 1] = i
+		if owned[i] == nil then
+			if b.IsItemInHero(i) then
+				owned[i] = math.max(1, b.GetItemCountInSolt(E, i, 0, 8))
+			else
+				owned[i] = 0
+			end
+		end
+		if owned[i] > 0 then
+			owned[i] = owned[i] - 1
+		elseif b[i] ~= nil then
+			for h, L in pairs(b.GetBasicItems(b[i], owned)) do
+				J[#J + 1] = L
 			end
 		else
-			if b.GetItemCount(GetBot(), i) <= 1 then
-				E.sLastRepeatItem = i
-			end
+			J[#J + 1] = i
 		end
 	end
 	return J
@@ -1215,10 +1268,14 @@ end
 -- count then reads 0, so a support carrying both re-buys wards every tick.
 -- Dispenser current charges are observers. Secondary charges are sentries.
 function b.GetWardCharges(E, wardType)
-	local charges = b.GetItemCharges(E, wardType)
+	local charges = 0
 	for A = 0, 16 do
 		local G = E:GetItemInSlot(A)
-		if G ~= nil and G:GetName() == "item_ward_dispenser" then
+		if G ~= nil and G:GetName() == wardType then
+			-- One ward often reports 0 charges, so a cap of 1 still bought a second.
+			local n = G:GetCurrentCharges()
+			charges = charges + ((n ~= nil and n > 0) and n or 1)
+		elseif G ~= nil and G:GetName() == "item_ward_dispenser" then
 			if wardType == "item_ward_observer" then
 				charges = charges + G:GetCurrentCharges()
 			else
@@ -1259,6 +1316,153 @@ function b.GetEmptyInventoryAmount(E)
 end
 function b.GetEmptyNonBackpackInventoryAmount(E)
 	return S(E, 0, 5)
+end
+-- Greater Healing Lotus (item_greater_famango) stacks up to 3 per slot.
+b.GREATER_FAMANGO = "item_greater_famango"
+b.GREATER_FAMANGO_MAX_STACK = 3
+function b.GetLotusCharges(item)
+	if item == nil or item:IsNull() then
+		return 0
+	end
+	local charges = item:GetCurrentCharges()
+	if charges == nil or charges <= 0 then
+		return 1
+	end
+	return charges
+end
+function b.CollectGreaterFamangoStacks(bot)
+	local stacks = {}
+	if bot == nil then
+		return stacks
+	end
+	for slot = 0, 8 do
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil and not item:IsNull() and item:GetName() == b.GREATER_FAMANGO then
+			stacks[#stacks + 1] = {
+				slot = slot,
+				item = item,
+				charges = b.GetLotusCharges(item),
+			}
+		end
+	end
+	return stacks
+end
+-- True if inventory has 2+ greater-famango piles that can merge (frees a slot).
+function b.CanStackGreaterFamango(bot)
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	if #stacks < 2 then
+		return false
+	end
+	for i = 1, #stacks do
+		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+			return true
+		end
+	end
+	return false
+end
+-- Drop a spare greater-famango so the next pick-up merges into an incomplete stack (max 3).
+-- Returns true if a drop was issued (caller should pick up on a later think).
+function b.TryStackGreaterFamango(bot)
+	if bot == nil or not b.CanStackGreaterFamango(bot) then
+		return false
+	end
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local sink = nil
+	for i = 1, #stacks do
+		local s = stacks[i]
+		if s.charges < b.GREATER_FAMANGO_MAX_STACK then
+			if sink == nil or s.charges < sink.charges then
+				sink = s
+			end
+		end
+	end
+	if sink == nil then
+		return false
+	end
+	local donor = nil
+	for i = 1, #stacks do
+		local s = stacks[i]
+		if s.slot ~= sink.slot then
+			donor = s
+			break
+		end
+	end
+	if donor == nil or donor.item == nil then
+		return false
+	end
+	bot:Action_DropItem(donor.item, bot:GetLocation())
+	bot._lotusStackPickupUntil = DotaTime() + 3.0
+	return true
+end
+-- After TryStackGreaterFamango drop: pick the ground greater back up to merge stacks.
+function b.TryPickupStackedGreaterFamango(bot)
+	if bot == nil or bot._lotusStackPickupUntil == nil then
+		return false
+	end
+	if DotaTime() > bot._lotusStackPickupUntil then
+		bot._lotusStackPickupUntil = nil
+		return false
+	end
+	local stacks = b.CollectGreaterFamangoStacks(bot)
+	local hasRoom = false
+	for i = 1, #stacks do
+		if stacks[i].charges < b.GREATER_FAMANGO_MAX_STACK then
+			hasRoom = true
+			break
+		end
+	end
+	if not hasRoom and b.GetEmptyInventoryAmount(bot) <= 0 then
+		bot._lotusStackPickupUntil = nil
+		return false
+	end
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and drop.item:GetName() == b.GREATER_FAMANGO then
+			local dist = GetUnitToLocationDistance(bot, drop.location)
+			if dist <= 400 then
+				if dist > 100 then
+					bot:Action_MoveToLocation(drop.location)
+				else
+					bot:Action_PickUpItem(drop.item)
+					bot._lotusStackPickupUntil = nil
+				end
+				return true
+			end
+		end
+	end
+	return false
+end
+-- Prefer freeing a lotus that cannot stack further (full greater stack, or lower tiers).
+function b.FindLotusToFreeSlot(bot)
+	if bot == nil then
+		return nil, -1, nil
+	end
+	local prefer = {
+		"item_famango",
+		"item_great_famango",
+		"item_greater_famango",
+	}
+	-- First pass: greater at max stack, then lower tiers.
+	for pass = 1, 2 do
+		for _, name in ipairs(prefer) do
+			for slot = 0, 8 do
+				local item = bot:GetItemInSlot(slot)
+				if item ~= nil and not item:IsNull() and item:GetName() == name then
+					if name == b.GREATER_FAMANGO then
+						local charges = b.GetLotusCharges(item)
+						if pass == 1 and charges >= b.GREATER_FAMANGO_MAX_STACK then
+							return name, slot, item
+						end
+						if pass == 2 then
+							return name, slot, item
+						end
+					elseif pass == 1 then
+						return name, slot, item
+					end
+				end
+			end
+		end
+	end
+	return nil, -1, nil
 end
 function b.GetEmptyNeutralBackpackAmount(E)
 	return S(E, 6, 8) + (E:GetItemInSlot(16) == nil and 1 or 0)
@@ -1416,5 +1620,178 @@ function b.GetItemWardSolt()
 		end
 	end
 	return -1
+end
+-- Aegis: a nearby human, then a core, then anyone else.
+-- Roshan's Banner: a nearby support, then anyone else.
+-- Cheese / Refresher Shard: a core with a free main slot, then a support with one, then anyone.
+-- Game 034, 63:38: Roshan died, Phoenix took the Aegis and the Cheese (into his backpack, full
+-- bag) and nobody took the Refresher Shard: these two were never claimed by anyone. A free main
+-- slot matters: bot swaps do not take effect, so an item that lands in the backpack stays there.
+function b.RoshanClaimKind(name)
+	if name == "item_aegis" then
+		return "aegis"
+	end
+	if name == "item_roshans_banner" then
+		return "banner"
+	end
+	if name == "item_cheese" or name == "item_refresher_shard" then
+		return "consumable"
+	end
+	return nil
+end
+local function RoshanDropTier(hero, kind)
+	local human = hero.IsBot ~= nil and not hero:IsBot()
+	local pos = a.GetPosition(hero) or 3
+	if kind == "consumable" then
+		if b.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
+			return 3
+		end
+		return pos <= 3 and 1 or 2
+	end
+	if kind == "aegis" then
+		if human then
+			return 1
+		end
+		if pos <= 3 then
+			return 2
+		end
+		return 3
+	end
+	if pos >= 4 then
+		return 1
+	end
+	return 2
+end
+local function RoshanDropCandidate(hero, itemName)
+	if hero == nil or not hero:IsAlive() or not hero:IsHero() or hero:IsIllusion() then
+		return false
+	end
+	if b.HasItem(hero, itemName) then
+		return false
+	end
+	return true
+end
+function b.ShouldClaimRoshanDrop(bot, loc, itemName)
+	local kind = b.RoshanClaimKind(itemName)
+	if kind == nil or loc == nil or not RoshanDropCandidate(bot, itemName) then
+		return false
+	end
+	local tiers = (kind == "aegis" or kind == "consumable") and { 1, 2, 3 } or { 1, 2 }
+	local function closest(tier, maxDist)
+		local best, bestDist, bestId = nil, maxDist, math.huge
+		local players = GetTeamPlayers(GetTeam())
+		for i = 1, #players do
+			local ally = GetTeamMember(i)
+			if RoshanDropCandidate(ally, itemName) and RoshanDropTier(ally, kind) == tier then
+				local dist = GetUnitToLocationDistance(ally, loc)
+				local id = ally:GetPlayerID() or 99
+				if dist <= bestDist and (dist < bestDist or id < bestId) then
+					best = ally
+					bestDist = dist
+					bestId = id
+				end
+			end
+		end
+		return best
+	end
+	local function winner(maxDist)
+		for n = 1, #tiers do
+			local ally = closest(tiers[n], maxDist)
+			if ally ~= nil then
+				return ally
+			end
+		end
+		return nil
+	end
+	-- Someone of a better tier within walking range keeps the claim. Otherwise it falls through.
+	local ally = winner(4000) or winner(math.huge)
+	return ally == bot
+end
+function b.RoshanDropDesire(bot)
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+			local name = drop.item:GetName()
+			if
+				b.RoshanClaimKind(name) ~= nil
+				and b.ShouldClaimRoshanDrop(bot, drop.location, name)
+				and GetUnitToLocationDistance(bot, drop.location) <= 4500
+			then
+				return 0.97
+			end
+		end
+	end
+	return 0
+end
+function b.TryPickupRoshanDrop(bot)
+	if bot == nil or not bot:IsAlive() then
+		return false
+	end
+	local best, bestDist = nil, math.huge
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+			local name = drop.item:GetName()
+			if b.RoshanClaimKind(name) ~= nil and b.ShouldClaimRoshanDrop(bot, drop.location, name) then
+				local dist = GetUnitToLocationDistance(bot, drop.location)
+				if dist < bestDist then
+					best = drop
+					bestDist = dist
+				end
+			end
+		end
+	end
+	if best == nil or bestDist > 4500 then
+		-- Nothing left to claim: pick back up the item dropped to make room (20s, within 1500).
+		local ret = bot._roshReturn
+		if ret ~= nil then
+			if DotaTime() - ret.at > 20 then
+				bot._roshReturn = nil
+				return false
+			end
+			for _, drop in pairs(GetDroppedItemList() or {}) do
+				if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() and drop.item:GetName() == ret.name then
+					local d = GetUnitToLocationDistance(bot, drop.location)
+					if d <= 1500 then
+						if d > 120 then
+							bot:Action_MoveToLocation(drop.location)
+						else
+							bot:Action_PickUpItem(drop.item)
+							bot._roshReturn = nil
+						end
+						return true
+					end
+				end
+			end
+			bot._roshReturn = nil
+		end
+		return false
+	end
+	if b.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+		local cheap = b.GetMainInvLessValItemSlot(bot)
+		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the
+		-- cheapest item to the backpack never made room. Drop it at his feet instead, pick up the
+		-- Roshan item into the freed main slot, then pick the dropped item back up (it goes to the
+		-- backpack). Game 021, 32:48: nobody took the Aegis, the claimant's bag was full.
+		if cheap ~= nil and cheap >= 0 and bestDist <= 600 then
+			local it = bot:GetItemInSlot(cheap)
+			if it ~= nil then
+				pcall(print, string.format(
+					"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					b.RoshanClaimKind(best.item:GetName()) or "drop",
+					(string.gsub(it:GetName(), "^item_", ""))
+				))
+				bot._roshReturn = { name = it:GetName(), at = DotaTime() }
+				bot:Action_DropItem(it, bot:GetLocation())
+				return true
+			end
+		end
+	end
+	if bestDist > 120 then
+		bot:Action_MoveToLocation(best.location)
+	else
+		bot:Action_PickUpItem(best.item)
+	end
+	return true
 end
 return b

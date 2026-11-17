@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 1, 3, 1, 2, 1, 6, 2, 2, 2, 6, 3, 3, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -30,14 +30,14 @@ m["pos_1"] = {
 m["pos_2"] = m["pos_1"]
 m["pos_3"] = {
 	"item_tank_outfit",
-	"item_crimson_guard",
-	"item_heavens_halberd",
+	"item_soul_ring",
+	"item_ultimate_scepter",
 	"item_lotus_orb",
 	"item_aghanims_shard",
 	"item_gungir",
 	"item_travel_boots",
 	"item_assault",
-	"item_heart",
+	"item_shivas_guard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
@@ -87,6 +87,8 @@ a["sSellList"] = {
 	"item_magic_wand",
 	"item_shivas_guard",
 	"item_bracer",
+	"item_assault",
+	"item_soul_ring",
 }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
@@ -142,6 +144,15 @@ function a.SkillsComplement()
 		return
 	end
 end
+-- fix: Firestorm and Pit were aimed with GetXUnitsTowardsLocation(b, loc, E), which always returns a
+-- point exactly E (cast range 675 + 200) from Underlord, so a close enemy group was missed by ~400+
+-- units (radius 425 / 400). Aim at the spot itself; clamp to E only when it is beyond E (far targets as before).
+function a.CastSpot(loc, castRange)
+	if GetUnitToLocationDistance(b, loc) <= castRange then
+		return loc
+	end
+	return c.Site.GetXUnitsTowardsLocation(b, loc, castRange)
+end
 function a.ConsiderFirestorm()
 	if not q:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -153,7 +164,7 @@ function a.ConsiderFirestorm()
 		local H = b:FindAoELocation(true, true, b:GetLocation(), E + F, F, G, 0)
 		local I = c.GetEnemiesNearLoc(H.targetloc, F)
 		if I ~= nil and #I >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, H.targetloc, E)
+			return BOT_ACTION_DESIRE_HIGH, a.CastSpot(H.targetloc, E)
 		end
 	end
 	if A then
@@ -169,9 +180,9 @@ function a.ConsiderFirestorm()
 			if J ~= nil and I ~= nil and #J >= #I then
 				I = c.GetEnemiesNearLoc(z:GetLocation(), E + F)
 				if I ~= nil and #I >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetCenterOfUnits(I), E)
+					return BOT_ACTION_DESIRE_HIGH, a.CastSpot(c.GetCenterOfUnits(I), E)
 				end
-				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, z:GetLocation(), E)
+				return BOT_ACTION_DESIRE_HIGH, a.CastSpot(z:GetLocation(), E)
 			end
 		end
 	end
@@ -221,7 +232,7 @@ function a.ConsiderPitOfMalice()
 	local M = c.GetNearbyHeroes(b, E + F, true, BOT_MODE_NONE)
 	for N, O in pairs(M) do
 		if c.IsValidHero(O) and c.CanCastOnNonMagicImmune(O) and O:IsChanneling() and not c.IsSuspiciousIllusion(O) then
-			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, O:GetLocation(), E)
+			return BOT_ACTION_DESIRE_HIGH, a.CastSpot(O:GetLocation(), E)
 		end
 	end
 	if A then
@@ -237,9 +248,9 @@ function a.ConsiderPitOfMalice()
 			if J ~= nil and I ~= nil and #J >= #I then
 				I = c.GetEnemiesNearLoc(z:GetLocation(), E + F)
 				if I ~= nil and #I >= 1 then
-					return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, c.GetCenterOfUnits(I), E)
+					return BOT_ACTION_DESIRE_HIGH, a.CastSpot(c.GetCenterOfUnits(I), E)
 				end
-				return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, z:GetLocation(), E)
+				return BOT_ACTION_DESIRE_HIGH, a.CastSpot(z:GetLocation(), E)
 			end
 		end
 	end
@@ -359,7 +370,9 @@ function a.ConsiderFiendsGate()
 					and #I == 0
 					and #S == 0
 				then
-					local R = c.GetCenterOfUnits(V:GetExtrapolatedLocation(1))
+					-- GetCenterOfUnits takes a unit list; given a Vector it gave Vector(0,0) (map centre)
+				-- or errored. Open the portal at the ally's predicted spot instead.
+				local R = V:GetExtrapolatedLocation(1)
 					if
 						IsLocationPassable(R)
 						and not c.IsLocationInChrono(R)

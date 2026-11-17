@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+local j = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -54,12 +54,12 @@ m["pos_3"] = {
 	"item_double_bracer",
 	"item_boots",
 	"item_radiance",
-	"item_pipe",
-	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_blink",
 	o,
 	"item_aghanims_shard",
 	"item_travel_boots",
-	"item_shivas_guard",
+	"item_assault",
 	"item_moon_shard",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
@@ -116,13 +116,11 @@ end
 local q = SafeAbility(b:GetAbilityByName("brewmaster_thunder_clap"), "brewmaster_thunder_clap", "brewmaster")
 local r = SafeAbility(b:GetAbilityByName("brewmaster_cinder_brew"), "brewmaster_cinder_brew", "brewmaster")
 local s = SafeAbility(b:GetAbilityByName("brewmaster_drunken_brawler"), "brewmaster_drunken_brawler", "brewmaster")
-local t = SafeAbility(b:GetAbilityByName("brewmaster_primal_companion"), "brewmaster_primal_companion", "brewmaster")
 local u = SafeAbility(b:GetAbilityByName("brewmaster_primal_split"), "brewmaster_primal_split", "brewmaster")
 local v = SafeAbility(b:GetAbilityByName("brewmaster_liquid_courage"), "brewmaster_liquid_courage", "brewmaster")
 local w
 local x, y
 local z, A
-local B
 local C
 local D, E
 local F = 1
@@ -169,12 +167,8 @@ function a.SkillsComplement()
 	D, E = a.ConsiderLiquidCourage()
 	if D > 0 then
 		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(v, E)
-		return
-	end
-	B = a.ConsiderPrimalCompanion()
-	if B > 0 then
-		b:Action_UseAbility(u)
+		-- datafeed (Shard): the drink is tossed to a teammate or self; E is a hero, so cast on the unit
+		b:ActionQueue_UseAbilityOnEntity(v, E)
 		return
 	end
 end
@@ -302,6 +296,9 @@ function a.ConsiderCinderBrew()
 		if
 			c.IsValidTarget(G)
 			and c.CanCastOnNonMagicImmune(G)
+			-- fix: no range check here, so a target 2000+ away got a brew thrown at a point Y (cast
+			-- range + 200) toward it, landing on nothing. Only when the target is within Y + radius.
+			and c.IsInRange(b, G, Y + N)
 			and not c.IsDisabled(G)
 			and not G:HasModifier("modifier_brewmaster_cinder_brew")
 			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -403,6 +400,8 @@ function a.ConsiderLiquidCourage()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local Y = v:GetCastRange()
+	-- fix: nAllyHeroes was an undefined global here (pairs(nil) errors once the Shard is owned)
+	local nAllyHeroes = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}
 	for R, a1 in pairs(nAllyHeroes) do
 		if
 			c.IsValidHero(a1)
@@ -421,38 +420,6 @@ function a.ConsiderLiquidCourage()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function a.ConsiderPrimalCompanion()
-	if not b:HasScepter() or not c.CanCastAbility(t) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local R, u = c.HasAbility(b, "brewmaster_primal_split")
-	local nAllyHeroes = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	local P = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	G = c.GetProperTarget(b)
-	if u ~= nil and (u:IsFullyCastable() or u:GetCooldownTimeRemaining() < 5) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	if L then
-		if P ~= nil and #P >= 2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if H then
-		if
-			c.IsValidTarget(G)
-			and not G:IsAttackImmune()
-			and c.IsInRange(b, G, 600)
-			and not c.IsSuspiciousIllusion(G)
-			and not c.IsDisabled(G)
-			and not c.IsMeepoClone(G)
-			and not G:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not c.IsLocationInChrono(G:GetLocation())
-		then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 function a.ConsiderPrimalSplit()
 	if not c.CanCastAbility(u) then
 		return BOT_ACTION_DESIRE_NONE
@@ -463,7 +430,13 @@ function a.ConsiderPrimalSplit()
 	if nAllyHeroes ~= nil and #nAllyHeroes == 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if c.GetHP(b) < 0.33 and P ~= nil and #P >= 2 and nAllyHeroes ~= nil and #nAllyHeroes == 0 then
+	-- fix: GetNearbyHeroes(allies) includes Brewmaster himself, so "#nAllyHeroes == 0" never held
+	-- and this low-HP split (save) never fired. "<= 1" = no ally but himself.
+	if c.GetHP(b) < 0.33 and P ~= nil and #P >= 2 and nAllyHeroes ~= nil and #nAllyHeroes <= 1 then
+		if DotaTime() >= (b._brewSplitLogAt or -999) then
+			b._brewSplitLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-BREWMASTER] t=%.0f primal split save hp=%.2f enemies=%d", DotaTime(), c.GetHP(b), #P))
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if L then

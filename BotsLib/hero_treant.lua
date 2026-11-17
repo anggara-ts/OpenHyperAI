@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local j = { { 2, 1, 3, 1, 3, 6, 3, 1, 1, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,7 +21,7 @@ m["pos_4"] = {
 	"item_guardian_greaves",
 	"item_blink",
 	"item_aghanims_shard",
-	"item_black_king_bar",
+	"item_meteor_hammer",
 	"item_lotus_orb",
 	"item_gungir",
 	"item_wind_waker",
@@ -44,8 +44,8 @@ m["pos_5"] = {
 	"item_aghanims_shard",
 	"item_blink",
 	"item_glimmer_cape",
-	"item_maelstrom",
-	"item_gungir",
+	"item_meteor_hammer",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
@@ -64,8 +64,8 @@ m["pos_3"] = {
 	"item_blink",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_maelstrom",
-	"item_gungir",
+	"item_meteor_hammer",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
@@ -92,6 +92,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "treant_overgrowth", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -142,14 +144,11 @@ function a.SkillsComplement()
 		return
 	end
 	w, x = a.ConsiderLeechSeed()
-	if w > 0 then
-		if o then
-			b:Action_UseAbilityOnLocation(q, x)
-			o = false
-			return
-		else
-			b:Action_UseAbilityOnEntity(q, x)
-		end
+	-- datafeed: Leech Seed is now unit-target only (behavior 135176 = unit target + autocast +
+	-- attack, range 150); the old point-cast path (o) could never be used, so it always casts on a unit.
+	if w > 0 and c.IsValid(x) then
+		o = false
+		b:Action_UseAbilityOnEntity(q, x)
 		return
 	end
 	A, B = a.ConsiderEyesInTheForest()
@@ -268,9 +267,9 @@ function a.ConsiderLeechSeed()
 		o = false
 		if c.IsValidHero(G) and c.CanCastOnNonMagicImmune(G) and not c.IsChasingTarget(b, G) then
 			local O = b:FindAoELocation(true, true, G:GetLocation(), 0, N, 0, 0)
-			if O.count >= 2 and GetUnitToLocationDistance(b, O.targetloc) <= M then
-				o = true
-				return BOT_ACTION_DESIRE_HIGH, O.targetloc
+			-- datafeed: unit-target now, so seed the hero itself (it was a point cast on the group).
+			if O.count >= 2 and c.IsInRange(b, G, M) then
+				return BOT_ACTION_DESIRE_HIGH, G
 			end
 		end
 		local P = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
@@ -322,14 +321,13 @@ function a.ConsiderLeechSeed()
 	end
 	if c.IsDoingRoshan(b) then
 		if c.IsRoshan(G) and c.CanCastOnNonMagicImmune(G) and c.IsInRange(b, G, 500) and I then
-			o = true
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			-- datafeed: unit-target now; seed Roshan instead of a point at Treant's feet.
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(G) and c.IsInRange(b, G, 500) and I then
-			o = true
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, G
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -340,6 +338,37 @@ function a.ConsiderLivingArmor()
 	end
 	local Z = nil
 	local _ = 0
+	-- In a fight an ally being focused comes first: the pick below takes the ally with the most
+	-- offensive power, at any HP, so a dying support never got the block. Under 50% HP and hit by a
+	-- hero in the last 2s, lowest HP first. Logged: [OHA-TREANT] armor-save.
+	if H or c.IsInTeamFight(b, 1600) then
+		local save, saveHP = nil, 0.5
+		for W, a0 in pairs(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(a0)
+				and not c.IsMeepoClone(a0)
+				and not a0:IsIllusion()
+				and not a0:HasModifier("modifier_arc_warden_tempest_double")
+				and not a0:HasModifier("modifier_treant_living_armor")
+				and c.GetHP(a0) < saveHP
+				and a0:WasRecentlyDamagedByAnyHero(2)
+			then
+				save, saveHP = a0, c.GetHP(a0)
+			end
+		end
+		if save ~= nil then
+			if DotaTime() >= (b._treantArmorLogAt or -999) then
+				b._treantArmorLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-TREANT] t=%.0f armor-save ally=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
+					saveHP
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, save
+		end
+	end
 	if H or c.IsInTeamFight(b, 1600) then
 		local Q = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
 		for W, a0 in pairs(Q) do
@@ -408,16 +437,27 @@ function a.ConsiderOvergrowth()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local N = t:GetSpecialValueInt("radius")
-	if K then
-		local P = c.GetEnemiesNearLoc(b:GetLocation(), N)
-		if
-			P ~= nil
-			and #P >= 2
-			and not c.IsLocationInChrono(b:GetLocation())
-			and not c.IsLocationInBlackHole(b:GetLocation())
-		then
-			return BOT_ACTION_DESIRE_HIGH
+	-- K (2+ allies in attack mode) used to be required, so Overgrowth stayed unused when Treant
+	-- was going in on someone with fewer allies in attack mode, or caught by 3 enemies while
+	-- defending. Now: 2+ enemies in radius (datafeed 800) in a fight or while engaging, or 3+ anytime.
+	-- Logged: [OHA-TREANT] overgrowth.
+	local P = c.GetEnemiesNearLoc(b:GetLocation(), N)
+	if
+		P ~= nil
+		and (#P >= 3 or #P >= 2 and (K or H))
+		and not c.IsLocationInChrono(b:GetLocation())
+		and not c.IsLocationInBlackHole(b:GetLocation())
+	then
+		if not K and DotaTime() >= (b._treantOvergrowthLogAt or -999) then
+			b._treantOvergrowthLogAt = DotaTime() + 10
+			pcall(print, string.format(
+				"[OHA-TREANT] t=%.0f overgrowth enemies=%d engaging=%s (not a team fight)",
+				DotaTime(),
+				#P,
+				tostring(H)
+			))
 		end
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -465,7 +505,9 @@ function a.ConsiderBlinkOvergrowth()
 	return BOT_ACTION_DESIRE_NONE
 end
 function CanDoBlinkOvergrowth()
-	if t:IsFullyCastable() and HasBlink() then
+	-- datafeed item_blink: blink_damage_cooldown 3, so Blink cannot be used within 3s of hero damage;
+	-- the queued Overgrowth would then go off where Treant stood (not verified in a game).
+	if t:IsFullyCastable() and HasBlink() and not b:WasRecentlyDamagedByAnyHero(3.0) then
 		local a7 = t:GetManaCost()
 		if b:GetMana() >= a7 then
 			b.shouldBlink = true

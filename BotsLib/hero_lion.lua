@@ -33,9 +33,9 @@ m["pos_5"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
-	"item_pipe",
 	"item_blink",
+	"item_boots_of_bearing",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_sheepstick",
@@ -92,6 +92,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "lion_voodoo", kind = "unit" } }
 a["bDeafaultItem"] = true
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -102,7 +104,9 @@ local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "lion")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "lion")
 local s = SafeAbility(b:GetAbilityByName(f[4]), "sTalentList[4]", "lion")
 local t = SafeAbility(b:GetAbilityByName(f[5]), "sTalentList[5]", "lion")
-local u = SafeAbility(b:GetAbilityByName(f[8]), "sTalentList[8]", "lion")
+-- Hex AoE talent is special_bonus_unique_lion_4 = sTalentList[7] (Valve data: Ability16; it adds
+-- "radius" 250 to Voodoo). sTalentList[8] is lion_2, the Earth Spike +600 range talent.
+local u = SafeAbility(b:GetAbilityByName(f[7]), "sTalentList[7]", "lion")
 local v, w
 local x, y
 local z, A
@@ -149,8 +153,17 @@ function a.SkillsComplement()
 	x, y = a.ConsiderW()
 	if x > 0 then
 		c.SetQueuePtToINT(b, true)
-		if u:IsTrained() then
-			b:ActionQueue_UseAbilityOnLocation(p, y)
+		-- ConsiderW returns a unit in every case now. Voodoo is UNIT_TARGET in the game files; in case
+		-- the AoE talent turns it into a point cast at runtime, the order follows GetBehavior().
+		local beh = p:GetBehavior()
+		local pointOnly = c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_POINT)
+			and not c.CheckBitfieldFlag(beh, ABILITY_BEHAVIOR_UNIT_TARGET)
+		if DotaTime() >= (b._hexCastLogAt or -999) then
+			b._hexCastLogAt = DotaTime() + 30
+			pcall(print, string.format("[OHA-LION] t=%.0f hex cast as %s", DotaTime(), pointOnly and "point" or "unit"))
+		end
+		if pointOnly then
+			b:ActionQueue_UseAbilityOnLocation(p, y:GetLocation())
 		else
 			b:ActionQueue_UseAbilityOnEntity(p, y)
 		end
@@ -160,6 +173,23 @@ end
 function a.ConsiderStopDrain()
 	if a.IsAbilityEChanneling() and c.IsRetreating(b) then
 		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- An enemy hero (not the one drained) comes within 700 while Earth Spike or Hex is ready: the
+	-- 5s channel blocked every other spell, so he kept draining a creep while being jumped.
+	if a.IsAbilityEChanneling() and (o:IsFullyCastable() or p:IsFullyCastable()) then
+		for N, Q in pairs(c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(Q) and not Q:HasModifier("modifier_lion_mana_drain") and not c.IsSuspiciousIllusion(Q) then
+				if DotaTime() >= (b._drainStopLogAt or -999) then
+					b._drainStopLogAt = DotaTime() + 5
+					pcall(print, string.format(
+						"[OHA-LION] t=%.0f stop drain for %s",
+						DotaTime(),
+						(string.gsub(Q:GetUnitName(), "npc_dota_hero_", ""))
+					))
+				end
+				return BOT_ACTION_DESIRE_HIGH
+			end
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -189,7 +219,8 @@ function a.ConsiderQ()
 	local T = o:GetSpecialValueInt("width")
 	local U = o:GetCastPoint()
 	local V = o:GetManaCost()
-	local W = o:GetAbilityDamage()
+	-- datafeed: Earth Spike damage is the "damage" value (105/170/235/300); it has no AbilityDamage (read 0).
+	local W = o:GetSpecialValueInt("damage")
 	local X = DAMAGE_TYPE_MAGICAL
 	local Y = c.GetNearbyHeroes(b, S, true, BOT_MODE_NONE)
 	local Z = c.GetNearbyHeroes(b, S + 200, true, BOT_MODE_NONE)
@@ -318,18 +349,20 @@ function a.ConsiderW()
 	local X = DAMAGE_TYPE_MAGICAL
 	local Y = c.GetNearbyHeroes(b, S, true, BOT_MODE_NONE)
 	local Z = c.GetNearbyHeroes(b, S + 300, true, BOT_MODE_NONE)
+	-- The "or u:IsTrained()" Linken's bypass is gone here and below: u used to be the wrong talent
+	-- (never trained), and whether the AoE hex gets past Linken's is not in the data.
 	for N, Q in pairs(Z) do
-		if c.IsValidHero(Q) and (c.CanCastOnTargetAdvanced(Q) or u:IsTrained()) and c.CanCastOnNonMagicImmune(Q) then
+		if c.IsValidHero(Q) and c.CanCastOnTargetAdvanced(Q) and c.CanCastOnNonMagicImmune(Q) then
 			if Q:IsChanneling() then
 				if u:IsTrained() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation(), "W-打断吟唱:" .. c.Chat.GetNormName(Q)
+					return BOT_ACTION_DESIRE_HIGH, Q, "W-打断吟唱:" .. c.Chat.GetNormName(Q)
 				else
 					return BOT_ACTION_DESIRE_HIGH, Q, "W-打断吟唱:" .. c.Chat.GetNormName(Q)
 				end
 			end
 			if Q:IsCastingAbility() and c.IsInRange(b, Q, S + 50) then
 				if u:IsTrained() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation(), "W-打断施法:" .. c.Chat.GetNormName(Q)
+					return BOT_ACTION_DESIRE_HIGH, Q, "W-打断施法:" .. c.Chat.GetNormName(Q)
 				else
 					return BOT_ACTION_DESIRE_HIGH, Q, "W-打断施法:" .. c.Chat.GetNormName(Q)
 				end
@@ -338,9 +371,23 @@ function a.ConsiderW()
 	end
 	if c.IsInTeamFight(b, 1200) and (#Z >= 2 or #K >= 3) then
 		if u:IsTrained() then
+			-- Unit-target even with the AoE talent: hex the castable hero nearest the cluster centre.
 			local a1 = c.GetAoeEnemyHeroLocation(b, S, 250, 2)
 			if a1 ~= nil then
-				return BOT_ACTION_DESIRE_HIGH, a1, "W-团控"
+				local best, bestD = nil, 251
+				for N, Q in pairs(Y) do
+					if
+						c.IsValidHero(Q)
+						and c.CanCastOnNonMagicImmune(Q)
+						and c.CanCastOnTargetAdvanced(Q)
+						and GetUnitToLocationDistance(Q, a1) < bestD
+					then
+						best, bestD = Q, GetUnitToLocationDistance(Q, a1)
+					end
+				end
+				if best ~= nil then
+					return BOT_ACTION_DESIRE_HIGH, best, "W-团控"
+				end
 			end
 		end
 		local a8 = nil
@@ -349,7 +396,7 @@ function a.ConsiderW()
 			if
 				c.IsValid(Q)
 				and c.CanCastOnNonMagicImmune(Q)
-				and (c.CanCastOnTargetAdvanced(Q) or u:IsTrained())
+				and c.CanCastOnTargetAdvanced(Q)
 				and not c.IsDisabled(Q)
 				and not c.IsTaunted(Q)
 				and not Q:IsDisarmed()
@@ -363,7 +410,7 @@ function a.ConsiderW()
 		end
 		if a8 ~= nil and c.IsInRange(b, a8, S + 50) then
 			if u:IsTrained() then
-				return BOT_ACTION_DESIRE_HIGH, a8:GetLocation(), "W-团战:" .. c.Chat.GetNormName(a8)
+				return BOT_ACTION_DESIRE_HIGH, a8, "W-团战:" .. c.Chat.GetNormName(a8)
 			else
 				return BOT_ACTION_DESIRE_HIGH, a8, "W-团战:" .. c.Chat.GetNormName(a8)
 			end
@@ -373,14 +420,14 @@ function a.ConsiderW()
 		if
 			c.IsValidHero(botTarget)
 			and c.CanCastOnNonMagicImmune(botTarget)
-			and (c.CanCastOnTargetAdvanced(botTarget) or u:IsTrained())
+			and c.CanCastOnTargetAdvanced(botTarget)
 			and c.IsInRange(b, botTarget, S + 150)
 			and not c.IsDisabled(botTarget)
 			and not c.IsTaunted(botTarget)
 			and not botTarget:IsDisarmed()
 		then
 			if u:IsTrained() then
-				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "W-进攻:" .. c.Chat.GetNormName(botTarget)
+				return BOT_ACTION_DESIRE_HIGH, botTarget, "W-进攻:" .. c.Chat.GetNormName(botTarget)
 			else
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "W-进攻:" .. c.Chat.GetNormName(botTarget)
 			end
@@ -391,15 +438,48 @@ function a.ConsiderW()
 			if
 				c.IsValid(Q)
 				and c.CanCastOnNonMagicImmune(Q)
-				and (c.CanCastOnTargetAdvanced(Q) or u:IsTrained())
+				and c.CanCastOnTargetAdvanced(Q)
 				and not c.IsDisabled(Q)
 				and not c.IsTaunted(Q)
 				and not Q:IsDisarmed()
 			then
 				if u:IsTrained() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation(), "W-保护自己:" .. c.Chat.GetNormName(Q)
+					return BOT_ACTION_DESIRE_HIGH, Q, "W-保护自己:" .. c.Chat.GetNormName(Q)
 				else
 					return BOT_ACTION_DESIRE_HIGH, Q, "W-保护自己"
+				end
+			end
+		end
+	end
+	-- Ally save: hex the enemy hitting or chasing a retreating ally Lion can reach. Hex was only
+	-- used for his own target, his own safety or in a team fight, never to peel for an ally.
+	for N, ally in pairs(c.GetNearbyHeroes(b, S + 300, false, BOT_MODE_NONE) or {}) do
+		if
+			ally ~= b
+			and c.IsValidHero(ally)
+			and not c.IsSuspiciousIllusion(ally)
+			and c.IsRetreating(ally)
+			and ally:WasRecentlyDamagedByAnyHero(2.0)
+		then
+			for N2, Q in pairs(Y) do
+				if
+					c.IsValidHero(Q)
+					and (Q:GetAttackTarget() == ally or c.IsChasingTarget(Q, ally))
+					and c.CanCastOnNonMagicImmune(Q)
+					and c.CanCastOnTargetAdvanced(Q)
+					and not c.IsDisabled(Q)
+					and not c.IsSuspiciousIllusion(Q)
+				then
+					if DotaTime() >= (b._hexSaveLogAt or -999) then
+						b._hexSaveLogAt = DotaTime() + 5
+						pcall(print, string.format(
+							"[OHA-LION] t=%.0f hex save %s from %s",
+							DotaTime(),
+							(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+							(string.gsub(Q:GetUnitName(), "npc_dota_hero_", ""))
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH, Q, "W-save"
 				end
 			end
 		end
@@ -410,13 +490,13 @@ function a.ConsiderW()
 				c.IsValidHero(Q)
 				and (b:WasRecentlyDamagedByHero(Q, 4.0) or GetUnitToUnitDistance(b, Q) <= 600)
 				and c.CanCastOnNonMagicImmune(Q)
-				and (c.CanCastOnTargetAdvanced(Q) or u:IsTrained())
+				and c.CanCastOnTargetAdvanced(Q)
 				and not c.IsDisabled(Q)
 				and not c.IsTaunted(Q)
 				and not Q:IsDisarmed()
 			then
 				if u:IsTrained() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation(), "W-撤退:" .. c.Chat.GetNormName(Q)
+					return BOT_ACTION_DESIRE_HIGH, Q, "W-撤退:" .. c.Chat.GetNormName(Q)
 				else
 					return BOT_ACTION_DESIRE_HIGH, Q, "W-撤退:" .. c.Chat.GetNormName(Q)
 				end
@@ -431,7 +511,7 @@ function a.ConsiderW()
 			and not botTarget:IsDisarmed()
 		then
 			if u:IsTrained() then
-				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "W-肉山:" .. c.Chat.GetNormName(botTarget)
+				return BOT_ACTION_DESIRE_HIGH, botTarget, "W-肉山:" .. c.Chat.GetNormName(botTarget)
 			else
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "W-肉山"
 			end
@@ -539,10 +619,11 @@ function a.ConsiderR()
 	local U = r:GetCastPoint()
 	local V = r:GetManaCost()
 	local ai = a.GetAbilityRDamageBonus()
-	local aj = 475 + 125 * R
+	local aj = r:GetSpecialValueInt("damage") -- datafeed: 600/725/850 (same as the old 475 + 125 * R)
 	if b:HasScepter() then
-		T = r:GetSpecialValueInt("splash_radius_scepter")
-		aj = 575 + 125 * R
+		-- datafeed: the Scepter adds AoE damage on the initial cast ("splash_radius"), not +100 damage, and
+		-- there is no "splash_radius_scepter" value.
+		T = r:GetSpecialValueInt("splash_radius")
 	end
 	local W = aj + ai
 	local X = DAMAGE_TYPE_MAGICAL

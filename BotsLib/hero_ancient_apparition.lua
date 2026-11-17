@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 2, 1, 3, 1, 6, 2, 1, 2, 6 } }
+local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -37,7 +37,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_force_staff",
 	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_mystic_staff",
@@ -48,10 +48,10 @@ m["pos_5"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
-	"item_pipe",
-	"item_ultimate_scepter",
 	"item_aghanims_shard",
+	"item_boots_of_bearing",
+	"item_force_staff",
+	"item_ultimate_scepter",
 	"item_mystic_staff",
 	"item_ultimate_scepter_2",
 	"item_sheepstick",
@@ -97,9 +97,10 @@ local s = SafeAbility(
 	"ancient_apparition_ice_blast_release",
 	"ancient_apparition"
 )
+-- datafeed: the AoE Cold Feet talent is special_bonus_unique_ancient_apparition_1; _7 is now Chilling Touch range
 local t = SafeAbility(
-	b:GetAbilityByName("special_bonus_unique_ancient_apparition_7"),
-	"special_bonus_unique_ancient_apparition_7",
+	b:GetAbilityByName("special_bonus_unique_ancient_apparition_1"),
+	"special_bonus_unique_ancient_apparition_1",
 	"ancient_apparition"
 )
 local u, v
@@ -112,7 +113,17 @@ local E
 local F
 local G
 local H
+-- where AA stood when the Ice Blast tracer was launched (for the release-overshoot check)
+local iceBlastFrom = nil
 function a.SkillsComplement()
+	-- fix: Ice Blast Release is IGNORE_SILENCE (game data), but CanNotUseAbility returns on silence,
+	-- so a silenced AA let the tracer fly on. Release first when the only problem is a silence.
+	if b:IsAlive() and b:IsSilenced() and not b:IsStunned() and not b:IsHexed() and not b:IsNightmared() then
+		if a.ConsiderIceBlastRelease() > 0 then
+			b:Action_UseAbility(s)
+			return
+		end
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -129,6 +140,7 @@ function a.SkillsComplement()
 	if A > 0 then
 		b:Action_UseAbilityOnLocation(r, B)
 		D = B
+		iceBlastFrom = b:GetLocation()
 		return
 	end
 	w, x = a.ConsiderIceVortex()
@@ -138,7 +150,10 @@ function a.SkillsComplement()
 	end
 	u, v = a.ConsiderColdFeet()
 	if u > 0 then
-		if t:IsTrained() then
+		-- fix: Cold Feet is DOTA_ABILITY_BEHAVIOR_UNIT_TARGET (game data and datafeed, the AoE talent only
+		-- adds area_of_effect), so the location order given with the talent was refused and Cold Feet
+		-- was not cast exactly when 2+ enemies stood together. Only order a location if it really is a point spell.
+		if t:IsTrained() and c.CheckBitfieldFlag(o:GetBehavior(), ABILITY_BEHAVIOR_POINT) then
 			local J = 450
 			local K = c.GetProperCastRange(false, b, o:GetCastRange())
 			local L = b:FindAoELocation(true, true, b:GetLocation(), K, J, 0, 0)
@@ -262,7 +277,8 @@ function a.ConsiderIceVortex()
 	if c.IsInTeamFight(b, 1200) then
 		local L = b:FindAoELocation(true, true, b:GetLocation(), K, T, 0, 0)
 		local R = c.GetEnemiesNearLoc(L.targetloc, T)
-		if R ~= nil and #R and GetUnitToLocationDistance(b, L.targetloc) <= K then
+		-- fix: `#R` alone is always true; require an enemy hero in the vortex
+		if R ~= nil and #R >= 1 and GetUnitToLocationDistance(b, L.targetloc) <= K then
 			return BOT_ACTION_DESIRE_HIGH, L.targetloc
 		end
 	end
@@ -455,8 +471,27 @@ function a.ConsiderIceBlastRelease()
 	end
 	local a2 = GetLinearProjectiles()
 	for N, a3 in pairs(a2) do
-		if a3 ~= nil and a3.ability:GetName() == "ancient_apparition_ice_blast" then
+		if a3 ~= nil and a3.ability ~= nil and a3.ability:GetName() == "ancient_apparition_ice_blast" then
 			if D ~= nil and c.GetLocationToLocationDistance(D, a3.location) < 100 then
+				return BOT_ACTION_DESIRE_HIGH
+			end
+			-- fix: at 1500 speed the tracer moves ~50-150 units between thinks and could skip the
+			-- 100-unit window, then fly past the target with nothing to release it. Release once it
+			-- is at or beyond the target distance from where it was launched.
+			if
+				D ~= nil
+				and iceBlastFrom ~= nil
+				and c.GetLocationToLocationDistance(iceBlastFrom, a3.location)
+					>= c.GetLocationToLocationDistance(iceBlastFrom, D) - 50
+			then
+				if DotaTime() >= (b._aaReleaseLogAt or -999) then
+					b._aaReleaseLogAt = DotaTime() + 10
+					pcall(print, string.format(
+						"[OHA-AA] t=%.0f ice blast release (overshoot check) miss=%d",
+						DotaTime(),
+						math.floor(c.GetLocationToLocationDistance(D, a3.location))
+					))
+				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

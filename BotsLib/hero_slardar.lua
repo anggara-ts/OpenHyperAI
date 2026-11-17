@@ -8,20 +8,20 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 3, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_3"] = {
 	"item_tank_outfit",
 	"item_echo_sabre",
-	"item_crimson_guard",
+	"item_blink",
+	"item_black_king_bar",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_heavens_halberd",
 	"item_assault",
 	"item_travel_boots",
-	"item_aghanims_shard",
-	"item_satanic",
+	"item_harpoon",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	"item_heart",
@@ -142,8 +142,10 @@ function a.ConsiderW()
 	local M = p:GetSpecialValueInt("crush_radius")
 	local N = p:GetCastPoint()
 	local O = p:GetManaCost()
-	local P = p:GetAbilityDamage()
-	local Q = DAMAGE_TYPE_MAGICAL
+	-- datafeed: Slithereen Crush deals physical damage (1) from "crush_damage" (60/140/220/300); it has no
+	-- AbilityDamage (read 0) and was checked as magical.
+	local P = p:GetSpecialValueInt("crush_damage")
+	local Q = DAMAGE_TYPE_PHYSICAL
 	local R = c.GetAroundEnemyHeroList(L - 30)
 	local S = c.GetAroundEnemyHeroList(L - 100)
 	local T = nil
@@ -159,7 +161,9 @@ function a.ConsiderW()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, M - 99)
-			and c.CanCastOnMagicImmune(botTarget)
+			-- Review fix: Crush does not pierce spell immunity (game data SPELL_IMMUNITY_ENEMIES_NO),
+			-- so do not waste it on a BKB'd target.
+			and c.CanCastOnNonMagicImmune(botTarget)
 			and not c.IsDisabled(botTarget)
 		then
 			T = botTarget
@@ -245,7 +249,9 @@ function a.ConsiderR()
 		if
 			c.IsValidHero(botTarget)
 			and c.IsInRange(botTarget, b, L)
-			and c.CanCastOnNonMagicImmune(botTarget)
+			-- Review fix: Corrosive Haze pierces spell immunity (game data SPELL_IMMUNITY_ENEMIES_YES,
+			-- MAGIC_IMMUNE_ENEMIES flag); it was skipped on BKB carries, the targets it matters most on.
+			and c.CanCastOnMagicImmune(botTarget)
 			and c.CanCastOnTargetAdvanced(botTarget)
 			and not botTarget:HasModifier("modifier_slardar_amplify_damage")
 		then
@@ -261,7 +267,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(W)
 				and not W:HasModifier("modifier_slardar_amplify_damage")
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W) -- Review fix: Haze pierces spell immunity (see above)
 				and c.CanCastOnTargetAdvanced(W)
 			then
 				local a2 = W:GetArmor()
@@ -311,7 +317,7 @@ function a.ConsiderR()
 			if
 				c.IsValid(W)
 				and not W:HasModifier("modifier_slardar_amplify_damage")
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W) -- Review fix: Haze pierces spell immunity (see above)
 				and c.CanCastOnTargetAdvanced(W)
 			then
 				T = W

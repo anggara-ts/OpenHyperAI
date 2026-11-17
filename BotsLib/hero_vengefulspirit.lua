@@ -28,7 +28,7 @@ m["pos_4"] = {
 	"item_aghanims_shard",
 	"item_force_staff",
 	"item_lotus_orb",
-	"item_aghanims_shard",
+	-- removed a second "item_aghanims_shard": the Shard is already bought a few lines up and only applies once
 	"item_hurricane_pike",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -50,13 +50,14 @@ m["pos_5"] = {
 	"item_pavise",
 	"item_solar_crest",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_hurricane_pike",
 	"item_sheepstick",
-	"item_orchid",
-	"item_bloodthorn",
+	"item_aether_lens",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- Hydra's Breath (user call; Dotabuff 44%, #4 of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 m["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
@@ -65,13 +66,13 @@ m["pos_3"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_witch_blade",
+	"item_ultimate_scepter",
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_aghanims_shard",
 	"item_black_king_bar",
-	"item_devastator",
-	"item_orchid",
-	"item_bloodthorn",
+	"item_manta",
+	"item_hydras_breath",
 	"item_sheepstick",
 	"item_travel_boots",
 	"item_moon_shard",
@@ -245,7 +246,8 @@ function a.ConsiderWaveOfTerror()
 	end
 	local B = c.GetProperCastRange(false, b, p:GetCastRange())
 	local Q = p:GetSpecialValueInt("wave_width")
-	local C = p:GetAbilityDamage()
+	-- datafeed: Wave of Terror's damage is the "damage" value (60/80/100/120); it has no AbilityDamage, so this was 0.
+	local C = p:GetSpecialValueInt("damage")
 	local D = c.GetNearbyHeroes(b, B, true, BOT_MODE_NONE)
 	for E, F in pairs(D) do
 		if
@@ -376,10 +378,13 @@ function a.ConsiderNetherSwap()
 	local H = c.GetNearbyHeroes(b, B, false, BOT_MODE_NONE)
 	for E, I in pairs(H) do
 		if c.IsValidHero(I) and not c.IsSuspiciousIllusion(I) then
+			-- Duel: our own Legion Commander carries the duel modifier too when he is the one dueling; what
+			-- Swap does to a running Duel is not verified, so do not swap him out of his own duel.
 			if
 				I:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				or I:HasModifier("modifier_enigma_black_hole_pull")
 				or I:HasModifier("modifier_legion_commander_duel")
+					and I:GetUnitName() ~= "npc_dota_hero_legion_commander"
 				or I:HasModifier("modifier_mars_arena_of_blood_leash")
 					and not b:HasModifier("modifier_mars_arena_of_blood_leash")
 			then
@@ -387,14 +392,54 @@ function a.ConsiderNetherSwap()
 			end
 		end
 	end
-	if y then
+	-- Low-HP ally save (Swap's main support use was missing): an ally under 30% HP, hit by a hero in
+	-- the last 1.5s, with an enemy hero within 700 of him, while Venge is above 50% HP, 500+ away
+	-- from him (a shorter swap barely moves him) and has fewer enemy heroes around her than he does.
+	-- Swap on allies: the npc data only says TEAM_CUSTOM; this relies on the ally swaps above, which
+	-- already target allies.
+	if c.GetHP(b) > 0.5 then
+		local nearMe = #(c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE) or {})
+		for E, I in pairs(H) do
+			if
+				c.IsValidHero(I)
+				and I ~= b
+				and not I:IsIllusion()
+				and not c.IsSuspiciousIllusion(I)
+				and c.GetHP(I) < 0.3
+				and not c.IsInRange(b, I, 500)
+				and I:WasRecentlyDamagedByAnyHero(1.5)
+				and not I:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				local nearAlly = #(c.GetNearbyHeroes(I, 700, true, BOT_MODE_NONE) or {})
+				if nearAlly >= 1 and nearMe < nearAlly then
+					if DotaTime() >= (b._swapSaveLogAt or -999) then
+						b._swapSaveLogAt = DotaTime() + 10
+						pcall(print, string.format(
+							"[OHA-VENGEFULSPIRIT] t=%.0f swap-save ally=%s hp=%.2f enemiesNearAlly=%d nearMe=%d",
+							DotaTime(),
+							(string.gsub(I:GetUnitName(), "npc_dota_hero_", "")),
+							c.GetHP(I),
+							nearAlly,
+							nearMe
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH, I
+				end
+			end
+		end
+	end
+	-- Engage swap: Swap pierces spell immunity (npc data: SPELL_IMMUNITY_ENEMIES_YES), so a BKB'd core
+	-- can still be pulled in; Linken's is avoided as for other targeted spells (not verified for Swap).
+	-- Venge lands where the enemy stood, so not below 40% HP.
+	if y and c.GetHP(b) > 0.4 then
 		local K = nil
 		local L = 0
 		local M = c.GetNearbyHeroes(b, B, true, BOT_MODE_NONE)
 		for E, F in pairs(M) do
 			if
 				c.IsValidHero(F)
-				and c.CanCastOnNonMagicImmune(F)
+				and c.CanCastOnMagicImmune(F)
+				and c.CanCastOnTargetAdvanced(F)
 				and not c.IsInRange(b, F, B / 2)
 				and not c.IsSuspiciousIllusion(F)
 				and not c.IsDisabled(F)

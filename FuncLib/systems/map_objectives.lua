@@ -206,14 +206,21 @@ function MapObjectives.PickWisdomForBot(bot, locations)
 end
 
 -- True if this bot is the best living ally to take the objective (one bot per spot).
-function MapObjectives.IsBestAllyForLocation(bot, loc, scoreFn)
+function MapObjectives.IsBestAllyForLocation(bot, loc, scoreFn, botsOnly)
 	if loc == nil then
 		return false
 	end
 	local bestBot = bot
 	local bestScore = scoreFn(bot, loc)
 	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-		if ally ~= nil and ally ~= bot and ally:IsAlive() and ally:IsHero() and not ally:IsIllusion() then
+		if
+			ally ~= nil
+			and ally ~= bot
+			and ally:IsAlive()
+			and ally:IsHero()
+			and not ally:IsIllusion()
+			and not (botsOnly and ally.IsBot and not ally:IsBot())
+		then
 			local score = scoreFn(ally, loc)
 			if score > bestScore then
 				bestScore = score
@@ -297,12 +304,16 @@ function MapObjectives.MaxWalk(bot, inWindow)
 end
 
 -- Free one slot so a lotus can land (early bags are often full of consumables).
+-- A free main slot for a lotus: swap the cheapest main-slot item (not a key item) into an empty
+-- backpack slot. Called when a lotus trip fails only on room (game 023, 3:01-3:04: Disruptor by
+-- the bottom pool, "room"). It used to sell (shop only), was never called, and counted the
+-- backpack as room.
 function MapObjectives.EnsureInventorySlot(bot)
 	if bot == nil then
 		return false
 	end
 	local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-	if Item.GetEmptyInventoryAmount(bot) > 0 then
+	if Item.GetEmptyNonBackpackInventoryAmount(bot) > 0 then
 		return true
 	end
 	local keep = {
@@ -317,18 +328,32 @@ function MapObjectives.EnsureInventorySlot(bot)
 		item_ward_dispenser = true,
 		item_smoke_of_deceit = true,
 		item_grisgris = true,
+		-- Cast from a main slot only. Game 032, 11:38-11:51: Grimstroke's lotus "room" check parked
+		-- his Dust (the cheapest item) in the backpack, and Mirana's ult went undusted.
+		item_dust = true,
+		item_roshans_banner = true,
+		item_blood_grenade = true,
 	}
-	local best = nil
-	local bestCost = 999999
-	for slot = 0, 8 do
+	local pack = nil
+	for slot = 6, 8 do
+		if bot:GetItemInSlot(slot) == nil then
+			pack = slot
+			break
+		end
+	end
+	if pack == nil then
+		return false
+	end
+	local best, bestCost = nil, 999999
+	for slot = 0, 5 do
 		local it = bot:GetItemInSlot(slot)
 		if it ~= nil and not it:IsNull() then
 			local name = it:GetName()
-			if not keep[name] and not string.find(name, "token") then
+			if not keep[name] and not string.find(name, "token", 1, true) then
 				local cost = GetItemCost(name) or 0
-				if cost < bestCost and cost <= 90 then
+				if cost < bestCost then
 					bestCost = cost
-					best = it
+					best = slot
 				end
 			end
 		end
@@ -336,7 +361,7 @@ function MapObjectives.EnsureInventorySlot(bot)
 	if best == nil then
 		return false
 	end
-	bot:ActionImmediate_SellItem(best)
+	bot:ActionImmediate_SwapItems(best, pack)
 	return true
 end
 
@@ -348,6 +373,62 @@ local function UtilsPos(bot)
 	return 3
 end
 
+-- Lane support contests his side's lotus pool in the laning phase (user call). Game 032, 3:00:
+-- the top lotus spawned with Doom and Mirana ~2000 away in the top lane; lane-push, pool-foes and
+-- not-best kept both in lane, and Dire took it later. A pos 4/5 bot assigned to top or bottom is the
+-- contester for that side's pool (top pool: y > 0). Once the laning phase ends this is off; the
+-- later pickup (passing by, pushing with the wave) is still to be designed.
+function MapObjectives.IsLotusContester(bot, loc)
+	local okL, laning = pcall(function()
+		return require(GetScriptDirectory() .. "/FuncLib/func_utils").IsInLaningPhase()
+	end)
+	if not (okL and laning) or bot == nil or not bot:IsAlive() then
+		return false
+	end
+	local pos = UtilsPos(bot)
+	if pos ~= 4 and pos ~= 5 then
+		return false
+	end
+	local lane = bot:GetAssignedLane()
+	if lane ~= LANE_TOP and lane ~= LANE_BOT then
+		return false
+	end
+	if loc == nil then
+		loc = MapObjectives.PickLotusForBot(bot, MapObjectives.GetLotusPoolLocations())
+	end
+	if loc == nil then
+		return false
+	end
+	return (lane == LANE_TOP) == (loc.y > 0)
+end
+
+-- Team memory for a pool: a teammate stood in it this spawn cycle and left it (empty, a stalled
+-- pluck, or a full inventory).
+function MapObjectives.LotusCheckedThisMark(loc)
+	local mark = math.floor(math.max(0, DotaTime()) / MapObjectives.LotusInterval()) * MapObjectives.LotusInterval()
+	for i = 1, 5 do
+		local m = GetTeamMember(i)
+		if
+			m ~= nil
+			and m._lotusSkipMark == mark
+			and m._lotusSkipPool ~= nil
+			and (m._lotusSkipPool - loc):Length2D() < 1000
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Game data: a Healing Lotus restores 125 HP and 125 mana (replenish_amount), so low mana counts.
+function MapObjectives.LotusNeedy(hero)
+	if hero == nil or not hero:IsAlive() then
+		return false
+	end
+	local hp = hero:GetHealth() / math.max(1, hero:GetMaxHealth())
+	local mp = hero:GetMana() / math.max(1, hero:GetMaxMana())
+	return hp < 0.5 or mp < 0.35
+end
 function MapObjectives.LotusScore(hero, loc)
 	if hero == nil or not hero:IsAlive() then
 		return -99999
@@ -358,6 +439,10 @@ function MapObjectives.LotusScore(hero, loc)
 	end
 	local pos = UtilsPos(hero)
 	local score = 10000 - dist
+	-- The hero already on the bank takes it. A support still walking in should not steal the job.
+	if dist <= 500 then
+		score = score + 4000
+	end
 	-- Supports hold healing lotuses; strongly prefer them at the pool.
 	if pos >= 4 then
 		score = score + 1200
@@ -370,8 +455,19 @@ function MapObjectives.LotusScore(hero, loc)
 	end
 	local hp = hero:GetHealth() / math.max(1, hero:GetMaxHealth())
 	local mp = hero:GetMana() / math.max(1, hero:GetMaxMana())
-	if hp < 0.7 or mp < 0.45 then
+	if MapObjectives.LotusNeedy(hero) then
+		-- Needs it now (a lotus restores HP and mana): ahead of a support's +1200.
+		score = score + 1500
+	elseif hp < 0.7 or mp < 0.45 then
 		score = score + 250
+	end
+	-- A full main inventory takes a lotus only when it needs one (it makes room then), so the pick
+	-- goes to a teammate with a free slot instead of a bot that will log why=room and stay.
+	if not MapObjectives.LotusNeedy(hero) then
+		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+		if Item.GetEmptyNonBackpackInventoryAmount(hero) <= 0 then
+			score = score - 3000
+		end
 	end
 	-- Already carrying a lotus: slightly less need to contest again.
 	if
@@ -415,16 +511,357 @@ function MapObjectives.WisdomScore(hero, loc)
 	return score
 end
 
+local function LotusCharges(bot)
+	local n = 0
+	for slot = 0, 16 do
+		local it = bot:GetItemInSlot(slot)
+		if it ~= nil and it.GetName ~= nil then
+			local name = it:GetName()
+			if name == "item_famango" or name == "item_great_famango" or name == "item_greater_famango" then
+				local charges = 1
+				if it.GetCurrentCharges ~= nil then
+					local c = it:GetCurrentCharges()
+					if type(c) == "number" and c > charges then
+						charges = c
+					end
+				end
+				n = n + charges
+			end
+		end
+	end
+	return n
+end
+
+function MapObjectives.LotusCountOnUnit(pool)
+	-- CanBeSeen() stays true on npc_dota_lotus_pool while it is fogged, and
+	-- NumModifiers then prints a developer warning every think. The stack is
+	-- not readable. Callers treat nil as "unknown" and use the in-ring timeout.
+	return nil
+end
+
+function MapObjectives.LotusCountNear(loc, units)
+	if loc == nil or units == nil then
+		return nil
+	end
+	local best = nil
+	local bestDist = 800
+	for i = 1, #units do
+		local pool = units[i]
+		if pool ~= nil and pool.GetLocation ~= nil then
+			local dist = GetUnitToLocationDistance(pool, loc)
+			if dist < bestDist then
+				bestDist = dist
+				best = pool
+			end
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return MapObjectives.LotusCountOnUnit(best)
+end
+
+-- True once this spawn's lotus should already be in the pool.
+function MapObjectives.LotusSpawnOpen()
+	local interval = MapObjectives.LotusInterval()
+	local t = DotaTime()
+	if t < interval - 1 then
+		return false
+	end
+	local mark = math.floor(t / interval) * interval
+	return mark >= interval and t >= mark
+end
+
+-- Inside the ring: a lotus that never arrives was taken or the pool is empty.
+-- Time spent waiting for the mark does not count, or they walk off as it spawns.
+function MapObjectives.LotusPluckStalled(bot, enemyInRing)
+	if not MapObjectives.LotusSpawnOpen() then
+		bot._lotusHaveAt = nil
+		return false
+	end
+	local have = LotusCharges(bot)
+	local now = DotaTime()
+	if bot._lotusHave ~= have or bot._lotusHaveAt == nil then
+		bot._lotusHave = have
+		bot._lotusHaveAt = now
+	end
+	local limit = enemyInRing and 8 or 6
+	return now - bot._lotusHaveAt >= limit
+end
+
+local function EnemyOnPoint(bot, loc, radius)
+	local enemies = bot:GetNearbyHeroes(radius + 200, true, BOT_MODE_NONE) or {}
+	for i = 1, #enemies do
+		local enemy = enemies[i]
+		if
+			enemy ~= nil
+			and enemy:IsAlive()
+			and not enemy:IsIllusion()
+			and GetUnitToLocationDistance(enemy, loc) <= radius
+		then
+			return enemy
+		end
+	end
+	return nil
+end
+
+local function EnemyInLotusRing(bot, loc)
+	local enemies = bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}
+	for i = 1, #enemies do
+		local enemy = enemies[i]
+		if
+			enemy ~= nil
+			and enemy:IsAlive()
+			and not enemy:IsIllusion()
+			and GetUnitToLocationDistance(enemy, loc) <= 380
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Attack or cast without leaving the pluck ring. Standing still is only for the pickup itself.
+local function MarkLotusDo(bot, name)
+	bot._lotusDo = name
+	if name == bot._lotusDoPrev then
+		return
+	end
+	bot._lotusDoPrev = name
+	local ok, err = pcall(function()
+		local pos = bot:GetLocation()
+		local hero = string.gsub(bot:GetUnitName() or "?", "npc_dota_hero_", "")
+		local team = GetTeam() == TEAM_RADIANT and "r" or "d"
+		print(string.format(
+			"[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f",
+			hero, team, DotaTime(), name, pos.x, pos.y
+		))
+	end)
+	if not ok then
+		print("[OHA-LOTUS] err " .. tostring(err))
+	end
+end
+local function ActInsideLotus(bot, loc)
+	if bot:IsCastingAbility() or bot:IsChanneling() then
+		MarkLotusDo(bot, "channel")
+		return
+	end
+	local action = bot:GetCurrentActionType()
+	if action == BOT_ACTION_TYPE_USE_ABILITY then
+		MarkLotusDo(bot, "ability")
+		return
+	end
+	local range = bot:GetAttackRange() + 80
+	local heroes = bot:GetNearbyHeroes(range, true, BOT_MODE_NONE) or {}
+	for i = 1, #heroes do
+		local hero = heroes[i]
+		if hero ~= nil and hero:IsAlive() and not hero:IsIllusion() and GetUnitToUnitDistance(bot, hero) <= range then
+			if bot:GetAttackTarget() ~= hero then
+				bot:Action_AttackUnit(hero, true)
+			end
+			MarkLotusDo(bot, "hit")
+			return
+		end
+	end
+	-- Stop the walk-in order once, so it does not carry the hero out of the ring.
+	-- Chasing a camp here walks them out before the lotus plucks.
+	if action == BOT_ACTION_TYPE_MOVE_TO then
+		bot:Action_ClearActions(true)
+		MarkLotusDo(bot, "clear")
+		return
+	end
+	MarkLotusDo(bot, "hold")
+end
+
+local T1_BY_LANE = {
+	[LANE_TOP] = TOWER_TOP_1,
+	[LANE_MID] = TOWER_MID_1,
+	[LANE_BOT] = TOWER_BOT_1,
+}
+
+local function LivingT1(lane)
+	local id = T1_BY_LANE[lane]
+	if id == nil then
+		return nil
+	end
+	local tower = GetTower(GetTeam(), id)
+	if tower ~= nil and tower:IsAlive() then
+		return tower
+	end
+	return nil
+end
+
+local function CreepsPushingTower(tower)
+	if tower == nil then
+		return false
+	end
+	local creeps = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
+	if creeps == nil then
+		return false
+	end
+	local n = 0
+	for _, creep in pairs(creeps) do
+		if
+			creep ~= nil
+			and creep:IsAlive()
+			and not creep:IsIllusion()
+			and GetUnitToUnitDistance(creep, tower) <= 1100
+		then
+			n = n + 1
+			if n >= 2 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function HeroesNearLoc(loc, radius)
+	if loc == nil then
+		return 0
+	end
+	local radiusSq = radius * radius
+	local n = 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam())) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local seen = info and info[1]
+			if
+				seen ~= nil
+				and seen.location ~= nil
+				and seen.time_since_seen ~= nil
+				and seen.time_since_seen <= 1.0
+			then
+				local dx = seen.location.x - loc.x
+				local dy = seen.location.y - loc.y
+				if dx * dx + dy * dy <= radiusSq then
+					n = n + 1
+				end
+			end
+		end
+	end
+	return n
+end
+
+-- A lotus trip while a T1 is being hit, or while heroes are already at the pool.
+-- Returns a short reason, or nil when the walk is fine.
+local function LotusTripBlock(bot, loc, dist, foes, friends)
+	if loc == nil then
+		return nil
+	end
+	local ownTower = LivingT1(bot:GetAssignedLane())
+	local poolTower, poolDist = nil, 99999
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local tower = LivingT1(lane)
+		if tower ~= nil then
+			local d = GetUnitToLocationDistance(tower, loc)
+			if d < poolDist then
+				poolTower, poolDist = tower, d
+			end
+		end
+	end
+	local wave = CreepsPushingTower(ownTower) or CreepsPushingTower(poolTower)
+	local heroesPool = HeroesNearLoc(loc, 1600)
+	local heroesTower = 0
+	if poolTower ~= nil then
+		heroesTower = HeroesNearLoc(poolTower:GetLocation(), 1400)
+	end
+	local foesNear = #foes >= 1 or heroesPool >= 1 or heroesTower >= 1
+	local holding = dist <= 800 and #friends >= math.max(#foes, heroesPool, 1)
+	if wave and foesNear and not holding then
+		if CreepsPushingTower(ownTower) then
+			return "lane-push"
+		end
+		return "tower-push"
+	end
+	if heroesPool >= 1 and not (dist <= 800 and #friends >= heroesPool) then
+		return "pool-foes"
+	end
+	return nil
+end
+
 -- Returns desire, location, kind ("lotus"|"wisdom"), eta. Desire 0 if none.
+-- [OHA-LOTUS] probe: can a bot read how many lotuses a pool holds (or whether a shrine is
+-- ready) when it is in vision? The count was never read because NumModifiers warns every think
+-- while the pool is fogged; here it is only read with the pool's spot visible. One bot per team
+-- logs each pool / shrine's modifiers with stack counts, at most once a minute and only when
+-- they changed.
+local probeSeen = {}
+local function ProbeUnit(kind, u)
+	if u == nil or u:IsNull() or not IsLocationVisible(u:GetLocation()) then
+		return
+	end
+	local key = kind .. ":" .. string.format("%.0f,%.0f", u:GetLocation().x, u:GetLocation().y)
+	local now = DotaTime()
+	local prev = probeSeen[key]
+	if prev ~= nil and now - prev.at < 60 then
+		return
+	end
+	local okN, n = pcall(function()
+		return u:NumModifiers()
+	end)
+	local parts = {}
+	if okN and type(n) == "number" then
+		for i = 0, n - 1 do
+			local okM, name = pcall(function()
+				return u:GetModifierName(i)
+			end)
+			local okS, stack = pcall(function()
+				return u:GetModifierStackCount(i)
+			end)
+			parts[#parts + 1] = string.format("%s/%s", okM and tostring(name) or "?", okS and tostring(stack) or "?")
+		end
+	end
+	local sig = table.concat(parts, ",")
+	if prev ~= nil and prev.sig == sig then
+		prev.at = now
+		return
+	end
+	probeSeen[key] = { at = now, sig = sig }
+	pcall(print, string.format(
+		"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
+		now,
+		kind,
+		key,
+		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+		#parts > 0 and sig or (okN and "none" or "unreadable")
+	))
+end
+local function ProbeObjectives(bot)
+	local first = nil
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0:IsBot() then
+			first = m0
+			break
+		end
+	end
+	if first ~= bot then
+		return
+	end
+	for _, u in ipairs(ScanUnits(cachedLotus, "npc_dota_lotus_pool")) do
+		ProbeUnit("lotus", u)
+	end
+	for _, u in ipairs(ScanUnits(cachedWisdom, "npc_dota_xp_fountain")) do
+		ProbeUnit("wisdom", u)
+	end
+end
 function MapObjectives.ConsiderObjectiveDesire(bot)
+	-- The pool / shrine probe answered it (game 020): pools show no modifiers with lotuses in
+	-- them, shrines only modifier_invulnerable, so neither can be read when passing by. Removed.
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
+		if bot ~= nil then
+			bot._lotusWhy = "dead"
+		end
 		return 0, nil, nil, nil
 	end
 	if MapObjectives.TeamInCrisis(bot) then
+		bot._lotusWhy = "crisis"
 		return 0, nil, nil, nil
 	end
 	local ok, Utils = pcall(require, GetScriptDirectory() .. "/FuncLib/func_utils")
 	if ok and Utils and Utils.IsDefending and Utils.IsDefending(bot) then
+		bot._lotusWhy = "defending"
 		return 0, nil, nil, nil
 	end
 
@@ -460,37 +897,241 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			if type(etaW) == "number" and math.abs(etaW) <= 8 then
 				desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
 			end
+			bot._lotusWhy = "wisdom"
 			return desire, loc, "wisdom", etaW
 		end
 	end
 
-	-- Lotus: same distance-scaled leave; linger ~12s after to pluck.
+	-- Lotus: walk in before the mark. Leave once the pool is empty or a pluck never lands.
+	-- The pool is empty until the first mark (3:00, 1:30 in turbo). Don't query it before the walk window.
 	do
 		local lInterval = MapObjectives.LotusInterval()
-		local locs = MapObjectives.GetLotusPoolLocations()
-		local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
-		local maxWalk = MapObjectives.MaxWalk(bot, true)
-		local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
-		local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 12)
-		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
-		if
-			inLotus
-			and loc ~= nil
-			and dist <= maxWalk
-			and hp >= 0.28
-			and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
-			and MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore)
-		then
-			local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
-			if type(etaL) == "number" and etaL > arrive * 0.55 then
-				desire = math.min(desire, BOT_MODE_DESIRE_LOW + 0.05)
-			elseif type(etaL) == "number" and etaL <= 12 then
-				desire = math.max(desire, BOT_MODE_DESIRE_HIGH + 0.05)
+		local toNext = MapObjectives.SecondsToNextMark(lInterval)
+		local sinceLast = lInterval - toNext
+		local spawnOpen = DotaTime() >= lInterval - 1
+		-- Walk window is short. A lotus that nobody took is still in the pool well after that.
+		local nearSpawn = toNext <= 32 or (spawnOpen and sinceLast <= 45)
+		-- Passing by (user call; game 031, 32:28: Techies passed 1304 from the right-side pool
+		-- outside the spawn window and nobody looked in it). After the laning phase, a pool within
+		-- 1000 with no enemy hero within 1600 of it, not checked by the team this spawn cycle, is
+		-- worth a short detour at any time; the lotus count cannot be read, so a stand that finds
+		-- nothing marks it checked for the team until the next spawn.
+		-- Game 036, 33:00-33:30: the bottom lotus spawned while Radiant pushed the bottom lane, four
+		-- heroes 3600-3900 from it and later within 1600; all logged why=outside, because the spawn
+		-- window (nearSpawn, up to 45s after the mark) switched pass-by off while the 6s linger after
+		-- the mark had already ended. Pass-by now also runs from 6s after the mark. A bot that needs
+		-- it (under 50% HP or 35% mana: a lotus restores both) detours up to 2500 instead of 1000.
+		local passBy = false
+		local needy = MapObjectives.LotusNeedy(bot)
+		if spawnOpen and (not nearSpawn or toNext > 32 and sinceLast > 6) then
+			local okLP, laningNow = pcall(function()
+				return require(GetScriptDirectory() .. "/FuncLib/func_utils").IsInLaningPhase()
+			end)
+			if okLP and not laningNow then
+				local ploc, pdist = MapObjectives.PickClosestLocation(bot, (MapObjectives.GetLotusPoolLocations()))
+				if
+					ploc ~= nil
+					and pdist <= (needy and 2500 or 1000)
+					and HeroesNearLoc(ploc, 1600) == 0
+					and not MapObjectives.LotusCheckedThisMark(ploc)
+				then
+					passBy = true
+				end
 			end
-			if type(etaL) == "number" and math.abs(etaL) <= 8 then
-				desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
+		end
+		if nearSpawn or passBy then
+			local locs, units = MapObjectives.GetLotusPoolLocations()
+			local loc, dist = MapObjectives.PickLotusForBot(bot, locs)
+			if passBy then
+				loc, dist = MapObjectives.PickClosestLocation(bot, locs)
 			end
-			return desire, loc, "lotus", etaL
+			local maxWalk = MapObjectives.MaxWalk(bot, true)
+			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
+			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
+			local foes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+			local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
+			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
+			local lostBeside = false
+			if beside then
+				local hpNow = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+				-- The forced desire beats retreat. Do not hold a losing fight on the pool.
+				if hpNow < 0.5 and #foes > #friends + 1 then
+					beside = false
+					lostBeside = true
+				end
+			end
+			if beside then
+				inLotus = true
+				etaL = -sinceLast
+			end
+			if passBy then
+				inLotus = true
+				etaL = -sinceLast
+			end
+			local count = MapObjectives.LotusCountNear(loc, units)
+			local mark = math.floor(math.max(0, DotaTime()) / lInterval) * lInterval
+			-- Enemy already took this spawn, or the pool has not stored one.
+			if count == 0 and type(etaL) == "number" and etaL < -1.5 then
+				inLotus = false
+			end
+			-- Count stays unknown, so a failed stand has to be enough to leave this mark.
+			if bot._lotusSkipMark == mark and mark >= lInterval then
+				inLotus = false
+			end
+			-- The 6s linger ends while he is still walking. A lotus still in the pool
+			-- is worth the rest of the trip when no enemy is actually visible.
+			-- Enemies are counted at the pool, not around the bot: his lane opponent is always within
+			-- 1200 of him, so a laner who said "Taking lotus" turned back a second later (6:05).
+			-- Near the bot only being outnumbered stops it.
+			local foesAtPool = HeroesNearLoc(loc, 1200)
+			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and foesAtPool == 0 and #foes <= #friends and bot._lotusSkipMark ~= mark then
+				inLotus = true
+				etaL = -sinceLast
+			end
+			local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+			local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+			local mainRoom = Item.GetEmptyNonBackpackInventoryAmount(bot) > 0
+			local danger = loc ~= nil and MapObjectives.DangerousObjective(bot, loc, 1500)
+			local tripBlock = LotusTripBlock(bot, loc, dist, foes, friends)
+			local contester = loc ~= nil and MapObjectives.IsLotusContester(bot, loc)
+			if contester then
+				-- A pushed lane does not hold the contester back; enemies at the pool only do when
+				-- they outnumber him and the allies with him (his lane partner).
+				if tripBlock == "lane-push" or tripBlock == "tower-push" then
+					tripBlock = nil
+				elseif tripBlock == "pool-foes" then
+					local withHim = #(bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {})
+					if HeroesNearLoc(loc, 1600) <= math.max(1, withHim) then
+						tripBlock = nil
+					end
+				end
+			end
+			if tripBlock ~= nil then
+				beside = false
+				inLotus = false
+			end
+			local function note(why)
+				-- [OHA-LOTUS] reason line whenever this bot's lotus reason changes in the window.
+				-- The per-second debug lives in mode_lotus_pool_generic.lua, which never runs (no
+				-- such bot mode in this game version), so game 018 had no record of why no Radiant
+				-- bot went for the 3:00 lotus beside Doom.
+				if why ~= bot._lotusWhyLogged then
+					bot._lotusWhyLogged = why
+					pcall(print, string.format(
+						"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						why,
+						loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
+						type(dist) == "number" and string.format("%.0f", dist) or "?",
+						#foes,
+						#friends,
+						loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
+						bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+						sinceLast,
+						toNext
+					))
+				end
+				bot._lotusWhy = why
+				bot._lotusDist = dist
+				bot._lotusDbg = {
+					why = why,
+					dist = dist,
+					eta = etaL,
+					beside = beside and 1 or 0,
+					lost = lostBeside and 1 or 0,
+					inwin = inLotus and 1 or 0,
+					count = count,
+					room = mainRoom and 1 or 0,
+					hp = hp,
+					walk = maxWalk,
+					skip = bot._lotusSkipMark or 0,
+					pools = units and #units or 0,
+					foes = #foes,
+					friends = #friends,
+					arrive = arrive,
+					toNext = toNext,
+					since = sinceLast,
+					danger = danger and 1 or 0,
+				}
+			end
+			local failWhy = "blocked"
+			if tripBlock ~= nil then
+				failWhy = tripBlock
+			elseif not inLotus then
+				if count == 0 and type(etaL) == "number" and etaL < -1.5 then
+					failWhy = "empty"
+				elseif bot._lotusSkipMark == mark and mark >= lInterval then
+					failWhy = "skip"
+				else
+					failWhy = "outside"
+				end
+			elseif not mainRoom then
+				failWhy = "room"
+				-- Full main inventory (user call): only a bot that needs it (under 50% HP, above the 28%
+				-- floor, or under 35% mana: game 036, Slark near empty) makes room (cheapest main item to
+				-- the backpack) and takes the trip; otherwise the lotus is skipped and nothing is moved.
+				if loc ~= nil and dist <= maxWalk and hp >= 0.28 and needy then
+					local okR, made = pcall(MapObjectives.EnsureInventorySlot, bot)
+					local logNow = DotaTime() >= (bot._lotusRoomLogAt or -999)
+					if logNow then
+						bot._lotusRoomLogAt = DotaTime() + 5
+					end
+					pcall(logNow and print or function() end, string.format(
+						"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(okR and made),
+						hp,
+						bot:GetMana() / math.max(1, bot:GetMaxMana())
+					))
+				end
+			elseif loc == nil then
+				failWhy = "no-pool"
+			elseif dist > maxWalk then
+				failWhy = "too-far"
+			elseif hp < 0.28 then
+				failWhy = "low-hp"
+			elseif danger and dist > 700 then
+				failWhy = "danger"
+			elseif not beside then
+				failWhy = "not-best"
+			end
+			if
+				inLotus
+				and mainRoom
+				and loc ~= nil
+				and dist <= maxWalk
+				and hp >= 0.28
+				and not (danger and dist > 700)
+				and (beside or contester or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
+			then
+				note(passBy and "pass-by" or (beside and "beside" or (contester and "contest" or "walk")))
+				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
+				if beside then
+					-- Has to beat laning and a nearby fight, or Think never runs and they never say it.
+					desire = BOT_MODE_DESIRE_ABSOLUTE + 0.05
+				elseif type(etaL) == "number" and etaL > arrive * 0.55 then
+					desire = math.min(desire, BOT_MODE_DESIRE_LOW + 0.05)
+				elseif type(etaL) == "number" and etaL <= 12 then
+					desire = math.max(desire, BOT_MODE_DESIRE_HIGH + 0.05)
+				end
+				if not beside and type(etaL) == "number" and math.abs(etaL) <= 8 then
+					desire = math.max(desire, BOT_MODE_DESIRE_VERYHIGH + 0.05)
+				end
+				if count ~= nil and count > 0 and #foes == 0 and hp >= 0.45 and not danger then
+					desire = BOT_MODE_DESIRE_ABSOLUTE + 0.02
+				end
+				-- A pass-by detour beats farming or pushing, not a fight or a retreat.
+				if passBy then
+					desire = math.min(desire, 0.7)
+				end
+				return desire, loc, "lotus", etaL
+			end
+			note(failWhy)
+		else
+			bot._lotusWhy = "not-window"
+			bot._lotusDist = nil
 		end
 	end
 
@@ -523,42 +1164,57 @@ local function AnnounceObjective(bot, kind)
 	bot:ActionImmediate_Chat(msg, false)
 end
 
--- Stand in the gather/pluck ring. kind: "lotus" | "wisdom"
+-- Cover the gather/pluck ring. kind: "lotus" | "wisdom"
+-- An attack or a spell inside the ring does not cancel either one.
+-- Wisdom fails only when an enemy hero is standing on the shrine.
 function MapObjectives.ThinkObjective(bot, loc, kind)
 	if bot == nil or loc == nil then
 		return false
 	end
 	AnnounceObjective(bot, kind)
-	local gather = kind == "wisdom" and 280 or 340
+	-- Lotus grants only from the middle of the pool. 340 stops them on the bank.
+	local gather = kind == "wisdom" and 280 or 140
 	local dist = GetUnitToLocationDistance(bot, loc)
 	local enemies = bot:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
 	local allies = bot:GetNearbyHeroes(1000, false, BOT_MODE_NONE) or {}
 
-	if #enemies > 0 and #enemies > #allies and dist > gather then
-		return true
-	end
-	if #enemies > 0 and #enemies <= #allies then
-		local target = enemies[1]
-		if target ~= nil and target:IsAlive() then
-			bot:Action_AttackUnit(target, true)
-			return true
-		end
-	end
-	if dist > gather then
-		if kind == "wisdom" then
+	if kind == "wisdom" then
+		local onShrine = EnemyOnPoint(bot, loc, gather)
+		if dist > gather then
 			bot._wisdomStandSince = nil
 			bot._wisdomXpAtStand = nil
+			-- Nearby heroes do not matter. Only a hero already on the shrine, and only when we are outnumbered.
+			if onShrine ~= nil and #enemies > #allies then
+				return true
+			end
+			bot:Action_MoveToLocation(loc)
+			return true
 		end
-		bot:Action_MoveToLocation(loc)
-		return true
-	end
-	if kind == "lotus" then
-		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
-		if Item.GetEmptyInventoryAmount(bot) <= 0 then
-			MapObjectives.EnsureInventorySlot(bot)
+		if onShrine ~= nil then
+			bot._wisdomStandSince = nil
+			bot._wisdomXpAtStand = nil
+			if not bot:IsCastingAbility() and not bot:IsChanneling() then
+				local range = bot:GetAttackRange() + 80
+				if GetUnitToUnitDistance(bot, onShrine) <= range then
+					if bot:GetAttackTarget() ~= onShrine then
+						bot:Action_AttackUnit(onShrine, true)
+					end
+				else
+					bot:Action_MoveToLocation(onShrine:GetLocation())
+				end
+			end
+			return true
 		end
-	elseif kind == "wisdom" then
-		-- Shrine channel is ~3s. Mark claimed once XP lands or after a short stand so we leave.
+		-- 280 only says "near the shrine". The real capture area is smaller: at 14:00 Techies
+		-- stood ~280 out "covering" it and got nothing. Walk onto the centre before covering.
+		if dist > 100 then
+			bot._wisdomStandSince = nil
+			bot._wisdomXpAtStand = nil
+			if not bot:IsCastingAbility() and not bot:IsChanneling() then
+				bot:Action_MoveToLocation(loc)
+			end
+			return true
+		end
 		local now = DotaTime()
 		local xp = bot.GetCurrentXP and bot:GetCurrentXP() or nil
 		if bot._wisdomStandSince == nil then
@@ -566,20 +1222,77 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			bot._wisdomXpAtStand = xp
 		else
 			local gotXp = xp ~= nil and bot._wisdomXpAtStand ~= nil and xp > bot._wisdomXpAtStand
-			local stoodLongEnough = now - bot._wisdomStandSince >= 3.5
-			-- Only claim after the mark has opened (eta already passed / clock on the interval).
+			local covered = now - bot._wisdomStandSince >= 3.5
 			local interval = MapObjectives.WisdomInterval()
 			local mark = math.floor(math.max(0, now) / interval) * interval
-			if mark >= interval and now >= mark and (gotXp or stoodLongEnough) then
+			if mark >= interval and now >= mark and (gotXp or covered) then
 				bot._wisdomClaimedMark = mark
 				bot._wisdomStandSince = nil
 				bot._wisdomXpAtStand = nil
 			end
 		end
+		-- Covering the shrine is enough. An attack or a spell does not cancel it.
+		return true
 	end
-	-- Hold still so pluck/channel is not cancelled by micro-moves.
-	bot:Action_ClearActions(true)
-	return true
+
+	-- Step into the pool before fighting. Stopping on the lip never grants the lotus.
+	if kind == "lotus" and dist > gather and dist <= 700 then
+		bot._lotusHaveAt = nil
+		bot:Action_MoveToLocation(loc)
+		MarkLotusDo(bot, "move-lip")
+		return true
+	end
+
+	if #enemies > 0 and #enemies > #allies and dist > gather then
+		MarkLotusDo(bot, "outnumbered")
+		return true
+	end
+	if #enemies > 0 and #enemies <= #allies and dist > gather then
+		local target = enemies[1]
+		if target ~= nil and target:IsAlive() then
+			bot:Action_AttackUnit(target, true)
+			MarkLotusDo(bot, "attack")
+			return true
+		end
+	end
+	if dist > gather then
+		bot._lotusHaveAt = nil
+		bot:Action_MoveToLocation(loc)
+		MarkLotusDo(bot, "move")
+		return true
+	end
+	if kind == "lotus" then
+		local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+		-- A full main inventory puts the lotus in the backpack, where it sits unused.
+		if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+			local interval = MapObjectives.LotusInterval()
+			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			bot._lotusSkipPool = loc
+			MarkLotusDo(bot, "full")
+			return false
+		end
+		local _, units = MapObjectives.GetLotusPoolLocations()
+		local count = MapObjectives.LotusCountNear(loc, units)
+		if count == 0 and MapObjectives.LotusSpawnOpen() then
+			local interval = MapObjectives.LotusInterval()
+			bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+			bot._lotusSkipPool = loc
+			MarkLotusDo(bot, "empty")
+			return false
+		end
+		if (MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0)) then
+			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
+				local interval = MapObjectives.LotusInterval()
+				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval
+				bot._lotusSkipPool = loc
+				MarkLotusDo(bot, "stalled")
+				return false
+			end
+		end
+		ActInsideLotus(bot, loc)
+		return true
+	end
+	return false
 end
 
 return MapObjectives

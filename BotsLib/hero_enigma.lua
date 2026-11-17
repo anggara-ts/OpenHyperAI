@@ -32,22 +32,25 @@ end
 if h == "pos_5" then
 	l = c.Skill.GetTalentBuild(i[2])
 end
-local m = { "item_pipe", "item_lotus_orb" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_double_circlet",
 	"item_magic_wand",
-	"item_vladmir",
+	-- Tranquil Boots before Vladmir (Buckler is its first part).
 	"item_boots",
+	"item_tranquil_boots",
+	"item_vladmir",
 	"item_blink",
 	"item_black_king_bar",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	-- Octarine (+450 mana, 25% cooldown) before Refresher: the double Black Hole needs ~1,125-1,465
+	-- mana, more than the pool before Octarine.
 	"item_octarine_core",
-	n,
 	"item_refresher",
+	n,
 	"item_travel_boots",
 	"item_arcane_blink",
 	"item_travel_boots_2",
@@ -57,7 +60,6 @@ o["pos_3"] = {
 o["pos_4"] = {
 	"item_enchanted_mango",
 	"item_double_tango",
-	"item_circlet",
 	"item_double_branches",
 	"item_blood_grenade",
 	"item_magic_wand",
@@ -78,13 +80,13 @@ o["pos_4"] = {
 o["pos_5"] = {
 	"item_enchanted_mango",
 	"item_double_tango",
-	"item_circlet",
 	"item_double_branches",
 	"item_blood_grenade",
 	"item_magic_wand",
 	"item_boots",
-	"item_vladmir",
+	-- Tranquil Boots before Vladmir (Buckler is its first part).
 	"item_tranquil_boots",
+	"item_vladmir",
 	"item_pipe",
 	"item_blink",
 	"item_boots_of_bearing",
@@ -105,6 +107,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "enigma_black_hole", kind = "point" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(p)
 	e.MinionThink(p)
@@ -150,6 +154,7 @@ function a.SkillsComplement()
 	end
 	G, H = a.ConsiderBlinkPulseHole()
 	if G > 0 then
+		a.LogBlackHole("blink-pulse", #c.GetEnemiesNearLoc(H, t:GetSpecialValueInt("radius")), nil)
 		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
@@ -164,6 +169,7 @@ function a.SkillsComplement()
 	end
 	E, F = a.ConsiderBlinkHole()
 	if E > 0 then
+		a.LogBlackHole("blink", #c.GetEnemiesNearLoc(F, t:GetSpecialValueInt("radius")), nil)
 		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
@@ -171,6 +177,7 @@ function a.SkillsComplement()
 		end
 		b:ActionQueue_UseAbilityOnLocation(I, F)
 		b:ActionQueue_Delay(0.1)
+		a.QueuePulseBefore(F)
 		b:ActionQueue_UseAbilityOnLocation(t, F)
 		return
 	end
@@ -181,13 +188,13 @@ function a.SkillsComplement()
 	end
 	C, D = a.ConsiderBlackHole()
 	if C > 0 then
+		b:Action_ClearActions(false)
 		if a.CanBKB() and not b:IsMagicImmune() then
 			b:ActionQueue_UseAbility(J)
 			b:ActionQueue_Delay(0.1)
-			b:ActionQueue_UseAbilityOnLocation(t, D)
-			return
 		end
-		b:Action_UseAbilityOnLocation(t, D)
+		a.QueuePulseBefore(D)
+		b:ActionQueue_UseAbilityOnLocation(t, D)
 		return
 	end
 	w, x = a.ConsiderMalefice()
@@ -206,7 +213,8 @@ function a.ConsiderMalefice()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local S = c.GetProperCastRange(false, b, q:GetCastRange())
-	local T = q:GetSpecialValueInt("value")
+	-- datafeed: Malefice's instance count is "stun_instances" (3); it has no "value", so T (and the kill damage) was 0.
+	local T = q:GetSpecialValueInt("stun_instances")
 	if u:IsTrained() then
 		T = T + q:GetSpecialValueInt("value")
 	end
@@ -400,10 +408,34 @@ function a.ConsiderDemonicSummoning()
 			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
 		end
 	end
-	if c.IsLaning(b) and c.GetHealthAfter(a0) > 0.61 and c.GetManaAfter(r:GetManaCost()) > 0.5 then
-		local a2 = b:GetNearbyLaneCreeps(800, true)
-		if a2 ~= nil and #a2 >= 3 then
+	if c.IsLaning(b) then
+		-- Eidolons take the wave and harass in lane. The mana bar was 50% after the cast, about
+		-- three quarters of a level 1-3 pool, and Enigma was never seen summoning in lane.
+		-- Every skip is logged with the reason so the next game shows what blocks it.
+		local hpAfter = c.GetHealthAfter(a0)
+		local mpAfter = c.GetManaAfter(r:GetManaCost())
+		local a2 = b:GetNearbyLaneCreeps(800, true) or {}
+		local why = nil
+		if hpAfter <= 0.61 then
+			why = "hp"
+		elseif mpAfter <= 0.35 then
+			why = "mana"
+		elseif #a2 < 3 then
+			why = "creeps"
+		end
+		if why == nil then
+			pcall(print, string.format(
+				"[OHA-ENIGMA] t=%.0f summon why=lane creeps=%d hpAfter=%.2f mpAfter=%.2f",
+				DotaTime(), #a2, hpAfter, mpAfter
+			))
 			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+		end
+		if DotaTime() >= (b._summonSkipLogAt or -999) then
+			b._summonSkipLogAt = DotaTime() + 20
+			pcall(print, string.format(
+				"[OHA-ENIGMA] t=%.0f summon-skip why=%s creeps=%d hpAfter=%.2f mpAfter=%.2f",
+				DotaTime(), why, #a2, hpAfter, mpAfter
+			))
 		end
 	end
 	if c.IsDoingRoshan(b) and c.GetHealthAfter(a0) > 0.5 then
@@ -420,6 +452,11 @@ function a.ConsiderDemonicSummoning()
 end
 function a.ConsiderMidnightPulse()
 	if not s:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- Pulse only adds to Black Hole. With Black Hole off cooldown, a Pulse on its own must leave
+	-- mana for it (Black Hole queues its own Pulse when both fit). Otherwise Pulse is free.
+	if t:IsTrained() and t:GetCooldownTimeRemaining() <= 0 and b:GetMana() - s:GetManaCost() < t:GetManaCost() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local S = c.GetProperCastRange(false, b, s:GetCastRange())
@@ -470,69 +507,117 @@ function a.ConsiderMidnightPulse()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Black Hole is for two or more enemy heroes. One enemy only when it kills a core and no other
+-- enemy hero is in sight: the old fallback cast it on a lone target whenever our numbers were
+-- even or better. Damage is read from "damage" (per second) x "duration"; the old "value" key
+-- does not exist on this ability, so every kill check came out 0.
 function a.ConsiderBlackHole()
 	if not t:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local S = c.GetProperCastRange(false, b, t:GetCastRange())
 	local a6 = t:GetSpecialValueInt("radius")
-	local U = t:GetSpecialValueInt("value")
-	local a8 = t:GetSpecialValueInt("duration")
-	if N then
+	local dps = t:GetSpecialValueInt("damage")
+	local a8 = t:GetSpecialValueFloat("duration")
+	if a8 == nil or a8 <= 0 then
+		a8 = 4
+	end
+	if N or L then
 		local a7 = b:FindAoELocation(true, true, b:GetLocation(), S, a6 * 0.8, 0, 0)
 		local W = c.GetEnemiesNearLoc(a7.targetloc, a6)
 		if W ~= nil and #W >= 2 then
+			a.LogBlackHole("group", #W, W[1])
 			return BOT_ACTION_DESIRE_HIGH, a7.targetloc
 		end
 	end
-	if L then
-		if
-			c.IsValidTarget(K)
-			and c.CanCastOnMagicImmune(K)
-			and c.IsInRange(b, K, 800)
-			and not c.IsSuspiciousIllusion(K)
-			and not K:HasModifier("modifier_dazzle_shallow_grave")
-			and not K:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not K:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not K:HasModifier("modifier_item_aeon_disk_buff")
-		then
-			local V = c.GetNearbyHeroes(K, 1200, true, BOT_MODE_NONE)
-			local W = c.GetNearbyHeroes(K, 1200, false, BOT_MODE_NONE)
-			if V ~= nil and W ~= nil then
-				if #W >= #V and #W <= 1 then
-					if c.CanKillTarget(K, U * a8, DAMAGE_TYPE_PURE) and K:GetHealth() > 200 then
-						W = c.GetEnemiesNearLoc(K:GetLocation(), a6)
-						if W ~= nil and #W >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(W)
-						else
-							if c.IsInRange(b, K, S + a6) and not c.IsInRange(b, K, S) then
-								return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
-							else
-								return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-							end
-						end
-					end
-				end
-				if #V >= #W then
-					if #V <= 1 and c.CanKillTarget(K, U * 1.1 * a8, DAMAGE_TYPE_PURE) then
-						return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-					else
-						W = c.GetEnemiesNearLoc(K:GetLocation(), a6)
-						if W ~= nil and #W >= 2 then
-							return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(W)
-						else
-							if c.IsInRange(b, K, S + a6) and not c.IsInRange(b, K, S) then
-								return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
-							else
-								return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
-							end
-						end
-					end
-				end
+	if
+		L
+		and c.IsValidTarget(K)
+		and c.IsCore(K)
+		and c.CanCastOnMagicImmune(K)
+		and c.IsInRange(b, K, S + 200)
+		and not c.IsSuspiciousIllusion(K)
+		and not K:HasModifier("modifier_dazzle_shallow_grave")
+		and not K:HasModifier("modifier_faceless_void_chronosphere_freeze")
+		and not K:HasModifier("modifier_templar_assassin_refraction_absorb")
+		and not K:HasModifier("modifier_item_aeon_disk_buff")
+		and K:GetHealth() > 200
+		and c.CanKillTarget(K, dps * a8, DAMAGE_TYPE_PURE)
+	then
+		local others = c.GetEnemiesNearLoc(K:GetLocation(), 1600)
+		if others ~= nil and #others <= 1 then
+			a.LogBlackHole("kill", 1, K)
+			if c.IsInRange(b, K, S) then
+				return BOT_ACTION_DESIRE_HIGH, K:GetLocation()
 			end
+			return BOT_ACTION_DESIRE_HIGH, c.Site.GetXUnitsTowardsLocation(b, K:GetLocation(), S)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-ENIGMA] black-hole why=group|kill heroes=N target=..., every cast decision (5s apart).
+function a.LogBlackHole(why, heroes, target)
+	if DotaTime() < (b._blackHoleLogAt or -999) then
+		return
+	end
+	b._blackHoleLogAt = DotaTime() + 5
+	pcall(print, string.format(
+		"[OHA-ENIGMA] t=%.0f black-hole why=%s heroes=%d target=%s pulseReady=%s",
+		DotaTime(),
+		why,
+		heroes,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		tostring(s:IsFullyCastable())
+	))
+end
+-- Refresher for a second Black Hole: the first one went out within the last 15s, Refresher
+-- and a Black Hole both fit in current mana, and 2+ enemy heroes are still grouped in reach.
+-- The shared rule wanted mana for two more Black Holes, so it almost never fired. Items are
+-- not used during the channel, so this runs once the first Black Hole has ended.
+function a.CanUseRefresherShard()
+	if not t:IsTrained() or t:IsFullyCastable() then
+		return false
+	end
+	local cd = t:GetCooldown()
+	local remain = t:GetCooldownTimeRemaining()
+	if cd == nil or remain == nil or cd - remain > 15 then
+		return false
+	end
+	local refresher = nil
+	for _, name in ipairs({ "item_refresher", "item_refresher_shard" }) do
+		local slot = b:FindItemSlot(name)
+		if slot >= 0 and slot <= 5 then
+			refresher = b:GetItemInSlot(slot)
+			break
+		end
+	end
+	if refresher == nil or not refresher:IsFullyCastable() then
+		return false
+	end
+	if b:GetMana() < refresher:GetManaCost() + t:GetManaCost() then
+		return false
+	end
+	local reach = c.GetProperCastRange(false, b, t:GetCastRange()) + 300
+	local spot = b:FindAoELocation(true, true, b:GetLocation(), reach, t:GetSpecialValueInt("radius") * 0.8, 0, 0)
+	local group = c.GetEnemiesNearLoc(spot.targetloc, t:GetSpecialValueInt("radius"))
+	if group == nil or #group < 2 then
+		return false
+	end
+	pcall(print, string.format(
+		"[OHA-ENIGMA] t=%.0f refresher heroes=%d mana=%.0f need=%.0f",
+		DotaTime(),
+		#group,
+		b:GetMana(),
+		refresher:GetManaCost() + t:GetManaCost()
+	))
+	return true
+end
+-- Midnight Pulse in front of Black Hole when it is ready and there is mana for both.
+function a.QueuePulseBefore(loc)
+	if s:IsFullyCastable() and b:GetMana() >= s:GetManaCost() + t:GetManaCost() then
+		b:ActionQueue_UseAbilityOnLocation(s, loc)
+		b:ActionQueue_Delay(0.1)
+	end
 end
 function a.ConsiderBlinkHole()
 	if a.CanDoBlinkHole() then
@@ -548,7 +633,9 @@ function a.ConsiderBlinkHole()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.CanDoBlinkHole()
-	if t:IsFullyCastable() and I ~= nil and I:IsFullyCastable() then
+	-- a.HasBlink() is what sets I (the blink item); nothing called it, so I stayed nil and the
+	-- Blink + Black Hole initiation never fired.
+	if t:IsFullyCastable() and a.HasBlink() then
 		local a9 = t:GetManaCost()
 		if b:GetMana() >= a9 then
 			return true
@@ -570,7 +657,8 @@ function a.ConsiderBlinkPulseHole()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.CanDoBlinkPulseHole()
-	if t:IsFullyCastable() and s:IsFullyCastable() and I ~= nil and I:IsFullyCastable() then
+	-- a.HasBlink() sets I; it was never called (see CanDoBlinkHole).
+	if t:IsFullyCastable() and s:IsFullyCastable() and a.HasBlink() then
 		local a9 = t:GetManaCost() + s:GetManaCost()
 		if b:GetMana() >= a9 then
 			return true

@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
+local j = { { 1, 2, 2, 2, 2, 6, 1, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,15 +21,15 @@ m["pos_2"] = {
 	"item_soul_ring",
 	"item_magic_wand",
 	"item_blink",
+	"item_aether_lens",
+	"item_aghanims_shard",
 	"item_kaya_and_sange",
-	"item_angels_demise",
-	"item_shivas_guard",
 	"item_ultimate_scepter",
+	"item_shivas_guard",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	"item_sheepstick",
 	"item_overwhelming_blink",
-	"item_aghanims_shard",
 }
 m["pos_3"] = {
 	"item_tango",
@@ -105,7 +105,6 @@ end
 local o = SafeAbility(b:GetAbilityByName("tinker_laser"), "tinker_laser", "tinker")
 local p = SafeAbility(b:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
 local q = SafeAbility(b:GetAbilityByName("tinker_deploy_turrets"), "tinker_deploy_turrets", "tinker")
-	or SafeAbility(b:GetAbilityByName("tinker_defense_matrix"), "tinker_defense_matrix", "tinker")
 	or g[3] and SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "tinker")
 local r = SafeAbility(b:GetAbilityByName("tinker_warp_grenade"), "tinker_warp_grenade", "tinker")
 local s = SafeAbility(b:GetAbilityByName("tinker_keen_teleport"), "tinker_keen_teleport", "tinker")
@@ -152,7 +151,6 @@ function a.SkillsComplement()
 	o = SafeAbility(b:GetAbilityByName("tinker_laser"), "tinker_laser", "tinker")
 	p = SafeAbility(b:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
 	q = SafeAbility(b:GetAbilityByName("tinker_deploy_turrets"), "tinker_deploy_turrets", "tinker")
-		or SafeAbility(b:GetAbilityByName("tinker_defense_matrix"), "tinker_defense_matrix", "tinker")
 		or g[3] and SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "tinker")
 	r = SafeAbility(b:GetAbilityByName("tinker_warp_grenade"), "tinker_warp_grenade", "tinker")
 	s = SafeAbility(b:GetAbilityByName("tinker_keen_teleport"), "tinker_keen_teleport", "tinker")
@@ -694,24 +692,27 @@ function a.ConsiderRearm()
 	if b.healInBase and aF ~= nil and #aF == 0 and s ~= nil and s:IsTrained() and s:GetCooldownTimeRemaining() > ar then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if
-		o ~= nil and o:IsTrained() and o:GetCooldownTimeRemaining() > ar
-		or p ~= nil and p:IsTrained() and p:GetCooldownTimeRemaining() > ar
-	then
-		return BOT_ACTION_DESIRE_HIGH
+	-- Review fix: Rearm (100-200 mana, 1.25-2.75s channel) fired whenever Laser or March was on
+	-- cooldown, in any situation: after a lane last-hit Laser, while walking alone, even while
+	-- retreating with enemies on him (a channel there is a death). It also fired in fights and
+	-- pushes with nothing on cooldown (game data: Rearm does not refresh items, affects_items 0).
+	-- Now it needs a spell to refresh plus a reason: a fight he is in (not retreating), or the
+	-- push/farm/Roshan cases below.
+	local function spellOnCd()
+		return o ~= nil and o:IsTrained() and o:GetCooldownTimeRemaining() > ar
+			or p ~= nil and p:IsTrained() and p:GetCooldownTimeRemaining() > ar
+			or q ~= nil and q:IsTrained() and q:GetCooldownTimeRemaining() > ar
 	end
-	if S then
-		if
-			c.IsValidTarget(H)
-			and c.IsInRange(b, H, 1500)
-			and (p:GetCooldownTimeRemaining() > ar or not c.CanBlinkDagger(GetBot()))
-		then
-			return BOT_ACTION_DESIRE_HIGH
+	if (S or X) and not T and spellOnCd() and aF ~= nil and #aF >= 1 then
+		if DotaTime() - (a.lastRearmLog or -99) > 10 then
+			a.lastRearmLog = DotaTime()
+			pcall(print, string.format("[OHA-TINKER] t=%.0f rearm-fight enemies=%d mp=%.2f", DotaTime(), #aF, W))
 		end
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	local aa = b:GetNearbyLaneCreeps(1600, true)
 	if c.IsPushing(b) or c.IsDefending(b) then
-		if #aa >= 2 and c.CanBeAttacked(aa[1]) then
+		if #aa >= 2 and c.CanBeAttacked(aa[1]) and spellOnCd() then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		local ab = b:FindAoELocation(true, true, b:GetLocation(), 1600, 900, 0, 0)

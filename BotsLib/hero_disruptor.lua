@@ -1,3 +1,5 @@
+-- [OHA-DISRUPTOR] logs off: the behaviour they traced works (game 029).
+local print = function() end
 -- Disruptor: skill build, item build, and ability use for this hero.
 local a = {}
 local b = GetBot()
@@ -8,7 +10,13 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+-- 1 Thunder Strike, 2 Glimpse, 3 Kinetic Field, 6 Static Storm (ultimate at 6, 12, 18).
+-- Support: Glimpse first, then Thunder Strike, Kinetic Field last (Dotabuff most picked order).
+-- Core: Thunder Strike first, then Glimpse, Kinetic Field last.
+local j = { { 1, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+if h ~= "pos_4" and h ~= "pos_5" then
+	j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+end
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -21,10 +29,10 @@ m["pos_4"] = {
 	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_force_staff",
+	"item_blink",
 	"item_guardian_greaves",
-	"item_hurricane_pike",
+	"item_ultimate_scepter",
 	"item_sheepstick",
-	"item_shivas_guard",
 	"item_wind_waker",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -36,14 +44,13 @@ m["pos_5"] = {
 	"item_faerie_fire",
 	"item_blood_grenade",
 	"item_magic_wand",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
-	"item_pavise",
 	"item_force_staff",
 	"item_pipe",
-	"item_solar_crest",
-	"item_boots_of_bearing",
-	"item_hurricane_pike",
+	"item_aether_lens",
+	"item_blink",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_moon_shard",
@@ -60,7 +67,7 @@ m["pos_3"] = {
 	"item_maelstrom",
 	"item_gungir",
 	"item_shivas_guard",
-	"item_hurricane_pike",
+	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_wind_waker",
 	"item_aghanims_shard",
@@ -98,7 +105,96 @@ local H
 local I
 local J
 local K
+-- Where each enemy hero was over the last few seconds, for the Glimpse return spot (Glimpse
+-- sends the target back to where it was 4s ago, Valve data). Sampled every 0.2s.
+local trail = {}
+local trailAt = -99
+local function RecordTrail()
+	local now = DotaTime()
+	if now - trailAt < 0.2 then
+		return
+	end
+	trailAt = now
+	for _, e0 in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if c.IsValidHero(e0) and e0:CanBeSeen() and not e0:IsIllusion() then
+			local id = e0:GetPlayerID()
+			local list = trail[id] or {}
+			list[#list + 1] = { t = now, loc = e0:GetLocation() }
+			while #list > 0 and now - list[1].t > 6 do
+				table.remove(list, 1)
+			end
+			trail[id] = list
+		end
+	end
+end
+-- Where target would land if Glimpsed now, or nil when it was not seen at that moment.
+function a.GlimpseReturnSpot(target)
+	local back = p:GetSpecialValueFloat("backtrack_time")
+	if back == nil or back <= 0 then
+		back = 4
+	end
+	local want = DotaTime() - back
+	local best, bestGap = nil, 0.35
+	for _, e0 in ipairs(trail[target:GetPlayerID()] or {}) do
+		local gap = math.abs(e0.t - want)
+		if gap < bestGap then
+			best, bestGap = e0.loc, gap
+		end
+	end
+	return best
+end
+-- Glimpse -> Kinetic Field on the return spot -> Static Storm there when 2+ enemy heroes will be
+-- in it or it is a team fight. The field forms in 1s, so it is up when the target lands.
+function a.ConsiderGlimpseCombo()
+	if not (H or K) or not p:IsFullyCastable() or not q:IsFullyCastable() then
+		return nil
+	end
+	local mana = b:GetMana() - p:GetManaCost() - q:GetManaCost()
+	if mana < 0 then
+		return nil
+	end
+	local range = c.GetProperCastRange(false, b, p:GetCastRange())
+	local fieldRange = q:GetCastRange() + 100
+	local candidates = {}
+	if c.IsValidHero(G) then
+		candidates[1] = G
+	end
+	for _, e0 in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+		candidates[#candidates + 1] = e0
+	end
+	for _, T in ipairs(candidates) do
+		if
+			c.IsValidHero(T)
+			and c.IsInRange(b, T, range)
+			and c.CanCastOnNonMagicImmune(T)
+			and c.CanCastOnTargetAdvanced(T)
+			and not c.IsSuspiciousIllusion(T)
+			and not c.IsDisabled(T)
+			and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			local spot = a.GlimpseReturnSpot(T)
+			if
+				spot ~= nil
+				and GetUnitToLocationDistance(T, spot) >= 350
+				and GetUnitToLocationDistance(b, spot) <= fieldRange
+			then
+				local allies = #(c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE) or {})
+				local foes = #(c.GetNearbyHeroes(T, 1200, false, BOT_MODE_NONE) or {})
+				if allies >= foes - 1 then
+					local storm = false
+					if s:IsTrained() and s:IsFullyCastable() and mana >= s:GetManaCost() then
+						local inStorm = #(c.GetEnemiesNearLoc(spot, s:GetSpecialValueInt("radius")) or {}) + 1
+						storm = inStorm >= 2 or K
+					end
+					return T, spot, storm
+				end
+			end
+		end
+	end
+	return nil
+end
 function a.SkillsComplement()
+	RecordTrail()
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -108,12 +204,56 @@ function a.SkillsComplement()
 	J = c.IsAttacking(b)
 	K = L.isTeamFight
 	G = L.target
+	-- An enemy teleporting within Glimpse range: Glimpse it first. It sat last in the order,
+	-- behind the storms, the fields and Thunder Strike (game 016, 62:00: no Glimpse on a TP).
+	if p:IsFullyCastable() then
+		local range = c.GetProperCastRange(false, b, p:GetCastRange())
+		for _, T in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(T)
+				and T:HasModifier("modifier_teleporting")
+				and c.CanCastOnNonMagicImmune(T)
+				and c.CanCastOnTargetAdvanced(T)
+				and not c.IsSuspiciousIllusion(T)
+			then
+				pcall(print, string.format(
+					"[OHA-DISRUPTOR] t=%.0f glimpse-tp target=%s dist=%d",
+					DotaTime(),
+					(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToUnitDistance(b, T)
+				))
+				b:Action_UseAbilityOnEntity(p, T)
+				return
+			end
+		end
+	end
+	local comboTarget, comboSpot, comboStorm = a.ConsiderGlimpseCombo()
+	if comboTarget ~= nil then
+		pcall(print, string.format(
+			"[OHA-DISRUPTOR] t=%.0f glimpse-combo target=%s back=%d storm=%s",
+			DotaTime(),
+			(string.gsub(comboTarget:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToLocationDistance(comboTarget, comboSpot),
+			tostring(comboStorm)
+		))
+		b:Action_ClearActions(false)
+		b:ActionQueue_UseAbilityOnEntity(p, comboTarget)
+		b:ActionQueue_Delay(0.1)
+		b:ActionQueue_UseAbilityOnLocation(q, comboSpot)
+		if comboStorm then
+			b:ActionQueue_Delay(0.1)
+			b:ActionQueue_UseAbilityOnLocation(s, comboSpot)
+		end
+		return
+	end
 	E, F = a.ConsiderKineticStorm()
 	if E > 0 then
+		-- Kinetic Field first, then Static Storm inside it (user call): the field holds them in the
+		-- storm. It used to be storm first, field second.
 		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbilityOnLocation(s, F)
-		b:ActionQueue_Delay(0.05)
 		b:ActionQueue_UseAbilityOnLocation(q, F)
+		b:ActionQueue_Delay(0.05)
+		b:ActionQueue_UseAbilityOnLocation(s, F)
 		b:ActionQueue_Delay(0.05)
 		return
 	end
@@ -124,6 +264,30 @@ function a.SkillsComplement()
 	end
 	x, y = a.ConsiderKineticField()
 	if x > 0 then
+		-- Static Storm on the same spot right behind the field when it is ready, an enemy hero
+		-- is inside the field's radius, and he is engaging or in a team fight.
+		local inField = c.GetEnemiesNearLoc(y, q:GetSpecialValueInt("radius")) or {}
+		local coreIn = false
+		for _, e0 in pairs(inField) do
+			local okP, pos = pcall(c.GetPosition, e0)
+			if okP and type(pos) == "number" and pos <= 2 then
+				coreIn = true
+			end
+		end
+		-- A group (2+) in the field, or one high-value core (estimated position 1 or 2).
+		local stormOk = (H or K)
+			and s:IsTrained()
+			and s:IsFullyCastable()
+			and b:GetMana() >= q:GetManaCost() + s:GetManaCost()
+			and (#inField >= 2 or coreIn)
+		if stormOk then
+			b:Action_ClearActions(false)
+			b:ActionQueue_UseAbilityOnLocation(q, y)
+			b:ActionQueue_Delay(0.05)
+			b:ActionQueue_UseAbilityOnLocation(s, y)
+			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f field-storm at=%.0f,%.0f", DotaTime(), y.x, y.y))
+			return
+		end
 		b:Action_UseAbilityOnLocation(q, y)
 		return
 	end
@@ -277,6 +441,37 @@ function a.ConsiderGlimpse()
 	if not p:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
+	-- A fleeing enemy: pull it back to where it was 4s ago when that spot is well behind it and
+	-- closer to us. The old chase rule also needed the target to be teleporting or in its fountain,
+	-- so a running enemy was never glimpsed.
+	if H or K then
+		local range = c.GetProperCastRange(false, b, p:GetCastRange())
+		for _, T in pairs(c.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(T)
+				and c.CanCastOnNonMagicImmune(T)
+				and c.CanCastOnTargetAdvanced(T)
+				and not c.IsSuspiciousIllusion(T)
+				and not c.IsDisabled(T)
+				and not T:IsFacingLocation(b:GetLocation(), 90)
+			then
+				local spot = a.GlimpseReturnSpot(T)
+				if
+					spot ~= nil
+					and GetUnitToLocationDistance(T, spot) >= 400
+					and GetUnitToLocationDistance(b, spot) + 300 < GetUnitToUnitDistance(b, T)
+				then
+					pcall(print, string.format(
+						"[OHA-DISRUPTOR] t=%.0f glimpse-flee target=%s back=%d",
+						DotaTime(),
+						(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToLocationDistance(T, spot)
+					))
+					return BOT_ACTION_DESIRE_HIGH, T
+				end
+			end
+		end
+	end
 	local M = c.GetProperCastRange(false, b, p:GetCastRange())
 	local T = c.GetNearbyHeroes(b, M, false, BOT_MODE_NONE)
 	local Q = c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE)
@@ -365,7 +560,8 @@ function a.ConsiderGlimpse()
 			c.IsValidHero(S)
 			and c.CanCastOnNonMagicImmune(S)
 			and c.CanCastOnTargetAdvanced(S)
-			and not c.IsSuspiciousIllusion(S)
+			-- no IsSuspiciousIllusion filter here: it dropped every illusion before the count below,
+			-- so "Glimpse kills illusions" (datafeed) could never fire.
 			and p:GetLevel() >= 3
 		then
 			if c.IsSuspiciousIllusion(S) then
@@ -377,6 +573,10 @@ function a.ConsiderGlimpse()
 		end
 	end
 	if a2 == 0 and a3 >= 1 then
+		if DotaTime() >= (b._glimpseIllLogAt or -999) then
+			b._glimpseIllLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f glimpse illusion=%s", DotaTime(), a4:GetUnitName()))
+		end
 		return BOT_ACTION_DESIRE_HIGH, a4
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -564,7 +764,8 @@ function a.ConsiderStaticStorm()
 	end
 	local N = s:GetSpecialValueInt("radius")
 	local M = s:GetCastRange()
-	if K and not CanCastKineticStorm() then
+	-- Engaging counts too, not only a team fight: two enemies in a skirmish never got it.
+	if (K or H) and not CanCastKineticStorm() then
 		local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 		local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
 		if
@@ -583,12 +784,20 @@ function a.ConsiderKineticStorm()
 	if CanCastKineticStorm() then
 		local M = c.GetProperCastRange(false, b, q:GetCastRange())
 		local N = q:GetSpecialValueInt("radius")
-		if K then
+		if K or H then
 			local a8 = b:FindAoELocation(true, true, b:GetLocation(), M, N * 0.8, 0, 0)
 			local X = c.GetEnemiesNearLoc(a8.targetloc, N * 0.8)
+			-- A group (2+) as before, or one hero when it is his target while engaging and a
+			-- high-value core: estimated position 1 or 2 (user call). An unknown role reads as 3 and
+			-- does not count.
+			local oneOk = false
+			if H and X ~= nil and #X == 1 and c.IsValidHero(G) and X[1] == G then
+				local okP, pos = pcall(c.GetPosition, G)
+				oneOk = okP and type(pos) == "number" and pos <= 2
+			end
 			if
 				X ~= nil
-				and #X >= 2
+				and (#X >= 2 or oneOk)
 				and GetUnitToLocationDistance(b, a8.targetloc) <= M
 				and not c.IsLocationInChrono(a8.targetloc)
 				and not c.IsLocationInBlackHole(a8.targetloc)

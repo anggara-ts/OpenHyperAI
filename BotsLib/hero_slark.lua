@@ -8,25 +8,26 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 3, 1, 1, 6, 1, 4, 2, 2, 6, 2, 4, 4, 6 } }
+-- datafeed: Essence Shift is innate now; the learnable basics are Dark Pact (1), Pounce (2) and
+-- Saltwater Shiv (3). The old index 4 points went to Shiv, which had only one point.
+local j = { { 1, 2, 3, 1, 1, 6, 1, 3, 2, 2, 6, 2, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
 m["pos_1"] = {
 	"item_melee_carry_outfit",
 	"item_diffusal_blade",
-	"item_yasha",
-	"item_broadsword",
 	"item_blitz_knuckles",
 	"item_invis_sword",
-	"item_sange_and_yasha",
 	"item_aghanims_shard",
 	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_skadi",
 	"item_travel_boots",
-	"item_abyssal_blade",
 	"item_silver_edge",
 	"item_disperser",
-	"item_ultimate_scepter",
+	"item_basher",
+	"item_abyssal_blade",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 	"item_butterfly",
@@ -75,7 +76,8 @@ local o = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "slark")
 local p = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "slark")
 local q = SafeAbility(b:GetAbilityByName(g[3]), "sAbilityList[3]", "slark")
 local r = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "slark")
-local s = SafeAbility(b:GetAbilityByName(g[4]), "sAbilityList[4]", "slark")
+-- datafeed: Depth Shroud (Shard, point/AoE) by name; g[4] is not a basic ability any more.
+local s = SafeAbility(b:GetAbilityByName("slark_depth_shroud"), "slark_depth_shroud", "slark")
 local t = SafeAbility(b:GetAbilityByName(f[2]), "sTalentList[2]", "slark")
 local u = SafeAbility(b:GetAbilityByName(f[6]), "sTalentList[6]", "slark")
 local v = SafeAbility(b:GetAbilityByName("slark_saltwater_shiv"), "slark_saltwater_shiv", "slark")
@@ -153,9 +155,10 @@ function a.ConsiderSaltwaterShiv()
 			end
 		end
 	end
-	if (c.IsDoingRoshan(b) or c.IsDoingTormentor(b)) and c.IsValid(botTarget) and c.IsInRange(b, botTarget, Q) then
-		return BOT_ACTION_DESIRE_HIGH, botTarget
-	end
+	-- Removed the Roshan / Tormentor branch: Saltwater Shiv targets heroes only (game data
+	-- AbilityUnitTargetType DOTA_UNIT_TARGET_HERO). Game 036, t=1187-1266: 53 "cannot target creeps"
+	-- refusals, all while the Radiant Roshan call/gather/attempt ran (gather counts as doing Roshan,
+	-- which explains the 9 before Slark's mode showed roshan).
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderQ()
@@ -168,7 +171,9 @@ function a.ConsiderQ()
 	local W = o:GetCastPoint()
 	local X = o:GetManaCost()
 	local Y = 0
-	local Z = o:GetSpecialValueInt("delay")
+	-- Review fix: "delay" is 1.5 in the game data; the Int read cut it to 1, so the pulse position
+	-- was predicted half a second early.
+	local Z = o:GetSpecialValueFloat("delay")
 	local _ = DAMAGE_TYPE_MAGICAL
 	local a0 = c.GetAroundEnemyHeroList(V)
 	local a1 = c.GetAroundEnemyHeroList(800)

@@ -329,6 +329,28 @@ local function a(b)
 	local X = Vector(8280, -5350, 128)
 	local Y = Vector(-8130, 5450, 128)
 	local Z = Vector(-6970, 7330, 256)
+	-- Game 036, 30:51: two cores went to the Tormentor while Dire took our bottom T2. Returns why
+	-- our side needs us (a lane defend desire over 0.5, or enemy heroes within 1200 of one of our
+	-- towers or barracks), or nil.
+	function b.OurLaneThreatened()
+		for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+			if (GetDefendLaneDesire(lane) or 0) > 0.5 then
+				return "defend-lane" .. tostring(lane)
+			end
+		end
+		for _, bld in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+			if bld ~= nil and not bld:IsNull() and bld:IsAlive() then
+				local nm = bld:GetUnitName() or ""
+				if
+					(string.find(nm, "tower", 1, true) or string.find(nm, "rax", 1, true))
+					and #b.GetEnemiesNearLoc(bld:GetLocation(), 1200) >= 1
+				then
+					return "enemy-at-" .. (string.gsub(nm, "npc_dota_", ""))
+				end
+			end
+		end
+		return nil
+	end
 	function b.GetTormentorWaitingLocation(i)
 		local _ = b.CheckTimeOfDay()
 		if _ == "day" then

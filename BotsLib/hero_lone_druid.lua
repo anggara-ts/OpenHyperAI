@@ -12,8 +12,10 @@ if c.GetLoneDruid(b).hero == nil then
 	c.GetLoneDruid(b).hero = b
 end
 local j = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local k = { { 2, 2, 6, 2, 2, 3, 6, 3, 3, 3, 6, 1, 1, 1, 1 } }
-local l = { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }
+-- Spirit Link maxed first, Entangle second, Savage Roar last (Dotabuff most picked order).
+-- True Form at entries 6/11/15 (levels 6/12/18).
+local k = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local l = { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }
 local m = d.Skill.GetRandomBuild(k)
 local n = d.Skill.GetTalentBuild(j)
 local o = {}
@@ -39,7 +41,7 @@ o["pos_2"] = o["pos_1"]
 o["pos_3"] = o["pos_1"]
 o["pos_4"] = o["pos_1"]
 o["pos_5"] = o["pos_1"]
-local r = SafeAbility(b:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid") ~= nil
+local r = b:GetAbilityByName("lone_druid_spirit_bear") ~= nil
 if r then
 	a["sBuyList"] = {
 		"item_tango",
@@ -56,8 +58,8 @@ if r then
 		"item_butterfly",
 		"item_moon_shard",
 		"item_satanic",
-		"item_ultimate_scepter_2",
 		"item_travel_boots",
+		"item_travel_boots_2",
 	}
 else
 	a["sBuyList"] = o[i]
@@ -87,6 +89,8 @@ end
 local t = SafeAbility(b:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid")
 local u = SafeAbility(b:GetAbilityByName("lone_druid_savage_roar"), "lone_druid_savage_roar", "lone_druid")
 local v = SafeAbility(b:GetAbilityByName("lone_druid_true_form"), "lone_druid_true_form", "lone_druid")
+-- datafeed: Entangle is an active point/AoE spell (behavior 48) and was never cast
+local entangle = SafeAbility(b:GetAbilityByName("lone_druid_entangle"), "lone_druid_entangle", "lone_druid")
 local w
 local x
 local y
@@ -109,11 +113,57 @@ function a.SkillsComplement()
 		b:Action_UseAbility(v)
 		return
 	end
+	local entangleDesire, entangleLoc = a.ConsiderEntangle()
+	if entangleDesire > 0 then
+		b:Action_UseAbilityOnLocation(entangle, entangleLoc)
+		return
+	end
 	x = a.ConsiderSavageRoar()
 	if x > 0 then
 		b:Action_UseAbility(u)
 		return
 	end
+end
+-- datafeed: Entangle, cast range 700, active_radius 350; the cast adds stacks to enemy heroes in the
+-- area and empowers Lone Druid's attacks.
+function a.ConsiderEntangle()
+	if not entangle:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local range = d.GetProperCastRange(false, b, entangle:GetCastRange())
+	local radius = entangle:GetSpecialValueInt("active_radius")
+	if d.IsInTeamFight(b, 1200) then
+		local aoe = b:FindAoELocation(true, true, b:GetLocation(), range, radius, 0, 0)
+		if aoe.count >= 2 then
+			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+		end
+	end
+	if d.IsGoingOnSomeone(b) then
+		if
+			d.IsValidHero(z)
+			and d.IsInRange(b, z, range)
+			and d.CanCastOnNonMagicImmune(z)
+			and not d.IsSuspiciousIllusion(z)
+		then
+			return BOT_ACTION_DESIRE_HIGH, z:GetLocation()
+		end
+	end
+	-- Data: root_heroes_on_cast is 0 without Scepter (the cast only adds 2 stacks, 5 are needed to
+	-- root), so a retreat cast without Scepter wasted the spell and did not stop the chaser.
+	if d.IsRetreating(b) and b:HasScepter() then
+		for _, F in pairs(d.GetNearbyHeroes(b, range, true, BOT_MODE_NONE) or {}) do
+			if
+				d.IsValidHero(F)
+				and d.IsChasingTarget(F, b)
+				and d.CanCastOnNonMagicImmune(F)
+				and not d.IsSuspiciousIllusion(F)
+				and not d.IsDisabled(F)
+			then
+				return BOT_ACTION_DESIRE_HIGH, F:GetLocation()
+			end
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderSummonSpiritBear()
 	if not t:IsFullyCastable() or c.GetLoneDruid(b).roleType ~= "pos_1_w_bear" then
@@ -130,10 +180,16 @@ function a.ConsiderSavageRoar()
 	end
 	local C = u:GetSpecialValueInt("radius")
 	local D = d.GetNearbyHeroes(b, C, true, BOT_MODE_NONE)
+	-- Was: any enemy hero in radius that was moving or attacking anything, i.e. nearly always, so the
+	-- roar feared Lone Druid's own chase target away from him and the bear. Now only an enemy on Lone
+	-- Druid or the bear, chasing him, channeling or casting.
+	local bear = c.GetLoneDruid(b).bear
 	for E, F in pairs(D) do
+		local onUs = d.IsValidHero(F)
+			and (F:GetAttackTarget() == b or (bear ~= nil and F:GetAttackTarget() == bear))
 		if
 			d.IsValidTarget(F)
-			and (d.IsChasingTarget(F, b) or d.IsAttacking(F) or d.IsMoving(F) or F:IsChanneling() or F:IsUsingAbility())
+			and (d.IsChasingTarget(F, b) or onUs or F:IsChanneling() or F:IsUsingAbility())
 			and not d.IsSuspiciousIllusion(F)
 			and not d.IsDisabled(F)
 			and d.CanCastOnNonMagicImmune(F)
@@ -142,17 +198,18 @@ function a.ConsiderSavageRoar()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if d.IsGoingOnSomeone(b) then
-		if d.IsValidTarget(z) and d.IsInRange(b, z, C) and not d.IsSuspiciousIllusion(z) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if d.IsDoingRoshan(b) then
+	-- Removed the "going on someone, target in radius" cast: the fear sends the target toward its
+	-- base, out of the bear's reach. A target hitting Lone Druid or the bear is handled above.
+	-- Roshan / Tormentor: the ability data sets only_affects_player_units 1, which suggests Roshan and
+	-- the Tormentor are not feared, so without Shard the cast likely did nothing. With Shard the roar
+	-- grants allies attack speed (datafeed shard text, shard_attack_speed 40).
+	local hasShard = b:HasModifier("modifier_item_aghanims_shard")
+	if d.IsDoingRoshan(b) and hasShard then
 		if d.IsRoshan(z) and d.IsInRange(b, z, 500) and d.IsAttacking(b) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if d.IsDoingTormentor(b) then
+	if d.IsDoingTormentor(b) and hasShard then
 		if d.IsTormentor(z) and d.IsInRange(b, z, 500) and d.IsAttacking(b) then
 			return BOT_ACTION_DESIRE_HIGH
 		end

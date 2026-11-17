@@ -1,11 +1,15 @@
--- Match trace. Live append to disk + [OHA-DEV] console print.
+-- Match trace. [OHA-DEV] console print (+ optional file append).
 -- Files: C:/Users/ANGGARA/Documents/OpenHyperAI/match-trace-p<id>.log
 -- Toggle: Customize.MatchTrace = true/false
--- Extra detail: Customize.MatchTraceVerbose = true (default true while developing)
+-- Extra detail: Customize.MatchTraceVerbose = true
+-- File writes are disabled: Dota bot sandbox usually blocks io.open.
 local MatchTrace = {}
 
 local enabled = true
 local verbose = true
+local perfEnabled = false
+-- Keep WriteFile code, but do not attempt disk I/O (it does not work in-game).
+local WRITE_TO_FILE = false
 local settingsOk, settings = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 if settingsOk and type(settings) == "table" then
 	if settings.MatchTrace == false then
@@ -13,6 +17,13 @@ if settingsOk and type(settings) == "table" then
 	end
 	if settings.MatchTraceVerbose == false then
 		verbose = false
+	end
+	if settings.MatchTraceWriteFile == true then
+		WRITE_TO_FILE = true
+	end
+	-- Perf can run without full MatchTrace decision spam.
+	if settings.MatchTracePerf == true then
+		perfEnabled = true
 	end
 end
 
@@ -100,6 +111,10 @@ function MatchTrace.LogPath(bot)
 end
 
 local function WriteFile(bot, line)
+	-- Disabled: file logging does not work under the bot sandbox.
+	if not WRITE_TO_FILE then
+		return "console-only"
+	end
 	if io == nil or io.open == nil then
 		return "console-only"
 	end
@@ -135,6 +150,89 @@ end
 
 function MatchTrace.Verbose()
 	return verbose
+end
+
+function MatchTrace.PerfEnabled()
+	return perfEnabled
+end
+
+-- Lightweight RealTime() profiler. Enable: Customize.MatchTracePerf = true
+-- Logs spikes + periodic top-N averages to console ([OHA-PERF]).
+local perfStats = {}
+local perfNextReport = 0
+local PERF_SPIKE_MS = 2.5
+local PERF_REPORT_EVERY = 10.0
+
+function MatchTrace.PerfSample(label, elapsedSec)
+	if not perfEnabled or label == nil or elapsedSec == nil then
+		return
+	end
+	local ms = elapsedSec * 1000.0
+	local s = perfStats[label]
+	if s == nil then
+		s = { n = 0, sum = 0, max = 0 }
+		perfStats[label] = s
+	end
+	s.n = s.n + 1
+	s.sum = s.sum + ms
+	if ms > s.max then
+		s.max = ms
+	end
+	if ms >= PERF_SPIKE_MS then
+		print(string.format("[OHA-PERF spike] %s %.2fms t=%.1f", tostring(label), ms, DotaTime()))
+	end
+	local now = RealTime and RealTime() or DotaTime()
+	if now >= perfNextReport then
+		perfNextReport = now + PERF_REPORT_EVERY
+		local rows = {}
+		for name, st in pairs(perfStats) do
+			if st.n > 0 then
+				rows[#rows + 1] = {
+					name = name,
+					avg = st.sum / st.n,
+					max = st.max,
+					n = st.n,
+					sum = st.sum,
+				}
+			end
+		end
+		table.sort(rows, function(a, b)
+			return a.sum > b.sum
+		end)
+		local parts = {}
+		for i = 1, math.min(8, #rows) do
+			local r = rows[i]
+			parts[#parts + 1] =
+				string.format("%s avg=%.2f max=%.2f n=%d", r.name, r.avg, r.max, r.n)
+		end
+		if #parts > 0 then
+			print(string.format("[OHA-PERF top] t=%.1f %s", DotaTime(), table.concat(parts, " | ")))
+		end
+		-- Soft reset max so spikes stay meaningful; keep avg over window via sum/n reset.
+		for _, st in pairs(perfStats) do
+			st.n = 0
+			st.sum = 0
+			st.max = 0
+		end
+	end
+end
+
+function MatchTrace.PerfWrap(label, fn, fallback)
+	if not perfEnabled then
+		return fn
+	end
+	return function(...)
+		local t0 = RealTime and RealTime() or nil
+		local ok, a, b, c = pcall(fn, ...)
+		if t0 ~= nil then
+			MatchTrace.PerfSample(label, (RealTime() - t0))
+		end
+		if ok then
+			return a, b, c
+		end
+		print(string.format("[OHA-PERF err] %s %s", tostring(label), tostring(a)))
+		return fallback
+	end
 end
 
 function MatchTrace.Event(bot, kind, detail)
@@ -199,7 +297,169 @@ local function StandingStillOk(bot, mode)
 	return mode == BOT_MODE_SECRET_SHOP or mode == BOT_MODE_WARD or mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM
 end
 
+-- Game boundary lines for Util/split-console.js. Printed even when tracing is off.
+-- Module state is per script VM, so a team can print the same marker more than once.
+local markerSent = {}
+local nextEndCheck = 0
+
+local function TeamTag(team)
+	return team == TEAM_RADIANT and "radiant" or "dire"
+end
+
+local function Lineup(team)
+	local names = {}
+	for _, pid in ipairs(GetTeamPlayers(team) or {}) do
+		local name = string.gsub(GetSelectedHeroName(pid) or "", "npc_dota_hero_", "")
+		names[#names + 1] = name ~= "" and name or "?"
+	end
+	return table.concat(names, ",")
+end
+
+function MatchTrace.MatchMarker(phase, detail)
+	if markerSent[phase] then
+		return
+	end
+	markerSent[phase] = true
+	print(string.format(
+		"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
+		phase,
+		TeamTag(GetTeam()),
+		DotaTime(),
+		version,
+		detail or ""
+	))
+end
+
+local function AncientDead(team)
+	local ancient = GetAncient(team)
+	return ancient == nil or ancient:GetHealth() <= 0
+end
+
+function MatchTrace.Markers()
+	MatchTrace.MatchMarker(
+		"game",
+		string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE))
+	)
+	if markerSent["end"] or DotaTime() < nextEndCheck then
+		return
+	end
+	nextEndCheck = DotaTime() + 1
+	local gs = GetGameState()
+	if gs ~= GAME_STATE_GAME_IN_PROGRESS and gs ~= GAME_STATE_POST_GAME then
+		return
+	end
+	local radiantDead = AncientDead(TEAM_RADIANT)
+	local direDead = AncientDead(TEAM_DIRE)
+	if gs ~= GAME_STATE_POST_GAME and not radiantDead and not direDead then
+		return
+	end
+	local winner = "unknown"
+	if radiantDead and not direDead then
+		winner = "dire"
+	elseif direDead and not radiantDead then
+		winner = "radiant"
+	end
+	MatchTrace.MatchMarker("end", "winner=" .. winner)
+end
+
+-- [OHA-DEATH]: one line per death of this bot, printed even when tracing is off. The death count
+-- comes from GetHeroDeaths, so a death is caught whether or not this tick runs while dead. The
+-- line shows the bot's state from the last snapshots before it died: "last" is the final one,
+-- "before" the one about 4s earlier (what it was doing before it got caught).
+-- Game 033: the summary's death list came from kill_window, which logs only some enemy deaths,
+-- and showed 26 of the 125 on the scoreboard.
+local function DeathSnap(bot, now)
+	local enemies = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+	local names = {}
+	for _, e in ipairs(enemies) do
+		if e ~= nil and e:IsHero() and not e:IsIllusion() then
+			names[#names + 1] = (string.gsub(e:GetUnitName(), "npc_dota_hero_", ""))
+		end
+	end
+	local loc = bot:GetLocation()
+	return {
+		t = now,
+		mode = bot:GetActiveMode(),
+		desire = bot:GetActiveModeDesire() or 0,
+		hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+		x = math.floor(loc.x),
+		y = math.floor(loc.y),
+		enemies = names,
+		allies = math.max(0, #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) - 1),
+		fountain = math.floor(bot:DistanceFromFountain()),
+		hit = bot:WasRecentlyDamagedByAnyHero(1.0),
+	}
+end
+local function SnapText(s, now)
+	if s == nil then
+		return "-"
+	end
+	return string.format(
+		"%.1fs-ago mode=%s/%.2f hp=%.2f xy=%d,%d fountain=%d allies=%d enemies=%d(%s)%s",
+		now - s.t,
+		ModeName(s.mode),
+		s.desire,
+		s.hp,
+		s.x,
+		s.y,
+		s.fountain,
+		s.allies,
+		#s.enemies,
+		table.concat(s.enemies, ","),
+		s.hit and " hit" or ""
+	)
+end
+local function DeathWatch(bot)
+	local now = DotaTime()
+	local w = bot._deathWatch
+	if w == nil then
+		w = { count = GetHeroDeaths(bot:GetPlayerID()) or 0, snaps = {}, nextSnap = now }
+		bot._deathWatch = w
+	end
+	local count = GetHeroDeaths(bot:GetPlayerID()) or 0
+	if count > w.count then
+		local snaps = w.snaps
+		local last = snaps[#snaps]
+		local before = nil
+		for i = #snaps, 1, -1 do
+			if last ~= nil and last.t - snaps[i].t >= 3.5 then
+				before = snaps[i]
+				break
+			end
+		end
+		-- The bot's think does not run while it is dead, so the count changes at respawn (game 034:
+		-- 12-18s late). t= is the last snapshot taken alive (within 0.5s of the death), and the
+		-- snapshot ages are counted from there.
+		local diedAt = last ~= nil and last.t or now
+		pcall(print, string.format(
+			"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
+			diedAt,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			count,
+			now,
+			SnapText(last, diedAt),
+			SnapText(before, diedAt)
+		))
+		w.count = count
+		w.snaps = {}
+	end
+	if bot:IsAlive() and now >= w.nextSnap then
+		w.nextSnap = now + 0.5
+		local snaps = w.snaps
+		snaps[#snaps + 1] = DeathSnap(bot, now)
+		if #snaps > 12 then
+			table.remove(snaps, 1)
+		end
+	end
+end
+
 function MatchTrace.Tick(bot)
+	if bot ~= nil and bot:IsHero() then
+		MatchTrace.Markers()
+		if not bot:IsIllusion() then
+			pcall(DeathWatch, bot)
+		end
+	end
 	if not enabled or bot == nil or not bot:IsHero() then
 		return
 	end

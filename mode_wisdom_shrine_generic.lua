@@ -52,3 +52,32 @@ function Think()
 	end
 	MapObj.ThinkObjective(bot, loc, "wisdom")
 end
+
+-- [OHA-ERROR] trap (wisdom shrine). From ~11:20 every game an unwrapped entry point fails and the engine only
+-- prints "Script Runtime Error: error in error handling" (its handler cannot run, typically a stack
+-- overflow), then squelches it after 10 copies. Caught here and printed with its name, up to 3 times
+-- per entry point per bot; the failing call still just stops, as before.
+local OHA_TRAP_COUNT = {}
+local function OHA_Trap(name, fn, fallback)
+	if type(fn) ~= "function" then
+		return fn
+	end
+	return function(...)
+		local res = { pcall(fn, ...) }
+		if res[1] then
+			return unpack(res, 2)
+		end
+		local n = (OHA_TRAP_COUNT[name] or 0) + 1
+		OHA_TRAP_COUNT[name] = n
+		if n <= 3 then
+			local hero = "?"
+			pcall(function()
+				hero = GetBot():GetUnitName()
+			end)
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(res[2])))
+		end
+		return fallback
+	end
+end
+GetDesire = OHA_Trap("WISDOM_GetDesire", GetDesire, 0)
+Think = OHA_Trap("WISDOM_Run", Think, nil)

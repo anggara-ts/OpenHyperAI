@@ -55,7 +55,7 @@ m["pos_3"] = {
 	"item_helm_of_the_overlord",
 	"item_ultimate_scepter",
 	"item_blink",
-	"item_heavens_halberd",
+	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_travel_boots",
 	"item_assault",
@@ -145,6 +145,10 @@ end
 local I
 local J
 local K
+-- fix: these helpers were globals; Batrider defines globals with the same names (HasBlink, CanBKB),
+-- so if both bots share globals one hero's checks read the other's items. Forward-declared
+-- locals: the "function X()" definitions at the bottom now assign these.
+local CanDoBlinkRoar, HasBlink, CanBKB
 function a.SkillsComplement()
 	local L = d.Build(b)
 	I = L.isEngaging
@@ -346,18 +350,17 @@ function a.ConsiderCallOfTheWildBoar()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local a8 = b:GetAttackRange()
-	if I then
-		local Z = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
-		local a1 = c.GetNearbyHeroes(b, 800, true, BOT_MODE_NONE)
-		if
-			c.IsValidTarget(E)
-			and c.IsInRange(b, E, 800)
-			and not c.IsInRange(b, E, a8)
-			and Z ~= nil
-			and a1
-			and #Z >= #a1
-		then
-			return BOT_ACTION_DESIRE_HIGH
+	-- Fights: any engage on a hero within 800. It used to need the target outside his attack
+	-- range and allies >= enemies, so in melee range or outnumbered he never summoned it.
+	if I and c.IsValidHero(E) and c.IsInRange(b, E, 800) then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Running away: an enemy hero chasing him within 700 (the boar fights the chaser).
+	if c.IsRetreating(b) then
+		for _, e0 in pairs(c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(e0) and not c.IsSuspiciousIllusion(e0) and c.IsChasingTarget(e0, b) then
+				return BOT_ACTION_DESIRE_HIGH
+			end
 		end
 	end
 	if c.IsPushing(b) or c.IsDefending(b) then
@@ -550,7 +553,9 @@ function a.ConsiderPrimalRoar()
 			return BOT_ACTION_DESIRE_HIGH, ac
 		end
 	end
-	if I and not CanDoBlinkRoar() then
+	-- fix: was "I and not CanDoBlinkRoar()". Blink-Roar is considered first and declines a target
+	-- at or below 50% HP, so with a Blink ready a finishing Roar was never cast.
+	if I then
 		local Z = c.GetNearbyHeroes(b, 800, false, BOT_MODE_NONE)
 		local a1 = c.GetNearbyHeroes(b, O, true, BOT_MODE_NONE)
 		local ac = nil
@@ -572,12 +577,10 @@ function a.ConsiderPrimalRoar()
 				and not W:HasModifier("modifier_stunned")
 			then
 				local _ = c.GetNearbyHeroes(W, 800, false, BOT_MODE_NONE)
-				if
-					Z ~= nil
-					and _ ~= nil
-					and #Z >= #_
-					and (c.GetHP(W) < 0.5 and #Z == 1 or c.GetHP(W) > 0.5 and #Z > #_)
-				then
+				-- fix: dropped "(HP < 50% and he is alone) or (HP > 50% and strictly more allies)":
+				-- Z includes Beastmaster, so with any ally next to him a hurt target was never roared,
+				-- and an even fight never was. Allies >= enemies is the gate, as in the other spells.
+				if Z ~= nil and _ ~= nil and #Z >= #_ then
 					local ah = M(W)
 					if ac == nil or ag and not ah then
 						ac = W
@@ -603,9 +606,12 @@ function a.ConsiderBlinkRoar()
 			end
 			if
 				c.IsValidTarget(af)
-				and c.CanCastOnNonMagicImmune(af)
+				-- fix: Primal Roar pierces (MAGIC_IMMUNE_ENEMIES flag, game data), like the plain Roar checks
+				and c.CanCastOnMagicImmune(af)
 				and c.CanCastOnTargetAdvanced(af)
 				and c.IsInRange(b, af, 1199)
+				-- fix: no Blink when the target is already in Roar range (600); plain Roar does it.
+				and not c.IsInRange(b, af, r:GetCastRange())
 				and c.GetHP(af) > 0.5
 				and not c.IsSuspiciousIllusion(af)
 				and not c.IsDisabled(af)

@@ -24,7 +24,7 @@ m["pos_4"] = {
 	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_force_staff",
+	"item_blink",
 	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_black_king_bar",
@@ -39,14 +39,14 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_magic_wand",
 	"item_boots",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
+	"item_aghanims_shard",
 	"item_pavise",
 	"item_pipe",
 	"item_solar_crest",
 	"item_force_staff",
-	"item_boots_of_bearing",
-	"item_aghanims_shard",
+	"item_blink",
 	"item_ultimate_scepter",
 	"item_wind_waker",
 	"item_ultimate_scepter_2",
@@ -109,6 +109,15 @@ local C, D
 local E = 0
 local F = 0
 local G, H, I, J, K, L
+-- [OHA-WD] lines: throttled per reason, at most once per 5s.
+function a.LogWD(why, fmt, ...)
+	b._wdLogAt = b._wdLogAt or {}
+	if DotaTime() < (b._wdLogAt[why] or -999) then
+		return
+	end
+	b._wdLogAt[why] = DotaTime() + 5
+	pcall(print, string.format("[OHA-WD] t=%.0f " .. why .. " " .. fmt, DotaTime(), ...))
+end
 function a.SkillsComplement()
 	a.ConsiderCombo()
 	if c.CanNotUseAbility(b) or b:IsInvisible() then
@@ -194,10 +203,13 @@ function a.ConsiderQ()
 	local U = o:GetCastRange() + E
 	local V = o:GetCastPoint()
 	local W = o:GetManaCost()
-	local X = 50 + T * 25
+	-- datafeed: Cask base_damage is 55/70/85/100 (+20 per bounce); the old 50 + T * 25 overrated it.
+	local X = o:GetSpecialValueInt("base_damage")
 	local Y = DAMAGE_TYPE_MAGICAL
 	local Z = c.GetNearbyHeroes(b, U + 50, true, BOT_MODE_NONE)
-	local _ = s:GetSpecialValueInt("bounce_range") / 2
+	-- datafeed: bounce_range (575) is a Cask value; it was read from Death Ward (s), which has none, so this was 0
+	-- and the Q-Aoe / Q-Attack / Q-Retreat group checks never saw anyone.
+	local _ = o:GetSpecialValueInt("bounce_range") / 2
 	for a0, a1 in pairs(Z) do
 		if c.IsValidHero(a1) and c.CanCastOnNonMagicImmune(a1) and c.CanCastOnTargetAdvanced(a1) then
 			local a2 = V + GetUnitToUnitDistance(b, a1) / 1000
@@ -206,6 +218,47 @@ function a.ConsiderQ()
 			end
 			if a1:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, a1, "Q-Check:" .. c.Chat.GetNormName(a1)
+			end
+		end
+	end
+	-- Ally save: game report (1:00, Anti-Mage harassing Pudge next to WD with Cask ready, WD did nothing).
+	-- Cask on an enemy hero that is attacking or chasing an ally who is hurt (< 75% HP) or was just hit by it.
+	-- datafeed: Cask cast range 600, mana 80/100/120/140, 0.8s hero stun per bounce, bounce_range 575.
+	if b:GetMana() >= W then
+		local aS = c.GetNearbyHeroes(b, 1600, false, BOT_MODE_NONE)
+		for a0, a1 in pairs(Z) do
+			if
+				c.IsValidHero(a1)
+				and c.IsInRange(b, a1, U)
+				and c.CanCastOnNonMagicImmune(a1)
+				and c.CanCastOnTargetAdvanced(a1)
+				and not c.IsSuspiciousIllusion(a1)
+			then
+				local aT = a1:GetAttackTarget()
+				for a0b, aU in pairs(aS) do
+					if
+						c.IsValidHero(aU)
+						and aU ~= b
+						and not aU:IsIllusion()
+						and aU:GetTeam() == b:GetTeam()
+						and (
+							(c.IsValid(aT) and aT:IsHero() and aT == aU)
+							or (GetUnitToUnitDistance(a1, aU) <= 900 and c.IsChasingTarget(a1, aU))
+						)
+						and (c.GetHP(aU) < 0.75 or aU:WasRecentlyDamagedByHero(a1, 2.0))
+					then
+						pcall(
+							print,
+							string.format(
+								"[OHA-WD] t=%.0f cask-save enemy=%s ally=%s",
+								DotaTime(),
+								a1:GetUnitName(),
+								aU:GetUnitName()
+							)
+						)
+						return BOT_ACTION_DESIRE_HIGH, a1, "Q-Save:" .. c.Chat.GetNormName(a1)
+					end
+				end
 			end
 		end
 	end
@@ -233,7 +286,14 @@ function a.ConsiderQ()
 		then
 			local a4 = botTarget:GetNearbyCreeps(_ * 1.9, false)
 			local a5 = c.GetNearbyHeroes(botTarget, _ * 1.9, false, BOT_MODE_NONE)
-			if #a4 >= 2 or #a5 >= 2 or J < 0.28 then
+			-- Gank on a lone hero (no creeps, no second enemy): Cask was never cast, and Death Ward
+			-- waits while Cask is ready (ConsiderR), so neither came out. Now also when another
+			-- allied hero is near the target (allies list counts WD, who is within cast range).
+			local aAlly = c.GetAlliesNearLoc(botTarget:GetLocation(), 900)
+			if #a4 >= 2 or #a5 >= 2 or J < 0.28 or #aAlly >= 2 then
+				if #a4 < 2 and #a5 < 2 and J >= 0.28 then
+					a.LogWD("cask-gank", "target=%s allies=%d", botTarget:GetUnitName(), #aAlly)
+				end
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack:" .. c.Chat.GetNormName(botTarget)
 			end
 		end
@@ -378,13 +438,16 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Heal only ran with no enemy within 1600 or in attack modes, so in a team fight while WD was
+	-- defending/pushing the heal stayed off (or was toggled off). Now team fights count too.
+	local inFight = c.IsInTeamFight(b, 1200)
 	local ac = c.GetAlliesNearLoc(b:GetLocation(), _)
 	for a0, ae in pairs(ac) do
 		if
 			c.IsValidHero(ae)
 			and c.GetHP(ae) < 0.5
 			and ab ~= nil
-			and #ab == 0
+			and (#ab == 0 or inFight)
 			and not c.IsSuspiciousIllusion(ae)
 			and not ae:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
 			and not ae:HasModifier("modifier_oracle_false_promise_timer")
@@ -463,7 +526,7 @@ function a.ConsiderR()
 	local V = s:GetCastPoint()
 	local W = s:GetManaCost()
 	local X = s:GetAbilityDamage()
-	local Y = DAMAGE_TYPE_PHYSICAL
+	local Y = DAMAGE_TYPE_PURE -- datafeed: Death Ward damage type is pure (4), not physical
 	local _ = 700 - 120
 	local Z = c.GetNearbyHeroes(b, U + _, true, BOT_MODE_NONE)
 	if c.IsInTeamFight(b, 900) then

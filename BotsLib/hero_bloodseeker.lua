@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 3, 2, 3, 1, 3, 6, 1, 1, 1, 3, 6, 2, 2, 2, 6 }, { 2, 3, 3, 1, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local k = j[2]
 if h == "pos_1" then
 	k = j[1]
@@ -32,8 +32,7 @@ end
 if h == "pos_3" then
 	l = c.Skill.GetTalentBuild(i[2])
 end
-local m = { "item_crimson_guard", "item_pipe" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_1"] = {
 	"item_tango",
@@ -52,7 +51,7 @@ o["pos_1"] = {
 	"item_basher",
 	"item_aghanims_shard",
 	"item_abyssal_blade",
-	"item_skadi",
+	"item_butterfly",
 	"item_monkey_king_bar",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -74,7 +73,7 @@ o["pos_2"] = {
 	"item_mjollnir",
 	"item_basher",
 	"item_aghanims_shard",
-	"item_sheepstick",
+	"item_butterfly",
 	"item_travel_boots",
 	"item_abyssal_blade",
 	"item_travel_boots_2",
@@ -92,7 +91,7 @@ o["pos_3"] = {
 	"item_maelstrom",
 	"item_black_king_bar",
 	"item_mjollnir",
-	"item_heavens_halberd",
+	"item_blade_mail",
 	n,
 	"item_basher",
 	"item_travel_boots",
@@ -119,12 +118,11 @@ end
 local q = SafeAbility(b:GetAbilityByName(g[1]), "sAbilityList[1]", "bloodseeker")
 local r = SafeAbility(b:GetAbilityByName(g[2]), "sAbilityList[2]", "bloodseeker")
 local s = SafeAbility(b:GetAbilityByName(g[6]), "sAbilityList[6]", "bloodseeker")
-local t = SafeAbility(b:GetAbilityByName("bloodseeker_blood_mist"), "bloodseeker_blood_mist", "bloodseeker")
 local u = SafeAbility(b:GetAbilityByName("bloodseeker_thirst"), "bloodseeker_thirst", "bloodseeker")
 local v = 0
 local w, x = 0
 local y, z = 0
-local A, B
+local B
 local C
 local D, E, F, G, H
 local I
@@ -140,12 +138,6 @@ function a.SkillsComplement()
 	G = J.level
 	H = J.enemies
 	C = J.target
-	A = a.ConsiderBloodMist()
-	if A > 0 then
-		b:Action_ClearActions(false)
-		b:ActionQueue_UseAbility(t)
-		return
-	end
 	B = a.ConsiderThirst()
 	if B > 0 then
 		c.SetQueuePtToINT(b, false)
@@ -183,27 +175,6 @@ function a.ConsiderThirst()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
-end
-function a.ConsiderBloodMist()
-	if not b:HasScepter() or not c.CanCastAbility(t) then
-		return BOT_MODE_NONE
-	end
-	local K = 450
-	local L = c.GetNearbyHeroes(b, K, true, BOT_MODE_NONE)
-	if t:GetToggleState() == true then
-		if F < 0.2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-		if #L == 0 then
-			return BOT_ACTION_DESIRE_ABSOLUTE
-		end
-	end
-	if not t:GetToggleState() == false and F > 0.5 then
-		if c.IsValidHero(C) and c.IsInRange(b, C, K * 0.8) and c.CanCastOnNonMagicImmune(C) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_MODE_NONE
 end
 function a.ConsiderQ()
 	if not q:IsFullyCastable() then
@@ -271,7 +242,8 @@ function a.ConsiderW()
 			return BOT_ACTION_DESIRE_MODERATE, X.targetloc
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b)) and c.IsAllowedToSpam(b, U) and N == nil or #N == 0 and #V <= 2 then
+	-- Parenthesised: without them "or" let this fire with no push/defend at all whenever no enemy hero was near.
+	if (c.IsPushing(b) or c.IsDefending(b)) and c.IsAllowedToSpam(b, U) and (N == nil or #N == 0) and #V <= 2 then
 		local Y = b:GetNearbyLaneCreeps(1000, true)
 		local X = b:FindAoELocation(true, false, b:GetLocation(), 1000, K / 2, S, M)
 		if X.count >= 4 and #Y >= 4 then
@@ -322,11 +294,13 @@ function a.ConsiderR()
 	local S = s:GetCastPoint()
 	local U = s:GetManaCost()
 	local N = c.GetNearbyHeroes(b, R + 200, true, BOT_MODE_NONE)
+	-- fix: Rupture has DOTA_UNIT_TARGET_FLAG_MAGIC_IMMUNE_ENEMIES / SPELL_IMMUNITY_ENEMIES_YES (game data),
+	-- so the three target checks below now accept BKB heroes (was CanCastOnNonMagicImmune).
 	if c.IsRetreating(b) then
 		for P, W in pairs(N) do
 			if
 				b:WasRecentlyDamagedByHero(W, 1.0)
-				and c.CanCastOnNonMagicImmune(W)
+				and c.CanCastOnMagicImmune(W)
 				and c.CanCastOnTargetAdvanced(W)
 				and not W:HasModifier("modifier_bloodseeker_bloodrage")
 				and not W:HasModifier("modifier_bloodseeker_rupture")
@@ -338,7 +312,7 @@ function a.ConsiderR()
 	if c.IsInTeamFight(b, 1200) then
 		for P, W in pairs(N) do
 			if
-				c.CanCastOnNonMagicImmune(W)
+				c.CanCastOnMagicImmune(W)
 				and c.CanCastOnTargetAdvanced(W)
 				and c.Role.IsCarry(W:GetUnitName())
 				and not W:HasModifier("modifier_bloodseeker_bloodrage")
@@ -352,7 +326,7 @@ function a.ConsiderR()
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(C)
-			and c.CanCastOnNonMagicImmune(C)
+			and c.CanCastOnMagicImmune(C)
 			and c.CanCastOnTargetAdvanced(C)
 			and c.IsInRange(C, b, R + 100)
 			and not C:HasModifier("modifier_bloodseeker_bloodrage")
@@ -361,6 +335,20 @@ function a.ConsiderR()
 		then
 			local a0 = c.GetNearbyHeroes(C, 1200, true, BOT_MODE_NONE)
 			if a0 ~= nil and #a0 >= 2 then
+				return BOT_ACTION_DESIRE_HIGH, C
+			end
+			-- fix: a0 counts Bloodseeker himself, so ">= 2" meant a solo gank never ruptured. Alone,
+			-- rupture a target already below half HP (it cannot run without bleeding).
+			if c.GetHP(C) < 0.5 and not c.IsSuspiciousIllusion(C) then
+				if DotaTime() >= (b._bsRuptureLogAt or -999) then
+					b._bsRuptureLogAt = DotaTime() + 10
+					pcall(print, string.format(
+						"[OHA-BLOODSEEKER] t=%.0f rupture solo %s hp=%.2f",
+						DotaTime(),
+						(string.gsub(C:GetUnitName(), "npc_dota_hero_", "")),
+						c.GetHP(C)
+					))
+				end
 				return BOT_ACTION_DESIRE_HIGH, C
 			end
 		end

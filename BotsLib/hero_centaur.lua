@@ -8,28 +8,26 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 3, 6, 3, 3, 6 } }
+local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_crimson_guard", "item_pipe", "item_lotus_orb" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_ring_of_protection",
 	"item_magic_wand",
-	"item_helm_of_iron_will",
+	"item_boots",
+	"item_double_bracer",
 	"item_phase_boots",
-	"item_veil_of_discord",
 	"item_blink",
+	"item_blade_mail",
 	"item_pipe",
+	"item_heart",
 	"item_shivas_guard",
 	n,
 	"item_aghanims_shard",
-	"item_kaya_and_sange",
-	"item_heart",
 	"item_overwhelming_blink",
 	"item_travel_boots_2",
 	"item_moon_shard",
@@ -48,6 +46,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "centaur_stampede", kind = "none" }, { name = "centaur_hoof_stomp", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(p)
 	e.MinionThink(p)
@@ -99,10 +99,19 @@ function a.SkillsComplement()
 		return
 	end
 	w, x = a.ConsiderDoubleEdge()
-	if w > 0 then
+	-- Guard: never send the unit-target cast without a live target.
+	if w > 0 and c.IsValid(x) then
 		b:Action_UseAbilityOnEntity(r, x)
 		return
 	end
+end
+-- [OHA-CENTAUR] stomp why=kill|group|fight heroes=N, at most once per 3s.
+function a.LogStomp(why, heroes)
+	if DotaTime() < (b._stompLogAt or -999) then
+		return
+	end
+	b._stompLogAt = DotaTime() + 3
+	pcall(print, string.format("[OHA-CENTAUR] t=%.0f stomp why=%s heroes=%d hp=%.2f", DotaTime(), why, heroes, c.GetHP(b)))
 end
 function a.ConsiderHoofStomp()
 	if not q:IsFullyCastable() then
@@ -117,16 +126,33 @@ function a.ConsiderHoofStomp()
 			if N:IsChanneling() or c.IsCastingUltimateAbility(N) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
-			if
-				c.CanKillTarget(N, K, DAMAGE_TYPE_MAGICAL)
-				and not N:HasModifier("modifier_abaddon_borrowed_time")
-				and not N:HasModifier("modifier_dazzle_shallow_grave")
-				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not N:HasModifier("modifier_oracle_false_promise_timer")
-				and not N:HasModifier("modifier_templar_assassin_refraction_absorb")
-			then
+			-- Kill range: stomp even through Shallow Grave and similar saves. The stun still holds
+			-- him for the team; only an already disabled target is skipped.
+			if c.CanKillTarget(N, K, DAMAGE_TYPE_MAGICAL) and not c.IsDisabled(N) then
+				a.LogStomp("kill", 1)
 				return BOT_ACTION_DESIRE_HIGH
 			end
+		end
+	end
+	-- Team fight: the stun is an area. Two or more enemy heroes not already disabled within
+	-- 275 (radius 325 less room for the 0.5s windup), or one in a team fight. The rule below
+	-- only looked at the single target, so Centaur held the stomp with heroes all around him.
+	do
+		local stompable = 0
+		for M, N in pairs(c.GetNearbyHeroes(b, J - 50, true, BOT_MODE_NONE) or {}) do
+			if
+				c.IsValidHero(N)
+				and c.CanCastOnNonMagicImmune(N)
+				and not c.IsSuspiciousIllusion(N)
+				and not c.IsDisabled(N)
+				and not N:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				stompable = stompable + 1
+			end
+		end
+		if stompable >= 2 or H and stompable >= 1 then
+			a.LogStomp(stompable >= 2 and "group" or "fight", stompable)
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if D then
@@ -285,7 +311,9 @@ function a.ConsiderDoubleEdge()
 			and F
 			and b:GetHealth() > K * 1.5
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Return the target: this returned only the desire, so the caller cast Double Edge on
+			-- nil ("nil-target" refusals). Double Edge is unit-target (datafeed behavior 40).
+			return BOT_ACTION_DESIRE_HIGH, C
 		end
 	end
 	if c.IsDoingTormentor(b) then
@@ -296,7 +324,8 @@ function a.ConsiderDoubleEdge()
 			and b:GetHealth() > K * 1.5
 			and (b:GetHealth() - K) / b:GetMaxHealth() > 0.45
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			-- Same nil-target fix as the Roshan branch above.
+			return BOT_ACTION_DESIRE_HIGH, C
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -336,13 +365,37 @@ function a.ConsiderStampede()
 			end
 		end
 	end
+	-- Ally save: Stampede moves every allied hero (datafeed: "leads all allies"), but it was only
+	-- cast for Centaur's own fight or escape. Cast it when an ally anywhere is low, retreating,
+	-- being hit by heroes and has an enemy hero next to him.
+	for _, a1 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if
+			a1 ~= b
+			and c.IsValidHero(a1)
+			and not a1:IsIllusion()
+			and not a1:HasModifier("modifier_arc_warden_tempest_double")
+			and c.GetHP(a1) < 0.35
+			and a1:WasRecentlyDamagedByAnyHero(1.5)
+			and c.IsRetreating(a1)
+			and #c.GetEnemiesNearLoc(a1:GetLocation(), 600) >= 1
+		then
+			if DotaTime() >= (b._stampedeSaveLogAt or -999) then
+				b._stampedeSaveLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-CENTAUR] t=%.0f stampede save ally=%s hp=%.2f", DotaTime(), a1:GetUnitName(), c.GetHP(a1)))
+			end
+			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderWorkHorse()
 	if not s:IsTrained() or not s:IsFullyCastable() or b:HasModifier("modifier_centaur_stampede") then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	if H then
+	-- Team fight: Work Horse gives the Stampede run to Centaur only (datafeed), while Stampede
+	-- carries every ally. The cart was cast first and then blocked Stampede (cart check there), so
+	-- the team never got the charge. Use the cart in a fight only while Stampede is not ready.
+	if H and not (u:IsTrained() and u:IsFullyCastable()) then
 		local _ = c.GetTeamFightLocation(b)
 		local P = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
 		if P ~= nil and #P >= 2 and _ ~= nil then
@@ -379,8 +432,10 @@ function a.ConsiderHitchARide()
 	if D or H then
 		local O = c.GetAlliesNearLoc(b:GetLocation(), S)
 		for M, a0 in pairs(O) do
+			-- a0 ~= b: GetAlliesNearLoc includes Centaur himself; he cannot ride his own cart.
 			if
-				c.IsValidHero(a0)
+				a0 ~= b
+				and c.IsValidHero(a0)
 				and a0:WasRecentlyDamagedByAnyHero(1.1)
 				and c.GetHP(a0) < 0.5
 				and not a0:IsIllusion()
@@ -393,8 +448,10 @@ function a.ConsiderHitchARide()
 	if E then
 		local O = c.GetAlliesNearLoc(b:GetLocation(), S)
 		for M, a0 in pairs(O) do
+			-- a0 ~= b: same self-target guard (a retreating Centaur matched himself).
 			if
-				c.IsValidHero(a0)
+				a0 ~= b
+				and c.IsValidHero(a0)
 				and c.IsRetreating(a0)
 				and a0:WasRecentlyDamagedByAnyHero(1.1)
 				and not a0:IsIllusion()

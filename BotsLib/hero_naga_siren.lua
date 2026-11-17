@@ -21,11 +21,11 @@ m["pos_1"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_manta",
 	"item_orchid",
 	"item_heart",
 	"item_butterfly",
+	"item_skadi",
 	"item_moon_shard",
 	"item_abyssal_blade",
 	"item_bloodthorn",
@@ -234,9 +234,19 @@ function a.ConsiderW()
 		if
 			c.IsValid(a2)
 			and (c.CanCastOnNonMagicImmune(a2) or c.CanCastOnMagicImmune(a2) and b:HasScepter())
+			-- Any channel, not only a TP: Ensnare "interrupts the target" (datafeed), so a channeled
+			-- ultimate is stopped too.
 			and a2:IsChanneling()
-			and a2:HasModifier("modifier_teleporting")
 		then
+			if DotaTime() >= (b._nagaNetLogAt or -999) then
+				b._nagaNetLogAt = DotaTime() + 3
+				pcall(print, string.format(
+					"[OHA-NAGA] t=%.0f ensnare-interrupt target=%s tp=%s",
+					DotaTime(),
+					(string.gsub(a2:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(a2:HasModifier("modifier_teleporting"))
+				))
+			end
 			V = a2
 			W = "W-打断TP:" .. c.Chat.GetNormName(a2)
 			return BOT_ACTION_DESIRE_HIGH, V, W
@@ -314,10 +324,45 @@ function a.ConsiderR()
 	local U = c.GetAroundEnemyHeroList(O)
 	local V = nil
 	local W = nil
+	-- Team save: in a fight, 2+ enemy heroes inside the Song radius and an allied hero (Naga too) under
+	-- 30% HP who was just hit. Song puts every enemy in range in a stasis where they cannot act or be
+	-- attacked (datafeed); it was only cast to ambush or to escape alone.
+	if c.IsInTeamFight(b, 1200) then
+		local foes = 0
+		for _, e0 in pairs(c.GetNearbyHeroes(b, O - 50, true, BOT_MODE_NONE) or {}) do
+			if c.IsValidHero(e0) and c.CanCastOnNonMagicImmune(e0) and not c.IsSuspiciousIllusion(e0) then
+				foes = foes + 1
+			end
+		end
+		if foes >= 2 then
+			for _, ally in pairs(c.GetNearbyHeroes(b, O - 50, false, BOT_MODE_NONE) or {}) do
+				if
+					c.IsValidHero(ally)
+					and not ally:IsIllusion()
+					and c.GetHP(ally) < 0.3
+					and ally:WasRecentlyDamagedByAnyHero(2.0)
+				then
+					if DotaTime() >= (b._nagaSongLogAt or -999) then
+						b._nagaSongLogAt = DotaTime() + 3
+						pcall(print, string.format(
+							"[OHA-NAGA] t=%.0f song-save ally=%s hp=%.2f foes=%d",
+							DotaTime(),
+							(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+							c.GetHP(ally),
+							foes
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH, ally, "R-save"
+				end
+			end
+		end
+	end
 	if c.IsGoingOnSomeone(b) then
+		-- The target must be inside the Song radius (900/1150/1400, game data): it took 800-1400 at
+		-- every level, so at level 1-2 the target could stand outside the Song it was cast for.
 		if
 			c.IsValidHero(botTarget)
-			and c.IsInRange(b, botTarget, 1400)
+			and c.IsInRange(b, botTarget, math.min(1400, O - 50))
 			and not c.IsInRange(b, botTarget, 800)
 			and c.CanCastOnNonMagicImmune(botTarget)
 			and not botTarget:WasRecentlyDamagedByAnyHero(3.0)

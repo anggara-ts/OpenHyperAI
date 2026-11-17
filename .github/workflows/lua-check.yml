@@ -1,0 +1,45 @@
+name: Lua check
+
+on:
+  push:
+    branches: [main, update-mechanism-7.41f, plugin-fretbots]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Syntax (LuaJIT, like the game)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LuaJIT
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
+      - name: Compile every Lua file
+        run: |
+          luajit -v
+          fail=0; n=0
+          while IFS= read -r -d '' f; do
+            n=$((n+1))
+            if ! out=$(luajit -b "./$f" /dev/null 2>&1); then
+              echo "::error file=${f#./}::$out"
+              fail=$((fail+1))
+            fi
+          done < <(git ls-files -z -- '*.lua')
+          echo "checked $n files, $fail failed"
+          [ "$fail" -eq 0 ]
+
+  lint:
+    name: Lint (luacheck, report only)
+    runs-on: ubuntu-latest
+    # Report only for now: the code base predates the lint. Make it blocking once the
+    # warnings are cleaned up (remove continue-on-error).
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install luacheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lua-check
+      - name: Run luacheck
+        run: luacheck . --formatter plain --codes

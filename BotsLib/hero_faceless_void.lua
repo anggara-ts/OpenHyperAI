@@ -8,7 +8,8 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 2, 6, 2, 2, 6 } }
+-- Time Walk first, then Time Lock, Time Dilation last; Chronosphere at 6/12/18.
+local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -43,6 +44,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "faceless_void_chronosphere", kind = "point" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -55,14 +58,11 @@ local r = SafeAbility(
 	"faceless_void_time_walk_reverse",
 	"faceless_void"
 )
-local s = SafeAbility(b:GetAbilityByName("faceless_void_time_zone"), "faceless_void_time_zone", "faceless_void")
 local t, u
 local v
 local w, x
 local y
-local z, A
 local B
-local C, D = 0, GameTime()
 local E
 local F
 local G
@@ -72,9 +72,6 @@ function a.SkillsComplement()
 	end
 	F = c.IsGoingOnSomeone(b)
 	G = c.IsRetreating(b)
-	if not q or q:IsHidden() then
-		q = SafeAbility(b:GetAbilityByName("faceless_void_time_zone"), "faceless_void_time_zone", "faceless_void")
-	end
 	E = c.GetProperTarget(b)
 	y = a.ConsiderTimeWalkReverse()
 	if y > 0 then
@@ -94,38 +91,9 @@ function a.SkillsComplement()
 		b:Action_UseAbility(p)
 		return
 	end
-	if q and not q:IsNull() and not q:IsHidden() then
-		if b.needRefreshAbilitiesFor737 then
-			q = SafeAbility(
-				b:GetAbilityByName("faceless_void_chronosphere"),
-				"faceless_void_chronosphere",
-				"faceless_void"
-			)
-			g = c.Skill.GetAbilityList(b)
-			a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
-			b:ActionImmediate_Chat("I now have my Chronosphere back. Thanks!", true)
-			b.needRefreshAbilitiesFor737 = false
-		end
-		w, x = a.ConsiderChronosphere()
-		if w > 0 then
-			b:Action_UseAbilityOnLocation(q, x)
-			return
-		end
-	else
-		b.needRefreshAbilitiesFor737 = true
-		if C <= 2 and GameTime() - D > 15 + b:GetPlayerID() then
-			D = GameTime()
-			C = C + 1
-			b:ActionImmediate_Chat(
-				"Due to Valve bug in 7.37. I lost Chronosphere. Please enable Fretbots mode in this script to fix this problem. Check Workshop page if you need help.",
-				true
-			)
-		end
-	end
-	z, A = a.ConsiderTimezone()
-	if z > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnLocation(s, A)
+	w, x = a.ConsiderChronosphere()
+	if w > 0 then
+		b:Action_UseAbilityOnLocation(q, x)
 		return
 	end
 end
@@ -184,7 +152,9 @@ function a.ConsiderTimeWalk()
 						local U = c.GetHP(b)
 						local V = E:GetHealth()
 						local W = b:GetAttackDamage()
-						local X = U < 0.3
+						-- Target low, not Void low: "U < 0.3" (Void's own HP) made him Time Walk in when he
+					-- was nearly dead and skip it when the target was.
+					local X = c.GetHP(E) < 0.3
 						local Y = V <= W * 3
 						local Z = E:GetNearbyTowers(700, false)
 						if (X or Y) and Z ~= nil and #Z == 0 then
@@ -325,7 +295,13 @@ function a.ConsiderChronosphere()
 	if c.IsInTeamFight(b, 1200) then
 		local ag = b:FindAoELocation(true, true, b:GetLocation(), H, aa / 1.2, M, 0)
 		local R = c.GetEnemiesNearLoc(ag.targetloc, aa / 1.2)
-		if R ~= nil and #R >= 2 then
+		-- Chronosphere pauses allies too (datafeed: "friendly or enemy, except those owned by
+		-- Faceless Void"). Skip a sphere that freezes as many of our heroes as enemies.
+		local frozen = a.AlliesInChrono(ag.targetloc, aa)
+		if R ~= nil and #R >= 2 and frozen >= #R then
+			a.LogChrono("skip-allies", #R, frozen)
+		end
+		if R ~= nil and #R >= 2 and frozen < #R then
 			local ah = nil
 			local ai = 10000
 			for _, a0 in pairs(R) do
@@ -400,6 +376,7 @@ function a.ConsiderChronosphere()
 						and not c.IsLocationInChrono(ag.targetloc)
 						and not c.IsLocationInBlackHole(ag.targetloc)
 						and not c.IsLocationInArena(ag.targetloc, aa)
+						and a.AlliesInChrono(ag.targetloc, aa) < #aj
 					then
 						return BOT_ACTION_DESIRE_HIGH, ag.targetloc
 					end
@@ -408,6 +385,23 @@ function a.ConsiderChronosphere()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Our heroes (not Void) that a sphere at loc would pause.
+function a.AlliesInChrono(loc, radius)
+	local n = 0
+	for _, ally in pairs(c.GetAlliesNearLoc(loc, radius) or {}) do
+		if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() then
+			n = n + 1
+		end
+	end
+	return n
+end
+function a.LogChrono(why, enemies, allies)
+	if DotaTime() < (b._chronoLogAt or -999) then
+		return
+	end
+	b._chronoLogAt = DotaTime() + 5
+	pcall(print, string.format("[OHA-VOID] t=%.0f chrono %s enemies=%d allies=%d", DotaTime(), why, enemies, allies))
 end
 function a.ConsiderTimeWalkReverse()
 	if not r:IsTrained() or not r:IsFullyCastable() or not r:IsActivated() then
@@ -440,49 +434,6 @@ function a.ConsiderTimeWalkReverse()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderTimezone()
-	if not s or s:IsNull() or not s:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	local H = c.GetProperCastRange(false, b, s:GetCastRange())
-	local aa = s:GetSpecialValueInt("radius")
-	if c.IsInTeamFight(b, 1600) then
-		local ag = b:FindAoELocation(true, true, b:GetLocation(), H, aa, 0, 0)
-		local Q = c.GetAlliesNearLoc(ag.targetloc, aa)
-		local R = c.GetEnemiesNearLoc(ag.targetloc, aa)
-		if Q ~= nil and R ~= nil and #Q >= 2 and #R >= 2 then
-			local ak = 0
-			for _, a0 in pairs(R) do
-				if
-					c.IsValidHero(a0)
-					and not c.IsSuspiciousIllusion(a0)
-					and c.GetHP(a0) > 0.25
-					and c.CanBeAttacked(a0)
-					and not a0:HasModifier("modifier_abaddon_borrowed_time")
-					and not a0:HasModifier("modifier_necrolyte_reapers_scythe")
-				then
-					ak = ak + 1
-				end
-			end
-			if ak >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, ag.targetloc
-			end
-		end
-	end
-	if F then
-		if
-			c.IsValidTarget(E)
-			and c.CanBeAttacked(E)
-			and c.IsInRange(b, E, H)
-			and not c.IsSuspiciousIllusion(E)
-			and not E:HasModifier("modifier_abaddon_borrowed_time")
-			and not E:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			return BOT_ACTION_DESIRE_HIGH, E:GetLocation()
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 function IsAllowedToCast(al)
 	if q ~= nil and not q:IsNull() and q:IsTrained() and q:IsFullyCastable() then

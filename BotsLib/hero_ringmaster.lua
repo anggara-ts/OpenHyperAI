@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 3, 1, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -16,10 +16,10 @@ m["pos_4"] = {
 	"item_enchanted_mango",
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_mekansm",
+	"item_blink",
 	"item_glimmer_cape",
 	"item_rod_of_atos",
-	"item_guardian_greaves",
+	"item_aether_lens",
 	"item_gungir",
 	"item_shivas_guard",
 	"item_aghanims_shard",
@@ -31,10 +31,10 @@ m["pos_4"] = {
 }
 m["pos_5"] = {
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_crystal_maiden_outfit",
+	"item_blink",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_aether_lens",
 	"item_pipe",
 	"item_rod_of_atos",
 	"item_gungir",
@@ -107,8 +107,6 @@ local u = SafeAbility(b:GetAbilityByName("ringmaster_empty_souvenir"), "ringmast
 local v = SafeAbility(b:GetAbilityByName("ringmaster_funhouse_mirror"), "ringmaster_funhouse_mirror", "ringmaster")
 local w = SafeAbility(b:GetAbilityByName("ringmaster_strongman_tonic"), "ringmaster_strongman_tonic", "ringmaster")
 local x = SafeAbility(b:GetAbilityByName("ringmaster_whoopee_cushion"), "ringmaster_whoopee_cushion", "ringmaster")
-local y = SafeAbility(b:GetAbilityByName("ringmaster_crystal_ball"), "ringmaster_crystal_ball", "ringmaster")
-local z = SafeAbility(b:GetAbilityByName("ringmaster_weighted_pie"), "ringmaster_weighted_pie", "ringmaster")
 local A = SafeAbility(b:GetAbilityByName("ringmaster_summon_unicycle"), "ringmaster_summon_unicycle", "ringmaster")
 local B, C
 local D
@@ -119,8 +117,6 @@ local K, L
 local M
 local N, O
 local P
-local Q, R
-local S, T
 local U
 local V
 local W, X
@@ -173,14 +169,18 @@ function a.SkillsComplement()
 		return
 	end
 	E, F = a.ConsiderEscapeAct()
+	-- return after queueing: without it a later Action_* (Tonic, Funhouse Mirror, Unicycle) in the same
+	-- think replaced the queue, so the Box save or the dagger was dropped.
 	if E > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnEntity(q, F)
+		return
 	end
 	G, H = a.ConsiderImpalementArts()
 	if G > 0 then
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(r, H)
+		return
 	end
 	N, O = a.ConsiderStrongmanTonic()
 	if N > 0 then
@@ -196,16 +196,6 @@ function a.SkillsComplement()
 	M = a.ConsiderFunhouseMirror()
 	if M > 0 then
 		b:Action_UseAbility(v)
-		return
-	end
-	Q, R = a.ConsiderCrystalBall()
-	if Q > 0 then
-		b:ActionQueue_UseAbilityOnLocation(y, R)
-		return
-	end
-	S, T = a.ConsiderWeightedPie()
-	if S > 0 then
-		b:Action_UseAbilityOnEntity(z, T)
 		return
 	end
 	U = a.ConsiderUnicycle()
@@ -628,9 +618,14 @@ function a.ConsiderSpotlight()
 	local a9 = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local aa = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	if c.IsInTeamFight(b, 1200) then
-		local ad = b:FindAoELocation(false, true, b:GetLocation(), a2, am, 0, 0)
-		local aw = c.GetAlliesNearLoc(ad.targetloc, am)
+		-- datafeed: the light makes ENEMIES miss and reveals them; this searched for a spot with 2+ allies.
+		local ad = b:FindAoELocation(true, true, b:GetLocation(), a2, am, 0, 0)
+		local aw = c.GetEnemiesNearLoc(ad.targetloc, am)
 		if #aw >= 2 then
+			if DotaTime() >= (b._spotlightLogAt or -999) then
+				b._spotlightLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-RINGMASTER] t=%.0f spotlight on %d enemies", DotaTime(), #aw))
+			end
 			return BOT_ACTION_DESIRE_HIGH, ad.targetloc
 		end
 	end
@@ -680,7 +675,10 @@ function a.ConsiderWheelOfWonder()
 	if c.IsInTeamFight(b, 1600) then
 		local ad = b:FindAoELocation(true, true, b:GetLocation(), a2, am, 0, 0)
 		local ax = c.GetEnemiesNearLoc(ad.targetloc, am)
-		if #ax >= 2 then
+		-- datafeed: Wheel has a 700 minimum range (min_range). A spot much closer than that makes the wheel
+		-- stop past the group, so skip spots nearer than min_range minus most of the mesmerize radius.
+		local minRange = t:GetSpecialValueInt("min_range")
+		if #ax >= 2 and GetUnitToLocationDistance(b, ad.targetloc) >= minRange - am * 0.6 then
 			return BOT_ACTION_DESIRE_HIGH, ad.targetloc
 		end
 	end
@@ -706,7 +704,8 @@ function a.ConsiderFunhouseMirror()
 		end
 	end
 	if c.IsDoingRoshan(b) or c.IsDoingTormentor(b) then
-		if (c.IsRoshan(W) or c.IsTormentor(b)) and c.IsInRange(b, W, 900) and _ then
+		-- was c.IsTormentor(b) (Ringmaster himself), never true
+		if (c.IsRoshan(W) or c.IsTormentor(W)) and c.IsInRange(b, W, 900) and _ then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -811,59 +810,6 @@ function a.ConsiderWhoopeeCushion()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-function a.ConsiderCrystalBall()
-	if not c.CanCastAbility(y) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	for aA, aB in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		if IsHeroAlive(aB) then
-			local aC = GetHeroLastSeenInfo(aB)
-			if aC ~= nil then
-				local aD = aC[1]
-				if
-					aD ~= nil
-					and c.GetLocationToLocationDistance(b:GetLocation(), aD.location) <= 100000
-					and aD.time_since_seen > 3
-				then
-					return BOT_ACTION_DESIRE_HIGH, aD.location
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function a.ConsiderWeightedPie()
-	if not c.CanCastAbility(z) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local a2 = c.GetProperCastRange(false, b, z:GetCastRange())
-	local aa = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	if Y then
-		if
-			c.IsValidHero(W)
-			and c.IsInRange(b, W, a2 / 3)
-			and c.CanCastOnNonMagicImmune(W)
-			and not W:IsInvulnerable()
-			and not W:HasModifier("modifier_ringmaster_weightedpie_blind")
-		then
-			return BOT_ACTION_DESIRE_HIGH, W
-		end
-	end
-	if Z and not c.IsRealInvisible(b) then
-		for ab, ac in pairs(aa) do
-			if
-				c.IsValidHero(ac)
-				and c.IsInRange(b, ac, a2)
-				and c.CanCastOnNonMagicImmune(ac)
-				and (a0 < 0.5 or c.IsChasingTarget(ac, b))
-				and not ac:HasModifier("modifier_ringmaster_weightedpie_blind")
-			then
-				return BOT_ACTION_DESIRE_HIGH, ac
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 function a.ConsiderUnicycle()
 	if not c.CanCastAbility(A) then
 		return BOT_ACTION_DESIRE_NONE
@@ -894,11 +840,20 @@ function a.ConsiderUnicycle()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- It checked c.IsValid(aE) instead of the attacker and never asked what the enemy was attacking, so any
+-- visible enemy hero or tower made it true: Box on self below 25% HP and Tonic on self below 50% fired
+-- anywhere on the map. Now the enemy must be attacking aE.
 function a.IsBeingAttacked(aE)
+	if not c.IsValid(aE) then
+		return false
+	end
 	for ab, ac in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-		if c.IsValid(aE) then
+		if c.IsValid(ac) then
 			local aF = ac:GetUnitName()
-			if c.IsValidHero(ac) or c.IsValidBuilding(ac) or string.find(aF, "warlock_golem") then
+			if
+				(c.IsValidHero(ac) or c.IsValidBuilding(ac) or string.find(aF, "warlock_golem"))
+				and ac:GetAttackTarget() == aE
+			then
 				return true
 			end
 		end

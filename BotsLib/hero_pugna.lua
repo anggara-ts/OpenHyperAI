@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 3, 6, 3, 3, 6 } }
+local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -41,13 +41,13 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_magic_wand",
 	"item_boots",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_pipe",
 	"item_aether_lens",
 	"item_aghanims_shard",
 	"item_force_staff",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_cyclone",
 	"item_moon_shard",
 	"item_sheepstick",
@@ -129,6 +129,10 @@ k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
 a["bDeafaultItem"] = true
+-- Declared before MinionThink: it was declared below it, so MinionThink set a global and the
+-- Decrepify-the-ward check in ConsiderW read a local that was always nil (datafeed notes:
+-- Decrepify "Can be used on your Nether Ward").
+local hNetherWard = nil
 function a.MinionThink(n)
 	if e.IsValidUnit(n) then
 		if c.IsKeyWordUnit("pugna_nether_ward", n) then
@@ -149,7 +153,6 @@ local x, y
 local z, A
 local B = 0
 local C = 0
-local hNetherWard = nil
 local D, E, F, G, H, I
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) or b:IsInvisible() then
@@ -200,7 +203,8 @@ function a.ConsiderQ()
 	local K = o:GetLevel()
 	local L = o:GetCastRange() + B
 	local M = o:GetSpecialValueInt("radius")
-	local N = o:GetCastPoint() + o:GetSpecialValueInt("delay")
+	-- datafeed: Nether Blast delay is 0.8s; GetSpecialValueInt truncated it to 0.
+	local N = o:GetCastPoint() + o:GetSpecialValueFloat("delay")
 	local O = o:GetManaCost()
 	local P = o:GetSpecialValueInt("blast_damage") + C
 	local Q = DAMAGE_TYPE_MAGICAL
@@ -490,7 +494,9 @@ function a.ConsiderR()
 			local ae = GetUnitList(UNIT_LIST_ALLIES)
 			for T, af in pairs(ae) do
 				if string.find(af:GetUnitName(), "nether_ward") and c.IsInRange(b, af, L) then
-					return BOT_ACTION_DESIRE_HIGH, af, "Nether Ward" .. c.Chat.GetNormName(botTarget)
+					-- The debug label read GetNormName(botTarget), which errors when botTarget is nil
+					-- and aborted the whole think; the ward's own name is enough.
+					return BOT_ACTION_DESIRE_HIGH, af, "Nether Ward"
 				end
 			end
 		end

@@ -23,11 +23,12 @@ m["pos_2"] = {
 	"item_boots",
 	"item_power_treads",
 	"item_witch_blade",
+	-- Shard right after Witch Blade, before Kaya and Sange (user call).
+	"item_aghanims_shard",
 	"item_kaya_and_sange",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_shivas_guard",
-	"item_aghanims_shard",
 	"item_travel_boots",
 	"item_devastator",
 	"item_cyclone",
@@ -43,11 +44,12 @@ m["pos_1"] = {
 	"item_boots",
 	"item_power_treads",
 	"item_witch_blade",
+	-- Shard right after Witch Blade, before Kaya and Sange (user call).
+	"item_aghanims_shard",
 	"item_kaya_and_sange",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_shivas_guard",
-	"item_aghanims_shard",
 	"item_travel_boots",
 	"item_devastator",
 	"item_cyclone",
@@ -107,6 +109,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "queenofpain_sonic_wave", kind = "point" } }
 a["bDeafaultItem"] = true
 function a.MinionThink(n)
 	if e.IsValidUnit(n) then
@@ -277,7 +281,8 @@ function a.ConsiderW()
 	local M = p:GetCastPoint()
 	local N = p:GetManaCost()
 	local O = p:GetAbilityDamage()
-	local Z = q:GetAbilityDamage()
+	-- datafeed: Scream of Pain has no AbilityDamage; its damage is the special value "damage" (90/175/260/345).
+	local Z = q:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = c.GetAroundEnemyHeroList(L)
 	local S = nil
@@ -335,8 +340,9 @@ function a.ConsiderW()
 					S = a6
 					T = "W-对线赶路"
 					if c.IsValidHero(b:GetTarget()) then
-						if c.CanKillTarget(b:GetTarget(), Z, DAMAGE_TYPE_MAGICAL) and q.IsFullyCastable() then
-							return BOT_ACTION_DESIRE_VERYHIGH
+						if c.CanKillTarget(b:GetTarget(), Z, DAMAGE_TYPE_MAGICAL) and q:IsFullyCastable() then
+							-- Return the blink location too: the caller casts Blink on w, and nil there broke the cast.
+							return BOT_ACTION_DESIRE_VERYHIGH, S, T
 						end
 					end
 					return BOT_ACTION_DESIRE_MODERATE, S, T
@@ -393,7 +399,9 @@ function a.ConsiderE()
 	local M = q:GetCastPoint()
 	local ac = q:GetSpecialValueInt("area_of_effect")
 	local N = q:GetManaCost()
-	local O = q:GetAbilityDamage()
+	-- datafeed: Scream of Pain has no AbilityDamage; its damage is the special value "damage" (90/175/260/345).
+	-- GetAbilityDamage() gave 0, so the kill and lane last-hit checks never fired.
+	local O = q:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = c.GetAroundEnemyHeroList(ac - 30)
 	local R = c.GetAroundEnemyHeroList(ac + 200)
@@ -407,7 +415,8 @@ function a.ConsiderE()
 		end
 	end
 	if c.IsGoingOnSomeone(b) then
-		if c.IsValidHero(botTarget) and c.IsInRange(botTarget, b, ac - 20) and c.CanCastOnMagicImmune(botTarget) then
+		-- Scream of Pain is SPELL_IMMUNITY_ENEMIES_NO (game files): a magic-immune target takes nothing.
+		if c.IsValidHero(botTarget) and c.IsInRange(botTarget, b, ac - 20) and c.CanCastOnNonMagicImmune(botTarget) then
 			S = botTarget
 			T = "E-攻击" .. c.Chat.GetNormName(S)
 			return BOT_ACTION_DESIRE_HIGH, S, T
@@ -505,9 +514,8 @@ function a.ConsiderR()
 	local N = r:GetManaCost()
 	local O = r:GetSpecialValueInt("damage")
 	local ac = r:GetSpecialValueInt("final_aoe") * 0.88
-	if b:HasScepter() then
-		O = r:GetSpecialValueInt("damage_scepter")
-	end
+	-- datafeed: Sonic Wave has no "damage_scepter" (the Scepter now upgrades Shadow Strike), so the old
+	-- Scepter override set the damage to 0 and broke the kill check; it is removed.
 	local P = DAMAGE_TYPE_PURE
 	local Q = c.GetAroundEnemyHeroList(L)
 	local S = nil

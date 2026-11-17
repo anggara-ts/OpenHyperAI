@@ -228,18 +228,27 @@ function C(aH, aI)
 	end
 	local aL = v()
 	local aM = 0
+	-- Heroes and creeps both count. The list used to be heroes only, so the creep
+	-- weights below never applied and a creep wave read as 0.
+	local units = {}
 	for aq, aE in ipairs(aL.enemyHeroes) do
+		units[#units + 1] = aE
+	end
+	for aq, aE in ipairs(aL.enemyCreeps) do
+		units[#units + 1] = aE
+	end
+	for aq, aE in ipairs(units) do
 		if Z.IsValid(aE) and GetUnitToLocationDistance(aE, aH) <= aI then
-			local aN = aE:GetUnitName()
+			local aN = aE:GetUnitName() or ""
 			if Z.IsValidHero(aE) and not Z.IsSuspiciousIllusion(aE) then
 				aM = aM + (Z.IsCore(aE) and 1 or 0.5)
-			elseif { string.find(aN, "upgraded_mega") } ~= nil then
+			elseif string.find(aN, "upgraded_mega", 1, true) ~= nil then
 				aM = aM + 0.6
-			elseif { string.find(aN, "upgraded") } ~= nil then
+			elseif string.find(aN, "upgraded", 1, true) ~= nil then
 				aM = aM + 0.4
-			elseif { string.find(aN, "siege") } ~= nil and { string.find(aN, "upgraded") } == nil then
+			elseif string.find(aN, "siege", 1, true) ~= nil then
 				aM = aM + 0.5
-			elseif { string.find(aN, "warlock_golem") } ~= nil or { string.find(aN, "lone_druid_bear") } ~= nil then
+			elseif string.find(aN, "warlock_golem", 1, true) ~= nil or string.find(aN, "lone_druid_bear", 1, true) ~= nil then
 				aM = aM + 1
 			elseif
 				aE:IsCreep()
@@ -255,6 +264,50 @@ function C(aH, aI)
 	aM = math.floor(aM)
 	U[aJ] = { t = ag, count = aM }
 	return aM
+end
+-- Plain count of enemy creeps and summons near a spot, no weights.
+local function CountEnemyCreepsNear(loc, radius)
+	if loc == nil then
+		return 0
+	end
+	local n = 0
+	for aq, aE in ipairs(v().enemyCreeps) do
+		if Z.IsValid(aE) and aE:IsAlive() and GetUnitToLocationDistance(aE, loc) <= radius then
+			n = n + 1
+		end
+	end
+	return n
+end
+-- Records why a lane's defend desire came back zero, for the [OHA-DEFEND] log.
+local function DefNone(af, why)
+	af._defendWhy = why
+	return a2.None
+end
+local BASE_CREEP_RADIUS = 1400
+-- Our base is being hit: heroes at the Ancient or on high ground, the Ancient
+-- below 95%, or a creep wave at the T4s.
+local function ReadBaseThreat(az)
+	local am = az.ourAncient
+	local s = {
+		exposed = false,
+		ancHP = az.ancientHP or 1,
+		heroes = az.enemiesAtAncient or 0,
+		hg = az.enemiesOnHG or 0,
+		creeps = 0,
+		t4 = 0,
+	}
+	if am == nil or not am:IsAlive() then
+		return s
+	end
+	s.creeps = CountEnemyCreepsNear(am:GetLocation(), BASE_CREEP_RADIUS)
+	for _, id in ipairs({ TOWER_BASE_1, TOWER_BASE_2 }) do
+		local tower = GetTower(az.team, id)
+		if tower ~= nil and tower:IsAlive() then
+			s.t4 = s.t4 + 1
+		end
+	end
+	s.exposed = s.heroes >= 1 or s.hg >= 1 or s.ancHP < 0.95 or s.creeps >= 2
+	return s
 end
 function D()
 	local aO = { a3.Top, a3.Mid, a3.Bot }
@@ -284,6 +337,32 @@ function D()
 	R = { lane = aP, ["until"] = DotaTime() + 3 }
 	return aP
 end
+-- Lane of a base threat: most enemy heroes last seen (8s) within 2200 of that lane's high-ground
+-- spot (G: in front of the T3 / barracks). Kept 20s when they drop out of sight, so a Dire push
+-- that steps into fog does not hand the base to the first lane in the list (top); creep-only
+-- threats fall back to the D() lane.
+local baseLaneMem = { lane = nil, t = -999 }
+local function BaseThreatLane(team, fallback)
+	local best, bestN = nil, 0
+	for _, lane in ipairs({ a3.Top, a3.Mid, a3.Bot }) do
+		local loc = G(team, lane)
+		if loc ~= nil then
+			local n = y(loc, 2200, 8)
+			if n > bestN then
+				best, bestN = lane, n
+			end
+		end
+	end
+	if best ~= nil then
+		baseLaneMem = { lane = best, t = DotaTime() }
+		return best, "seen"
+	end
+	if baseLaneMem.lane ~= nil and DotaTime() - baseLaneMem.t <= 20 then
+		return baseLaneMem.lane, "remembered"
+	end
+	return fallback, "fallback"
+end
+local laneNames = { [a3.Top] = "top", [a3.Mid] = "mid", [a3.Bot] = "bot" }
 function E(aZ, a_)
 	local b0 = nil
 	local b1 = math.huge
@@ -296,7 +375,8 @@ function E(aZ, a_)
 				do
 					local b4 = 1
 					while b4 <= #aZ do
-						if b3 == aZ[b4 + 1] then
+						-- Was aZ[b4 + 1]: skipped the first position in the list (pos 4 in { 4, 5, 3 }).
+						if b3 == aZ[b4] then
 							local ar = GetUnitToLocationDistance(b2, a_)
 							if ar < b1 then
 								b1 = ar
@@ -531,6 +611,9 @@ function r.ShouldDefend(af, bu, aI)
 	for aq, aE in ipairs(aL.enemyCreeps) do
 		if Z.IsValid(aE) and GetUnitToUnitDistance(bu, aE) <= aI then
 			local aN = aE:GetUnitName()
+			-- NOTE: a table literal is never nil, so these tests do not do what they say: every
+			-- creep lands in the upgraded_mega branch (0.6). Left as is on purpose, since the
+			-- current tower defense is tuned around that count.
 			if { string.find(aN, "siege") } ~= nil and { string.find(aN, "upgraded") } == nil then
 				bw = bw + 0.5
 			elseif { string.find(aN, "upgraded_mega") } ~= nil then
@@ -688,12 +771,12 @@ function r.GetDefendDesireHelper(af, aF)
 				af._defendCommitLane = aF
 				af._defendCommitUntil = DotaTime() + 5
 			else
-				return a2.None
+				return DefNone(af, "committed-other")
 			end
 		elseif aF ~= aP then
 			af._defendCommitLane = aP
 			af._defendCommitUntil = DotaTime() + 5
-			return a2.None
+			return DefNone(af, "other-lane")
 		else
 			af._defendCommitLane = aP
 			af._defendCommitUntil = DotaTime() + 5
@@ -716,15 +799,15 @@ function r.GetDefendDesireHelper(af, aF)
 			or Z.GetPosition(af) == 5 and bZ < 4
 		)
 	then
-		return a2.None
+		return DefNone(af, "level")
 	end
 	if bZ < 3 then
-		return a2.None
+		return DefNone(af, "level")
 	end
 	if az.isLaningPhase and af:GetAssignedLane() == aF then
 		local b_ = Z.GetLastSeenEnemiesNearLoc(bX.defendLoc, 1200)
 		if #b_ <= 1 then
-			return a2.None
+			return DefNone(af, "laning")
 		end
 	end
 	local c0 = false
@@ -750,13 +833,41 @@ function r.GetDefendDesireHelper(af, aF)
 	local c8 = D()
 	local c9 = az.enemiesOnHG
 	local ca = az.enemiesAtAncient
-	if c0 and c9 < 2 then
-		return a2.None
+	-- Three allies pushing together keep pushing, unless our own base is being hit.
+	-- A creep wave at the T4s used to lose the Ancient while the group pushed.
+	local baseThreat = ReadBaseThreat(az)
+	local baseHit = baseThreat.ancHP < 0.95 or baseThreat.creeps >= 2 or ca >= 1
+	if c0 and c9 < 2 and not baseHit then
+		return DefNone(af, "push-group")
 	end
 	local cb = am and am:IsAlive() and az.ancientHP < 0.4
-	local cc = not cb and az.aliveEnemyCount >= 3 and az.aliveEnemyCount > az.aliveAllyCount + 1
+	-- Last stand: enemy heroes at our Ancient while it is hurt or both T4s are gone. Game 036,
+	-- 55:00-55:28: defend read 0.30-0.46 ("ancient-heroes", capped at L) and 0.06-0.12 for Ogre
+	-- ("hg-outnumbered"), and the Ancient fell from 0.77 to 0.13 with all five Radiant alive.
+	-- Then: no outnumbered cut, no half desire, and the desire may reach 0.9 (above farm, push and
+	-- most retreat rules; attack at 0.95 still fights). Not for a bot under 30% HP.
+	local lastStand = am
+		and am:IsAlive()
+		and ca >= 1
+		and (az.ancientHP < 0.95 or baseThreat.t4 == 0)
+		and Z.GetHP(af) >= 0.3
+	local lastStandDesire = 0.9
+	if lastStand and DotaTime() >= (af._ancLastStandLogAt or -999) then
+		af._ancLastStandLogAt = DotaTime() + 5
+		pcall(print, string.format(
+			"[OHA-DEFEND] t=%.0f %s ancient-last-stand lane=%s anc=%.2f heroesAtAnc=%d t4=%d hp=%.2f",
+			DotaTime(),
+			(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(laneNames[aF]),
+			az.ancientHP or -1,
+			ca,
+			baseThreat.t4,
+			Z.GetHP(af)
+		))
+	end
+	local cc = not cb and not lastStand and az.aliveEnemyCount >= 3 and az.aliveEnemyCount > az.aliveAllyCount + 1
 	local cd = L * 0.5
-	if c9 >= 1 then
+	if c9 >= 1 and not lastStand then
 		local ce = Z.GetLastSeenEnemiesNearLoc(af:GetLocation(), 2000)
 		if #ce >= 2 then
 			local cf = 0
@@ -767,11 +878,14 @@ function r.GetDefendDesireHelper(af, aF)
 			end
 			local cg = Z.WeAreStronger(af, 2500)
 			if not cg and #ce >= cf then
+				af._defendWhy = "hg-outnumbered"
 				return aF == c8 and L * 0.2 or L * 0.1
 			end
 		end
 	end
 	local ch = { active = false, floor = 0 }
+	-- Lane creeps hit the Ancient or the T4s with no hero nearby. Only the closest bot answers.
+	local ancientCreeps = baseThreat.creeps
 	if am and am:IsAlive() then
 		local ci = az.ancientHP
 		local cj = az.defendersAtAncient
@@ -789,10 +903,24 @@ function r.GetDefendDesireHelper(af, aF)
 					af.laneToDefend = aF
 				end
 			end
-		elseif ci < 0.95 and ca == 0 and cj == 0 then
+		elseif ca == 0 and (ci < 0.95 or ancientCreeps >= 2) then
+			-- cj counts every ally within 2500 of the Ancient, this bot included. A hero who
+			-- just respawned is ~1800 away, so it counted itself as the defender already there
+			-- and walked out to farm while creeps hit the base.
+			local selfAtBase = GetUnitToUnitDistance(af, am) <= 3500
+			local others = cj - ((GetUnitToUnitDistance(af, am) <= 2500) and 1 or 0)
 			local by = Z.GetPosition(af)
 			local bB = E({ 4, 5, 3 }, am:GetLocation())
-			if by == bB then
+			-- A full wave (5+) or a hurt Ancient needs more than the one closest support.
+			local bigWave = ancientCreeps >= 5 or ci < 0.85
+			local rest = {}
+			for _, pos in ipairs({ 4, 5, 3 }) do
+				if pos ~= bB then
+					rest[#rest + 1] = pos
+				end
+			end
+			local secondB = E(rest, am:GetLocation())
+			if selfAtBase or others <= 0 and by == bB or bigWave and others <= 1 and by == secondB then
 				ch = { active = true, floor = cl, forceLoc = Z.AdjustLocationWithOffsetTowardsFountain(
 					am:GetLocation(),
 					300
@@ -802,6 +930,13 @@ function r.GetDefendDesireHelper(af, aF)
 				end
 			end
 		end
+	end
+	if lastStand then
+		if not ch.active then
+			ch = { active = true, floor = 0, forceLoc = Z.AdjustLocationWithOffsetTowardsFountain(am:GetLocation(), 300) }
+		end
+		ch.floor = math.max(ch.floor, lastStandDesire)
+		S = DotaTime() + N
 	end
 	if c9 >= 2 and not c7 then
 		S = DotaTime() + N
@@ -814,6 +949,37 @@ function r.GetDefendDesireHelper(af, aF)
 		end
 		if aF == c8 then
 			af.laneToDefend = aF
+		end
+	end
+	-- Base under threat: only the threatened lane defends. Every other lane used to keep a 0.7 share
+	-- of the base floor, so when the attacked lane dipped for a moment (game 036, 37:09: Radiant
+	-- enemies at the bottom T3 out of sight, bot read 0 "no-threat", top 0.30 "base-floor"), Primal
+	-- Beast's defend mode flipped to top and he TPed from the fountain to the top T2, chatting
+	-- "Defending the base!". The bot then stays on the base lane: no "no-threat" exit below either.
+	local baseLane = nil
+	if ch.active or ca >= 2 then
+		local why
+		baseLane, why = BaseThreatLane(az.team, c8)
+		if baseLane ~= nil and aF ~= baseLane then
+			if DotaTime() >= (af._baseLaneLogAt or -999) then
+				af._baseLaneLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-DEFEND] t=%.0f %s base-lane=%s(%s) d8lane=%s hg=%d anc=%d skip=%s",
+					DotaTime(),
+					(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(laneNames[baseLane]),
+					why,
+					tostring(laneNames[c8]),
+					c9 or 0,
+					ca or 0,
+					tostring(laneNames[aF])
+				))
+			end
+			return DefNone(af, "base-other-lane")
+		end
+		if baseLane ~= nil and baseLane ~= c8 then
+			-- The defend location and the lane to defend follow the threatened lane.
+			af.laneToDefend = baseLane
 		end
 	end
 	local cp = A()
@@ -833,7 +999,7 @@ function r.GetDefendDesireHelper(af, aF)
 		bX.defendLoc = Z.AdjustLocationWithOffsetTowardsFountain(am:GetLocation(), 300)
 	end
 	if cp then
-		if aF ~= c8 then
+		if aF ~= c8 and not lastStand then
 			af._defendDesireHalved = true
 		end
 	else
@@ -862,7 +1028,7 @@ function r.GetDefendDesireHelper(af, aF)
 			) >= 2)
 			and ca == 0
 	then
-		return a2.None
+		return DefNone(af, "roshan-tormentor")
 	end
 	local cv = 0
 	local cw, cx = Z.GetHumanPing()
@@ -875,9 +1041,14 @@ function r.GetDefendDesireHelper(af, aF)
 	end
 	local cA, cB, cC = unpack(r.GetFurthestBuildingOnLane(aF))
 	if not z(cA) then
-		return a2.None
+		return DefNone(af, "no-building")
 	end
 	if cC >= 4 and am and am:IsAlive() and ca >= 2 then
+		af._defendWhy = "ancient-heroes"
+		if lastStand then
+			af._defendWhy = "ancient-last-stand"
+			return lastStandDesire
+		end
 		if cc then
 			return cd
 		end
@@ -891,10 +1062,52 @@ function r.GetDefendDesireHelper(af, aF)
 	local cI = Z.CanCastAbility(af:GetAbilityByName("tinker_keen_teleport"))
 	local cJ = cG or cH or cI or cE <= 11
 	local cK = r.ShouldDefend(af, cA, 1600)
-	if not cK then
+	-- Creeps alone on our high ground (T3 or deeper, no enemy hero near). Any hero already
+	-- there clears it; if nobody is, the closest support or anyone within 4000 comes. The
+	-- old rule counted a creep as 0.2 (a 5-creep wave read as 1, needed 2) and only sent a
+	-- support while no ally was near, itself included, so he arrived, quit, and came back.
+	-- The wave counts from HG_WAVE_RADIUS (2600) out, not when it reaches the building, so a
+	-- hero has time to walk there.
+	if cC >= 3 and not ch.active then
+		local hgLoc = cA:GetLocation()
+		local hgRadius = Z.Utils.HG_WAVE_RADIUS or 2600
+		local hgCreeps = Z.Utils.CountHighGroundWave(ah, hgLoc, hgRadius)
+		if hgCreeps >= 2 and #Z.GetLastSeenEnemiesNearLoc(hgLoc, hgRadius) == 0 then
+			local myDist = GetUnitToLocationDistance(af, hgLoc)
+			local others = #Z.Utils.GetAllyIdsInTpToLocation(hgLoc, 2500)
+			for aq, ally in ipairs(Z.GetAlliesNearLoc(hgLoc, 2500)) do
+				if ally ~= af then
+					others = others + 1
+				end
+			end
+			-- Rank among the living allied heroes by distance to the wave (1 = closest).
+			local rank = 1
+			for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+				if ally ~= af and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, hgLoc) < myDist then
+					rank = rank + 1
+				end
+			end
+			-- A big wave (6+) or one already at the T4s / Ancient: 0.85, above farm, Roshan and
+			-- rune (game 020, 64:23-64:40: 7-12 creeps on the Dire high ground with one T4 left,
+			-- the only defender got 0.5 and every Dire hero stayed on attack, Roshan or farm).
+			-- With nobody near, the closest ally always counts; with 8+ creeps the second
+			-- closest comes too.
+			local severe = hgCreeps >= 6 or cC >= 4
+			local desire = severe and 0.85 or 0.5
+			if
+				myDist <= 2500
+				or others == 0 and (Z.GetPosition(af) == E({ 4, 5, 3 }, hgLoc) or myDist <= 4000 or rank == 1)
+				or hgCreeps >= 8 and others <= 1 and rank <= 2
+			then
+				af._defendWhy = severe and "hg-creeps-big" or "hg-creeps"
+				return desire
+			end
+		end
+	end
+	if not cK and baseLane == nil then
 		local cL = Z.GetLastSeenEnemiesNearLoc(cA:GetLocation(), 1200)
 		if not cJ and #cL == 0 or #cL == 0 and #Z.GetAlliesNearLoc(cA:GetLocation(), 1600) >= 1 then
-			return a2.None
+			return DefNone(af, "no-threat")
 		end
 	end
 	local cM = z(cA) and cA:GetLocation() or GetLaneFrontLocation(Q, aF, 0)
@@ -911,11 +1124,12 @@ function r.GetDefendDesireHelper(af, aF)
 			if cq >= 2 then
 				local cT = E({ 4, 5, 3 }, cM)
 				if cP == cT then
+					af._defendWhy = "hg-creeps"
 					return 0.4
 				end
 			end
 		end
-		return a2.None
+		return DefNone(af, "no-heroes")
 	end
 	local cU = #cN + 2
 	local cV = cU - bE
@@ -925,13 +1139,14 @@ function r.GetDefendDesireHelper(af, aF)
 		if #cN > cX + 1 then
 			local cY = am and am:IsAlive() and az.ancientHP < 0.4
 			if not cY then
+				af._defendWhy = "outnumbered"
 				return L * 0.3
 			end
 		end
 	end
 	if cV <= 0 and not ch.active then
 		if cQ > 2000 then
-			return a2.None
+			return DefNone(af, "far")
 		end
 	end
 	local cZ = #cO
@@ -952,7 +1167,7 @@ function r.GetDefendDesireHelper(af, aF)
 				end
 			end
 			if c_ >= cV then
-				return a2.None
+				return DefNone(af, "others-closer")
 			end
 		end
 	end
@@ -971,7 +1186,7 @@ function r.GetDefendDesireHelper(af, aF)
 						local d4 = GetUnitToLocationDistance(af, d3)
 						local d5 = Z.GetLastSeenEnemiesNearLoc(d3, 2500)
 						if #d5 >= 1 and d4 < cQ - 1500 then
-							return a2.None
+							return DefNone(af, "closer-lane")
 						end
 						d2 = true
 					until true
@@ -991,35 +1206,42 @@ function r.GetDefendDesireHelper(af, aF)
 			end
 		end
 		if d6 and Z.GetHP(af) > 0.8 then
-			return a2.None
+			return DefNone(af, "laning-safe")
 		end
 	end
 	local d8 = RemapValClamped(GetDefendLaneDesire(aF), 0, 1, 0, 0.7)
 	local d9 = B(af, aF)
 	if cC <= 1 then
 		if d9 then
-			return a2.None
+			return DefNone(af, "defending-other")
 		end
 		local da = z(cA) and Z.GetHP(cA) or 1
 		if da < 0.25 and #cN > 0 or not cJ then
-			return a2.None
+			return DefNone(af, "tower-low-or-no-tp")
 		end
 	elseif cC == 2 then
 		if d9 then
-			return a2.None
+			return DefNone(af, "defending-other")
 		end
 		local da = z(cA) and Z.GetHP(cA) or 1
 		if da < 0.25 and #cN > 0 or not cJ then
-			return a2.None
+			return DefNone(af, "tower-low-or-no-tp")
 		end
 		d8 = d8 * 3
 	else
 		d8 = d8 * 5
 	end
+	af._defendWhy = "lane"
 	if ch.active then
+		if ch.floor > d8 then
+			af._defendWhy = "base-floor"
+		end
 		d8 = math.max(d8, ch.floor)
 	end
 	if cv > 0 then
+		if cv > d8 then
+			af._defendWhy = "ping"
+		end
 		d8 = math.max(d8, cv)
 	end
 	if (#cN >= 4 or cZ >= 3) and not cc then
@@ -1068,7 +1290,7 @@ function r.GetDefendDesireHelper(af, aF)
 			d8 = math.max(0.05, d8)
 		end
 	end
-	return math.min(math.max(d8, 0), L)
+	return math.min(math.max(d8, 0), lastStand and lastStandDesire or L)
 end
 I, J = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
 if not I then
@@ -1097,6 +1319,69 @@ V = 0.5
 W = nil
 X = nil
 Y = nil
+local MODE_NAMES = nil
+local function ModeName(mode)
+	if MODE_NAMES == nil then
+		MODE_NAMES = {}
+		for _, name in ipairs({
+			"NONE", "LANING", "ATTACK", "ROAM", "RETREAT", "SECRET_SHOP", "SIDE_SHOP",
+			"PUSH_TOWER_TOP", "PUSH_TOWER_MID", "PUSH_TOWER_BOT",
+			"DEFEND_TOWER_TOP", "DEFEND_TOWER_MID", "DEFEND_TOWER_BOT",
+			"ASSEMBLE", "TEAM_ROAM", "FARM", "DEFEND_ALLY", "EVASIVE_MANEUVERS",
+			"ROSHAN", "ITEM", "WARD", "RUNE", "OUTPOST",
+		}) do
+			local id = _G ~= nil and _G["BOT_MODE_" .. name] or nil
+			if id ~= nil then
+				MODE_NAMES[id] = string.lower(name)
+			end
+		end
+	end
+	return MODE_NAMES[mode] or tostring(mode)
+end
+-- [OHA-DEFEND]: every 5s per bot while our base is being hit. One line holds all
+-- three lane desires with the reason each one came out, plus what the bot is doing.
+local function LogBaseDefense(af, aF, desire, why, az)
+	af._defendLaneDesire = af._defendLaneDesire or {}
+	af._defendLaneWhy = af._defendLaneWhy or {}
+	af._defendLaneDesire[aF] = desire
+	af._defendLaneWhy[aF] = why
+	local now = DotaTime()
+	if now < (af._defendLogAt or -999) then
+		return
+	end
+	local threat = ReadBaseThreat(az)
+	local hgBuilding, hgCreeps = Z.Utils.HighGroundCreepWaveNear(af, 30000)
+	if not threat.exposed and hgBuilding == nil then
+		return
+	end
+	af._defendLogAt = now + 5
+	local function lane(id)
+		return string.format("%.2f(%s)", af._defendLaneDesire[id] or 0, af._defendLaneWhy[id] or "-")
+	end
+	local am = az.ourAncient
+	local ok, modeDesire = pcall(function()
+		return af:GetActiveModeDesire()
+	end)
+	pcall(print, string.format(
+		"[OHA-DEFEND] t=%.0f %s %s mode=%s/%.2f dist=%d top=%s mid=%s bot=%s anc=%.2f creeps=%d heroes=%d hg=%d hgcreeps=%d t4=%d hp=%.2f",
+		now,
+		GetTeam() == TEAM_DIRE and "dire" or "radiant",
+		string.gsub(af:GetUnitName(), "npc_dota_hero_", ""),
+		ModeName(af:GetActiveMode()),
+		ok and type(modeDesire) == "number" and modeDesire or -1,
+		am ~= nil and math.floor(GetUnitToUnitDistance(af, am)) or -1,
+		lane(a3.Top),
+		lane(a3.Mid),
+		lane(a3.Bot),
+		threat.ancHP,
+		threat.creeps,
+		threat.heroes,
+		threat.hg,
+		hgCreeps or 0,
+		threat.t4,
+		Z.GetHP(af)
+	))
+end
 function r.GetDefendDesire(af, aF)
 	if
 		af:IsInvulnerable()
@@ -1107,12 +1392,17 @@ function r.GetDefendDesire(af, aF)
 	then
 		return a2.None
 	end
+	af._defendWhy = "?"
 	local b7 = math.min(r.GetDefendDesireHelper(af, aF), 1)
+	local why = af._defendWhy or "?"
 	local dl = s(af).defendLoc or GetLaneFrontLocation(Q, aF, 0)
 	local dm = Z.GetAlliesNearLoc(dl, 2000)
 	local dn = Z.GetEnemiesNearLoc(dl, 2000)
 	local dp = #dm >= 3 and #dn >= 1 and #dm > #dn and Z.WeAreStronger(af, 2500)
 	if dp and b7 < 0.9 then
+		if b7 > 0.55 then
+			why = why .. "+group-cap"
+		end
 		b7 = math.min(b7, 0.55)
 	end
 	local dq = t()
@@ -1132,6 +1422,9 @@ function r.GetDefendDesire(af, aF)
 					end
 					local bP = GetUnitToUnitDistance(af, bV)
 					if bP <= 1200 or bP <= dt or bP <= 1600 and bP <= bV:GetAttackRange() then
+						if b7 > 0 then
+							why = why .. "+skirmish"
+						end
 						b7 = b7 * 0.35
 						break
 					end
@@ -1159,6 +1452,7 @@ function r.GetDefendDesire(af, aF)
 	end
 	af._lastDefendChatDesire = b7
 	af.defendDesire = b7
+	LogBaseDefense(af, aF, b7, why, dq)
 	return b7
 end
 function r.DefendThink(af, aF)
@@ -1275,6 +1569,107 @@ function r.DefendThink(af, aF)
 		local d_ = t().enemiesOnHG
 		local e0 = Z.GetLastSeenEnemiesNearLoc(dZ, 1200)
 		local e1 = Z.GetAlliesNearLoc(dZ, 1400)
+		-- Only creeps at our high ground (no enemy hero seen there). Pull them into the fountain
+		-- when they will follow: none of them is busy with one of our units, none of our creeps is
+		-- near, and our next wave is not about to arrive (lane creeps spawn every 30s; arriving at
+		-- the high ground they take the aggro and break the pull, so only from 4s to 22s into
+		-- each 30s). The hero takes their aggro with one attack, then walks to the fountain while
+		-- they chase. As soon as they stop chasing, or any of that changes, it is regular attacks.
+		-- Before, it always walked back toward the fountain, even with the creeps busy with ours
+		-- (game 016, 43:15: Medusa backing off, nothing followed).
+		if #e0 == 0 then
+			local now = DotaTime()
+			local enemyCreeps = af:GetNearbyCreeps(1200, true) or {}
+			local onMe, busy, nearest, nearestD = 0, false, nil, math.huge
+			for _, cr in pairs(enemyCreeps) do
+				if Z.IsValid(cr) then
+					local tgt = cr:GetAttackTarget()
+					if tgt == af then
+						onMe = onMe + 1
+					elseif tgt ~= nil and tgt:GetTeam() == af:GetTeam() then
+						busy = true
+					end
+					local d0 = GetUnitToUnitDistance(af, cr)
+					if d0 < nearestD and Z.CanBeAttacked(cr) then
+						nearest, nearestD = cr, d0
+					end
+				end
+			end
+			local ourCreeps = #(af:GetNearbyLaneCreeps(1200, false) or {}) > 0
+			local phase = now % 30
+			local spawnOk = phase >= 4 and phase <= 22
+			local pullOk = nearest ~= nil
+				and not busy
+				and not ourCreeps
+				and spawnOk
+				and Z.GetHP(af) >= 0.5
+				and af:DistanceFromFountain() > 900
+			if pullOk then
+				if onMe >= 1 then
+					if now >= (af._hgPullLogAt or -999) then
+						af._hgPullLogAt = now + 5
+						pcall(print, string.format(
+							"[OHA-DEFEND] t=%.0f %s hg-pull following=%d fountainDist=%d",
+							now,
+							(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+							onMe,
+							math.floor(af:DistanceFromFountain())
+						))
+					end
+					af:Action_MoveToLocation(Z.GetTeamFountain())
+					return
+				end
+				if now - (af._hgPullTriedAt or -99) > 6 then
+					af._hgPullTriedAt = now
+					af:Action_AttackUnit(nearest, true)
+					return
+				end
+			end
+			local best, bestScore = nil, -1
+			for _, cr in pairs(af:GetNearbyCreeps(1200, true) or {}) do
+				if Z.IsValid(cr) and Z.CanBeAttacked(cr) then
+					local name = cr:GetUnitName()
+					local score = cr:GetAttackDamage() * cr:GetAttackSpeed() * (1 - Z.GetHP(cr))
+					if g(name, "siege") then
+						score = score + 10000
+					end
+					if score > bestScore then
+						best, bestScore = cr, score
+					end
+				end
+			end
+			if best ~= nil then
+				af:Action_AttackUnit(best, true)
+				return
+			end
+			-- No creep within 1200 of him, but the wave the defense counted (within the
+			-- high-ground radius of the building, or of our Ancient) is elsewhere: go hit the
+			-- nearest of it. He used to attack-move around the building and wait (game 020,
+			-- 67:20-68:06: Techies in the Dire base, 6-14 creeps on the high ground, none
+			-- within reach of him, no attack).
+			local hgR = Z.Utils.HG_WAVE_RADIUS or 2600
+			local anc = GetAncient(Q)
+			local far, farD = nil, math.huge
+			for _, cr in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+				if
+					Z.IsValid(cr)
+					and Z.CanBeAttacked(cr)
+					and (
+						GetUnitToLocationDistance(cr, dZ) <= hgR
+						or anc ~= nil and GetUnitToUnitDistance(cr, anc) <= hgR
+					)
+				then
+					local d0 = GetUnitToUnitDistance(af, cr)
+					if d0 < farD then
+						far, farD = cr, d0
+					end
+				end
+			end
+			if far ~= nil then
+				af:Action_AttackUnit(far, true)
+				return
+			end
+		end
 		if d_ == 0 and #e0 > 0 and #e1 >= #e0 + 1 then
 			local e2 = a8(dZ, Z.RandomForwardVector(120))
 			af:Action_AttackMove(e2)

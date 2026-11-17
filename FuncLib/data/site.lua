@@ -287,9 +287,16 @@ w.IsLocationHaveTrueSight = function(at)
 			return true
 		end
 	end
-	local aH = GetBot():GetNearbyTowers(1600, false)
-	for ao, az in ipairs(aH) do
-		if GetUnitToLocationDistance(az, at) < M then
+	-- Our towers anywhere on the map (was only towers within 1600 of the bot, so a spot under a far
+	-- tower looked uncovered and the ward mode walked a sentry there).
+	for ao, az in ipairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+		if
+			az ~= nil
+			and not az:IsNull()
+			and az:IsAlive()
+			and string.find(az:GetUnitName(), "tower", 1, true) ~= nil
+			and GetUnitToLocationDistance(az, at) < M
+		then
 			return true
 		end
 	end
@@ -323,6 +330,26 @@ w.GetCampStackTime = function(aO)
 		return 55
 	end
 	return 56
+end
+-- Farm mode (mode_farm_generic.lua, switching to a closer camp) has called this since the base
+-- import, but it never existed: every call crashed the farm Think (game 032: [OHA-ERROR] FARM_Run
+-- "attempt to call field IsCampDangerous" from ~10:00 for every bot; before build 077 only
+-- "error in error handling" showed). A camp with an enemy hero seen within 1200 of it in the last 5s.
+w.IsCampDangerous = function(bot, camp)
+	if camp == nil or camp.cattr == nil or camp.cattr.location == nil then
+		return false
+	end
+	local loc = camp.cattr.location
+	for _, pid in ipairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local ls = info ~= nil and info[1] or nil
+			if ls ~= nil and ls.time_since_seen <= 5 and (ls.location - loc):Length2D() <= 1200 then
+				return true
+			end
+		end
+	end
+	return false
 end
 w.IsEnemyCamp = function(aO)
 	return aO.team ~= GetTeam()

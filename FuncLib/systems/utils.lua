@@ -519,7 +519,10 @@ local aY = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
 local aZ = aY.HeroName
 local a_ = require(GetScriptDirectory() .. "/FuncLib/systems/cache_keys")
 function aD.IsValidUnit(E)
-	if E == nil then
+	-- A number reached here from the defend desire in every game ("attempt to index local
+	-- E (a number value)", pos 4 heroes, all three lanes); the caller could not be traced (no
+	-- debug.traceback in the game sandbox). Not a unit, so not valid.
+	if E == nil or type(E) == "number" or type(E) == "string" or type(E) == "boolean" then
 		return false
 	end
 	return not E:IsNull() and E:CanBeSeen() and E:IsAlive() and not E:IsInvulnerable()
@@ -649,8 +652,8 @@ aD.BarrackList = { aH.TopMelee, aH.TopRanged, aH.MidMelee, aH.MidRanged, aH.BotM
 aD.WisdomRunes = { [aL.Radiant] = Vector(-8126, -320, 256), [aL.Dire] = Vector(8319, 266, 256) }
 -- Lotus pool centers (7.41 map). Prefer live npc_dota_lotus_pool discovery in modes.
 aD.LotusPools = {
-	top = Vector(-7264, 4493, 256),
-	bottom = Vector(7788, -4121, 256),
+	top = Vector(-7421, 4238, 0),
+	bottom = Vector(7309, -4419, 0),
 }
 aD.BuggyHeroesDueToValveTooLazy = {
 	[aZ.Muerta] = true,
@@ -1027,6 +1030,74 @@ function aD.CountEnemyHeroesOnHighGround(bn)
 	end
 	aD.SetCachedVars(c9, ch)
 	return ch
+end
+-- How far out from a high-ground building a creep wave starts to count. Defenders are sent
+-- while the wave is still walking up, so they arrive before it hits the building. It was
+-- 1600; 1000 more gives a walking hero about 3s more lead.
+aD.HG_WAVE_RADIUS = 2600
+-- Enemy creeps within `radius` of loc, counting only those closer to loc than to another of
+-- our T3 towers (mid and top T3 are close enough that one wave would count for both).
+function aD.CountHighGroundWave(team, loc, radius)
+	local others = {}
+	for a2, id in ipairs(c8) do
+		local tower = GetTower(team, id)
+		if aD.IsValidBuilding(tower) then
+			local tl = tower:GetLocation()
+			if (tl.x - loc.x) ^ 2 + (tl.y - loc.y) ^ 2 > 300 * 300 then
+				others[#others + 1] = tl
+			end
+		end
+	end
+	local n = 0
+	for a2, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+		if unit ~= nil and unit:IsAlive() then
+			local d = GetUnitToLocationDistance(unit, loc)
+			if d <= radius then
+				local mine = true
+				for a3, tl in ipairs(others) do
+					if GetUnitToLocationDistance(unit, tl) < d then
+						mine = false
+						break
+					end
+				end
+				if mine then
+					n = n + 1
+				end
+			end
+		end
+	end
+	return n
+end
+-- A creep wave (2+ enemy creeps within HG_WAVE_RADIUS) at one of our high-ground buildings
+-- (T3 or barracks) with no enemy hero that close to it, and that building within `range` of
+-- the bot. Returns the building and the creep count, or nil.
+function aD.HighGroundCreepWaveNear(bot, range)
+	local team = bot:GetTeam()
+	local buildings = {}
+	for a2, id in ipairs(c8) do
+		local tower = GetTower(team, id)
+		if aD.IsValidBuilding(tower) then
+			buildings[#buildings + 1] = tower
+		end
+	end
+	for a2, id in ipairs(c7) do
+		local rax = GetBarracks(team, id)
+		if aD.IsValidBuilding(rax) then
+			buildings[#buildings + 1] = rax
+		end
+	end
+	for a2, building in ipairs(buildings) do
+		if GetUnitToUnitDistance(bot, building) <= range then
+			local loc = building:GetLocation()
+			if aD.CountEnemyHeroesNear(loc, aD.HG_WAVE_RADIUS) == 0 then
+				local creeps = aD.CountHighGroundWave(team, loc, aD.HG_WAVE_RADIUS)
+				if creeps >= 2 then
+					return building, creeps
+				end
+			end
+		end
+	end
+	return nil
 end
 function aD.GetDistanceFromAncient(bv, ci)
 	local cj = GetAncient(ci and GetOpposingTeam() or GetTeam())
@@ -1720,11 +1791,11 @@ function aD.GetAllyIdsInTpToLocation(bp, bq)
 end
 function aD.ConsiderTPToTarget(bv, cV, dY)
 	local dV = GetUnitToLocationDistance(bv, cV)
-	if bv.IsUsingAbility() or bv:HasModifier("modifier_teleporting") then
+	if bv:IsUsingAbility() or bv:HasModifier("modifier_teleporting") then
 		return false
 	end
 	local bu = aD.GetItemFromFullInventory(bv, "item_tpscroll")
-	if bu == nil or not bu.IsFullyCastable() then
+	if bu == nil or not bu:IsFullyCastable() then
 		return false
 	end
 	local dZ = aD.GetAllyIdsInTpToLocation(cV, 2500)

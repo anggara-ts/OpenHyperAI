@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 2, 3, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -28,15 +28,33 @@ m["pos_1"] = {
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-m["pos_2"] = m["pos_1"]
+-- Mid: Dotabuff has Blink, Shard, Yasha and Kaya, Arcane Boots, Scepter, BKB, Octarine and
+-- Refresher on top; the carry list (Midas, Satanic, Daedalus, Abyssal) is outside its top 25.
+m["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_bottle",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_blink",
+	"item_aghanims_shard",
+	"item_yasha_and_kaya",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_octarine_core",
+	"item_refresher",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
 m["pos_3"] = {
 	"item_tank_outfit",
-	"item_crimson_guard",
-	"item_aghanims_shard",
-	"item_heavens_halberd",
 	"item_blink",
-	"item_lotus_orb",
+	"item_aghanims_shard",
+	"item_crimson_guard",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
+	"item_lotus_orb",
 	"item_travel_boots",
 	"item_assault",
 	"item_ultimate_scepter_2",
@@ -84,6 +102,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "earthshaker_echo_slam", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -452,49 +472,94 @@ function a.ConsiderEnchantTotem()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0, false
 end
+-- Echo Slam (datafeed: 100/140/180 to enemies within 700; each enemy hit sends an echo for 70/90/110,
+-- real heroes two; 110-130s). It used to count only enemy heroes within 350 (half the radius) and
+-- nothing else, so slams into heroes with a creep wave, illusions or summons were held. Now the
+-- echoes are counted (user call): creeps, neutrals, summons and illusions 1 each, real heroes 2.
+-- A hero's own echoes do not hit him. The estimate per enemy hero: initial + echo damage x the
+-- other echoes, as magic damage after his resistance.
+local SLAM_RADIUS = 650
+function a.EchoSlamValue(loc)
+	local initial = r:GetSpecialValueInt("echo_slam_initial_damage")
+	local echo = r:GetSpecialValueInt("echo_slam_echo_damage")
+	local heroes, others = {}, 0
+	for _, u in pairs(c.GetEnemiesNearLoc(loc, SLAM_RADIUS) or {}) do
+		if c.IsValidHero(u) and not u:IsMagicImmune() then
+			if c.IsSuspiciousIllusion(u) then
+				others = others + 1
+			else
+				heroes[#heroes + 1] = u
+			end
+		end
+	end
+	for _, u in pairs(GetUnitList(UNIT_LIST_ENEMIES) or {}) do
+		if
+			u ~= nil
+			and not u:IsNull()
+			and u:IsAlive()
+			and not u:IsHero()
+			and not u:IsBuilding()
+			and not u:IsMagicImmune()
+			and not string.find(u:GetUnitName(), "ward", 1, true)
+			and (u:GetLocation() - loc):Length2D() <= SLAM_RADIUS
+		then
+			others = others + 1
+		end
+	end
+	for _, u in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS) or {}) do
+		if u ~= nil and not u:IsNull() and u:IsAlive() and (u:GetLocation() - loc):Length2D() <= SLAM_RADIUS then
+			others = others + 1
+		end
+	end
+	local echoes = others + 2 * #heroes
+	local kills, total = 0, 0
+	for _, h0 in ipairs(heroes) do
+		local raw = initial + echo * math.max(0, echoes - 2)
+		local dmg = h0:GetActualIncomingDamage(raw, DAMAGE_TYPE_MAGICAL)
+		total = total + math.min(dmg, h0:GetHealth())
+		if dmg >= h0:GetHealth() and not h0:HasModifier("modifier_dazzle_shallow_grave") and not h0:HasModifier("modifier_oracle_false_promise_timer") then
+			kills = kills + 1
+		end
+	end
+	return #heroes, echoes, kills, total
+end
+-- Worth it: a kill, 2+ heroes with 6+ echoes, 3+ heroes, or 1 hero taking 70%+ of his HP.
+function a.EchoSlamWorth(loc)
+	local n, echoes, kills, total = a.EchoSlamValue(loc)
+	if n == 0 then
+		return false, n, echoes, kills
+	end
+	if kills >= 1 or n >= 3 or n >= 2 and echoes >= 6 then
+		return true, n, echoes, kills
+	end
+	return false, n, echoes, kills
+end
+local function LogSlam(why, n, echoes, kills)
+	pcall(print, string.format(
+		"[OHA-ES] t=%.0f slam why=%s heroes=%d echoes=%d kills=%d",
+		DotaTime(),
+		why,
+		n,
+		echoes,
+		kills
+	))
+end
 function a.ConsiderEchoSlam()
 	if not r:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local M = r:GetSpecialValueInt("echo_slam_echo_range")
-	if G then
-		local V = c.GetEnemiesNearLoc(b:GetLocation(), M / 2)
-		if V ~= nil and #V >= 2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
+	if not (G or E) then
+		return BOT_ACTION_DESIRE_NONE
 	end
-	if E then
-		if
-			c.IsValidTarget(D)
-			and c.CanCastOnNonMagicImmune(D)
-			and c.IsInRange(b, D, M / 2)
-			and not c.IsSuspiciousIllusion(D)
-			and not D:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not D:HasModifier("modifier_templar_assassin_refraction_absorb")
-			and not D:HasModifier("modifier_item_aeon_disk_buff")
-			and not D:IsInvulnerable()
-		then
-			local Z = c.GetNearbyHeroes(D, 1200, true, BOT_MODE_NONE)
-			local V = c.GetNearbyHeroes(D, 1200, false, BOT_MODE_NONE)
-			if Z ~= nil and V ~= nil then
-				if #Z <= 1 and #V <= 1 then
-					if D:IsChanneling() then
-						return BOT_ACTION_DESIRE_HIGH
-					end
-					if D:GetHealth() <= b:GetEstimatedDamageToTarget(true, D, 5, DAMAGE_TYPE_ALL) then
-						return BOT_ACTION_DESIRE_HIGH
-					end
-				end
-				if #V > #Z then
-					if D:GetHealth() <= b:GetEstimatedDamageToTarget(true, D, 5, DAMAGE_TYPE_ALL) then
-						return BOT_ACTION_DESIRE_HIGH
-					end
-				end
-				if #Z >= #V and not (#Z >= #V + 2) then
-					return BOT_ACTION_DESIRE_HIGH
-				end
-			end
-		end
+	local worth, n, echoes, kills = a.EchoSlamWorth(b:GetLocation())
+	if worth then
+		LogSlam(G and "fight" or "engage", n, echoes, kills)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Interrupt a channel (Black Hole, a teleport, ...) on his target in range.
+	if E and c.IsValidHero(D) and D:IsChanneling() and c.IsInRange(b, D, SLAM_RADIUS) and c.CanCastOnNonMagicImmune(D) then
+		LogSlam("channel", n, echoes, kills)
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -502,11 +567,16 @@ function a.ConsiderBlinkSlam()
 	if a.CanDoBlinkSlam() then
 		local J = 1199
 		local M = r:GetSpecialValueInt("echo_slam_echo_range")
-		if E then
+		if E or G then
 			local a3 = b:FindAoELocation(true, true, b:GetLocation(), J, M, 0, 0)
-			local V = c.GetEnemiesNearLoc(a3.targetloc, M / 2)
-			if V ~= nil and #V >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(V)
+			local V = c.GetEnemiesNearLoc(a3.targetloc, SLAM_RADIUS)
+			if V ~= nil and #V >= 1 then
+				local spot = c.GetCenterOfUnits(V)
+				local worth, n, echoes, kills = a.EchoSlamWorth(spot)
+				if worth then
+					LogSlam("blink", n, echoes, kills)
+					return BOT_ACTION_DESIRE_HIGH, spot
+				end
 			end
 		end
 	end
@@ -530,9 +600,14 @@ function a.ConsiderTotemSlam()
 		local M = r:GetSpecialValueInt("echo_slam_echo_range")
 		if G then
 			local a3 = b:FindAoELocation(true, true, b:GetLocation(), a7, M, a8, 0)
-			local V = c.GetEnemiesNearLoc(a3.targetloc, M / 2)
-			if V ~= nil and #V >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(V)
+			local V = c.GetEnemiesNearLoc(a3.targetloc, SLAM_RADIUS)
+			if V ~= nil and #V >= 1 then
+				local spot = c.GetCenterOfUnits(V)
+				local worth, n, echoes, kills = a.EchoSlamWorth(spot)
+				if worth then
+					LogSlam("totem", n, echoes, kills)
+					return BOT_ACTION_DESIRE_HIGH, spot
+				end
 			end
 		end
 	end

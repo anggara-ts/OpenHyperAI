@@ -1,3 +1,5 @@
+-- [OHA-GRIM] logs off: the behaviour they traced works (game 029).
+local print = function() end
 -- Grimstroke: skill build, item build, and ability use for this hero.
 local a = {}
 local b = GetBot()
@@ -8,7 +10,14 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 3, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
+-- 1 Stroke of Fate, 2 Phantom's Embrace, 3 Ink Swell, 6 Soulbind.
+-- Support (pos 4/5): Stroke of Fate first, then Phantom's Embrace, Ink Swell last (Dotabuff most
+-- picked order; it was Ink Swell first).
+-- Core: Stroke of Fate first, then Ink Swell, Phantom's Embrace last.
+local j = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+if h ~= "pos_4" and h ~= "pos_5" then
+	j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+end
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -54,11 +63,11 @@ m["pos_3"] = {
 m["pos_4"] = {
 	"item_blood_grenade",
 	"item_priest_outfit",
-	"item_mekansm",
+	"item_blink",
 	"item_glimmer_cape",
-	"item_guardian_greaves",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_spirit_vessel",
+	"item_aether_lens",
 	"item_shivas_guard",
 	"item_sheepstick",
 	"item_moon_shard",
@@ -69,17 +78,17 @@ m["pos_5"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
+	"item_blink",
 	"item_boots_of_bearing",
-	"item_pipe",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_spirit_vessel",
 	"item_shivas_guard",
 	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+a["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_aether_lens", "item_urn_of_shadows" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
 end
@@ -93,21 +102,74 @@ end
 local o = SafeAbility(b:GetAbilityByName("grimstroke_dark_artistry"), "grimstroke_dark_artistry", "grimstroke")
 local p = SafeAbility(b:GetAbilityByName("grimstroke_ink_creature"), "grimstroke_ink_creature", "grimstroke")
 local q = SafeAbility(b:GetAbilityByName("grimstroke_spirit_walk"), "grimstroke_spirit_walk", "grimstroke")
-local r = SafeAbility(b:GetAbilityByName("grimstroke_return"), "grimstroke_return", "grimstroke")
 local s = SafeAbility(b:GetAbilityByName("grimstroke_dark_portrait"), "grimstroke_dark_portrait", "grimstroke")
 local t = SafeAbility(b:GetAbilityByName("grimstroke_soul_chain"), "grimstroke_soul_chain", "grimstroke")
 local u, v
 local w, x
 local y, z
-local A
 local B, C
 local D, E
-local F = -1
 local G
 local H
 local I
 local J
+-- Stroke of Fate on alt-cast goes straight (7.41), easier to aim than the curve. The bot API
+-- has no alt-cast call; the autocast switch is the closest, so it is turned on once Stroke is
+-- learned and the state is logged before and after, to confirm in game that the path is straight.
+-- Checked every 5s: if the switch is found off again (e.g. reset by a death), it is logged with
+-- the gap since the last check (a long gap means he was dead) and turned back on.
+local function StrokeStraight()
+	if not o:IsTrained() then
+		return
+	end
+	local now = DotaTime()
+	if b._strokeAltCheckAt ~= nil and now - b._strokeAltCheckAt < 5 then
+		return
+	end
+	local gap = b._strokeAltCheckAt ~= nil and now - b._strokeAltCheckAt or 0
+	local first = b._strokeAltCheckAt == nil
+	b._strokeAltCheckAt = now
+	local okB, before = pcall(function()
+		return o:GetAutoCastState()
+	end)
+	if not okB or before ~= false then
+		if first then
+			pcall(print, string.format("[OHA-GRIM] t=%.0f stroke-altcast already=%s", now, tostring(okB and before)))
+		end
+		return
+	end
+	pcall(function()
+		o:ToggleAutoCast()
+	end)
+	local okA, after = pcall(function()
+		return o:GetAutoCastState()
+	end)
+	pcall(print, string.format(
+		"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
+		now,
+		first and "set" or "reset-found",
+		gap,
+		tostring(okA and after)
+	))
+end
+-- Stroke of Fate on creeps keeps mana for Ink Swell + Phantom's Embrace (+ Soulbind when it is
+-- up within 20s), and at least 25% of the pool. It was spammed on waves down to low mana.
+function a.StrokeOnCreepsOk()
+	local reserve = 0
+	if q:IsTrained() then
+		reserve = reserve + q:GetManaCost()
+	end
+	if p:IsTrained() then
+		reserve = reserve + p:GetManaCost()
+	end
+	if t:IsTrained() and t:GetCooldownTimeRemaining() < 20 then
+		reserve = reserve + t:GetManaCost()
+	end
+	local left = b:GetMana() - o:GetManaCost()
+	return left >= reserve and c.GetManaAfter(o:GetManaCost()) >= 0.25
+end
 function a.SkillsComplement()
+	pcall(StrokeStraight)
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -119,17 +181,22 @@ function a.SkillsComplement()
 	y, z = a.ConsiderInkSwell()
 	if y > 0 then
 		b:Action_UseAbilityOnEntity(q, z)
-		F = DotaTime()
-		return
-	end
-	A = a.ConsiderInkExplosion()
-	if A > 0 then
-		b:Action_UseAbility(r)
 		return
 	end
 	D, E = a.ConsiderSoulBind()
 	if D > 0 then
-		b:Action_UseAbilityOnEntity(t, E)
+		-- Soulbind -> Phantom's Embrace on the bound hero: a unit-target spell on one bound hero
+		-- is also cast on the other (Valve data), so both get the latch and the silence.
+		b:Action_ClearActions(false)
+		b:ActionQueue_UseAbilityOnEntity(t, E)
+		if p:IsFullyCastable() and b:GetMana() >= t:GetManaCost() + p:GetManaCost() then
+			b:ActionQueue_UseAbilityOnEntity(p, E)
+			pcall(print, string.format(
+				"[OHA-GRIM] t=%.0f soulbind-embrace target=%s",
+				DotaTime(),
+				(string.gsub(E:GetUnitName(), "npc_dota_hero_", ""))
+			))
+		end
 		return
 	end
 	w, x = a.ConsiderPhantomsEmbrace()
@@ -139,6 +206,37 @@ function a.SkillsComplement()
 	end
 	u, v = a.ConsiderStrokeOfFate()
 	if u > 0 then
+		-- EXPERIMENT: Stroke of Fate is ALT_CASTABLE (game files): the plain cast curves from where
+		-- Grimstroke faces, the alt-cast goes straight. The bot API has no alt-cast order; try
+		-- whether the alt state is the autocast toggle. Toggled once; every cast logs the state.
+		if not b._grimAltTried then
+			b._grimAltTried = true
+			local okB, before = pcall(function()
+				return o:GetAutoCastState()
+			end)
+			local okT = pcall(function()
+				o:ToggleAutoCast()
+			end)
+			local okA, after = pcall(function()
+				return o:GetAutoCastState()
+			end)
+			pcall(print, string.format(
+				"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
+				DotaTime(),
+				tostring(okT),
+				okB and tostring(before) or "error",
+				okA and tostring(after) or "error"
+			))
+		end
+		local okS, state = pcall(function()
+			return o:GetAutoCastState()
+		end)
+		pcall(print, string.format(
+			"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
+			DotaTime(),
+			okS and tostring(state) or "error",
+			math.floor(GetUnitToLocationDistance(b, v))
+		))
 		b:Action_UseAbilityOnLocation(o, v)
 		return
 	end
@@ -211,7 +309,7 @@ function a.ConsiderStrokeOfFate()
 			return BOT_ACTION_DESIRE_HIGH, W[1]:GetLocation()
 		end
 	end
-	if (c.IsPushing(b) or c.IsDefending(b)) and c.GetManaAfter(o:GetManaCost()) > 0.4 and Q >= 3 then
+	if (c.IsPushing(b) or c.IsDefending(b)) and a.StrokeOnCreepsOk() and Q >= 3 then
 		local X = b:FindAoELocation(true, true, b:GetLocation(), L, N, M, 0)
 		if X.count >= 2 then
 			local Y = c.GetVulnerableUnitNearLoc(b, true, true, L, N, X.targetloc)
@@ -281,7 +379,8 @@ function a.ConsiderPhantomsEmbrace()
 			c.IsValidHero(T)
 			and c.CanCastOnNonMagicImmune(T)
 			and c.CanCastOnTargetAdvanced(T)
-			and c.CanKillTarget(T, a3 * a2 + a4, DAMAGE_TYPE_PHYSICAL)
+			-- datafeed: Phantom's Embrace deals magical damage.
+			and c.CanKillTarget(T, a3 * a2 + a4, DAMAGE_TYPE_MAGICAL)
 			and not c.IsSuspiciousIllusion(T)
 			and not T:HasModifier("modifier_abaddon_borrowed_time")
 			and not T:HasModifier("modifier_dazzle_shallow_grave")
@@ -403,7 +502,10 @@ function a.ConsiderInkSwell()
 			and not c.IsSuspiciousIllusion(a0)
 			and GetUnitToUnitDistance(a0, G) < a8
 		then
+			-- Keep the ally nearest the target: a8 was never lowered, so the last ally in the list
+			-- won (often one far from the target, and then no enemy was in the swell radius).
 			a9 = a0
+			a8 = GetUnitToUnitDistance(a0, G)
 		end
 	end
 	if H then
@@ -420,6 +522,7 @@ function a.ConsiderInkSwell()
 			if V ~= nil and W ~= nil and (#V >= #W or c.WeAreStronger(b, 1600)) and a9 ~= nil then
 				W = c.GetEnemiesNearLoc(a9:GetLocation(), N)
 				if W ~= nil and #W >= 1 then
+					pcall(print, string.format("[OHA-GRIM] t=%.0f ink-swell engage ally=%s dist=%d", DotaTime(), a9:GetUnitName(), math.floor(a8)))
 					return BOT_ACTION_DESIRE_HIGH, a9
 				end
 			end
@@ -457,46 +560,6 @@ function a.ConsiderInkSwell()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
-end
-function a.ConsiderInkExplosion()
-	if r:IsHidden() or not r:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local N = q:GetSpecialValueInt("radius")
-	local a2 = q:GetSpecialValueInt("buff_duration")
-	if DotaTime() < F + a2 then
-		local R = b:GetNearbyHeroes(N, true, BOT_MODE_NONE)
-		for S, T in pairs(R) do
-			if
-				c.IsValidHero(T)
-				and c.CanCastOnNonMagicImmune(T)
-				and T:IsChanneling()
-				and not c.IsSuspiciousIllusion(T)
-				and not c.IsDisabled(T)
-				and b:HasModifier("modifier_grimstroke_spirit_walk_buff")
-			then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-		for S, a0 in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			local a6 = a0:GetNearbyHeroes(N, true, BOT_MODE_NONE)
-			if c.IsValidHero(a0) then
-				for S, a7 in pairs(a6) do
-					if
-						c.IsValidHero(a7)
-						and c.CanCastOnNonMagicImmune(a7)
-						and a7:IsChanneling()
-						and not c.IsSuspiciousIllusion(a7)
-						and not c.IsDisabled(a7)
-						and a0:HasModifier("modifier_grimstroke_spirit_walk_buff")
-					then
-						return BOT_ACTION_DESIRE_HIGH
-					end
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderSoulBind()
 	if not t:IsFullyCastable() then

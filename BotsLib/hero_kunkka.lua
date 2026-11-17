@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 1, 6, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -36,8 +36,8 @@ m["pos_2"] = {
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_black_king_bar",
+	"item_greater_crit",
 	"item_shivas_guard",
-	"item_octarine_core",
 	"item_travel_boots",
 	"item_heart",
 	"item_refresher",
@@ -57,8 +57,8 @@ m["pos_3"] = {
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_black_king_bar",
+	"item_greater_crit",
 	"item_shivas_guard",
-	"item_refresher",
 	"item_sheepstick",
 	"item_travel_boots",
 	"item_heart",
@@ -67,35 +67,33 @@ m["pos_3"] = {
 	"item_moon_shard",
 }
 m["pos_1"] = m["pos_3"]
+-- Support builds: Hand of Midas, Basher, MKB, Assault Cuirass and Abyssal Blade were carry items on a pos 4/5
+-- support; swapped for save/utility items (Force Staff, Lotus Orb, Scythe of Vyse).
 m["pos_4"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
-	"item_basher",
-	"item_monkey_king_bar",
-	"item_assault",
-	"item_heavens_halberd",
+	"item_force_staff",
 	"item_aghanims_shard",
-	"item_abyssal_blade",
 	"item_ultimate_scepter",
+	"item_heavens_halberd",
+	"item_lotus_orb",
+	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 m["pos_5"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_pipe",
-	"item_basher",
-	"item_monkey_king_bar",
-	"item_assault",
-	"item_heavens_halberd",
+	"item_force_staff",
 	"item_aghanims_shard",
-	"item_abyssal_blade",
 	"item_ultimate_scepter",
+	"item_heavens_halberd",
+	"item_lotus_orb",
+	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
@@ -165,7 +163,7 @@ function a.SkillsComplement()
 		V = 0
 		W = 0
 	end
-	if U ~= 0 or V ~= 0 or V ~= 0 then
+	if U ~= 0 or V ~= 0 or W ~= 0 then -- was "V ~= 0" twice; W is the X + Torrent combo timer
 		return
 	end
 	G, H, I = a.ConsiderCombo1()
@@ -313,9 +311,6 @@ function a.ConsiderQ()
 			return BOT_ACTION_DESIRE_LOW, a6:GetLocation()
 		end
 	end
-	if q:GetLevel() >= 3 and q:IsFullyCastable() and b:GetMana() > 160 then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
 	if c.IsRetreating(b) then
 		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
 		for a8, a9 in pairs(a7) do
@@ -327,8 +322,18 @@ function a.ConsiderQ()
 	local a7 = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
 	for a8, a9 in pairs(a7) do
 		if a9:IsChanneling() then
+			if DotaTime() >= (b._kunkkaLogAt or -999) then
+				b._kunkkaLogAt = DotaTime() + 3
+				pcall(print, string.format("[OHA-KUNKKA] t=%.0f torrent-channel target=%s", DotaTime(), a9:GetUnitName()))
+			end
 			return BOT_ACTION_DESIRE_MODERATE, a9:GetLocation()
 		end
+	end
+	-- Hold Torrent for the X combos only after the retreat and channel-cut checks above: the hold used
+	-- to come first, so with X ready (level 3+) Kunkka never Torrented to escape or to cut a channel,
+	-- and Combo3 (X + Torrent on a channeller) is also off while Ghostship is ready.
+	if q:GetLevel() >= 3 and q:IsFullyCastable() and b:GetMana() > 160 then
+		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if c.IsGoingOnSomeone(b) then
 		local a6 = b:GetTarget()
@@ -359,13 +364,17 @@ function a.ConsiderE()
 	end
 	local a7 = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 	for a8, a9 in pairs(a7) do
+		-- X alone on a channelling enemy was a wasted cast: nothing in this branch triggers Return, so the
+		-- enemy was sent back to the spot it was already channelling on. Removed; Torrent covers channels.
+		-- Range and magic-immunity checks added (X range is 550-1000, this list reaches 1200).
 		if
-			a9:IsChanneling()
-			or b:GetActiveMode() == BOT_MODE_ATTACK
-				and #a7 == 1
-				and b:GetLevel() >= 6
-				and b:IsFacingLocation(a9:GetLocation(), 30)
-				and a9:IsFacingLocation(c.GetEnemyFountain(), 30)
+			b:GetActiveMode() == BOT_MODE_ATTACK
+			and #a7 == 1
+			and b:GetLevel() >= 6
+			and c.IsInRange(b, a9, a5)
+			and c.CanCastOnNonMagicImmune(a9)
+			and b:IsFacingLocation(a9:GetLocation(), 30)
+			and a9:IsFacingLocation(c.GetEnemyFountain(), 30)
 		then
 			return BOT_ACTION_DESIRE_MODERATE, a9
 		end
@@ -373,12 +382,17 @@ function a.ConsiderE()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function a.ConsiderR()
-	if not t:IsFullyCastable() or q:IsFullyCastable() then
+	-- Ghostship alone was blocked whenever X was ready. The X combos only run while going on someone,
+	-- so in a fight in any other mode (defending, retreating) Ghostship was never cast. Only defer to
+	-- the combos when they can actually run.
+	if not t:IsFullyCastable() or q:IsFullyCastable() and c.IsGoingOnSomeone(b) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local a5 = t:GetCastRange()
 	local ac = t:GetSpecialValueInt("ghostship_width")
-	if c.IsRetreating(b) then
+	-- The retreat Ghostship keeps the old X gate (only while X is on cooldown), so the looser gate
+	-- above does not spend the ultimate on every retreat.
+	if c.IsRetreating(b) and not q:IsFullyCastable() then
 		local a7 = c.GetNearbyHeroes(b, 1000, true, BOT_MODE_NONE)
 		for a8, a9 in pairs(a7) do
 			if b:WasRecentlyDamagedByHero(a9, 1.0) then
@@ -414,7 +428,10 @@ function a.ConsiderW()
 		af = 200
 	end
 	local ag = a.GetNearbyUnit(b, a6)
-	if c.IsValid(ag) and GetUnitToUnitDistance(a6, b) > af then
+	-- Only stop to cleave a unit in front when the cleave (cleave_distance 650-1025, game KV) reaches the
+	-- real target; it used to fire whenever the target was out of attack range, which stalled chases.
+	local cleave = p:GetSpecialValueInt("cleave_distance")
+	if c.IsValid(ag) and GetUnitToUnitDistance(a6, b) > af and GetUnitToUnitDistance(ag, a6) <= cleave * 0.8 then
 		return BOT_ACTION_DESIRE_HIGH, ag
 	end
 	return BOT_ACTION_DESIRE_NONE

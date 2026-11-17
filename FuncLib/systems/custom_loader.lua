@@ -5,15 +5,17 @@ function LoadCustomize()
 		return a
 	end
 	local b, c = "game/Customize/general", nil
+	-- Handler only keeps the message (see init_debug: logging inside it errored).
+	local loadErr = nil
 	local d, e = xpcall(function()
 		c = require(b)
 	end, function(f)
-		if log then
-			log("[WARN] When loading customized file: %s", f)
-		else
-			print("[WARN] When loading customized file: " .. tostring(f))
-		end
+		loadErr = f
+		return f
 	end)
+	if not (d and c) and loadErr ~= nil and log then
+		pcall(log, "[WARN] When loading customized file: %s", tostring(loadErr))
+	end
 	if d and c then
 		a = c
 	else

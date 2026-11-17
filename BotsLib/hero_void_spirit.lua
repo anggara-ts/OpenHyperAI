@@ -8,7 +8,7 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 2, 6, 2, 2, 6 } }
+local j = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -22,8 +22,9 @@ m["pos_2"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_echo_sabre",
+	"item_spirit_vessel",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
 	"item_manta",
 	"item_black_king_bar",
 	"item_travel_boots",
@@ -34,7 +35,6 @@ m["pos_2"] = {
 	"item_travel_boots_2",
 	"item_orchid",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 }
 m["pos_1"] = {
 	"item_tango",
@@ -45,8 +45,9 @@ m["pos_1"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_echo_sabre",
+	"item_spirit_vessel",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
 	"item_manta",
 	"item_black_king_bar",
 	"item_travel_boots",
@@ -57,7 +58,6 @@ m["pos_1"] = {
 	"item_travel_boots_2",
 	"item_orchid",
 	"item_bloodthorn",
-	"item_aghanims_shard",
 }
 m["pos_4"] = m["pos_1"]
 m["pos_5"] = m["pos_1"]
@@ -91,6 +91,13 @@ local z
 local A
 local B
 local C
+-- Throttled trace for the stun-dodge Dissimilate, which used to be overwritten by later casts.
+local function LogVoidCast(what)
+	if DotaTime() >= (b._voidCastLogAt or -999) then
+		b._voidCastLogAt = DotaTime() + 10
+		pcall(print, string.format("[OHA-VOID_SPIRIT] t=%.0f %s", DotaTime(), what))
+	end
+end
 function a.SkillsComplement()
 	A = c.IsGoingOnSomeone(b)
 	B = c.IsRetreating(b)
@@ -98,22 +105,37 @@ function a.SkillsComplement()
 	if c.CanNotUseAbility(b) or b:NumQueuedActions() > 0 then
 		return
 	end
+	-- One order per think. The four casts used to run without a return, so two or more Action_ orders
+	-- could go out in the same think, and a later one could replace an earlier one (not verified in
+	-- game; e.g. Pulse over a stun-dodge Dissimilate). Order now: stun dodge, Astral Step,
+	-- Dissimilate, Pulse, Remnant. Remnant is vector-targeted and the bot API has no vector order;
+	-- whether a plain location order on it always goes through is not verified, so it goes last
+	-- and cannot hold up the other three.
+	if p:IsFullyCastable() and c.IsStunProjectileIncoming(b, 600) then
+		LogVoidCast("dissimilate-dodge")
+		b:Action_UseAbility(p)
+		return
+	end
 	w, x = a.ConsiderAstralStep()
 	if w > 0 then
 		b:Action_UseAbilityOnLocation(r, x)
 		y = DotaTime()
-	end
-	s, t = a.ConsiderAetherRemnant()
-	if s > 0 then
-		b:Action_UseAbilityOnLocation(o, t)
+		return
 	end
 	u = a.ConsiderDissimilate()
 	if u > 0 then
 		b:Action_UseAbility(p)
+		return
 	end
 	v = a.ConsiderResonantPulse()
 	if v > 0 then
 		b:Action_UseAbility(q)
+		return
+	end
+	s, t = a.ConsiderAetherRemnant()
+	if s > 0 then
+		b:Action_UseAbilityOnLocation(o, t)
+		return
 	end
 end
 function a.ConsiderAetherRemnant()
@@ -353,9 +375,13 @@ function a.ConsiderAstralStep()
 	if A then
 		local K = c.GetNearbyHeroes(b, G + 100, false, BOT_MODE_NONE)
 		local L = c.GetNearbyHeroes(b, G, true, BOT_MODE_NONE)
+		-- Target within max_travel_distance: the step used to fire at a target any distance away,
+		-- spending a charge on travel with no pop on him. Astral Step pierces spell immunity
+		-- (npc data: SPELL_IMMUNITY_ENEMIES_YES), so a BKB'd target is still a valid engage.
 		if
 			c.IsValidHero(z)
-			and c.CanCastOnNonMagicImmune(z)
+			and c.CanCastOnMagicImmune(z)
+			and c.IsInRange(b, z, G)
 			and not c.IsInRange(b, z, b:GetAttackRange() + 100)
 			and not c.IsSuspiciousIllusion(z)
 			and not c.IsDisabled(z)

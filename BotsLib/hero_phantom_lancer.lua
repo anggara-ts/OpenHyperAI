@@ -8,11 +8,11 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local j = { { 1, 3, 2, 3, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = RandomInt(1, 9) > 5 and "item_monkey_king_bar" or "item_abyssal_blade"
-local n = RandomInt(1, 9) > 4 and "item_bloodthorn" or "item_butterfly"
+local n = "item_butterfly"
 local o = {}
 o["pos_1"] = {
 	"item_tango",
@@ -23,12 +23,11 @@ o["pos_1"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_manta",
-	"item_heart",
-	"item_skadi",
 	"item_ultimate_scepter",
-	"item_disperser",
+	"item_skadi",
+	"item_bloodthorn",
+	"item_heart",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	m,
@@ -89,9 +88,8 @@ function a.SkillsComplement()
 	if s:IsTrained() then
 		D = s:GetSpecialValueInt("max_distance")
 	end
-	if v:IsTrained() then
-		D = D + v:GetSpecialValueInt("value")
-	end
+	-- sTalentList[5] is now special_bonus_unique_phantom_lancer_lance_damage (+100 lance damage, game files),
+	-- not a Phantom Rush range talent, so it no longer stretches the rush distance D.
 	w, x = a.ConsiderQ()
 	if w > 0 then
 		c.SetQueuePtToINT(b, true)
@@ -112,7 +110,9 @@ function a.SkillsComplement()
 	end
 end
 function a.ConsiderR()
-	if not t:IsFullyCastable() or not b:HasScepter() or true then
+	-- datafeed: the Juxtapose active (invisibility) comes from the Shard, not the Scepter. The branch was also
+	-- switched off with "or true"; CanCastAbility keeps it off while Juxtapose is still passive.
+	if not c.CanCastAbility(t) then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if c.IsRetreating(b) and c.GetHP(b) < 0.4 then

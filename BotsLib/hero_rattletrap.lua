@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local j = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local k
 local l
 if h == "pos_4" then
@@ -33,7 +33,7 @@ m["pos_4"] = {
 	"item_force_staff",
 	"item_blade_mail",
 	"item_ancient_janggo",
-	"item_solar_crest",
+	"item_spirit_vessel",
 	"item_boots_of_bearing",
 	"item_aghanims_shard",
 	"item_shivas_guard",
@@ -48,12 +48,12 @@ m["pos_5"] = {
 	"item_wind_lace",
 	"item_boots",
 	"item_magic_wand",
-	"item_arcane_boots",
+	"item_tranquil_boots",
 	"item_force_staff",
 	"item_blade_mail",
-	"item_mekansm",
+	"item_spirit_vessel",
 	"item_solar_crest",
-	"item_guardian_greaves",
+	"item_lotus_orb",
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_heavens_halberd",
@@ -209,7 +209,8 @@ function a.ConsiderBatteryAssault()
 		end
 	end
 	if c.IsDoingTormentor(b) then
-		if c.IsRoshan(E) and c.IsInRange(b, E, J) and H then
+		-- was c.IsRoshan(E), which is never true at the Tormentor
+		if c.IsTormentor(E) and c.IsInRange(b, E, J) and H then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -356,7 +357,8 @@ function a.ConsiderRocketFlare()
 		end
 	end
 	if c.IsDoingTormentor(b) then
-		if c.IsRoshan(E) and c.IsInRange(b, E, J) and H then
+		-- was c.IsRoshan(E), which is never true at the Tormentor
+		if c.IsTormentor(E) and c.IsInRange(b, E, J) and H then
 			return BOT_ACTION_DESIRE_HIGH, E:GetLocation()
 		end
 	end
@@ -433,7 +435,8 @@ function a.ConsiderHookshot()
 							and M:DistanceFromFountain() > 1600
 							and b:DistanceFromFountain() > M:DistanceFromFountain()
 							and GetUnitToUnitDistance(b, M) > 1200
-							and not c.IsNotSelf(b, M)
+							-- was "not c.IsNotSelf" (= M is Clockwerk himself), so the hook-to-ally escape never fired
+							and c.IsNotSelf(b, M)
 						then
 							local a2 = GetUnitToUnitDistance(b, M) / a1 + U
 							local a3 = c.GetCorrectLoc(M, a2)
@@ -449,18 +452,35 @@ function a.ConsiderHookshot()
 				end
 			end
 		end
-		local a4 = GetNeutralSpawners()
+		-- Hookshot latches onto a unit, not a spot. The old loop aimed at any neutral SPAWNER nearer the
+		-- escape point with no range check, so it hooked empty camps or walked Clockwerk toward a camp
+		-- far beyond cast range. Now: a visible neutral creep inside hook range, nearer safety, path clear.
 		local a5 = c.GetEscapeLoc()
 		local a3 = GetUnitToLocationDistance(b, a5)
-		for L, a6 in pairs(a4) do
-			local a7 = c.GetDistance(a6.location, a5)
-			if a7 < a3 and GetUnitToLocationDistance(b, a6.location) > 700 then
+		for L, a6 in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS) or {}) do
+			if
+				c.IsValid(a6)
+				and a6:CanBeSeen()
+				and GetUnitToUnitDistance(b, a6) > 700
+				and GetUnitToUnitDistance(b, a6) <= W
+				and c.GetDistance(a6:GetLocation(), a5) < a3 - 500
+			then
+				local a7 = a6:GetLocation()
 				if
-					not c.IsUnitBetweenMeAndLocation(b, b, a6.location, J)
-					and not c.IsLocationInChrono(a6.location)
-					and not c.IsLocationInArena(a6.location, 800)
+					not c.IsUnitBetweenMeAndLocation(b, a6, a7, J)
+					and not c.IsLocationInChrono(a7)
+					and not c.IsLocationInArena(a7, 800)
 				then
-					return BOT_ACTION_DESIRE_HIGH, a6.location
+					if DotaTime() >= (b._hookCampLogAt or -999) then
+						b._hookCampLogAt = DotaTime() + 10
+						pcall(print, string.format(
+							"[OHA-RATTLETRAP] t=%.0f hookshot escape onto %s dist=%d",
+							DotaTime(),
+							a6:GetUnitName(),
+							math.floor(GetUnitToUnitDistance(b, a6))
+						))
+					end
+					return BOT_ACTION_DESIRE_HIGH, a7
 				end
 			end
 		end

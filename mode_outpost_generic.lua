@@ -50,28 +50,161 @@ local X = {}
 local Y = false
 local Z = nil
 local _ = 10000
+local outpostMoveLoc = nil
 local a0 = false
 local a1 = c:GetAbilityByName("ability_capture")
 local a2 = false
 local a3 = "none"
 local a4 = 0
+-- Chain Frost bouncing around us (Valve data: bounces to a hero within 550, 10 jumps). The
+-- projectile is visible in GetIncomingTrackingProjectiles of whoever it is flying at. Returns the
+-- ally (or this bot) it is heading to, when that one is this bot or within 700 of it.
+local chainFrostSpread = false
+local function ChainFrostNear()
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if ally ~= nil and not ally:IsNull() and ally:IsAlive() and (ally == c or GetUnitToUnitDistance(c, ally) <= 700) then
+			for _, proj in pairs(ally:GetIncomingTrackingProjectiles() or {}) do
+				local ab = proj.ability
+				if
+					ab ~= nil
+					and not ab:IsNull()
+					and ab:GetName() == "lich_chain_frost"
+					and (proj.caster == nil or proj.caster:GetTeam() ~= GetTeam())
+				then
+					return ally
+				end
+			end
+		end
+	end
+	return nil
+end
+local function ConsiderChainFrostSpread()
+	local ok, on = pcall(ChainFrostNear)
+	if not ok or on == nil then
+		return false
+	end
+	-- Only worth moving when another ally hero is close enough to be the next bounce.
+	local near = 0
+	for _, ally in pairs(c:GetNearbyHeroes(650, false, BOT_MODE_NONE) or {}) do
+		if ally ~= c and ally:IsAlive() then
+			near = near + 1
+		end
+	end
+	if near == 0 then
+		return false
+	end
+	return true
+end
+-- Never inside the enemy fountain: within 1300 of it, leave (above attack and retreat). Game 019,
+-- 52:04-52:21: Dire chased into the Radiant fountain after killing Mirana (Techies planted M.A.D.
+-- at -7250,-6845) and four of them died. The Radiant Ancient is ~1860 from its fountain, so
+-- fights at the Ancient (even its fountain side, ~1550+) stay outside this radius.
+local leaveFountain = nil
+-- After pos 5's early mid ward is down (ward mode set c._earlyWardPending with the observer
+-- count): walk to our own jungle's bounty spot, up to 40s.
+local wardReturnTo = nil
+local function ObserverCount()
+	local n = 0
+	for slot = 0, 8 do
+		local it = c:GetItemInSlot(slot)
+		if it ~= nil then
+			local nm = it:GetName()
+			if nm == "item_ward_observer" or nm == "item_ward_dispenser" then
+				n = n + (it:GetCurrentCharges() or 0)
+			end
+		end
+	end
+	return n
+end
+local function WardReturnTarget()
+	local now = DotaTime()
+	local p = c._earlyWardPending
+	if p ~= nil then
+		if ObserverCount() < (p.obs or 0) then
+			c._wardReturn = { to = p.to, untilAt = now + (p.window or 25) }
+			-- Ward mode and the horn river hold leave him alone after this (one early ward, then
+			-- behind T1 and to lane).
+			c._earlyWardPlantedAt = now
+			c._earlyWardPending = nil
+			pcall(print, string.format(
+				"[OHA-WARD] t=%.0f %s return-start to=%.0f,%.0f dist=%.0f",
+				now,
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				p.to.x,
+				p.to.y,
+				GetUnitToLocationDistance(c, p.to)
+			))
+		elseif now - p.at > 6 then
+			c._earlyWardPending = nil
+		end
+	end
+	local r = c._wardReturn
+	if r == nil then
+		return nil
+	end
+	if now > r.untilAt or GetUnitToLocationDistance(c, r.to) <= 350 or not c:IsAlive() then
+		pcall(print, string.format(
+			"[OHA-WARD] t=%.0f %s return-done why=%s dist=%.0f",
+			now,
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			not c:IsAlive() and "dead" or (now > r.untilAt and "timeout" or "reached"),
+			GetUnitToLocationDistance(c, r.to)
+		))
+		c._wardReturn = nil
+		return nil
+	end
+	return r.to
+end
+local function EnemyFountainEscape()
+	local fountain = a.GetEnemyFountain()
+	if fountain == nil or not c:IsAlive() then
+		return nil
+	end
+	local d0 = GetUnitToLocationDistance(c, fountain)
+	if d0 > 1300 then
+		return nil
+	end
+	local away = c:GetLocation() - fountain
+	if away:Length2D() < 1 then
+		away = a.GetTeamFountain() - fountain
+	end
+	local dest = fountain + away:Normalized() * 1800
+	return dest
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
+	leaveFountain = nil
+	if c:IsHero() and not c:IsIllusion() then
+		local okF, dest = pcall(EnemyFountainEscape)
+		if okF and dest ~= nil then
+			leaveFountain = dest
+			a4 = DotaTime()
+			return 1.06
+		end
+	end
+	wardReturnTo = nil
+	if c:IsHero() and not c:IsIllusion() then
+		local okW, to = pcall(WardReturnTarget)
+		if okW and to ~= nil then
+			wardReturnTo = to
+			a4 = DotaTime()
+			return 0.9
+		end
+	end
+	-- Ahead of everything in this mode, above 1 so it beats attack and retreat: the old spread
+	-- rule only knew an enemy Lich had Chain Frost ready, and skipped every fighting bot, so
+	-- bots stood together and let the bounces hit them all.
+	chainFrostSpread = false
+	if c:IsAlive() and c:IsHero() and not c:IsIllusion() and ConsiderChainFrostSpread() then
+		chainFrostSpread = true
+		a4 = DotaTime()
+		return 1.05
+	end
 	local a5 = GetDesireHelper()
 	if a5 > 0 then
 		a4 = DotaTime()
-		log(
-			"[OUTPOST] %s t=%.0f desire=%.2f reason=%s hp=%.2f enemies=%d allies=%d",
-			c:GetUnitName(),
-			DotaTime(),
-			a5,
-			a3,
-			a.GetHP(c),
-			I and #I or -1,
-			J and #J or -1
-		)
 	end
 	return a5
 end
@@ -82,6 +215,7 @@ function GetDesireHelper()
 	end
 	M = false
 	N = false
+	a2 = false
 	S = a.GetHP(c)
 	h = a.Utils.GetItemFromFullInventory(c, "item_tpscroll")
 	O = a.GetProperTarget(c)
@@ -131,6 +265,13 @@ function GetDesireHelper()
 			end
 		end
 	end
+	-- Capture before roam so a farming/roam desire cannot skip the outpost check.
+	local aa = ConsiderOutpostCapture()
+	if aa > 0 then
+		a2 = true
+		a3 = "outpost_capture"
+		return aa
+	end
 	local a9 = ConsiderGeneralRoamingInConditions()
 	if a9 then
 		if a9 > 0 and a9 <= 1 then
@@ -141,29 +282,90 @@ function GetDesireHelper()
 			return a9
 		end
 	end
-	a2 = false
-	local aa = ConsiderOutpostCapture()
-	if aa > 0 then
-		a2 = true
-		a3 = "outpost_capture"
-		return aa
-	end
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
 	if a.CanNotUseAction(c) then
 		return
 	end
-	if a2 and Z ~= nil then
-		if GetUnitToUnitDistance(c, Z) > 300 then
-			c:Action_MoveToLocation(Z:GetLocation())
+	if leaveFountain ~= nil then
+		c:Action_MoveToLocation(leaveFountain)
+		return
+	end
+	if wardReturnTo ~= nil then
+		c:Action_MoveToLocation(wardReturnTo)
+		return
+	end
+	if chainFrostSpread then
+		a.Utils.SmartSpreadOut(c, 650, 600, {}, false)
+		return
+	end
+	if a2 then
+		if c:IsChanneling() or c:HasModifier("modifier_watch_tower_capturing") then
+			c._outpostNearSince = nil
 			return
-		else
-			if a1 then
-				c:Action_UseAbilityOnEntity(a1, Z)
-			else
-				c:Action_AttackUnit(Z, false)
+		end
+		if Z ~= nil and not Z:IsNull() and Z:GetTeam() ~= GetTeam() then
+			local dist = GetUnitToUnitDistance(c, Z)
+			-- Hold still after the capture order so the 6s channel is not restarted every frame.
+			if c.outpostOrderAt ~= nil and DotaTime() - c.outpostOrderAt < 1.5 and dist <= 650 then
+				return
 			end
+			-- The capture order walks the bot into range by itself. Moving to the outpost centre until
+			-- within 250 could never finish against the building edge: game 017, 50:23-52:43,
+			-- Invoker stood at the Radiant outpost ordering a move every frame (moved 0). Within
+			-- 600 the capture is cast; within 600 for 10s with no capture started, the outpost is
+			-- dropped for 90s (logged).
+			if dist > 600 then
+				c.outpostOrderAt = nil
+				c._outpostNearSince = nil
+				c:Action_MoveToLocation(Z:GetLocation())
+				return
+			end
+			c._outpostNearSince = c._outpostNearSince or DotaTime()
+			if DotaTime() - c._outpostNearSince >= 15 then
+				c._outpostNearSince = nil
+				c._outpostOffUntil = DotaTime() + 90
+				local zl = Z:GetLocation()
+				pcall(print, string.format(
+					"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d",
+					DotaTime(),
+					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+					Z:GetUnitName(),
+					zl.x,
+					zl.y,
+					math.floor(dist)
+				))
+				c:Action_ClearActions(true)
+				return
+			end
+			local capture = c:GetAbilityByName("ability_capture")
+			local castable = capture ~= nil and capture:IsFullyCastable()
+			local nearFor = DotaTime() - c._outpostNearSince
+			-- Game 019: Gyrocopter (36:31, ~260 away) and Medusa (40:51, ~140 away) stood at an
+			-- outpost with no capture for 10s, from within 600. Log each order (what the bot sees
+			-- of ability_capture), and after 3s with no capture, walk to the outpost's edge on
+			-- the bot's side (150 from the centre) before ordering again.
+			if nearFor >= 3 and dist > 200 then
+				local edge = c:GetLocation()
+				local zl = Z:GetLocation()
+				local dir = (edge - zl)
+				if dir:Length2D() > 1 then
+					edge = zl + dir:Normalized() * 150
+				end
+				c.outpostOrderAt = nil
+				c:Action_MoveToLocation(edge)
+				return
+			end
+			if castable then
+				c:Action_UseAbilityOnEntity(capture, Z)
+				c.outpostOrderAt = DotaTime()
+			end
+			-- No attack fallback: outposts are invulnerable, an attack order only made him stand.
+			return
+		end
+		if outpostMoveLoc ~= nil then
+			c:Action_MoveToLocation(outpostMoveLoc)
 			return
 		end
 	end
@@ -268,7 +470,7 @@ function ThinkIndividualRoaming()
 					end
 				end
 				if h ~= nil and not h:IsNull() and h:IsFullyCastable() then
-					log("[TP] %s t=%.0f ROAM tp to fountain", c:GetUnitName(), DotaTime())
+					pcall(print, string.format("[OHA-TP] outpost-mode %s t=%.0f ROAM tp to fountain", c:GetUnitName(), DotaTime()))
 					c:Action_UseAbilityOnLocation(h, a.GetTeamFountain())
 					return true
 				end
@@ -721,7 +923,7 @@ function ThinkGeneralRoaming()
 	if m and n ~= nil then
 		local aV = a.Utils.GetItemFromFullInventory(c, "item_tpscroll")
 		if a.CanCastAbility(aV) then
-			log("[TP] %s t=%.0f ROAM tp to lane at (%.0f,%.0f)", c:GetUnitName(), DotaTime(), n.x, n.y)
+			pcall(print, string.format("[OHA-TP] outpost-mode %s t=%.0f ROAM tp to lane at (%.0f,%.0f)", c:GetUnitName(), DotaTime(), n.x, n.y))
 			c:Action_UseAbilityOnLocation(aV, n)
 			m = false
 			return true
@@ -917,12 +1119,30 @@ function SetupTwinGates()
 		end
 	end
 end
+-- The lane this bot lanes in, by position (Radiant pos 3/4 top, Dire pos 3/4 bot), the same
+-- mapping laning and the laning teleport use. The engine assignment can differ, which sent a
+-- support walking or teleporting to the wrong lane.
+local function PositionLane()
+	if IsLanMode and IsLanMode() then
+		return c:GetAssignedLane()
+	end
+	local pos = a.GetPosition(c)
+	local radiant = GetTeam() == TEAM_RADIANT
+	if pos == 2 then
+		return LANE_MID
+	elseif pos == 1 or pos == 5 then
+		return radiant and LANE_BOT or LANE_TOP
+	elseif pos == 3 or pos == 4 then
+		return radiant and LANE_TOP or LANE_BOT
+	end
+	return c:GetAssignedLane()
+end
 function ThinkActualGankingInLanes()
 	if s ~= nil then
 		local b4 = a.GetEnemyCountInLane(s)
 		if b4 == 0 then
 			s = nil
-			c:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), c:GetAssignedLane(), 0))
+			c:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), PositionLane(), 0))
 			return true
 		end
 		local b5 = GetLaneFrontLocation(GetTeam(), s, -300)
@@ -1010,7 +1230,7 @@ function CheckLaneToGank(b8)
 				if bj > 4000 and not a.HasItem(c, "item_tpscroll") then
 					goto bk
 				end
-				if be[1] == c:GetAssignedLane() then
+				if be[1] == PositionLane() then
 					goto bk
 				end
 				local bl = bi < 2000
@@ -1328,12 +1548,28 @@ function ConsiderGeneralRoamingInConditions()
 		return 0.91
 	end
 	if a.IsInLaningPhase() then
+		-- A Tango heals over 16s a charge. Under 15% the hero sat in lane nibbling for a minute
+		-- or more; walking or teleporting home is faster and safer. Above that, a healing item
+		-- in the bag still keeps the hero in lane.
+		local critical = S < 0.15
 		if
 			not c:WasRecentlyDamagedByAnyHero(1.5)
-			and not a.HasHealingItem(c)
+			-- P: already on the way home. Regen past 15% must not turn the hero back mid-walk.
+			and (P or critical or not a.HasHealingItem(c))
 			and d ~= "npc_dota_hero_huskar"
 			and (P and not IsInHealthyState() or (S < 0.22 or S < 0.3 and a.GetMP(c) < 0.22))
 		then
+			if not P then
+				pcall(print, string.format(
+					"[OHA-LANE] t=%.0f %s go-home hp=%.2f mp=%.2f healItem=%s critical=%s",
+					DotaTime(),
+					(string.gsub(d, "npc_dota_hero_", "")),
+					S,
+					a.GetMP(c),
+					tostring(a.HasHealingItem(c)),
+					tostring(critical)
+				))
+			end
 			P = true
 			return BOT_ACTION_DESIRE_ABSOLUTE * 1.5
 		end
@@ -1538,6 +1774,17 @@ r["npc_dota_hero_primal_beast"] = function()
 	e = c:GetAbilityByName("primal_beast_trample")
 	if e:IsTrained() then
 		if e:IsInAbilityPhase() or c:HasModifier("modifier_primal_beast_trample") and S > 0.3 then
+			-- Game 036: outpost/1.50 in 32 of Primal Beast's base-defence samples. Name the source
+			-- (Trample lasts 5.5s, game data) and whether a fight or a lane defence was on.
+			if DotaTime() >= (c._pbOverrideLogAt or -999) then
+				c._pbOverrideLogAt = DotaTime() + 10
+				local defend = 0
+				for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+					defend = math.max(defend, GetDefendLaneDesire(lane) or 0)
+				end
+				pcall(print, string.format("[OHA-FLIPSRC] t=%.0f primal_beast override=1.50 why=trample enemies=%d maxDefend=%.2f",
+					DotaTime(), #a.GetEnemiesNearLoc(c:GetLocation(), 1200), defend))
+			end
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
@@ -1834,86 +2081,447 @@ r["npc_dota_hero_nevermore"] = function()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+-- Primary-jungle outposts (map dump). Live units override these when the scan finds them.
+local OUTPOST_FALLBACK = {
+	Vector(-4096, -448, 128),
+	Vector(3392, -448, 128),
+}
+
 local function IsOutpostUnit(unit)
-	if unit == nil or unit:IsNull() then
+	if unit == nil or unit:IsNull() or unit.GetUnitName == nil then
 		return false
 	end
-	local name = unit:GetUnitName() or ""
-	return name == "npc_dota_watch_tower"
-		or name == "#DOTA_OutpostName_North"
-		or name == "#DOTA_OutpostName_South"
-		or (unit.IsBuilding and unit:IsBuilding() and string.find(name, "watch_tower"))
+	local name = string.lower(unit:GetUnitName() or "")
+	if name == "" then
+		return false
+	end
+	-- Watchers are npc_dota_lantern. Outposts are watch_tower / OutpostName.
+	return string.find(name, "watch_tower", 1, true) ~= nil or string.find(name, "outpost", 1, true) ~= nil
+end
+
+local function AddOutpost(list, unit)
+	if not IsOutpostUnit(unit) then
+		return
+	end
+	for i = 1, #list do
+		if list[i] == unit then
+			return
+		end
+	end
+	list[#list + 1] = unit
 end
 
 local outpostCacheAt = -999
+-- One-time scan log (first bot of the team, from 0:30): every non-hero unit within 900 of the two
+-- fallback outpost spots, and every unit on the map whose name looks like a building of that
+-- kind, with team. Game 017: Invoker stood by the Radiant outpost and the scan matched nothing;
+-- no game has ever logged an outpost. This shows the real outpost unit name, or that the bot API
+-- does not list it.
+local outpostScanLogged = false
+local function LogOutpostScan()
+	if outpostScanLogged or DotaTime() < 30 then
+		return
+	end
+	for i = 1, 5 do
+		local m0 = GetTeamMember(i)
+		if m0 ~= nil and m0:IsBot() then
+			if m0 ~= c then
+				outpostScanLogged = true
+				return
+			end
+			break
+		end
+	end
+	outpostScanLogged = true
+	local near, named = {}, {}
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+		if u ~= nil and not u:IsNull() and not u:IsHero() then
+			local n0 = u:GetUnitName() or "?"
+			local l0 = string.lower(n0)
+			for k = 1, #OUTPOST_FALLBACK do
+				if GetUnitToLocationDistance(u, OUTPOST_FALLBACK[k]) <= 900 then
+					near[#near + 1] = n0 .. "/team" .. tostring(u:GetTeam())
+					break
+				end
+			end
+			if string.find(l0, "watch", 1, true) or string.find(l0, "outpost", 1, true) or string.find(l0, "lantern", 1, true) then
+				named[#named + 1] = n0 .. "/team" .. tostring(u:GetTeam())
+			end
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-OUTPOST] t=%.0f scan near-spots=%s named=%s",
+		DotaTime(),
+		#near > 0 and table.concat(near, ",") or "-",
+		#named > 0 and table.concat(named, ",") or "-"
+	))
+end
 local function RefreshOutpostCache()
 	X = {}
-	for _, unit in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
-		if IsOutpostUnit(unit) then
-			X[#X + 1] = unit
+	local lists = {
+		UNIT_LIST_ALL,
+		UNIT_LIST_ENEMY_BUILDINGS,
+		UNIT_LIST_ALLIED_BUILDINGS,
+	}
+	for i = 1, #lists do
+		for _, unit in pairs(GetUnitList(lists[i]) or {}) do
+			AddOutpost(X, unit)
 		end
 	end
 	Y = true
 	outpostCacheAt = DotaTime()
 end
 
-function ConsiderOutpostCapture()
-	-- Unlock once an enemy T1/T2 is down, or after ~12 minutes.
-	if not a0 then
-		local enemy = GetOpposingTeam()
-		if
-			GetTower(enemy, TOWER_TOP_1) == nil
-			or GetTower(enemy, TOWER_MID_1) == nil
-			or GetTower(enemy, TOWER_BOT_1) == nil
-			or GetTower(enemy, TOWER_TOP_2) == nil
-			or GetTower(enemy, TOWER_MID_2) == nil
-			or GetTower(enemy, TOWER_BOT_2) == nil
-			or DotaTime() >= 12 * 60
-		then
-			a0 = true
+-- Capture rule (from the user, 2026-11-15): the enemy-side outpost needs one of the enemy's tier-2
+-- towers dead. Our own side's outpost, taken by the enemy, can be retaken any time: the rule looks
+-- at whose side the outpost is on, not at towers. Our own tier-2 or the 10:00 clock does not
+-- unlock the enemy-side one.
+-- A tier-2 counts as dead only after that lane's tier-1 is gone too, so a nil tower list at game start does not qualify.
+local function EnemyTier2Down()
+	local enemy = GetOpposingTeam()
+	local lanes = {
+		{ TOWER_TOP_1, TOWER_TOP_2 },
+		{ TOWER_MID_1, TOWER_MID_2 },
+		{ TOWER_BOT_1, TOWER_BOT_2 },
+	}
+	local anyTower = false
+	for i = 1, #lanes do
+		if GetTower(enemy, lanes[i][1]) ~= nil or GetTower(enemy, lanes[i][2]) ~= nil then
+			anyTower = true
+			break
 		end
 	end
-	if not a0 then
+	if not anyTower then
+		return false
+	end
+	for i = 1, #lanes do
+		if GetTower(enemy, lanes[i][1]) == nil and GetTower(enemy, lanes[i][2]) == nil then
+			return true
+		end
+	end
+	return false
+end
+
+local function HeroHp(hero)
+	if hero == nil or hero:GetMaxHealth() <= 0 then
 		return 0
 	end
-	if a.Utils.IsTeamPushingSecondTierOrHighGround(c) then
-		return 0
+	return hero:GetHealth() / hero:GetMaxHealth()
+end
+
+local function IsBusyPushing(hero)
+	if hero == nil or hero:IsNull() then
+		return false
 	end
+	local towers = hero:GetNearbyTowers(900, true)
+	if towers == nil or #towers == 0 then
+		return false
+	end
+	local allies = hero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
+	return allies ~= nil and #allies >= 2
+end
+
+local function CanThisBotCapture()
+	if not c:IsAlive() or HeroHp(c) < 0.45 then
+		return false
+	end
+	if a.IsRetreating(c) and c:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH then
+		return false
+	end
+	if c:WasRecentlyDamagedByAnyHero(1.5) then
+		local near = c:GetNearbyHeroes(900, true, BOT_MODE_NONE)
+		if near ~= nil and #near >= 1 then
+			return false
+		end
+	end
+	local ak = a.GetProperTarget(c)
+	if a.IsDoingRoshan(c) and a.IsRoshan(ak) and a.IsAttacking(c) then
+		return false
+	end
+	if a.IsDoingTormentor(c) and a.IsTormentor(ak) and a.IsAttacking(c) then
+		return false
+	end
+	local fight = c:GetNearbyHeroes(700, true, BOT_MODE_NONE)
+	if fight ~= nil and #fight >= 2 then
+		return false
+	end
+	return true
+end
+
+-- Only the closest free hero walks over. A grouped tower siege stays put if someone else can go.
+local function AmAssignedCapturer(loc)
+	local myDist = GetUnitToLocationDistance(c, loc)
+	local myBusy = IsBusyPushing(c)
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local ally = GetTeamMember(i)
+		if
+			ally ~= nil
+			and ally ~= c
+			and ally:IsHero()
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and HeroHp(ally) >= 0.45
+		then
+			local allyDist = GetUnitToLocationDistance(ally, loc)
+			local allyBusy = IsBusyPushing(ally)
+			if not allyBusy and allyDist + 250 < myDist then
+				return false
+			end
+			if myBusy and not allyBusy and allyDist < myDist + 3500 then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+-- Enemies within this of the outpost make walking over a fight, not a capture.
+local OUTPOST_CONTEST = 1600
+
+local function OutpostIsTooHot(loc)
+	local enemies = a.GetEnemiesNearLoc(loc, OUTPOST_CONTEST)
+	local n = enemies ~= nil and #enemies or 0
+	if n == 0 then
+		return false
+	end
+	-- An enemy beside the bot on the walk over is just as much a fight as one on the outpost.
+	local beside = c:GetNearbyHeroes(OUTPOST_CONTEST, true, BOT_MODE_NONE)
+	if beside ~= nil and #beside > n then
+		n = #beside
+	end
+	local allies = a.GetAlliesNearLoc(loc, OUTPOST_CONTEST)
+	local allyN = allies ~= nil and #allies or 0
+	if GetUnitToLocationDistance(c, loc) <= OUTPOST_CONTEST then
+		allyN = math.max(allyN, 1)
+	end
+	-- One enemy keeps the nearest ally contesting; two or more needs a clear majority.
+	if n == 1 then
+		return allyN < 1
+	end
+	return allyN <= n
+end
+
+function ConsiderOutpostCapture()
+	outpostMoveLoc = nil
+	-- Stop a capture in progress once enemy heroes show up and we do not outnumber them. The
+	-- 6s channel was never cancelled: Doom kept capturing with Tusk and Enigma on him.
+	-- Only the capture itself: a plain IsChanneling() check would also cancel ults like Black Hole.
+	if c:HasModifier("modifier_watch_tower_capturing") then
+		local foes = c:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+		local friends = c:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
+		if #foes >= 1 and #friends <= #foes then
+			pcall(print, string.format(
+				"[OHA-OUTPOST] t=%.0f %s capture-abort foes=%d allies=%d hp=%.2f",
+				DotaTime(),
+				(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+				#foes,
+				#friends,
+				a.GetHP(c)
+			))
+			c:Action_ClearActions(true)
+			c.outpostOrderAt = nil
+			a0 = true
+			return 0
+		end
+	end
+	-- No global tower gate any more: GetClosestOutpost only offers outposts this team may take.
+	a0 = true
 	if a.GetEnemiesAroundAncient(c, 3200) > 0 then
 		return 0
 	end
-	if a.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
+	if a.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1 then
 		return 0
 	end
-	if d == "npc_dota_hero_invoker" then
+	if not CanThisBotCapture() then
 		return 0
 	end
-	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 30 then
+	if DotaTime() < (c._outpostOffUntil or -999) then
+		return 0
+	end
+	if not Y or #X == 0 or DotaTime() - outpostCacheAt > 2 then
 		RefreshOutpostCache()
 	end
 	Z, _ = GetClosestOutpost()
-	local maxDist = 3200
-	if Z ~= nil and _ < maxDist and not IsEnemyCloserToOutpostLoc(Z:GetLocation(), _) and IsSuitableToCaptureOutpost() then
-		if GetUnitToUnitDistance(c, Z) < 700 then
-			local bU = a.GetEnemiesNearLoc(Z:GetLocation(), 1200)
-			if bU ~= nil and #bU >= 1 then
-				return 0
+	local loc = nil
+	if Z ~= nil and not Z:IsNull() then
+		loc = Z:GetLocation()
+	elseif #X > 0 then
+		-- Both outposts are already ours.
+		Z = nil
+		return 0
+	else
+		Z = nil
+		-- Without the scan the owner is unknown, so only walk to the enemy-side spot, and only
+		-- once it may be taken. Our own side's outpost is retaken only when the scan sees it.
+		if not EnemyTier2Down() then
+			return 0
+		end
+		-- Scan missed the buildings. Walk to the outpost closer to the enemy fountain
+		-- (their jungle outpost, or ours if they already took it and it is the nearer spot).
+		-- Arrived and still no outpost found: drop the fallback for 90s. Game 017, 50:23-52:43:
+		-- Invoker stood on the fallback spot by the Radiant outpost at desire 0.98, re-ordering a
+		-- move to where he already was, with nothing to capture.
+		if DotaTime() < (c._outpostFallbackOffUntil or -999) then
+			return 0
+		end
+		local enemyFountain = a.GetEnemyFountain()
+		local best = 100000
+		for i = 1, #OUTPOST_FALLBACK do
+			local spot = OUTPOST_FALLBACK[i]
+			local score = enemyFountain ~= nil and a.GetDistance(spot, enemyFountain)
+				or GetUnitToLocationDistance(c, spot)
+			if score < best then
+				best = score
+				loc = spot
 			end
 		end
-		return RemapValClamped(GetUnitToUnitDistance(c, Z), maxDist, 0, BOT_ACTION_DESIRE_VERYLOW, BOT_ACTION_DESIRE_HIGH)
+		if loc == nil or not CanCaptureOutpostAt(loc) then
+			return 0
+		end
+		_ = GetUnitToLocationDistance(c, loc)
+		if _ <= 600 then
+			c._outpostFallbackAt = c._outpostFallbackAt or DotaTime()
+			if DotaTime() - c._outpostFallbackAt >= 5 then
+				c._outpostFallbackAt = nil
+				c._outpostFallbackOffUntil = DotaTime() + 90
+				-- Names of the units near the spot: the outpost scan matched none of them.
+				local near = {}
+				for _, u in pairs(GetUnitList(UNIT_LIST_ALL) or {}) do
+					if u ~= nil and not u:IsNull() and not u:IsHero() and GetUnitToLocationDistance(u, loc) <= 700 then
+						near[#near + 1] = u:GetUnitName() .. "/team" .. tostring(u:GetTeam())
+					end
+				end
+				pcall(print, string.format(
+					"[OHA-OUTPOST] t=%.0f %s fallback-giveup spot=%.0f,%.0f near=%s",
+					DotaTime(),
+					(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+					loc.x,
+					loc.y,
+					#near > 0 and table.concat(near, ",") or "-"
+				))
+				return 0
+			end
+		else
+			c._outpostFallbackAt = nil
+		end
+		outpostMoveLoc = loc
 	end
-	return 0
+	if loc == nil then
+		return 0
+	end
+	if OutpostIsTooHot(loc) then
+		return 0
+	end
+	if not AmAssignedCapturer(loc) then
+		-- Already on it: stay and help finish the channel.
+		if GetUnitToLocationDistance(c, loc) > 600 then
+			return 0
+		end
+	end
+	local dist = GetUnitToLocationDistance(c, loc)
+	-- Above farm (VERYHIGH ~0.9) so one bot actually leaves the wave. Below retreat.
+	-- Far outposts no longer beat a nearby fight or a lane the bot is already in.
+	if dist <= 500 then
+		return 0.98
+	end
+	-- Not on the way to Roshan or the Tormentor (game 035, 33:55: Leshrac, walking to the bottom
+	-- Tormentor, passed within 2500 of the Dire outpost and the 0.95 here took him off his trip).
+	if a.IsDoingRoshan(c) or a.IsDoingTormentor(c) then
+		return 0
+	end
+	-- User call: 2500 pulled bots off whatever they were doing from too far away.
+	if dist <= 1200 then
+		return 0.95
+	end
+	return BOT_MODE_DESIRE_MODERATE
+end
+-- Our side's outpost: the one closer to our fountain than to theirs.
+function IsOurSideOutpost(loc)
+	local ours, theirs = a.GetTeamFountain(), a.GetEnemyFountain()
+	if loc == nil or ours == nil or theirs == nil then
+		return false
+	end
+	return a.GetDistance(loc, ours) < a.GetDistance(loc, theirs)
+end
+-- Living enemy heroes not seen for over 3s (GetHeroLastSeenInfo works without vision).
+local function MissingEnemies()
+	local n = 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local ls = info ~= nil and info[1] or nil
+			if ls == nil or ls.time_since_seen == nil or ls.time_since_seen > 3 then
+				n = n + 1
+			end
+		end
+	end
+	return n
+end
+-- The lane whose front is closest to the outpost, and how far our wave has pushed along it
+-- (0 = our base, 1 = theirs).
+local function OutpostLaneFront(loc)
+	local bestLane, bestDist = nil, math.huge
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local front = GetLaneFrontLocation(GetTeam(), lane, 0)
+		if front ~= nil then
+			local d = a.GetDistance(front, loc)
+			if d < bestDist then
+				bestLane, bestDist = lane, d
+			end
+		end
+	end
+	if bestLane == nil then
+		return nil, 0
+	end
+	return bestLane, GetLaneFrontAmount(GetTeam(), bestLane, false) or 0
+end
+-- The enemy-side outpost sits in their jungle. User call (game 035, 34:04: Leshrac walked alone
+-- to the Dire outpost while Radiant was well behind on kills and no wave pushed toward Dire, and
+-- Necrophos, Dragon Knight and Winter Wyvern killed him there): besides an enemy lane with T1 and
+-- T2 down, our wave must be past the middle of the outpost's lane, and no more than 2 living enemy
+-- heroes may be out of sight (the three who killed him were in the fog). This replaced a kill-deficit
+-- check (user call: kills say little about who is waiting nearby).
+local ENEMY_OUTPOST_MAX_MISSING = 2
+local enemyOutpostLogAt = -999
+local function EnemyOutpostSafe(loc)
+	local why = nil
+	if not EnemyTier2Down() then
+		why = "no-tier2-down"
+	else
+		local missing = MissingEnemies()
+		local lane, amount = OutpostLaneFront(loc)
+		if missing > ENEMY_OUTPOST_MAX_MISSING then
+			why = string.format("enemies-unseen(%d)", missing)
+		elseif amount <= 0.5 then
+			why = string.format("wave-not-pushed(lane=%s front=%.2f)", tostring(lane), amount)
+		end
+	end
+	if why ~= nil and why ~= "no-tier2-down" and DotaTime() >= enemyOutpostLogAt + 60 then
+		enemyOutpostLogAt = DotaTime()
+		pcall(print, string.format(
+			"[OHA-OUTPOST] t=%.0f %s enemy-outpost-skip why=%s",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			why
+		))
+	end
+	return why == nil
+end
+function CanCaptureOutpostAt(loc)
+	return IsOurSideOutpost(loc) or EnemyOutpostSafe(loc)
 end
 function GetClosestOutpost()
 	local bV = nil
 	local bW = 10000
 	for aE = 1, #X do
 		local outpost = X[aE]
+		-- Outposts are permanently invulnerable buildings; capture is a channel, not damage.
+		-- Do NOT require not IsInvulnerable() — that filtered every outpost.
 		if
 			outpost ~= nil
 			and not outpost:IsNull()
 			and outpost:GetTeam() ~= GetTeam()
-			and not outpost:IsInvulnerable()
+			and CanCaptureOutpostAt(outpost:GetLocation())
 		then
 			local dist = GetUnitToUnitDistance(c, outpost)
 			if dist < bW then
@@ -1924,38 +2532,8 @@ function GetClosestOutpost()
 	end
 	return bV, bW
 end
-function IsEnemyCloserToOutpostLoc(bX, bY)
-	for af, bZ in pairs(GetTeamPlayers(GetOpposingTeam())) do
-		local b_ = GetHeroLastSeenInfo(bZ)
-		if b_ ~= nil then
-			local c0 = b_[1]
-			if c0 ~= nil and c0.time_since_seen < 5 and a.GetDistance(c0.location, bX) < bY then
-				return true
-			end
-		end
-	end
-	return false
-end
 function IsSuitableToCaptureOutpost()
-	local ak = a.GetProperTarget(c)
-	if
-		a.IsGoingOnSomeone(c) and a.IsValidTarget(ak) and GetUnitToUnitDistance(c, ak) < 700
-		or a.IsDefending(c)
-		or a.IsDoingTormentor(c) and a.IsTormentor(ak) and a.IsAttacking(c)
-		or a.IsDoingRoshan(c) and a.IsRoshan(ak) and a.IsAttacking(c)
-		or a.IsRetreating(c) and c:GetActiveModeDesire() > BOT_MODE_DESIRE_HIGH
-		or c:WasRecentlyDamagedByAnyHero(2.0)
-		or c:GetActiveMode() == BOT_MODE_DEFEND_ALLY
-	then
-		return false
-	end
-	-- Only refuse on numbers if the outpost area is contested / we are far behind.
-	local aliveAlly = a.GetNumOfAliveHeroes(false)
-	local aliveEnemy = a.GetNumOfAliveHeroes(true)
-	if aliveAlly + 1 < aliveEnemy then
-		return false
-	end
-	return true
+	return CanThisBotCapture()
 end
 if SafeCall then
 	local c1 = GetDesire

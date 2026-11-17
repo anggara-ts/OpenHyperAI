@@ -1,544 +1,333 @@
--- Shared bot system: item strategy.
-local function a(self, b, c)
-	if c == nil then
-		c = 0
-	end
-	local d = #self
-	if d == 0 then
-		return -1
-	end
-	if c >= d then
-		return -1
-	end
-	if c < 0 then
-		c = d + c
-		if c < 0 then
-			c = 0
-		end
-	end
-	for e = c + 1, d do
-		if self[e] == b then
-			return e - 1
-		end
-	end
-	return -1
+-- Team defensive items. Picks Pipe / Crimson Guard / Lotus Orb from the enemy's damage
+-- and gives each one to a single bot on the team.
+--
+-- Every bot builds its item list on its own, so the plan only reads things that are the
+-- same for every bot: ally heroes, their roster positions, and the enemy lineup.
+-- Every bot then arrives at the same split without sharing state.
+local Strategy = {}
+
+local Roles = require(GetScriptDirectory() .. "/FuncLib/data/hero_roles_map").HeroRolesMap
+
+-- Placeholder a hero build puts where its flexible defensive item goes.
+Strategy.SLOT = "item_team_aura"
+
+-- Items a team should not double. Their effects do not stack.
+local TEAM_ITEMS = {
+	item_pipe = true,
+	item_crimson_guard = true,
+	item_lotus_orb = true,
+}
+Strategy.TEAM_ITEMS = TEAM_ITEMS
+
+-- Heroes with a flexible defensive slot, and the items that slot may hold.
+-- Non-team items here (Halberd, Shiva's) are the fallback once the team items are taken.
+local FLEX = {
+	npc_dota_hero_bloodseeker = { "item_crimson_guard", "item_pipe" },
+	npc_dota_hero_centaur = { "item_crimson_guard", "item_pipe", "item_lotus_orb" },
+	npc_dota_hero_doom_bringer = { "item_crimson_guard", "item_pipe", "item_lotus_orb", "item_heavens_halberd" },
+	npc_dota_hero_enigma = { "item_pipe", "item_lotus_orb" },
+	npc_dota_hero_legion_commander = { "item_crimson_guard", "item_pipe", "item_heavens_halberd" },
+	npc_dota_hero_leshrac = { "item_pipe", "item_lotus_orb", "item_crimson_guard" },
+	npc_dota_hero_lycan = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" },
+	npc_dota_hero_magnataur = { "item_lotus_orb", "item_heavens_halberd" },
+	npc_dota_hero_mars = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" },
+	npc_dota_hero_night_stalker = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" },
+	npc_dota_hero_omniknight = { "item_crimson_guard", "item_pipe", "item_heavens_halberd" },
+	npc_dota_hero_pangolier = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" },
+	npc_dota_hero_pudge = { "item_pipe", "item_lotus_orb", "item_crimson_guard" },
+	npc_dota_hero_shredder = { "item_crimson_guard", "item_pipe", "item_lotus_orb" },
+	npc_dota_hero_undying = { "item_pipe", "item_lotus_orb" },
+	npc_dota_hero_venomancer = { "item_pipe", "item_lotus_orb", "item_heavens_halberd" },
+	npc_dota_hero_winter_wyvern = { "item_lotus_orb", "item_shivas_guard" },
+}
+
+-- Heroes the role table scores wrong for damage type.
+local DAMAGE_OVERRIDE = {
+	npc_dota_hero_huskar = { magic = 2, physical = 1 },
+	npc_dota_hero_storm_spirit = { magic = 2, physical = 1 },
+	npc_dota_hero_bristleback = { magic = 0, physical = 2 },
+}
+
+-- Offlaner leads team items, then supports, then mid, then carry.
+local POS_ORDER = { [3] = 1, [4] = 2, [5] = 3, [2] = 4, [1] = 5 }
+
+-- Urn of Shadows and its upgrades share one heal/damage effect, so one per team.
+local URN_FAMILY = { item_urn_of_shadows = true, item_spirit_vessel = true, item_essence_distiller = true }
+-- Roamer first, then hard support.
+local URN_POS_ORDER = { [4] = 1, [5] = 2, [3] = 3, [2] = 4, [1] = 5 }
+-- Positions whose BotsLib build has Urn, Spirit Vessel or Essence Distiller. A bot cannot read an ally's
+-- build at runtime, so this is kept by hand. Update it when a hero build adds or drops one.
+local URN_BUILDS = {
+	npc_dota_hero_ancient_apparition = { 4 },
+	npc_dota_hero_bane = { 4 },
+	npc_dota_hero_beastmaster = { 4 },
+	npc_dota_hero_bounty_hunter = { 4, 5 },
+	npc_dota_hero_brewmaster = { 4, 5 },
+	npc_dota_hero_bristleback = { 4, 5 },
+	npc_dota_hero_chaos_knight = { 4, 5 },
+	npc_dota_hero_chen = { 4 },
+	npc_dota_hero_crystal_maiden = { 4 },
+	npc_dota_hero_dawnbreaker = { 4, 5 },
+	npc_dota_hero_dazzle = { 4, 5 },
+	npc_dota_hero_earth_spirit = { 1, 2, 4 },
+	npc_dota_hero_earthshaker = { 4 },
+	npc_dota_hero_elder_titan = { 4, 5 },
+	npc_dota_hero_ember_spirit = { 2 },
+	npc_dota_hero_furion = { 4, 5 },
+	npc_dota_hero_grimstroke = { 4 },
+	npc_dota_hero_gyrocopter = { 4 },
+	npc_dota_hero_hoodwink = { 4 },
+	npc_dota_hero_invoker = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_jakiro = { 4 },
+	npc_dota_hero_keeper_of_the_light = { 1, 2, 3, 4 },
+	npc_dota_hero_kunkka = { 4, 5 },
+	npc_dota_hero_largo = { 4, 5 },
+	npc_dota_hero_lich = { 4, 5 },
+	npc_dota_hero_life_stealer = { 4, 5 },
+	npc_dota_hero_lina = { 4 },
+	npc_dota_hero_lion = { 4 },
+	npc_dota_hero_marci = { 4, 5 },
+	npc_dota_hero_mirana = { 4 },
+	npc_dota_hero_muerta = { 4, 5 },
+	npc_dota_hero_necrolyte = { 4, 5 },
+	npc_dota_hero_night_stalker = { 4, 5 },
+	npc_dota_hero_ogre_magi = { 4 },
+	npc_dota_hero_omniknight = { 4 },
+	npc_dota_hero_oracle = { 4 },
+	npc_dota_hero_phoenix = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_primal_beast = { 4, 5 },
+	npc_dota_hero_pugna = { 4 },
+	npc_dota_hero_rattletrap = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_ringmaster = { 4 },
+	npc_dota_hero_sand_king = { 4 },
+	npc_dota_hero_snapfire = { 4 },
+	npc_dota_hero_spirit_breaker = { 4, 5 },
+	npc_dota_hero_tinker = { 5 },
+	npc_dota_hero_undying = { 4 },
+	npc_dota_hero_venomancer = { 4, 5 },
+	npc_dota_hero_visage = { 4 },
+	npc_dota_hero_void_spirit = { 1, 2, 3, 4, 5 },
+	npc_dota_hero_windrunner = { 4 },
+	npc_dota_hero_wisp = { 4 },
+	npc_dota_hero_witch_doctor = { 4 },
+	npc_dota_hero_zuus = { 4 },
+}
+
+local function TeamKey(team)
+	return team == TEAM_RADIANT and "TEAM_RADIANT" or "TEAM_DIRE"
 end
-local function f(...)
-	return select("#", ...)
-end
-local function g(self, ...)
-	local h = { ... }
-	local d = #self
-	local i = f(...)
-	local j = h[1]
-	local k = h[2]
-	if j < 0 then
-		j = d + j
-		if j < 0 then
-			j = 0
-		end
-	elseif j > d then
-		j = d
-	end
-	local l = i - 2
-	if l < 0 then
-		l = 0
-	end
-	local m
-	if i == 0 then
-		m = 0
-	elseif i == 1 then
-		m = d - j
-	else
-		m = k or 0
-		if m < 0 then
-			m = 0
-		end
-		if m > d - j then
-			m = d - j
-		end
-	end
-	local n = {}
-	for o = 1, m do
-		local p = j + o
-		if self[p] ~= nil then
-			n[o] = self[p]
-		end
-	end
-	if l < m then
-		for o = j + 1, d - m do
-			local p = o + m
-			local q = o + l
-			if self[p] then
-				self[q] = self[p]
+
+-- Returns magic, physical summed over the enemy lineup.
+function Strategy.EnemyDamage()
+	local magic, physical = 0, 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		local name = GetSelectedHeroName(pid)
+		if name ~= nil and name ~= "" then
+			local o = DAMAGE_OVERRIDE[name]
+			if o ~= nil then
+				magic = magic + o.magic
+				physical = physical + o.physical
 			else
-				self[q] = nil
+				local r = Roles[name]
+				if r ~= nil then
+					magic = magic + (r.nuker or 0) + 0.25 * (r.disabler or 0)
+					physical = physical + (r.carry or 0) + 0.25 * (r.pusher or 0)
+				end
 			end
 		end
-		for o = d - m + l + 1, d do
-			self[o] = nil
-		end
-	elseif l > m then
-		for o = d - m, j + 1, -1 do
-			local p = o + m
-			local q = o + l
-			if self[p] then
-				self[q] = self[p]
-			else
-				self[q] = nil
+	end
+	return magic, physical
+end
+
+-- Heroes whose damage comes through illusions or clones. Halberd's disarm hits only one body.
+local ILLUSION_HEROES = {
+	npc_dota_hero_arc_warden = true,
+	npc_dota_hero_chaos_knight = true,
+	npc_dota_hero_meepo = true,
+	npc_dota_hero_naga_siren = true,
+	npc_dota_hero_phantom_lancer = true,
+	npc_dota_hero_terrorblade = true,
+}
+
+-- Heaven's Halberd is worth it: the enemy has heavy right-click damage that does not come
+-- through illusions. Counts carry weight (or a physical override) over enemy heroes that
+-- hit mostly with attacks (carry above nuker) and are not illusion heroes. One hard carry
+-- (3) or two lesser ones is enough. Returns the answer and the heroes that counted.
+function Strategy.EnemyHeavyPhysical()
+	local weight, names = 0, {}
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		local name = GetSelectedHeroName(pid)
+		if name ~= nil and name ~= "" and not ILLUSION_HEROES[name] then
+			local o = DAMAGE_OVERRIDE[name]
+			local r = Roles[name]
+			local w = 0
+			if o ~= nil then
+				w = o.physical > o.magic and o.physical or 0
+			elseif r ~= nil and (r.carry or 0) > (r.nuker or 0) then
+				w = r.carry or 0
+			end
+			if w >= 2 then
+				weight = weight + w
+				names[#names + 1] = (string.gsub(name, "npc_dota_hero_", ""))
 			end
 		end
 	end
-	local r = j + 1
-	for e = 3, i do
-		self[r] = h[e]
-		r = r + 1
-	end
-	for o = #self, d - m + l + 1, -1 do
-		self[o] = nil
-	end
-	return n
+	return weight >= 3, names
 end
-local function s(t)
-	local u = {}
-	local d = 0
-	for v in pairs(t) do
-		d = d + 1
-		u[d] = { v, t[v] }
+
+-- Team items, best first, for this enemy lineup.
+function Strategy.RankTeamItems()
+	local magic, physical = Strategy.EnemyDamage()
+	local total = magic + physical
+	if total <= 0 then
+		return { "item_lotus_orb", "item_crimson_guard", "item_pipe" }, "unknown"
 	end
-	return u
+	local share = magic / total
+	if share >= 0.58 then
+		return { "item_pipe", "item_lotus_orb", "item_crimson_guard" }, "magic"
+	elseif share <= 0.42 then
+		return { "item_crimson_guard", "item_lotus_orb", "item_pipe" }, "physical"
+	end
+	return { "item_lotus_orb", "item_crimson_guard", "item_pipe" }, "mixed"
 end
-local function w(self, x)
-	local d = #self
-	for e = 1, #x do
-		d = d + 1
-		self[d] = x[e]
-	end
-	return d
-end
-local function y(self, b, c)
-	if c == nil then
-		c = 0
-	end
-	local d = #self
-	local o = c
-	if c < 0 then
-		o = d + c
-	end
-	if o < 0 then
-		o = 0
-	end
-	for e = o + 1, d do
-		if self[e] == b then
+
+local function Has(list, item)
+	for i = 1, #list do
+		if list[i] == item then
 			return true
 		end
 	end
 	return false
 end
-local z = {}
-local A = require(GetScriptDirectory() .. "/ts_libs/dota/heroes")
-local B = A.HeroName
-local C = require(GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
-local D = C.HeroRolesMap
-local E = C.IsRanged
-local F = {
-	pos_1 = {
-		melee = { "item_tango", "item_double_branches", "item_quelling_blade", "item_circlet" },
-		ranged = { "item_tango", "item_double_branches", "item_slippers", "item_circlet" },
-	},
-	pos_2 = {
-		melee = { "item_tango", "item_double_branches", "item_faerie_fire", "item_circlet" },
-		ranged = { "item_tango", "item_double_branches", "item_faerie_fire", "item_circlet" },
-	},
-	pos_3 = {
-		melee = { "item_tango", "item_double_branches", "item_quelling_blade" },
-		ranged = { "item_tango", "item_double_branches", "item_circlet" },
-	},
-	pos_4 = {
-		melee = { "item_tango", "item_double_branches", "item_enchanted_mango", "item_blood_grenade" },
-		ranged = { "item_tango", "item_double_branches", "item_enchanted_mango", "item_blood_grenade" },
-	},
-	pos_5 = {
-		melee = { "item_tango", "item_tango", "item_double_branches", "item_enchanted_mango", "item_blood_grenade" },
-		ranged = { "item_tango", "item_tango", "item_double_branches", "item_enchanted_mango", "item_blood_grenade" },
-	},
-}
-local G = { "item_magic_wand", "item_boots" }
-local H = {
-	pos_1 = { "item_power_treads" },
-	pos_2 = { "item_power_treads" },
-	pos_3 = { "item_phase_boots" },
-	pos_4 = { "item_arcane_boots" },
-	pos_5 = { "item_tranquil_boots" },
-}
-local I = {
-	pos_1 = {
-		melee = {
-			"item_wraith_band",
-			"item_hand_of_midas",
-			"item_bfury",
-			"item_manta",
-			"item_black_king_bar",
-			"item_skadi",
-			"item_butterfly",
-			"item_abyssal_blade",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-		ranged = {
-			"item_wraith_band",
-			"item_hand_of_midas",
-			"item_dragon_lance",
-			"item_manta",
-			"item_black_king_bar",
-			"item_skadi",
-			"item_butterfly",
-			"item_bloodthorn",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-	},
-	pos_2 = {
-		melee = {
-			"item_bottle",
-			"item_hand_of_midas",
-			"item_blink",
-			"item_black_king_bar",
-			"item_cyclone",
-			"item_octarine_core",
-			"item_cyclone",
-			"item_black_king_bar",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-		ranged = {
-			"item_bottle",
-			"item_hand_of_midas",
-			"item_cyclone",
-			"item_black_king_bar",
-			"item_force_staff",
-			"item_octarine_core",
-			"item_cyclone",
-			"item_black_king_bar",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-	},
-	pos_3 = {
-		melee = {
-			"item_bracer",
-			"item_blink",
-			"item_lotus_orb",
-			"item_black_king_bar",
-			"item_heavens_halberd",
-			"item_heart",
-			"item_assault",
-			"item_abyssal_blade",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-		ranged = {
-			"item_bracer",
-			"item_blink",
-			"item_lotus_orb",
-			"item_black_king_bar",
-			"item_heavens_halberd",
-			"item_heart",
-			"item_assault",
-			"item_heavens_halberd",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-	},
-	pos_4 = {
-		melee = {
-			"item_urn_of_shadows",
-			"item_solar_crest",
-			"item_glimmer_cape",
-			"item_force_staff",
-			"item_guardian_greaves",
-			"item_sheepstick",
-			"item_guardian_greaves",
-			"item_heavens_halberd",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-		ranged = {
-			"item_urn_of_shadows",
-			"item_solar_crest",
-			"item_glimmer_cape",
-			"item_force_staff",
-			"item_guardian_greaves",
-			"item_sheepstick",
-			"item_guardian_greaves",
-			"item_cyclone",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-	},
-	pos_5 = {
-		melee = {
-			"item_urn_of_shadows",
-			"item_solar_crest",
-			"item_glimmer_cape",
-			"item_force_staff",
-			"item_boots_of_bearing",
-			"item_sheepstick",
-			"item_boots_of_bearing",
-			"item_heavens_halberd",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-		ranged = {
-			"item_urn_of_shadows",
-			"item_solar_crest",
-			"item_glimmer_cape",
-			"item_force_staff",
-			"item_boots_of_bearing",
-			"item_sheepstick",
-			"item_boots_of_bearing",
-			"item_cyclone",
-			"item_travel_boots_2",
-			"item_moon_shard",
-			"item_ultimate_scepter_2",
-		},
-	},
-}
-local J = {
-	evasion = { "item_monkey_king_bar", "item_bloodthorn" },
-	magic_heavy = { "item_black_king_bar", "item_pipe_of_insight", "item_lotus_orb" },
-	illusion_heavy = { "item_maelstrom", "item_mjollnir", "item_radiance", "item_battlefury" },
-	invisibility = { "item_dust", "item_gem", "item_ward_sentry" },
-	heroes = {
-		[B.PhantomAssassin] = { "item_monkey_king_bar", "item_bloodthorn" },
-		[B.Riki] = { "item_dust", "item_gem", "item_ward_sentry" },
-		[B.Antimage] = { "item_cyclone", "item_black_king_bar" },
-	},
-}
-local K = { "item_moon_shard", "item_ultimate_scepter_2", "item_aghanims_shard" }
-local function L(M)
-	return D[M] or {}
-end
-local function N(M)
-	return E(M)
-end
-local O = {
-	[B.OgreMagi] = { addItems = { "item_hand_of_midas" } },
-	[B.Slark] = { replaceItems = { item_bfury = { "item_diffusal_blade" } } },
-}
-local function P()
-	local Q = {}
-	do
-		local e = 1
-		while e <= 5 do
-			local R = GetTeamMember(GetOpposingTeam(), e)
-			if R and R.IsHero() then
-				Q[#Q + 1] = R.GetUnitName()
-			end
-			e = e + 1
-		end
-	end
-	return Q
-end
-local function S(M, T)
-	local U = O[M]
-	if not U then
-		return T
-	end
-	local V = { unpack(T) }
-	if U.replaceItems then
-		for W, X in ipairs(s(U.replaceItems)) do
-			local Y = X[1]
-			local Z = X[2]
-			local _ = a(V, Y)
-			if _ ~= -1 then
-				g(V, _, 1, unpack(Z))
+
+-- The one bot ally whose build keeps Urn / Spirit Vessel. Same result in every bot.
+function Strategy.UrnOwner()
+	local team = GetTeam()
+	local roles = require(GetScriptDirectory() .. "/FuncLib/systems/role").RoleAssignment[TeamKey(team)] or {}
+	local best, bestOrder, bestIdx = nil, 99, 99
+	for idx, pid in pairs(GetTeamPlayers(team) or {}) do
+		local name = GetSelectedHeroName(pid)
+		local positions = name ~= nil and URN_BUILDS[name] or nil
+		if positions ~= nil and IsPlayerBot(pid) then
+			local pos = roles[idx] or idx
+			if Has(positions, pos) then
+				local order = URN_POS_ORDER[pos] or 9
+				if order < bestOrder or (order == bestOrder and idx < bestIdx) then
+					best, bestOrder, bestIdx = name, order, idx
+				end
 			end
 		end
 	end
-	if U.addItems then
-		w(V, U.addItems)
+	return best
+end
+
+-- heroName -> item for every bot ally with a flexible slot. Same result in every bot.
+function Strategy.TeamPlan()
+	local team = GetTeam()
+	local key = TeamKey(team)
+	local roles = require(GetScriptDirectory() .. "/FuncLib/systems/role").RoleAssignment[key] or {}
+	local members = {}
+	for idx, pid in pairs(GetTeamPlayers(team) or {}) do
+		local name = GetSelectedHeroName(pid)
+		if name ~= nil and FLEX[name] ~= nil and IsPlayerBot(pid) then
+			local pos = roles[idx] or idx
+			members[#members + 1] = { name = name, order = POS_ORDER[pos] or 9, idx = idx }
+		end
 	end
-	if U.removeItems then
-		for W, a0 in ipairs(U.removeItems) do
-			local _ = a(V, a0)
-			if _ ~= -1 then
-				g(V, _, 1)
+	table.sort(members, function(x, y)
+		if x.order ~= y.order then
+			return x.order < y.order
+		end
+		return x.idx < y.idx
+	end)
+	local rank, kind = Strategy.RankTeamItems()
+	local plan, owner = {}, {}
+	for _, m in ipairs(members) do
+		local options = FLEX[m.name]
+		local pick = nil
+		for _, item in ipairs(rank) do
+			if owner[item] == nil and Has(options, item) then
+				pick = item
+				break
+			end
+		end
+		if pick == nil then
+			for _, item in ipairs(options) do
+				if not TEAM_ITEMS[item] then
+					pick = item
+					break
+				end
+			end
+		end
+		if pick ~= nil then
+			plan[m.name] = pick
+			if TEAM_ITEMS[pick] then
+				owner[pick] = m.name
 			end
 		end
 	end
-	return V
+	return plan, owner, kind
 end
-local function a1(M, a2)
-	local a3 = L(M)
-	local a4 = {}
-	if a3.initiator and a3.initiator >= 2 then
-		a4[#a4 + 1] = "item_blink"
+
+-- Fill this bot's placeholder, and drop a fixed team item the plan gave to an ally.
+function Strategy.ApplyTeamItems(bot, list)
+	if bot == nil or type(list) ~= "table" then
+		return list
 	end
-	if a3.disabler and a3.disabler >= 2 then
-		a4[#a4 + 1] = "item_cyclone"
+	local me = bot:GetUnitName()
+	local plan, owner, kind = Strategy.TeamPlan()
+	local mine = plan[me]
+	local urnOwner = Strategy.UrnOwner()
+	local dropUrn = urnOwner ~= nil and urnOwner ~= me
+	local out, seen = {}, {}
+	for i = 1, #list do
+		local item = list[i]
+		if URN_FAMILY[item] then
+			if not dropUrn then
+				out[#out + 1] = item
+			end
+		elseif item == Strategy.SLOT then
+			if mine ~= nil and not seen[mine] then
+				out[#out + 1] = mine
+				seen[mine] = true
+			end
+		elseif TEAM_ITEMS[item] then
+			if (owner[item] == nil or owner[item] == me) and not seen[item] then
+				out[#out + 1] = item
+				seen[item] = true
+			end
+		else
+			out[#out + 1] = item
+		end
 	end
-	if a3.healer and a3.healer >= 2 then
-		a4[#a4 + 1] = "item_guardian_greaves"
-	end
-	if a3.nuker and a3.nuker >= 2 then
-		a4[#a4 + 1] = "item_octarine_core"
-	end
-	if a3.durable and a3.durable >= 2 then
-		a4[#a4 + 1] = "item_heart"
-	end
-	if a3.pusher and a3.pusher >= 2 then
-		a4[#a4 + 1] = "item_assault"
-	end
-	return a4
+	log("[TeamItems] %s enemy=%s pick=%s urn=%s", me, kind, tostring(mine), tostring(urnOwner))
+	return out
 end
-local function a5(Q, a6)
-	for W, R in ipairs(Q) do
-		if a6 == "evasion" then
-			if R == B.PhantomAssassin or R == B.Windrunner or R == B.Weaver or R == B.Brewmaster then
-				return true
-			end
-		elseif a6 == "magic_heavy" then
-			local a3 = L(R)
-			if a3.nuker and a3.nuker >= 2 then
-				return true
-			end
-		elseif a6 == "illusion_heavy" then
-			if R == B.PhantomLancer or R == B.ChaosKnight or R == B.Terrorblade or R == B.NagaSiren then
-				return true
-			end
-		elseif a6 == "invisibility" then
-			if R == B.Riki or R == B.BountyHunter or R == B.Clinkz or R == B.NyxAssassin then
-				return true
+
+-- True when an ally hero already carries this team item (or one from the Urn family).
+function Strategy.AllyOwns(bot, item)
+	local family = nil
+	if URN_FAMILY[item] then
+		-- Upgrading our own Urn is fine.
+		if item ~= "item_urn_of_shadows" and bot:FindItemSlot("item_urn_of_shadows") >= 0 then
+			return false
+		end
+		family = URN_FAMILY
+	elseif TEAM_ITEMS[item] then
+		family = { [item] = true }
+	else
+		return false
+	end
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if ally ~= nil and ally ~= bot and not ally:IsIllusion() then
+			for name in pairs(family) do
+				if ally:FindItemSlot(name) >= 0 then
+					return true
+				end
 			end
 		end
 	end
 	return false
 end
-function z.GetItemBuild(a7, a8)
-	local M = a7.GetUnitName()
-	local Q = P()
-	local T = {}
-	local a9 = N(M)
-	local aa = a9 and "ranged" or "melee"
-	if F[a8] ~= nil and F[a8][aa] ~= nil then
-		w(T, F[a8][aa])
-	end
-	w(T, G)
-	if H[a8] then
-		w(T, H[a8])
-	end
-	if I[a8] ~= nil and I[a8][aa] ~= nil then
-		w(T, I[a8][aa])
-	end
-	local ab = a1(M, a8)
-	w(T, ab)
-	if a5(Q, "evasion") then
-		w(T, J.evasion)
-	end
-	if a5(Q, "magic_heavy") then
-		w(T, J.magic_heavy)
-	end
-	if a5(Q, "illusion_heavy") then
-		w(T, J.illusion_heavy)
-	end
-	if a5(Q, "invisibility") then
-		w(T, J.invisibility)
-	end
-	for W, R in ipairs(Q) do
-		if J.heroes[R] then
-			w(T, J.heroes[R])
-		end
-	end
-	return S(M, T)
-end
-function z.GetSellList(ac, ad)
-	local ae = {
-		"item_travel_boots_2",
-		"item_boots",
-		"item_ultimate_scepter_2",
-		"item_ultimate_scepter",
-		"item_skadi",
-		"item_wraith_band",
-		"item_butterfly",
-		"item_magic_wand",
-		"item_abyssal_blade",
-		"item_quelling_blade",
-		"item_octarine_core",
-		"item_bottle",
-		"item_sheepstick",
-		"item_urn_of_shadows",
-	}
-	return ae
-end
-function z.GetLateGame6Slot(a7, a8)
-	local M = a7.GetUnitName()
-	local a9 = N(M)
-	local aa = a9 and "ranged" or "melee"
-	local T = {}
-	if I[a8] ~= nil and I[a8][aa] ~= nil then
-		for W, a0 in ipairs(I[a8][aa]) do
-			if not y(K, a0) then
-				T[#T + 1] = a0
-			end
-		end
-	end
-	while #T > 6 do
-		table.remove(T)
-	end
-	while #T < 6 do
-		T[#T + 1] = "item_moon_shard"
-	end
-	return T
-end
-function z.GetNonSlotItems(a7, a8)
-	local M = a7.GetUnitName()
-	local a9 = N(M)
-	local aa = a9 and "ranged" or "melee"
-	local af = {}
-	if I[a8] ~= nil and I[a8][aa] ~= nil then
-		for W, a0 in ipairs(I[a8][aa]) do
-			if y(K, a0) then
-				af[#af + 1] = a0
-			end
-		end
-	end
-	return af
-end
-function z.GetCounterItems(Q)
-	local ag = {}
-	if a5(Q, "evasion") then
-		w(ag, J.evasion)
-	end
-	if a5(Q, "magic_heavy") then
-		w(ag, J.magic_heavy)
-	end
-	if a5(Q, "illusion_heavy") then
-		w(ag, J.illusion_heavy)
-	end
-	if a5(Q, "invisibility") then
-		w(ag, J.invisibility)
-	end
-	for W, R in ipairs(Q) do
-		if J.heroes[R] then
-			w(ag, J.heroes[R])
-		end
-	end
-	return ag
-end
-function z.GetPositionSpecificItems(a7, a8)
-	return z.GetItemBuild(a7, a8)
-end
-function z.GetRangeSpecificItems(a7, a8)
-	return z.GetItemBuild(a7, a8)
-end
-return z
+
+return Strategy

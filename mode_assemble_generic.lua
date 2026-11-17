@@ -5,7 +5,7 @@ if a == nil or a:IsInvulnerable() or not a:IsHero() or not string.find(a:GetUnit
 end
 local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local c = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
-local d = require(GetScriptDirectory() .. "/FretBots/HeroNames")
+local d = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
 local function e(f)
 	if f == nil then
 		return ""
@@ -290,6 +290,8 @@ function Think()
 	end
 	a:Action_MoveToLocation(B + RandomVector(50))
 end
+-- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "assemble", BOT_MODE_ASSEMBLE)
 if SafeCall then
 	local a7 = GetDesire
 	local a8 = Think

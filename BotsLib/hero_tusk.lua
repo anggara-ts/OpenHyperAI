@@ -37,12 +37,12 @@ m["pos_5"] = {
 	"item_wind_lace",
 	"item_magic_wand",
 	"item_tranquil_boots",
+	"item_blink",
 	"item_boots_of_bearing",
 	"item_pipe",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_pavise",
-	"item_blink",
 	"item_solar_crest",
 	"item_heavens_halberd",
 	"item_lotus_orb",
@@ -54,14 +54,18 @@ m["pos_5"] = {
 m["pos_1"] = {
 	"item_tank_outfit",
 	"item_echo_sabre",
+	"item_ring_of_health",
+	"item_vanguard",
 	"item_crimson_guard",
-	"item_ultimate_scepter",
+	-- No Aghanim's Scepter on the core: its Walrus Kick often knocked a ganked enemy away
+	-- to safety. Blink to land the snowball/punch, BKB to stay in the fight.
+	"item_blink",
+	"item_black_king_bar",
 	"item_heavens_halberd",
 	"item_assault",
 	"item_travel_boots",
 	"item_aghanims_shard",
 	"item_satanic",
-	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	"item_heart",
 	"item_travel_boots_2",
@@ -76,6 +80,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Tusk is invulnerable inside his snowball; spell logic must still run to launch it.
+a["bThinkWhileInvulnerable"] = true
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -102,6 +108,34 @@ local I
 local J
 local K
 function a.SkillsComplement()
+	-- The hold flag only belongs to the escape snowball that set it. Clear it once Tusk is
+	-- out of the snowball, or every later snowball would also wait out the full duration.
+	if b.snowballHeroRetreat and q:IsHidden() and DotaTime() > (b._snowballRetreatAt or -99) + 1.5 then
+		b.snowballHeroRetreat = false
+	end
+	-- Walrus Punch is an autocast attack spell. With autocast on, any right-click on a hero
+	-- punches without Tag Team first (7:04 on Mirana, no Tag Team, no punch decision of ours).
+	-- Keep it off so every Punch goes through ConsiderWalrusPunch and Tag Team leads.
+	if t ~= nil and not t:IsNull() and t:IsTrained() and t:GetAutoCastState() then
+		pcall(print, string.format("[OHA-TUSK] t=%.0f punch-autocast was=on turned=off", DotaTime()))
+		t:ToggleAutoCast()
+	end
+	-- Launch as soon as the snowball is up, before the busy-casting check and every other
+	-- spell. Checked after them, it could wait out the whole 3s windup while engaging. Only an
+	-- escape snowball (snowballHeroRetreat) keeps rolling, to stay out of reach.
+	if a.ConsiderLaunchSnowball() > 0 and not b:IsStunned() and not b:IsHexed() and not b:IsSilenced() then
+		-- The order repeats each think until the snowball leaves; log the first one only.
+		if (b._snowballLaunchLoggedFor or -1) ~= (b._snowballCastAt or 0) then
+			b._snowballLaunchLoggedFor = b._snowballCastAt or 0
+			pcall(print, string.format(
+				"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
+				DotaTime(),
+				DotaTime() - (b._snowballCastAt or DotaTime())
+			))
+		end
+		b:Action_UseAbility(q)
+		return
+	end
 	if c.CanNotUseAbility(b) then
 		return
 	end
@@ -125,15 +159,10 @@ function a.SkillsComplement()
 		b:Action_UseAbilityOnLocation(o, w)
 		return
 	end
-	z = a.ConsiderLaunchSnowball()
-	if z > 0 then
-		b:Action_UseAbility(q)
-		b.snowballHeroRetreat = false
-		return
-	end
 	x, y = a.ConsiderSnowball()
 	if x > 0 then
 		b:Action_UseAbilityOnEntity(p, y)
+		b._snowballCastAt = DotaTime()
 		return
 	end
 	B, C = a.ConsiderWalrusKick()
@@ -143,6 +172,22 @@ function a.SkillsComplement()
 	end
 	D, E = a.ConsiderWalrusPunch()
 	if D > 0 then
+		-- Tag Team first when it can go: its bonus damage applies to the Punch. Tag Team keys
+		-- off Tusk's target and Punch off any hero in reach, so in lane (target a creep) the
+		-- Punch went out alone (7:04).
+		local tagWhy = a.TagTeamBeforePunch(E)
+		if tagWhy == "cast" then
+			b:Action_UseAbility(r)
+			return
+		end
+		pcall(print, string.format(
+			"[OHA-TUSK] t=%.0f punch target=%s hp=%.2f tagTeam=%s mp=%.2f",
+			DotaTime(),
+			E and (string.gsub(E:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			E and c.GetHP(E) or 0,
+			tagWhy,
+			c.GetMP(b)
+		))
 		b:Action_UseAbilityOnEntity(t, E)
 		return
 	end
@@ -156,6 +201,33 @@ function a.ConsiderIceShards()
 	local O = o:GetSpecialValueInt("shard_width")
 	local P = o:GetSpecialValueInt("shard_damage")
 	local Q = o:GetSpecialValueInt("shard_speed")
+	-- The shards ring the target point (7 shards 200 out), so aim where he will be when the
+	-- ball arrives. The old aim added 2s on top and landed the ring ~700 ahead of a runner.
+	local function Spot(T)
+		-- Close up (right after a snowball), a ring centred on the enemy puts shards between
+		-- him and Tusk: at 10:00 it walled Tusk off and the enemy walked away. Centre it 300
+		-- past the enemy, on the side away from Tusk, so the wall is behind the enemy instead.
+		local dist = GetUnitToUnitDistance(b, T)
+		if dist < 500 then
+			local from, to = b:GetLocation(), T:GetLocation()
+			local dx, dy = to.x - from.x, to.y - from.y
+			local len = math.max(1, math.sqrt(dx * dx + dy * dy))
+			return Vector(to.x + dx / len * 300, to.y + dy / len * 300, to.z)
+		end
+		if c.IsDisabled(T) or T:GetCurrentMovementSpeed() <= 0 then
+			return T:GetLocation()
+		end
+		return T:GetExtrapolatedLocation(dist / math.max(1, Q) + N + 0.2)
+	end
+	local function Trappable(T)
+		return c.IsValidHero(T)
+			and c.IsInRange(b, T, M)
+			and not c.IsSuspiciousIllusion(T)
+			and not T:HasModifier("modifier_enigma_black_hole_pull")
+			and not T:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			and not T:HasModifier("modifier_legion_commander_duel")
+			and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+	end
 	local R = c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE)
 	for S, T in pairs(R) do
 		if
@@ -170,8 +242,8 @@ function a.ConsiderIceShards()
 			and not T:HasModifier("modifier_oracle_false_promise_timer")
 			and not T:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			local U = GetUnitToUnitDistance(b, T) / Q + N + 2
-			return BOT_ACTION_DESIRE_HIGH, T:GetExtrapolatedLocation(U)
+			a.LogShards("kill", T)
+			return BOT_ACTION_DESIRE_HIGH, Spot(T)
 		end
 	end
 	if c.IsInTeamFight(b, 1200) then
@@ -183,38 +255,94 @@ function a.ConsiderIceShards()
 			and not c.IsLocationInChrono(V.targetloc)
 			and not c.IsLocationInBlackHole(V.targetloc)
 		then
+			a.LogShards("fight", W[1])
 			return BOT_ACTION_DESIRE_HIGH, V.targetloc
 		end
 	end
-	if I then
-		if
-			c.IsValidTarget(H)
-			and c.CanCastOnMagicImmune(H)
-			and c.IsInRange(b, H, M)
-			and c.IsChasingTarget(b, H)
-			and not c.IsSuspiciousIllusion(H)
-			and not H:HasModifier("modifier_enigma_black_hole_pull")
-			and not H:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and not H:HasModifier("modifier_legion_commander_duel")
-			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			local X = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
-			local W = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if X ~= nil and W ~= nil and #X >= #W then
-				local U = GetUnitToUnitDistance(b, H) / Q + N + 2
-				return BOT_ACTION_DESIRE_HIGH, H:GetExtrapolatedLocation(U)
+	-- Going in on his target: trap it whether he is chasing, walking up, or it is disabled.
+	if I and c.IsValidTarget(H) and c.CanCastOnMagicImmune(H) and Trappable(H) then
+		local X = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
+		local W = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
+		if X ~= nil and W ~= nil and #X >= #W then
+			a.LogShards("engage", H)
+			return BOT_ACTION_DESIRE_HIGH, Spot(H)
+		end
+	end
+	-- An ally is already hitting a hurt enemy hero: trap it so it cannot walk out.
+	for S, T in pairs(R) do
+		if Trappable(T) and c.GetHP(T) < 0.6 then
+			local ours = c.GetNearbyHeroes(T, 1200, true, BOT_MODE_NONE)
+			local theirs = c.GetNearbyHeroes(T, 1200, false, BOT_MODE_NONE)
+			if ours ~= nil and theirs ~= nil and #ours >= #theirs then
+				for Z, ally in pairs(c.GetNearbyHeroes(T, 700, true, BOT_MODE_NONE)) do
+					if ally ~= b and c.IsValidHero(ally) and not ally:IsIllusion() and ally:GetAttackTarget() == T then
+						a.LogShards("gank", T)
+						return BOT_ACTION_DESIRE_HIGH, Spot(T)
+					end
+				end
 			end
 		end
 	end
-	if c.IsLaning(b) or c.IsPushing(b) and not c.IsThereNonSelfCoreNearby(1200) then
-		if not c.IsInLaningPhase() then
-			local Y = b:GetNearbyLaneCreeps(M, true)
-			if Y ~= nil and #Y >= 3 then
-				return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(Y)
-			end
-		end
+	local wave = a.WaveToClear(o, 900, 3, 0.45)
+	if wave ~= nil then
+		a.LogWaveClear("shards", wave)
+		return BOT_ACTION_DESIRE_HIGH, c.GetCenterOfUnits(wave)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-TUSK] shards why=kill|fight|engage|gank, at most once per 3s.
+function a.LogShards(why, target)
+	if DotaTime() < (b._tuskShardsLogAt or -999) then
+		return
+	end
+	b._tuskShardsLogAt = DotaTime() + 3
+	pcall(print, string.format(
+		"[OHA-TUSK] t=%.0f shards why=%s target=%s hp=%.2f dist=%d",
+		DotaTime(),
+		why,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		target and c.GetHP(target) or 0,
+		target and math.floor(GetUnitToUnitDistance(b, target)) or 0
+	))
+end
+-- Enemy lane creeps worth a spell, or nil. No enemy hero in sight, mana left after the cast,
+-- and not taking a core's farm. Laning phase only to save a tower, so the lane is not pushed.
+function a.WaveToClear(ability, range, minCreeps, manaAfter)
+	if J or I or c.GetManaAfter(ability:GetManaCost()) < manaAfter then
+		return nil
+	end
+	local defending = c.IsDefending(b)
+	if c.IsInLaningPhase() and not defending then
+		return nil
+	end
+	if not defending and c.IsThereNonSelfCoreNearby(1200) then
+		return nil
+	end
+	local foes = c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE)
+	if foes ~= nil and #foes >= 1 then
+		return nil
+	end
+	local creeps = b:GetNearbyLaneCreeps(range, true)
+	if creeps == nil or #creeps < minCreeps then
+		return nil
+	end
+	return creeps
+end
+-- [OHA-TUSK] wave-shards / wave-snowball, at most once per 10s per kind.
+function a.LogWaveClear(kind, creeps)
+	b._tuskWaveLogAt = b._tuskWaveLogAt or {}
+	if DotaTime() < (b._tuskWaveLogAt[kind] or -999) then
+		return
+	end
+	b._tuskWaveLogAt[kind] = DotaTime() + 10
+	pcall(print, string.format(
+		"[OHA-TUSK] t=%.0f wave-%s creeps=%d mp=%.2f mode=%d",
+		DotaTime(),
+		kind,
+		#creeps,
+		c.GetMP(b),
+		b:GetActiveMode()
+	))
 end
 function a.ConsiderDrinkingBuddies()
 	-- Not castable while rooted since 7.41c.
@@ -335,7 +463,12 @@ function a.ConsiderSnowball()
 		local W = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
 		local aa = nil
 		local ab = 0
-		if X ~= nil and W ~= nil and #W > #X then
+		-- Escape: outnumbered, low, or a ready blink locked by recent hero damage. The
+		-- snowball holds him out of reach while the 3s blink lock runs out.
+		local outnumbered = X ~= nil and W ~= nil and #W > #X
+		local low = c.GetHP(b) < 0.5
+		local blinkLocked = a.BlinkLockedByDamage()
+		if W ~= nil and #W >= 1 and (outnumbered or low or blinkLocked) then
 			for S, T in pairs(W) do
 				if
 					c.IsValidHero(T)
@@ -355,8 +488,10 @@ function a.ConsiderSnowball()
 								GetAncient(GetTeam()):GetLocation()
 							)
 							and GetUnitToUnitDistance(b, ad) > M / 2
-							and ab > GetUnitToUnitDistance(b, ad)
+							and GetUnitToUnitDistance(b, ad) > ab
 						then
+							-- Farthest enemy creep on the way home. The old test (ab > distance)
+							-- started from 0 and never picked one.
 							ab = GetUnitToUnitDistance(b, ad)
 							aa = ad
 						end
@@ -364,6 +499,9 @@ function a.ConsiderSnowball()
 				end
 			end
 			if aa ~= nil then
+				b.snowballHeroRetreat = true
+				b._snowballRetreatAt = DotaTime()
+				a.LogEscapeSnowball(aa, outnumbered, low, blinkLocked, X, W)
 				return BOT_ACTION_DESIRE_HIGH, aa
 			end
 			W = c.GetNearbyHeroes(b, M, true, BOT_MODE_NONE)
@@ -382,6 +520,8 @@ function a.ConsiderSnowball()
 					and not T:HasModifier("modifier_necrolyte_reapers_scythe")
 				then
 					b.snowballHeroRetreat = true
+					b._snowballRetreatAt = DotaTime()
+					a.LogEscapeSnowball(T, outnumbered, low, blinkLocked, X, W)
 					return BOT_ACTION_DESIRE_HIGH, T
 				end
 			end
@@ -397,7 +537,58 @@ function a.ConsiderSnowball()
 			return BOT_ACTION_DESIRE_HIGH, H
 		end
 	end
+	-- Wave clear on high mana only: the snowball is his gank and save, so keep mana for Shards
+	-- and the next fight. Aim at the farthest creep so the roll crosses the whole wave, and
+	-- never roll under an enemy tower.
+	local wave = a.WaveToClear(p, 900, 4, 0.6)
+	if wave ~= nil then
+		local far, farDist = nil, 0
+		for S, cr in pairs(wave) do
+			if c.IsValid(cr) then
+				local dist = GetUnitToUnitDistance(b, cr)
+				if dist > farDist and #(cr:GetNearbyTowers(800, false) or {}) == 0 then
+					far, farDist = cr, dist
+				end
+			end
+		end
+		if far ~= nil then
+			a.LogWaveClear("snowball", wave)
+			return BOT_ACTION_DESIRE_HIGH, far
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+local BLINKS = { "item_blink", "item_overwhelming_blink", "item_swift_blink", "item_arcane_blink" }
+-- Blink is off cooldown but cannot be used: a hero hit him within the last 3 seconds.
+function a.BlinkLockedByDamage()
+	if not b:WasRecentlyDamagedByAnyHero(3.0) then
+		return false
+	end
+	for _, name in ipairs(BLINKS) do
+		local slot = b:FindItemSlot(name)
+		if slot >= 0 and slot <= 5 then
+			local item = b:GetItemInSlot(slot)
+			if item ~= nil and item:GetCooldownTimeRemaining() <= 0 then
+				return true
+			end
+		end
+	end
+	return false
+end
+-- [OHA-TUSK]: every escape snowball, with what triggered it.
+function a.LogEscapeSnowball(target, outnumbered, low, blinkLocked, allies, enemies)
+	local name = target:IsHero() and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "creep"
+	pcall(print, string.format(
+		"[OHA-TUSK] t=%.0f escape-snowball target=%s hp=%.2f allies=%d enemies=%d outnumbered=%s low=%s blinkLocked=%s",
+		DotaTime(),
+		name,
+		c.GetHP(b),
+		allies and #allies or 0,
+		enemies and #enemies or 0,
+		tostring(outnumbered),
+		tostring(low),
+		tostring(blinkLocked)
+	))
 end
 function a.ConsiderLaunchSnowball()
 	if q:IsHidden() or not q:IsFullyCastable() or b.snowballHeroRetreat then
@@ -417,11 +608,13 @@ function a.ConsiderTagTeam()
 		end
 	end
 	if I then
+		-- A stunned target is the best time for it: Tag Team adds bonus damage to every
+		-- attack on enemies in the aura, Walrus Punch included. The old "not disabled" test
+		-- skipped it right after Snowball landed, so Tusk went straight to the ult.
 		if
 			c.IsValidTarget(H)
 			and c.IsInRange(b, H, O)
 			and not c.IsSuspiciousIllusion(H)
-			and not c.IsDisabled(H)
 			and not H:HasModifier("modifier_dazzle_shallow_grave")
 			and not H:HasModifier("modifier_legion_commander_duel")
 			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -429,7 +622,18 @@ function a.ConsiderTagTeam()
 		then
 			local X = c.GetNearbyHeroes(H, 1200, true, BOT_MODE_NONE)
 			local W = c.GetNearbyHeroes(H, 1200, false, BOT_MODE_NONE)
-			if X ~= nil and W ~= nil and #X >= #W then
+			local numbers = X ~= nil and W ~= nil and #X >= #W
+			-- Going in with Walrus Punch anyway: open with Tag Team regardless of numbers.
+			local punchReady = t ~= nil and t:IsTrained() and t:IsFullyCastable()
+			if numbers or punchReady or c.IsDisabled(H) then
+				pcall(print, string.format(
+					"[OHA-TUSK] t=%.0f tag-team target=%s disabled=%s punchReady=%s numbers=%s",
+					DotaTime(),
+					(string.gsub(H:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(c.IsDisabled(H)),
+					tostring(punchReady),
+					tostring(numbers)
+				))
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -455,8 +659,32 @@ function a.ConsiderTagTeam()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- "cast" when Tag Team should go out ahead of a Walrus Punch on `target`, or why not.
+function a.TagTeamBeforePunch(target)
+	if r == nil or r:IsNull() or not r:IsTrained() then
+		return "untrained"
+	end
+	if r:GetCooldownTimeRemaining() > 0 then
+		return "cooldown"
+	end
+	if b:GetMana() < r:GetManaCost() + t:GetManaCost() then
+		return "mana"
+	end
+	local radius = r:GetSpecialValueInt("radius")
+	if radius == nil or radius < 100 then
+		radius = 350
+	end
+	if target == nil or GetUnitToUnitDistance(b, target) > radius then
+		return "range"
+	end
+	if not c.CanCastAbility(r) then
+		return "blocked"
+	end
+	return "cast"
+end
 function a.ConsiderWalrusKick()
-	if not s:IsFullyCastable() then
+	-- Walrus Kick comes from Aghanim's Scepter. Before that it is hidden but can still read castable.
+	if not c.CanCastAbility(s) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local M = c.GetProperCastRange(false, b, s:GetCastRange())

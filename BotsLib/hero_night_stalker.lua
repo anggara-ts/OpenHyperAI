@@ -11,8 +11,7 @@ local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10
 local j = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_pipe", "item_lotus_orb", "item_heavens_halberd", "item_crimson_guard" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
@@ -26,11 +25,12 @@ o["pos_3"] = {
 	"item_blink",
 	"item_aghanims_shard",
 	"item_black_king_bar",
+	-- Harpoon (Echo Sabre upgrade): 41% of his matches, #6 (Dotabuff, last patch).
+	"item_harpoon",
 	n,
 	"item_basher",
 	"item_assault",
 	"item_abyssal_blade",
-	"item_travel_boots",
 	"item_overwhelming_blink",
 	"item_travel_boots_2",
 	"item_moon_shard",
@@ -115,6 +115,8 @@ function a.SkillsComplement()
 	H = c.IsInTeamFight(b, 1200)
 	C = a.ConsiderDarkAscension()
 	if C > 0 then
+		-- Noted for Void: Dark Ascension makes night (datafeed), which the clock check cannot see.
+		b._nsDarkAt = DotaTime()
 		b:Action_UseAbility(u)
 		return
 	end
@@ -125,11 +127,9 @@ function a.SkillsComplement()
 	end
 	v, w = a.ConsiderVoid()
 	if v > 0 then
-		if b:HasScepter() then
-			b:Action_UseAbilityOnLocation(q, w)
-		else
-			b:Action_UseAbilityOnEntity(q, w)
-		end
+		-- datafeed: Void is unit-target only (behavior 8); the Shard adds its AoE around the target and the
+		-- Scepter belongs to Hunter in the Night, so the old Scepter "cast on a point" path failed once he had one.
+		b:Action_UseAbilityOnEntity(q, w)
 		return
 	end
 	y, z = a.ConsiderHunterInTheNight()
@@ -160,12 +160,14 @@ function a.ConsiderVoid()
 	local O = c.GetNearbyHeroes(b, I, true, BOT_MODE_NONE)
 	for P, Q in pairs(O) do
 		if c.IsValidHero(Q) and c.CanCastOnNonMagicImmune(Q) and not c.IsSuspiciousIllusion(Q) then
-			if Q:IsChanneling() or c.IsCastingUltimateAbility(Q) and N == "night" then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetLocation()
-				else
-					return BOT_ACTION_DESIRE_HIGH, Q
-				end
+			-- Void returns a unit everywhere below (unit-target per datafeed; no Scepter point-cast)
+			-- Interrupt only at night: Void mini-stuns only then (datafeed, "At night, Void also
+			-- mini-stuns, interrupting channeling abilities"). "a or b and night" let any channel through
+			-- by day, where Void does not stop it. Night here also counts the 30s after Dark Ascension.
+			local darkUntil = (b._nsDarkAt or -999) + math.max(u:GetSpecialValueFloat("duration"), 0) + 0.5
+			local isNight = N == "night" or DotaTime() < darkUntil
+			if (Q:IsChanneling() or c.IsCastingUltimateAbility(Q)) and isNight then
+				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 			if
 				c.CanKillTarget(Q, L, DAMAGE_TYPE_MAGICAL)
@@ -174,36 +176,24 @@ function a.ConsiderVoid()
 				and not Q:HasModifier("modifier_oracle_false_promise_timer")
 				and not Q:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Q:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, Q
-				end
+				return BOT_ACTION_DESIRE_HIGH, Q
 			end
 		end
 	end
 	if H then
 		local R = c.GetStrongestUnit(I, b, true, false, M)
-		if b:HasScepter() then
-			local S = b:FindAoELocation(true, true, b:GetLocation(), I, K, J, 0)
-			local T = c.GetEnemiesNearLoc(S.targetloc, K)
-			if T ~= nil and #T >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, S.targetloc
-			end
-		else
-			if R == nil then
-				R = c.GetStrongestUnit(I, b, true, true, M)
-			end
-			if
-				c.IsValidTarget(R)
-				and c.CanCastOnNonMagicImmune(R)
-				and not c.IsSuspiciousIllusion(R)
-				and not c.IsDisabled(R)
-				and not c.IsTaunted(R)
-				and not R:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				return BOT_ACTION_DESIRE_HIGH, R
-			end
+		if R == nil then
+			R = c.GetStrongestUnit(I, b, true, true, M)
+		end
+		if
+			c.IsValidTarget(R)
+			and c.CanCastOnNonMagicImmune(R)
+			and not c.IsSuspiciousIllusion(R)
+			and not c.IsDisabled(R)
+			and not c.IsTaunted(R)
+			and not R:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			return BOT_ACTION_DESIRE_HIGH, R
 		end
 	end
 	if E then
@@ -220,17 +210,7 @@ function a.ConsiderVoid()
 		then
 			local V = c.GetNearbyHeroes(D, 800, false, BOT_MODE_NONE)
 			if U ~= nil and V ~= nil and #U >= #V then
-				if
-					b:HasScepter()
-					and not D:HasModifier("modifier_enigma_black_hole_pull")
-					and not D:HasModifier("modifier_faceless_void_chronosphere_freeze")
-					and not D:HasModifier("modifier_legion_commander_duel")
-					and not D:HasModifier("modifier_necrolyte_reapers_scythe")
-				then
-					return BOT_ACTION_DESIRE_HIGH, D:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, D
-				end
+				return BOT_ACTION_DESIRE_HIGH, D
 			end
 		end
 	end
@@ -248,30 +228,18 @@ function a.ConsiderVoid()
 		then
 			local V = c.GetNearbyHeroes(W[1], 800, false, BOT_MODE_NONE)
 			if V ~= nil and (#V > #U or c.GetHP(b) < 0.52 and b:WasRecentlyDamagedByAnyHero(2)) then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, W[1]:GetExtrapolatedLocation(J)
-				else
-					return BOT_ACTION_DESIRE_HIGH, W[1]
-				end
+				return BOT_ACTION_DESIRE_HIGH, W[1]
 			end
 		end
 	end
 	if c.IsDoingRoshan(b) then
 		if c.IsRoshan(D) and c.CanCastOnNonMagicImmune(D) and c.IsInRange(b, D, 500) and F then
-			if b:HasScepter() then
-				return BOT_ACTION_DESIRE_HIGH, D:GetLocation()
-			else
-				return BOT_ACTION_DESIRE_HIGH, D
-			end
+			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
 	if c.IsDoingTormentor(b) then
 		if c.IsTormentor(D) and c.IsInRange(b, D, 400) and F then
-			if b:HasScepter() then
-				return BOT_ACTION_DESIRE_HIGH, D:GetLocation()
-			else
-				return BOT_ACTION_DESIRE_HIGH, D
-			end
+			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
 	local X = c.GetNearbyHeroes(b, I, false, BOT_MODE_NONE)
@@ -293,11 +261,8 @@ function a.ConsiderVoid()
 				and not Z[1]:HasModifier("modifier_enigma_black_hole_pull")
 				and not Z[1]:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			then
-				if b:HasScepter() then
-					return BOT_ACTION_DESIRE_HIGH, Z[1]:GetLocation()
-				else
-					return BOT_ACTION_DESIRE_HIGH, D
-				end
+				-- the non-Scepter path returned D (own target) here instead of Z[1], the enemy chasing that ally
+				return BOT_ACTION_DESIRE_HIGH, Z[1]
 			end
 		end
 	end
@@ -310,7 +275,9 @@ function a.ConsiderCripplingFear()
 	local K = r:GetSpecialValueInt("radius")
 	D = c.GetProperTarget(b)
 	if H then
-		local T = c.GetEnemiesNearLoc(b:GetLocation(), K * 2)
+		-- Enemies near enough to be silenced: Crippling Fear only works on enemies near him (datafeed,
+		-- radius 350, game data). K * 2 started the timed effect with both enemies 700 away.
+		local T = c.GetEnemiesNearLoc(b:GetLocation(), K + 150)
 		if T ~= nil and #T >= 2 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -365,7 +332,9 @@ function a.ConsiderHunterInTheNight()
 	if s:IsPassive() or not s:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local I = s:GetSpecialValueInt("shard_cast_range")
+	-- datafeed has no "shard_cast_range" on Hunter in the Night (it read 0, so no creep was ever found);
+	-- fall back to the engine cast range for the Shard cast
+	local I = math.max(s:GetSpecialValueInt("shard_cast_range"), s:GetCastRange())
 	local N = c.CheckTimeOfDay()
 	if c.IsFarming(b) then
 		local a1 = b:GetNearbyCreeps(I, true)
@@ -413,24 +382,77 @@ function a.ConsiderDarkAscension()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Midnight Feast (datafeed): heals on attacks; "At night, the ability can be activated to instantly destroy a
+-- non-ancient creep and restore a percentage of Night Stalker's maximum health and mana" (10/15/20/25% HP,
+-- 10/12/14/16% mana, cooldown 39/36/33/30, range 125, no mana cost). The game file lists it as PASSIVE, so the
+-- old c.CanCastAbility (rejects IsPassive) may never have let it through. We now try it only at night, at most
+-- once per 3s, and log whether the previous try started the cooldown (an order refused by the engine would not).
+local feastTryAt, feastTryCd, feastGold = -999, nil, nil
+local function FeastIsNight()
+	local darkUntil = (b._nsDarkAt or -999) + math.max(u:GetSpecialValueFloat("duration"), 0)
+	return c.CheckTimeOfDay() == "night" or DotaTime() < darkUntil
+end
+-- Lane, siege and neutral creeps only (not summons, couriers or ancients: "non-ancient creep").
+local function IsFeastCreep(cr)
+	if not c.IsValid(cr) or not c.CanBeAttacked(cr) or cr:IsAncientCreep() or cr:IsDominated() then
+		return false
+	end
+	local nm = cr:GetUnitName() or ""
+	return string.find(nm, "creep", 1, true) ~= nil
+		or string.find(nm, "neutral", 1, true) ~= nil
+		or string.find(nm, "siege", 1, true) ~= nil
+end
+-- Highest level, then highest max HP creep in range (same rule as Midas and Devour).
+local function BestFeastCreep(range)
+	local list = {}
+	for _, cr in pairs(b:GetNearbyCreeps(range, true) or {}) do
+		if IsFeastCreep(cr) then
+			list[#list + 1] = cr
+		end
+	end
+	return c.GetBestCreepToEat(list, nil, false)
+end
 function a.ConsiderMidnightFeast()
+	local now = DotaTime()
+	-- Did the last try start the cooldown? Logs the gold change once so we learn if eating gives bounty.
+	if feastTryCd ~= nil and now - feastTryAt > 1 then
+		local cdNow = t:GetCooldownTimeRemaining()
+		print(string.format("[OHA-NS] feast result started=%s goldDelta=%d", tostring(cdNow > 0), b:GetGold() - (feastGold or b:GetGold())))
+		feastTryCd, feastGold = nil, nil
+	end
 	if
-		not c.CanCastAbility(t)
+		t == nil
+		or t:IsNull()
+		or not t:IsTrained()
+		or t:IsHidden()
+		or not t:IsActivated()
+		or t:GetCooldownTimeRemaining() > 0
+		or now - feastTryAt < 3
+		or not FeastIsNight()
 		or c.IsRetreating(b) and c.IsRealInvisible(b) and #c.GetNearbyHeroes(b, 1600, true, BOT_MODE_NONE) > 0
 	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local a2 = b:GetNearbyCreeps(650, true)
-	if
-		c.IsValid(a2[1])
-		and c.CanBeAttacked(a2[1])
-		and c.CanCastOnTargetAdvanced(a2[1])
-		and not a2[1]:IsAncientCreep()
-		and not a2[1]:IsDominated()
-	then
-		if c.GetHP(b) < 0.5 or G < 0.5 and c.GetHP(b) < 0.75 then
-			return BOT_ACTION_DESIRE_HIGH, a2[1]
-		end
+	local hp = c.GetHP(b)
+	local enemies = c.GetNearbyHeroes(b, 1200, true, BOT_MODE_NONE)
+	local nEnemies = enemies ~= nil and #enemies or 0
+	local why, cr = nil, nil
+	-- Heal: HP under 75% or mana under 50% (no mana cost, 30-39s cooldown, so no need to wait for 50% HP).
+	-- Only a creep next to him while heroes are around.
+	if hp < 0.75 or G < 0.5 then
+		cr = BestFeastCreep(nEnemies > 0 and 300 or 600)
+		why = "heal"
+	end
+	-- Farm: no enemy hero near, use it on cooldown like Devour / Midas (it also tops up HP and mana).
+	if cr == nil and nEnemies == 0 and (c.IsFarming(b) or c.IsLaning(b) or c.IsPushing(b) or hp < 0.9 or G < 0.9) then
+		cr = BestFeastCreep(450)
+		why = "farm"
+	end
+	if cr ~= nil and c.CanCastOnTargetAdvanced(cr) then
+		feastTryAt, feastTryCd, feastGold = now, t:GetCooldownTimeRemaining(), b:GetGold()
+		print(string.format("[OHA-NS] feast try why=%s creep=%s passive=%s castable=%s hp=%.2f mp=%.2f",
+			why, cr:GetUnitName(), tostring(t:IsPassive()), tostring(t:IsFullyCastable()), hp, G))
+		return BOT_ACTION_DESIRE_HIGH, cr
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end

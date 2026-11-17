@@ -11,7 +11,7 @@ local i = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local j = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 3, 1, 3, 6, 3, 2, 1, 1, 6, 2, 2, 2, 6 } }
+local j = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local k
 local l
 if h == "pos_2" then
@@ -22,11 +22,11 @@ else
 	l = c.Skill.GetTalentBuild(i[2])
 end
 local m = {}
+-- No starting Circlet (user report, game 033 20:00: still in her bag): nothing in these builds uses it.
 m["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_bottle",
 	"item_magic_wand",
 	"item_boots",
@@ -34,7 +34,7 @@ m["pos_2"] = {
 	"item_arcane_boots",
 	"item_shivas_guard",
 	"item_cyclone",
-	"item_crellas_crozier",
+	"item_ultimate_scepter",
 	"item_bloodstone",
 	"item_black_king_bar",
 	"item_aghanims_shard",
@@ -50,9 +50,9 @@ m["pos_3"] = {
 	"item_shivas_guard",
 	"item_cyclone",
 	"item_aghanims_shard",
-	"item_gungir",
+	"item_ultimate_scepter",
 	"item_travel_boots",
-	"item_assault",
+	"item_black_king_bar",
 	"item_heart",
 	"item_moon_shard",
 	"item_wind_waker",
@@ -64,7 +64,6 @@ m["pos_4"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_magic_wand",
 	"item_boots",
 	"item_ring_of_basilius",
@@ -85,7 +84,6 @@ m["pos_5"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_circlet",
 	"item_boots",
 	"item_ring_of_basilius",
 	"item_magic_wand",
@@ -177,7 +175,9 @@ function a.ConsiderQ()
 	local L = p:GetCastRange() + B + 100
 	local M = p:GetCastPoint()
 	local N = p:GetManaCost()
-	local O = p:GetAbilityDamage()
+	-- datafeed: Crypt Swarm has no AbilityDamage, its damage is the special value "damage" (100/175/250/325);
+	-- GetAbilityDamage() gave 0, so the kill check never fired and the last-hit AoE had no HP cap.
+	local O = p:GetSpecialValueInt("damage")
 	local P = DAMAGE_TYPE_MAGICAL
 	local Q = p:GetSpecialValueInt("end_radius")
 	local R = c.GetNearbyHeroes(b, L - 50, true, BOT_MODE_NONE)
@@ -351,6 +351,40 @@ function a.ConsiderW()
 			end
 		end
 	end
+	-- Silence was only cast on channelers and while going on someone. Also cast it in a team fight
+	-- (2+ heroes in the area) and while retreating on a hero chasing her, so the chaser cannot
+	-- cast his stun or gap closer.
+	if c.IsInTeamFight(b, 1200) then
+		local W = c.GetAoeEnemyHeroLocation(b, L, Q, 2)
+		if W ~= nil then
+			if DotaTime() >= (b._dpSilenceFightLogAt or -999) then
+				b._dpSilenceFightLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f silence fight", DotaTime()))
+			end
+			return BOT_ACTION_DESIRE_HIGH, W, "W-Fight"
+		end
+	end
+	if c.IsRetreating(b) and b:WasRecentlyDamagedByAnyHero(3.0) then
+		for T, U in pairs(R) do
+			if
+				c.IsValidHero(U)
+				and c.CanCastOnNonMagicImmune(U)
+				and c.IsChasingTarget(U, b)
+				and not c.IsSuspiciousIllusion(U)
+				and not c.IsDisabled(U)
+				and not U:IsSilenced()
+			then
+				S = c.GetCastLocation(b, U, L, Q)
+				if S ~= nil then
+					if DotaTime() >= (b._dpSilenceLogAt or -999) then
+						b._dpSilenceLogAt = DotaTime() + 5
+						pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f silence chaser=%s", DotaTime(), U:GetUnitName()))
+					end
+					return BOT_ACTION_DESIRE_HIGH, S, "W-Retreat:" .. c.Chat.GetNormName(U)
+				end
+			end
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderE()
@@ -419,6 +453,18 @@ function a.ConsiderR()
 			and c.CanCastOnMagicImmune(botTarget)
 		then
 			return BOT_ACTION_DESIRE_HIGH, "R-Attack:" .. c.Chat.GetNormName(botTarget)
+		end
+	end
+	-- Team fight with 2+ enemy heroes inside the spirits' radius (700, datafeed): Exorcism was only
+	-- cast while going on a target, so a fight that came to her was fought without the ultimate.
+	if c.IsInTeamFight(b, 1200) then
+		local nearFoes = c.GetNearbyHeroes(b, 700, true, BOT_MODE_NONE)
+		if nearFoes ~= nil and #nearFoes >= 2 then
+			if DotaTime() >= (b._dpExorcismLogAt or -999) then
+				b._dpExorcismLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f exorcism fight heroes=%d", DotaTime(), #nearFoes))
+			end
+			return BOT_ACTION_DESIRE_HIGH, "R-Fight"
 		end
 	end
 	local a1 = b:GetNearbyLaneCreeps(1000, false)

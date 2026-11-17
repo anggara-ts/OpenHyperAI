@@ -31,18 +31,16 @@ m["pos_2"] = {
 	"item_phase_boots",
 	"item_magic_wand",
 	"item_blade_mail",
-	"item_radiance",
+	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_blink",
-	"item_veil_of_discord",
+	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_heart",
 	"item_travel_boots",
 	"item_overwhelming_blink",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_aghanims_shard",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 }
 m["pos_3"] = {
@@ -54,8 +52,8 @@ m["pos_3"] = {
 	"item_magic_wand",
 	"item_phase_boots",
 	"item_blade_mail",
-	"item_radiance",
-	"item_veil_of_discord",
+	"item_blink",
+	"item_ultimate_scepter",
 	"item_crimson_guard",
 	"item_black_king_bar",
 	"item_lotus_orb",
@@ -150,6 +148,22 @@ function a.SkillsComplement()
 	if not b:HasModifier("modifier_primal_beast_trample") then
 		b.trample_status = { "", 0, nil }
 	end
+	-- Uproar (no target, IMMEDIATE, ignores channel) does not break Trample's walk, but the busy check
+	-- below blocked it for Trample's whole 5.5s; let it through during Trample only.
+	if
+		b:HasModifier("modifier_primal_beast_trample")
+		and not c.CanNotUseAbility(b)
+		and not b:HasModifier("modifier_primal_beast_pulverize_self")
+	then
+		if a.ConsiderUproar() > 0 then
+			if DotaTime() >= (b._uproarTrampleLogAt or -999) then
+				b._uproarTrampleLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f uproar during trample hp=%.2f", DotaTime(), L))
+			end
+			b:Action_UseAbility(q)
+			return
+		end
+	end
 	if
 		c.CanNotUseAbility(b)
 		or b:HasModifier("modifier_prevent_taunts")
@@ -239,8 +253,11 @@ function a.ConsiderOnslaught()
 	end
 	if J and not c.IsRealInvisible(b) and b:WasRecentlyDamagedByAnyHero(4) and b:GetActiveModeDesire() > 0.7 then
 		if c.IsValidHero(v[1]) and (not c.WeAreStronger(b, 1200) and L < 0.75 or c.IsChasingTarget(v[1], b)) then
+			-- T is already a charge TIME (0.6-1.0 x chargeup_time); remapping it again as a distance
+			-- (100..max_distance) always gave the 0.3s floor, so the escape charge went only a few hundred units.
 			local T = RemapValClamped(GetUnitToUnitDistance(b, v[1]), 600, 1200, O * 0.6, O)
-			H = RemapValClamped(T, 100, M, 0.3, O)
+			H = T
+			a.LogOnslaughtRetreat(H)
 			b.onslaught_status = { "retreat", c.GetTeamFountain() }
 			return BOT_ACTION_DESIRE_HIGH, c.GetTeamFountain()
 		end
@@ -269,6 +286,14 @@ function a.ConsiderOnslaught()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-PRIMAL_BEAST] retreat onslaught charge time, at most once per 5s.
+function a.LogOnslaughtRetreat(chargeTime)
+	if DotaTime() < (b._onslaughtLogAt or -999) then
+		return
+	end
+	b._onslaughtLogAt = DotaTime() + 5
+	pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f onslaught retreat charge=%.2fs hp=%.2f", DotaTime(), chargeTime, L))
 end
 function a.ConsiderBeginOnslaughtDesire()
 	if not c.CanCastAbility(t) then
@@ -340,7 +365,8 @@ function a.ConsiderTrample()
 			c.IsValidHero(Q)
 			and not Q:IsInvulnerable()
 			and c.IsInRange(b, Q, N)
-			and c.CanKillTarget(Q, Y * X, DAMAGE_TYPE_PHYSICAL)
+			-- datafeed: Trample deals magical damage (base + a share of his attack damage).
+			and c.CanKillTarget(Q, Y * X, DAMAGE_TYPE_MAGICAL)
 			and not Q:HasModifier("modifier_abaddon_borrowed_time")
 			and not Q:HasModifier("modifier_dazzle_shallow_grave")
 			and not Q:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -432,6 +458,31 @@ function a.ConsiderRockThrow()
 		local a6 = c.GetEnemiesNearLoc(W.targetloc, N)
 		if #a6 >= 2 then
 			return BOT_ACTION_DESIRE_HIGH, W.targetloc
+		end
+	end
+	-- Game data: 325 damage, 1.4s stun in 225, min range 550, travel 0.65-1.75s (taken as growing with
+	-- distance over 550-1800). Was never thrown to start a fight or to stop a chaser.
+	local function Flight(Q)
+		local d = Clamp(GetUnitToUnitDistance(b, Q), a4, 1800)
+		return a2 + r:GetSpecialValueFloat("min_travel_time") + (d - a4) / math.max(1800 - a4, 1) * (a3 - r:GetSpecialValueFloat("min_travel_time"))
+	end
+	local function Usable(Q)
+		return c.IsValidHero(Q)
+			and c.CanCastOnNonMagicImmune(Q)
+			and not c.IsSuspiciousIllusion(Q)
+			and not c.IsInRange(b, Q, a4)
+			and c.IsInRange(b, Q, a1)
+	end
+	if I and Usable(u) and not u:HasModifier("modifier_necrolyte_reapers_scythe") then
+		print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=engage target=%s dist=%d", u:GetUnitName(), GetUnitToUnitDistance(b, u)))
+		return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(u, Flight(u))
+	end
+	if J then
+		for P, Q in pairs(v) do
+			if Usable(Q) and c.IsInRange(b, Q, 1200) and (b:WasRecentlyDamagedByHero(Q, 2.0) or c.IsChasingTarget(Q, b)) then
+				print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=retreat target=%s dist=%d", Q:GetUnitName(), GetUnitToUnitDistance(b, Q)))
+				return BOT_ACTION_DESIRE_HIGH, c.GetCorrectLoc(Q, Flight(Q))
+			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

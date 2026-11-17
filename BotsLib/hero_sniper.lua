@@ -2,13 +2,14 @@
 local a = {}
 local b = GetBot()
 local c = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local d = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local e = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local j = { { 2, 3, 2, 3, 1, 6, 1, 1, 1, 2, 2, 3, 6, 3, 6 } }
+local j = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
 local m = {}
@@ -24,10 +25,10 @@ m["pos_1"] = {
 	"item_travel_boots",
 	"item_monkey_king_bar",
 	"item_mjollnir",
+	"item_greater_crit",
 	"item_broken_satanic",
 	"item_moon_shard",
 	"item_hydras_breath",
-	"item_skadi",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
@@ -43,10 +44,10 @@ m["pos_2"] = {
 	"item_travel_boots",
 	"item_monkey_king_bar",
 	"item_mjollnir",
+	"item_greater_crit",
 	"item_broken_satanic",
 	"item_moon_shard",
 	"item_hydras_breath",
-	"item_skadi",
 	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
@@ -107,6 +108,7 @@ function a.SkillsComplement()
 	end
 	s, t = a.ConsiderQ()
 	if s > 0 then
+		pcall(ChargeTracker.Issued, b, o)
 		c.SetQueuePtToINT(b, false)
 		b:ActionQueue_UseAbilityOnLocation(o, t)
 		E = DotaTime()
@@ -154,9 +156,10 @@ function a.ConsiderQ()
 		V = 0
 	end
 	local W = b:FindAoELocation(true, true, R, M, P - 30, 0.8, 0)
+	-- Typo fix: the field is .count (FindAoELocation); .cout was always nil, so this 2+ hero Shrapnel never fired.
 	if
 		#T >= 2
-		and (W.cout ~= nil and W.cout >= 2)
+		and (W.count ~= nil and W.count >= 2)
 		and b:GetActiveMode() ~= BOT_MODE_LANING
 		and (b:GetActiveMode() ~= BOT_MODE_RETREAT or b:GetActiveMode() == BOT_MODE_RETREAT and b:GetActiveModeDesire() < 0.6)
 		and not a.IsAbiltyQCastedHere(W.targetloc, P)
@@ -263,7 +266,7 @@ function a.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, G:GetLocation()
 		end
 	end
-	if c.IsFarming(b) and #D == 0 and c.GetManaAfter(o:GetManaCost()) > 0.4 and o:GetCurrentCharges() >= 2 then
+	if c.IsFarming(b) and #D == 0 and c.GetManaAfter(o:GetManaCost()) > 0.4 and (ChargeTracker.Count(b, o) or 0) >= 2 then
 		local a4 = b:GetNearbyNeutralCreeps(M)
 		if #a4 >= 3 then
 			local a7 = b:FindAoELocation(true, false, R, M, P, 0.8, 0)
@@ -461,7 +464,14 @@ function a.ConsiderAS()
 		local az = c.GetNearbyHeroes(b, P, true, BOT_MODE_NONE)
 		local aA = az[1]
 		if c.IsValidHero(aA) and c.CanCastOnNonMagicImmune(aA) and not aA:IsDisarmed() then
-			return BOT_ACTION_DESIRE_HIGH, b:GetLocation()
+			-- Review fix: the grenade landed on Sniper's own spot, so no knockback direction was defined
+			-- for the attacker on top of him. Land it 150 toward the attacker so the attacker is pushed
+			-- away from Sniper. Unverified: which way Sniper himself (self_push 1) is pushed.
+			if DotaTime() - (a.lastGrenadeLog or -99) > 10 then
+				a.lastGrenadeLog = DotaTime()
+				pcall(print, string.format("[OHA-SNIPER] t=%.0f grenade-retreat enemy=%s dist=%d", DotaTime(), aA:GetUnitName(), GetUnitToUnitDistance(b, aA)))
+			end
+			return BOT_ACTION_DESIRE_HIGH, c.GetUnitTowardDistanceLocation(b, aA, math.min(150, GetUnitToUnitDistance(b, aA)))
 		end
 	end
 	if c.IsInTeamFight(b, 1400) then

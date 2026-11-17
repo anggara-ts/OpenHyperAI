@@ -261,9 +261,9 @@ local function a0()
 	return nil
 end
 -- Ally T1 ↔ enemy T1 is ~7k mid / ~11k side lanes; midpoint ≈ 3.5k / 5.5k from our T1.
--- Harass within 3000 of our T1 = our half of the lane without diving theirs.
-local OFFSIDE_ENEMY_FROM_T1 = 3000
-local OFFSIDE_SELF_FROM_T1 = 3400
+-- Harass up to ~lane midpoint on our half; never inside enemy T1 range.
+local OFFSIDE_ENEMY_FROM_T1 = 3800
+local OFFSIDE_SELF_FROM_T1 = 4000
 local function GetLaneT1(team, lane)
 	if lane == LANE_TOP then
 		return GetTower(team, TOWER_TOP_1)
@@ -289,15 +289,30 @@ local function AnnounceOffsideHarass(target)
 	e.sOffsideHarassChatTime = now
 	e:ActionImmediate_Chat("Harassing " .. PrettyHeroName(target), false)
 end
--- Light poke when enemy is within 3000 of our T1 (offside / our half). LH/deny first.
+-- Right-clicking a hero pulls every enemy lane creep within 500 that is not already on us.
+local function CreepAggroUnsafe(hero)
+	local creeps = hero:GetNearbyLaneCreeps(500, true) or {}
+	local fresh, hitting = 0, 0
+	for _, creep in pairs(creeps) do
+		if b.IsValid(creep) then
+			if creep:GetAttackTarget() == hero then
+				hitting = hitting + 1
+			else
+				fresh = fresh + 1
+			end
+		end
+	end
+	return fresh > 0 or hitting >= 2
+end
+-- Aggressive lane poke on our half. LH/deny still come first in Think.
 local function ConsiderOffsideHarass(enemyHeroes)
 	if not b.IsInLaningPhase or not b.IsInLaningPhase() then
 		return nil
 	end
-	if b.GetHP(e) < 0.85 or b.GetMP(e) < 0.75 then
+	if b.GetHP(e) < 0.55 or CreepAggroUnsafe(e) then
 		return nil
 	end
-	if e:WasRecentlyDamagedByAnyHero(1.5) then
+	if e:WasRecentlyDamagedByAnyHero(1.0) and b.GetHP(e) < 0.75 then
 		return nil
 	end
 	local allyT1 = GetLaneT1(GetTeam(), l)
@@ -313,13 +328,21 @@ local function ConsiderOffsideHarass(enemyHeroes)
 			b.IsValidHero(enemy)
 			and b.CanBeAttacked(enemy)
 			and not b.IsSuspiciousIllusion(enemy)
-			and b.IsInRange(e, enemy, atk + 80)
+			and b.IsInRange(e, enemy, atk + 250)
 		then
 			-- Never stand inside enemy tower attack range.
 			if
 				enemyT1 ~= nil
 				and enemyT1:IsAlive()
-				and GetUnitToUnitDistance(e, enemyT1) < (enemyT1:GetAttackRange() or 700) + 120
+				and GetUnitToUnitDistance(e, enemyT1) < (enemyT1:GetAttackRange() or 700) + 180
+			then
+				goto continue_enemy
+			end
+			-- Don't chase a hero who is hugging their own T1 (rune/tower bait).
+			if
+				enemyT1 ~= nil
+				and enemyT1:IsAlive()
+				and GetUnitToUnitDistance(enemy, enemyT1) < (enemyT1:GetAttackRange() or 700) + 250
 			then
 				goto continue_enemy
 			end
@@ -337,8 +360,160 @@ local function ConsiderOffsideHarass(enemyHeroes)
 	end
 	return best
 end
-if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
+-- A melee core held back at the enemy's attack range (600 vs a ranged laner) is too
+-- far to walk in for a last hit before the creeps finish it. It stands by the wave.
+local MELEE_CORE_STANDOFF = 300
+local function LaneStandOff()
+	local standOff = math.max(m, 250, j)
+	if IsCoreRole() and m < 326 and b.GetHP(e) >= 0.45 then
+		standOff = math.min(standOff, MELEE_CORE_STANDOFF)
+	end
+	return standOff
+end
+-- Name of an allied core that will get this last hit itself, or nil when none can, plus
+-- when its hit would land (nil for a human core, who is always left the creep). A bot core
+-- counts when its own attack, including the walk, lands before the creeps kill it.
+local function CoreCanTakeLastHit(creep)
+	for _, ally in pairs(b.GetNearbyHeroes(e, 1000, false, BOT_MODE_NONE) or {}) do
+		if b.IsValidHero(ally) and ally ~= e and b.IsCore(ally) and not ally:IsIllusion() then
+			local name = (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
+			if not ally:IsBot() then
+				return name, nil
+			end
+			local delay = b.GetAttackProDelayTime(ally, creep)
+			if b.WillKillTarget(creep, ally:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, delay) then
+				return name, delay
+			end
+		end
+	end
+	return nil, nil
+end
+-- Enemy heroes harassing us: aiming at us now, or hit us in the last 1.5s.
+local function Harassers()
+	local list = {}
+	for _, h in pairs(k or {}) do
+		if
+			b.IsValidHero(h)
+			and not b.IsSuspiciousIllusion(h)
+			and (h:GetAttackTarget() == e or e:WasRecentlyDamagedByHero(h, 1.5))
+		then
+			list[#list + 1] = h
+		end
+	end
+	return list
+end
+local function LaneLog(fmt, ...)
+	if DotaTime() >= (e._laneRiskLogAt or -999) then
+		e._laneRiskLogAt = DotaTime() + 2
+		pcall(print, string.format(fmt, ...))
+	end
+end
+-- Walking in for a last hit with a harasser on us (user rule 2026-11-17). The spot we attack from
+-- is inside a harasser's attack range + 100: skip below 40% HP, skip a melee creep below 60% HP
+-- (ranged / siege / flagbearer still worth it), and a ranged bot below 60% only last-hits from
+-- where it stands. Returns why it skips, or nil.
+local function LastHitRisk(creep, spot, needsWalk)
+	local hp = b.GetHP(e)
+	if hp >= 0.6 then
+		return nil
+	end
+	local danger = nil
+	for _, h in pairs(Harassers()) do
+		if GetUnitToLocationDistance(h, spot) <= h:GetAttackRange() + 100 then
+			danger = h
+			break
+		end
+	end
+	if danger == nil then
+		return nil
+	end
+	local name = creep:GetUnitName() or ""
+	local valuable = N(creep) >= 2 or string.find(name, "siege", 1, true) ~= nil
+	if hp < 0.4 then
+		return "low-hp", danger
+	end
+	if not valuable then
+		return "melee-creep", danger
+	end
+	if m > 326 and needsWalk then
+		return "ranged-walk", danger
+	end
+	return nil
+end
+-- [OHA-LANE]: every 20s per bot in the laning phase. Last hits, denies, where it
+-- stands relative to the wave, and how often a support took or left a last hit.
+local function LogLaning()
+	local now = DotaTime()
+	if now < 0 or now > 10 * 60 or now < (e._laneLogAt or -999) then
+		return
+	end
+	e._laneLogAt = now + 20
+	local nearest = 99999
+	for _, creep in pairs(e:GetNearbyLaneCreeps(1600, true) or {}) do
+		if b.IsValid(creep) then
+			nearest = math.min(nearest, GetUnitToUnitDistance(e, creep))
+		end
+	end
+	local partner = a0()
+	pcall(print, string.format(
+		"[OHA-LANE] t=%.0f %s pos=%d lane=%s range=%d standoff=%d enemyRange=%d creep=%d lh=%d dn=%d partner=%s supTook=%d supLeft=%d hp=%.2f",
+		now,
+		(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+		b.GetPosition(e),
+		tostring(l),
+		math.floor(m),
+		math.floor(LaneStandOff()),
+		math.floor(j or 0),
+		math.floor(nearest),
+		e:GetLastHits(),
+		e:GetDenies(),
+		partner ~= nil and (string.gsub(partner:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		e._laneSupportTook or 0,
+		e._laneSupportLeft or 0,
+		b.GetHP(e)
+	))
+	e._laneSupportTook = 0
+	e._laneSupportLeft = 0
+end
+-- Enemy summons attacking this hero: spiderlings, wolves, golems, treants. Lane creeps,
+-- heroes and buildings are handled elsewhere.
+local function SummonsOnMe()
+	local n = 0
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES) or {}) do
+		if
+			b.IsValid(unit)
+			and not unit:IsHero()
+			and not unit:IsBuilding()
+			and not string.find(unit:GetUnitName() or "", "npc_dota_creep_", 1, true)
+			and unit:GetAttackTarget() == e
+			and GetUnitToUnitDistance(unit, e) <= 800
+		then
+			n = n + 1
+		end
+	end
+	return n
+end
+-- Custom laning Think for all roles so cores also harass (not only buggy/human-support).
+do
 	function Think()
+		LogLaning()
+		-- Standing at the lane spot while two or more summons bite is how a hero melted to
+		-- spiderlings. Step back toward the tower and let the creeps or tower take them.
+		local summons = SummonsOnMe()
+		if summons >= 2 then
+			if DotaTime() >= (e._summonStepLogAt or -999) then
+				e._summonStepLogAt = DotaTime() + 5
+				pcall(print, string.format(
+					"[OHA-LANE] t=%.0f %s summons-step-back count=%d hp=%.2f",
+					DotaTime(),
+					(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+					summons,
+					b.GetHP(e)
+				))
+			end
+			e:Action_MoveToLocation(b.AdjustLocationWithOffsetTowardsFountain(e:GetLocation(), 500))
+			return
+		end
 		local _ = e:GetNearbyTowers(1200, true)
 		if Y(h) then
 			return
@@ -378,8 +553,24 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 			end
 			local bCanLastHit
 			if bSupport then
-				-- Do not compete with a core for last hits.
-				bCanLastHit = not b.IsThereNonSelfCoreNearby(1000)
+				-- Do not compete with a core for last hits, but take one the core cannot reach in time.
+				-- With a bot core on the creep, go too but land after the core's hit: the core
+				-- gets it first, and the support only secures it if the core misses it.
+				local coreName, coreDelay = CoreCanTakeLastHit(C)
+				bCanLastHit = coreName == nil
+				if not bCanLastHit and coreDelay ~= nil then
+					local myDelay = b.GetAttackProDelayTime(e, C)
+					bCanLastHit = myDelay > coreDelay + 0.15
+						and b.WillKillTarget(C, e:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, myDelay)
+				end
+				if e._laneSupportCreep ~= C then
+					e._laneSupportCreep = C
+					if bCanLastHit then
+						e._laneSupportTook = (e._laneSupportTook or 0) + 1
+					else
+						e._laneSupportLeft = (e._laneSupportLeft or 0) + 1
+					end
+				end
 			else
 				local a6 = a0()
 				bCanLastHit = a6 == nil
@@ -390,6 +581,26 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 			end
 			if bCanLastHit then
 				local a7 = GetUnitToUnitDistance(e, C)
+				do
+					local spot = e:GetLocation()
+					if a7 > m then
+						spot = b.GetXUnitsTowardsLocation2(C:GetLocation(), e:GetLocation(), m - C:GetBoundingRadius())
+					end
+					local why, by = LastHitRisk(C, spot, a7 > m)
+					if why ~= nil then
+						LaneLog(
+							"[OHA-LANE] t=%.0f %s lasthit-skip why=%s creep=%s by=%s hp=%.2f walk=%d",
+							DotaTime(),
+							(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+							why,
+							(string.gsub(C:GetUnitName(), "npc_dota_", "")),
+							(string.gsub(by:GetUnitName(), "npc_dota_hero_", "")),
+							b.GetHP(e),
+							math.max(0, math.floor(a7 - m))
+						)
+						goto a5
+					end
+				end
 				if a7 > m then
 					local a8 = m - C:GetBoundingRadius()
 					local a9 = b.GetXUnitsTowardsLocation2(C:GetLocation(), e:GetLocation(), a8)
@@ -412,10 +623,11 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 				return
 			end
 		end
-		-- Offside poke (after LH/deny, before general harass).
+		-- Offside poke (after LH/deny, before general harass). Stay in attack range.
+		-- Walking closer is what pulls the wave onto her.
 		do
 			local offside = ConsiderOffsideHarass(k)
-			if offside ~= nil then
+			if offside ~= nil and GetUnitToUnitDistance(e, offside) <= m then
 				AnnounceOffsideHarass(offside)
 				e:Action_AttackUnit(offside, true)
 				return
@@ -436,44 +648,147 @@ if g or (IsCoreRole() and IsHumanSupportOnTeam()) or IsSupportRole() then
 				return
 			end
 		end
-		local ab = e:GetNearbyLaneCreeps(600, true)
-		if #ab <= 1 and not b.IsCore(e) and b.GetHP(e) > 0.5 then
+		local enemyT1Harass = GetLaneT1(GetOpposingTeam(), l)
+		local function SafeToHarassHero(L)
+			if not b.IsValidHero(L) or not b.CanBeAttacked(L) or b.IsSuspiciousIllusion(L) then
+				return false
+			end
+			if
+				enemyT1Harass ~= nil
+				and enemyT1Harass:IsAlive()
+				and (
+					GetUnitToUnitDistance(e, enemyT1Harass) < (enemyT1Harass:GetAttackRange() or 700) + 180
+					or GetUnitToUnitDistance(L, enemyT1Harass) < (enemyT1Harass:GetAttackRange() or 700) + 250
+				)
+			then
+				return false
+			end
+			return true
+		end
+		if not b.IsCore(e) and b.GetHP(e) > 0.5 and not CreepAggroUnsafe(e) then
 			for D, L in pairs(k) do
-				if
-					b.IsValidHero(L)
-					and b.CanBeAttacked(L)
-					and not b.IsSuspiciousIllusion(L)
-					and b.IsInRange(e, L, m + 150)
-				then
+				if SafeToHarassHero(L) and b.IsInRange(e, L, m) then
 					e:Action_AttackUnit(L, true)
 					return
 				end
 			end
 		end
-		if b.IsCore(e) and b.GetHP(e) > 0.6 then
+		if b.IsCore(e) and b.GetHP(e) > 0.45 and not CreepAggroUnsafe(e) then
 			for D, L in pairs(k) do
-				if
-					b.IsValidHero(L)
-					and b.CanBeAttacked(L)
-					and not b.IsSuspiciousIllusion(L)
-					and b.IsInRange(e, L, m + 50)
-				then
-					local ac = 0
-					for D, ad in pairs(i) do
-						if b.IsValid(ad) and ad:GetAttackTarget() == e then
-							ac = ac + 1
-						end
-					end
-					if ac <= 2 then
-						e:Action_AttackUnit(L, true)
-						return
+				if SafeToHarassHero(L) and b.IsInRange(e, L, m) then
+					e:Action_AttackUnit(L, true)
+					return
+				end
+			end
+		end
+		-- Harassed with no last hit to take and no trade above: step out of the harasser's attack
+		-- range + 100 toward our fountain for 1s, then the wait spot below brings us back.
+		if e._harassStepUntil ~= nil and DotaTime() < e._harassStepUntil then
+			e:Action_MoveToLocation(e._harassStepTo)
+			return
+		end
+		do
+			for _, h in pairs(Harassers()) do
+				local dist = GetUnitToUnitDistance(e, h)
+				if e:WasRecentlyDamagedByHero(h, 1.5) and dist <= h:GetAttackRange() + 100 then
+					local need = math.max(150, h:GetAttackRange() + 150 - dist)
+					e._harassStepUntil = DotaTime() + 1.0
+					e._harassStepTo = b.AdjustLocationWithOffsetTowardsFountain(e:GetLocation(), need)
+					LaneLog(
+						"[OHA-LANE] t=%.0f %s harass-step by=%s dist=%d step=%d hp=%.2f",
+						DotaTime(),
+						(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(h:GetUnitName(), "npc_dota_hero_", "")),
+						dist,
+						need,
+						b.GetHP(e)
+					)
+					e:Action_MoveToLocation(e._harassStepTo)
+					return
+				end
+			end
+		end
+		-- Melee core aggro pull. Ordering an attack on any visible enemy hero, at any distance,
+		-- makes the enemy creeps near him turn on him (the order is what counts, not walking in).
+		-- He gives the order once, then steps back toward our tower for 1.5s so they follow:
+		-- the wave fight moves off the enemy tower and away from their heroes, easier to farm.
+		-- Only with HP 60%+, 2+ enemy creeps within 500, the wave within 1500 of the enemy T1,
+		-- at most one enemy hero within 800, and once every 8s.
+		if e._aggroBackUntil ~= nil and DotaTime() < e._aggroBackUntil then
+			e:Action_MoveToLocation(e._aggroBackTo)
+			return
+		end
+		if IsCoreRole() and m < 326 and b.GetHP(e) >= 0.6 and DotaTime() >= (e._aggroNextAt or -999) then
+			local close = 0
+			for D, cr in pairs(i or {}) do
+				if b.IsValid(cr) and GetUnitToUnitDistance(e, cr) <= 500 then
+					close = close + 1
+				end
+			end
+			local enemyT1 = GetLaneT1(GetOpposingTeam(), l)
+			local nearTower = enemyT1 ~= nil
+				and enemyT1:IsAlive()
+				and b.IsValid(i[1])
+				and GetUnitToUnitDistance(i[1], enemyT1) <= 1500
+			local heroesClose = 0
+			for D, L in pairs(k or {}) do
+				if b.IsValidHero(L) and GetUnitToUnitDistance(e, L) <= 800 then
+					heroesClose = heroesClose + 1
+				end
+			end
+			if close >= 2 and nearTower and heroesClose <= 1 then
+				local bait = nil
+				for D, L in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+					if b.IsValidHero(L) and L:CanBeSeen() and not b.IsSuspiciousIllusion(L) then
+						bait = L
+						break
 					end
 				end
+				if bait ~= nil then
+					e._aggroNextAt = DotaTime() + 8
+					e._aggroBackUntil = DotaTime() + 1.5
+					e._aggroBackTo = b.AdjustLocationWithOffsetTowardsFountain(e:GetLocation(), 350)
+					pcall(print, string.format(
+						"[OHA-AGGRO] t=%.0f %s pull creeps=%d bait=%s dist=%d",
+						DotaTime(),
+						(string.gsub(e:GetUnitName(), "npc_dota_hero_", "")),
+						close,
+						(string.gsub(bait:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToUnitDistance(e, bait)
+					))
+					e:Action_AttackUnit(bait, true)
+					return
+				end
+			end
+		end
+		-- Melee core: wait at the edge of attack range of the enemy creep that is about to die
+		-- (2.5 hits or less), not 300 behind the wave. From there the last hit only needs the
+		-- attack, not a walk, so it lands in time. Not next to the enemy tower.
+		if IsCoreRole() and m < 326 and b.GetHP(e) >= 0.45 and not CreepAggroUnsafe(e) then
+			local dmg = e:GetAttackDamage()
+			local soon, soonHp = nil, math.huge
+			for D, cr in pairs(i or {}) do
+				if
+					b.IsValid(cr)
+					and b.CanBeAttacked(cr)
+					and cr:GetHealth() <= dmg * 2.5
+					and cr:GetHealth() < soonHp
+					and not (b.IsValidBuilding(_[1]) and GetUnitToUnitDistance(cr, _[1]) < 750)
+				then
+					soon, soonHp = cr, cr:GetHealth()
+				end
+			end
+			if soon ~= nil then
+				local spot = b.GetXUnitsTowardsLocation2(soon:GetLocation(), e:GetLocation(), m + soon:GetBoundingRadius() + 40)
+				if GetUnitToLocationDistance(e, spot) > 60 then
+					e:Action_MoveDirectly(spot)
+				end
+				return
 			end
 		end
 		local ae = GetLaneFrontAmount(GetTeam(), l, false)
 		local af = GetLaneFrontAmount(GetOpposingTeam(), l, false)
-		local ag = math.max(m, 250, j)
+		local ag = LaneStandOff()
 		local ah = GetLaneFrontLocation(GetTeam(), l, -ag)
 		if af < ae then
 			ah = GetLaneFrontLocation(GetOpposingTeam(), l, -ag)
@@ -515,6 +830,9 @@ function AnnounceMessages()
 		end
 	end
 end
+-- Hold the desire through short dips while laning (FuncLib/systems/mode_hold.lua). Game 030: the
+-- flips left were mostly laning against rune or attack (OD, 4:00: laning 0.56 / rune 0.35, 9 times).
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "laning", BOT_MODE_LANING)
 if SafeCall then
 	local au = GetDesire
 	local av = Think

@@ -57,7 +57,7 @@ m["pos_3"] = {
 	"item_magic_wand",
 	"item_blade_mail",
 	"item_radiance",
-	"item_pipe",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_assault",
 	"item_lotus_orb",
@@ -76,7 +76,7 @@ m["pos_4"] = {
 	"item_magic_wand",
 	"item_blade_mail",
 	"item_solar_crest",
-	"item_glimmer_cape",
+	"item_holy_locket",
 	"item_boots_of_bearing",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
@@ -96,7 +96,7 @@ m["pos_5"] = {
 	"item_magic_wand",
 	"item_blade_mail",
 	"item_solar_crest",
-	"item_glimmer_cape",
+	"item_holy_locket",
 	"item_guardian_greaves",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
@@ -132,6 +132,15 @@ local s, t
 local u = false
 local v, w
 local x, y
+-- [OHA-ABADDON]: new casts (Borrowed Time by hand, Mist Coil harass), at most once per 10s per reason.
+local function LogAbaddon(why)
+	b._abaddonLogAt = b._abaddonLogAt or {}
+	if DotaTime() < (b._abaddonLogAt[why] or -999) then
+		return
+	end
+	b._abaddonLogAt[why] = DotaTime() + 10
+	pcall(print, string.format("[OHA-ABADDON] t=%.0f %s hp=%.2f", DotaTime(), why, c.GetHP(b)))
+end
 function a.SkillsComplement()
 	if c.CanNotUseAbility(b) then
 		return
@@ -143,6 +152,13 @@ function a.SkillsComplement()
 	v = c.GetProperTarget(b)
 	x = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	y = b:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	-- fix: Borrowed Time (active, strong dispel, datafeed) was never cast; it only auto-fired below
+	-- hp_threshold 400 HP, which late game is ~10% HP and too late against burst.
+	local borrowedTime = b:GetAbilityByName("abaddon_borrowed_time")
+	if a.ConsiderBorrowedTime(borrowedTime) > 0 then
+		b:Action_UseAbility(borrowedTime)
+		return
+	end
 	s, t = a.ConsiderAphoticShield()
 	if s > 0 then
 		c.SetQueuePtToINT(b, false)
@@ -162,7 +178,8 @@ function a.ConsiderMistCoil()
 	end
 	local z = c.GetProperCastRange(false, b, o:GetCastRange())
 	local A = o:GetCastPoint()
-	local B = o:GetSpecialValueInt("target_damage")
+	-- datafeed: Mist Coil's damage value is "damage_heal"; "target_damage" no longer exists (read 0)
+	local B = o:GetSpecialValueInt("damage_heal")
 	local C = o:GetSpecialValueInt("missile_speed")
 	local D = o:GetManaCost()
 	local E = c.GetManaAfter(D)
@@ -172,7 +189,8 @@ function a.ConsiderMistCoil()
 			c.IsValidHero(H)
 			and c.CanBeAttacked(H)
 			and c.IsInRange(b, H, z)
-			and c.CanCastOnMagicImmune(H)
+			-- fix: Mist Coil is SPELL_IMMUNITY_ENEMIES_NO (game data); CanCastOnMagicImmune let it target BKB heroes
+			and c.CanCastOnNonMagicImmune(H)
 			and c.CanCastOnTargetAdvanced(H)
 			and not H:HasModifier("modifier_dazzle_shallow_grave")
 			and not H:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -212,6 +230,21 @@ function a.ConsiderMistCoil()
 	end
 	if J then
 		return BOT_ACTION_DESIRE_HIGH, J
+	end
+	-- fix: Mist Coil only hit enemy heroes to finish them. While engaging, coil the target
+	-- (damage_heal, magical) when mana allows and Abaddon can afford the 40 self-damage.
+	if
+		c.IsGoingOnSomeone(b)
+		and c.IsValidHero(v)
+		and c.IsInRange(b, v, z)
+		and c.CanCastOnNonMagicImmune(v)
+		and c.CanCastOnTargetAdvanced(v)
+		and not c.IsSuspiciousIllusion(v)
+		and E > F
+		and w > 0.4
+	then
+		LogAbaddon("coil-engage")
+		return BOT_ACTION_DESIRE_HIGH, v
 	end
 	if c.IsLaning(b) and c.IsEarlyGame() and E > F + 0.1 then
 		local N = b:GetNearbyLaneCreeps(math.min(z + 300, 1600), true)
@@ -266,6 +299,8 @@ function a.ConsiderAphoticShield()
 			and c.CanBeAttacked(L)
 			and c.IsInRange(b, L, z + 300)
 			and not L:IsIllusion()
+			-- fix: Aphotic Shield has DOTA_UNIT_TARGET_FLAG_NOT_MAGIC_IMMUNE_ALLIES (game data); a BKB ally is an invalid target
+			and not L:IsMagicImmune()
 			and not L:HasModifier("modifier_abaddon_aphotic_shield")
 			and not L:HasModifier("modifier_abaddon_borrowed_time")
 			and not L:HasModifier("modifier_doom_bringer_doom_aura_enemy")
@@ -330,5 +365,24 @@ function a.ConsiderAphoticShield()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- Borrowed Time by hand: under hero damage in a fight, before burst drops him through the
+-- 400 HP auto-trigger. The cast also strong-dispels him (datafeed).
+function a.ConsiderBorrowedTime(borrowedTime)
+	if not c.CanCastAbility(borrowedTime) or b:HasModifier("modifier_abaddon_borrowed_time") then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if not b:WasRecentlyDamagedByAnyHero(1.5) then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local enemiesNear = c.GetEnemiesNearLoc(b:GetLocation(), 1200)
+	if enemiesNear == nil or #enemiesNear == 0 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if w < 0.35 or w < 0.5 and #enemiesNear >= 2 then
+		LogAbaddon("borrowed-time enemies=" .. #enemiesNear)
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	return BOT_ACTION_DESIRE_NONE
 end
 return a

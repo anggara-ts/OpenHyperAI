@@ -11,8 +11,7 @@ local i = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10
 local j = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_crimson_guard", "item_pipe", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_3"] = {
 	"item_tango",
@@ -45,6 +44,8 @@ end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "legion_commander_duel", kind = "unit" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(p)
 	e.MinionThink(p)
@@ -76,18 +77,35 @@ function a.SkillsComplement()
 	K = L.allies
 	C, D = a.ConsiderR()
 	if C > 0 then
+		-- Clear once, then queue all three: the old Action_UseAbilityOnEntity for Duel cleared the
+		-- queue, so the Press the Attack and Blade Mail queued before it never went out.
+		b:Action_ClearActions(false)
 		if r:IsTrained() and r:IsFullyCastable() and b:GetMana() > r:GetManaCost() + t:GetManaCost() then
-			if v:IsTrained() then
-				b:ActionQueue_UseAbilityOnLocation(r, b:GetLocation())
-			else
-				b:ActionQueue_UseAbilityOnEntity(r, b)
-			end
+			-- datafeed: Press the Attack is unit-target (behavior 8); f[5] is now the Duel duration
+			-- talent, not an AoE talent, so the old point-cast branch could never cast.
+			b:ActionQueue_UseAbilityOnEntity(r, b)
 		end
 		local M = c.IsItemAvailable("item_blade_mail")
 		if M ~= nil and M:IsFullyCastable() and b:GetMana() > M:GetManaCost() + t:GetManaCost() then
 			b:ActionQueue_UseAbility(M)
 		end
-		b:Action_UseAbilityOnEntity(t, D)
+		b:ActionQueue_UseAbilityOnEntity(t, D)
+		return
+	end
+	-- Blink > Duel (was missing: Duel range is 200, so a target out of reach was only Dueled if the
+	-- generic Blink logic happened to land next to it first, without Press the Attack or Blade Mail).
+	local blinkTarget = a.ConsiderBlinkDuel()
+	if blinkTarget ~= nil then
+		b:Action_ClearActions(false)
+		if r:IsTrained() and r:IsFullyCastable() and b:GetMana() > r:GetManaCost() + t:GetManaCost() then
+			b:ActionQueue_UseAbilityOnEntity(r, b)
+		end
+		local M = c.IsItemAvailable("item_blade_mail")
+		if M ~= nil and M:IsFullyCastable() and b:GetMana() > M:GetManaCost() + t:GetManaCost() then
+			b:ActionQueue_UseAbility(M)
+		end
+		b:ActionQueue_UseAbilityOnLocation(b.Blink, blinkTarget:GetLocation())
+		b:ActionQueue_UseAbilityOnEntity(t, blinkTarget)
 		return
 	end
 	w, x = a.ConsiderQ()
@@ -99,11 +117,8 @@ function a.SkillsComplement()
 	y, z = a.ConsiderW()
 	if y > 0 then
 		c.SetQueuePtToINT(b, true)
-		if v:IsTrained() then
-			b:ActionQueue_UseAbilityOnLocation(r, z:GetLocation())
-		else
-			b:ActionQueue_UseAbilityOnEntity(r, z)
-		end
+		-- datafeed: Press the Attack is unit-target (behavior 8); no talent makes it point-cast.
+		b:ActionQueue_UseAbilityOnEntity(r, z)
 		return
 	end
 end
@@ -284,14 +299,17 @@ function a.ConsiderR()
 	local V = c.GetAroundEnemyHeroList(650)
 	local W = nil
 	local X = nil
+	-- Duel pierces spell immunity (SPELL_IMMUNITY_ENEMIES_YES, MAGIC_IMMUNE_ENEMIES flag in the game KV),
+	-- so the old "not IsMagicImmune" tests skipped exactly the BKB'd carries Duel is meant for. Removed in
+	-- all three branches. CanCastOnTargetAdvanced added so Duel is not wasted into Linken's/Lotus.
 	if c.IsGoingOnSomeone(b) then
 		if
 			c.IsValidHero(botTarget)
 			and botTarget:CanBeSeen()
-			and not botTarget:IsMagicImmune()
 			and not botTarget:IsInvulnerable()
 			and not c.IsSuspiciousIllusion(botTarget)
 			and not c.HasForbiddenModifier(botTarget)
+			and c.CanCastOnTargetAdvanced(botTarget)
 			and c.IsInRange(b, botTarget, O + 100)
 		then
 			local a8 = botTarget:GetActualIncomingDamage(S, T)
@@ -308,7 +326,14 @@ function a.ConsiderR()
 		end
 	end
 	for Y, Z in pairs(V) do
-		if Z:IsChanneling() and not Z:IsMagicImmune() and Z:IsBot() then
+		-- Channel cut: dropped "IsBot()" (human channellers were never interrupted) and the magic-immune
+		-- test (Duel pierces it); added validity and Linken's checks.
+		if
+			c.IsValidHero(Z)
+			and Z:IsChanneling()
+			and not c.IsSuspiciousIllusion(Z)
+			and c.CanCastOnTargetAdvanced(Z)
+		then
 			W = Z
 			X = "R-打断" .. c.Chat.GetNormName(W)
 			return BOT_ACTION_DESIRE_ABSOLUTE, W, X
@@ -316,8 +341,8 @@ function a.ConsiderR()
 		if
 			c.IsValidHero(Z)
 			and Z:CanBeSeen()
-			and not Z:IsMagicImmune()
 			and not Z:IsInvulnerable()
+			and c.CanCastOnTargetAdvanced(Z)
 			and not c.IsSuspiciousIllusion(Z)
 			and not c.HasForbiddenModifier(Z)
 		then
@@ -339,6 +364,61 @@ function a.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Blink-Duel target: going on a hero beyond Duel range but inside Blink range, the same kill estimate
+-- as the aggressive Duel above, and not more enemies than allies around the target.
+-- [OHA-LC] logs each blink-duel, at most once per 5s.
+function a.ConsiderBlinkDuel()
+	if not t:IsFullyCastable() or b:GetMana() < t:GetManaCost() or b:IsRooted() then
+		return nil
+	end
+	if not c.IsGoingOnSomeone(b) or not c.CanBlinkDagger(b) or b.Blink == nil then
+		return nil
+	end
+	local O = t:GetCastRange()
+	local blinkRange = b.Blink:GetName() == "item_arcane_blink" and 1350 or 1150
+	if
+		not c.IsValidHero(botTarget)
+		or not botTarget:CanBeSeen()
+		or botTarget:IsInvulnerable()
+		or c.IsSuspiciousIllusion(botTarget)
+		or c.HasForbiddenModifier(botTarget)
+		or not c.CanCastOnTargetAdvanced(botTarget)
+		or c.IsInRange(b, botTarget, O + 100)
+		or not c.IsInRange(b, botTarget, blinkRange)
+	then
+		return nil
+	end
+	local a7 = t:GetSpecialValueInt("duration") - 0.3
+	local S = b:GetAttackDamage() * a7 / b:GetSecondsPerAttack()
+	local a8 = botTarget:GetActualIncomingDamage(S, DAMAGE_TYPE_PHYSICAL)
+	if a8 > S then
+		a8 = S * 0.6
+	end
+	local a9 = a.GetAllyToTargetDamage(botTarget, a7)
+	if a8 * 0.8 + a9 * 1.2 <= botTarget:GetHealth() + botTarget:GetHealthRegen() * a7 then
+		return nil
+	end
+	local enemiesThere = c.GetEnemiesNearLoc(botTarget:GetLocation(), 1200)
+	local alliesThere = c.GetAlliesNearLoc(botTarget:GetLocation(), 1200)
+	if #enemiesThere > #alliesThere + 1 then
+		return nil
+	end
+	if DotaTime() >= (b._lcLogAt or -999) then
+		b._lcLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-LC] t=%.0f blink-duel target=%s dist=%d enemies=%d allies=%d",
+				DotaTime(),
+				botTarget:GetUnitName(),
+				GetUnitToUnitDistance(b, botTarget),
+				#enemiesThere,
+				#alliesThere
+			)
+		)
+	end
+	return botTarget
 end
 function a.GetAllyToTargetDamage(Z, a7)
 	local ad = 0

@@ -8,15 +8,16 @@ local d = {}
 local e = {}
 local f = {}
 local g = false
-local h = require(GetScriptDirectory() .. "/FretBots/matchups_data")
+local h = require(GetScriptDirectory() .. "/FuncLib/data/matchups_data")
 local i = require(GetScriptDirectory() .. "/FuncLib/systems/role")
 local j = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local k = require(GetScriptDirectory() .. "/FuncLib/data/team_names")
 local l = require(GetScriptDirectory() .. "/FuncLib/hero/captain_mode")
 local m = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local n = require(GetScriptDirectory() .. "/FuncLib/data/hero_pos_weights")
-local o = require(GetScriptDirectory() .. "/FretBots/HeroNames")
+local o = require(GetScriptDirectory() .. "/FuncLib/data/hero_display_names")
 local p = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 n = n.GetHeroPositions()
 if GAMEMODE_TURBO == nil then
 	GAMEMODE_TURBO = 23
@@ -126,32 +127,86 @@ local W = { [1] = LANE_TOP, [2] = LANE_MID, [3] = LANE_BOT, [4] = LANE_BOT, [5] 
 f = { TEAM_RADIANT = j.Deepcopy(V), TEAM_DIRE = j.Deepcopy(W) }
 local X = { [1] = LANE_MID, [2] = LANE_MID, [3] = LANE_MID, [4] = LANE_MID, [5] = LANE_MID }
 local Y = { [1] = LANE_MID, [2] = LANE_TOP, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_TOP }
-if p then
-	if GetTeam() == TEAM_RADIANT and p.Radiant_Heros then
-		for Z = 1, #p.Radiant_Heros do
-			local U = j.TrimString(p.Radiant_Heros[Z])
-			if U and U ~= "Random" and j.HasValue(u, U) then
-				d[Z] = U
-			end
-		end
-	elseif GetTeam() == TEAM_DIRE and p.Dire_Heros then
-		for Z = 1, #p.Dire_Heros do
-			local U = j.TrimString(p.Dire_Heros[Z])
-			if U and U ~= "Random" and j.HasValue(u, U) then
-				d[Z] = U
-			end
+-- Resolve which Customize pick list applies to a team.
+-- Debug_Ally/Enemy override Radiant/Dire when that debug list has real hero names.
+local function a_DebugHumanTeam()
+	if j.IsHumanPlayerInTeam(TEAM_RADIANT) then
+		return TEAM_RADIANT
+	end
+	if j.IsHumanPlayerInTeam(TEAM_DIRE) then
+		return TEAM_DIRE
+	end
+	return TEAM_RADIANT
+end
+local function a_HasForcedHeroNames(list)
+	if type(list) ~= "table" then
+		return false
+	end
+	for Z = 1, #list do
+		local U = j.TrimString(list[Z] or "")
+		if U ~= "" and U ~= "Random" then
+			return true
 		end
 	end
+	return false
+end
+local function a_GetForcedPickList(ab)
+	if not p then
+		return nil
+	end
+	local allyList = p.Debug_Ally_Heros
+	local enemyList = p.Debug_Enemy_Heros
+	local useAlly = a_HasForcedHeroNames(allyList)
+	local useEnemy = a_HasForcedHeroNames(enemyList)
+	if useAlly or useEnemy then
+		local humanTeam = a_DebugHumanTeam()
+		if ab == humanTeam then
+			return useAlly and allyList or nil
+		end
+		return useEnemy and enemyList or nil
+	end
+	if ab == TEAM_RADIANT and p.Radiant_Heros then
+		return p.Radiant_Heros
+	end
+	if ab == TEAM_DIRE and p.Dire_Heros then
+		return p.Dire_Heros
+	end
+	return nil
+end
+-- forcedSlot[Z] marks a slot whose hero comes from a pick list, not from the random pool.
+-- Checked by slot: a "Random" slot whose roll matches a listed hero is still random.
+local forcedSlot = {}
+local function a_ApplyForcedPicks(list)
+	if type(list) ~= "table" then
+		return false
+	end
+	local applied = false
+	for Z = 1, math.min(5, #list) do
+		local U = j.TrimString(list[Z] or "")
+		if U ~= "" and U ~= "Random" and j.HasValue(u, U) then
+			d[Z] = U
+			forcedSlot[Z] = true
+			applied = true
+		end
+	end
+	return applied
+end
+local a_ForcedPickList = nil
+local a_HasDebugForcedPicks = false
+if p then
+	a_ForcedPickList = a_GetForcedPickList(GetTeam())
+	a_HasDebugForcedPicks = a_ApplyForcedPicks(a_ForcedPickList)
+		and (
+			a_HasForcedHeroNames(p.Debug_Ally_Heros) or a_HasForcedHeroNames(p.Debug_Enemy_Heros)
+		)
 end
 function a.IsInCustomizedPicks(I)
 	if not p then
 		return false
 	end
-	local _ = {}
-	if GetTeam() == TEAM_RADIANT and p.Radiant_Heros then
-		_ = p.Radiant_Heros
-	elseif GetTeam() == TEAM_DIRE and p.Dire_Heros then
-		_ = p.Dire_Heros
+	local _ = a_ForcedPickList or a_GetForcedPickList(GetTeam())
+	if type(_) ~= "table" then
+		return false
 	end
 	return j.HasValue(_, I)
 end
@@ -172,6 +227,7 @@ function a.ShufflePickOrder(a3)
 		local a5 = a4[Z]
 		if a3[Z] and a3[Z] >= 0 and IsPlayerBot(a3[Z]) and IsPlayerBot(a3[a5]) then
 			d[Z], d[a5] = d[a5], d[Z]
+			forcedSlot[Z], forcedSlot[a5] = forcedSlot[a5], forcedSlot[Z]
 			e[Z], e[a5] = e[a5], e[Z]
 			f["TEAM_RADIANT"][Z], f["TEAM_RADIANT"][a5] = f["TEAM_RADIANT"][a5], f["TEAM_RADIANT"][Z]
 			f["TEAM_DIRE"][Z], f["TEAM_DIRE"][a5] = f["TEAM_DIRE"][a5], f["TEAM_DIRE"][Z]
@@ -278,6 +334,24 @@ function a.CanPickHero(ab, a7)
 	end
 	return not ak(a7)
 end
+-- A hero named in either team's pick list is kept for that slot. A random slot that picks
+-- first would otherwise take it, and the listed slot then picked it again (two Techies).
+function a.IsReservedByForcedPick(a7)
+	for G, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+		local list = a_GetForcedPickList(team)
+		if type(list) == "table" then
+			for Z = 1, math.min(5, #list) do
+				if j.TrimString(list[Z] or "") == a7 then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+function a.CanPickRandomHero(ab, a7)
+	return a.CanPickHero(ab, a7) and not a.IsReservedByForcedPick(a7)
+end
 function a.GetRandomAvailableHero(ab, an)
 	if type(an) ~= "table" or #an == 0 then
 		return nil
@@ -288,7 +362,7 @@ function a.GetRandomAvailableHero(ab, an)
 	end
 	a.ShuffleArray(ao)
 	for G, ap in ipairs(ao) do
-		if a.CanPickHero(ab, ap) then
+		if a.CanPickRandomHero(ab, ap) then
 			return ap
 		end
 	end
@@ -499,6 +573,46 @@ local function ReassignBotRoles(teamKey, locked)
 	-- Force GetPosition() to re-read RoleAssignment.
 	i.HeroPositions = {}
 end
+-- Exchange roster slot idx with whoever currently holds newPos. Every other slot stays.
+-- Returns "ok", "same", "human", or "missing".
+local function SwapRoleWithHolder(teamKey, players, idx, newPos)
+	local roles = i.RoleAssignment[teamKey]
+	local oldPos = roles[idx]
+	if oldPos == nil then
+		return "missing"
+	end
+	if oldPos == newPos then
+		return "same"
+	end
+	local holder = nil
+	for slot = 1, 5 do
+		if roles[slot] == newPos then
+			holder = slot
+			break
+		end
+	end
+	if holder ~= nil and holder ~= idx then
+		local pid = players[holder]
+		if pid ~= nil and not IsPlayerBot(pid) then
+			return "human"
+		end
+	end
+	roles[idx] = newPos
+	if holder ~= nil and holder ~= idx then
+		roles[holder] = oldPos
+	end
+	ApplyLanesFromRoles(teamKey)
+	i.HeroPositions = {}
+	log(
+		"Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s",
+		teamKey,
+		idx,
+		oldPos,
+		tostring(holder),
+		newPos
+	)
+	return "ok"
+end
 local function aI(ab)
 	local aJ = 0
 	for G, al in pairs(GetTeamPlayers(ab)) do
@@ -517,7 +631,7 @@ local function aL(ab, aM, aN, aO)
 	local aQ = ac(ab)
 	local aR = aF()
 	for G, ap in ipairs(aM) do
-		if a.CanPickHero(ab, ap) then
+		if a.CanPickRandomHero(ab, ap) then
 			local aS = 0
 			if h[ap] then
 				for G, aT in ipairs(aN) do
@@ -582,7 +696,8 @@ local function b3(Z, al)
 	local aM = e[Z]
 	local b4 = d[Z]
 	local ar = b4
-	if not a.IsInCustomizedPicks(b4) and RandomInt(1, 5) >= 1 then
+	local forced = forcedSlot[Z] == true
+	if not forced and RandomInt(1, 5) >= 1 then
 		local aN = aC()
 		local aZ = aL(ab, aM, aN, Z)
 		local b5 = ab == TEAM_RADIANT and "Radiant" or "Dire"
@@ -595,9 +710,9 @@ local function b3(Z, al)
 			ar = a.GetRandomAvailableHero(ab, aM) or b4
 		end
 	end
-	local b6 = a.IsInCustomizedPicks(b4) and b4 == ar
+	local b6 = forced and b4 == ar
 	if not b6 then
-		if not a.CanPickHero(ab, ar) then
+		if not a.CanPickRandomHero(ab, ar) then
 			ar = a.GetRandomAvailableHero(ab, aM) or b4
 		end
 	end
@@ -609,8 +724,16 @@ local function b3(Z, al)
 end
 local function b7()
 	local a3 = GetTeamPlayers(GetTeam(), true)
-	if not ay[B] and not j.IsHumanPlayerInTeam(GetTeam()) and not IsLanMode() then
+	-- Keep debug force-pick order stable (pos 1..N as listed).
+	if
+		not ay[B]
+		and not a_HasDebugForcedPicks
+		and not j.IsHumanPlayerInTeam(GetTeam())
+		and not IsLanMode()
+	then
 		a.ShufflePickOrder(a3)
+		ay[B] = true
+	elseif not ay[B] and a_HasDebugForcedPicks then
 		ay[B] = true
 	end
 	for Z, al in pairs(a3) do
@@ -809,39 +932,23 @@ local function bg(bh, bi, bj)
 				end
 				local targetPid = a3[bA]
 				local targetHero = targetPid and GetSelectedHeroName(targetPid) or ""
-				-- Don't force a core hero onto 4/5.
+				-- Don't force a core hero onto 4/5. Leave the roster as it is.
 				if aA >= 4 and IsCorePreferredHero(targetHero) then
 					log(
-						"Refuse !%spos %s: %s is a core hero, reassigning supports to 4/5 instead",
+						"Refuse !%spos %s: %s is a core hero",
 						bE,
 						bF,
 						targetHero
 					)
-					local locked = {}
-					for idx, pid in pairs(a3) do
-						if idx <= 5 and not IsPlayerBot(pid) then
-							locked[idx] = i.RoleAssignment[by][idx]
-						end
-					end
-					ReassignBotRoles(by, locked)
 				else
-					local locked = {}
-					for idx, pid in pairs(a3) do
-						if idx <= 5 and not IsPlayerBot(pid) then
-							if i.RoleAssignment[by][idx] ~= aA then
-								locked[idx] = i.RoleAssignment[by][idx]
-							end
-						end
+					local swapped = SwapRoleWithHolder(by, a3, bA, aA)
+					if swapped == "human" then
+						log("Switch role failed: target role belongs to human.")
+					elseif swapped == "same" then
+						log("Switch role skipped: idx %s already pos %s", bA, aA)
+					elseif swapped == "missing" then
+						log("Switch role failed: idx %s has no role", bA)
 					end
-					locked[bA] = aA
-					ReassignBotRoles(by, locked)
-					log(
-						"Switch role ok (role-aware). Team: %s idx: %s hero: %s -> pos %s",
-						by,
-						bA,
-						targetHero,
-						i.RoleAssignment[by][bA]
-					)
 				end
 			else
 				log("Cannot select pos: %s (not available).", bF)
@@ -875,6 +982,7 @@ local function bH()
 	b.initialized = true
 end
 function Think()
+	MatchTrace.MatchMarker("start", "mode=" .. tostring(GetGameMode()))
 	if GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM then
 		l.CaptainModeLogic(u)
 		l.AddToList()
@@ -1032,3 +1140,32 @@ function GetSelectedHumanHero(ab)
 		end
 	end
 end
+
+-- [OHA-ERROR] trap (hero selection). From ~11:20 every game an unwrapped entry point fails and the engine only
+-- prints "Script Runtime Error: error in error handling" (its handler cannot run, typically a stack
+-- overflow), then squelches it after 10 copies. Caught here and printed with its name, up to 3 times
+-- per entry point per bot; the failing call still just stops, as before.
+local OHA_TRAP_COUNT = {}
+local function OHA_Trap(name, fn, fallback)
+	if type(fn) ~= "function" then
+		return fn
+	end
+	return function(...)
+		local res = { pcall(fn, ...) }
+		if res[1] then
+			return unpack(res, 2)
+		end
+		local n = (OHA_TRAP_COUNT[name] or 0) + 1
+		OHA_TRAP_COUNT[name] = n
+		if n <= 3 then
+			local hero = "?"
+			pcall(function()
+				hero = GetBot():GetUnitName()
+			end)
+			pcall(print, string.format("[OHA-ERROR] t=%.1f %s %s: %s", DotaTime(), hero, name, tostring(res[2])))
+		end
+		return fallback
+	end
+end
+Think = OHA_Trap("HEROSEL_Run", Think, nil)
+UpdateLaneAssignments = OHA_Trap("UpdateLaneAssignments", UpdateLaneAssignments, nil)

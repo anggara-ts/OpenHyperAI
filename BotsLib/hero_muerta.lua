@@ -21,15 +21,17 @@ m["pos_1"] = {
 	"item_wraith_band",
 	"item_wraith_band",
 	"item_power_treads",
-	"item_mask_of_madness",
+	-- Maelstrom, then Mjollnir: her most bought item after Power Treads (Dotabuff, last patch).
+	"item_maelstrom",
 	"item_dragon_lance",
 	"item_lesser_crit",
 	"item_hurricane_pike",
+	-- Black King Bar instead of Shadow Blade / Silver Edge (user call: improve her build). Pierce the
+	-- Veil turns her damage magical and she stands in fights; she needs the spell immunity.
+	"item_black_king_bar",
+	"item_mjollnir",
 	"item_aghanims_shard",
 	"item_greater_crit",
-	"item_invis_sword",
-	"item_silver_edge",
-	"item_butterfly",
 	"item_travel_boots",
 	"item_moon_shard",
 	"item_satanic",
@@ -176,7 +178,8 @@ function a.ConsiderQ()
 			and c.IsInRange(b, O, K)
 			and c.CanCastOnNonMagicImmune(O)
 			and c.CanCastOnTargetAdvanced(O)
-			and c.CanKillTarget(O, L, DAMAGE_TYPE_PHYSICAL)
+			-- Dead Shot is magic damage (datafeed); this used to check physical.
+			and c.CanKillTarget(O, L, DAMAGE_TYPE_MAGICAL)
 			and not c.IsSuspiciousIllusion(O)
 		then
 			return BOT_ACTION_DESIRE_HIGH, O, "Q-Kill"
@@ -195,7 +198,8 @@ function a.ConsiderQ()
 				and c.CanCastOnTargetAdvanced(P)
 				and b:WasRecentlyDamagedByHero(P, 3.0)
 			then
-				return BOT_ACTION_DESIRE_HIGH, F, "Q-Retreat"
+				-- On the hero hitting her (it used to go on her attack target F).
+				return BOT_ACTION_DESIRE_HIGH, P, "Q-Retreat"
 			end
 		end
 	end
@@ -233,9 +237,10 @@ function a.ConsiderW()
 		end
 	end
 	local V = b:FindAoELocation(true, true, T, K, R - 30, 0.8, 0)
+	-- FindAoELocation's field is "count"; the old ".cout" typo was always nil, so this never fired.
 	if
 		#U >= 2
-		and (V.cout ~= nil and V.cout >= 2)
+		and (V.count ~= nil and V.count >= 2)
 		and b:GetActiveMode() ~= BOT_MODE_LANING
 		and (
 			b:GetActiveMode() ~= BOT_MODE_RETREAT
@@ -342,11 +347,14 @@ function a.ConsiderR()
 	if c.IsWithoutTarget(b) and c.GetAttackProjectileDamageByRange(b, 800) >= b:GetHealth() then
 		return BOT_ACTION_DESIRE_MODERATE
 	end
-	if c.IsGoingOnSomeone(b) and false then
-		local I = b:GetTarget()
-		if c.IsValidHero(I) and c.IsInRange(I, b, G) then
-			if c.GetHP(I) <= 0.7 then
-				return BOT_ACTION_DESIRE_MODERATE
+	-- Engage (was switched off with "and false"): her target in attack range with 40-90% HP left,
+	-- not magic immune (Pierce the Veil turns her attacks into magic damage, datafeed).
+	if c.IsGoingOnSomeone(b) then
+		local I = c.GetProperTarget(b)
+		if c.IsValidHero(I) and c.IsInRange(I, b, G + 50) and not I:IsMagicImmune() and not c.IsSuspiciousIllusion(I) then
+			local hpI = c.GetHP(I)
+			if hpI >= 0.4 and hpI <= 0.9 then
+				return BOT_ACTION_DESIRE_HIGH
 			end
 			if
 				I:HasModifier("modifier_item_ethereal_blade_ethereal")
@@ -374,8 +382,11 @@ function a.ConsiderAS()
 	local a5 = c.GetAroundEnemyHeroList(K + 200)
 	if c.IsRetreating(b) and (b:WasRecentlyDamagedByAnyHero(3.0) or b:GetActiveModeDesire() > 0.7) then
 		for N, P in pairs(a5) do
+			-- Only an enemy already in Spectral Slug's cast range (500, game data): the list reaches 900, so
+			-- she used to walk up to 400 toward the enemy while retreating to cast it.
 			if
 				c.IsValid(P)
+				and c.IsInRange(b, P, s:GetCastRange())
 				and c.CanCastOnNonMagicImmune(P)
 				and c.CanCastOnTargetAdvanced(P)
 				and not c.IsDisabled(P)

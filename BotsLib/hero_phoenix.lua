@@ -19,10 +19,11 @@ m["pos_4"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_tranquil_boots",
-	"item_veil_of_discord",
+	"item_spirit_vessel",
+	-- Rod of Atos instead of Veil of Discord: roots the Sun Ray target so it cannot walk out.
+	"item_rod_of_atos",
 	"item_aghanims_shard",
 	"item_shivas_guard",
-	"item_force_staff",
 	"item_boots_of_bearing",
 	"item_cyclone",
 	"item_refresher",
@@ -35,9 +36,9 @@ m["pos_5"] = {
 	"item_blood_grenade",
 	"item_mage_outfit",
 	"item_ancient_janggo",
-	"item_glimmer_cape",
+	"item_spirit_vessel",
 	"item_boots_of_bearing",
-	"item_pipe",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_shivas_guard",
@@ -47,10 +48,14 @@ m["pos_5"] = {
 	"item_ultimate_scepter_2",
 }
 m["pos_2"] = {
-	"item_bristleback_outfit",
-	"item_hand_of_midas",
+	"item_tango",
+	"item_double_branches",
+	"item_bracer",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_spirit_vessel",
 	"item_radiance",
-	"item_kaya_and_sange",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_heart",
@@ -62,13 +67,15 @@ m["pos_2"] = {
 m["pos_1"] = m["pos_2"]
 m["pos_3"] = m["pos_2"]
 a["sBuyList"] = m[h]
-a["sSellList"] = { "item_heart", "item_hand_of_midas" }
+a["sSellList"] = { "item_heart", "item_magic_wand" }
 if c.Role.IsPvNMode() or c.Role.IsAllShadow() then
 	a["sBuyList"], a["sSellList"] = { "PvN_antimage" }, {}
 end
 k, l, a["sBuyList"], a["sSellList"] = c.SetUserHeroInit(k, l, a["sBuyList"], a["sSellList"])
 a["sSkillList"] = c.Skill.GetSkillList(g, k, f, l)
 a["bDeafaultAbility"] = false
+-- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
+a["LastStandSpells"] = { { name = "phoenix_supernova", kind = "none" } }
 a["bDeafaultItem"] = false
 function a.MinionThink(n)
 	e.MinionThink(n)
@@ -100,13 +107,73 @@ local N
 local O
 local P
 function a.SkillsComplement()
-	if c.CanNotUseAbility(b) then
-		return
-	end
 	local Q = d.Build(b)
 	N = Q.isEngaging
 	O = c.IsAttacking(b)
 	P = Q.hp
+	-- Sun Ray / dive stop + ray move must run while channeling.
+	-- CanNotUseAbility() is true during channels, which previously blocked stop forever
+	-- (Phoenix stood still on low HP until the ray finished).
+	E = a.ConsiderSunRayStop()
+	if E > 0 then
+		b:Action_UseAbility(t)
+		b.sun_ray_engage = false
+		b.sun_ray_heal_ally = false
+		return
+	end
+	F, G = a.ConsiderToggleMovement()
+	if F > 0 then
+		if G == "on" then
+			if not u:GetToggleState() then
+				b:Action_UseAbility(u)
+			end
+		else
+			if u:GetToggleState() then
+				b:Action_UseAbility(u)
+			end
+		end
+		return
+	end
+	-- Root the Sun Ray target with Rod of Atos so it cannot walk out of the beam. Runs here
+	-- because the busy check below is true during the ray and blocks the shared item logic.
+	local atos, atosTarget = a.ConsiderAtosOnSunRay()
+	if atos ~= nil then
+		b:Action_UseAbilityOnEntity(atos, atosTarget)
+		return
+	end
+	-- Fire Spirits work during Sun Ray too, but the busy check below blocked them for the
+	-- whole beam. During the ray, only against enemy heroes and with HP to spare (the cast
+	-- costs a share of HP on top of the ray's own cost).
+	if b:HasModifier("modifier_phoenix_sun_ray") and (P or c.GetHP(b)) > 0.35 then
+		local spiritRange = c.GetProperCastRange(false, b, q:GetCastRange())
+		local foes = b:GetNearbyHeroes(math.min(spiritRange, 1600), true, BOT_MODE_NONE) or {}
+		if #foes > 0 then
+			if a.ConsiderFireSpirits() > 0 then
+				a.LogSunRaySpirits("summon", foes[1])
+				b:Action_UseAbility(q)
+				return
+			end
+			local launch, loc = a.ConsiderFireSpiritsLaunch()
+			if launch > 0 and loc ~= nil then
+				local hit = c.GetEnemiesNearLoc(loc, q:GetSpecialValueInt("radius") + 150)
+				if hit ~= nil and #hit >= 1 then
+					a.LogSunRaySpirits("launch", hit[1])
+					b:Action_UseAbilityOnLocation(r, loc)
+					L = DotaTime()
+					return
+				end
+			end
+		end
+	end
+	y = a.ConsiderIcarusDiveStop()
+	if y > 0 then
+		b:Action_UseAbility(p)
+		b.icarus_dive_stuck = false
+		return
+	end
+	if c.CanNotUseAbility(b) then
+		return
+	end
 	z = a.ConsiderFireSpirits()
 	if z > 0 then
 		b:Action_UseAbility(q)
@@ -154,35 +221,9 @@ function a.SkillsComplement()
 		J = DotaTime()
 		return
 	end
-	y = a.ConsiderIcarusDiveStop()
-	if y > 0 then
-		b:Action_UseAbility(p)
-		b.icarus_dive_stuck = false
-		return
-	end
 	C, D = a.ConsiderSunRay()
 	if C > 0 then
 		b:Action_UseAbilityOnLocation(s, D)
-		return
-	end
-	E = a.ConsiderSunRayStop()
-	if E > 0 then
-		b:Action_UseAbility(t)
-		b.sun_ray_engage = false
-		b.sun_ray_heal_ally = false
-		return
-	end
-	F, G = a.ConsiderToggleMovement()
-	if F > 0 then
-		if G == "on" then
-			if not u:GetToggleState() then
-				b:Action_UseAbility(u)
-			end
-		else
-			if u:GetToggleState() then
-				b:Action_UseAbility(u)
-			end
-		end
 		return
 	end
 end
@@ -196,6 +237,9 @@ function a.ConsiderIcarusDive()
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Not diving now: clear the reason flags so a past retreat dive does not make the next engage
+	-- dive stop halfway (they were never reset before).
+	b.icarus_dive_kill, b.icarus_dive_engage, b.icarus_dive_stuck, b.icarus_dive_retreat = false, false, false, false
 	local U = o:GetSpecialValueInt("dash_length")
 	local V = o:GetSpecialValueInt("dash_width")
 	local W = o:GetSpecialValueInt("hp_cost_perc") / 100 * b:GetHealth()
@@ -274,9 +318,11 @@ function a.ConsiderIcarusDive()
 	return BOT_ACTION_DESIRE_NONE
 end
 function a.ConsiderIcarusDiveStop()
+	-- Stop only exists DURING the dive: the old guard returned when Phoenix had the dive modifier, so Stop
+	-- never fired and a retreat dive (an arc of dive_duration 2s) carried Phoenix back to where it started.
 	if
 		not c.CanCastAbility(p)
-		or b:HasModifier("modifier_phoenix_icarus_dive")
+		or not b:HasModifier("modifier_phoenix_icarus_dive")
 		or b:HasModifier("modifier_phoenix_supernova_hiding")
 	then
 		return BOT_ACTION_DESIRE_NONE
@@ -287,7 +333,12 @@ function a.ConsiderIcarusDiveStop()
 		end
 	end
 	if b.icarus_dive_stuck or b.icarus_dive_retreat then
+		-- Half of the 2s arc is the far end, nearest the fountain.
 		if DotaTime() > J + K / 2 then
+			if DotaTime() >= (b._diveStopLogAt or -999) then
+				b._diveStopLogAt = DotaTime() + 5
+				pcall(print, string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), c.GetHP(b)))
+			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -363,6 +414,31 @@ function a.ConsiderFireSpirits()
 			end
 		end
 	end
+	-- Laning: harass a farming enemy core (last-hits / near wave), not only when they hit an ally.
+	if c.IsInLaningPhase() and Y > 0.4 and c.GetMP(b) > 0.2 and not c.IsRetreating(b) then
+		for S, T in pairs(R) do
+			if
+				c.IsValidHero(T)
+				and c.IsCore(T)
+				and not c.IsSuspiciousIllusion(T)
+				and c.IsInRange(b, T, a1)
+				and c.CanCastOnNonMagicImmune(T)
+				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+				and not T:HasModifier("modifier_necrolyte_reapers_scythe")
+			then
+				local atk = T:GetAttackTarget()
+				local farming = atk ~= nil
+					and not atk:IsNull()
+					and atk:IsAlive()
+					and not atk:IsHero()
+					and atk:GetTeam() ~= T:GetTeam()
+				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+				if farming or nearWave then
+					return BOT_ACTION_DESIRE_HIGH
+				end
+			end
+		end
+	end
 	local a8 = b:GetNearbyLaneCreeps(math.min(a1, 1600), true)
 	if (c.IsPushing(b) or c.IsDefending(b)) and not c.IsThereNonSelfCoreNearby(1200) then
 		if
@@ -431,7 +507,8 @@ function a.ConsiderFireSpiritsLaunch()
 	local a1 = q:GetCastRange()
 	local a2 = q:GetSpecialValueInt("radius")
 	local a3 = q:GetSpecialValueInt("spirit_speed")
-	local aa = q:GetSpecialValueFloat("burn_duration")
+	-- datafeed: Fire Spirits' burn length is "duration" (4); "burn_duration" is Icarus Dive's key and read 0 here
+	local aa = q:GetSpecialValueFloat("duration")
 	local X = q:GetSpecialValueInt("damage_per_second") * aa
 	M = c.GetProperTarget(b)
 	local Z = b:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
@@ -503,6 +580,34 @@ function a.ConsiderFireSpiritsLaunch()
 					if a0.count >= 2 then
 						return BOT_ACTION_DESIRE_HIGH, a0.targetloc
 					else
+						return BOT_ACTION_DESIRE_HIGH, ac
+					end
+				end
+			end
+		end
+	end
+	-- Laning: launch spirits onto farming enemy cores.
+	if c.IsInLaningPhase() and not c.IsRetreating(b) then
+		for S, T in pairs(R) do
+			if
+				c.IsValidHero(T)
+				and c.IsCore(T)
+				and not c.IsSuspiciousIllusion(T)
+				and c.IsInRange(b, T, a1)
+				and c.CanCastOnNonMagicImmune(T)
+				and not T:HasModifier("modifier_phoenix_fire_spirit_burn")
+			then
+				local atk = T:GetAttackTarget()
+				local farming = atk ~= nil
+					and not atk:IsNull()
+					and atk:IsAlive()
+					and not atk:IsHero()
+					and atk:GetTeam() ~= T:GetTeam()
+				local nearWave = #T:GetNearbyLaneCreeps(500, true) >= 1
+				if farming or nearWave then
+					local ab = GetUnitToUnitDistance(b, T) / a3
+					local ac = c.GetCorrectLoc(T, ab)
+					if DotaTime() > L + ab + 0.25 and ab > a.GetModifierTime(T, "modifier_phoenix_fire_spirit_burn") then
 						return BOT_ACTION_DESIRE_HIGH, ac
 					end
 				end
@@ -637,30 +742,86 @@ function a.ConsiderSunRay()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- [OHA-PHOENIX] sun-ray-spirits summon|launch, at most once per 2s per kind.
+function a.LogSunRaySpirits(kind, target)
+	b._sunRaySpiritsLogAt = b._sunRaySpiritsLogAt or {}
+	if DotaTime() < (b._sunRaySpiritsLogAt[kind] or -999) then
+		return
+	end
+	b._sunRaySpiritsLogAt[kind] = DotaTime() + 2
+	pcall(print, string.format(
+		"[OHA-PHOENIX] t=%.0f sun-ray-spirits %s target=%s hp=%.2f",
+		DotaTime(),
+		kind,
+		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+		c.GetHP(b)
+	))
+end
+-- Rod of Atos and the enemy to root while an engage Sun Ray is on it, or nil.
+function a.ConsiderAtosOnSunRay()
+	if not b.sun_ray_engage or not b:HasModifier("modifier_phoenix_sun_ray") then
+		return nil
+	end
+	local T = b.sun_ray_target
+	if not c.IsValidHero(T) or T:GetTeam() == b:GetTeam() or c.IsSuspiciousIllusion(T) then
+		return nil
+	end
+	local slot = b:FindItemSlot("item_rod_of_atos")
+	if slot < 0 or slot > 5 then
+		return nil
+	end
+	local atos = b:GetItemInSlot(slot)
+	if atos == nil or not atos:IsFullyCastable() then
+		return nil
+	end
+	local range = c.GetProperCastRange(false, b, atos:GetCastRange())
+	if
+		not c.IsInRange(b, T, range)
+		or not c.CanCastOnNonMagicImmune(T)
+		or c.IsDisabled(T)
+		or T:IsRooted()
+	then
+		return nil
+	end
+	pcall(print, string.format(
+		"[OHA-PHOENIX] t=%.0f atos-sun-ray target=%s hp=%.2f dist=%d",
+		DotaTime(),
+		(string.gsub(T:GetUnitName(), "npc_dota_hero_", "")),
+		c.GetHP(T),
+		math.floor(GetUnitToUnitDistance(b, T))
+	))
+	return atos, T
+end
 function a.ConsiderSunRayStop()
 	if not c.CanCastAbility(t) or b:HasModifier("modifier_phoenix_icarus_dive") then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	if not b:HasModifier("modifier_phoenix_sun_ray") then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	local Z = c.GetAlliesNearLoc(b:GetLocation(), 1600)
 	local R = c.GetEnemiesNearLoc(b:GetLocation(), 1600)
-	local ag = P
+	local ag = P or c.GetHP(b)
+	local underFire = b:WasRecentlyDamagedByAnyHero(2.0) or a.IsBeingAttackedByRealHero(R, b)
+	-- Abort early so retreat / dive can run instead of standing still.
+	if c.IsRetreating(b) and underFire then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	if underFire and ag < 0.4 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	if ag < 0.28 then
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	if b.sun_ray_engage then
-		if
-			a.IsBeingAttackedByRealHero(R, b) and ag < 0.25 and b:WasRecentlyDamagedByAnyHero(2.0)
-			or #Z + 1 < #R
-			or #R == 0
-			or #Z == 0 and #R == 0
-		then
+		if underFire and ag < 0.35 or #Z + 1 < #R or #R == 0 or #Z == 0 and #R == 0 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if b.sun_ray_heal_ally then
-		if a.IsBeingAttackedByRealHero(R, b) and ag < 0.25 and b:WasRecentlyDamagedByAnyHero(2.0) then
+		if underFire and ag < 0.35 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-	end
-	if ag < 0.17 then
-		return BOT_ACTION_DESIRE_HIGH
 	end
 	if math.floor(DotaTime()) % 2 == 0 then
 		if c.IsValidHero(b.sun_ray_target) and not b:IsFacingLocation(b.sun_ray_target:GetLocation(), 45) then
@@ -703,8 +864,8 @@ function a.ConsiderSupernova()
 		local ao = c.GetEnemiesNearLoc(b:GetLocation(), a2 / 2 + 250)
 		if #ao >= 2 then
 			if string.find(GetBot():GetUnitName(), "phoenix") and b:HasScepter() then
-				an = c.GetAlliesNearLoc(b:GetLocation(), a1)
-				for S, al in pairs(an) do
+				local near = c.GetAlliesNearLoc(b:GetLocation(), a1)
+				for S, al in pairs(near) do
 					if
 						c.IsValidHero(al)
 						and not c.IsAttacking(al)
@@ -714,10 +875,11 @@ function a.ConsiderSupernova()
 						return BOT_ACTION_DESIRE_HIGH, al, true
 					end
 				end
-			else
-				if not (#an >= #ao + 2) then
-					return BOT_ACTION_DESIRE_HIGH, nil, false
-				end
+			end
+			-- With Scepter and no ally to save, still self-cast: the old else-branch meant a
+			-- Scepter Phoenix never cast Supernova in a fight unless an ally was low.
+			if not (#an >= #ao + 2) then
+				return BOT_ACTION_DESIRE_HIGH, nil, false
 			end
 		end
 	end

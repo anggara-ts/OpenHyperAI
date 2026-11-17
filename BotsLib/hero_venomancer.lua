@@ -8,11 +8,10 @@ local f = c.Skill.GetTalentList(b)
 local g = c.Skill.GetAbilityList(b)
 local h = c.Item.GetRoleItemsBuyList(b)
 local i = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
-local j = { { 1, 2, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local j = { { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
 local k = c.Skill.GetRandomBuild(j)
 local l = c.Skill.GetTalentBuild(i)
-local m = { "item_pipe", "item_lotus_orb", "item_heavens_halberd" }
-local n = m[RandomInt(1, #m)]
+local n = "item_team_aura"
 local o = {}
 o["pos_4"] = {
 	"item_double_tango",
@@ -24,7 +23,7 @@ o["pos_4"] = {
 	"item_arcane_boots",
 	"item_pavise",
 	"item_guardian_greaves",
-	"item_solar_crest",
+	"item_glimmer_cape",
 	"item_spirit_vessel",
 	"item_force_staff",
 	"item_aghanims_shard",
@@ -44,7 +43,7 @@ o["pos_5"] = {
 	"item_tranquil_boots",
 	"item_pavise",
 	"item_pipe",
-	"item_solar_crest",
+	"item_glimmer_cape",
 	"item_spirit_vessel",
 	"item_force_staff",
 	"item_boots_of_bearing",
@@ -146,8 +145,7 @@ function a.SkillsComplement()
 	end
 	w, x = a.ConsiderSnakebite()
 	if w > 0 then
-		c.SetQueuePtToINT(b, false)
-		b:ActionQueue_UseAbilityOnEntity(r, x)
+		b:Action_UseAbilityOnEntity(r, x)
 		return
 	end
 	u, v = a.ConsiderVenomousGale()
@@ -173,12 +171,15 @@ function a.ConsiderVenomousGale()
 	local J = q:GetSpecialValueInt("radius")
 	local K = q:GetSpecialValueInt("strike_damage")
 	local L = q:GetSpecialValueInt("tick_damage")
+	-- datafeed: Venomous Gale deals strike_damage once plus tick_damage every tick_interval (3s) over duration (15s).
+	-- The old kill check used strike * tick (25 * 10 = 250 at level 1, real total 75).
+	local nGaleTicks = math.floor(q:GetSpecialValueInt("duration") / math.max(1, q:GetSpecialValueInt("tick_interval")))
 	local M = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
 	for N, O in pairs(M) do
 		if
 			c.IsValidHero(O)
 			and c.CanCastOnNonMagicImmune(O)
-			and (c.CanKillTarget(O, K, DAMAGE_TYPE_MAGICAL) or c.CanKillTarget(O, K * L, DAMAGE_TYPE_MAGICAL))
+			and (c.CanKillTarget(O, K, DAMAGE_TYPE_MAGICAL) or c.CanKillTarget(O, K + L * nGaleTicks, DAMAGE_TYPE_MAGICAL))
 			and not c.IsSuspiciousIllusion(O)
 			and not O:HasModifier("modifier_abaddon_borrowed_time")
 			and not O:HasModifier("modifier_dazzle_shallow_grave")
@@ -345,6 +346,34 @@ function a.ConsiderPlagueWard()
 			end
 		end
 	end
+	-- Push / defend / farm: wards were only placed when engaging or retreating, so the 5s ward
+	-- (24-30 mana) never helped clear a wave or a camp. Keeps mana for Gale, Snakebite and the ult
+	-- (same reserve idiom as Snakebite), and only with no enemy hero within 1600.
+	if
+		(c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b))
+		and c.GetManaAfter(s:GetManaCost()) > c.GetManaThreshold(b, s:GetManaCost(), { q, r, t })
+		and #M == 0
+	then
+		local spot = nil
+		local X = b:GetNearbyLaneCreeps(I, true)
+		if X ~= nil and #X >= 3 then
+			spot = c.GetCenterOfUnits(X)
+		elseif c.IsFarming(b) and c.IsValid(D) and D:GetTeam() == TEAM_NEUTRAL and c.IsInRange(b, D, I) then
+			spot = D:GetLocation()
+		end
+		if spot ~= nil then
+			if DotaTime() >= (b._wardLogAt or -999) then
+				b._wardLogAt = DotaTime() + 15
+				pcall(print, string.format(
+					"[OHA-VENOMANCER] t=%.0f plague-ward clear creeps=%d farm=%s",
+					DotaTime(),
+					X ~= nil and #X or 0,
+					tostring(c.IsFarming(b))
+				))
+			end
+			return BOT_ACTION_DESIRE_HIGH, spot, false
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, 0, false
 end
 function a.ConsiderNoxiousPlague()
@@ -358,10 +387,12 @@ function a.ConsiderNoxiousPlague()
 		local Q = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
 		for N, O in pairs(Q) do
 			if
+				-- Noxious Plague is damage and a slow, not a disable: a stunned target is a good target, so
+				-- "not disabled" is dropped. Linken's check added: an 80-100s ult must not pop a sphere.
 				c.IsValidHero(O)
 				and c.CanCastOnNonMagicImmune(O)
+				and c.CanCastOnTargetAdvanced(O)
 				and not c.IsSuspiciousIllusion(O)
-				and not c.IsDisabled(O)
 				and not O:HasModifier("modifier_enigma_black_hole_pull")
 				and not O:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not O:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -386,19 +417,25 @@ function a.ConsiderSnakebite()
 	if not c.CanCastAbility(r) then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- A queued bite clears his move order, and lane, farm, and retreat then wait
+	-- on that queue. Cast only when the target is already in range.
+	-- Real cast range (600), not GetProperCastRange's +200: the comment above wants the target
+	-- already in range, and the +200 made him walk forward to bite.
 	local I = r:GetCastRange()
 	local a5 = r:GetManaCost()
 	local a6 = c.GetManaAfter(a5)
 	local a7 = c.GetManaThreshold(b, a5, { q, s, t })
-	if c.IsGoingOnSomeone(b) then
+	local hitByHero = b:WasRecentlyDamagedByAnyHero(1.5)
+	local hitByCreep = b:WasRecentlyDamagedByCreep(1.5)
+	if c.IsGoingOnSomeone(b) and not c.IsRetreating(b) then
 		if
 			c.IsValidHero(D)
 			and c.CanBeAttacked(D)
-			and c.IsInRange(b, D, I + 300)
+			and c.IsInRange(b, D, I)
 			and c.CanCastOnNonMagicImmune(D)
 			and c.CanCastOnTargetAdvanced(D)
-			and not c.IsDisabled(D)
-			and not D:IsDisarmed()
+			-- Snakebite is only damage over time (npc data: base_damage + tick_damage, no disable), so
+			-- the old "not disabled / not disarmed" checks only skipped stunned targets.
 			and not D:HasModifier("modifier_abaddon_borrowed_time")
 			and not D:HasModifier("modifier_dazzle_shallow_grave")
 			and not D:HasModifier("modifier_oracle_false_promise_timer")
@@ -407,28 +444,13 @@ function a.ConsiderSnakebite()
 			return BOT_ACTION_DESIRE_HIGH, D
 		end
 	end
-	if c.IsRetreating(b) and not c.IsRealInvisible(b) then
-		local M = b:GetNearbyHeroes(I, true, BOT_MODE_NONE)
-		for N, O in pairs(M) do
-			if
-				c.IsValidHero(O)
-				and c.CanBeAttacked(O)
-				and c.IsInRange(b, O, I)
-				and c.CanCastOnNonMagicImmune(O)
-				and c.CanCastOnTargetAdvanced(O)
-				and not c.IsDisabled(O)
-				and not O:IsDisarmed()
-				and b:WasRecentlyDamagedByHero(O, 2.0)
-			then
-				return BOT_ACTION_DESIRE_HIGH, O
-			end
-		end
-	end
-	if (c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b)) and F and a6 > a7 then
+	if (c.IsPushing(b) or c.IsDefending(b) or c.IsFarming(b)) and F and a6 > a7 and not hitByHero and not hitByCreep then
 		if
 			c.IsValid(D)
 			and c.CanBeAttacked(D)
+			and c.IsInRange(b, D, I)
 			and not D:IsBuilding()
+			and not D:IsHero()
 			and not c.CanKillTarget(D, b:GetAttackDamage() * 3.5, DAMAGE_TYPE_PHYSICAL)
 		then
 			return BOT_ACTION_DESIRE_HIGH, D

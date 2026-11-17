@@ -25,22 +25,27 @@ Customize.Enable = true
 --[[
 MatchTrace — live decision/debug logging for bot development.
 
-Enable:  Customize.MatchTrace = true   (default here)
+Enable:  Customize.MatchTrace = true
 Disable: Customize.MatchTrace = false
 
 Verbose heartbeats every ~15s (mode/hp/gold/xy). Set false for quieter logs (~30s):
   Customize.MatchTraceVerbose = true
 
-Where logs go (appended during the match, plus an "end" marker after the game):
-  C:\Users\<you>\Documents\OpenHyperAI\match-trace-p<playerId>.log
-  Fallback: next to the bot scripts if Documents write fails.
-
-Also prints the same lines to the Dota console as [OHA-DEV ...].
+File writes are OFF by default (Dota sandbox blocks them). Console [OHA-DEV ...] still works
+when MatchTrace is true. Set MatchTraceWriteFile = true only if you intentionally want disk logs.
 Logged events include: mode changes, stuck, deaths, item use, buys (wards/smoke),
 ward plants, farm exits, smoke skip reasons, periodic beats.
+
+FPS / CPU: set MatchTracePerf = true to sample RealTime() costs of ItemUsageThink,
+SkillsComplement, and SafeCall-wrapped mode GetDesire/Think. Console shows spikes >2.5ms
+and a top-N summary every ~10s as [OHA-PERF ...].
 --]]
-Customize.MatchTrace = true
-Customize.MatchTraceVerbose = true
+Customize.MatchTrace = false
+Customize.MatchTraceVerbose = false
+Customize.MatchTraceWriteFile = false
+-- RealTime() CPU profiler: prints [OHA-PERF spike] / [OHA-PERF top] to console.
+-- Does not need MatchTrace=true. Use to find which bot Think paths tank FPS.
+Customize.MatchTracePerf = false
 
 -- Set the localization code to make bots speak the specific language when possible (not guaranteed to 100% localized).
 -- Currently supprot: "en" for "English", "zh" for "中文", "ru" for Russian, "ja" for Japanese
@@ -56,12 +61,31 @@ Customize.Ban = {
 }
 
 --[[
+Debug force-picks (ally / enemy) — preferred for debugging specific matchups.
+
+Ally = human player's team (Radiant if no human). Enemy = the other side.
+Put any number of internal hero names (0–5). Remaining slots pick freely.
+Empty tables = off (falls back to Radiant_Heros / Dire_Heros below).
+Examples:
+  Customize.Debug_Ally_Heros = { "npc_dota_hero_phoenix" }
+  Customize.Debug_Enemy_Heros = { "npc_dota_hero_sniper", "npc_dota_hero_axe" }
+Hero name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
+--]]
+Customize.Debug_Ally_Heros = {
+	-- "npc_dota_hero_phoenix",
+}
+Customize.Debug_Enemy_Heros = {
+	-- "npc_dota_hero_sniper",
+}
+
+--[[
 1. To pick heroes for the Radiant bots. You have to use hero's internal name.
 2. Hero internal name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
 3. Don't need to provide a value for all 5 bots, any empty/missing value will fallback to a Random value.
 4. The position is ranked by the order of the names you put in the below list, pos 1 - 5, from top to down.
 5. There are sample team picks in Appendix section below. 
 6. Check Appendix to ensure you DO NOT pick more than 1 "weak" heroes in a team for your game experience.
+7. Ignored for a side when the matching Debug_Ally_Heros / Debug_Enemy_Heros list above is non-empty.
 --]]
 Customize.Radiant_Heros = {
 	"Random",
@@ -131,33 +155,13 @@ Customize.Force_Group_Push_Level = 1
 -- 1 is default, bot may choose to farm more in game. 2 is balanced for push vs farm. 3 is almost no farm, all push.
 Customize.Push_Frequency = 1
 
--- The Enhanced Fretbots mode settings:
--- For more about Fretbots mode: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/68
--- Note: these settings below will override the pre-defind settings in Fretbots folder.
-Customize.Fretbots = {
-	-- Default difficulty, a number between: [0, 10]. Used when nobody votes.
-	-- 0 is the lightest: almost no extra gold or XP, and no bonuses when a bot dies.
-	-- 1 is a small edge. 2 pushes a carry toward roughly 300 GPM and feels heavy.
-	-- 5 is about 1.2x the bonus and 10 is 2x. A chat vote still overrides this.
-	Default_Difficulty = 1,
+-- Fretbots settings moved to the optional Fretbots plugin (branch plugin-fretbots, Customize/fretbots.lua).
 
-	-- Default ally bots bonus scale comparing to enemy bots, a number between: [0, 1]
-	Default_Ally_Scale = 0.5,
-
-	-- Set whether or not allowing the team to vote for difficulty. If false, will directly apply the default difficulty.
-	Allow_To_Vote = true,
-
-	-- Set to false disables all sounds from Fretbots mode
-	Play_Sounds = true,
-
-	-- Set to play chatwheel taunt sounds when human player died
-	Player_Death_Sound = true,
-}
-
--- Make bots think less, 0: fully think through, 1 to 10: think less and less frequently.
--- Bots can become slow or dumb in reaction and decision making if you set this value to a higher number.
--- When doing Local Host, you can potentially improve PC performance (FPS) by setting this to 1 to 10, which sacrifices some bot IQ/performance.
--- This won't be very effective for FPS improvement because Valve has a lot of compute on their side that your PC have to handle for Local Hosting.
+-- Make bots think less, 0: fully think through every tick, 1 to 10: sample heavy item/ability
+-- rescans less often when already attacking a valid target (safe: ~every 3 frames * ThinkLess).
+-- Urgent cases (no target, low HP, recently damaged, tower hits, 3+ nearby enemies) still run every tick.
+-- Higher values improve FPS a bit but can make bots feel slower/dumber.
+-- Valve mode GetDesire() still runs every frame for all modes — that part cannot be sampled away.
 Customize.ThinkLess = 1
 
 return Customize

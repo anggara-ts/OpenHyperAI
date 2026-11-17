@@ -1,763 +1,521 @@
 -- Shared bot system: ward.
 local a = {}
 local b = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local c = 1600
-local d = Vector(-249.706375, -1046.293945)
-local e = Vector(-1615.225952, -122.014526)
-local f = Vector(355.807343, -1645.619995)
-local g = Vector(1638.469482, -4640.707031)
-local h = Vector(-4014.073975, 2569.298340)
-local i = Vector(-7552.072266, 3967.816162)
-local j = Vector(-1615.225952, -122.014526)
-local k = Vector(-868.482300, -783.444824)
-local l = Vector(3097.361328, -4069.593018)
-local m = Vector(7614.873047, -5381.669434)
-local n = Vector(-471.729309, 360.174347)
-local o = Vector(1141.866211, -458.288147)
-local p = Vector(-926.699951, 1274.039062)
-local q = Vector(-1472.750732, 3815.509766)
-local r = Vector(-4310.856445, 3639.681885)
-local s = Vector(-7490.370117, 4741.802246)
-local t = Vector(-2159.649414, 1987.394531)
-local u = Vector(1141.866211, -458.288147)
-local v = Vector(3810.311523, -4562.782227)
-local w = Vector(7512.600586, -4630.147461)
-local x =
-	{ TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1, TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2, TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
--- Late general spots (after 6:00). role: defend / contest / offense.
-local y = {
-	-- Radiant defend (home jungle / HG approaches)
-	{ location = Vector(-4800.000000, -4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-5500.000000, -1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-2200.000000, -1500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(200.000000, -4600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-4200.000000, -3900.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-6200.000000, -5200.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(1770.320068, -3297.484619, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-2590.959717, 808.961487, 0.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	-- Contested (river / mid / Rosh approaches)
-	{ location = Vector(-304.583435, -1010.216370, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(-416.000000, 224.000000, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(-2400.000000, 1800.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(2400.000000, -1800.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(1067.144287, -2554.027832, 0.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(-1575.356445, 2015.812500, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	-- Radiant offense (Dire jungle / HG approaches)
-	{ location = Vector(-6879.606934, 7948.673340, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-6223.481445, 5977.364258, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(6618.658203, -3122.270264, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(4200.000000, 3900.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(5500.000000, 1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(2200.000000, 1500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-100.000000, 4600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(4800.000000, 4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(6987.828613, -7517.367188, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(5940.784668, -6109.887695, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
+-- Eye cliffs pinged in the current map. Ground point under the cliff, used after that lane's T1 falls.
+local UBER_WALK = 7000
+local OBS_GAP = 1500
+local UberWardSpots = {
+	{ location = Vector(1015, 3593, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "dire" },
+	{ location = Vector(4612, 767, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "dire" },
+	{ location = Vector(-1287, -4329, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "radiant" },
+	{ location = Vector(-4348, -1008, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "radiant" },
 }
-local z = {
-	-- Dire defend (home jungle / HG approaches)
-	{ location = Vector(4800.000000, 4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(5500.000000, 1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(2200.000000, 1500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-200.000000, 4600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(4200.000000, 3900.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(6200.000000, 5200.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-6879.606934, 7948.673340, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	{ location = Vector(-6633.713867, 2726.299316, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "defend" },
-	-- Contested
-	{ location = Vector(-514.736816, 293.893494, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(2472.568359, -1176.064941, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(-1575.356445, 2015.812500, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(-2400.000000, 1800.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(2400.000000, -1800.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	{ location = Vector(1067.144287, -2554.027832, 0.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "contest" },
-	-- Dire offense (Radiant jungle / HG approaches)
-	{ location = Vector(5940.784668, -6109.887695, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(6987.828613, -7517.367188, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-4800.000000, -4500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-5500.000000, -1600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-2200.000000, -1500.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(200.000000, -4600.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-4200.000000, -3900.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-6200.000000, -5200.000000, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(1770.320068, -3297.484619, 256.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
-	{ location = Vector(-6223.481445, 5977.364258, 128.000000), plant_time_obs = 0, plant_time_sentry = 0, role = "offense" },
+local RoshSpots = {
+	{ location = Vector(-3379, 743, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
+	{ location = Vector(1230, -3082, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
+	{ location = Vector(-1700, 2728, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
+	{ location = Vector(2588, -1248, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
 }
-local A = {
-	[TOWER_TOP_1] = {
-		[1] = { location = Vector(-6309.000000, 5671.123535), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-6726.650879, 3244.411621), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-3311.859619, 4315.231445), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-2300.783936, 6745.654297, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-4330.303223, 7147.556152, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-2334.944336, 4638.333008, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_1] = {
-		[1] = { location = Vector(2255.840820, -1892.881836), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-416.000000, 224.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-2606.656250, 1702.770752), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(1067.144287, -2554.027832), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_1] = {
-		[1] = { location = Vector(5365.699707, -4870.313965), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(5870.312500, -7174.024414), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(3097.361328, -4069.593018), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(1824.772705, -3358.895996), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(7688.733398, -1536.282471, 527.996094), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(4541.222656, -1810.860840, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_2] = {
-		[1] = { location = Vector(-7923.261719, 1820.198730), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-4199.289062, 1328.263062), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-4245.528320, 357.413574), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-4562.793457, 1873.175537), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-7579.524902, 493.309631), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-3380.673828, 672.909180), plant_time_obs = 0, plant_time_sentry = 0 },
-		[8] = { location = Vector(-8416.000000, 2272.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[9] = { location = Vector(-5152.000000, 2336.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[10] = { location = Vector(-7553.846680, -1063.322388, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_2] = {
-		[1] = { location = Vector(-1288.532471, -4351.110352), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-995.484375, -2654.527832), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(104.285484, -3576.448242), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-3322.988037, -200.036987), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-2458.159668, -1210.825439), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-4245.528320, 357.413574), plant_time_obs = 0, plant_time_sentry = 0 },
-		[8] = { location = Vector(795.113586, -3576.661621, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_2] = {
-		[1] = { location = Vector(2258.137207, -7110.736328), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(2049.426514, -8427.432617), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(2033.350830, -4917.041992), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-682.876953, -7909.373047), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(361.339355, -4027.959473), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_3] = {
-		[1] = { location = Vector(-7497.418457, -1303.780396), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-5464.000000, -2335.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-6578.378906, -3101.990479), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-5014.221191, -1732.490723), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-5915.992676, -3089.985596), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-5458.211426, -3371.772217, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_3] = {
-		[1] = { location = Vector(-4377.171387, -3911.893555), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-3888.701904, -1594.625244), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-2414.402100 - 3802.327637), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-2706.345459, -1664.330566), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-1288.418091, -4359.833496), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-3871.644043, -4988.541016, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_3] = {
-		[1] = { location = Vector(-3628.625244, -6110.583496), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-2515.698975, -7325.979492), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-1978.637329, -6093.620117), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-3128.099609, -4716.803223), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-3532.540771, -6960.055176), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-3871.644043, -4988.541016, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
+local HuntSpots = {
+	{ location = Vector(-1921, 4464, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "dire" },
+	{ location = Vector(3796, -622, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "dire" },
+	{ location = Vector(36, -3778, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "radiant" },
+	{ location = Vector(-4876, 624, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "radiant" },
 }
-local B = {
-	[TOWER_TOP_1] = {
-		[1] = { location = Vector(-6141.217773, 7387.221680), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-1520.533691, 7675.010742), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-2108.795898, 4265.250000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-4082.341309, 7135.104492), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-4620.397461, 4879.798340), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-2384.553955, 4859.611328), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-2085.847412, 3290.809814), plant_time_obs = 0, plant_time_sentry = 0 },
-		[8] = { location = Vector(-5648.824219, 5342.285645), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_1] = {
-		[1] = { location = Vector(-501.130188, 2374.691895), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(857.109497, 1693.968018), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(3006.320068, -347.194275), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(3454.585449, 965.981628), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(4564.609375, 1342.290283), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-64.840370, 1206.849365), plant_time_obs = 0, plant_time_sentry = 0 },
-		[8] = { location = Vector(-876.541870, 3462.283203), plant_time_obs = 0, plant_time_sentry = 0 },
-		[9] = { location = Vector(929.558411, -178.148193), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_1] = {
-		[1] = { location = Vector(4719.973145, -1828.040405), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(7695.852539, -1561.971436), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(5092.339844, -366.790771), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(3880.949219, -879.248657), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(8427.142578, -704.303223), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(4330.230469, -3323.803223), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(2822.328369, -1504.332764), plant_time_obs = 0, plant_time_sentry = 0 },
-		[8] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[9] = { location = Vector(8137.696289, 415.701904), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_2] = {
-		[1] = { location = Vector(1019.997620, 3568.473633), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-707.014709, 7638.974609), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(3045.438477, 5003.273438), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(2250.127686, 4692.457520), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(429.645172, 4669.281250), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(1767.005737, 7348.324707), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_2] = {
-		[1] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(3429.349609, 958.148438), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(1015.765564, 3570.294434), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(4578.642578, 2904.757324), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(3382.799316, 4072.131836), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(2671.740967, 1842.921387), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_2] = {
-		[1] = { location = Vector(8137.696289, 415.701904), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(5499.228027, 2687.067871), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(5367.971680, 1197.417236), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_3] = {
-		[1] = { location = Vector(2239.004395, 4694.355469), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(1936.913818, 7349.268555), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(4439.182617, 5550.124512), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_3] = {
-		[1] = { location = Vector(4493.447754, 3960.869385), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(5898.282715, 5387.940430), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(2878.860840, 3631.565918), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_3] = {
-		[1] = { location = Vector(6335.169922, 4065.608643), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(5338.760254, 2737.025879), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-}
-local C = {
-	[TOWER_TOP_1] = {
-		[1] = { location = Vector(-7645.819824, 4469.880371), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-5775.200195, 2600.540527), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-3994.346924, 3636.463135), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-7932.318848, 1798.319336, 535.996094), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-4765.358887, 1978.797485, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_1] = {
-		[1] = { location = Vector(-917.716919, 1233.115723), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(2769.960693, -1521.609985), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-1679.397339, 3541.931396), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-2400.793457, 1431.276611), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(1631.129028, -604.961731), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_1] = {
-		[1] = { location = Vector(4318.670410, -3305.405518), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(4670.166504, -1949.093018), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(6391.976074, -4914.761230), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(1863.126099, -6671.102539, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(2048.552246, -4891.520020, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(3949.502197, -7155.229492, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_2] = {
-		[1] = { location = Vector(-1679.397339, 3541.931396), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-1531.722900, 7651.007324), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-4283.493164, 6410.409668), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-2553.300049, 4773.497070), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-2428.735596, 6744.824219), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(1559.554199, 6069.459961, 128.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(206.604904, 4382.747559, 134.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_2] = {
-		[1] = { location = Vector(3335.353760, -207.220703), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(1029.402222, 3571.081055), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-1679.397339, 3541.931396), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(279.710938, 1104.007568), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(2844.631592, -1560.403564), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(1026.262451, 3588.000977, 399.996094), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(4607.770996, 770.798767, 527.996094), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_2] = {
-		[1] = { location = Vector(7695.852539, -1561.971436), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(8432.747070, -379.338318), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(6716.602539, -2427.237305), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(3433.443604, -733.166626), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(7761.000977, 474.206818, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_3] = {
-		[1] = { location = Vector(3126.187500, 5750.492676), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(1029.402222, 3571.081055), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(450.604736, 4730.952148), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(605.637573, 6996.875977), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(2174.007812, 4253.548828), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(3301.364990, 4615.956055, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_3] = {
-		[1] = { location = Vector(4041.562256, 3465.514893), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(1029.402222, 3571.081055), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(2806.711182, 1943.263550), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(5131.353516, 2881.154053, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_3] = {
-		[1] = { location = Vector(6344.555176, 2640.419678), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(4613.312500, 755.917847), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(8107.012695, 457.608398), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(6536.082520, -1299.558472), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(5131.353516, 2881.154053, 256.000000), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-}
-local D = {
-	[TOWER_TOP_1] = {
-		[1] = { location = Vector(-4006.174316, 269.627747), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-7923.261719, 1820.198730), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-7918.682129, 56.263672), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_1] = {
-		[1] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-3542.703857, -509.485474), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-830.539551, -2626.359131), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-1288.532471, -4351.110352), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_1] = {
-		[1] = { location = Vector(2101.796875, -4957.856445), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(3906.684570, -7174.484375), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(3533.874512, -7856.141113), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(2259.454590, -7111.220215), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(1694.457642, -5533.504395), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(2050.627686, -8429.074219), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_2] = {
-		[1] = { location = Vector(-5217.980957, -1648.555908), plant_time_obs = 0, plant_time_sentry = 0 },
-		[1] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-7579.280762, -1119.693848), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-5685, -3139), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_MID_2] = {
-		[1] = { location = Vector(-1288.532471, -4351.110352), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-4334.572266, -1036.464844), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-4300.054199, -1757.872803), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-3788.625732, -4484.107910), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-5168.498535, -3407.188477), plant_time_obs = 0, plant_time_sentry = 0 },
-		[6] = { location = Vector(-5347.964844, -2573.015381), plant_time_obs = 0, plant_time_sentry = 0 },
-		[7] = { location = Vector(-2470.028320, -3950.313232), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_2] = {
-		[1] = { location = Vector(-1288.532471, -4351.110352), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-1954.655029, -7911.340820), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-3542.787598, -6944.415527), plant_time_obs = 0, plant_time_sentry = 0 },
-		[4] = { location = Vector(-3612.549805, -5252.114258), plant_time_obs = 0, plant_time_sentry = 0 },
-		[5] = { location = Vector(-2632.111328, -5009.849609), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_TOP_3] = { [1] = { location = Vector(-6401, -4286, 256), plant_time_obs = 0, plant_time_sentry = 0 } },
-	[TOWER_MID_3] = {
-		[1] = { location = Vector(-4867.748047, -4425.016113), plant_time_obs = 0, plant_time_sentry = 0 },
-		[3] = { location = Vector(-6194.468262, -5706.500488), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
-	[TOWER_BOT_3] = {
-		[1] = { location = Vector(-4876.913574, -5980.851562), plant_time_obs = 0, plant_time_sentry = 0 },
-		[2] = { location = Vector(-2632.111328, -5009.849609), plant_time_obs = 0, plant_time_sentry = 0 },
-	},
+-- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
+local GateSpots = {
+	{ location = Vector(-7421, 4238, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
+	{ location = Vector(7309, -4419, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
+	{ location = Vector(-6244, 7147, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
+	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
 }
 local E = {
-	[1] = { location = h, plant_time_obs = 0, plant_time_sentry = 0 },
-	[2] = { location = i, plant_time_obs = 0, plant_time_sentry = 0 },
-	[3] = { location = j, plant_time_obs = 0, plant_time_sentry = 0 },
-	[4] = { location = k, plant_time_obs = 0, plant_time_sentry = 0 },
-	[5] = { location = l, plant_time_obs = 0, plant_time_sentry = 0 },
-	[6] = { location = m, plant_time_obs = 0, plant_time_sentry = 0 },
+	-- Radiant mid: the user's safe spots, pinged in game 022 (2026-11-16), on Radiant's side of the
+	-- river so the support does not cross it. Replace the Dire bank of the top rune (-627, 850),
+	-- where Mirana was killed walking back (game 020 and 021), and (-245, -996). safe = true lets
+	-- them through the "early wards go on the enemy side" filter.
+	[1] = { location = Vector(-1386, -171, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[2] = { location = Vector(-303, -1001, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[3] = { location = Vector(-882, -1000, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
+	[4] = { location = Vector(6113, -3427, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
+	[5] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 local F = {
-	[1] = { location = r, plant_time_obs = 0, plant_time_sentry = 0 },
-	[2] = { location = s, plant_time_obs = 0, plant_time_sentry = 0 },
-	[3] = { location = t, plant_time_obs = 0, plant_time_sentry = 0 },
-	[4] = { location = u, plant_time_obs = 0, plant_time_sentry = 0 },
-	[5] = { location = v, plant_time_obs = 0, plant_time_sentry = 0 },
-	[6] = { location = w, plant_time_obs = 0, plant_time_sentry = 0 },
+	-- Dire mid: the user's safe spots, pinged in game 022 (2026-11-16): (-501, 696), (12, 257) and
+	-- (632, -281), on Dire's side of the river. Replace the Radiant bank of the bottom rune
+	-- (44, -1232; it planted, but across the river) and (-627, 850). safe = true lets them through
+	-- the "early wards go on the enemy side" filter.
+	[1] = { location = Vector(-501, 696, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[2] = { location = Vector(12, 257, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[3] = { location = Vector(632, -281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
+	[4] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
+	[5] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
 }
 function a.GetEarlyGameWardSpots()
 	return GetTeam() == TEAM_RADIANT and E or F
 end
-local G = nil
-local H = nil
 function a.GetGameStartWardSpots()
-	if G == nil then
-		local I = { d, e, f }
-		local J = I[RandomInt(1, #I)]
-		G = {
-			[1] = { location = J, plant_time_obs = 0, plant_time_sentry = 0 },
-			[2] = { location = g, plant_time_obs = 0, plant_time_sentry = 0 },
-		}
+	return a.GetEarlyGameWardSpots()
+end
+-- A spot next to an enemy T2/T3, or deeper than a living T1, gets the ward killed and the support ganked.
+local function EnemyWardTooDeep(loc)
+	local enemy = GetOpposingTeam()
+	local gates = {
+		{ TOWER_TOP_2, TOWER_TOP_1 },
+		{ TOWER_MID_2, TOWER_MID_1 },
+		{ TOWER_BOT_2, TOWER_BOT_1 },
+		{ TOWER_TOP_3, TOWER_TOP_2 },
+		{ TOWER_MID_3, TOWER_MID_2 },
+		{ TOWER_BOT_3, TOWER_BOT_2 },
+		{ TOWER_TOP_3, TOWER_TOP_1 },
+		{ TOWER_MID_3, TOWER_MID_1 },
+		{ TOWER_BOT_3, TOWER_BOT_1 },
+	}
+	for i = 1, #gates do
+		local inner = GetTower(enemy, gates[i][1])
+		local outer = GetTower(enemy, gates[i][2])
+		if inner ~= nil and outer ~= nil and GetUnitToLocationDistance(inner, loc) <= 1600 then
+			return true
+		end
 	end
-	if H == nil then
-		local I = { n, o, p }
-		local J = I[RandomInt(1, #I)]
-		H = {
-			[1] = { location = J, plant_time_obs = 0, plant_time_sentry = 0 },
-			[2] = { location = q, plant_time_obs = 0, plant_time_sentry = 0 },
-		}
+	local ancient = GetAncient(enemy)
+	if ancient == nil then
+		return false
 	end
-	return GetTeam() == TEAM_RADIANT and G or H
+	local fronts = { TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1 }
+	local nearest = nil
+	local nearestDist = 3200
+	for i = 1, #fronts do
+		local t1 = GetTower(enemy, fronts[i])
+		if t1 ~= nil then
+			local dist = GetUnitToLocationDistance(t1, loc)
+			if dist < nearestDist then
+				nearestDist = dist
+				nearest = t1
+			end
+		end
+	end
+	if nearest == nil then
+		return false
+	end
+	local spotDepth = GetUnitToLocationDistance(ancient, loc)
+	local towerDepth = GetUnitToUnitDistance(ancient, nearest)
+	return spotDepth + 500 < towerDepth
+end
+local function DropDeepEnemySpots(list)
+	local kept = {}
+	for i = 1, #list do
+		local spot = list[i]
+		if spot.role == "early" then
+			kept[#kept + 1] = spot
+		elseif spot.location ~= nil and not EnemyWardTooDeep(spot.location) then
+			kept[#kept + 1] = spot
+		end
+	end
+	return kept
+end
+-- Home/defend ground spots sit on our T3. Skip them until that lane's T1 is gone,
+-- unless enemies are already on the high ground (handled by the caller).
+local function HomeWardTooEarly(loc)
+	local team = GetTeam()
+	local lanes = {
+		{ TOWER_TOP_1, TOWER_TOP_3 },
+		{ TOWER_MID_1, TOWER_MID_3 },
+		{ TOWER_BOT_1, TOWER_BOT_3 },
+	}
+	local sawTower = false
+	local laneOpen = false
+	for i = 1, #lanes do
+		local t1 = GetTower(team, lanes[i][1])
+		local t3 = GetTower(team, lanes[i][2])
+		if t1 ~= nil or t3 ~= nil then
+			sawTower = true
+		end
+		if t1 == nil and t3 ~= nil then
+			laneOpen = true
+		end
+		if t1 ~= nil and t3 ~= nil and GetUnitToLocationDistance(t3, loc) <= 1800 then
+			return true
+		end
+	end
+	return not sawTower or not laneOpen
+end
+function a.WalkLimit(spot)
+	if spot and spot.role == "uber" then
+		return UBER_WALK
+	end
+	return 4000
+end
+local function ObsFree(spot)
+	return spot ~= nil
+		and spot.location ~= nil
+		and not a.IsOtherWardClose(spot.location, "npc_dota_observer_wards", OBS_GAP, true, false)
+		and not a.AllyGoingTo(spot.location, OBS_GAP)
+		and not a.IsThereEnemySentry(spot.location, 1100)
+		and (spot.plant_time_obs == 0 or DotaTime() > spot.plant_time_obs + 360)
+end
+local function SentryFree(spot)
+	return spot ~= nil
+		and spot.location ~= nil
+		-- Sentry True Sight 1050 (game files): spots within 1200 of an allied sentry are skipped,
+		-- more than the radius, so planted sentries never overlap. Towers: IsLocationHaveTrueSight.
+		and not a.IsOtherWardClose(spot.location, "npc_dota_sentry_wards", 1200, true, false)
+		and not b.Site.IsLocationHaveTrueSight(spot.location)
+		and (spot.plant_time_sentry == 0 or DotaTime() > spot.plant_time_sentry + 360)
+end
+-- Towers have loaded and at least one enemy tier-1 is gone. All-nil is not "all down".
+local function EnemyOuterDown()
+	local enemy = GetOpposingTeam()
+	local lanes = { TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1 }
+	local alive = 0
+	local loaded = GetTower(enemy, TOWER_TOP_2) ~= nil
+		or GetTower(enemy, TOWER_MID_2) ~= nil
+		or GetTower(enemy, TOWER_BOT_2) ~= nil
+		or GetTower(enemy, TOWER_TOP_3) ~= nil
+		or GetTower(enemy, TOWER_MID_3) ~= nil
+		or GetTower(enemy, TOWER_BOT_3) ~= nil
+	for i = 1, #lanes do
+		if GetTower(enemy, lanes[i]) ~= nil then
+			alive = alive + 1
+			loaded = true
+		end
+	end
+	return loaded and alive < #lanes
+end
+local function TeamSide()
+	return GetTeam() == TEAM_RADIANT and "radiant" or "dire"
+end
+-- Cliffs, hunt spots and gates on the enemy side sit in their jungle. River banks do not. A lane
+-- spot past the middle of the map is toward their towers.
+local function NeedsCover(spot)
+	return spot.role == "uber" or spot.role == "hunt" or spot.role == "lane" or spot.deep == true
+end
+-- Lane spots (user call: after towers fall, bots never warded along the lane paths, only the fixed
+-- spots). For a lane where a tier-1 tower (either team's) is down, after 10:00: a point on the lane
+-- path a little ahead of our wave, toward the enemy, so the vision follows the front both ways.
+-- Positions come from the game's lane data (GetLaneFrontLocation with a forward offset, as push.lua
+-- uses it backward with -500), so they are on walkable ground on the lane path. One spot table per
+-- lane is kept and moved only when the front has moved 900+, so a planted or given-up mark stays.
+local LANE_AHEAD = 900
+local laneSpots = {}
+-- Within 1200 of a living enemy tower (tower attack range 700, plus the walk in to plant).
+local ENEMY_TOWER_GAP = 1200
+local function NearEnemyTower(loc)
+	local enemy = GetOpposingTeam()
+	for _, id in ipairs({
+		TOWER_TOP_1, TOWER_TOP_2, TOWER_TOP_3, TOWER_MID_1, TOWER_MID_2, TOWER_MID_3,
+		TOWER_BOT_1, TOWER_BOT_2, TOWER_BOT_3, TOWER_BASE_1, TOWER_BASE_2,
+	}) do
+		local t = GetTower(enemy, id)
+		if t ~= nil and GetUnitToLocationDistance(t, loc) <= ENEMY_TOWER_GAP then
+			return true
+		end
+	end
+	return false
+end
+local function LaneTier1Down(lane)
+	local t1 = lane == LANE_TOP and TOWER_TOP_1 or lane == LANE_MID and TOWER_MID_1 or TOWER_BOT_1
+	return GetTower(TEAM_RADIANT, t1) == nil or GetTower(TEAM_DIRE, t1) == nil
+end
+local function LaneSpots()
+	local out = {}
+	if DotaTime() < 10 * 60 then
+		return out
+	end
+	local fountain = b.GetTeamFountain and b.GetTeamFountain() or nil
+	local enemyFountain = b.GetEnemyFountain and b.GetEnemyFountain() or nil
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		if LaneTier1Down(lane) then
+			local loc = GetLaneFrontLocation(GetTeam(), lane, LANE_AHEAD)
+			-- Not under an enemy tower (user question: a wave pushing their T2 put the spot in its
+			-- range; the deep filter only covers towers that still have an outer tower in front).
+			-- Pull back to 300 ahead of the wave, else no lane spot for now.
+			if loc ~= nil and NearEnemyTower(loc) then
+				loc = GetLaneFrontLocation(GetTeam(), lane, 300)
+				if loc ~= nil and NearEnemyTower(loc) then
+					loc = nil
+				end
+			end
+			-- Not inside either base: a front pushed to a barracks is a siege, not a ward spot.
+			local inBase = fountain ~= nil and enemyFountain ~= nil and loc ~= nil
+				and (b.GetDistance(loc, fountain) < 4000 or b.GetDistance(loc, enemyFountain) < 4000)
+			if loc ~= nil and not inBase then
+				local cur = laneSpots[lane]
+				if cur == nil or b.GetDistance(cur.location, loc) >= 900 then
+					local ours = fountain ~= nil and enemyFountain ~= nil
+						and b.GetDistance(loc, fountain) < b.GetDistance(loc, enemyFountain)
+					local ourSide = TeamSide()
+					local side = ours and ourSide or (ourSide == "radiant" and "dire" or "radiant")
+					cur = { location = loc, plant_time_obs = 0, plant_time_sentry = 0, role = "lane", side = side }
+					laneSpots[lane] = cur
+				end
+				out[#out + 1] = cur
+			end
+		end
+	end
+	return out
+end
+-- Walk into enemy jungle only behind our wave or with teammates, never into a visible bigger group.
+local function EnemySideCovered(bot, loc)
+	if bot == nil or loc == nil then
+		return false
+	end
+	if bot:GetHealth() / math.max(1, bot:GetMaxHealth()) < 0.6 then
+		return false
+	end
+	local allies = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if u ~= bot and u:IsAlive() and not u:IsIllusion() and GetUnitToLocationDistance(u, loc) <= 1800 then
+			allies = allies + 1
+		end
+	end
+	local enemies = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if u:IsAlive() and not u:IsIllusion() and GetUnitToLocationDistance(u, loc) <= 2000 then
+			enemies = enemies + 1
+		end
+	end
+	if enemies > allies then
+		return false
+	end
+	-- Several enemies out of sight can be waiting in that jungle.
+	local missing = 0
+	for _, pid in pairs(GetTeamPlayers(GetOpposingTeam()) or {}) do
+		if IsHeroAlive(pid) then
+			local info = GetHeroLastSeenInfo(pid)
+			local seen = info ~= nil and info[1] or nil
+			if seen == nil or seen.time_since_seen > 5 then
+				missing = missing + 1
+			end
+		end
+	end
+	if allies >= 2 then
+		return true
+	end
+	if missing >= 3 then
+		return false
+	end
+	local creeps = 0
+	for _, u in pairs(GetUnitList(UNIT_LIST_ALLIED_CREEPS) or {}) do
+		if u:IsAlive() and GetUnitToLocationDistance(u, loc) <= 2200 then
+			creeps = creeps + 1
+			if creeps >= 3 then
+				return true
+			end
+		end
+	end
+	return false
+end
+local function DefendingHighGround()
+	local ancient = GetAncient(GetTeam())
+	local near = ancient ~= nil and b.Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2500) or 0
+	return near >= 1 or b.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
 end
 function a.GetAvailabeObserverWardSpots(K)
 	local L = {}
-	if DotaTime() < 0 then
-		for M, N in pairs(a.GetGameStartWardSpots()) do
-			if
-				not a.IsOtherWardClose(N.location, "npc_dota_observer_wards", c * 2, true, false)
-				and not a.IsThereEnemySentry(N.location, 1100)
-			then
-				table.insert(L, N)
-			end
-		end
-		return L
-	end
-	if b.IsEarlyGame() then
+	if DotaTime() < 0 or b.IsEarlyGame() then
+		local ourSide = TeamSide()
 		for M, N in pairs(a.GetEarlyGameWardSpots()) do
-			if
-				not a.IsOtherWardClose(N.location, "npc_dota_observer_wards", c * 2, true, false)
-				and not a.IsThereEnemySentry(N.location, 1100)
-				and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-			then
+			-- Early observers go on the enemy side. Own-side cliffs look back into our jungle.
+			if ObsFree(N) and (N.side ~= ourSide or N.safe) then
 				table.insert(L, N)
 			end
 		end
-	end
-	if DotaTime() > 6 * 60 then
-		local O = GetTeam() == TEAM_RADIANT and y or z
-		local a1 = GetAncient(GetTeam())
-		local a2 = a1 ~= nil and b.Utils.CountEnemyHeroesNear(a1:GetLocation(), 2500) or 0
-		local a3 = b.Utils.CountEnemyHeroesOnHighGround(GetTeam())
-		local a4 = b.GetNumOfAliveHeroes(false)
-		local a5 = b.GetNumOfAliveHeroes(true)
-		local a6 = a2 >= 1 or a3 >= 1
-		local a7 = a4 >= a5 + 1 and a4 >= 3
-		for M, N in pairs(O) do
-			local a8 = N.role or "contest"
-			if a6 and a8 == "offense" then
-			elseif a7 and a8 == "defend" and not a6 then
-			elseif
-				not a.IsOtherWardClose(N.location, "npc_dota_observer_wards", c * 2, true, false)
-				and not a.IsThereEnemySentry(N.location, 1100)
-				and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-			then
-				table.insert(L, N)
-			end
+		if DotaTime() < 6 * 60 then
+			return DropDeepEnemySpots(L)
 		end
 	end
-	for P = 1, #x do
-		local Q = GetTower(GetTeam(), x[P])
-		if
-			Q ~= nil
-			or GetTower(GetTeam(), TOWER_TOP_3) == nil
-			or GetTower(GetTeam(), TOWER_MID_3) == nil
-			or GetTower(GetTeam(), TOWER_BOT_3) == nil
-		then
-			if
-				Q == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
-				or Q == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
-			then
-			else
-				if GetTeam() == TEAM_RADIANT then
-					for R, S in pairs(A) do
-						if R == x[P] then
-							for M, N in pairs(S) do
-								if
-									IsLocationPassable(N.location)
-									and not a.IsOtherWardClose(
-										N.location,
-										"npc_dota_observer_wards",
-										c * 2,
-										true,
-										false
-									)
-									and not a.IsThereEnemySentry(N.location, 1100)
-									and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-								then
-									table.insert(L, N)
-								end
-							end
-						end
-					end
-				else
-					for R, S in pairs(C) do
-						if R == x[P] then
-							for M, N in pairs(S) do
-								if
-									IsLocationPassable(N.location)
-									and not a.IsOtherWardClose(
-										N.location,
-										"npc_dota_observer_wards",
-										c * 2,
-										true,
-										false
-									)
-									and not a.IsThereEnemySentry(N.location, 1100)
-									and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-								then
-									table.insert(L, N)
-								end
-							end
-						end
-					end
+	local ourSide = TeamSide()
+	local defending = DefendingHighGround()
+	local pushing = not defending and EnemyOuterDown()
+	local function consider(spot)
+		if not ObsFree(spot) then
+			return
+		end
+		local onOurs = spot.side == ourSide
+		if not onOurs and NeedsCover(spot) and not EnemySideCovered(K, spot.location) then
+			return
+		end
+		if spot.role == "uber" then
+			-- Own eye cliff looks back into our jungle. While pushing, ward the enemy cliff.
+			if defending and not onOurs then
+				return
+			end
+			if pushing and onOurs then
+				return
+			end
+		elseif spot.role == "contest" then
+			if defending and not onOurs then
+				return
+			end
+		elseif spot.role == "hunt" then
+			if onOurs then
+				if not defending and HomeWardTooEarly(spot.location) then
+					return
 				end
+			elseif defending or (b.IsEarlyGame() and not pushing) then
+				return
 			end
+		elseif spot.role == "lane" then
+			-- Defending our high ground: no lane ward on their half.
+			if defending and not onOurs then
+				return
+			end
+		else
+			return
+		end
+		table.insert(L, spot)
+	end
+	for _, spot in ipairs(LaneSpots()) do
+		consider(spot)
+	end
+	for i = 1, #UberWardSpots do
+		consider(UberWardSpots[i])
+	end
+	for i = 1, #RoshSpots do
+		local spot = RoshSpots[i]
+		local x, y = spot.location.x, spot.location.y
+		local bottomRune = (x == 1230 and y == -3082) or (x == 2588 and y == -1248)
+		-- Own bank of the bottom rune faces our jungle. Ward the enemy bank.
+		if not (bottomRune and spot.side == ourSide) then
+			consider(spot)
 		end
 	end
-	for P = 1, #x do
-		local Q = GetTower(GetOpposingTeam(), x[P])
-		if Q == nil then
-			if
-				Q == GetTower(GetOpposingTeam(), TOWER_TOP_2) and GetTower(GetOpposingTeam(), TOWER_TOP_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_TOP_3) and GetTower(GetOpposingTeam(), TOWER_TOP_2) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_MID_2) and GetTower(GetOpposingTeam(), TOWER_MID_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_MID_3) and GetTower(GetOpposingTeam(), TOWER_MID_2) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_BOT_2) and GetTower(GetOpposingTeam(), TOWER_BOT_1) ~= nil
-				or Q == GetTower(GetOpposingTeam(), TOWER_BOT_3) and GetTower(GetOpposingTeam(), TOWER_BOT_2) ~= nil
-			then
-			else
-				if GetTeam() == TEAM_RADIANT then
-					for R, S in pairs(B) do
-						if R == x[P] then
-							for M, N in pairs(S) do
-								if
-									IsLocationPassable(N.location)
-									and not a.IsOtherWardClose(
-										N.location,
-										"npc_dota_observer_wards",
-										c * 2,
-										true,
-										false
-									)
-									and not a.IsThereEnemySentry(N.location, 1100)
-									and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-								then
-									table.insert(L, N)
-								end
-							end
-						end
-					end
-				else
-					for R, S in pairs(D) do
-						if R == x[P] then
-							for M, N in pairs(S) do
-								if
-									IsLocationPassable(N.location)
-									and not a.IsOtherWardClose(
-										N.location,
-										"npc_dota_observer_wards",
-										c * 2,
-										true,
-										false
-									)
-									and not a.IsThereEnemySentry(N.location, 1100)
-									and (N.plant_time_obs == 0 or DotaTime() > N.plant_time_obs + 360)
-								then
-									table.insert(L, N)
-								end
-							end
-						end
-					end
-				end
-			end
-		end
+	for i = 1, #GateSpots do
+		consider(GateSpots[i])
 	end
-	return L
+	for i = 1, #HuntSpots do
+		consider(HuntSpots[i])
+	end
+	return DropDeepEnemySpots(L)
 end
 function a.GetClosestObserverWardSpot(K, S)
 	local T = 100000
 	local U = nil
+	local uberBest = nil
+	local uberDist = 100000
+	local uberMax = UBER_WALK
 	for M, N in pairs(S) do
 		local V = GetUnitToLocationDistance(K, N.location)
+		if N.role == "uber" and V < uberDist and V <= uberMax then
+			uberDist = V
+			uberBest = N
+		end
 		if V < T then
 			T = V
 			U = N
 		end
 	end
-	return U
+	return uberBest or U
+end
+-- Objective ward (user call): when a teammate heads for Roshan, or for the enemy-side outpost, a
+-- support with an observer wards the enemy-side spot nearest that objective first: the side the
+-- enemies come from. For Radiant at the bottom pit that is the Dire contest spot by the river and
+-- the Dire outpost (2588, -1248); for Dire at the top pit, the Radiant contest spot (-3379, 743).
+-- Contest and hunt spots only, never an eye cliff (uber): those mean walking deep into enemy
+-- territory. A spot already covered by one of our observers (any, also a human's) or with an ally
+-- already walking to it is skipped (ObsFree). Game 035, 34:04: Leshrac died at the Dire outpost to
+-- three heroes nobody could see.
+local OBJECTIVE_OUTPOSTS = { Vector(-4096, -448, 128), Vector(3392, -448, 128) }
+local OBJECTIVE_WARD_RANGE = 2600
+local function ObjectiveTarget()
+	local ourSide = TeamSide()
+	local rosh = b.GetCurrentRoshanLocation and b.GetCurrentRoshanLocation() or nil
+	-- The enemy-side outpost: the one farther from our fountain.
+	local fountain = b.GetTeamFountain and b.GetTeamFountain() or nil
+	local enemyOutpost = OBJECTIVE_OUTPOSTS[2]
+	if fountain ~= nil and b.GetDistance(OBJECTIVE_OUTPOSTS[1], fountain) > b.GetDistance(OBJECTIVE_OUTPOSTS[2], fountain) then
+		enemyOutpost = OBJECTIVE_OUTPOSTS[1]
+	end
+	for i = 1, 5 do
+		local ally = GetTeamMember(i)
+		if b.IsValidHero(ally) then
+			local m = ally:GetActiveMode()
+			if m == BOT_MODE_ROSHAN and rosh ~= nil then
+				return rosh, "roshan"
+			end
+			if BOT_MODE_OUTPOST ~= nil and m == BOT_MODE_OUTPOST and GetUnitToLocationDistance(ally, enemyOutpost) <= 4000 then
+				return enemyOutpost, "enemy-outpost"
+			end
+		end
+	end
+	return nil
+end
+function a.GetObjectiveWardSpot(K)
+	local target, kind = ObjectiveTarget()
+	if target == nil then
+		return nil
+	end
+	local ourSide = TeamSide()
+	local best, bestDist = nil, OBJECTIVE_WARD_RANGE
+	local function consider(spot)
+		if spot.side == ourSide then
+			return
+		end
+		local d = b.GetDistance(spot.location, target)
+		if d < bestDist then
+			best, bestDist = spot, d
+		end
+	end
+	for i = 1, #RoshSpots do
+		consider(RoshSpots[i])
+	end
+	for i = 1, #HuntSpots do
+		consider(HuntSpots[i])
+	end
+	if best == nil or not ObsFree(best) then
+		return nil
+	end
+	return best, kind
 end
 function a.GetPossibleSentryWardSpots(K)
 	local W = {}
-	if b.IsEarlyGame() then
+	local ourSide = TeamSide()
+	local defending = DefendingHighGround()
+	local pushing = not defending and EnemyOuterDown()
+	if DotaTime() < 0 or b.IsEarlyGame() then
 		for M, N in pairs(a.GetEarlyGameWardSpots()) do
-			if
-				not a.IsOtherWardClose(N.location, "npc_dota_sentry_wards", 1200, true, false)
-				and not b.Site.IsLocationHaveTrueSight(N.location)
-			then
-				if
-					N.plant_time_obs > 0 and DotaTime() - N.plant_time_obs < 360
-					or a.IsOtherWardClose(N.location, "npc_dota_observer_wards", 400, true, true)
-				then
-					table.insert(W, N)
-				end
+			if (N.side ~= ourSide or N.safe) and SentryFree(N) then
+				table.insert(W, N)
 			end
+		end
+		if DotaTime() < 6 * 60 then
+			return DropDeepEnemySpots(W)
 		end
 	end
-	if DotaTime() > 0 then
-		for P = 1, #x do
-			local Q = GetTower(GetTeam(), x[P])
-			if
-				Q ~= nil
-				or GetTower(GetTeam(), TOWER_TOP_3) == nil
-				or GetTower(GetTeam(), TOWER_MID_3) == nil
-				or GetTower(GetTeam(), TOWER_BOT_3) == nil
-			then
-				if
-					Q == GetTower(GetTeam(), TOWER_TOP_2) and GetTower(GetTeam(), TOWER_TOP_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_TOP_3) and GetTower(GetTeam(), TOWER_TOP_2) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_MID_2) and GetTower(GetTeam(), TOWER_MID_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_MID_3) and GetTower(GetTeam(), TOWER_MID_2) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_BOT_2) and GetTower(GetTeam(), TOWER_BOT_1) ~= nil
-					or Q == GetTower(GetTeam(), TOWER_BOT_3) and GetTower(GetTeam(), TOWER_BOT_2) ~= nil
-				then
-				else
-					if GetTeam() == TEAM_RADIANT then
-						for R, S in pairs(A) do
-							if R == x[P] then
-								for M, N in pairs(S) do
-									if
-										IsLocationPassable(N.location)
-										and not a.IsOtherWardClose(
-											N.location,
-											"npc_dota_sentry_wards",
-											1200,
-											true,
-											false
-										)
-										and not b.Site.IsLocationHaveTrueSight(N.location)
-									then
-										if
-											N.plant_time_obs > 0 and DotaTime() - N.plant_time_obs < 360
-											or a.IsOtherWardClose(
-												N.location,
-												"npc_dota_observer_wards",
-												400,
-												true,
-												true
-											)
-										then
-											table.insert(W, N)
-										end
-									end
-								end
-							end
-						end
-					else
-						for R, S in pairs(C) do
-							if R == x[P] then
-								for M, N in pairs(S) do
-									if
-										IsLocationPassable(N.location)
-										and not a.IsOtherWardClose(
-											N.location,
-											"npc_dota_sentry_wards",
-											1200,
-											true,
-											false
-										)
-										and not b.Site.IsLocationHaveTrueSight(N.location)
-									then
-										if
-											N.plant_time_obs > 0 and DotaTime() - N.plant_time_obs < 360
-											or a.IsOtherWardClose(
-												N.location,
-												"npc_dota_observer_wards",
-												400,
-												true,
-												true
-											)
-										then
-											table.insert(W, N)
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-			end
+	local function consider(spot)
+		if not SentryFree(spot) then
+			return
 		end
-		for P = 1, #x do
-			local Q = GetTower(GetOpposingTeam(), x[P])
-			if Q == nil then
-				if
-					Q == GetTower(GetOpposingTeam(), TOWER_TOP_2) and GetTower(GetOpposingTeam(), TOWER_TOP_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_TOP_3) and GetTower(GetOpposingTeam(), TOWER_TOP_2) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_MID_2) and GetTower(GetOpposingTeam(), TOWER_MID_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_MID_3) and GetTower(GetOpposingTeam(), TOWER_MID_2) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_BOT_2) and GetTower(GetOpposingTeam(), TOWER_BOT_1) ~= nil
-					or Q == GetTower(GetOpposingTeam(), TOWER_BOT_3) and GetTower(GetOpposingTeam(), TOWER_BOT_2) ~= nil
-				then
-				else
-					if GetTeam() == TEAM_RADIANT then
-						for R, S in pairs(B) do
-							if R == x[P] then
-								for M, N in pairs(S) do
-									if
-										IsLocationPassable(N.location)
-										and not a.IsOtherWardClose(
-											N.location,
-											"npc_dota_sentry_wards",
-											1200,
-											true,
-											false
-										)
-										and not b.Site.IsLocationHaveTrueSight(N.location)
-									then
-										if
-											N.plant_time_obs > 0 and DotaTime() - N.plant_time_obs < 360
-											or a.IsOtherWardClose(
-												N.location,
-												"npc_dota_observer_wards",
-												400,
-												true,
-												true
-											)
-										then
-											table.insert(W, N)
-										end
-									end
-								end
-							end
-						end
-					else
-						for R, S in pairs(D) do
-							if R == x[P] then
-								for M, N in pairs(S) do
-									if
-										IsLocationPassable(N.location)
-										and not a.IsOtherWardClose(
-											N.location,
-											"npc_dota_sentry_wards",
-											1200,
-											true,
-											false
-										)
-										and not b.Site.IsLocationHaveTrueSight(N.location)
-									then
-										if
-											N.plant_time_obs > 0 and DotaTime() - N.plant_time_obs < 360
-											or a.IsOtherWardClose(
-												N.location,
-												"npc_dota_observer_wards",
-												400,
-												true,
-												true
-											)
-										then
-											table.insert(W, N)
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-			end
+		local onOurs = spot.side == ourSide
+		if not onOurs and NeedsCover(spot) and not EnemySideCovered(K, spot.location) then
+			return
+		end
+		local want = false
+		if defending then
+			want = onOurs
+		elseif pushing then
+			want = not onOurs
+		else
+			want = spot.role == "contest" or spot.role == "uber"
+		end
+		if want then
+			table.insert(W, spot)
 		end
 	end
-	return W
+	for i = 1, #UberWardSpots do
+		consider(UberWardSpots[i])
+	end
+	for i = 1, #RoshSpots do
+		consider(RoshSpots[i])
+	end
+	for i = 1, #GateSpots do
+		consider(GateSpots[i])
+	end
+	for i = 1, #HuntSpots do
+		consider(HuntSpots[i])
+	end
+	return DropDeepEnemySpots(W)
 end
 function a.GetClosestSentryWardSpot(K, S)
 	local T = 100000
@@ -770,6 +528,22 @@ function a.GetClosestSentryWardSpot(K, S)
 		end
 	end
 	return U
+end
+-- Another support already heading here would plant a second observer before the first exists.
+function a.AllyGoingTo(loc, gap)
+	local me = GetBot()
+	for i = 1, 5 do
+		local ally = GetTeamMember(i)
+		if
+			b.IsValidHero(ally)
+			and ally ~= me
+			and ally:GetActiveMode() == BOT_MODE_WARD
+			and b.GetDistance(ally:GetExtrapolatedLocation(3), loc) <= gap
+		then
+			return true
+		end
+	end
+	return false
 end
 function a.IsOtherWardClose(X, Y, Z, _, a0)
 	local a1 = GetUnitList(UNIT_LIST_ALLIED_WARDS)

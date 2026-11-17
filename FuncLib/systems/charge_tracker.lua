@@ -59,7 +59,11 @@ local DATA = {
 		talent = { "special_bonus_unique_clockwerk_rocket_flare_charges", 3 },
 		restore = { 20, 18, 16, 14 },
 	},
-	ringmaster_impalement = { base = 3, talent = { "special_bonus_unique_ringmaster_dagger_charge", 1 }, restore = { 17 } },
+	ringmaster_impalement = {
+		base = 3,
+		talent = { "special_bonus_unique_ringmaster_dagger_charge", 1 },
+		restore = { 17 },
+	},
 	shadow_demon_disruption = {
 		base = 0,
 		talent = { "special_bonus_unique_shadow_demon_7", 2 },
@@ -76,7 +80,11 @@ local DATA = {
 	treant_eyes_in_the_forest = { base = 2, restore = { 135 } },
 	ursa_earthshock = { base = 0, talent = { "special_bonus_unique_ursa_3", 2 }, restore = { 15, 13, 11, 9 } },
 	void_spirit_astral_step = { base = 2, restore = { 25, 20, 15 } },
-	zuus_heavenly_jump = { base = 0, talent = { "special_bonus_unique_zeus_jump_charges", 3 }, restore = { 26, 22, 18, 14 } },
+	zuus_heavenly_jump = {
+		base = 0,
+		talent = { "special_bonus_unique_zeus_jump_charges", 3 },
+		restore = { 26, 22, 18, 14 },
+	},
 }
 
 local state = {} -- [playerId][abilityName] = { n, max, nextAt, ... }
@@ -111,7 +119,6 @@ local function TalentLearned(bot, name)
 	end)
 	return ok and result == true
 end
-
 
 local function RuntimeMax(ability)
 	local ok, result = pcall(function()
@@ -168,16 +175,19 @@ local function RestoreTime(bot, ability, chargeData)
 end
 
 local function Log(bot, ability, chargeState, why)
-	pcall(print, string.format(
-		"[OHA-CHARGES] t=%.0f %s %s n=%d/%d why=%s next=%s",
-		DotaTime(),
-		Short(bot),
-		ability:GetName(),
-		chargeState.n,
-		chargeState.max,
-		why,
-		chargeState.nextAt ~= nil and string.format("%.0f", chargeState.nextAt) or "-"
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-CHARGES] t=%.0f %s %s n=%d/%d why=%s next=%s",
+			DotaTime(),
+			Short(bot),
+			ability:GetName(),
+			chargeState.n,
+			chargeState.max,
+			why,
+			chargeState.nextAt ~= nil and string.format("%.0f", chargeState.nextAt) or "-"
+		)
+	)
 end
 
 local function Spend(bot, ability, chargeState, restoreTime, why)
@@ -195,23 +205,27 @@ local function Probe(bot, ability, chargeState, castable)
 		return ability:GetCooldownTimeRemaining()
 	end)
 	cooldown = okCd and type(cooldown) == "number" and cooldown or -1
-	local key = string.format("%s|%s|%d|%d", tostring(castable), tostring(cooldown > 0), RuntimeMax(ability), chargeState.n)
+	local key =
+		string.format("%s|%s|%d|%d", tostring(castable), tostring(cooldown > 0), RuntimeMax(ability), chargeState.n)
 	if key == chargeState.probeKey or DotaTime() < (chargeState.probeAt or -999) then
 		return
 	end
 	chargeState.probeKey = key
 	chargeState.probeAt = DotaTime() + 1
-	pcall(print, string.format(
-		"[OHA-CHARGES] t=%.0f %s %s probe castable=%s cd=%.1f runtimeMax=%d max=%d tracked=%d",
-		DotaTime(),
-		Short(bot),
-		ability:GetName(),
-		tostring(castable),
-		cooldown,
-		RuntimeMax(ability),
-		chargeState.max,
-		chargeState.n
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-CHARGES] t=%.0f %s %s probe castable=%s cd=%.1f runtimeMax=%d max=%d tracked=%d",
+			DotaTime(),
+			Short(bot),
+			ability:GetName(),
+			tostring(castable),
+			cooldown,
+			RuntimeMax(ability),
+			chargeState.max,
+			chargeState.n
+		)
+	)
 end
 
 local function TickAbility(bot, ability, slot)

@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 -- tAllAbilityBuildList[2]: Flaming Lasso moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
 local nAbilityBuildList
 local nTalentBuildList
@@ -118,17 +119,20 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local stickyNapalmAbility = SafeAbility(bot:GetAbilityByName("batrider_sticky_napalm"), "batrider_sticky_napalm", "batrider")
+local stickyNapalmAbility =
+	SafeAbility(bot:GetAbilityByName("batrider_sticky_napalm"), "batrider_sticky_napalm", "batrider")
 local flamebreakAbility = SafeAbility(bot:GetAbilityByName("batrider_flamebreak"), "batrider_flamebreak", "batrider")
 local fireflyAbility = SafeAbility(bot:GetAbilityByName("batrider_firefly"), "batrider_firefly", "batrider")
-local flamingLassoAbility = SafeAbility(bot:GetAbilityByName("batrider_flaming_lasso"), "batrider_flaming_lasso", "batrider")
+local flamingLassoAbility =
+	SafeAbility(bot:GetAbilityByName("batrider_flaming_lasso"), "batrider_flaming_lasso", "batrider")
 local stickyNapalmDesire, stickyNapalmLocation
 local flamebreakDesire, flamebreakLocation
 local fireflyDesire
@@ -231,7 +235,10 @@ function X.ConsiderStickyNapalm()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetExtrapolatedLocation(castPoint)
 			end
 		end
@@ -273,12 +280,22 @@ function X.ConsiderStickyNapalm()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -344,7 +361,10 @@ function X.ConsiderFlamebreak()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				if GetUnitToUnitDistance(bot, nearbyEnemies[1]) < radius - 50 then
 					return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 				else
@@ -377,7 +397,12 @@ function X.ConsiderFlamebreak()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and Fu.GetMP(bot) > 0.48 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and Fu.GetMP(bot) > 0.48
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -437,13 +462,21 @@ function X.ConsiderFirefly()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.1)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.1))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 		-- fix: Firefly (bonus move speed, flies over trees) was an escape only vs a chaser within 350
 		-- that faced him. Also use it when a hero hurt him recently and one is still within 900.
-		if bot:WasRecentlyDamagedByAnyHero(2.0) and nearbyEnemies ~= nil and Fu.IsValidHero(nearbyEnemies[1]) and Fu.IsInRange(bot, nearbyEnemies[1], 900) then
+		if
+			bot:WasRecentlyDamagedByAnyHero(2.0)
+			and nearbyEnemies ~= nil
+			and Fu.IsValidHero(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], 900)
+		then
 			if DotaTime() >= (bot._batFireflyLogAt or -999) then
 				bot._batFireflyLogAt = DotaTime() + 10
 				pcall(print, string.format("[OHA-BATRIDER] t=%.0f firefly escape hp=%.2f", DotaTime(), hpRatio))

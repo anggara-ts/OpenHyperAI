@@ -12,7 +12,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" or sRole == "pos_2" then
@@ -118,7 +119,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -126,7 +128,8 @@ function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
 local mistCoilAbility = SafeAbility(bot:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
-local aphoticShieldAbility = SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
+local aphoticShieldAbility =
+	SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
 local mistCoilDesire, mistCoilTarget
 local aphoticShieldDesire, aphoticShieldTarget
 local isAttacking = false
@@ -146,7 +149,8 @@ function X.SkillsComplement()
 		return
 	end
 	mistCoilAbility = SafeAbility(bot:GetAbilityByName("abaddon_death_coil"), "abaddon_death_coil", "abaddon")
-	aphoticShieldAbility = SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
+	aphoticShieldAbility =
+		SafeAbility(bot:GetAbilityByName("abaddon_aphotic_shield"), "abaddon_aphotic_shield", "abaddon")
 	isAttacking = Fu.IsAttacking(bot)
 	hpRatio = Fu.GetHP(bot)
 	botTarget = Fu.GetProperTarget(bot)
@@ -279,7 +283,12 @@ function X.ConsiderMistCoil()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and manaAfter > 0.5 then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > 0.5
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end

@@ -36,7 +36,10 @@ local function installUnitCheck(Fu)
 			unit.is_suspicious_illusion = false
 			return false
 		end
-		if unit:CanBeSeen() and (not unit:IsHero() or unit:IsCastingAbility() or unit:IsUsingAbility() or unit:IsChanneling()) then
+		if
+			unit:CanBeSeen()
+			and (not unit:IsHero() or unit:IsCastingAbility() or unit:IsUsingAbility() or unit:IsChanneling())
+		then
 			unit.is_suspicious_illusion = false
 			return false
 		end
@@ -115,7 +118,8 @@ local function installUnitCheck(Fu)
 			and (unit:GetTeam() == GetTeam() or not unit:HasModifier("modifier_crystal_maiden_frostbite"))
 			and (
 				unit:GetTeam() ~= GetTeam()
-				or unit:GetUnitName() ~= "npc_dota_wraith_king_skeleton_warrior" and unit:GetHealth() / unit:GetMaxHealth() < 0.5
+				or unit:GetUnitName() ~= "npc_dota_wraith_king_skeleton_warrior"
+					and unit:GetHealth() / unit:GetMaxHealth() < 0.5
 			)
 	end
 	function Fu.IsTormentor(unit)

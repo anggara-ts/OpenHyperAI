@@ -394,7 +394,12 @@ X.ConsiderSpellUsage["ice_shaman_incendiary_bomb"] = function(minion, ability)
 		end
 	end
 	if Fu.IsPushing(bot) then
-		if Fu.IsValidBuilding(botTarget) and Fu.IsInRange(minion, botTarget, 700) and Fu.GetHP(botTarget) > 0.35 and Fu.CanBeAttacked(botTarget) then
+		if
+			Fu.IsValidBuilding(botTarget)
+			and Fu.IsInRange(minion, botTarget, 700)
+			and Fu.GetHP(botTarget) > 0.35
+			and Fu.CanBeAttacked(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "unit"
 		end
 	end
@@ -594,7 +599,11 @@ X.ConsiderSpellUsage["harpy_storm_chain_lightning"] = function(minion, ability)
 	end
 	if Fu.IsFarming(bot) and Fu.IsInRange(bot, minion, 1600) then
 		local nearbyCreeps = bot:GetNearbyCreeps(1600, true)
-		if nearbyCreeps ~= nil and (#nearbyCreeps >= 3 or #nearbyCreeps >= 2 and nearbyCreeps[1]:IsAncientCreep()) and Fu.IsAttacking(bot) then
+		if
+			nearbyCreeps ~= nil
+			and (#nearbyCreeps >= 3 or #nearbyCreeps >= 2 and nearbyCreeps[1]:IsAncientCreep())
+			and Fu.IsAttacking(bot)
+		then
 			for _, creep in pairs(nearbyCreeps) do
 				if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 					local unitCount = Fu.GetNearbyAroundLocationUnitCount(true, false, jumpRange, creep:GetLocation())
@@ -606,7 +615,12 @@ X.ConsiderSpellUsage["harpy_storm_chain_lightning"] = function(minion, ability)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(minion, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(minion, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "unit"
 		end
 	end
@@ -636,7 +650,12 @@ end
 X.ConsiderSpellUsage["satyr_trickster_purge"] = function(minion, ability)
 	local castRange = ability:GetCastRange()
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsInRange(minion, allyHero, castRange + 300) and not allyHero:IsIllusion() and Fu.IsDisabled(allyHero) then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsInRange(minion, allyHero, castRange + 300)
+			and not allyHero:IsIllusion()
+			and Fu.IsDisabled(allyHero)
+		then
 			return BOT_ACTION_DESIRE_HIGH, allyHero, "unit"
 		end
 	end
@@ -743,7 +762,12 @@ X.ConsiderSpellUsage["centaur_khan_war_stomp"] = function(minion, ability)
 		end
 	end
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and not Fu.IsRealInvisible(allyHero) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and not Fu.IsRealInvisible(allyHero)
+			and not allyHero:IsIllusion()
+		then
 			local enemiesNearAlly = allyHero:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			if
 				Fu.IsValidHero(enemiesNearAlly[1])

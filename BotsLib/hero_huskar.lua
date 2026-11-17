@@ -43,7 +43,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_huskar" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -107,7 +108,12 @@ function X.SkillsComplement()
 	end
 end
 function X.ConsiderHW()
-	if hurricanePike == nil or not hurricanePike:IsFullyCastable() or not burningSpearAbility:IsFullyCastable() or bot:IsDisarmed() then
+	if
+		hurricanePike == nil
+		or not hurricanePike:IsFullyCastable()
+		or not burningSpearAbility:IsFullyCastable()
+		or bot:IsDisarmed()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local pikeRange = 400 + aetherRange + 50
@@ -167,7 +173,11 @@ function X.ConsiderQ()
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		local killableCount = 0
 		for _, creep in pairs(laneCreeps) do
-			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and Fu.WillKillTarget(creep, damage, damageType, castPoint) then
+			if
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.WillKillTarget(creep, damage, damageType, castPoint)
+			then
 				killableCount = killableCount + 1
 			end
 		end
@@ -178,7 +188,11 @@ function X.ConsiderQ()
 	if Fu.IsFarming(bot) and botLevel >= 8 and Fu.IsAllowedToSpam(bot, manaCost) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
 		local firstNeutral = neutralCreeps[1]
-		if #neutralCreeps >= 2 and Fu.IsValid(firstNeutral) and not Fu.CanKillTarget(firstNeutral, bot:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL) then
+		if
+			#neutralCreeps >= 2
+			and Fu.IsValid(firstNeutral)
+			and not Fu.CanKillTarget(firstNeutral, bot:GetAttackDamage() * 2.2, DAMAGE_TYPE_PHYSICAL)
+		then
 			return BOT_ACTION_DESIRE_HIGH, "Q打钱:" .. #neutralCreeps
 		end
 	end
@@ -220,7 +234,12 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.GetHP(bot) > 0.45 and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.GetHP(bot) > 0.45
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -243,10 +262,17 @@ function X.ConsiderW()
 	local enemyHeroesInRange = Fu.GetNearbyHeroes(bot, attackRange, true, BOT_MODE_NONE)
 	local weakestUnit = Fu.GetAttackableWeakestUnit(bot, attackRange, true, true)
 	if botLevel >= 7 then
-		if (nearbyEnemies[1] ~= nil or botLevel >= 15 and hpRatio > 0.38) and not burningSpearAbility:GetAutoCastState() then
+		if
+			(nearbyEnemies[1] ~= nil or botLevel >= 15 and hpRatio > 0.38)
+			and not burningSpearAbility:GetAutoCastState()
+		then
 			lastAutoCastOnTime = DotaTime()
 			burningSpearAbility:ToggleAutoCast()
-		elseif nearbyEnemies[1] == nil and lastAutoCastOnTime < DotaTime() - 3.0 and burningSpearAbility:GetAutoCastState() then
+		elseif
+			nearbyEnemies[1] == nil
+			and lastAutoCastOnTime < DotaTime() - 3.0
+			and burningSpearAbility:GetAutoCastState()
+		then
 			burningSpearAbility:ToggleAutoCast()
 		end
 	else
@@ -323,7 +349,11 @@ function X.ConsiderW()
 		local bestCreep = nil
 		local bestHealth = 0
 		for _, creep in pairs(neutralCreeps) do
-			if Fu.IsValid(creep) and not creep:HasModifier("modifier_huskar_burning_spear_debuff") and creep:GetHealth() > bestHealth then
+			if
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_huskar_burning_spear_debuff")
+				and creep:GetHealth() > bestHealth
+			then
 				bestCreep = creep
 				bestHealth = creep:GetHealth()
 			end
@@ -335,11 +365,21 @@ function X.ConsiderW()
 			return BOT_ACTION_DESIRE_HIGH, mostHpCreep, "W打野消耗"
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and botLevel > 9 and #nearbyEnemies <= 1 and not burningSpearAbility:GetAutoCastState() then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and botLevel > 9
+		and #nearbyEnemies <= 1
+		and not burningSpearAbility:GetAutoCastState()
+	then
 		local enemyLaneCreeps = bot:GetNearbyLaneCreeps(attackRange + 80, true)
 		local allyLaneCreeps = bot:GetNearbyLaneCreeps(1200, false)
 		local weakestAllyUnit = Fu.GetAttackableWeakestUnit(bot, attackRange + 200, false, true)
-		if (#allyLaneCreeps == 0 or weakestAllyUnit ~= nil and weakestAllyUnit:GetHealth() > bot:GetAttackDamage() + 88) and #enemyLaneCreeps >= 2 then
+		if
+			(
+				#allyLaneCreeps == 0
+				or weakestAllyUnit ~= nil and weakestAllyUnit:GetHealth() > bot:GetAttackDamage() + 88
+			) and #enemyLaneCreeps >= 2
+		then
 			local bestCreep = nil
 			local bestHealth = 0
 			for _, creep in pairs(enemyLaneCreeps) do
@@ -383,12 +423,20 @@ function X.ConsiderR()
 			-- Life Break pierces spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES and
 			-- FLAG_MAGIC_IMMUNE_ENEMIES); it was held whenever the target popped BKB.
 			and Fu.CanCastOnMagicImmune(botTarget)
-			and (Fu.IsInRange(bot, botTarget, castRange + 88) or Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 99))
+			and (
+				Fu.IsInRange(bot, botTarget, castRange + 88) or Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 99)
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "R进攻" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	if botLevel >= 12 and #nearbyEnemies == 0 and hpRatio > 0.38 and #nearbyAllies < 3 and castRange > bot:GetAttackRange() + 58 then
+	if
+		botLevel >= 12
+		and #nearbyEnemies == 0
+		and hpRatio > 0.38
+		and #nearbyAllies < 3
+		and castRange > bot:GetAttackRange() + 58
+	then
 		if
 			Fu.IsValid(botTarget)
 			and Fu.IsInRange(bot, botTarget, castRange)

@@ -47,7 +47,8 @@ X["sSellList"] = { "item_satanic", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -148,7 +149,11 @@ function X.ConsiderE()
 		and #nearbyEnemies == 0
 	then
 		local enemyLaneCreeps = bot:GetNearbyLaneCreeps(1400, true)
-		if #enemyLaneCreeps >= 4 and Fu.IsValid(enemyLaneCreeps[1]) and not enemyLaneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			#enemyLaneCreeps >= 4
+			and Fu.IsValid(enemyLaneCreeps[1])
+			and not enemyLaneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), 700, radius + 50, 0, 0)
 			if aoe.count >= 3 then
 				nTargetLocation = aoe.targetloc
@@ -169,7 +174,13 @@ function X.ConsiderE()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderWM()
-	if botLevel < 15 or maskOfMadnessItem == nil or not maskOfMadnessItem:IsFullyCastable() or not gustAbility:IsFullyCastable() or not frostArrowsAbility:GetAutoCastState() then
+	if
+		botLevel < 15
+		or maskOfMadnessItem == nil
+		or not maskOfMadnessItem:IsFullyCastable()
+		or not gustAbility:IsFullyCastable()
+		or not frostArrowsAbility:GetAutoCastState()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local gustManaCost = gustAbility:GetManaCost()
@@ -183,7 +194,12 @@ function X.ConsiderWM()
 	local enemyList = nearbyEnemies
 	local closeEnemies = Fu.GetNearbyHeroes(bot, 500, true, BOT_MODE_NONE)
 	local target = Fu.GetProperTarget(bot)
-	if Fu.IsGoingOnSomeone(bot) and #closeEnemies == 0 and not Fu.IsEnemyTargetUnit(bot, 1600) and Fu.GetAllyCount(bot, 1000) >= 3 then
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and #closeEnemies == 0
+		and not Fu.IsEnemyTargetUnit(bot, 1600)
+		and Fu.GetAllyCount(bot, 1000) >= 3
+	then
 		if
 			Fu.IsValidHero(target)
 			and not target:IsSilenced()
@@ -290,7 +306,11 @@ function X.ConsiderM()
 	end
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot) then
 		local nearbyCreeps = bot:GetNearbyCreeps(800, true)
-		if Fu.IsValid(target) and Fu.IsInRange(target, bot, attackRange + 99) and (#nearbyCreeps >= 2 or target:GetHealth() > attackDamage * 2.28) then
+		if
+			Fu.IsValid(target)
+			and Fu.IsInRange(target, bot, attackRange + 99)
+			and (#nearbyCreeps >= 2 or target:GetHealth() > attackDamage * 2.28)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -323,7 +343,12 @@ function X.ConsiderQ()
 		if (nearbyEnemies[1] ~= nil or mpRatio > 0.76) and not frostArrowsAbility:GetAutoCastState() then
 			lastAutoCastOnTime = DotaTime()
 			frostArrowsAbility:ToggleAutoCast()
-		elseif nearbyEnemies[1] == nil and mpRatio < 0.7 and lastAutoCastOnTime + 3.0 < DotaTime() and frostArrowsAbility:GetAutoCastState() then
+		elseif
+			nearbyEnemies[1] == nil
+			and mpRatio < 0.7
+			and lastAutoCastOnTime + 3.0 < DotaTime()
+			and frostArrowsAbility:GetAutoCastState()
+		then
 			frostArrowsAbility:ToggleAutoCast()
 		end
 	else
@@ -331,7 +356,12 @@ function X.ConsiderQ()
 			frostArrowsAbility:ToggleAutoCast()
 		end
 	end
-	if botLevel <= 7 and hpRatio > 0.55 and Fu.IsValidHero(target) and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, target, attackRange + 18)) then
+	if
+		botLevel <= 7
+		and hpRatio > 0.55
+		and Fu.IsValidHero(target)
+		and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, target, attackRange + 18))
+	then
 		if not target:IsAttackImmune() and Fu.IsInRange(bot, target, attackRange + 99) then
 			frostTarget = target
 			return BOT_ACTION_DESIRE_HIGH, frostTarget
@@ -441,7 +471,13 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, frostTarget
 		end
 		local farLaneCreeps = bot:GetNearbyLaneCreeps(1600, true)
-		if botMode ~= BOT_MODE_LANING and botLevel >= 6 and hpRatio > 0.25 and Fu.IsValid(farLaneCreeps[1]) and bot:GetAttackDamage() > 130 then
+		if
+			botMode ~= BOT_MODE_LANING
+			and botLevel >= 6
+			and hpRatio > 0.25
+			and Fu.IsValid(farLaneCreeps[1])
+			and bot:GetAttackDamage() > 130
+		then
 			frostTarget = farLaneCreeps[1]
 			return BOT_ACTION_DESIRE_HIGH, frostTarget
 		end

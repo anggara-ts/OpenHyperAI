@@ -80,7 +80,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = true
@@ -98,7 +99,11 @@ local voodooSwitcherooAbility = SafeAbility(
 	"witch_doctor_voodoo_switcheroo",
 	"witch_doctor"
 )
-local deathWardAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]) or bot:GetAbilityByName("witch_doctor_death_ward"), "sAbilityList[6]", "witch_doctor")
+local deathWardAbility = SafeAbility(
+	bot:GetAbilityByName(sAbilityList[6]) or bot:GetAbilityByName("witch_doctor_death_ward"),
+	"sAbilityList[6]",
+	"witch_doctor"
+)
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "witch_doctor")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "witch_doctor")
 local caskDesire, caskTarget
@@ -130,7 +135,12 @@ function X.SkillsComplement()
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
 	switcherooDesire = X.ConsiderAS()
-	if switcherooDesire > 0 and voodooSwitcherooAbility ~= nil and not voodooSwitcherooAbility:IsHidden() and voodooSwitcherooAbility:IsFullyCastable() then
+	if
+		switcherooDesire > 0
+		and voodooSwitcherooAbility ~= nil
+		and not voodooSwitcherooAbility:IsHidden()
+		and voodooSwitcherooAbility:IsFullyCastable()
+	then
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbility(voodooSwitcherooAbility)
 		return
@@ -207,7 +217,11 @@ function X.ConsiderQ()
 	-- and the Q-Aoe / Q-Attack / Q-Retreat group checks never saw anyone.
 	local bounceRadius = paralyzingCaskAbility:GetSpecialValueInt("bounce_range") / 2
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			local hitTime = castPoint + GetUnitToUnitDistance(bot, enemyHero) / 1000
 			if Fu.WillMagicKillTarget(bot, enemyHero, damage * 1.6, hitTime) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "Q-Kill:" .. Fu.Chat.GetNormName(enemyHero)
@@ -237,10 +251,10 @@ function X.ConsiderQ()
 						and allyHero ~= bot
 						and not allyHero:IsIllusion()
 						and allyHero:GetTeam() == bot:GetTeam()
-						and (
-							(Fu.IsValid(enemyAttackTarget) and enemyAttackTarget:IsHero() and enemyAttackTarget == allyHero)
-							or (GetUnitToUnitDistance(enemyHero, allyHero) <= 900 and Fu.IsChasingTarget(enemyHero, allyHero))
-						)
+						and ((Fu.IsValid(enemyAttackTarget) and enemyAttackTarget:IsHero() and enemyAttackTarget == allyHero) or (GetUnitToUnitDistance(
+							enemyHero,
+							allyHero
+						) <= 900 and Fu.IsChasingTarget(enemyHero, allyHero)))
 						and (Fu.GetHP(allyHero) < 0.75 or allyHero:WasRecentlyDamagedByHero(enemyHero, 2.0))
 					then
 						pcall(
@@ -320,13 +334,20 @@ function X.ConsiderQ()
 		local enemyLaneCreeps = bot:GetNearbyLaneCreeps(999, true)
 		local allyLaneCreeps = bot:GetNearbyLaneCreeps(888, false)
 		for _, creep in pairs(enemyLaneCreeps) do
-			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and Fu.IsInRange(creep, bot, castRange + 300) then
+			if
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.IsInRange(creep, bot, castRange + 300)
+			then
 				if #allyLaneCreeps == 0 and Fu.GetAroundTargetEnemyUnitCount(creep, bounceRadius * 2) >= 3 then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushAoe"
 				end
 				if
 					Fu.IsKeyWordUnit("ranged", creep)
-					and (Fu.WillKillTarget(creep, damage, damageType, castPoint) or #enemyLaneCreeps >= 7 and Fu.GetAroundTargetEnemyUnitCount(creep, bounceRadius * 2) >= 3)
+					and (
+						Fu.WillKillTarget(creep, damage, damageType, castPoint)
+						or #enemyLaneCreeps >= 7 and Fu.GetAroundTargetEnemyUnitCount(creep, bounceRadius * 2) >= 3
+					)
 				then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushRanged"
 				end
@@ -397,7 +418,11 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, 1600) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1600)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
@@ -422,10 +447,18 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsRetreating(bot) then
-		if Fu.IsValidHero(enemiesNearby[1]) and Fu.GetHP(bot) < 0.5 and not Fu.IsSuspiciousIllusion(enemiesNearby[1]) then
+		if
+			Fu.IsValidHero(enemiesNearby[1])
+			and Fu.GetHP(bot) < 0.5
+			and not Fu.IsSuspiciousIllusion(enemiesNearby[1])
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(enemiesNearby[1], 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(enemiesNearby[1], 1200, false, BOT_MODE_NONE)
-			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#alliesNearTarget > #enemiesNearTarget or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				alliesNearTarget ~= nil
+				and enemiesNearTarget ~= nil
+				and (#alliesNearTarget > #enemiesNearTarget or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				if voodooRestorationAbility:GetToggleState() == false then
 					return BOT_ACTION_DESIRE_HIGH
 				else
@@ -498,7 +531,11 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange + 99) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + 99)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			local castLocation = Fu.GetCastLocation(bot, botTarget, castRange, radius)
 			if castLocation ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "E-Attack:" .. Fu.Chat.GetNormName(botTarget)
@@ -511,10 +548,16 @@ function X.ConsiderR()
 	if not deathWardAbility:IsFullyCastable() then
 		return 0
 	end
-	if paralyzingCaskAbility:IsFullyCastable() and bot:GetMana() > deathWardAbility:GetManaCost() + paralyzingCaskAbility:GetManaCost() then
+	if
+		paralyzingCaskAbility:IsFullyCastable()
+		and bot:GetMana() > deathWardAbility:GetManaCost() + paralyzingCaskAbility:GetManaCost()
+	then
 		return 0
 	end
-	if maledictAbility:IsFullyCastable() and bot:GetMana() > deathWardAbility:GetManaCost() + maledictAbility:GetManaCost() then
+	if
+		maledictAbility:IsFullyCastable()
+		and bot:GetMana() > deathWardAbility:GetManaCost() + maledictAbility:GetManaCost()
+	then
 		return 0
 	end
 	local abilityLevel = deathWardAbility:GetLevel()
@@ -528,7 +571,11 @@ function X.ConsiderR()
 	if Fu.IsInTeamFight(bot, 900) then
 		if #enemiesInRange >= 2 then
 			for _, enemyHero in pairs(enemiesInRange) do
-				if Fu.IsValidHero(enemyHero) and Fu.CanCastOnMagicImmune(enemyHero) and not enemyHero:IsAttackImmune() then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanCastOnMagicImmune(enemyHero)
+					and not enemyHero:IsAttackImmune()
+				then
 					local castLocation = Fu.GetCastLocation(bot, enemyHero, castRange, wardRadius)
 					if castLocation ~= nil then
 						return BOT_ACTION_DESIRE_HIGH, castLocation, "R-团战:" .. Fu.Chat.GetNormName(enemyHero)
@@ -560,7 +607,12 @@ function X.ConsiderR()
 end
 function X.ConsiderAS()
 	-- Voodoo Switcheroo is shard-locked and hidden until then (invalid order 60 if cast early).
-	if voodooSwitcherooAbility == nil or voodooSwitcherooAbility:IsHidden() or not voodooSwitcherooAbility:IsTrained() or not voodooSwitcherooAbility:IsFullyCastable() then
+	if
+		voodooSwitcherooAbility == nil
+		or voodooSwitcherooAbility:IsHidden()
+		or not voodooSwitcherooAbility:IsTrained()
+		or not voodooSwitcherooAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local radius = 700

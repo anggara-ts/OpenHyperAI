@@ -144,7 +144,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -218,7 +219,8 @@ function X.SkillsComplement()
 	if X.TryBlinkHook(meatHookAbility) then
 		return
 	end
-	meatShieldDesire = X.ConsiderMeatShield(meatShieldAbility, rotAbility, botTarget, hpRatio, rotRadius, enemiesInRotRange)
+	meatShieldDesire =
+		X.ConsiderMeatShield(meatShieldAbility, rotAbility, botTarget, hpRatio, rotRadius, enemiesInRotRange)
 	if meatShieldDesire > 0 then
 		bot:Action_UseAbility(meatShieldAbility)
 		return
@@ -228,7 +230,8 @@ function X.SkillsComplement()
 			return
 		end
 	end
-	meatHookDesire, meatHookLocation = X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTarget, hpRatio, enemiesInRotRange)
+	meatHookDesire, meatHookLocation =
+		X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTarget, hpRatio, enemiesInRotRange)
 	if meatHookDesire > 0 then
 		X.LogPudge("hook", hpRatio)
 		bot:Action_UseAbilityOnLocation(meatHookAbility, meatHookLocation)
@@ -243,7 +246,15 @@ function X.SkillsComplement()
 	end
 	dismemberDesire, dismemberTarget = X.ConsiderDismember(dismemberAbility, botTarget, hpRatio, enemiesInRotRange)
 	if dismemberDesire > 0 then
-		X.LogPudge("dismember " .. (Fu.IsValid(dismemberTarget) and (string.gsub(dismemberTarget:GetUnitName(), "npc_dota_hero_", "")) or "?"), hpRatio)
+		X.LogPudge(
+			"dismember "
+				.. (
+					Fu.IsValid(dismemberTarget)
+						and (string.gsub(dismemberTarget:GetUnitName(), "npc_dota_hero_", ""))
+					or "?"
+				),
+			hpRatio
+		)
 		bot:Action_ClearActions(false)
 		if Fu.CanCastAbility(meatShieldAbility) and not bot:HasModifier("modifier_pudge_flesh_heap_block") then
 			bot:ActionQueue_UseAbility(meatShieldAbility)
@@ -286,7 +297,10 @@ function X.BlinkComboStep(rot, shield, dismember)
 	end
 	bot._pudgeCombo = nil
 	if dismember ~= nil and Fu.CanCastAbility(dismember) and Fu.CanCastOnMagicImmune(comboTarget) then
-		X.LogPudge("blink-combo dismember " .. (string.gsub(comboTarget:GetUnitName(), "npc_dota_hero_", "")), Fu.GetHP(bot))
+		X.LogPudge(
+			"blink-combo dismember " .. (string.gsub(comboTarget:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(bot)
+		)
 		bot:Action_UseAbilityOnEntity(dismember, comboTarget)
 		return true
 	end
@@ -317,7 +331,12 @@ function X.TryBlink(rot, shield, dismember)
 	-- (Pudge always counted) at least as many as theirs. The whole combo is queued at once:
 	-- blink to point blank -> Meat Shield -> Rot on -> Dismember. It used to be the blink alone,
 	-- and the next think could hook or Rot first.
-	if isGoingOnSomeone and Fu.GetHP(bot) >= 0.4 and Fu.IsValidHero(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+	if
+		isGoingOnSomeone
+		and Fu.GetHP(bot) >= 0.4
+		and Fu.IsValidHero(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+	then
 		local dist = GetUnitToUnitDistance(bot, botTarget)
 		if
 			dist > 350
@@ -342,7 +361,10 @@ function X.TryBlink(rot, shield, dismember)
 					-- wiped by the next order from the spell think or the mode.
 					bot._pudgeCombo = { target = botTarget, at = DotaTime(), shield = false, rot = false }
 					X.LogPudge(
-						"blink-combo start target=" .. (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) .. " dist=" .. math.floor(dist),
+						"blink-combo start target="
+							.. (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
+							.. " dist="
+							.. math.floor(dist),
 						Fu.GetHP(bot)
 					)
 					bot:Action_UseAbilityOnLocation(blink, dest)
@@ -403,10 +425,20 @@ function X.TryBlinkHook(hook)
 	local width = hook:GetSpecialValueInt("hook_width")
 	local target = nil
 	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
-		if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) and Fu.CanCastOnNonMagicImmune(enemy) and not enemy:IsInvulnerable() then
+		if
+			Fu.IsValidHero(enemy)
+			and not Fu.IsSuspiciousIllusion(enemy)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and not enemy:IsInvulnerable()
+		then
 			local distance = GetUnitToUnitDistance(bot, enemy)
-			local hookableNow = distance <= hookRange - 100 and HookLineClear(bot:GetLocation(), enemy:GetLocation(), width, enemy)
-			if not hookableNow and distance > hookRange - 100 - blinkRange and distance <= blinkRange + hookRange - 250 then
+			local hookableNow = distance <= hookRange - 100
+				and HookLineClear(bot:GetLocation(), enemy:GetLocation(), width, enemy)
+			if
+				not hookableNow
+				and distance > hookRange - 100 - blinkRange
+				and distance <= blinkRange + hookRange - 250
+			then
 				if target == nil or Fu.GetHP(enemy) < Fu.GetHP(target) then
 					target = enemy
 				end
@@ -421,7 +453,8 @@ function X.TryBlinkHook(hook)
 	local best, bestScore = nil, 1200
 	for deg = 0, 330, 30 do
 		local rad = math.rad(deg)
-		local point = Vector(targetLocation.x + math.cos(rad) * ring, targetLocation.y + math.sin(rad) * ring, targetLocation.z)
+		local point =
+			Vector(targetLocation.x + math.cos(rad) * ring, targetLocation.y + math.sin(rad) * ring, targetLocation.z)
 		if
 			GetUnitToLocationDistance(bot, point) <= blinkRange
 			and IsLocationPassable(point)
@@ -438,13 +471,16 @@ function X.TryBlinkHook(hook)
 		return false
 	end
 	bot._pudgeBlinkHook = { target = target, at = DotaTime() }
-	pcall(print, string.format(
-		"[OHA-PUDGE] t=%.0f blink-hook start target=%s dist=%d anchor=%d",
-		DotaTime(),
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		math.floor(GetUnitToUnitDistance(bot, target)),
-		math.floor(bestScore)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUDGE] t=%.0f blink-hook start target=%s dist=%d anchor=%d",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(GetUnitToUnitDistance(bot, target)),
+			math.floor(bestScore)
+		)
+	)
 	bot:Action_UseAbilityOnLocation(bot.Blink, best)
 	return true
 end
@@ -456,18 +492,26 @@ function X.BlinkHookStep(hook)
 	end
 	bot._pudgeBlinkHook = nil
 	local target = blinkHookState.target
-	if DotaTime() - blinkHookState.at > 1.5 or not Fu.IsValidHero(target) or not target:IsAlive() or not Fu.CanCastAbility(hook) then
+	if
+		DotaTime() - blinkHookState.at > 1.5
+		or not Fu.IsValidHero(target)
+		or not target:IsAlive()
+		or not Fu.CanCastAbility(hook)
+	then
 		return false
 	end
 	local speed = math.max(1, hook:GetSpecialValueInt("hook_speed"))
 	local distance = GetUnitToUnitDistance(bot, target)
 	bot:Action_UseAbilityOnLocation(hook, target:GetExtrapolatedLocation(hook:GetCastPoint() + distance / speed))
-	pcall(print, string.format(
-		"[OHA-PUDGE] t=%.0f blink-hook hook target=%s dist=%d",
-		DotaTime(),
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		math.floor(distance)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUDGE] t=%.0f blink-hook hook target=%s dist=%d",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(distance)
+		)
+	)
 	return true
 end
 -- [OHA-PUDGE] one line per cast decision, with HP, mode and the heroes around him.
@@ -480,17 +524,19 @@ function X.LogPudge(what, hp)
 	pcall(function()
 		local foes = #(Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {})
 		local friends = #(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {})
-		print(string.format(
-			"[OHA-PUDGE] t=%.0f %s hp=%.2f mode=%d engaging=%s retreating=%s foes=%d allies=%d",
-			DotaTime(),
-			what,
-			hp or Fu.GetHP(bot),
-			bot:GetActiveMode(),
-			tostring(isGoingOnSomeone and true or false),
-			tostring(isRetreating and true or false),
-			foes,
-			friends - 1
-		))
+		print(
+			string.format(
+				"[OHA-PUDGE] t=%.0f %s hp=%.2f mode=%d engaging=%s retreating=%s foes=%d allies=%d",
+				DotaTime(),
+				what,
+				hp or Fu.GetHP(bot),
+				bot:GetActiveMode(),
+				tostring(isGoingOnSomeone and true or false),
+				tostring(isRetreating and true or false),
+				foes,
+				friends - 1
+			)
+		)
 	end)
 end
 function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTarget, hpRatio, enemiesInRotRange)
@@ -518,7 +564,10 @@ function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTa
 			if enemyHero:HasModifier("modifier_teleporting") then
 				local tpRemaining = Fu.GetModifierTime(enemyHero, "modifier_teleporting")
 				local hookTravelTime = GetUnitToUnitDistance(bot, enemyHero) / hookSpeed + castPoint
-				if tpRemaining > hookTravelTime and not Fu.IsUnitBetweenMeAndLocation(bot, enemyHero, enemyHero:GetLocation(), hookWidth) then
+				if
+					tpRemaining > hookTravelTime
+					and not Fu.IsUnitBetweenMeAndLocation(bot, enemyHero, enemyHero:GetLocation(), hookWidth)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -554,7 +603,12 @@ function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTa
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
 				local enemyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if nearbyAllyHeroes ~= nil and enemyAllies ~= nil and #nearbyAllyHeroes >= #enemyAllies and squishyHookTargets[enemyHero:GetUnitName()] then
+				if
+					nearbyAllyHeroes ~= nil
+					and enemyAllies ~= nil
+					and #nearbyAllyHeroes >= #enemyAllies
+					and squishyHookTargets[enemyHero:GetUnitName()]
+				then
 					local hitDelay = GetUnitToUnitDistance(bot, enemyHero) / hookSpeed + castPoint
 					local predictedLocation = Fu.GetCorrectLoc(enemyHero, hitDelay)
 					if
@@ -602,7 +656,8 @@ function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTa
 					local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 					if
 						(
-							Fu.IsValid(nearbyEnemyHeroes[1]) and GetUnitToUnitDistance(nearbyEnemyHeroes[1], creep) < 500
+							Fu.IsValid(nearbyEnemyHeroes[1])
+								and GetUnitToUnitDistance(nearbyEnemyHeroes[1], creep) < 500
 							or not Fu.IsInRange(bot, creep, bot:GetAttackRange() + 25)
 						)
 						and not Fu.IsUnitBetweenMeAndLocation(bot, creep, creep:GetLocation(), hookWidth)
@@ -614,7 +669,11 @@ function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTa
 			end
 			local allyTowers = bot:GetNearbyTowers(700, false)
 			local enemiesInCastRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-			if Fu.IsValidBuilding(allyTowers[1]) and Fu.IsValidHero(enemiesInCastRange[1]) and Fu.IsInRange(bot, allyTowers[1], 500) then
+			if
+				Fu.IsValidBuilding(allyTowers[1])
+				and Fu.IsValidHero(enemiesInCastRange[1])
+				and Fu.IsInRange(bot, allyTowers[1], 500)
+			then
 				local towerTarget = allyTowers[1]:GetAttackTarget()
 				if towerTarget == nil then
 					for _, enemyHero in pairs(enemiesInCastRange) do
@@ -686,13 +745,16 @@ function X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTa
 				and GetUnitToLocationDistance(ally, escapeLocation) - GetUnitToLocationDistance(bot, escapeLocation) >= 300
 				and not Fu.IsUnitBetweenMeAndLocation(bot, ally, ally:GetLocation(), hookWidth)
 			then
-				pcall(print, string.format(
-					"[OHA-PUDGE] t=%.0f ally-hook %s chaser=%s dist=%d",
-					DotaTime(),
-					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
-					(string.gsub(chaser:GetUnitName(), "npc_dota_hero_", "")),
-					math.floor(allyDist)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-PUDGE] t=%.0f ally-hook %s chaser=%s dist=%d",
+						DotaTime(),
+						(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(chaser:GetUnitName(), "npc_dota_hero_", "")),
+						math.floor(allyDist)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH, ally:GetLocation()
 			end
 		end
@@ -822,7 +884,13 @@ function X.ConsiderRot(rotAbility, botTarget, hpRatio, rotRadius, enemiesInRotRa
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, rotRadius) and isAttacking and hpRatio > 0.4 then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, rotRadius)
+			and isAttacking
+			and hpRatio > 0.4
+		then
 			if RotOn(rotAbility) == false and hpRatio > 0.4 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
@@ -854,7 +922,12 @@ function X.ConsiderMeatShield(meatShieldAbility, rotAbility, botTarget, hpRatio,
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 	local engaged = nearbyEnemies ~= nil
 		and #nearbyEnemies >= 1
-		and (isGoingOnSomeone or isRetreating or bot:WasRecentlyDamagedByAnyHero(2.0) or bot:WasRecentlyDamagedByTower(1.5))
+		and (
+			isGoingOnSomeone
+			or isRetreating
+			or bot:WasRecentlyDamagedByAnyHero(2.0)
+			or bot:WasRecentlyDamagedByTower(1.5)
+		)
 	if engaged then
 		return BOT_ACTION_DESIRE_HIGH
 	end
@@ -906,7 +979,10 @@ function X.ConsiderDismember(dismemberAbility, botTarget, hpRatio, enemiesInRotR
 			-- Running away: only a Dismember that kills. It went on the weakest enemy whenever the
 			-- enemies outnumbered us, or below 20% HP, which kept him channelling 2.75s in place
 			-- while outnumbered.
-			if Fu.IsInRange(bot, weakestEnemy, castRange) and Fu.WillKillTarget(weakestEnemy, damage, DAMAGE_TYPE_MAGICAL, channelTime) then
+			if
+				Fu.IsInRange(bot, weakestEnemy, castRange)
+				and Fu.WillKillTarget(weakestEnemy, damage, DAMAGE_TYPE_MAGICAL, channelTime)
+			then
 				return BOT_ACTION_DESIRE_HIGH, weakestEnemy
 			end
 		end
@@ -929,7 +1005,12 @@ function X.ConsiderDismember(dismemberAbility, botTarget, hpRatio, enemiesInRotR
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end

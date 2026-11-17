@@ -104,7 +104,10 @@ function ObjectiveTravel.Best(unit, loc)
 		if channel == nil or channel <= 0 then
 			channel = 6
 		end
-		local gateTime = GetUnitToUnitDistance(unit, near) / speed + channel + 1 + GetUnitToLocationDistance(far, loc) / speed
+		local gateTime = GetUnitToUnitDistance(unit, near) / speed
+			+ channel
+			+ 1
+			+ GetUnitToLocationDistance(far, loc) / speed
 		if gateTime + MIN_SAVED < best then
 			best, how, extra, spot = gateTime, "gate", warp, near
 		end
@@ -137,15 +140,18 @@ function ObjectiveTravel.Go(bot, loc, tag)
 	local function Log()
 		if DotaTime() >= (bot._travelLogAt or -999) then
 			bot._travelLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-TRAVEL] t=%.0f %s %s for=%s eta=%.0f walk=%.0f",
-				DotaTime(),
-				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-				how,
-				tostring(tag),
-				seconds,
-				GetUnitToLocationDistance(bot, loc) / Speed(bot)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TRAVEL] t=%.0f %s %s for=%s eta=%.0f walk=%.0f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					how,
+					tostring(tag),
+					seconds,
+					GetUnitToLocationDistance(bot, loc) / Speed(bot)
+				)
+			)
 		end
 	end
 	if how == "tp" then

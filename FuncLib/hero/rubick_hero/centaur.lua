@@ -64,7 +64,11 @@ function X.ConsiderHoofStomp()
 	local damage = hoofStompAbility:GetSpecialValueInt("stomp_damage")
 	local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInRadius) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -212,7 +216,12 @@ function X.ConsiderDoubleEdge()
 				return BOT_ACTION_DESIRE_HIGH, neutralCreeps[1]
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(castRange * 2, true)
-			if laneCreeps ~= nil and #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) and Fu.GetHP(laneCreeps[1]) > 0.33 then
+			if
+				laneCreeps ~= nil
+				and #laneCreeps >= 3
+				and Fu.CanBeAttacked(laneCreeps[1])
+				and Fu.GetHP(laneCreeps[1]) > 0.33
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreeps[1]
 			end
 		end
@@ -237,7 +246,12 @@ function X.ConsiderDoubleEdge()
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), castRange + 75)
-		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and Fu.IsValidTarget(nearbyEnemies[1]) and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.65 then
+		if
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.IsValidTarget(nearbyEnemies[1])
+			and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.65
+		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 		end
 	end
@@ -295,7 +309,13 @@ function X.ConsiderStampede()
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and #chaserAllies > #nearbyAllies and #chaserAllies >= 2 and #nearbyAllies <= 1 and Fu.GetHP(bot) < 0.5 then
+			if
+				chaserAllies ~= nil
+				and #chaserAllies > #nearbyAllies
+				and #chaserAllies >= 2
+				and #nearbyAllies <= 1
+				and Fu.GetHP(bot) < 0.5
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -303,7 +323,11 @@ function X.ConsiderStampede()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderWorkHorse()
-	if not workHorseAbility:IsTrained() or not workHorseAbility:IsFullyCastable() or bot:HasModifier("modifier_centaur_stampede") then
+	if
+		not workHorseAbility:IsTrained()
+		or not workHorseAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_centaur_stampede")
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
@@ -328,7 +352,13 @@ function X.ConsiderWorkHorse()
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and #chaserAllies > #nearbyAllies and #chaserAllies >= 2 and #nearbyAllies <= 1 and Fu.GetHP(bot) < 0.5 then
+			if
+				chaserAllies ~= nil
+				and #chaserAllies > #nearbyAllies
+				and #chaserAllies >= 2
+				and #nearbyAllies <= 1
+				and Fu.GetHP(bot) < 0.5
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

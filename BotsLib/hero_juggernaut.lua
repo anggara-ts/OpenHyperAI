@@ -42,7 +42,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_melee_carry" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -61,7 +62,8 @@ local bladeDanceAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sA
 local omnislashAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "juggernaut")
 -- datafeed: Swift Slash is granted by Aghanim's Scepter; fetch it by name, since entry 4 of the ability list is
 -- not guaranteed to be it (the hero also has the innate Bladeform).
-local swiftSlashAbility = SafeAbility(bot:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
+local swiftSlashAbility =
+	SafeAbility(bot:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "juggernaut")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "juggernaut")
 local bladeFuryDesire
@@ -131,7 +133,11 @@ function X.ConsiderQ()
 		return BOT_ACTION_DESIRE_HIGH, debugText
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, radius) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			castTarget = botTarget
 			debugText = "Q-攻击:" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, debugText
@@ -157,7 +163,10 @@ function X.ConsiderQ()
 				and Fu.IsInRange(bot, enemyHero, 1200)
 				and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
 				and Fu.CanCastOnMagicImmune(enemyHero)
-				and (Fu.IsInRange(bot, enemyHero, radius - 120) or botLevel >= 9 and bot:GetCurrentMovementSpeed() < 220)
+				and (
+					Fu.IsInRange(bot, enemyHero, radius - 120)
+					or botLevel >= 9 and bot:GetCurrentMovementSpeed() < 220
+				)
 			then
 				castTarget = enemyHero
 				debugText = "Q-撤退" .. Fu.Chat.GetNormName(castTarget)
@@ -177,7 +186,10 @@ function X.ConsiderQ()
 		and Fu.IsItemAvailable("item_bfury") == nil
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(creepSearchRadius, true)
-		if (#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			(#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82)
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			castTarget = laneCreeps[1] -- was the undefined global creep (nil); label only
 			debugText = "Q-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, debugText
@@ -264,7 +276,11 @@ function X.ConsiderR()
 	local debugText = nil
 	if Fu.IsStunProjectileIncoming(bot, 1000) then
 		for _, enemyHero in pairs(enemiesNearby) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				castTarget = enemyHero
 				debugText = "R-防御:" .. Fu.Chat.GetNormName(castTarget)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
@@ -278,7 +294,11 @@ function X.ConsiderR()
 			and (botTarget:GetHealth() > bot:GetAttackDamage() * 4 or hpRatio < 0.2 or #enemiesNearby >= 2)
 		then
 			for _, enemyHero in pairs(enemiesInRange) do
-				if Fu.IsValid(enemyHero) and Fu.CanCastOnMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+				if
+					Fu.IsValid(enemyHero)
+					and Fu.CanCastOnMagicImmune(enemyHero)
+					and Fu.CanCastOnTargetAdvanced(enemyHero)
+				then
 					castTarget = enemyHero
 					debugText = "R-攻击:" .. Fu.Chat.GetNormName(castTarget)
 					return BOT_ACTION_DESIRE_HIGH, castTarget, debugText

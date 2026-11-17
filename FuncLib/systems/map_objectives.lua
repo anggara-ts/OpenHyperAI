@@ -247,7 +247,11 @@ end
 
 function MapObjectives.TeamInCrisis(bot)
 	local ancient = GetAncient(GetTeam())
-	if ancient ~= nil and Utils.CountEnemyHeroesNear and Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2800) >= 1 then
+	if
+		ancient ~= nil
+		and Utils.CountEnemyHeroesNear
+		and Utils.CountEnemyHeroesNear(ancient:GetLocation(), 2800) >= 1
+	then
 		return true
 	end
 	if Utils.CountEnemyHeroesOnHighGround and Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 2 then
@@ -632,10 +636,7 @@ local function MarkLotusDo(bot, name)
 		local pos = bot:GetLocation()
 		local hero = string.gsub(bot:GetUnitName() or "?", "npc_dota_hero_", "")
 		local team = GetTeam() == TEAM_RADIANT and "r" or "d"
-		print(string.format(
-			"[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f",
-			hero, team, DotaTime(), name, pos.x, pos.y
-		))
+		print(string.format("[OHA-LOTUS] %s/%s t=%.1f do=%s xy=%.0f,%.0f", hero, team, DotaTime(), name, pos.x, pos.y))
 	end)
 	if not ok then
 		print("[OHA-LOTUS] err " .. tostring(err))
@@ -726,12 +727,7 @@ local function HeroesNearLoc(loc, radius)
 		if IsHeroAlive(pid) then
 			local info = GetHeroLastSeenInfo(pid)
 			local seen = info and info[1]
-			if
-				seen ~= nil
-				and seen.location ~= nil
-				and seen.time_since_seen ~= nil
-				and seen.time_since_seen <= 1.0
-			then
+			if seen ~= nil and seen.location ~= nil and seen.time_since_seen ~= nil and seen.time_since_seen <= 1.0 then
 				local dx = seen.location.x - loc.x
 				local dy = seen.location.y - loc.y
 				if dx * dx + dy * dy <= radiusSq then
@@ -818,14 +814,17 @@ local function ProbeUnit(kind, unit)
 		return
 	end
 	probeSeen[key] = { at = now, sig = sig }
-	pcall(print, string.format(
-		"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
-		now,
-		kind,
-		key,
-		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
-		#parts > 0 and sig or (okN and "none" or "unreadable")
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-LOTUS] t=%.0f probe %s %s team=%s mods=%s",
+			now,
+			kind,
+			key,
+			GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+			#parts > 0 and sig or (okN and "none" or "unreadable")
+		)
+	)
 end
 local function ProbeObjectives(bot)
 	local first = nil
@@ -984,7 +983,16 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			-- 1200 of him, so a laner who said "Taking lotus" turned back a second later (6:05).
 			-- Near the bot only being outnumbered stops it.
 			local foesAtPool = HeroesNearLoc(loc, 1200)
-			if count ~= nil and count > 0 and spawnOpen and sinceLast >= 0 and sinceLast <= 45 and foesAtPool == 0 and #foes <= #friends and bot._lotusSkipMark ~= mark then
+			if
+				count ~= nil
+				and count > 0
+				and spawnOpen
+				and sinceLast >= 0
+				and sinceLast <= 45
+				and foesAtPool == 0
+				and #foes <= #friends
+				and bot._lotusSkipMark ~= mark
+			then
 				inLotus = true
 				etaL = -sinceLast
 			end
@@ -1017,20 +1025,23 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				-- bot went for the 3:00 lotus beside Doom.
 				if why ~= bot._lotusWhyLogged then
 					bot._lotusWhyLogged = why
-					pcall(print, string.format(
-						"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						why,
-						loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
-						type(dist) == "number" and string.format("%.0f", dist) or "?",
-						#foes,
-						#friends,
-						loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
-						bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
-						sinceLast,
-						toNext
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-LOTUS] t=%.0f %s why=%s pool=%s dist=%s foes=%d friends=%d poolFoes=%d hp=%.2f since=%.0f toNext=%.0f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							why,
+							loc ~= nil and string.format("%.0f,%.0f", loc.x, loc.y) or "-",
+							type(dist) == "number" and string.format("%.0f", dist) or "?",
+							#foes,
+							#friends,
+							loc ~= nil and HeroesNearLoc(loc, 1600) or -1,
+							bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
+							sinceLast,
+							toNext
+						)
+					)
 				end
 				bot._lotusWhy = why
 				bot._lotusDist = dist
@@ -1077,14 +1088,17 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 					if logNow then
 						bot._lotusRoomLogAt = DotaTime() + 5
 					end
-					pcall(logNow and print or function() end, string.format(
-						"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						tostring(okR and made),
-						hp,
-						bot:GetMana() / math.max(1, bot:GetMaxMana())
-					))
+					pcall(
+						logNow and print or function() end,
+						string.format(
+							"[OHA-LOTUS] t=%.0f %s make-room ok=%s hp=%.2f mp=%.2f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(okR and made),
+							hp,
+							bot:GetMana() / math.max(1, bot:GetMaxMana())
+						)
+					)
 				end
 			elseif loc == nil then
 				failWhy = "no-pool"
@@ -1104,7 +1118,11 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and dist <= maxWalk
 				and hp >= 0.28
 				and not (danger and dist > 700)
-				and (beside or contester or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true))
+				and (
+					beside
+					or contester
+					or MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.LotusScore, true)
+				)
 			then
 				note(passBy and "pass-by" or (beside and "beside" or (contester and "contest" or "walk")))
 				local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
@@ -1280,7 +1298,7 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			MarkLotusDo(bot, "empty")
 			return false
 		end
-		if (MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0)) then
+		if MapObjectives.LotusSpawnOpen() or (count ~= nil and count > 0) then
 			if MapObjectives.LotusPluckStalled(bot, EnemyInLotusRing(bot, loc)) then
 				local interval = MapObjectives.LotusInterval()
 				bot._lotusSkipMark = math.floor(math.max(0, DotaTime()) / interval) * interval

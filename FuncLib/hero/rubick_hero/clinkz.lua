@@ -90,7 +90,10 @@ function X.ConsiderStrafe()
 	if Fu.IsFarming(bot) then
 		if Fu.IsAttacking(bot) then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				if Fu.GetMP(bot) > 0.25 then
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -112,7 +115,11 @@ function X.ConsiderStrafe()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, attackRange) and Fu.IsAttacking(bot) then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, attackRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -160,7 +167,8 @@ function X.ConsiderTarBomb()
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 				if
 					Fu.IsAttacking(bot)
-					or Fu.IsChasingTarget(bot, botTarget) and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed()
+					or Fu.IsChasingTarget(bot, botTarget)
+						and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed()
 				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
@@ -190,7 +198,12 @@ function X.ConsiderTarBomb()
 		end
 	end
 	if Fu.IsPushing(bot) then
-		if Fu.IsValidBuilding(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(botTarget) then
+		if
+			Fu.IsValidBuilding(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -215,7 +228,10 @@ function X.ConsiderTarBomb()
 		for _, creep in pairs(laneCreeps) do
 			if
 				Fu.IsValid(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= damage
 			then
 				local nearbyAllies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
@@ -234,13 +250,22 @@ function X.ConsiderTarBomb()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and Fu.IsAttacking(bot) then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	for _, allyHero in pairs(nearbyHeroes) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2)
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -296,7 +321,11 @@ function X.ConsiderDeathPact()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function X.ConsiderSkeletonWalk()
-	if not skeletonWalkAbility:IsFullyCastable() or bot:HasModifier("modifier_clinkz_wind_walk") or Fu.IsRealInvisible(bot) then
+	if
+		not skeletonWalkAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_clinkz_wind_walk")
+		or Fu.IsRealInvisible(bot)
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local roshanLocation = Fu.GetCurrentRoshanLocation()
@@ -327,7 +356,11 @@ function X.ConsiderSkeletonWalk()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -431,7 +464,11 @@ function X.ConsiderBurningBarrage()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and Fu.IsAttacking(bot) then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -449,7 +486,8 @@ function X.ConsiderBurningArmy()
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if enemiesInRadius ~= nil and #enemiesInRadius >= 2 then
 			if GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesInRadius)) > castRange then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesInRadius), castRange)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesInRadius), castRange)
 			else
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesInRadius)
 			end
@@ -470,13 +508,15 @@ function X.ConsiderBurningArmy()
 				enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius)
 				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
 					if GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearTarget)) > castRange then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 					end
 				else
 					if GetUnitToUnitDistance(bot, botTarget) > castRange then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(0.5)
 					end

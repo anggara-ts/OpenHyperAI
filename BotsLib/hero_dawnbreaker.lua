@@ -74,17 +74,21 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local fireWreathAbility = SafeAbility(bot:GetAbilityByName("dawnbreaker_fire_wreath"), "dawnbreaker_fire_wreath", "dawnbreaker")
-local celestialHammerAbility = SafeAbility(bot:GetAbilityByName("dawnbreaker_celestial_hammer"), "dawnbreaker_celestial_hammer", "dawnbreaker")
+local fireWreathAbility =
+	SafeAbility(bot:GetAbilityByName("dawnbreaker_fire_wreath"), "dawnbreaker_fire_wreath", "dawnbreaker")
+local celestialHammerAbility =
+	SafeAbility(bot:GetAbilityByName("dawnbreaker_celestial_hammer"), "dawnbreaker_celestial_hammer", "dawnbreaker")
 local convergeAbility = SafeAbility(bot:GetAbilityByName("dawnbreaker_converge"), "dawnbreaker_converge", "dawnbreaker")
-local solarGuardianAbility = SafeAbility(bot:GetAbilityByName("dawnbreaker_solar_guardian"), "dawnbreaker_solar_guardian", "dawnbreaker")
+local solarGuardianAbility =
+	SafeAbility(bot:GetAbilityByName("dawnbreaker_solar_guardian"), "dawnbreaker_solar_guardian", "dawnbreaker")
 local hammerCastRangeTalent = SafeAbility(
 	bot:GetAbilityByName("special_bonus_unique_dawnbreaker_celestial_hammer_cast_range"),
 	"special_bonus_unique_dawnbreaker_celestial_hammer_cast_range",
@@ -146,7 +150,9 @@ function X.SkillsComplement()
 			projectileSpeed = projectileSpeed * (1 + hammerCastRangeTalent:GetSpecialValueInt("value") / 100)
 		end
 		bot:Action_UseAbilityOnLocation(celestialHammerAbility, celestialHammerLocation)
-		hammerLandTime = DotaTime() + celestialHammerAbility:GetCastPoint() + GetUnitToLocationDistance(bot, celestialHammerLocation) / projectileSpeed
+		hammerLandTime = DotaTime()
+			+ celestialHammerAbility:GetCastPoint()
+			+ GetUnitToLocationDistance(bot, celestialHammerLocation) / projectileSpeed
 		return
 	end
 	convergeDesire = X.ConsiderConverge()
@@ -173,7 +179,9 @@ function X.ConsiderStarBreaker()
 	local duration = fireWreathAbility:GetSpecialValueFloat("duration")
 	local castPoint = fireWreathAbility:GetCastPoint()
 	local mpRatio = bot:GetMana() / bot:GetMaxMana()
-	local damage = bot:GetAttackDamage() + fireWreathAbility:GetSpecialValueInt("swipe_damage") + fireWreathAbility:GetSpecialValueInt("smash_damage")
+	local damage = bot:GetAttackDamage()
+		+ fireWreathAbility:GetSpecialValueInt("swipe_damage")
+		+ fireWreathAbility:GetSpecialValueInt("smash_damage")
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
@@ -227,7 +235,13 @@ function X.ConsiderStarBreaker()
 	if Fu.IsFarming(bot) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(300)
 		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), radius, radius, 0, 0)
-		if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoe.count >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoe.count >= 3) then
+		if
+			neutralCreeps ~= nil
+			and (
+				#neutralCreeps >= 3 and aoe.count >= 3
+				or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoe.count >= 3
+			)
+		then
 			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 		end
 	end
@@ -352,7 +366,11 @@ function X.ConsiderCelestialHammer()
 				and creep:GetHealth() <= damage
 			then
 				local enemiesAround = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if enemiesAround ~= nil and #enemiesAround >= 1 and GetUnitToUnitDistance(creep, enemiesAround[1]) <= 600 then
+				if
+					enemiesAround ~= nil
+					and #enemiesAround >= 1
+					and GetUnitToUnitDistance(creep, enemiesAround[1]) <= 600
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
 				end
 			end
@@ -389,7 +407,10 @@ function X.ConsiderConverge()
 			if
 				targetAllies ~= nil
 				and #alliesAround >= #targetAllies
-				and GetUnitToLocationDistance(botTarget, hammerLocation) < GetUnitToLocationDistance(bot, hammerLocation)
+				and GetUnitToLocationDistance(botTarget, hammerLocation) < GetUnitToLocationDistance(
+					bot,
+					hammerLocation
+				)
 				and DotaTime() >= hammerLandTime
 			then
 				return BOT_ACTION_DESIRE_HIGH
@@ -435,7 +456,10 @@ function X.ConsiderSolarGuardian()
 				-- fight that radius spanned the map, so the ally cluster could be anywhere (even base).
 				-- The enemy check is also made at the chosen spot instead of a separate enemy cluster.
 				local allyAoe = bot:FindAoELocation(false, true, teamFightLocation, radius, radius, totalDelay, 0)
-				local enemiesAtSpot = allyAoe ~= nil and allyAoe.targetloc ~= nil and Fu.GetEnemiesNearLoc(allyAoe.targetloc, radius) or {}
+				local enemiesAtSpot = allyAoe ~= nil
+						and allyAoe.targetloc ~= nil
+						and Fu.GetEnemiesNearLoc(allyAoe.targetloc, radius)
+					or {}
 				local enemyAoe = { count = #enemiesAtSpot }
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 				if allyAoe.count >= 1 and enemyAoe.count >= 1 then
@@ -453,19 +477,23 @@ function X.ConsiderSolarGuardian()
 							if Fu.IsValidHero(allyHero) and allyHero ~= bot and not allyHero:IsIllusion() then
 								local distance = GetUnitToLocationDistance(allyHero, allyAoe.targetloc)
 								if allyDist < 0 or distance < allyDist then
-									allyDist, allyName = distance, (string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", ""))
+									allyDist, allyName =
+										distance, (string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", ""))
 								end
 							end
 						end
-						pcall(print, string.format(
-							"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s",
-							DotaTime(),
-							allyAoe.count,
-							enemyAoe.count,
-							GetUnitToLocationDistance(bot, allyAoe.targetloc),
-							math.floor(allyDist),
-							allyName
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-DAWNBREAKER] t=%.0f solar guardian allies=%d enemies=%d dist=%d allyDist=%d ally=%s",
+								DotaTime(),
+								allyAoe.count,
+								enemyAoe.count,
+								GetUnitToLocationDistance(bot, allyAoe.targetloc),
+								math.floor(allyDist),
+								allyName
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, allyAoe.targetloc
 				end
@@ -475,7 +503,11 @@ function X.ConsiderSolarGuardian()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 	if isRetreating and bot:DistanceFromFountain() > 1600 and hpRatio < 0.33 then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if bot:WasRecentlyDamagedByHero(enemyHero, 2.0) and not Fu.IsSuspiciousIllusion(enemyHero) and not Fu.IsRealInvisible(bot) then
+			if
+				bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsRealInvisible(bot)
+			then
 				local nearbyAllies = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
 				local farthestAlly = nil
 				for i = 1, #GetTeamPlayers(GetTeam()) do

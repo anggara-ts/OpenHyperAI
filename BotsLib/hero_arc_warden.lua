@@ -14,23 +14,27 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, { 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 }, {
-	3,
-	1,
-	3,
-	1,
-	3,
-	6,
-	3,
-	1,
-	1,
-	2,
-	6,
-	2,
-	2,
-	2,
-	6,
-} }
+local tAllAbilityBuildList = {
+	{ 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 },
+	{ 3, 1, 3, 1, 3, 6, 3, 1, 1, 2, 6, 2, 2, 2, 6 },
+	{
+		3,
+		1,
+		3,
+		1,
+		3,
+		6,
+		3,
+		1,
+		1,
+		2,
+		6,
+		2,
+		2,
+		2,
+		6,
+	},
+}
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_1" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -138,7 +142,8 @@ X["sSellList"] = { "item_travel_boots", "item_magic_wand", "item_sheepstick", "i
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -146,9 +151,12 @@ function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
 local fluxAbility = SafeAbility(bot:GetAbilityByName("arc_warden_flux"), "arc_warden_flux", "arc_warden")
-local magneticFieldAbility = SafeAbility(bot:GetAbilityByName("arc_warden_magnetic_field"), "arc_warden_magnetic_field", "arc_warden")
-local sparkWraithAbility = SafeAbility(bot:GetAbilityByName("arc_warden_spark_wraith"), "arc_warden_spark_wraith", "arc_warden")
-local tempestDoubleAbility = SafeAbility(bot:GetAbilityByName("arc_warden_tempest_double"), "arc_warden_tempest_double", "arc_warden")
+local magneticFieldAbility =
+	SafeAbility(bot:GetAbilityByName("arc_warden_magnetic_field"), "arc_warden_magnetic_field", "arc_warden")
+local sparkWraithAbility =
+	SafeAbility(bot:GetAbilityByName("arc_warden_spark_wraith"), "arc_warden_spark_wraith", "arc_warden")
+local tempestDoubleAbility =
+	SafeAbility(bot:GetAbilityByName("arc_warden_tempest_double"), "arc_warden_tempest_double", "arc_warden")
 local fluxDesire, fluxTarget
 local magneticFieldDesire, magneticFieldLocation
 local sparkWraithDesire, sparkWraithLocation
@@ -274,13 +282,22 @@ function X.ConsiderFlux()
 		then
 			local alliesNearEnemy = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, true, BOT_MODE_NONE)
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				alliesNearEnemy ~= nil
+				and enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -316,7 +333,11 @@ function X.ConsiderMagneticField()
 	-- fix: the field was never used to survive. It evades attacks from outside the field (datafeed;
 	-- 100% evasion, radius 300 in game data): drop it on himself when retreating from a ranged
 	-- hero that is right-clicking him from outside that radius.
-	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(1.5) and not bot:HasModifier("modifier_arc_warden_magnetic_field") then
+	if
+		Fu.IsRetreating(bot)
+		and bot:WasRecentlyDamagedByAnyHero(1.5)
+		and not bot:HasModifier("modifier_arc_warden_magnetic_field")
+	then
 		for _, chaser in pairs(Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {}) do
 			if
 				Fu.IsValidHero(chaser)
@@ -326,7 +347,10 @@ function X.ConsiderMagneticField()
 			then
 				if DotaTime() >= (bot._arcFieldLogAt or -999) then
 					bot._arcFieldLogAt = DotaTime() + 10
-					pcall(print, string.format("[OHA-ARC] t=%.0f magnetic field retreat hp=%.2f", DotaTime(), Fu.GetHP(bot)))
+					pcall(
+						print,
+						string.format("[OHA-ARC] t=%.0f magnetic field retreat hp=%.2f", DotaTime(), Fu.GetHP(bot))
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
@@ -339,7 +363,9 @@ function X.ConsiderMagneticField()
 				local allyTarget = allyHero:GetAttackTarget()
 				if
 					Fu.IsValidHero(allyHero)
-					and (Fu.IsInRange(bot, allyHero, radius) and not allyHero:HasModifier("modifier_arc_warden_magnetic_field"))
+					and (Fu.IsInRange(bot, allyHero, radius) and not allyHero:HasModifier(
+						"modifier_arc_warden_magnetic_field"
+					))
 					and (Fu.IsValidTarget(allyTarget) and GetUnitToUnitDistance(allyHero, allyTarget) <= allyHero:GetAttackRange())
 					and not Fu.IsSuspiciousIllusion(allyHero)
 					and not Fu.IsSuspiciousIllusion(allyTarget)
@@ -347,7 +373,11 @@ function X.ConsiderMagneticField()
 				then
 					local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1600, true, BOT_MODE_NONE)
 					local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1600, false, BOT_MODE_NONE)
-					if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+					if
+						alliesNearTarget ~= nil
+						and enemiesNearTarget ~= nil
+						and #alliesNearTarget >= #enemiesNearTarget
+					then
 						return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 					end
 				end
@@ -362,7 +392,12 @@ function X.ConsiderMagneticField()
 		local nearbyBarracks = bot:GetNearbyBarracks(888, true)
 		local nearbyFillers = bot:GetNearbyFillers(888, true)
 		if isAttacking then
-			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 or nearbyTowers ~= nil and #nearbyTowers >= 1 or nearbyBarracks ~= nil and #nearbyBarracks >= 1 or nearbyFillers ~= nil and #nearbyFillers >= 1 then
+			if
+				nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3
+				or nearbyTowers ~= nil and #nearbyTowers >= 1
+				or nearbyBarracks ~= nil and #nearbyBarracks >= 1
+				or nearbyFillers ~= nil and #nearbyFillers >= 1
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -378,7 +413,10 @@ function X.ConsiderMagneticField()
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(888)
-			if nearbyNeutrals ~= nil and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -463,7 +501,11 @@ function X.ConsiderSparkWraith()
 	then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 1) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 1)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -541,7 +583,11 @@ function X.ConsiderSparkWraith()
 		local weakestEnemy = nil
 		local minHealth = 99999
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsValidHero(enemyHero) and GetUnitToUnitDistance(bot, enemyHero) <= castRange and enemyHero:GetHealth() < minHealth then
+			if
+				Fu.IsValidHero(enemyHero)
+				and GetUnitToUnitDistance(bot, enemyHero) <= castRange
+				and enemyHero:GetHealth() < minHealth
+			then
 				weakestEnemy = enemyHero
 				minHealth = enemyHero:GetHealth()
 			end
@@ -589,12 +635,22 @@ function X.ConsiderSparkWraith()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.GetHP(botTarget) > 0.2 and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.GetHP(botTarget) > 0.2
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.GetHP(botTarget) > 0.2 and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.GetHP(botTarget) > 0.2
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -611,7 +667,11 @@ function X.ConsiderTempestDouble()
 		local nearbyTowers = bot:GetNearbyTowers(800, true)
 		local nearbyCreeps = bot:GetNearbyCreeps(800, true)
 		if isAttacking then
-			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 2 or nearbyTowers ~= nil and #nearbyTowers >= 1 or nearbyCreeps ~= nil and #nearbyCreeps >= 2 then
+			if
+				nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 2
+				or nearbyTowers ~= nil and #nearbyTowers >= 1
+				or nearbyCreeps ~= nil and #nearbyCreeps >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -643,7 +703,11 @@ function X.ConsiderTempestDouble()
 		end
 	end
 	if isGoingOnSomeone then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1600) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1600)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1600, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1600, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget + 1 >= #enemiesNearTarget then
@@ -658,7 +722,8 @@ function X.ConsiderTempestDouble()
 					end
 				end
 				if not Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				end
 			end
 		end
@@ -671,7 +736,12 @@ function X.ConsiderTempestDouble()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and Fu.GetHP(botTarget) > 0.5 and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and Fu.GetHP(botTarget) > 0.5
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 		end
 	end
@@ -697,7 +767,11 @@ end
 function X.UpdateDoubleStatus()
 	if tempestDouble == nil and bot:GetLevel() >= 6 then
 		for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			if allyHero ~= nil and allyHero:IsAlive() and allyHero:HasModifier("modifier_arc_warden_tempest_double") then
+			if
+				allyHero ~= nil
+				and allyHero:IsAlive()
+				and allyHero:HasModifier("modifier_arc_warden_tempest_double")
+			then
 				tempestDouble = allyHero
 			end
 		end

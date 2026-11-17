@@ -92,18 +92,24 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_aether_le
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local strokeOfFateAbility = SafeAbility(bot:GetAbilityByName("grimstroke_dark_artistry"), "grimstroke_dark_artistry", "grimstroke")
-local phantomsEmbraceAbility = SafeAbility(bot:GetAbilityByName("grimstroke_ink_creature"), "grimstroke_ink_creature", "grimstroke")
-local inkSwellAbility = SafeAbility(bot:GetAbilityByName("grimstroke_spirit_walk"), "grimstroke_spirit_walk", "grimstroke")
-local darkPortraitAbility = SafeAbility(bot:GetAbilityByName("grimstroke_dark_portrait"), "grimstroke_dark_portrait", "grimstroke")
-local soulBindAbility = SafeAbility(bot:GetAbilityByName("grimstroke_soul_chain"), "grimstroke_soul_chain", "grimstroke")
+local strokeOfFateAbility =
+	SafeAbility(bot:GetAbilityByName("grimstroke_dark_artistry"), "grimstroke_dark_artistry", "grimstroke")
+local phantomsEmbraceAbility =
+	SafeAbility(bot:GetAbilityByName("grimstroke_ink_creature"), "grimstroke_ink_creature", "grimstroke")
+local inkSwellAbility =
+	SafeAbility(bot:GetAbilityByName("grimstroke_spirit_walk"), "grimstroke_spirit_walk", "grimstroke")
+local darkPortraitAbility =
+	SafeAbility(bot:GetAbilityByName("grimstroke_dark_portrait"), "grimstroke_dark_portrait", "grimstroke")
+local soulBindAbility =
+	SafeAbility(bot:GetAbilityByName("grimstroke_soul_chain"), "grimstroke_soul_chain", "grimstroke")
 local strokeOfFateDesire, strokeOfFateLocation
 local phantomsEmbraceDesire, phantomsEmbraceTarget
 local inkSwellDesire, inkSwellTarget
@@ -144,13 +150,16 @@ local function StrokeStraight()
 	local okA, after = pcall(function()
 		return strokeOfFateAbility:GetAutoCastState()
 	end)
-	pcall(print, string.format(
-		"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
-		now,
-		first and "set" or "reset-found",
-		gap,
-		tostring(okA and after)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
+			now,
+			first and "set" or "reset-found",
+			gap,
+			tostring(okA and after)
+		)
+	)
 end
 -- Stroke of Fate on creeps keeps mana for Ink Swell + Phantom's Embrace (+ Soulbind when it is
 -- up within 20s), and at least 25% of the pool. It was spammed on waves down to low mana.
@@ -189,13 +198,19 @@ function X.SkillsComplement()
 		-- is also cast on the other (Valve data), so both get the latch and the silence.
 		bot:Action_ClearActions(false)
 		bot:ActionQueue_UseAbilityOnEntity(soulBindAbility, soulBindTarget)
-		if phantomsEmbraceAbility:IsFullyCastable() and bot:GetMana() >= soulBindAbility:GetManaCost() + phantomsEmbraceAbility:GetManaCost() then
+		if
+			phantomsEmbraceAbility:IsFullyCastable()
+			and bot:GetMana() >= soulBindAbility:GetManaCost() + phantomsEmbraceAbility:GetManaCost()
+		then
 			bot:ActionQueue_UseAbilityOnEntity(phantomsEmbraceAbility, soulBindTarget)
-			pcall(print, string.format(
-				"[OHA-GRIM] t=%.0f soulbind-embrace target=%s",
-				DotaTime(),
-				(string.gsub(soulBindTarget:GetUnitName(), "npc_dota_hero_", ""))
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRIM] t=%.0f soulbind-embrace target=%s",
+					DotaTime(),
+					(string.gsub(soulBindTarget:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
 		end
 		return
 	end
@@ -220,23 +235,29 @@ function X.SkillsComplement()
 			local okA, after = pcall(function()
 				return strokeOfFateAbility:GetAutoCastState()
 			end)
-			pcall(print, string.format(
-				"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
-				DotaTime(),
-				tostring(okT),
-				okB and tostring(before) or "error",
-				okA and tostring(after) or "error"
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
+					DotaTime(),
+					tostring(okT),
+					okB and tostring(before) or "error",
+					okA and tostring(after) or "error"
+				)
+			)
 		end
 		local okS, state = pcall(function()
 			return strokeOfFateAbility:GetAutoCastState()
 		end)
-		pcall(print, string.format(
-			"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
-			DotaTime(),
-			okS and tostring(state) or "error",
-			math.floor(GetUnitToLocationDistance(bot, strokeOfFateLocation))
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
+				DotaTime(),
+				okS and tostring(state) or "error",
+				math.floor(GetUnitToLocationDistance(bot, strokeOfFateLocation))
+			)
+		)
 		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, strokeOfFateLocation)
 		return
 	end
@@ -281,7 +302,11 @@ function X.ConsiderStrokeOfFate()
 		then
 			local nearbyAllies = botTarget:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 			local nearbyEnemies = botTarget:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-			if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600)) then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
+				and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600))
+			then
 				local travelTime = GetUnitToUnitDistance(bot, botTarget) / projectileSpeed + castPoint
 				nearbyEnemies = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius)
 				if nearbyEnemies ~= nil and #nearbyEnemies >= 2 and not Fu.IsRunning(botTarget) then
@@ -312,7 +337,8 @@ function X.ConsiderStrokeOfFate()
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and X.StrokeOnCreepsOk() and abilityLevel >= 3 then
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
 		if aoeLocation.count >= 2 then
-			local vulnerableUnit = Fu.GetVulnerableUnitNearLoc(bot, true, true, castRange, radius, aoeLocation.targetloc)
+			local vulnerableUnit =
+				Fu.GetVulnerableUnitNearLoc(bot, true, true, castRange, radius, aoeLocation.targetloc)
 			if vulnerableUnit ~= nil then
 				local travelTime = GetUnitToUnitDistance(bot, vulnerableUnit) / projectileSpeed + castPoint
 				return BOT_ACTION_DESIRE_HIGH, vulnerableUnit:GetExtrapolatedLocation(travelTime)
@@ -334,7 +360,12 @@ function X.ConsiderStrokeOfFate()
 	local nearbyAllies = bot:GetNearbyHeroes(castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = allyHero:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:GetActiveModeDesire() >= 0.5 and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:GetActiveModeDesire() >= 0.5
+			and not allyHero:IsIllusion()
+		then
 			if
 				Fu.IsValidHero(enemiesNearAlly[1])
 				and Fu.CanCastOnNonMagicImmune(enemiesNearAlly[1])
@@ -354,12 +385,22 @@ function X.ConsiderStrokeOfFate()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and Fu.GetHP(botTarget) < 0.5 and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and Fu.GetHP(botTarget) < 0.5
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -404,7 +445,11 @@ function X.ConsiderPhantomsEmbrace()
 		then
 			local nearbyAllies = botTarget:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 			local nearbyEnemies = botTarget:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-			if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600)) then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
+				and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600))
+			then
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end
@@ -425,7 +470,11 @@ function X.ConsiderPhantomsEmbrace()
 			if
 				nearbyAllies ~= nil
 				and chaserAllies ~= nil
-				and (#chaserAllies > #nearbyAllies or not Fu.WeAreStronger(bot, 1200) or bot:WasRecentlyDamagedByAnyHero(1))
+				and (
+					#chaserAllies > #nearbyAllies
+					or not Fu.WeAreStronger(bot, 1200)
+					or bot:WasRecentlyDamagedByAnyHero(1)
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
@@ -434,7 +483,12 @@ function X.ConsiderPhantomsEmbrace()
 	local nearbyAllies = bot:GetNearbyHeroes(castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = allyHero:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -519,10 +573,23 @@ function X.ConsiderInkSwell()
 		then
 			local nearbyAllies = botTarget:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			local nearbyEnemies = botTarget:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-			if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600)) and nearestAlly ~= nil then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
+				and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600))
+				and nearestAlly ~= nil
+			then
 				nearbyEnemies = Fu.GetEnemiesNearLoc(nearestAlly:GetLocation(), radius)
 				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
-					pcall(print, string.format("[OHA-GRIM] t=%.0f ink-swell engage ally=%s dist=%d", DotaTime(), nearestAlly:GetUnitName(), math.floor(nearestAllyDistance)))
+					pcall(
+						print,
+						string.format(
+							"[OHA-GRIM] t=%.0f ink-swell engage ally=%s dist=%d",
+							DotaTime(),
+							nearestAlly:GetUnitName(),
+							math.floor(nearestAllyDistance)
+						)
+					)
 					return BOT_ACTION_DESIRE_HIGH, nearestAlly
 				end
 			end
@@ -543,14 +610,23 @@ function X.ConsiderInkSwell()
 			if
 				nearbyAllies ~= nil
 				and chaserAllies ~= nil
-				and (#chaserAllies > #nearbyAllies or not Fu.WeAreStronger(bot, 1600) or bot:WasRecentlyDamagedByAnyHero(1) and Fu.GetHP(bot) < 0.75)
+				and (
+					#chaserAllies > #nearbyAllies
+					or not Fu.WeAreStronger(bot, 1600)
+					or bot:WasRecentlyDamagedByAnyHero(1) and Fu.GetHP(bot) < 0.75
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
@@ -582,7 +658,13 @@ function X.ConsiderSoulBind()
 			local nearbyAllies = strongestEnemy:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			local nearbyEnemies = strongestEnemy:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 			local enemiesInLatchRadius = Fu.GetEnemiesNearLoc(strongestEnemy:GetLocation(), latchRadius)
-			if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600)) and enemiesInLatchRadius ~= nil and #enemiesInLatchRadius >= 2 then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
+				and (#nearbyAllies >= #nearbyEnemies or Fu.WeAreStronger(bot, 1600))
+				and enemiesInLatchRadius ~= nil
+				and #enemiesInLatchRadius >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 			end
 		end
@@ -608,7 +690,11 @@ function X.ConsiderDarkPortrait()
 		then
 			local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-			if nearbyEnemies ~= nil and nearbyAllies ~= nil and (#nearbyEnemies >= #nearbyAllies or Fu.WeAreStronger(bot, 1600)) then
+			if
+				nearbyEnemies ~= nil
+				and nearbyAllies ~= nil
+				and (#nearbyEnemies >= #nearbyAllies or Fu.WeAreStronger(bot, 1600))
+			then
 				return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 			end
 		end

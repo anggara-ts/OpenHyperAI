@@ -156,21 +156,37 @@ function X.ConsiderSpinWeb()
 			and not X.DoesLocationHaveWeb(bot:GetLocation(), radius)
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
 	if Fu.IsPushing(bot) then
-		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and not X.DoesLocationHaveWeb(Fu.GetCenterOfUnits(nearbyLaneCreeps), radius) then
+		if
+			nearbyLaneCreeps ~= nil
+			and #nearbyLaneCreeps >= 4
+			and not X.DoesLocationHaveWeb(Fu.GetCenterOfUnits(nearbyLaneCreeps), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 		end
-		if nearbyTowers ~= nil and #nearbyTowers >= 1 and Fu.CanBeAttacked(nearbyTowers[1]) and not X.DoesLocationHaveWeb(nearbyTowers[1]:GetLocation(), radius) then
+		if
+			nearbyTowers ~= nil
+			and #nearbyTowers >= 1
+			and Fu.CanBeAttacked(nearbyTowers[1])
+			and not X.DoesLocationHaveWeb(nearbyTowers[1]:GetLocation(), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyTowers[1]:GetLocation()
 		end
 	end
 	if Fu.IsLaning(bot) then
-		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and not X.DoesLocationHaveWeb(Fu.GetCenterOfUnits(nearbyLaneCreeps), radius) then
+		if
+			nearbyLaneCreeps ~= nil
+			and #nearbyLaneCreeps >= 4
+			and not X.DoesLocationHaveWeb(Fu.GetCenterOfUnits(nearbyLaneCreeps), radius)
+		then
 			return BOT_MODE_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 		end
 	end
@@ -248,7 +264,10 @@ function X.ConsiderSilkenBola()
 			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
@@ -332,7 +351,11 @@ function X.ConsiderSpawnSpiderlings()
 end
 function X.DoesLocationHaveWeb(location, radius)
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if Fu.IsValid(unit) and unit:GetUnitName() == "npc_dota_broodmother_web" and GetUnitToLocationDistance(unit, location) < radius then
+		if
+			Fu.IsValid(unit)
+			and unit:GetUnitName() == "npc_dota_broodmother_web"
+			and GetUnitToLocationDistance(unit, location) < radius
+		then
 			return true
 		end
 	end

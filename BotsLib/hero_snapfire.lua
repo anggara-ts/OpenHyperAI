@@ -92,19 +92,24 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local scatterblastAbility = SafeAbility(bot:GetAbilityByName("snapfire_scatterblast"), "snapfire_scatterblast", "snapfire")
-local firesnapCookieAbility = SafeAbility(bot:GetAbilityByName("snapfire_firesnap_cookie"), "snapfire_firesnap_cookie", "snapfire")
-local lilShredderAbility = SafeAbility(bot:GetAbilityByName("snapfire_lil_shredder"), "snapfire_lil_shredder", "snapfire")
+local scatterblastAbility =
+	SafeAbility(bot:GetAbilityByName("snapfire_scatterblast"), "snapfire_scatterblast", "snapfire")
+local firesnapCookieAbility =
+	SafeAbility(bot:GetAbilityByName("snapfire_firesnap_cookie"), "snapfire_firesnap_cookie", "snapfire")
+local lilShredderAbility =
+	SafeAbility(bot:GetAbilityByName("snapfire_lil_shredder"), "snapfire_lil_shredder", "snapfire")
 local gobbleUpAbility = SafeAbility(bot:GetAbilityByName("snapfire_gobble_up"), "snapfire_gobble_up", "snapfire")
 local spitCreepAbility = SafeAbility(bot:GetAbilityByName("snapfire_spit_creep"), "snapfire_spit_creep", "snapfire")
-local mortimerKissesAbility = SafeAbility(bot:GetAbilityByName("snapfire_mortimer_kisses"), "snapfire_mortimer_kisses", "snapfire")
+local mortimerKissesAbility =
+	SafeAbility(bot:GetAbilityByName("snapfire_mortimer_kisses"), "snapfire_mortimer_kisses", "snapfire")
 local scatterblastDesire, scatterblastLocation
 local firesnapCookieDesire, firesnapCookieTarget
 local lilShredderDesire
@@ -215,7 +220,10 @@ function X.ConsiderScatterBlast()
 				and Fu.IsChasingTarget(enemyHero, bot)
 				-- Review fix: the slow is the escape value, so also blast a chaser that is hurting us,
 				-- not only one it kills.
-				and (Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL) or bot:WasRecentlyDamagedByHero(enemyHero, 2.0))
+				and (Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL) or bot:WasRecentlyDamagedByHero(
+					enemyHero,
+					2.0
+				))
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
@@ -227,7 +235,14 @@ function X.ConsiderScatterBlast()
 				-- undefined/forward (away from the chaser while running). Aim at the chaser.
 				if DotaTime() - (X.lastBlastLog or -99) > 10 then
 					X.lastBlastLog = DotaTime()
-					pcall(print, string.format("[OHA-SNAPFIRE] t=%.0f scatter-retreat chaser=%s", DotaTime(), enemyHero:GetUnitName()))
+					pcall(
+						print,
+						string.format(
+							"[OHA-SNAPFIRE] t=%.0f scatter-retreat chaser=%s",
+							DotaTime(),
+							enemyHero:GetUnitName()
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(castPoint)
 			end
@@ -288,7 +303,12 @@ function X.ConsiderScatterBlast()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -322,7 +342,13 @@ function X.ConsiderFiresnapCookie()
 		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-			if Fu.IsInRange(bot, enemyHero, jumpDistance + radius) and not Fu.IsInRange(bot, enemyHero, jumpDistance * 0.51) and alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+			if
+				Fu.IsInRange(bot, enemyHero, jumpDistance + radius)
+				and not Fu.IsInRange(bot, enemyHero, jumpDistance * 0.51)
+				and alliesNearTarget ~= nil
+				and enemiesNearTarget ~= nil
+				and #alliesNearTarget >= #enemiesNearTarget
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
@@ -331,10 +357,16 @@ function X.ConsiderFiresnapCookie()
 		return BOT_ACTION_DESIRE_HIGH, bot
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
-		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), jumpDistance, radius, jumpDuration + castPoint, 0)
+		local aoe =
+			bot:FindAoELocation(true, true, bot:GetLocation(), jumpDistance, radius, jumpDuration + castPoint, 0)
 		local enemiesNearAoe = Fu.GetEnemiesNearLoc(aoe.targetloc, jumpDistance)
 		local notStunnedCount = Fu.CountNotStunnedUnits(enemiesNearAoe, aoe, radius, 2)
-		if enemiesNearAoe ~= nil and #enemiesNearAoe >= 2 and notStunnedCount >= 2 and bot:IsFacingLocation(aoe.targetloc, 15) then
+		if
+			enemiesNearAoe ~= nil
+			and #enemiesNearAoe >= 2
+			and notStunnedCount >= 2
+			and bot:IsFacingLocation(aoe.targetloc, 15)
+		then
 			return BOT_ACTION_DESIRE_LOW, bot
 		end
 	end
@@ -381,7 +413,11 @@ function X.ConsiderFiresnapCookie()
 			then
 				local alliesNearAllyTarget = Fu.GetNearbyHeroes(allyTarget, 1200, true, BOT_MODE_NONE)
 				local enemiesNearAllyTarget = Fu.GetNearbyHeroes(allyTarget, 1200, false, BOT_MODE_NONE)
-				if alliesNearAllyTarget ~= nil and enemiesNearAllyTarget ~= nil and #alliesNearAllyTarget >= #enemiesNearAllyTarget then
+				if
+					alliesNearAllyTarget ~= nil
+					and enemiesNearAllyTarget ~= nil
+					and #alliesNearAllyTarget >= #enemiesNearAllyTarget
+				then
 					return BOT_ACTION_DESIRE_HIGH, allyHero
 				end
 			end
@@ -462,14 +498,22 @@ function X.ConsiderLilShredder()
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		local laneCreeps = bot:GetNearbyLaneCreeps(attackRange, true)
 		local nearbyTowers = bot:GetNearbyTowers(bot:GetAttackRange(), true)
-		if isAttacking and enemiesInRange ~= nil and #enemiesInRange <= 1 and (laneCreeps ~= nil and #laneCreeps >= 4 or nearbyTowers ~= nil and #nearbyTowers >= 1) then
+		if
+			isAttacking
+			and enemiesInRange ~= nil
+			and #enemiesInRange <= 1
+			and (laneCreeps ~= nil and #laneCreeps >= 4 or nearbyTowers ~= nil and #nearbyTowers >= 1)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if Fu.IsFarming(bot) then
 		if isAttacking and mpRatio > 0.33 then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(attackRange)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(attackRange, true)
@@ -504,7 +548,9 @@ function X.ConsiderMortimerKisses()
 				and not Fu.IsInRange(bot, enemyHero, minRange)
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 			then
-				if Fu.IsLocationInChrono(enemyHero:GetLocation()) or Fu.IsLocationInBlackHole(enemyHero:GetLocation()) then
+				if
+					Fu.IsLocationInChrono(enemyHero:GetLocation()) or Fu.IsLocationInBlackHole(enemyHero:GetLocation())
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -531,7 +577,11 @@ function X.ConsiderMortimerKisses()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function X.ConsiderGobbleUp()
-	if not bot:HasScepter() or not gobbleUpAbility:IsFullyCastable() or bot:HasModifier("modifier_snapfire_mortimer_kisses") then
+	if
+		not bot:HasScepter()
+		or not gobbleUpAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_snapfire_mortimer_kisses")
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, gobbleUpAbility:GetCastRange())
@@ -576,7 +626,10 @@ function X.ConsiderGobbleUp()
 				gobbled = "hero" -- Review fix: was gobbleUpAbility = "hero", overwriting the Gobble Up ability handle
 				if DotaTime() - (X.lastGobbleLog or -99) > 10 then
 					X.lastGobbleLog = DotaTime()
-					pcall(print, string.format("[OHA-SNAPFIRE] t=%.0f gobble-save ally=%s", DotaTime(), allyHero:GetUnitName()))
+					pcall(
+						print,
+						string.format("[OHA-SNAPFIRE] t=%.0f gobble-save ally=%s", DotaTime(), allyHero:GetUnitName())
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end

@@ -71,7 +71,8 @@ function X.GetDesire(thinkingBot)
 								and not Fu.IsInRange(bot, botTarget, 400)
 								and Fu.IsChasingTarget(enemyHero, bot)
 							then
-								local lineDistance = PointToLineDistance(botLocation, botTarget:GetLocation(), unitLocation)
+								local lineDistance =
+									PointToLineDistance(botLocation, botTarget:GetLocation(), unitLocation)
 								if lineDistance ~= nil and lineDistance.within and lineDistance.distance <= 185 then
 									return 2
 								end
@@ -84,7 +85,12 @@ function X.GetDesire(thinkingBot)
 					if #nearbyEnemies >= 1 then
 						local closeEnemies = Fu.GetEnemiesNearLoc(botLocation, 800)
 						if cogsNearby == 8 and cogsInRing >= 4 and isInAttackRange then
-							if #closeEnemies == 0 or isGoingOnSomeone or isRetreating and not isRealInvisible and #closeEnemies >= 1 or #alliesNearLoc < #enemiesNearLoc then
+							if
+								#closeEnemies == 0
+								or isGoingOnSomeone
+								or isRetreating and not isRealInvisible and #closeEnemies >= 1
+								or #alliesNearLoc < #enemiesNearLoc
+							then
 								return 0.95
 							else
 								return 0.55
@@ -154,7 +160,11 @@ function X.GetDesire(thinkingBot)
 					local unitsDamage = X.GetTotalAttackDamage(attackingUnits, 8.0)
 					botDamage = X.GetUnitAttackDamageWithinTime(bot, 5.0)
 					if not Fu.IsInTeamFight(bot, 900) and not (isRetreating and isRealInvisible) then
-						if unitsDamage < health or Fu.IsInRange(bot, unit, attackRange) and not Fu.IsInRange(bot, unit, unit:GetAttackRange()) then
+						if
+							unitsDamage < health
+							or Fu.IsInRange(bot, unit, attackRange)
+								and not Fu.IsInRange(bot, unit, unit:GetAttackRange())
+						then
 							return 0.31
 						end
 					end
@@ -162,7 +172,10 @@ function X.GetDesire(thinkingBot)
 				if string.find(unitName, "pugna_nether_ward") then
 					if Fu.IsInRange(bot, unit, attackRange + 150) then
 						if
-							isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, attackRange - 130) and Fu.GetHP(botTarget) < 0.5
+							isGoingOnSomeone
+								and Fu.IsValidHero(botTarget)
+								and Fu.IsInRange(bot, botTarget, attackRange - 130)
+								and Fu.GetHP(botTarget) < 0.5
 							or X.IsBeingAttackedByHero(bot) and botHpRatio < 0.5
 						then
 							return 0.35
@@ -184,7 +197,10 @@ function X.GetDesire(thinkingBot)
 						return 0.9
 					end
 					if
-						isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, attackRange - 130) and Fu.GetHP(botTarget) < 0.5
+						isGoingOnSomeone
+							and Fu.IsValidHero(botTarget)
+							and Fu.IsInRange(bot, botTarget, attackRange - 130)
+							and Fu.GetHP(botTarget) < 0.5
 						or X.IsBeingAttackedByHero(bot) and botHpRatio < 0.5
 					then
 						return 0.35
@@ -198,7 +214,11 @@ function X.GetDesire(thinkingBot)
 					end
 				end
 				if string.find(unitName, "gyrocopter_homing_missile") then
-					if not Fu.IsInTeamFight(bot, 900) and isInAttackRange and not (isRetreating and isRealInvisible) then
+					if
+						not Fu.IsInTeamFight(bot, 900)
+						and isInAttackRange
+						and not (isRetreating and isRealInvisible)
+					then
 						if not Fu.IsRunning(unit) or not Fu.IsInRange(bot, unit, 250) then
 							return 0.9
 						end
@@ -234,7 +254,13 @@ function X.GetDesire(thinkingBot)
 				then
 					local unitDamage = X.GetUnitAttackDamageWithinTime(unit, 5.5)
 					botDamage = X.GetUnitAttackDamageWithinTime(bot, 5.0)
-					if not Fu.IsInTeamFight(bot, 1200) and not (isRetreating and not isRealInvisible) and isInAttackRange and botDamage > unitHpRatio and unitDamage < health then
+					if
+						not Fu.IsInTeamFight(bot, 1200)
+						and not (isRetreating and not isRealInvisible)
+						and isInAttackRange
+						and botDamage > unitHpRatio
+						and unitDamage < health
+					then
 						return 0.5
 					end
 				end
@@ -251,7 +277,12 @@ function X.GetDesire(thinkingBot)
 					local unitsDamage = X.GetTotalAttackDamage(attackingUnits, 4.0)
 					local unitsHealth = X.GetTotalUnitHealth(attackingUnits)
 					botDamage = X.GetUnitAttackDamageWithinTime(bot, 4.0)
-					if not Fu.IsInTeamFight(bot, 1200) and isInAttackRange and botDamage > unitsHealth and unitsDamage < health then
+					if
+						not Fu.IsInTeamFight(bot, 1200)
+						and isInAttackRange
+						and botDamage > unitsHealth
+						and unitsDamage < health
+					then
 						return RemapValClamped(botHpRatio, 0.25, 0.9, 0.2, 0.5)
 					end
 				end
@@ -662,16 +693,19 @@ function X.GetDewardDesire(bot, attackRange, nearbyEnemies)
 	local function DewardLog(what, desire)
 		if DotaTime() >= (bot._dewardLogAt or -999) then
 			bot._dewardLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-DEWARD] t=%.0f %s %s desire=%.2f hp=%.2f foes=%d dist=%d",
-				DotaTime(),
-				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-				what,
-				desire,
-				hp,
-				#foes,
-				bestDist
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-DEWARD] t=%.0f %s %s desire=%.2f hp=%.2f foes=%d dist=%d",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					what,
+					desire,
+					hp,
+					#foes,
+					bestDist
+				)
+			)
 		end
 	end
 	if hp < 0.5 and (#foes >= 2 or bot:WasRecentlyDamagedByAnyHero(2.0)) then

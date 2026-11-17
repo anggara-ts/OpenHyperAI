@@ -74,7 +74,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -140,7 +141,8 @@ function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
 local rageAbility = SafeAbility(bot:GetAbilityByName("life_stealer_rage"), "life_stealer_rage", "life_stealer")
-local openWoundsAbility = SafeAbility(bot:GetAbilityByName("life_stealer_open_wounds"), "life_stealer_open_wounds", "life_stealer")
+local openWoundsAbility =
+	SafeAbility(bot:GetAbilityByName("life_stealer_open_wounds"), "life_stealer_open_wounds", "life_stealer")
 local infestAbility = SafeAbility(bot:GetAbilityByName("life_stealer_infest"), "life_stealer_infest", "life_stealer")
 local consumeAbility = SafeAbility(bot:GetAbilityByName("life_stealer_consume"), "life_stealer_consume", "life_stealer")
 local rageDesire
@@ -153,7 +155,8 @@ local isGoingOnSomeone
 local isRetreating
 function X.SkillsComplement()
 	rageAbility = SafeAbility(bot:GetAbilityByName("life_stealer_rage"), "life_stealer_rage", "life_stealer")
-	openWoundsAbility = SafeAbility(bot:GetAbilityByName("life_stealer_open_wounds"), "life_stealer_open_wounds", "life_stealer")
+	openWoundsAbility =
+		SafeAbility(bot:GetAbilityByName("life_stealer_open_wounds"), "life_stealer_open_wounds", "life_stealer")
 	infestAbility = SafeAbility(bot:GetAbilityByName("life_stealer_infest"), "life_stealer_infest", "life_stealer")
 	consumeAbility = SafeAbility(bot:GetAbilityByName("life_stealer_consume"), "life_stealer_consume", "life_stealer")
 	isAttacking = Fu.IsAttacking(bot)
@@ -217,7 +220,14 @@ function X.ConsiderRage()
 				if isGoingOnSomeone or isRetreating or hpRatio < 0.6 then
 					if DotaTime() >= (bot._rageLogAt or -999) then
 						bot._rageLogAt = DotaTime() + 5
-						pcall(print, string.format("[OHA-LIFESTEALER] t=%.0f rage vs incoming spell hp=%.2f", DotaTime(), hpRatio))
+						pcall(
+							print,
+							string.format(
+								"[OHA-LIFESTEALER] t=%.0f rage vs incoming spell hp=%.2f",
+								DotaTime(),
+								hpRatio
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -230,12 +240,21 @@ function X.ConsiderRage()
 			if bot:IsRooted() then
 				if isRetreating then
 					return BOT_ACTION_DESIRE_HIGH
-				elseif isGoingOnSomeone and Fu.IsValidTarget(botTarget) and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) then
+				elseif
+					isGoingOnSomeone
+					and Fu.IsValidTarget(botTarget)
+					and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
 			enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 600)
-			if bot:IsSilenced() and #enemiesNearBot >= 2 and isGoingOnSomeone and not bot:HasModifier("modifier_item_mask_of_madness_berserk") then
+			if
+				bot:IsSilenced()
+				and #enemiesNearBot >= 2
+				and isGoingOnSomeone
+				and not bot:HasModifier("modifier_item_mask_of_madness_berserk")
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			local alliesNearBot = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
@@ -320,7 +339,12 @@ function X.ConsiderOpenWounds()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and hpRatio < 0.5 and (manaAfter > manaThreshold or hpRatio < 0.2) and isAttacking then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and hpRatio < 0.5
+		and (manaAfter > manaThreshold or hpRatio < 0.2)
+		and isAttacking
+	then
 		if
 			Fu.IsValid(botTarget)
 			and Fu.CanBeAttacked(botTarget)
@@ -346,7 +370,13 @@ function X.ConsiderOpenWounds()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and hpRatio < 0.5 and (manaAfter > manaThreshold or hpRatio < 0.2) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and hpRatio < 0.5
+			and (manaAfter > manaThreshold or hpRatio < 0.2)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end

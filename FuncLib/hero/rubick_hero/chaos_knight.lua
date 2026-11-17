@@ -56,7 +56,10 @@ function X.ConsiderChaosBolt()
 				Fu.IsValid(enemiesInRange[i])
 				and Fu.CanCastOnNonMagicImmune(enemiesInRange[i])
 				and Fu.CanCastOnTargetAdvanced(enemiesInRange[i])
-				and enemiesInRange[i]:GetHealth() < enemiesInRange[i]:GetActualIncomingDamage(damage, DAMAGE_TYPE_MAGICAL)
+				and enemiesInRange[i]:GetHealth() < enemiesInRange[i]:GetActualIncomingDamage(
+					damage,
+					DAMAGE_TYPE_MAGICAL
+				)
 				and GetUnitToUnitDistance(enemiesInRange[i], bot) > bot:GetAttackRange() + 60
 				and not Fu.IsDisabled(enemiesInRange[i])
 			then
@@ -125,7 +128,13 @@ function X.ConsiderChaosBolt()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() > 400 then
 		local attackTarget = bot:GetAttackTarget()
-		if attackTarget ~= nil and attackTarget:IsAlive() and Fu.GetHP(attackTarget) > 0.2 and not Fu.IsDisabled(attackTarget) and not attackTarget:IsDisarmed() then
+		if
+			attackTarget ~= nil
+			and attackTarget:IsAlive()
+			and Fu.GetHP(attackTarget) > 0.2
+			and not Fu.IsDisabled(attackTarget)
+			and not attackTarget:IsDisarmed()
+		then
 			return BOT_ACTION_DESIRE_LOW, attackTarget
 		end
 	end

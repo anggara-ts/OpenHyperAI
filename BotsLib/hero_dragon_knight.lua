@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -101,16 +102,20 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local breatheFireAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_breathe_fire"), "dragon_knight_breathe_fire", "dragon_knight")
-local dragonTailAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_dragon_tail"), "dragon_knight_dragon_tail", "dragon_knight")
-local fireballAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_fireball"), "dragon_knight_fireball", "dragon_knight")
+local breatheFireAbility =
+	SafeAbility(bot:GetAbilityByName("dragon_knight_breathe_fire"), "dragon_knight_breathe_fire", "dragon_knight")
+local dragonTailAbility =
+	SafeAbility(bot:GetAbilityByName("dragon_knight_dragon_tail"), "dragon_knight_dragon_tail", "dragon_knight")
+local fireballAbility =
+	SafeAbility(bot:GetAbilityByName("dragon_knight_fireball"), "dragon_knight_fireball", "dragon_knight")
 local elderDragonFormAbility = SafeAbility(
 	bot:GetAbilityByName("dragon_knight_elder_dragon_form"),
 	"dragon_knight_elder_dragon_form",
@@ -136,9 +141,12 @@ function X.SkillsComplement()
 	isEngaging = abilityContext.isEngaging
 	isRetreating = abilityContext.isRetreating
 	isInTeamFight = abilityContext.isTeamFight
-	breatheFireAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_breathe_fire"), "dragon_knight_breathe_fire", "dragon_knight")
-	dragonTailAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_dragon_tail"), "dragon_knight_dragon_tail", "dragon_knight")
-	fireballAbility = SafeAbility(bot:GetAbilityByName("dragon_knight_fireball"), "dragon_knight_fireball", "dragon_knight")
+	breatheFireAbility =
+		SafeAbility(bot:GetAbilityByName("dragon_knight_breathe_fire"), "dragon_knight_breathe_fire", "dragon_knight")
+	dragonTailAbility =
+		SafeAbility(bot:GetAbilityByName("dragon_knight_dragon_tail"), "dragon_knight_dragon_tail", "dragon_knight")
+	fireballAbility =
+		SafeAbility(bot:GetAbilityByName("dragon_knight_fireball"), "dragon_knight_fireball", "dragon_knight")
 	elderDragonFormAbility = SafeAbility(
 		bot:GetAbilityByName("dragon_knight_elder_dragon_form"),
 		"dragon_knight_elder_dragon_form",
@@ -186,7 +194,11 @@ function X.ConsiderBreatheFire()
 	local projectileSpeed = breatheFireAbility:GetSpecialValueInt("speed")
 	local manaCost = breatheFireAbility:GetManaCost()
 	local manaAfter = Fu.GetManaAfter(manaCost)
-	local manaThresholdAll = Fu.GetManaThreshold(bot, manaCost, { breatheFireAbility, dragonTailAbility, fireballAbility, elderDragonFormAbility })
+	local manaThresholdAll = Fu.GetManaThreshold(
+		bot,
+		manaCost,
+		{ breatheFireAbility, dragonTailAbility, fireballAbility, elderDragonFormAbility }
+	)
 	local manaThresholdTailUlt = Fu.GetManaThreshold(bot, manaCost, { dragonTailAbility, elderDragonFormAbility })
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
@@ -264,7 +276,10 @@ function X.ConsiderBreatheFire()
 				and not enemyHero:IsDisarmed()
 				and not enemyHero:HasModifier("modifier_dragonknight_breathefire_reduction")
 			then
-				if Fu.IsChasingTarget(enemyHero, bot) or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot then
+				if
+					Fu.IsChasingTarget(enemyHero, bot)
+					or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -276,7 +291,13 @@ function X.ConsiderBreatheFire()
 		end
 	end
 	local nearbyCreeps = bot:GetNearbyCreeps(Min(castRange + 300, 1600), true)
-	if Fu.IsPushing(bot) and isAttacking and #nearbyAllies <= 2 and manaAfter > manaThresholdAll and not isInDragonForm then
+	if
+		Fu.IsPushing(bot)
+		and isAttacking
+		and #nearbyAllies <= 2
+		and manaAfter > manaThresholdAll
+		and not isInDragonForm
+	then
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
@@ -286,7 +307,13 @@ function X.ConsiderBreatheFire()
 			end
 		end
 	end
-	if Fu.IsDefending(bot) and isAttacking and #nearbyEnemies == 0 and manaAfter > manaThresholdAll and not isInDragonForm then
+	if
+		Fu.IsDefending(bot)
+		and isAttacking
+		and #nearbyEnemies == 0
+		and manaAfter > manaThresholdAll
+		and not isInDragonForm
+	then
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
@@ -300,7 +327,11 @@ function X.ConsiderBreatheFire()
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
-				if aoeLocation.count >= 3 and not isInDragonForm or aoeLocation.count >= 2 and creep:IsAncientCreep() or aoeLocation.count >= 2 and manaAfter > manaThresholdAll then
+				if
+					aoeLocation.count >= 3 and not isInDragonForm
+					or aoeLocation.count >= 2 and creep:IsAncientCreep()
+					or aoeLocation.count >= 2 and manaAfter > manaThresholdAll
+				then
 					return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 				end
 			end
@@ -320,7 +351,9 @@ function X.ConsiderBreatheFire()
 				local travelTime = GetUnitToUnitDistance(bot, creep) / projectileSpeed + castPoint
 				if Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL, travelTime) then
 					if
-						Fu.IsValidHero(nearbyEnemies[1]) and Fu.IsInRange(nearbyEnemies[1], creep, radius) and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
+						Fu.IsValidHero(nearbyEnemies[1])
+							and Fu.IsInRange(nearbyEnemies[1], creep, radius)
+							and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 						or Fu.IsUnitTargetedByTower(creep, false)
 					then
 						return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
@@ -497,7 +530,11 @@ function X.ConsiderDragonTail()
 				and not enemyHero:IsDisarmed()
 				and not enemyHero:HasModifier("modifier_dragonknight_breathefire_reduction")
 			then
-				if Fu.IsChasingTarget(enemyHero, bot) or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot or hpRatio < 0.5 then
+				if
+					Fu.IsChasingTarget(enemyHero, bot)
+					or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot
+					or hpRatio < 0.5
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -614,7 +651,12 @@ function X.ConsiderElderDragonForm()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if isEngaging then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 800) and Fu.CanBeAttacked(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and Fu.CanBeAttacked(botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearBot = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
 			local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
 			if #alliesNearBot < #enemiesNearBot + 2 then
@@ -649,7 +691,13 @@ function X.ConsiderElderDragonForm()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) and bot:GetNetWorth() < 20000 then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, 600) and Fu.GetHP(botTarget) > 0.4 and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, 600)
+			and Fu.GetHP(botTarget) > 0.4
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

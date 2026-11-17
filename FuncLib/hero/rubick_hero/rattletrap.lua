@@ -108,7 +108,11 @@ function X.ConsiderBatteryAssault()
 		then
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -125,7 +129,11 @@ function X.ConsiderBatteryAssault()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -138,7 +146,12 @@ function X.ConsiderBatteryAssault()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -167,7 +180,11 @@ function X.ConsiderPowerCogs()
 		then
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -185,7 +202,11 @@ function X.ConsiderPowerCogs()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -238,7 +259,11 @@ function X.ConsiderRocketFlare()
 		then
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
 				targetNearbyAllies = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius)
 				if targetNearbyAllies ~= nil and #targetNearbyAllies >= 1 then
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(targetNearbyAllies)
@@ -261,7 +286,11 @@ function X.ConsiderRocketFlare()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -279,7 +308,12 @@ function X.ConsiderRocketFlare()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 		if
@@ -333,7 +367,8 @@ function X.ConsiderHookshot()
 				then
 					if #enemyNearbyEnemies == 0 and #enemyNearbyAllies == 0 then
 						if
-							bot:GetEstimatedDamageToTarget(true, enemyHero, 5, DAMAGE_TYPE_ALL) > enemyHero:GetHealth()
+							bot:GetEstimatedDamageToTarget(true, enemyHero, 5, DAMAGE_TYPE_ALL)
+								> enemyHero:GetHealth()
 							and powerCogsAbility:IsFullyCastable()
 							and batteryAssaultAbility:IsFullyCastable()
 						then
@@ -362,7 +397,11 @@ function X.ConsiderHookshot()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					for _, allyHero in pairs(nearbyAllies) do
 						if
 							Fu.IsValidHero(allyHero)
@@ -421,7 +460,11 @@ function X.ConsiderJetpack()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2.5)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

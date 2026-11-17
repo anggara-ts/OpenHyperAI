@@ -138,7 +138,11 @@ local function installMapInfo(Fu)
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil then
 					local lastSeen = lastSeenInfo[1]
-					if lastSeen ~= nil and Fu.GetLocationToLocationDistance(location, lastSeen.location) <= radius and lastSeen.time_since_seen < 2.0 then
+					if
+						lastSeen ~= nil
+						and Fu.GetLocationToLocationDistance(location, lastSeen.location) <= radius
+						and lastSeen.time_since_seen < 2.0
+					then
 						return true
 					end
 				end

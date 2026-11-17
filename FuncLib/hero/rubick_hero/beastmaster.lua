@@ -128,7 +128,10 @@ function X.ConsiderWildAxes()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and (#chaserAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				chaserAllies ~= nil
+				and (#chaserAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetExtrapolatedLocation(castPoint)
 			end
 		end
@@ -176,7 +179,12 @@ function X.ConsiderWildAxes()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -222,7 +230,10 @@ function X.ConsiderCallOfTheWildBoar()
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(attackRange + 75)
 		local laneCreeps = bot:GetNearbyLaneCreeps(attackRange + 75, true)
 		if Fu.IsAttacking(bot) then
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			if laneCreeps ~= nil and #laneCreeps >= 3 then
@@ -288,7 +299,10 @@ function X.ConsiderCallOfTheWildHawk()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and (#chaserAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				chaserAllies ~= nil
+				and (#chaserAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

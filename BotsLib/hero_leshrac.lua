@@ -13,7 +13,8 @@ local tTalentTreeList = {
 }
 -- Diabolic Edict maxed first, Lightning Storm second, Split Earth last (Dotabuff most picked order).
 -- Pulse Nova at entries 6/11/15 (levels 6/12/18).
-local tAllAbilityBuildList = { { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 3, 2, 3, 2, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -74,7 +75,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -82,8 +84,10 @@ function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
 local splitEarthAbility = SafeAbility(bot:GetAbilityByName("leshrac_split_earth"), "leshrac_split_earth", "leshrac")
-local diabolicEdictAbility = SafeAbility(bot:GetAbilityByName("leshrac_diabolic_edict"), "leshrac_diabolic_edict", "leshrac")
-local lightningStormAbility = SafeAbility(bot:GetAbilityByName("leshrac_lightning_storm"), "leshrac_lightning_storm", "leshrac")
+local diabolicEdictAbility =
+	SafeAbility(bot:GetAbilityByName("leshrac_diabolic_edict"), "leshrac_diabolic_edict", "leshrac")
+local lightningStormAbility =
+	SafeAbility(bot:GetAbilityByName("leshrac_lightning_storm"), "leshrac_lightning_storm", "leshrac")
 local nihilismAbility =
 	SafeAbility(bot:GetAbilityByName("leshrac_greater_lightning_storm"), "leshrac_greater_lightning_storm", "leshrac")
 local pulseNovaAbility = SafeAbility(bot:GetAbilityByName("leshrac_pulse_nova"), "leshrac_pulse_nova", "leshrac")
@@ -153,7 +157,11 @@ function X.ConsiderSplitEarth()
 	local abilityLevel = splitEarthAbility:GetLevel()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + radius, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
@@ -166,14 +174,19 @@ function X.ConsiderSplitEarth()
 				and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
 				if not Fu.IsInRange(bot, enemyHero, castRange) then
-					local targetLocation = Fu.Site.GetXUnitsTowardsLocation(bot, enemyHero:GetExtrapolatedLocation(delay + castPoint), castRange)
+					local targetLocation = Fu.Site.GetXUnitsTowardsLocation(
+						bot,
+						enemyHero:GetExtrapolatedLocation(delay + castPoint),
+						castRange
+					)
 					local enemiesAtLocation = Fu.GetEnemiesNearLoc(targetLocation, radius)
 					if enemiesAtLocation ~= nil and #enemiesAtLocation >= 1 then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesAtLocation)
 					end
 					return BOT_ACTION_DESIRE_HIGH, targetLocation
 				end
-				local enemiesAtLocation = Fu.GetEnemiesNearLoc(enemyHero:GetExtrapolatedLocation(delay + castPoint), radius)
+				local enemiesAtLocation =
+					Fu.GetEnemiesNearLoc(enemyHero:GetExtrapolatedLocation(delay + castPoint), radius)
 				if enemiesAtLocation ~= nil and #enemiesAtLocation >= 1 then
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesAtLocation)
 				end
@@ -202,14 +215,16 @@ function X.ConsiderSplitEarth()
 			local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 			if nearbyAllies ~= nil and nearbyEnemyHeroes ~= nil and #nearbyAllies >= #nearbyEnemyHeroes then
 				if Fu.IsChasingTarget(bot, botTarget) then
-					nearbyEnemyHeroes = Fu.GetEnemiesNearLoc(botTarget:GetExtrapolatedLocation(delay + castPoint), radius)
+					nearbyEnemyHeroes =
+						Fu.GetEnemiesNearLoc(botTarget:GetExtrapolatedLocation(delay + castPoint), radius)
 				else
 					nearbyEnemyHeroes = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius)
 				end
 				if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 then
 					if not Fu.IsInRange(bot, botTarget, castRange) then
 						if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemyHeroes), castRange)
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemyHeroes), castRange)
 						else
 							return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyEnemyHeroes)
 						end
@@ -218,9 +233,14 @@ function X.ConsiderSplitEarth()
 				if not Fu.IsInRange(bot, botTarget, castRange) then
 					if Fu.IsChasingTarget(bot, botTarget) then
 						return BOT_ACTION_DESIRE_HIGH,
-							Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetExtrapolatedLocation(delay + castPoint), castRange)
+							Fu.Site.GetXUnitsTowardsLocation(
+								bot,
+								botTarget:GetExtrapolatedLocation(delay + castPoint),
+								castRange
+							)
 					else
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 					end
 				else
 					if Fu.IsChasingTarget(bot, botTarget) then
@@ -244,7 +264,11 @@ function X.ConsiderSplitEarth()
 			then
 				local enemyTargets = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyTargets ~= nil and enemyAllies ~= nil and (#enemyAllies > #enemyTargets or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyTargets ~= nil
+					and enemyAllies ~= nil
+					and (#enemyAllies > #enemyTargets or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay + castPoint)
 				end
 			end
@@ -253,7 +277,10 @@ function X.ConsiderSplitEarth()
 	if Fu.IsFarming(bot) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
 		if isAttacking then
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(neutralCreeps)
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -283,12 +310,24 @@ function X.ConsiderSplitEarth()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if Fu.GetManaAfter(manaCost) > 0.25 and nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 and #killableCreeps >= 2 and Fu.CanBeAttacked(killableCreeps[1]) then
+		if
+			Fu.GetManaAfter(manaCost) > 0.25
+			and nearbyEnemyHeroes ~= nil
+			and #nearbyEnemyHeroes >= 1
+			and #killableCreeps >= 2
+			and Fu.CanBeAttacked(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -350,9 +389,17 @@ function X.ConsiderDiabolicEdict()
 			end
 		end
 	end
-	if Fu.IsFarming(bot) and Fu.GetManaAfter(manaCost) > 0.35 and not bot:HasModifier("modifier_leshrac_pulse_nova") then
+	if
+		Fu.IsFarming(bot)
+		and Fu.GetManaAfter(manaCost) > 0.35
+		and not bot:HasModifier("modifier_leshrac_pulse_nova")
+	then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
-		if neutralCreeps ~= nil and #neutralCreeps > 0 and (#neutralCreeps < 3 or #neutralCreeps <= 2 and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			neutralCreeps ~= nil
+			and #neutralCreeps > 0
+			and (#neutralCreeps < 3 or #neutralCreeps <= 2 and neutralCreeps[1]:IsAncientCreep())
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
@@ -369,7 +416,11 @@ function X.ConsiderDiabolicEdict()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -459,7 +510,11 @@ function X.ConsiderLightningStorm()
 			then
 				local enemyTargets = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyTargets ~= nil and enemyAllies ~= nil and (#enemyAllies > #enemyTargets or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyTargets ~= nil
+					and enemyAllies ~= nil
+					and (#enemyAllies > #enemyTargets or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -467,7 +522,9 @@ function X.ConsiderLightningStorm()
 	end
 	if Fu.IsFarming(bot) and mpRatio > 0.35 then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if neutralCreeps ~= nil and (#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			neutralCreeps ~= nil and (#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep())
+		then
 			return BOT_ACTION_DESIRE_HIGH, neutralCreeps[1]
 		end
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -484,7 +541,13 @@ function X.ConsiderLightningStorm()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if mpRatio > 0.25 and nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 and #killableCreeps >= 2 and Fu.CanBeAttacked(killableCreeps[1]) then
+		if
+			mpRatio > 0.25
+			and nearbyEnemyHeroes ~= nil
+			and #nearbyEnemyHeroes >= 1
+			and #killableCreeps >= 2
+			and Fu.CanBeAttacked(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 	end
@@ -596,7 +659,9 @@ function X.ConsiderPulseNova()
 	end
 	if Fu.IsFarming(bot) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
-		if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+		then
 			if #neutralCreeps >= 3 and pulseNovaAbility:GetToggleState() == false and isAttacking and mpRatio > 0.5 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
@@ -619,7 +684,12 @@ function X.ConsiderPulseNova()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			if pulseNovaAbility:GetToggleState() == false and mpRatio > 0.7 then
 				return BOT_ACTION_DESIRE_HIGH
 			else
@@ -672,7 +742,11 @@ function X.ConsiderNihilism()
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		local enemiesHit = 0
 		for _, enemyHero in pairs(enemiesInRadius) do
-			if Fu.IsValidHero(enemyHero) and not enemyHero:IsMagicImmune() and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not enemyHero:IsMagicImmune()
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				enemiesHit = enemiesHit + 1
 			end
 		end
@@ -698,7 +772,10 @@ function X.ConsiderNihilism()
 			if castReason ~= nil then
 				if DotaTime() >= (bot._nihilLogAt or -999) then
 					bot._nihilLogAt = DotaTime() + 5
-					pcall(print, string.format("[OHA-LESHRAC] t=%.0f nihilism %s enemies=%d", DotaTime(), castReason, enemiesHit))
+					pcall(
+						print,
+						string.format("[OHA-LESHRAC] t=%.0f nihilism %s enemies=%d", DotaTime(), castReason, enemiesHit)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH
 			end

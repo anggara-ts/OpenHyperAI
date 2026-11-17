@@ -45,7 +45,11 @@ function X.ConsiderMagicMissile(minion, ability)
 	local castRange = Fu.GetProperCastRange(false, minion, ability:GetCastRange())
 	local damage = ability:GetSpecialValueInt("magic_missile_damage")
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			if enemyHero:IsChanneling() and Fu.IsInRange(minion, enemyHero, castRange + 300) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
@@ -62,7 +66,12 @@ function X.ConsiderMagicMissile(minion, ability)
 		end
 	end
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(3.0) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(3.0)
+			and not allyHero:IsIllusion()
+		then
 			local allyNearbyEnemies = allyHero:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			if
 				Fu.IsValidHero(allyNearbyEnemies[1])
@@ -152,7 +161,8 @@ function X.ConsiderWaveOfTerror(minion, ability)
 		end
 	end
 	if strongestTarget ~= nil then
-		local aoeLocation = minion:FindAoELocation(true, true, strongestTarget:GetLocation(), waveWidth, waveWidth, 0, 0)
+		local aoeLocation =
+			minion:FindAoELocation(true, true, strongestTarget:GetLocation(), waveWidth, waveWidth, 0, 0)
 		if aoeLocation.count >= 2 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		else
@@ -161,7 +171,12 @@ function X.ConsiderWaveOfTerror(minion, ability)
 		end
 	end
 	local nearbyLaneCreeps = minion:GetNearbyLaneCreeps(castRange, true)
-	if #nearbyLaneCreeps >= 3 and Fu.CanBeAttacked(nearbyLaneCreeps[1]) and not Fu.IsRunning(nearbyLaneCreeps[1]) and not Fu.IsThereCoreNearby(1200) then
+	if
+		#nearbyLaneCreeps >= 3
+		and Fu.CanBeAttacked(nearbyLaneCreeps[1])
+		and not Fu.IsRunning(nearbyLaneCreeps[1])
+		and not Fu.IsThereCoreNearby(1200)
+	then
 		return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -172,8 +187,17 @@ function X.ConsiderNetherSwap(minion, ability)
 	end
 	local castRange = Fu.GetProperCastRange(false, minion, ability:GetCastRange())
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsInRange(minion, allyHero, castRange + 300) and Fu.IsCore(allyHero) and not Fu.IsSuspiciousIllusion(allyHero) then
-			if Fu.IsInTeamFight(allyHero, 1200) and not Fu.IsInRange(minion, allyHero, castRange) and MinionUtils.CantMove(allyHero) then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsInRange(minion, allyHero, castRange + 300)
+			and Fu.IsCore(allyHero)
+			and not Fu.IsSuspiciousIllusion(allyHero)
+		then
+			if
+				Fu.IsInTeamFight(allyHero, 1200)
+				and not Fu.IsInRange(minion, allyHero, castRange)
+				and MinionUtils.CantMove(allyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 			if
@@ -203,7 +227,12 @@ function X.ConsiderNetherSwap(minion, ability)
 			and not enemyHero:WasRecentlyDamagedByAnyHero(2.0)
 		then
 			local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(false, minion, 5, DAMAGE_TYPE_ALL)
-			if #nearbyAllies >= #nearbyEnemies and #nearbyAllies >= 1 and #nearbyAllies <= #nearbyEnemies + 2 and maxDamage < estimatedDamage then
+			if
+				#nearbyAllies >= #nearbyEnemies
+				and #nearbyAllies >= 1
+				and #nearbyAllies <= #nearbyEnemies + 2
+				and maxDamage < estimatedDamage
+			then
 				maxDamage = estimatedDamage
 				strongestTarget = enemyHero
 			end

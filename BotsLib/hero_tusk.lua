@@ -77,7 +77,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Tusk is invulnerable inside his snowball; spell logic must still run to launch it.
@@ -92,7 +93,8 @@ local launchSnowballAbility = SafeAbility(bot:GetAbilityByName("tusk_launch_snow
 local tagTeamAbility = SafeAbility(bot:GetAbilityByName("tusk_tag_team"), "tusk_tag_team", "tusk")
 local walrusKickAbility = SafeAbility(bot:GetAbilityByName("tusk_walrus_kick"), "tusk_walrus_kick", "tusk")
 local walrusPunchAbility = SafeAbility(bot:GetAbilityByName("tusk_walrus_punch"), "tusk_walrus_punch", "tusk")
-local drinkingBuddiesAbility = SafeAbility(bot:GetAbilityByName("tusk_drinking_buddies"), "tusk_drinking_buddies", "tusk")
+local drinkingBuddiesAbility =
+	SafeAbility(bot:GetAbilityByName("tusk_drinking_buddies"), "tusk_drinking_buddies", "tusk")
 local iceShardsDesire, iceShardsLocation
 local snowballDesire, snowballTarget
 local launchSnowballDesire
@@ -110,13 +112,22 @@ local isAttacking
 function X.SkillsComplement()
 	-- The hold flag only belongs to the escape snowball that set it. Clear it once Tusk is
 	-- out of the snowball, or every later snowball would also wait out the full duration.
-	if bot.snowballHeroRetreat and launchSnowballAbility:IsHidden() and DotaTime() > (bot._snowballRetreatAt or -99) + 1.5 then
+	if
+		bot.snowballHeroRetreat
+		and launchSnowballAbility:IsHidden()
+		and DotaTime() > (bot._snowballRetreatAt or -99) + 1.5
+	then
 		bot.snowballHeroRetreat = false
 	end
 	-- Walrus Punch is an autocast attack spell. With autocast on, any right-click on a hero
 	-- punches without Tag Team first (7:04 on Mirana, no Tag Team, no punch decision of ours).
 	-- Keep it off so every Punch goes through ConsiderWalrusPunch and Tag Team leads.
-	if walrusPunchAbility ~= nil and not walrusPunchAbility:IsNull() and walrusPunchAbility:IsTrained() and walrusPunchAbility:GetAutoCastState() then
+	if
+		walrusPunchAbility ~= nil
+		and not walrusPunchAbility:IsNull()
+		and walrusPunchAbility:IsTrained()
+		and walrusPunchAbility:GetAutoCastState()
+	then
 		pcall(print, string.format("[OHA-TUSK] t=%.0f punch-autocast was=on turned=off", DotaTime()))
 		walrusPunchAbility:ToggleAutoCast()
 	end
@@ -127,11 +138,14 @@ function X.SkillsComplement()
 		-- The order repeats each think until the snowball leaves; log the first one only.
 		if (bot._snowballLaunchLoggedFor or -1) ~= (bot._snowballCastAt or 0) then
 			bot._snowballLaunchLoggedFor = bot._snowballCastAt or 0
-			pcall(print, string.format(
-				"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
-				DotaTime(),
-				DotaTime() - (bot._snowballCastAt or DotaTime())
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TUSK] t=%.0f snowball-launch after=%.1fs",
+					DotaTime(),
+					DotaTime() - (bot._snowballCastAt or DotaTime())
+				)
+			)
 		end
 		bot:Action_UseAbility(launchSnowballAbility)
 		return
@@ -180,14 +194,17 @@ function X.SkillsComplement()
 			bot:Action_UseAbility(tagTeamAbility)
 			return
 		end
-		pcall(print, string.format(
-			"[OHA-TUSK] t=%.0f punch target=%s hp=%.2f tagTeam=%s mp=%.2f",
-			DotaTime(),
-			walrusPunchTarget and (string.gsub(walrusPunchTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
-			walrusPunchTarget and Fu.GetHP(walrusPunchTarget) or 0,
-			tagWhy,
-			Fu.GetMP(bot)
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-TUSK] t=%.0f punch target=%s hp=%.2f tagTeam=%s mp=%.2f",
+				DotaTime(),
+				walrusPunchTarget and (string.gsub(walrusPunchTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
+				walrusPunchTarget and Fu.GetHP(walrusPunchTarget) or 0,
+				tagWhy,
+				Fu.GetMP(bot)
+			)
+		)
 		bot:Action_UseAbilityOnEntity(walrusPunchAbility, walrusPunchTarget)
 		return
 	end
@@ -275,7 +292,12 @@ function X.ConsiderIceShards()
 			local theirs = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 			if ours ~= nil and theirs ~= nil and #ours >= #theirs then
 				for _, ally in pairs(Fu.GetNearbyHeroes(enemyHero, 700, true, BOT_MODE_NONE)) do
-					if ally ~= bot and Fu.IsValidHero(ally) and not ally:IsIllusion() and ally:GetAttackTarget() == enemyHero then
+					if
+						ally ~= bot
+						and Fu.IsValidHero(ally)
+						and not ally:IsIllusion()
+						and ally:GetAttackTarget() == enemyHero
+					then
 						X.LogShards("gank", enemyHero)
 						return BOT_ACTION_DESIRE_HIGH, Spot(enemyHero)
 					end
@@ -296,14 +318,17 @@ function X.LogShards(why, target)
 		return
 	end
 	bot._tuskShardsLogAt = DotaTime() + 3
-	pcall(print, string.format(
-		"[OHA-TUSK] t=%.0f shards why=%s target=%s hp=%.2f dist=%d",
-		DotaTime(),
-		why,
-		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		target and Fu.GetHP(target) or 0,
-		target and math.floor(GetUnitToUnitDistance(bot, target)) or 0
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TUSK] t=%.0f shards why=%s target=%s hp=%.2f dist=%d",
+			DotaTime(),
+			why,
+			target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			target and Fu.GetHP(target) or 0,
+			target and math.floor(GetUnitToUnitDistance(bot, target)) or 0
+		)
+	)
 end
 -- Enemy lane creeps worth a spell, or nil. No enemy hero in sight, mana left after the cast,
 -- and not taking a core's farm. Laning phase only to save a tower, so the lane is not pushed.
@@ -335,14 +360,17 @@ function X.LogWaveClear(kind, creeps)
 		return
 	end
 	bot._tuskWaveLogAt[kind] = DotaTime() + 10
-	pcall(print, string.format(
-		"[OHA-TUSK] t=%.0f wave-%s creeps=%d mp=%.2f mode=%d",
-		DotaTime(),
-		kind,
-		#creeps,
-		Fu.GetMP(bot),
-		bot:GetActiveMode()
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TUSK] t=%.0f wave-%s creeps=%d mp=%.2f mode=%d",
+			DotaTime(),
+			kind,
+			#creeps,
+			Fu.GetMP(bot),
+			bot:GetActiveMode()
+		)
+	)
 end
 function X.ConsiderDrinkingBuddies()
 	-- Not castable while rooted since 7.41c.
@@ -359,7 +387,12 @@ function X.ConsiderDrinkingBuddies()
 				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
 			if Fu.IsDoingRoshan(bot) then
-				if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+				if
+					Fu.IsRoshan(botTarget)
+					and Fu.CanBeAttacked(botTarget)
+					and Fu.IsInRange(bot, botTarget, 500)
+					and isAttacking
+				then
 					return BOT_ACTION_DESIRE_HIGH, allyHero
 				end
 			end
@@ -395,16 +428,27 @@ function X.ConsiderDrinkingBuddies()
 			local isAllyChasing = Fu.IsChasingTarget(strongestAlly, botTarget)
 			local botDistance = GetUnitToUnitDistance(bot, botTarget)
 			local allyDistance = GetUnitToUnitDistance(strongestAlly, botTarget)
-			if not isBotChasing or isBotChasing and isAllyChasing and allyDistance < botDistance and allyDistance < 500 then
+			if
+				not isBotChasing
+				or isBotChasing and isAllyChasing and allyDistance < botDistance and allyDistance < 500
+			then
 				return BOT_ACTION_DESIRE_HIGH, strongestAlly
 			end
 		end
 	end
 	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
-	if isRetreating and not Fu.IsRealInvisible(bot) and not bot:HasModifier("modifier_fountain_aura_buff") and #alliesInRange > 1 then
+	if
+		isRetreating
+		and not Fu.IsRealInvisible(bot)
+		and not bot:HasModifier("modifier_fountain_aura_buff")
+		and #alliesInRange > 1
+	then
 		for _, hero in pairs(nearbyAllies) do
 			if Fu.IsValidHero(hero) and Fu.IsInRange(bot, hero, 800) and Fu.IsChasingTarget(hero, bot) then
-				if bot:WasRecentlyDamagedByAnyHero(3.0) and not Fu.IsSuspiciousIllusion(hero) or #alliesInRange + 2 <= #nearbyAllies then
+				if
+					bot:WasRecentlyDamagedByAnyHero(3.0) and not Fu.IsSuspiciousIllusion(hero)
+					or #alliesInRange + 2 <= #nearbyAllies
+				then
 					for _, allyHero in pairs(alliesInRange) do
 						if
 							allyHero ~= bot
@@ -412,7 +456,8 @@ function X.ConsiderDrinkingBuddies()
 							and not allyHero:IsIllusion()
 							and Fu.IsRetreating(allyHero)
 							and GetUnitToUnitDistance(allyHero, hero) > GetUnitToUnitDistance(bot, hero)
-							and GetUnitToLocationDistance(hero, (bot:GetLocation() + allyHero:GetLocation()) / 2) > 500
+							and GetUnitToLocationDistance(hero, (bot:GetLocation() + allyHero:GetLocation()) / 2)
+								> 500
 						then
 							return BOT_ACTION_DESIRE_HIGH, allyHero
 						end
@@ -443,7 +488,8 @@ function X.ConsiderSnowball()
 				and not enemyHero:HasModifier("modifier_legion_commander_duel")
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(false, bot, snowballDuration, DAMAGE_TYPE_ALL)
+				local estimatedDamage =
+					enemyHero:GetEstimatedDamageToTarget(false, bot, snowballDuration, DAMAGE_TYPE_ALL)
 				if estimatedDamage > highestDamage then
 					highestDamage = estimatedDamage
 					bestTarget = enemyHero
@@ -528,7 +574,12 @@ function X.ConsiderSnowball()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -578,17 +629,20 @@ end
 -- [OHA-TUSK]: every escape snowball, with what triggered it.
 function X.LogEscapeSnowball(target, outnumbered, low, blinkLocked, allies, enemies)
 	local name = target:IsHero() and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "creep"
-	pcall(print, string.format(
-		"[OHA-TUSK] t=%.0f escape-snowball target=%s hp=%.2f allies=%d enemies=%d outnumbered=%s low=%s blinkLocked=%s",
-		DotaTime(),
-		name,
-		Fu.GetHP(bot),
-		allies and #allies or 0,
-		enemies and #enemies or 0,
-		tostring(outnumbered),
-		tostring(low),
-		tostring(blinkLocked)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TUSK] t=%.0f escape-snowball target=%s hp=%.2f allies=%d enemies=%d outnumbered=%s low=%s blinkLocked=%s",
+			DotaTime(),
+			name,
+			Fu.GetHP(bot),
+			allies and #allies or 0,
+			enemies and #enemies or 0,
+			tostring(outnumbered),
+			tostring(low),
+			tostring(blinkLocked)
+		)
+	)
 end
 function X.ConsiderLaunchSnowball()
 	if launchSnowballAbility:IsHidden() or not launchSnowballAbility:IsFullyCastable() or bot.snowballHeroRetreat then
@@ -624,16 +678,21 @@ function X.ConsiderTagTeam()
 			local nearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			local numbers = nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyAllies >= #nearbyEnemies
 			-- Going in with Walrus Punch anyway: open with Tag Team regardless of numbers.
-			local punchReady = walrusPunchAbility ~= nil and walrusPunchAbility:IsTrained() and walrusPunchAbility:IsFullyCastable()
+			local punchReady = walrusPunchAbility ~= nil
+				and walrusPunchAbility:IsTrained()
+				and walrusPunchAbility:IsFullyCastable()
 			if numbers or punchReady or Fu.IsDisabled(botTarget) then
-				pcall(print, string.format(
-					"[OHA-TUSK] t=%.0f tag-team target=%s disabled=%s punchReady=%s numbers=%s",
-					DotaTime(),
-					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-					tostring(Fu.IsDisabled(botTarget)),
-					tostring(punchReady),
-					tostring(numbers)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-TUSK] t=%.0f tag-team target=%s disabled=%s punchReady=%s numbers=%s",
+						DotaTime(),
+						(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(Fu.IsDisabled(botTarget)),
+						tostring(punchReady),
+						tostring(numbers)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -720,7 +779,12 @@ function X.ConsiderWalrusKick()
 				and not enemyHero:HasModifier("modifier_legion_commander_duel")
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				if nearbyAllies ~= nil and #nearbyAllies >= 2 and enemyHero ~= botTarget and Fu.IsInRange(enemyHero, nearbyAllies[1], 600) then
+				if
+					nearbyAllies ~= nil
+					and #nearbyAllies >= 2
+					and enemyHero ~= botTarget
+					and Fu.IsInRange(enemyHero, nearbyAllies[1], 600)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

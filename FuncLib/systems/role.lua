@@ -10,23 +10,26 @@ local NumHumanBotPlayersInTeam = Utils.NumHumanBotPlayersInTeam
 local HeroRolesMap = require(GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
 local EnemyRoleEstimation = require(GetScriptDirectory() .. "/FuncLib/hero/enemy_role_estimation")
 local GetEnemyPosition = EnemyRoleEstimation.GetEnemyPosition
-Role.RoleAssignment = { TEAM_RADIANT = { 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5 }, TEAM_DIRE = {
-	1,
-	2,
-	3,
-	4,
-	5,
-	1,
-	2,
-	3,
-	4,
-	5,
-	1,
-	2,
-	3,
-	4,
-	5,
-} }
+Role.RoleAssignment = {
+	TEAM_RADIANT = { 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5 },
+	TEAM_DIRE = {
+		1,
+		2,
+		3,
+		4,
+		5,
+		1,
+		2,
+		3,
+		4,
+		5,
+		1,
+		2,
+		3,
+		4,
+		5,
+	},
+}
 Role.IsCarry = function(heroName)
 	return HeroRolesMap.IsCarry(heroName)
 end
@@ -82,10 +85,20 @@ Role.GetCurrentSuitableRole = function(bot, heroName)
 	elseif Role.CanBeMidlaner(heroName) and assignedLane == Lane.Mid then
 		return "midlaner"
 	elseif
-		Role.CanBeSafeLaneCarry(heroName) and (GetTeam() == Team.Radiant and assignedLane == Lane.Bot or GetTeam() == Team.Dire and assignedLane == Lane.Top)
+		Role.CanBeSafeLaneCarry(heroName)
+		and (
+			GetTeam() == Team.Radiant and assignedLane == Lane.Bot
+			or GetTeam() == Team.Dire and assignedLane == Lane.Top
+		)
 	then
 		return "carry"
-	elseif Role.CanBeOfflaner(heroName) and (GetTeam() == Team.Radiant and assignedLane == Lane.Top or GetTeam() == Team.Dire and assignedLane == Lane.Bot) then
+	elseif
+		Role.CanBeOfflaner(heroName)
+		and (
+			GetTeam() == Team.Radiant and assignedLane == Lane.Top
+			or GetTeam() == Team.Dire and assignedLane == Lane.Bot
+		)
+	then
 		return "offlaner"
 	else
 		return "unknown"
@@ -136,7 +149,12 @@ Role.UpdateInvisEnemyStatus = function(bot)
 						local glimmerCapeSlot = enemyHero:FindItemSlot("item_glimmer_cape")
 						local shadowBladeSlot = enemyHero:FindItemSlot("item_invis_sword")
 						local silverEdgeSlot = enemyHero:FindItemSlot("item_silver_edge")
-						if shadowAmuletSlot >= 0 or glimmerCapeSlot >= 0 or shadowBladeSlot >= 0 or silverEdgeSlot >= 0 then
+						if
+							shadowAmuletSlot >= 0
+							or glimmerCapeSlot >= 0
+							or shadowBladeSlot >= 0
+							or silverEdgeSlot >= 0
+						then
 							Role.invisEnemyExist = true
 							break
 						end
@@ -327,7 +345,12 @@ Role.GetPositionForCM = function(bot)
 	end
 	if position == nil then
 		position = 1
-		log("[ERROR] Failed to determine role for bot %s in CM. It got assigned lane#: %s. Set it to pos: %s", heroName, assignedLane, position)
+		log(
+			"[ERROR] Failed to determine role for bot %s in CM. It got assigned lane#: %s. Set it to pos: %s",
+			heroName,
+			assignedLane,
+			position
+		)
 	end
 	return position
 end
@@ -404,7 +427,12 @@ Role.GetPosition = function(bot)
 	bot.assignedRole = position
 	if position == nil and GetGameState() ~= GameState.PreGame then
 		position = Role.GetPositionForCM(bot)
-		log("[ERROR] Failed to match bot role for bot: %s, PlayerID: %s, fallback pos: %s", heroName, playerId, position)
+		log(
+			"[ERROR] Failed to match bot role for bot: %s, PlayerID: %s, fallback pos: %s",
+			heroName,
+			playerId,
+			position
+		)
 		bot.assignedRole = position
 	end
 	if position == nil then

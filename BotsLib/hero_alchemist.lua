@@ -45,7 +45,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -57,14 +58,17 @@ function X.MinionThink(minionUnit)
 	end
 end
 local acidSprayAbility = SafeAbility(bot:GetAbilityByName("alchemist_acid_spray"), "alchemist_acid_spray", "alchemist")
-local unstableConcoctionAbility = SafeAbility(bot:GetAbilityByName("alchemist_unstable_concoction"), "alchemist_unstable_concoction", "alchemist")
+local unstableConcoctionAbility =
+	SafeAbility(bot:GetAbilityByName("alchemist_unstable_concoction"), "alchemist_unstable_concoction", "alchemist")
 local unstableConcoctionThrowAbility = SafeAbility(
 	bot:GetAbilityByName("alchemist_unstable_concoction_throw"),
 	"alchemist_unstable_concoction_throw",
 	"alchemist"
 )
-local chemicalRageAbility = SafeAbility(bot:GetAbilityByName("alchemist_chemical_rage"), "alchemist_chemical_rage", "alchemist")
-local berserkPotionAbility = SafeAbility(bot:GetAbilityByName("alchemist_berserk_potion"), "alchemist_berserk_potion", "alchemist")
+local chemicalRageAbility =
+	SafeAbility(bot:GetAbilityByName("alchemist_chemical_rage"), "alchemist_chemical_rage", "alchemist")
+local berserkPotionAbility =
+	SafeAbility(bot:GetAbilityByName("alchemist_berserk_potion"), "alchemist_berserk_potion", "alchemist")
 local acidSprayDesire, acidSprayLocation
 local unstableConcoctionDesire
 local unstableConcoctionThrowDesire, unstableConcoctionThrowTarget
@@ -102,7 +106,15 @@ function X.SkillsComplement()
 		-- [OHA-ALCHEMIST]: the brew start (never happened before the cast-range fix), throttled to 10s.
 		if DotaTime() >= (bot._alchBrewLogAt or -999) then
 			bot._alchBrewLogAt = DotaTime() + 10
-			pcall(print, string.format("[OHA-ALCHEMIST] t=%.0f concoction start range=%d brewRange=%d", DotaTime(), unstableConcoctionThrowAbility:GetCastRange(), unstableConcoctionAbility:GetCastRange()))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ALCHEMIST] t=%.0f concoction start range=%d brewRange=%d",
+					DotaTime(),
+					unstableConcoctionThrowAbility:GetCastRange(),
+					unstableConcoctionAbility:GetCastRange()
+				)
+			)
 		end
 		bot:Action_UseAbility(unstableConcoctionAbility)
 		concoctionStartTime = DotaTime()
@@ -174,7 +186,10 @@ function X.ConsiderAcidSpray()
 			and not Fu.IsDisabled(nInRangeEnemy[1])
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nInRangeEnemy[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.5)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -184,7 +199,12 @@ function X.ConsiderAcidSpray()
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
 		local allyLaneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
 		local enemyLaneFront = GetLaneFrontLocation(GetOpposingTeam(), bot:GetAssignedLane(), 0)
-		if laneCreeps ~= nil and #laneCreeps >= 5 and aoeLocation.count >= 5 and Fu.GetLocationToLocationDistance(allyLaneFront, enemyLaneFront) < 150 then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 5
+			and aoeLocation.count >= 5
+			and Fu.GetLocationToLocationDistance(allyLaneFront, enemyLaneFront) < 150
+		then
 			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 		end
 	end
@@ -193,7 +213,13 @@ function X.ConsiderAcidSpray()
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(600)
 		local laneCreeps = bot:GetNearbyLaneCreeps(600, true)
 		if isAttacking and Fu.GetMP(bot) > 0.33 then
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoeLocation.count >= 3 or #neutralCreeps >= 2 and aoeLocation.count >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (
+					#neutralCreeps >= 3 and aoeLocation.count >= 3
+					or #neutralCreeps >= 2 and aoeLocation.count >= 2 and neutralCreeps[1]:IsAncientCreep()
+				)
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 			if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
@@ -211,7 +237,12 @@ function X.ConsiderAcidSpray()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -295,7 +326,10 @@ function X.ConsiderUnstableConcoction()
 			and not nInRangeEnemy[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nInRangeEnemy[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -371,7 +405,10 @@ function X.ConsiderUnstableConcoctionThrow()
 			and DotaTime() >= concoctionStartTime + retreatThrowDelay
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nInRangeEnemy[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nInRangeEnemy[1]
 			end
 		end
@@ -382,9 +419,18 @@ function X.ConsiderUnstableConcoctionThrow()
 	-- throw stays only for the retreat case (isRetreating) above.
 	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and DotaTime() >= concoctionStartTime + fullBrewThrowDelay then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
-				print(string.format("[OHA-ALCHEMIST] concoction throw why=fallback target=%s brewed=%.1fs",
-					enemyHero:GetUnitName(), DotaTime() - concoctionStartTime))
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
+				print(
+					string.format(
+						"[OHA-ALCHEMIST] concoction throw why=fallback target=%s brewed=%.1fs",
+						enemyHero:GetUnitName(),
+						DotaTime() - concoctionStartTime
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -434,7 +480,10 @@ function X.ConsiderChemicalRage()
 			and not nInRangeEnemy[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nInRangeEnemy[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or hpRatio < 0.35 and bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or hpRatio < 0.35 and bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

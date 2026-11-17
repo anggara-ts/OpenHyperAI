@@ -59,7 +59,8 @@ X["sSellList"] = { "item_mjollnir", "item_magic_wand", "item_greater_crit", "ite
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -128,7 +129,11 @@ function X.ConsiderTarget()
 	end
 	local weakestUnit = Fu.GetAttackableWeakestUnit(bot, attackRange, true, true)
 	local newTarget = nil
-	if Fu.IsValidHero(botTarget) and GetUnitToUnitDistance(botTarget, bot) > attackRange and Fu.IsValidHero(weakestUnit) then
+	if
+		Fu.IsValidHero(botTarget)
+		and GetUnitToUnitDistance(botTarget, bot) > attackRange
+		and Fu.IsValidHero(weakestUnit)
+	then
 		newTarget = weakestUnit
 		bot:SetTarget(newTarget)
 		return
@@ -170,16 +175,24 @@ function X.ConsiderQ()
 		and (abilityLevel >= 3 or bot:GetMana() >= retainMana)
 		and not X.IsAbiltyQCastedHere(botTarget:GetLocation(), radius)
 	then
-		if botTarget:IsFacingLocation(Fu.GetEnemyFountain(), 30) and Fu.GetHP(botTarget) < 0.4 and Fu.IsRunning(botTarget) then
+		if
+			botTarget:IsFacingLocation(Fu.GetEnemyFountain(), 30)
+			and Fu.GetHP(botTarget) < 0.4
+			and Fu.IsRunning(botTarget)
+		then
 			for offset = 0, 800, 200 do
-				local aheadLocation = Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius + 800 - offset)
+				local aheadLocation =
+					Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius + 800 - offset)
 				if GetUnitToLocationDistance(bot, aheadLocation) <= castRange + 200 then
 					return BOT_ACTION_DESIRE_HIGH, aheadLocation
 				end
 			end
 		end
 		local predictedLocation = Fu.GetCorrectLoc(botTarget, castPoint + 1.8)
-		if Fu.GetLocationToLocationDistance(botTarget:GetLocation(), predictedLocation) > 300 and botTarget:GetMovementDirectionStability() > 0.4 then
+		if
+			Fu.GetLocationToLocationDistance(botTarget:GetLocation(), predictedLocation) > 300
+			and botTarget:GetMovementDirectionStability() > 0.4
+		then
 			return BOT_ACTION_DESIRE_HIGH, predictedLocation
 		end
 		local distance = GetUnitToUnitDistance(bot, botTarget)
@@ -197,7 +210,8 @@ function X.ConsiderQ()
 			end
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetUnitTowardDistanceLocation(bot, botTarget, distance)
 		end
-		return BOT_ACTION_DESIRE_HIGH, Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius / 2)
+		return BOT_ACTION_DESIRE_HIGH,
+			Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius / 2)
 	end
 	if Fu.IsRetreating(bot) and not bot:IsInvisible() then
 		local retreatAoe = bot:FindAoELocation(true, true, botLocation, castRange - 400, radius, 1.5, 0)
@@ -207,7 +221,11 @@ function X.ConsiderQ()
 		if bot:GetActiveModeDesire() > 0.8 then
 			local closeEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 			for _, enemyHero in pairs(closeEnemies) do
-				if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 2.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				if
+					Fu.IsValid(enemyHero)
+					and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+				then
 					local midpoint = (botLocation + enemyHero:GetLocation()) / 2
 					if not X.IsAbiltyQCastedHere(midpoint, radius) then
 						return BOT_ACTION_DESIRE_HIGH, midpoint
@@ -232,7 +250,11 @@ function X.ConsiderQ()
 	end
 	if Fu.IsFarming(bot) and bot:GetMana() >= retainMana then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(800)
-		if #neutralCreeps >= 4 and Fu.IsValid(botTarget) and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 3.88, DAMAGE_TYPE_PHYSICAL) then
+		if
+			#neutralCreeps >= 4
+			and Fu.IsValid(botTarget)
+			and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 3.88, DAMAGE_TYPE_PHYSICAL)
+		then
 			local neutralAoe = bot:FindAoELocation(true, false, botLocation, castRange, radius, 0.8, 0)
 			if neutralAoe.count >= 5 then
 				return BOT_ACTION_DESIRE_HIGH, neutralAoe.targetloc
@@ -262,7 +284,12 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
-	if Fu.IsFarming(bot) and #nearbyEnemies == 0 and Fu.GetManaAfter(shrapnelAbility:GetManaCost()) > 0.4 and (ChargeTracker.Count(bot, shrapnelAbility) or 0) >= 2 then
+	if
+		Fu.IsFarming(bot)
+		and #nearbyEnemies == 0
+		and Fu.GetManaAfter(shrapnelAbility:GetManaCost()) > 0.4
+		and (ChargeTracker.Count(bot, shrapnelAbility) or 0) >= 2
+	then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
 		if #neutralCreeps >= 3 then
 			local neutralAoe = bot:FindAoELocation(true, false, botLocation, castRange, radius, 0.8, 0)
@@ -281,7 +308,11 @@ function X.ConsiderE()
 	local abilityLevel = takeAimAbility:GetLevel()
 	local attackDamage = bot:GetAttackDamage()
 	local attackTarget = bot:GetAttackTarget()
-	if Fu.IsValidHero(attackTarget) and not attackTarget:IsAttackImmune() and Fu.IsInRange(bot, attackTarget, attackRange) then
+	if
+		Fu.IsValidHero(attackTarget)
+		and not attackTarget:IsAttackImmune()
+		and Fu.IsInRange(bot, attackTarget, attackRange)
+	then
 		if GetHeightLevel(bot:GetLocation()) < GetHeightLevel(attackTarget:GetLocation()) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -338,7 +369,9 @@ function X.ConsiderR()
 			hitDelay = GetUnitToUnitDistance(bot, weakestEnemy) / projectileSpeed + castPoint
 		end
 		if
-			Fu.WillMagicKillTarget(bot, weakestEnemy, damage, hitDelay) or X.ShouldUseR(attackTarget, weakestEnemy, damage) and (bot:GetMana() > retainMana * 1.28 or bot:HasScepter())
+			Fu.WillMagicKillTarget(bot, weakestEnemy, damage, hitDelay)
+			or X.ShouldUseR(attackTarget, weakestEnemy, damage)
+				and (bot:GetMana() > retainMana * 1.28 or bot:HasScepter())
 		then
 			target = weakestEnemy
 			return BOT_ACTION_DESIRE_HIGH, target
@@ -366,7 +399,9 @@ function X.GetWeakestUnitInRangeExRadius(units, range, excludeRadius, bot)
 			and not Fu.IsOtherAllyCanKillTarget(bot, unit)
 			and unit:GetHealth() < lowestHealth
 			and not unit:HasModifier("modifier_teleporting")
-			and not (Fu.IsInRange(unit, bot, attackRange) and Fu.CanKillTarget(unit, attackDamage, DAMAGE_TYPE_PHYSICAL))
+			and not (
+				Fu.IsInRange(unit, bot, attackRange) and Fu.CanKillTarget(unit, attackDamage, DAMAGE_TYPE_PHYSICAL)
+			)
 		then
 			weakestUnit = unit
 			lowestHealth = unit:GetHealth()
@@ -430,16 +465,26 @@ function X.ShouldUseR(attackTarget, target, damage)
 				and GetUnitToUnitDistance(teammate, target) <= 600
 				and (
 					teammate:IsFacingLocation(target:GetLocation(), 20)
-					or not (Fu.IsValidHero(attackTarget) and GetUnitToUnitDistance(bot, attackTarget) <= bot:GetAttackRange())
+					or not (
+						Fu.IsValidHero(attackTarget)
+						and GetUnitToUnitDistance(bot, attackTarget) <= bot:GetAttackRange()
+					)
 				)
 			then
 				return true
 			end
-			if Fu.IsValid(teammate) and teammate:GetUnitName() == "npc_dota_hero_zuus" and not Fu.CanNotUseAbility(teammate) then
+			if
+				Fu.IsValid(teammate)
+				and teammate:GetUnitName() == "npc_dota_hero_zuus"
+				and not Fu.CanNotUseAbility(teammate)
+			then
 				local thundergodsWrathAbility = teammate:GetAbilityByName("zuus_thundergods_wrath")
 				if thundergodsWrathAbility:IsFullyCastable() then
 					local wrathDamage = thundergodsWrathAbility:GetAbilityDamage()
-					if target:GetHealth() + 66 < target:GetActualIncomingDamage(wrathDamage + damage, DAMAGE_TYPE_MAGICAL) then
+					if
+						target:GetHealth() + 66
+						< target:GetActualIncomingDamage(wrathDamage + damage, DAMAGE_TYPE_MAGICAL)
+					then
 						return true
 					end
 				end
@@ -459,15 +504,32 @@ function X.ConsiderAS()
 	if Fu.IsRetreating(bot) then
 		local closeEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 		local nearestEnemy = closeEnemies[1]
-		if Fu.IsValidHero(nearestEnemy) and Fu.CanCastOnNonMagicImmune(nearestEnemy) and not nearestEnemy:IsDisarmed() then
+		if
+			Fu.IsValidHero(nearestEnemy)
+			and Fu.CanCastOnNonMagicImmune(nearestEnemy)
+			and not nearestEnemy:IsDisarmed()
+		then
 			-- Review fix: the grenade landed on Sniper's own spot, so no knockback direction was defined
 			-- for the attacker on top of him. Land it 150 toward the attacker so the attacker is pushed
 			-- away from Sniper. Unverified: which way Sniper himself (self_push 1) is pushed.
 			if DotaTime() - (X.lastGrenadeLog or -99) > 10 then
 				X.lastGrenadeLog = DotaTime()
-				pcall(print, string.format("[OHA-SNIPER] t=%.0f grenade-retreat enemy=%s dist=%d", DotaTime(), nearestEnemy:GetUnitName(), GetUnitToUnitDistance(bot, nearestEnemy)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-SNIPER] t=%.0f grenade-retreat enemy=%s dist=%d",
+						DotaTime(),
+						nearestEnemy:GetUnitName(),
+						GetUnitToUnitDistance(bot, nearestEnemy)
+					)
+				)
 			end
-			return BOT_ACTION_DESIRE_HIGH, Fu.GetUnitTowardDistanceLocation(bot, nearestEnemy, math.min(150, GetUnitToUnitDistance(bot, nearestEnemy)))
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.GetUnitTowardDistanceLocation(
+					bot,
+					nearestEnemy,
+					math.min(150, GetUnitToUnitDistance(bot, nearestEnemy))
+				)
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1400) then
@@ -477,7 +539,11 @@ function X.ConsiderAS()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end

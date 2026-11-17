@@ -132,7 +132,11 @@ function getLaneState()
 			[Lane.Mid] = GetLaneFrontLocation(enemyTeam, Lane.Mid, 0),
 			[Lane.Bot] = GetLaneFrontLocation(enemyTeam, Lane.Bot, 0),
 		},
-		highGroundEdgeWaitPoints = { [Lane.Top] = getHighGroundWaitPoint(team, Lane.Top), [Lane.Mid] = getHighGroundWaitPoint(team, Lane.Mid), [Lane.Bot] = getHighGroundWaitPoint(team, Lane.Bot) },
+		highGroundEdgeWaitPoints = {
+			[Lane.Top] = getHighGroundWaitPoint(team, Lane.Top),
+			[Lane.Mid] = getHighGroundWaitPoint(team, Lane.Mid),
+			[Lane.Bot] = getHighGroundWaitPoint(team, Lane.Bot),
+		},
 	}
 	return laneStateCache
 end
@@ -168,7 +172,9 @@ function getUnitLists()
 	return unitListCache
 end
 function locationKey(location)
-	return location and (tostring(math.floor(location.x / 200) * 200) .. ":") .. tostring(math.floor(location.y / 200) * 200) or "0:0"
+	return location
+			and (tostring(math.floor(location.x / 200) * 200) .. ":") .. tostring(math.floor(location.y / 200) * 200)
+		or "0:0"
 end
 function locationRadiusKey(location, radius)
 	return (locationKey(location) .. "|") .. tostring(math.floor(radius or 0))
@@ -188,7 +194,12 @@ function countRecentlySeenEnemies(location, radius, maxAge)
 					break
 				end
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
-				if lastSeenInfo and lastSeenInfo[1] and lastSeenInfo[1].time_since_seen <= maxAge and getLocationToLocationDistance(lastSeenInfo[1].location, location) <= radius then
+				if
+					lastSeenInfo
+					and lastSeenInfo[1]
+					and lastSeenInfo[1].time_since_seen <= maxAge
+					and getLocationToLocationDistance(lastSeenInfo[1].location, location) <= radius
+				then
 					count = count + 1
 				end
 				continued = true
@@ -248,7 +259,10 @@ function getWeightedEnemyCount(location, radius)
 				weightedCount = weightedCount + 0.4
 			elseif string.find(unitName, "siege", 1, true) ~= nil then
 				weightedCount = weightedCount + 0.5
-			elseif string.find(unitName, "warlock_golem", 1, true) ~= nil or string.find(unitName, "lone_druid_bear", 1, true) ~= nil then
+			elseif
+				string.find(unitName, "warlock_golem", 1, true) ~= nil
+				or string.find(unitName, "lone_druid_bear", 1, true) ~= nil
+			then
 				weightedCount = weightedCount + 1
 			elseif
 				unit:IsCreep()
@@ -315,7 +329,8 @@ function getMostThreatenedLane()
 	local bestScore = -1
 	for _, lane in ipairs(lanes) do
 		local building, healthScore, tier = unpack(Defend.GetFurthestBuildingOnLane(lane))
-		local location = isAliveBuilding(building) and tier < 3 and building:GetLocation() or getHighGroundWaitPoint(ourTeam, lane)
+		local location = isAliveBuilding(building) and tier < 3 and building:GetLocation()
+			or getHighGroundWaitPoint(ourTeam, lane)
 		local heroCount = countRecentlySeenEnemies(location, 1800)
 		local score = heroCount * 10
 		if heroCount == 0 then
@@ -600,7 +615,11 @@ function Defend.ShouldDefend(bot, building, radius)
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 			if lastSeenInfo ~= nil then
 				local lastSeen = lastSeenInfo[1]
-				if lastSeen ~= nil and lastSeen.time_since_seen <= lastSeenSeconds and GetUnitToLocationDistance(building, lastSeen.location) <= 1600 then
+				if
+					lastSeen ~= nil
+					and lastSeen.time_since_seen <= lastSeenSeconds
+					and GetUnitToLocationDistance(building, lastSeen.location) <= 1600
+				then
 					heroThreat = heroThreat + 1
 				end
 			end
@@ -620,7 +639,10 @@ function Defend.ShouldDefend(bot, building, radius)
 				creepThreat = creepThreat + 0.6
 			elseif { string.find(unitName, "upgraded") } ~= nil then
 				creepThreat = creepThreat + 0.4
-			elseif { string.find(unitName, "warlock_golem") } ~= nil or { string.find(unitName, "shadow_shaman_ward") } ~= nil then
+			elseif
+				{ string.find(unitName, "warlock_golem") } ~= nil
+				or { string.find(unitName, "shadow_shaman_ward") } ~= nil
+			then
 				creepThreat = creepThreat + 1
 			elseif { string.find(unitName, "lone_druid_bear") } ~= nil then
 				heroThreat = heroThreat + 1
@@ -652,7 +674,13 @@ function Defend.ShouldDefend(bot, building, radius)
 			shouldDefend = true
 		end
 	elseif threatCount == 3 then
-		if position == 2 or position == 3 or position == 4 or position == 5 or position == 1 and GetUnitToUnitDistance(bot, building) <= 3200 then
+		if
+			position == 2
+			or position == 3
+			or position == 4
+			or position == 5
+			or position == 1 and GetUnitToUnitDistance(bot, building) <= 3200
+		then
 			shouldDefend = true
 		end
 	elseif threatCount >= 4 then
@@ -715,7 +743,8 @@ function pingForDefense(bot, lane, desire, building, tier, alliesComing, enemyCo
 	if GameTime() - defendPings.pingedTime <= 6 then
 		return
 	end
-	local pingLocation = vectorAdd(Fu.AdjustLocationWithOffsetTowardsFountain(building:GetLocation(), 850), RandomVector(50))
+	local pingLocation =
+		vectorAdd(Fu.AdjustLocationWithOffsetTowardsFountain(building:GetLocation(), 850), RandomVector(50))
 	local retreatingAllies = Fu.GetRetreatingAlliesNearLoc(pingLocation, 1600)
 	if #retreatingAllies == 0 then
 		bot:ActionImmediate_Chat(Localization.Get("say_come_def"), false)
@@ -749,7 +778,13 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			local enemyCount = #Fu.GetLastSeenEnemiesNearLoc(laneFront, 2500)
 			local building, healthScore, tier = unpack(Defend.GetFurthestBuildingOnLane(candidateLane))
 			local tierWeight = tier >= 5 and 3 or (tier >= 4 and 2.5 or (tier >= 3 and 2 or (tier >= 2 and 1.5 or 1)))
-			candidates[#candidates + 1] = { lane = candidateLane, desire = laneDesire * tierWeight, dist = distance, enemies = enemyCount, tier = tier }
+			candidates[#candidates + 1] = {
+				lane = candidateLane,
+				desire = laneDesire * tierWeight,
+				dist = distance,
+				enemies = enemyCount,
+				tier = tier,
+			}
 		end
 	end
 	if #candidates >= 2 then
@@ -767,7 +802,12 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			local thisCandidate = arrayFind(candidates, function(_, candidate)
 				return candidate.lane == lane
 			end)
-			if thisCandidate and committedCandidate and thisCandidate.tier > committedCandidate.tier and thisCandidate.enemies >= 1 then
+			if
+				thisCandidate
+				and committedCandidate
+				and thisCandidate.tier > committedCandidate.tier
+				and thisCandidate.enemies >= 1
+			then
 				bot._defendCommitLane = lane
 				bot._defendCommitUntil = DotaTime() + 5
 			else
@@ -812,7 +852,9 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	end
 	local isGroupPushing = false
 	local activeMode = bot:GetActiveMode()
-	local isPushing = activeMode == BotMode.PushTowerTop or activeMode == BotMode.PushTowerMid or activeMode == BotMode.PushTowerBot
+	local isPushing = activeMode == BotMode.PushTowerTop
+		or activeMode == BotMode.PushTowerMid
+		or activeMode == BotMode.PushTowerBot
 	if isPushing then
 		local nearbyAllies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
 		local nearbyEnemies = Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 1400)
@@ -854,18 +896,24 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	local lastStandDesire = 0.9
 	if lastStand and DotaTime() >= (bot._ancLastStandLogAt or -999) then
 		bot._ancLastStandLogAt = DotaTime() + 5
-		pcall(print, string.format(
-			"[OHA-DEFEND] t=%.0f %s ancient-last-stand lane=%s anc=%.2f heroesAtAnc=%d t4=%d hp=%.2f",
-			DotaTime(),
-			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-			tostring(laneNames[lane]),
-			gameState.ancientHP or -1,
-			enemiesAtAncient,
-			baseThreat.t4,
-			Fu.GetHP(bot)
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-DEFEND] t=%.0f %s ancient-last-stand lane=%s anc=%.2f heroesAtAnc=%d t4=%d hp=%.2f",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				tostring(laneNames[lane]),
+				gameState.ancientHP or -1,
+				enemiesAtAncient,
+				baseThreat.t4,
+				Fu.GetHP(bot)
+			)
+		)
 	end
-	local outnumbered = not ancientLow and not lastStand and gameState.aliveEnemyCount >= 3 and gameState.aliveEnemyCount > gameState.aliveAllyCount + 1
+	local outnumbered = not ancientLow
+		and not lastStand
+		and gameState.aliveEnemyCount >= 3
+		and gameState.aliveEnemyCount > gameState.aliveAllyCount + 1
 	local outnumberedDesire = maxDefendDesire * 0.5
 	if enemiesOnHG >= 1 and not lastStand then
 		local nearbyEnemies = Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000)
@@ -889,16 +937,18 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	if ourAncient and ourAncient:IsAlive() then
 		local ancientHP = gameState.ancientHP
 		local defendersAtAncient = gameState.defendersAtAncient
-		local heroFloor = lane == threatLane and (outnumbered and outnumberedDesire or maxDefendDesire) or (outnumbered and outnumberedDesire * 0.7 or maxDefendDesire * 0.7)
+		local heroFloor = lane == threatLane and (outnumbered and outnumberedDesire or maxDefendDesire)
+			or (outnumbered and outnumberedDesire * 0.7 or maxDefendDesire * 0.7)
 		local creepFloor = lane == threatLane and maxDefendDesire * 0.9 or maxDefendDesire * 0.6
 		if enemiesAtAncient >= 2 or enemiesAtAncient >= 1 and ancientHP < 0.95 then
 			local defendersNeeded = enemiesAtAncient + 1
 			if defendersAtAncient < defendersNeeded then
 				baseDefenseUntil = DotaTime() + baseDefenseSeconds
-				baseFloor = { active = true, floor = heroFloor, forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(
-					ourAncient:GetLocation(),
-					300
-				) }
+				baseFloor = {
+					active = true,
+					floor = heroFloor,
+					forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300),
+				}
 				if lane == threatLane then
 					bot.laneToDefend = lane
 				end
@@ -920,11 +970,16 @@ function Defend.GetDefendDesireHelper(bot, lane)
 				end
 			end
 			local secondB = getClosestPosition(rest, ourAncient:GetLocation())
-			if selfAtBase or others <= 0 and position == closestPosition or bigWave and others <= 1 and position == secondB then
-				baseFloor = { active = true, floor = creepFloor, forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(
-					ourAncient:GetLocation(),
-					300
-				) }
+			if
+				selfAtBase
+				or others <= 0 and position == closestPosition
+				or bigWave and others <= 1 and position == secondB
+			then
+				baseFloor = {
+					active = true,
+					floor = creepFloor,
+					forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300),
+				}
 				if lane == threatLane then
 					bot.laneToDefend = lane
 				end
@@ -933,15 +988,21 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	end
 	if lastStand then
 		if not baseFloor.active then
-			baseFloor = { active = true, floor = 0, forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300) }
+			baseFloor = {
+				active = true,
+				floor = 0,
+				forceLoc = Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300),
+			}
 		end
 		baseFloor.floor = math.max(baseFloor.floor, lastStandDesire)
 		baseDefenseUntil = DotaTime() + baseDefenseSeconds
 	end
 	if enemiesOnHG >= 2 and not recentlyDamaged then
 		baseDefenseUntil = DotaTime() + baseDefenseSeconds
-		local hgFloor = outnumbered and outnumberedDesire or (lane == threatLane and maxDefendDesire or maxDefendDesire * 0.7)
-		local hgDefendLoc = ourAncient and Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300) or defendState.defendLoc
+		local hgFloor = outnumbered and outnumberedDesire
+			or (lane == threatLane and maxDefendDesire or maxDefendDesire * 0.7)
+		local hgDefendLoc = ourAncient and Fu.AdjustLocationWithOffsetTowardsFountain(ourAncient:GetLocation(), 300)
+			or defendState.defendLoc
 		if not baseFloor.active then
 			baseFloor = { active = true, floor = hgFloor, forceLoc = hgDefendLoc }
 		else
@@ -963,17 +1024,20 @@ function Defend.GetDefendDesireHelper(bot, lane)
 		if baseLane ~= nil and lane ~= baseLane then
 			if DotaTime() >= (bot._baseLaneLogAt or -999) then
 				bot._baseLaneLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-DEFEND] t=%.0f %s base-lane=%s(%s) d8lane=%s hg=%d anc=%d skip=%s",
-					DotaTime(),
-					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-					tostring(laneNames[baseLane]),
-					why,
-					tostring(laneNames[threatLane]),
-					enemiesOnHG or 0,
-					enemiesAtAncient or 0,
-					tostring(laneNames[lane])
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-DEFEND] t=%.0f %s base-lane=%s(%s) d8lane=%s hg=%d anc=%d skip=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(laneNames[baseLane]),
+						why,
+						tostring(laneNames[threatLane]),
+						enemiesOnHG or 0,
+						enemiesAtAncient or 0,
+						tostring(laneNames[lane])
+					)
+				)
 			end
 			return DefNone(bot, "base-other-lane")
 		end
@@ -1007,7 +1071,10 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			local enemyLaneFront = laneState.enemyLaneFronts[lane]
 			local enemiesNearFront = Fu.GetLastSeenEnemiesNearLoc(enemyLaneFront, 1600)
 			local alliesNearFront = Fu.GetAlliesNearLoc(enemyLaneFront, 1600)
-			if GetUnitToLocationDistance(bot, enemyLaneFront) > bot:GetAttackRange() and #enemiesNearFront <= #alliesNearFront + 1 then
+			if
+				GetUnitToLocationDistance(bot, enemyLaneFront) > bot:GetAttackRange()
+				and #enemiesNearFront <= #alliesNearFront + 1
+			then
 				defendState.defendLoc = enemyLaneFront
 			end
 		end
@@ -1083,7 +1150,12 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			-- Rank among the living allied heroes by distance to the wave (1 = closest).
 			local rank = 1
 			for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-				if ally ~= bot and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, hgLoc) < myDist then
+				if
+					ally ~= bot
+					and ally:IsAlive()
+					and not ally:IsIllusion()
+					and GetUnitToLocationDistance(ally, hgLoc) < myDist
+				then
 					rank = rank + 1
 				end
 			end
@@ -1106,11 +1178,15 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	end
 	if not shouldDefend and baseLane == nil then
 		local enemiesNearBuilding = Fu.GetLastSeenEnemiesNearLoc(building:GetLocation(), 1200)
-		if not canReach and #enemiesNearBuilding == 0 or #enemiesNearBuilding == 0 and #Fu.GetAlliesNearLoc(building:GetLocation(), 1600) >= 1 then
+		if
+			not canReach and #enemiesNearBuilding == 0
+			or #enemiesNearBuilding == 0 and #Fu.GetAlliesNearLoc(building:GetLocation(), 1600) >= 1
+		then
 			return DefNone(bot, "no-threat")
 		end
 	end
-	local defendLocation = isAliveBuilding(building) and building:GetLocation() or GetLaneFrontLocation(ourTeam, lane, 0)
+	local defendLocation = isAliveBuilding(building) and building:GetLocation()
+		or GetLaneFrontLocation(ourTeam, lane, 0)
 	local enemiesNearDefendLoc = Fu.GetLastSeenEnemiesNearLoc(defendLocation, 2500)
 	local alliesNearDefendLoc = Fu.GetAlliesNearLoc(defendLocation, 2500)
 	local alliesComing = #alliesNearDefendLoc + #Fu.Utils.GetAllyIdsInTpToLocation(defendLocation, 2500)
@@ -1261,7 +1337,8 @@ function Defend.GetDefendDesireHelper(bot, lane)
 	if maxDesire < 0.1 then
 		bot.laneToDefend = nil
 	else
-		bot.laneToDefend = topDesire >= midDesire and topDesire >= botDesire and Lane.Top or (midDesire >= botDesire and Lane.Mid or Lane.Bot)
+		bot.laneToDefend = topDesire >= midDesire and topDesire >= botDesire and Lane.Top
+			or (midDesire >= botDesire and Lane.Mid or Lane.Bot)
 	end
 	if distanceToDefendLoc < 1200 and not baseFloor.active then
 		defendDesire = math.min(defendDesire, 0.55)
@@ -1324,11 +1401,29 @@ local function ModeName(mode)
 	if MODE_NAMES == nil then
 		MODE_NAMES = {}
 		for _, name in ipairs({
-			"NONE", "LANING", "ATTACK", "ROAM", "RETREAT", "SECRET_SHOP", "SIDE_SHOP",
-			"PUSH_TOWER_TOP", "PUSH_TOWER_MID", "PUSH_TOWER_BOT",
-			"DEFEND_TOWER_TOP", "DEFEND_TOWER_MID", "DEFEND_TOWER_BOT",
-			"ASSEMBLE", "TEAM_ROAM", "FARM", "DEFEND_ALLY", "EVASIVE_MANEUVERS",
-			"ROSHAN", "ITEM", "WARD", "RUNE", "OUTPOST",
+			"NONE",
+			"LANING",
+			"ATTACK",
+			"ROAM",
+			"RETREAT",
+			"SECRET_SHOP",
+			"SIDE_SHOP",
+			"PUSH_TOWER_TOP",
+			"PUSH_TOWER_MID",
+			"PUSH_TOWER_BOT",
+			"DEFEND_TOWER_TOP",
+			"DEFEND_TOWER_MID",
+			"DEFEND_TOWER_BOT",
+			"ASSEMBLE",
+			"TEAM_ROAM",
+			"FARM",
+			"DEFEND_ALLY",
+			"EVASIVE_MANEUVERS",
+			"ROSHAN",
+			"ITEM",
+			"WARD",
+			"RUNE",
+			"OUTPOST",
 		}) do
 			local id = _G ~= nil and _G["BOT_MODE_" .. name] or nil
 			if id ~= nil then
@@ -1362,25 +1457,28 @@ local function LogBaseDefense(bot, defendLane, desire, why, gameState)
 	local ok, modeDesire = pcall(function()
 		return bot:GetActiveModeDesire()
 	end)
-	pcall(print, string.format(
-		"[OHA-DEFEND] t=%.0f %s %s mode=%s/%.2f dist=%d top=%s mid=%s bot=%s anc=%.2f creeps=%d heroes=%d hg=%d hgcreeps=%d t4=%d hp=%.2f",
-		now,
-		GetTeam() == TEAM_DIRE and "dire" or "radiant",
-		string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""),
-		ModeName(bot:GetActiveMode()),
-		ok and type(modeDesire) == "number" and modeDesire or -1,
-		ourAncient ~= nil and math.floor(GetUnitToUnitDistance(bot, ourAncient)) or -1,
-		lane(Lane.Top),
-		lane(Lane.Mid),
-		lane(Lane.Bot),
-		threat.ancHP,
-		threat.creeps,
-		threat.heroes,
-		threat.hg,
-		hgCreeps or 0,
-		threat.t4,
-		Fu.GetHP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-DEFEND] t=%.0f %s %s mode=%s/%.2f dist=%d top=%s mid=%s bot=%s anc=%.2f creeps=%d heroes=%d hg=%d hgcreeps=%d t4=%d hp=%.2f",
+			now,
+			GetTeam() == TEAM_DIRE and "dire" or "radiant",
+			string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""),
+			ModeName(bot:GetActiveMode()),
+			ok and type(modeDesire) == "number" and modeDesire or -1,
+			ourAncient ~= nil and math.floor(GetUnitToUnitDistance(bot, ourAncient)) or -1,
+			lane(Lane.Top),
+			lane(Lane.Mid),
+			lane(Lane.Bot),
+			threat.ancHP,
+			threat.creeps,
+			threat.heroes,
+			threat.hg,
+			hgCreeps or 0,
+			threat.t4,
+			Fu.GetHP(bot)
+		)
+	)
 end
 function Defend.GetDefendDesire(bot, lane)
 	if
@@ -1398,7 +1496,10 @@ function Defend.GetDefendDesire(bot, lane)
 	local defendLoc = getDefendState(bot).defendLoc or GetLaneFrontLocation(ourTeam, lane, 0)
 	local alliesNearDefendLoc = Fu.GetAlliesNearLoc(defendLoc, 2000)
 	local enemiesNearDefendLoc = Fu.GetEnemiesNearLoc(defendLoc, 2000)
-	local isStrongGroup = #alliesNearDefendLoc >= 3 and #enemiesNearDefendLoc >= 1 and #alliesNearDefendLoc > #enemiesNearDefendLoc and Fu.WeAreStronger(bot, 2500)
+	local isStrongGroup = #alliesNearDefendLoc >= 3
+		and #enemiesNearDefendLoc >= 1
+		and #alliesNearDefendLoc > #enemiesNearDefendLoc
+		and Fu.WeAreStronger(bot, 2500)
 	if isStrongGroup and desire < 0.9 then
 		if desire > 0.55 then
 			why = why .. "+group-cap"
@@ -1421,7 +1522,11 @@ function Defend.GetDefendDesire(bot, lane)
 						break
 					end
 					local distance = GetUnitToUnitDistance(bot, enemyHero)
-					if distance <= 1200 or distance <= attackRange or distance <= 1600 and distance <= enemyHero:GetAttackRange() then
+					if
+						distance <= 1200
+						or distance <= attackRange
+						or distance <= 1600 and distance <= enemyHero:GetAttackRange()
+					then
 						if desire > 0 then
 							why = why .. "+skirmish"
 						end
@@ -1438,7 +1543,8 @@ function Defend.GetDefendDesire(bot, lane)
 	end
 	if desire >= 0.5 and (bot._lastDefendChatDesire or 0) < 0.5 then
 		if FarmDefend.ClaimDecisionChat("defend_commit") then
-			local chatKey = lane == Lane.Top and "say_defend_top" or (lane == Lane.Mid and "say_defend_mid" or "say_defend_bot")
+			local chatKey = lane == Lane.Top and "say_defend_top"
+				or (lane == Lane.Mid and "say_defend_mid" or "say_defend_bot")
 			if gameState.enemiesAtAncient >= 1 or gameState.enemiesOnHG >= 1 then
 				chatKey = "say_base_defend"
 			end
@@ -1471,7 +1577,8 @@ function Defend.DefendThink(bot, lane)
 	end
 	local distanceToDefendLoc = GetUnitToLocationDistance(bot, defendState.defendLoc)
 	if distanceToDefendLoc > 2000 then
-		local midpoint = Vector((botLocation.x + defendState.defendLoc.x) / 2, (botLocation.y + defendState.defendLoc.y) / 2, 0)
+		local midpoint =
+			Vector((botLocation.x + defendState.defendLoc.x) / 2, (botLocation.y + defendState.defendLoc.y) / 2, 0)
 		local enemiesOnPath = Fu.GetLastSeenEnemiesNearLoc(midpoint, 1200)
 		if #enemiesOnPath >= 1 then
 			local deltaX = defendState.defendLoc.x - botLocation.x
@@ -1482,11 +1589,18 @@ function Defend.DefendThink(bot, lane)
 			local fountainTpPoint = ourTeam == Team.Radiant and radiantFountainTpPoint or direFountainTpPoint
 			local sideA = Vector(midpoint.x + offsetX, midpoint.y + offsetY, 0)
 			local sideB = Vector(midpoint.x - offsetX, midpoint.y - offsetY, 0)
-			local detourLocation = getLocationToLocationDistance(sideA, fountainTpPoint) < getLocationToLocationDistance(sideB, fountainTpPoint) and sideA or sideB
+			local detourLocation = getLocationToLocationDistance(sideA, fountainTpPoint)
+						< getLocationToLocationDistance(sideB, fountainTpPoint)
+					and sideA
+				or sideB
 			do
 				local fraction = 1
 				while fraction >= 0.2 do
-					local candidate = Vector(midpoint.x + (detourLocation.x - midpoint.x) * fraction, midpoint.y + (detourLocation.y - midpoint.y) * fraction, 0)
+					local candidate = Vector(
+						midpoint.x + (detourLocation.x - midpoint.x) * fraction,
+						midpoint.y + (detourLocation.y - midpoint.y) * fraction,
+						0
+					)
 					if IsLocationPassable(candidate) then
 						detourLocation = candidate
 						break
@@ -1549,7 +1663,10 @@ function Defend.DefendThink(bot, lane)
 		if baseAncient ~= nil then
 			local baseAncientLocation = baseAncient:GetLocation()
 			local enemiesAtAncient = Fu.GetEnemiesNearLoc(baseAncientLocation, 2500)
-			if #enemiesAtAncient > 0 and Fu.Utils.GetLocationToLocationDistance(defendLocation, baseAncientLocation) > 2000 then
+			if
+				#enemiesAtAncient > 0
+				and Fu.Utils.GetLocationToLocationDistance(defendLocation, baseAncientLocation) > 2000
+			then
 				local enemyAtAncient = enemiesAtAncient[1]
 				if Fu.IsValidHero(enemyAtAncient) and Fu.CanBeAttacked(enemyAtAncient) then
 					local distanceToEnemy = GetUnitToUnitDistance(bot, enemyAtAncient)
@@ -1608,13 +1725,16 @@ function Defend.DefendThink(bot, lane)
 				if onMe >= 1 then
 					if now >= (bot._hgPullLogAt or -999) then
 						bot._hgPullLogAt = now + 5
-						pcall(print, string.format(
-							"[OHA-DEFEND] t=%.0f %s hg-pull following=%d fountainDist=%d",
-							now,
-							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-							onMe,
-							math.floor(bot:DistanceFromFountain())
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-DEFEND] t=%.0f %s hg-pull following=%d fountainDist=%d",
+								now,
+								(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+								onMe,
+								math.floor(bot:DistanceFromFountain())
+							)
+						)
 					end
 					bot:Action_MoveToLocation(Fu.GetTeamFountain())
 					return

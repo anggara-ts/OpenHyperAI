@@ -87,7 +87,11 @@ function X.ConsiderBloodrage()
 			end
 		end
 	end
-	if Fu.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL and not bot:HasModifier("modifier_bloodseeker_bloodrage") then
+	if
+		Fu.IsValid(botTarget)
+		and botTarget:GetTeam() == TEAM_NEUTRAL
+		and not bot:HasModifier("modifier_bloodseeker_bloodrage")
+	then
 		local nearbyCreeps = bot:GetNearbyCreeps(1000, true)
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and not Fu.CanKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL) then
@@ -115,7 +119,11 @@ function X.ConsiderBloodRite()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PURE) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PURE)
+		then
 			if enemyHero:GetMovementDirectionStability() >= 0.75 then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
 			else
@@ -129,7 +137,10 @@ function X.ConsiderBloodRite()
 			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and nearbyEnemies == nil or #nearbyEnemies == 0 and #nearbyAllies <= 2 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and nearbyEnemies == nil
+		or #nearbyEnemies == 0 and #nearbyAllies <= 2
+	then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1000, true)
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 1000, radius / 2, castPoint, damage)
 		if aoeLocation.count >= 4 and #nearbyLaneCreeps >= 4 then
@@ -138,13 +149,18 @@ function X.ConsiderBloodRite()
 	end
 	if Fu.IsRetreating(bot) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 1.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 1.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
-		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 200, radius / 2, castPoint, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 200, radius / 2, castPoint, 0)
 		if aoeLocation.count >= 2 then
 			local castableEnemyCount = Fu.GetInvUnitInLocCount(bot, castRange, radius / 2, aoeLocation.targetloc, false)
 			if castableEnemyCount >= aoeLocation.count then
@@ -153,7 +169,11 @@ function X.ConsiderBloodRite()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + radius) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + radius)
+		then
 			local castLocation = Fu.GetDelayCastLocation(bot, botTarget, castRange, radius, 2.0)
 			if castLocation ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -226,7 +246,11 @@ function X.ConsiderBloodMist()
 	end
 	-- Toggle Blood Mist on (it was `not toggle == false`, which only fired while it was already on)
 	if bloodMistAbility:GetToggleState() == false and hpRatio > 0.5 then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, radius * 0.8) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius * 0.8)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

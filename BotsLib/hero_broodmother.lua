@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[2]
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 if sRole == "pos_2" then
@@ -68,7 +69,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -228,25 +230,48 @@ function X.ConsiderSpinWeb()
 		end
 	end
 	if Fu.IsPushing(bot) then
-		if laneCreeps ~= nil and #laneCreeps >= 4 and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius) then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 4
+			and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
-		if enemyTowers ~= nil and #enemyTowers >= 1 and Fu.CanBeAttacked(enemyTowers[1]) and not DoesLocationHaveWeb(enemyTowers[1]:GetLocation(), radius) then
+		if
+			enemyTowers ~= nil
+			and #enemyTowers >= 1
+			and Fu.CanBeAttacked(enemyTowers[1])
+			and not DoesLocationHaveWeb(enemyTowers[1]:GetLocation(), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, enemyTowers[1]:GetLocation()
 		end
 	end
 	if Fu.IsLaning(bot) then
-		if laneCreeps ~= nil and #laneCreeps >= 4 and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius) then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 4
+			and not DoesLocationHaveWeb(Fu.GetCenterOfUnits(laneCreeps), radius)
+		then
 			return BOT_MODE_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not DoesLocationHaveWeb(botTarget:GetLocation(), radius) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and not DoesLocationHaveWeb(botTarget:GetLocation(), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not DoesLocationHaveWeb(botTarget:GetLocation(), radius) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and not DoesLocationHaveWeb(botTarget:GetLocation(), radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -289,17 +314,25 @@ function X.ConsiderSpawnSpiderlings()
 	then
 		if DotaTime() >= (bot._broodSpawnLogAt or -999) then
 			bot._broodSpawnLogAt = DotaTime() + 10
-			pcall(print, string.format(
-				"[OHA-BROODMOTHER] t=%.0f spiderlings engage %s",
-				DotaTime(),
-				(string.gsub(spiderTarget:GetUnitName(), "npc_dota_hero_", ""))
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-BROODMOTHER] t=%.0f spiderlings engage %s",
+					DotaTime(),
+					(string.gsub(spiderTarget:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH, spiderTarget
 	end
 	local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 	for _, creep in pairs(laneCreeps) do
-		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL) and not isRetreating then
+		if
+			Fu.IsValid(creep)
+			and Fu.CanBeAttacked(creep)
+			and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL)
+			and not isRetreating
+		then
 			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end
@@ -307,7 +340,11 @@ function X.ConsiderSpawnSpiderlings()
 end
 function DoesLocationHaveWeb(location, radius)
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if Fu.IsValid(unit) and unit:GetUnitName() == "npc_dota_broodmother_web" and GetUnitToLocationDistance(unit, location) < radius then
+		if
+			Fu.IsValid(unit)
+			and unit:GetUnitName() == "npc_dota_broodmother_web"
+			and GetUnitToLocationDistance(unit, location) < radius
+		then
 			return true
 		end
 	end

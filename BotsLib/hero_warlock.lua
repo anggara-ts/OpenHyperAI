@@ -92,7 +92,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_heart", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -181,7 +182,11 @@ function X.ConsiderR()
 	end
 	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
 	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
-	if bot:GetMana() >= fatalBondsAbility:GetManaCost() + chaoticOfferingAbility:GetManaCost() and hpRatio > 0.5 and X.ConsiderQ() > 0 then
+	if
+		bot:GetMana() >= fatalBondsAbility:GetManaCost() + chaoticOfferingAbility:GetManaCost()
+		and hpRatio > 0.5
+		and X.ConsiderQ() > 0
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = chaoticOfferingAbility:GetCastRange() + aetherRange
@@ -198,7 +203,11 @@ function X.ConsiderR()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local botTarget = Fu.GetProperTarget(bot)
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + 200) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 200)
+		then
 			if #enemyList >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(castPoint)
 			end
@@ -212,7 +221,11 @@ function X.ConsiderRFR()
 	end
 	-- Hold the ult for Fatal Bonds only when Bonds is going out this think. Waiting on a Bonds
 	-- with no valid target (all under BKB) used to stall the ult until HP fell below 50%.
-	if bot:GetMana() >= fatalBondsAbility:GetManaCost() + chaoticOfferingAbility:GetManaCost() and hpRatio > 0.5 and X.ConsiderQ() > 0 then
+	if
+		bot:GetMana() >= fatalBondsAbility:GetManaCost() + chaoticOfferingAbility:GetManaCost()
+		and hpRatio > 0.5
+		and X.ConsiderQ() > 0
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if bot:GetMana() < chaoticOfferingAbility:GetManaCost() * 2 + refresher:GetManaCost() then
@@ -225,7 +238,11 @@ function X.ConsiderRFR()
 	local enemyList = Fu.GetEnemyList(bot, 1600)
 	if Fu.IsGoingOnSomeone(bot) then
 		local botTarget = Fu.GetProperTarget(bot)
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + 200) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 200)
+		then
 			if #enemyList >= 3 then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(castPoint)
 			end
@@ -261,13 +278,16 @@ function X.ConsiderE()
 			if hittable >= 2 then
 				if DotaTime() >= (bot._upheavalLogAt or -999) then
 					bot._upheavalLogAt = DotaTime() + 15
-					pcall(print, string.format(
-						"[OHA-WARLOCK] t=%.0f upheaval heroes=%d bondsReady=%s wordReady=%s",
-						DotaTime(),
-						hittable,
-						tostring(fatalBondsAbility:IsFullyCastable()),
-						tostring(shadowWordAbility:IsFullyCastable())
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-WARLOCK] t=%.0f upheaval heroes=%d bondsReady=%s wordReady=%s",
+							DotaTime(),
+							hittable,
+							tostring(fatalBondsAbility:IsFullyCastable()),
+							tostring(shadowWordAbility:IsFullyCastable())
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_LOW, aoe.targetloc
 			end
@@ -275,7 +295,11 @@ function X.ConsiderE()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local botTarget = Fu.GetProperTarget(bot)
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + 200) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 200)
+		then
 			local targetAllies = Fu.GetNearbyHeroes(botTarget, radius, false, BOT_MODE_NONE)
 			if #targetAllies >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(castPoint)
@@ -391,13 +415,16 @@ function X.ConsiderQ()
 		if best ~= nil then
 			if DotaTime() >= (bot._bondsLogAt or -999) then
 				bot._bondsLogAt = DotaTime() + 10
-				pcall(print, string.format(
-					"[OHA-WARLOCK] t=%.0f fatal-bonds grouped=%d target=%s ultReady=%s",
-					DotaTime(),
-					cluster.count,
-					(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
-					tostring(chaoticOfferingAbility:IsFullyCastable())
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-WARLOCK] t=%.0f fatal-bonds grouped=%d target=%s ultReady=%s",
+						DotaTime(),
+						cluster.count,
+						(string.gsub(best:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(chaoticOfferingAbility:IsFullyCastable())
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, best
 		end
@@ -406,7 +433,11 @@ function X.ConsiderQ()
 		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 		if aoe.count >= 2 then
 			local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-			if Fu.IsValidHero(nearbyEnemies[1]) and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1]) and Fu.CanCastOnTargetAdvanced(nearbyEnemies[1]) then
+			if
+				Fu.IsValidHero(nearbyEnemies[1])
+				and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
+				and Fu.CanCastOnTargetAdvanced(nearbyEnemies[1])
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end

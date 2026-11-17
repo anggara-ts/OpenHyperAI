@@ -190,7 +190,11 @@ local function installProjectile(Fu)
 				if activeAbility ~= nil then
 					local behavior = activeAbility:GetBehavior()
 					local abilityName = activeAbility:GetName()
-					if behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5) and not ignoredSelfCasts[abilityName] then
+					if
+						behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET
+						and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5)
+						and not ignoredSelfCasts[abilityName]
+					then
 						return true
 					end
 					if

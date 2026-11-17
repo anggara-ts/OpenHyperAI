@@ -12,7 +12,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 -- Build 1 took Earth Splitter only at level 9 and rank 2 at 16; ultimate now at levels 6/12 (entries 6/11).
-local tAllAbilityBuildList = { { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 3, 2, 6, 2, 3, 3, 1, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 if sRole == "pos_1" then
@@ -87,16 +88,23 @@ X["sSellList"] = { "item_travel_boots", "item_quelling_blade", "item_abyssal_bla
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
-local echoStompAbility = SafeAbility(bot:GetAbilityByName("elder_titan_echo_stomp"), "elder_titan_echo_stomp", "elder_titan")
-local ancestralSpiritAbility = SafeAbility(bot:GetAbilityByName("elder_titan_ancestral_spirit"), "elder_titan_ancestral_spirit", "elder_titan")
-local moveSpiritAbility = SafeAbility(bot:GetAbilityByName("elder_titan_move_spirit"), "elder_titan_move_spirit", "elder_titan")
-local returnSpiritAbility = SafeAbility(bot:GetAbilityByName("elder_titan_return_spirit"), "elder_titan_return_spirit", "elder_titan")
-local naturalOrderAbility = SafeAbility(bot:GetAbilityByName("elder_titan_natural_order"), "elder_titan_natural_order", "elder_titan")
-local earthSplitterAbility = SafeAbility(bot:GetAbilityByName("elder_titan_earth_splitter"), "elder_titan_earth_splitter", "elder_titan")
+local echoStompAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_echo_stomp"), "elder_titan_echo_stomp", "elder_titan")
+local ancestralSpiritAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_ancestral_spirit"), "elder_titan_ancestral_spirit", "elder_titan")
+local moveSpiritAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_move_spirit"), "elder_titan_move_spirit", "elder_titan")
+local returnSpiritAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_return_spirit"), "elder_titan_return_spirit", "elder_titan")
+local naturalOrderAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_natural_order"), "elder_titan_natural_order", "elder_titan")
+local earthSplitterAbility =
+	SafeAbility(bot:GetAbilityByName("elder_titan_earth_splitter"), "elder_titan_earth_splitter", "elder_titan")
 local botTarget
 local nearbyEnemies, nearbyAllies
 local astralSpiritLocation = nil
@@ -120,7 +128,10 @@ local function IsHeldForAtLeast(unit, minDuration)
 	return false
 end
 local function IsAstralSpiritOut()
-	return ancestralSpiritAbility and not ancestralSpiritAbility:IsFullyCastable() and astralSpiritLocation ~= nil and DotaTime() - astralSpiritCastTime < astralSpiritDuration
+	return ancestralSpiritAbility
+		and not ancestralSpiritAbility:IsFullyCastable()
+		and astralSpiritLocation ~= nil
+		and DotaTime() - astralSpiritCastTime < astralSpiritDuration
 end
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
@@ -139,8 +150,10 @@ function X.SkillsComplement()
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
 	botTarget = context.target
-	moveSpiritAbility = SafeAbility(bot:GetAbilityByName("elder_titan_move_spirit"), "elder_titan_move_spirit", "elder_titan")
-	returnSpiritAbility = SafeAbility(bot:GetAbilityByName("elder_titan_return_spirit"), "elder_titan_return_spirit", "elder_titan")
+	moveSpiritAbility =
+		SafeAbility(bot:GetAbilityByName("elder_titan_move_spirit"), "elder_titan_move_spirit", "elder_titan")
+	returnSpiritAbility =
+		SafeAbility(bot:GetAbilityByName("elder_titan_return_spirit"), "elder_titan_return_spirit", "elder_titan")
 	if ConsiderEchoStomp(bot) > 0 then
 		bot:Action_UseAbility(echoStompAbility)
 		return
@@ -157,7 +170,8 @@ function X.SkillsComplement()
 			return
 		end
 		local nearestEnemy = nearbyEnemies and nearbyEnemies[1] or nil
-		local isInEnemyAttackRange = Fu.IsValidHero(nearestEnemy) and Fu.IsInRange(bot, nearestEnemy, nearestEnemy:GetAttackRange() + 150)
+		local isInEnemyAttackRange = Fu.IsValidHero(nearestEnemy)
+			and Fu.IsInRange(bot, nearestEnemy, nearestEnemy:GetAttackRange() + 150)
 		if
 			DotaTime() > lastSpiritMoveTime + spiritMoveInterval
 			and not bot:WasRecentlyDamagedByAnyHero(2.0)
@@ -257,8 +271,16 @@ function ConsiderEarthSplitter()
 	if Fu.IsInTeamFight(bot, 1600) or isGoingOnSomeone or Fu.IsPushing(bot) then
 		for _, enemyHero in pairs(nearbyEnemies) do
 			-- The crack lands crack_time (2.72s) after the cast, so the hold must outlast that (was 1.8).
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and IsHeldForAtLeast(enemyHero, 2.8) then
-				pcall(print, string.format("[OHA-ELDERTITAN] t=%.0f splitter on held %s", DotaTime(), enemyHero:GetUnitName()))
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and IsHeldForAtLeast(enemyHero, 2.8)
+			then
+				pcall(
+					print,
+					string.format("[OHA-ELDERTITAN] t=%.0f splitter on held %s", DotaTime(), enemyHero:GetUnitName())
+				)
 				return BOT_ACTION_DESIRE_VERYHIGH, enemyHero:GetLocation()
 			end
 		end
@@ -308,7 +330,10 @@ function ConsiderEchoStomp(caster)
 	end
 	local disabledCount = 0
 	for _, enemyHero in pairs(enemiesInRadius) do
-		if Fu.IsValidHero(enemyHero) and (Fu.IsDisabled(enemyHero) or enemyHero:GetCurrentMovementSpeed() <= 250 or IsHeldInPlace(enemyHero)) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and (Fu.IsDisabled(enemyHero) or enemyHero:GetCurrentMovementSpeed() <= 250 or IsHeldInPlace(enemyHero))
+		then
 			disabledCount = disabledCount + 1
 		end
 	end
@@ -319,7 +344,12 @@ function ConsiderEchoStomp(caster)
 		for _, enemyHero in pairs(enemiesInRadius) do
 			if Fu.IsValidHero(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 2) then
 				if
-					Fu.CanCastOnNonMagicImmune(enemyHero) and (Fu.IsDisabled(enemyHero) or enemyHero:GetCurrentMovementSpeed() <= 250 or IsHeldInPlace(enemyHero))
+					Fu.CanCastOnNonMagicImmune(enemyHero)
+					and (
+						Fu.IsDisabled(enemyHero)
+						or enemyHero:GetCurrentMovementSpeed() <= 250
+						or IsHeldInPlace(enemyHero)
+					)
 				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -358,7 +388,10 @@ function ConsiderEchoStomp(caster)
 		end
 		local disabledCountInFight = 0
 		for _, enemyHero in pairs(enemiesInRadius) do
-			if Fu.IsValidHero(enemyHero) and (Fu.IsDisabled(enemyHero) or enemyHero:GetCurrentMovementSpeed() <= 250 or IsHeldInPlace(enemyHero)) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and (Fu.IsDisabled(enemyHero) or enemyHero:GetCurrentMovementSpeed() <= 250 or IsHeldInPlace(enemyHero))
+			then
 				disabledCountInFight = disabledCountInFight + 1
 			end
 		end

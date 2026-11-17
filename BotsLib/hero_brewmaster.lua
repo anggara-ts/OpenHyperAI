@@ -106,18 +106,24 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local thunderClapAbility = SafeAbility(bot:GetAbilityByName("brewmaster_thunder_clap"), "brewmaster_thunder_clap", "brewmaster")
-local cinderBrewAbility = SafeAbility(bot:GetAbilityByName("brewmaster_cinder_brew"), "brewmaster_cinder_brew", "brewmaster")
-local drunkenBrawlerAbility = SafeAbility(bot:GetAbilityByName("brewmaster_drunken_brawler"), "brewmaster_drunken_brawler", "brewmaster")
-local primalSplitAbility = SafeAbility(bot:GetAbilityByName("brewmaster_primal_split"), "brewmaster_primal_split", "brewmaster")
-local liquidCourageAbility = SafeAbility(bot:GetAbilityByName("brewmaster_liquid_courage"), "brewmaster_liquid_courage", "brewmaster")
+local thunderClapAbility =
+	SafeAbility(bot:GetAbilityByName("brewmaster_thunder_clap"), "brewmaster_thunder_clap", "brewmaster")
+local cinderBrewAbility =
+	SafeAbility(bot:GetAbilityByName("brewmaster_cinder_brew"), "brewmaster_cinder_brew", "brewmaster")
+local drunkenBrawlerAbility =
+	SafeAbility(bot:GetAbilityByName("brewmaster_drunken_brawler"), "brewmaster_drunken_brawler", "brewmaster")
+local primalSplitAbility =
+	SafeAbility(bot:GetAbilityByName("brewmaster_primal_split"), "brewmaster_primal_split", "brewmaster")
+local liquidCourageAbility =
+	SafeAbility(bot:GetAbilityByName("brewmaster_liquid_courage"), "brewmaster_liquid_courage", "brewmaster")
 local thunderClapDesire
 local cinderBrewDesire, cinderBrewLocation
 local drunkenBrawlerDesire, drunkenBrawlerStance
@@ -226,7 +232,11 @@ function X.ConsiderThunderClap()
 	if Fu.IsFarming(bot) then
 		if isAttacking and mpRatio > 0.4 then
 			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(radius)
-			if nearbyNeutrals ~= nil and Fu.IsValid(nearbyNeutrals[1]) and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and Fu.IsValid(nearbyNeutrals[1])
+				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 and Fu.CanBeAttacked(nearbyLaneCreeps[1]) then
@@ -241,10 +251,17 @@ function X.ConsiderThunderClap()
 			if
 				Fu.IsValid(creep)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= damage
 			then
-				if Fu.IsValidHero(nearbyEnemies[1]) and GetUnitToUnitDistance(nearbyEnemies[1], creep) < 500 and mpRatio > 0.35 then
+				if
+					Fu.IsValidHero(nearbyEnemies[1])
+					and GetUnitToUnitDistance(nearbyEnemies[1], creep) < 500
+					and mpRatio > 0.35
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -258,13 +275,23 @@ function X.ConsiderThunderClap()
 		end
 		if Fu.IsInLaningPhase() then
 			local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
-			if enemiesInRadius ~= nil and #enemiesInRadius >= 1 and Fu.GetManaAfter(thunderClapAbility:GetManaCost()) > 0.5 then
+			if
+				enemiesInRadius ~= nil
+				and #enemiesInRadius >= 1
+				and Fu.GetManaAfter(thunderClapAbility:GetManaCost()) > 0.5
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and not botTarget:IsDisarmed() and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and not botTarget:IsDisarmed()
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -330,7 +357,13 @@ function X.ConsiderCinderBrew()
 		end
 	end
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
-		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and Fu.CanBeAttacked(nearbyLaneCreeps[1]) and not Fu.IsRunning(nearbyLaneCreeps[1]) and isAttacking then
+		if
+			nearbyLaneCreeps ~= nil
+			and #nearbyLaneCreeps >= 4
+			and Fu.CanBeAttacked(nearbyLaneCreeps[1])
+			and not Fu.IsRunning(nearbyLaneCreeps[1])
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 		end
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
@@ -341,16 +374,31 @@ function X.ConsiderCinderBrew()
 	if Fu.IsFarming(bot) then
 		if isAttacking and mpRatio > 0.45 then
 			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(600)
-			if nearbyNeutrals ~= nil and Fu.IsValid(nearbyNeutrals[1]) and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and Fu.IsValid(nearbyNeutrals[1])
+				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyNeutrals)
 			end
-			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 and Fu.CanBeAttacked(nearbyLaneCreeps[1]) and not Fu.IsRunning(nearbyLaneCreeps[1]) then
+			if
+				nearbyLaneCreeps ~= nil
+				and #nearbyLaneCreeps >= 3
+				and Fu.CanBeAttacked(nearbyLaneCreeps[1])
+				and not Fu.IsRunning(nearbyLaneCreeps[1])
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and not botTarget:IsInvulnerable() and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and not botTarget:IsInvulnerable()
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -432,10 +480,24 @@ function X.ConsiderPrimalSplit()
 	end
 	-- fix: GetNearbyHeroes(allies) includes Brewmaster himself, so "#nearbyAllies == 0" never held
 	-- and this low-HP split (save) never fired. "<= 1" = no ally but himself.
-	if Fu.GetHP(bot) < 0.33 and nearbyEnemies ~= nil and #nearbyEnemies >= 2 and nearbyAllies ~= nil and #nearbyAllies <= 1 then
+	if
+		Fu.GetHP(bot) < 0.33
+		and nearbyEnemies ~= nil
+		and #nearbyEnemies >= 2
+		and nearbyAllies ~= nil
+		and #nearbyAllies <= 1
+	then
 		if DotaTime() >= (bot._brewSplitLogAt or -999) then
 			bot._brewSplitLogAt = DotaTime() + 10
-			pcall(print, string.format("[OHA-BREWMASTER] t=%.0f primal split save hp=%.2f enemies=%d", DotaTime(), Fu.GetHP(bot), #nearbyEnemies))
+			pcall(
+				print,
+				string.format(
+					"[OHA-BREWMASTER] t=%.0f primal split save hp=%.2f enemies=%d",
+					DotaTime(),
+					Fu.GetHP(bot),
+					#nearbyEnemies
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end

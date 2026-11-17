@@ -102,7 +102,12 @@ function AttackUnits(minion)
 			return botTarget
 		end
 	end
-	if botMode == BOT_MODE_RETREAT or botMode == BOT_MODE_SECRET_SHOP or botMode == BOT_MODE_WARD or botMode == BOT_MODE_RUNE then
+	if
+		botMode == BOT_MODE_RETREAT
+		or botMode == BOT_MODE_SECRET_SHOP
+		or botMode == BOT_MODE_WARD
+		or botMode == BOT_MODE_RUNE
+	then
 		local nearbyEnemies = minion:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 		if nearbyEnemies and #nearbyEnemies >= 1 then
 			return Fu.GetWeakestUnit(nearbyEnemies)
@@ -157,7 +162,11 @@ function AttackUnits(minion)
 		local enemyBarracks = minion:GetNearbyBarracks(1600, true)
 		if enemyBarracks then
 			for _, barracks in pairs(enemyBarracks) do
-				if Fu.IsValidBuilding(barracks) and not barracks:IsInvulnerable() and string.find(barracks:GetUnitName(), "melee") then
+				if
+					Fu.IsValidBuilding(barracks)
+					and not barracks:IsInvulnerable()
+					and string.find(barracks:GetUnitName(), "melee")
+				then
 					return barracks
 				end
 			end
@@ -168,11 +177,21 @@ function AttackUnits(minion)
 			end
 		end
 		local enemyTowers = minion:GetNearbyTowers(1600, true)
-		if enemyTowers and #enemyTowers >= 1 and Fu.IsValidBuilding(enemyTowers[1]) and not enemyTowers[1]:IsInvulnerable() then
+		if
+			enemyTowers
+			and #enemyTowers >= 1
+			and Fu.IsValidBuilding(enemyTowers[1])
+			and not enemyTowers[1]:IsInvulnerable()
+		then
 			return enemyTowers[1]
 		end
 		local enemyAncient = GetAncient(GetOpposingTeam())
-		if enemyAncient and Fu.IsValidBuilding(enemyAncient) and not enemyAncient:IsInvulnerable() and GetUnitToUnitDistance(minion, enemyAncient) <= 1600 then
+		if
+			enemyAncient
+			and Fu.IsValidBuilding(enemyAncient)
+			and not enemyAncient:IsInvulnerable()
+			and GetUnitToUnitDistance(minion, enemyAncient) <= 1600
+		then
 			return enemyAncient
 		end
 		return nil
@@ -236,7 +255,12 @@ function UseCyclone(minion)
 	local stunnableEnemies = Fu.FilterEnemiesForStun(nearbyEnemies)
 	local cycloneTarget = nil
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidTarget(enemyHero) and enemyHero:IsChanneling() and Fu.IsNotImmune(enemyHero) and not Fu.IsReflectingSpells(enemyHero) then
+		if
+			Fu.IsValidTarget(enemyHero)
+			and enemyHero:IsChanneling()
+			and Fu.IsNotImmune(enemyHero)
+			and not Fu.IsReflectingSpells(enemyHero)
+		then
 			cycloneTarget = enemyHero
 			break
 		end
@@ -244,7 +268,12 @@ function UseCyclone(minion)
 	if cycloneTarget == nil and Fu.IsGoingOnSomeone(bot) then
 		local ownerTarget = botTarget
 		for _, enemyHero in pairs(stunnableEnemies) do
-			if Fu.IsValidHero(enemyHero) and enemyHero ~= ownerTarget and not enemyHero:IsMagicImmune() and not Fu.IsReflectingSpells(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero ~= ownerTarget
+				and not enemyHero:IsMagicImmune()
+				and not Fu.IsReflectingSpells(enemyHero)
+			then
 				cycloneTarget = enemyHero
 				break
 			end
@@ -252,7 +281,11 @@ function UseCyclone(minion)
 	end
 	if cycloneTarget == nil and #stunnableEnemies >= 2 then
 		local strongestEnemy = Fu.GetStrongestEnemyHero(stunnableEnemies)
-		if strongestEnemy ~= nil and not strongestEnemy:IsMagicImmune() and not Fu.IsReflectingSpells(strongestEnemy) then
+		if
+			strongestEnemy ~= nil
+			and not strongestEnemy:IsMagicImmune()
+			and not Fu.IsReflectingSpells(strongestEnemy)
+		then
 			cycloneTarget = strongestEnemy
 		end
 	end
@@ -308,14 +341,23 @@ function UseHurlBoulder(minion)
 	end
 	if Fu.IsRetreating(bot) then
 		local strongestEnemy = Fu.GetStrongestEnemyHero(nearbyEnemies)
-		if strongestEnemy ~= nil and not strongestEnemy:IsMagicImmune() and not Fu.IsReflectingSpells(strongestEnemy) then
+		if
+			strongestEnemy ~= nil
+			and not strongestEnemy:IsMagicImmune()
+			and not Fu.IsReflectingSpells(strongestEnemy)
+		then
 			return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 		end
 	end
 	local allyTowers = minion:GetNearbyTowers(1600, false)
 	for _, tower in pairs(allyTowers) do
 		local towerTarget = tower:GetAttackTarget()
-		if Fu.IsValidHero(towerTarget) and not towerTarget:IsMagicImmune() and not Fu.IsDisabled(towerTarget) and not Fu.IsReflectingSpells(towerTarget) then
+		if
+			Fu.IsValidHero(towerTarget)
+			and not towerTarget:IsMagicImmune()
+			and not Fu.IsDisabled(towerTarget)
+			and not Fu.IsReflectingSpells(towerTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, towerTarget
 		end
 	end
@@ -333,7 +375,11 @@ function UseAstralPull(minion)
 	local nearbyEnemies = minion:GetNearbyHeroes(searchRange, true, BOT_MODE_NONE)
 	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and not Fu.IsReflectingSpells(enemyHero) and (enemyHero:IsChanneling() or damage > enemyHero:GetHealth()) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsReflectingSpells(enemyHero)
+				and (enemyHero:IsChanneling() or damage > enemyHero:GetHealth())
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end

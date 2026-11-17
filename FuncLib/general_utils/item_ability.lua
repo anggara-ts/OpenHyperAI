@@ -33,7 +33,10 @@ local function installItemAbility(Fu)
 					and member:GetUnitName() ~= "npc_dota_hero_nevermore"
 					and member:GetUnitName() ~= "npc_dota_hero_arc_warden"
 				then
-					if member:GetUnitName() == "npc_dota_hero_silencer" or member:GetUnitName() == "npc_dota_hero_warlock" then
+					if
+						member:GetUnitName() == "npc_dota_hero_silencer"
+						or member:GetUnitName() == "npc_dota_hero_warlock"
+					then
 						return member
 					end
 					local ultimate = Fu.GetUltimateAbility(member)
@@ -220,7 +223,11 @@ local function installItemAbility(Fu)
 			local enemyCount = Fu.GetEnemyCount(bot, 1600)
 			local hpRatio = Fu.GetHP(bot)
 			local mpRatio = Fu.GetMP(bot)
-			if hpRatio > 0.35 + 0.1 * enemyCount and mpRatio < 0.99 - 0.1 * enemyCount and (enemyCount <= 2 or hpRatio > mpRatio * 2.5) then
+			if
+				hpRatio > 0.35 + 0.1 * enemyCount
+				and mpRatio < 0.99 - 0.1 * enemyCount
+				and (enemyCount <= 2 or hpRatio > mpRatio * 2.5)
+			then
 				bot:ActionQueue_UseAbility(soulRing)
 				return
 			end
@@ -277,7 +284,11 @@ local function installItemAbility(Fu)
 		elseif currentStat == ATTRIBUTE_AGILITY then
 			currentStat = ATTRIBUTE_INTELLECT
 		end
-		if primaryAttribute ~= ATTRIBUTE_INTELLECT and primaryAttribute ~= ATTRIBUTE_STRENGTH and primaryAttribute ~= ATTRIBUTE_AGILITY then
+		if
+			primaryAttribute ~= ATTRIBUTE_INTELLECT
+			and primaryAttribute ~= ATTRIBUTE_STRENGTH
+			and primaryAttribute ~= ATTRIBUTE_AGILITY
+		then
 			return currentStat ~= ATTRIBUTE_STRENGTH
 		end
 		return primaryAttribute ~= currentStat

@@ -12,23 +12,27 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, {
-	2,
-	3,
-	2,
-	1,
-	2,
-	6,
-	2,
-	3,
-	3,
-	3,
-	6,
-	1,
-	1,
-	1,
-	6,
-} }
+local tAllAbilityBuildList = {
+	{ 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 },
+	{ 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 },
+	{
+		2,
+		3,
+		2,
+		1,
+		2,
+		6,
+		2,
+		3,
+		3,
+		3,
+		6,
+		1,
+		1,
+		1,
+		6,
+	},
+}
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" then
@@ -143,17 +147,20 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local shackleshotAbility = SafeAbility(bot:GetAbilityByName("windrunner_shackleshot"), "windrunner_shackleshot", "windrunner")
+local shackleshotAbility =
+	SafeAbility(bot:GetAbilityByName("windrunner_shackleshot"), "windrunner_shackleshot", "windrunner")
 local powershotAbility = SafeAbility(bot:GetAbilityByName("windrunner_powershot"), "windrunner_powershot", "windrunner")
 local windrunAbility = SafeAbility(bot:GetAbilityByName("windrunner_windrun"), "windrunner_windrun", "windrunner")
-local galeForceAbility = SafeAbility(bot:GetAbilityByName("windrunner_gale_force"), "windrunner_gale_force", "windrunner")
+local galeForceAbility =
+	SafeAbility(bot:GetAbilityByName("windrunner_gale_force"), "windrunner_gale_force", "windrunner")
 local focusFireAbility = SafeAbility(bot:GetAbilityByName("windrunner_focusfire"), "windrunner_focusfire", "windrunner")
 -- [OHA-WINDRUNNER] lines: throttled per reason, at most once per 5s.
 function X.LogWindrunner(why, fmt, ...)
@@ -253,7 +260,12 @@ function X.ConsiderShackleShot()
 		then
 			local shackleUnit = X.GetShackleTarget(bot, botTarget, shackleDistance, shackleAngle)
 			if shackleUnit then
-				X.LogWindrunner("shackle-target", "target=%s via=%s", botTarget:GetUnitName(), shackleUnit:GetUnitName())
+				X.LogWindrunner(
+					"shackle-target",
+					"target=%s via=%s",
+					botTarget:GetUnitName(),
+					shackleUnit:GetUnitName()
+				)
 				return BOT_ACTION_DESIRE_HIGH, shackleUnit
 			end
 		end
@@ -281,7 +293,8 @@ function X.ConsiderShackleShot()
 			local attackingAllies = Fu.GetSpecialModeAllies(bot, 900, BOT_MODE_ATTACK)
 			if
 				Fu.IsChasingTarget(bot, strongestEnemy) and #attackingAllies >= 2
-				or isAttacking and bot:GetEstimatedDamageToTarget(true, strongestEnemy, stunDuration, DAMAGE_TYPE_ALL) > strongestEnemy:GetHealth()
+				or isAttacking
+					and bot:GetEstimatedDamageToTarget(true, strongestEnemy, stunDuration, DAMAGE_TYPE_ALL) > strongestEnemy:GetHealth()
 			then
 				local shackleUnit = X.GetShackleTarget(bot, strongestEnemy, shackleDistance, shackleAngle)
 				if shackleUnit then
@@ -400,7 +413,12 @@ function X.ConsiderPowershot()
 	end
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
-		if Fu.IsValid(laneCreeps[1]) and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and manaRatio > 0.45 then
+		if
+			Fu.IsValid(laneCreeps[1])
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+			and manaRatio > 0.45
+		then
 			local aoeLocation = bot:FindAoELocation(true, false, laneCreeps[1]:GetLocation(), 0, arrowWidth, 0, 0)
 			if aoeLocation.count >= 4 then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
@@ -439,7 +457,10 @@ function X.ConsiderPowershot()
 		for _, creep in pairs(laneCreeps) do
 			if
 				Fu.IsValid(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() > bot:GetAttackDamage()
 				and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL)
 			then
@@ -465,12 +486,23 @@ function X.ConsiderPowershot()
 				end
 			end
 		end
-		if #killableCreeps >= 3 and mpRatio > 0.25 and Fu.CanBeAttacked(killableCreeps[1]) and not Fu.IsRunning(killableCreeps[1]) then
+		if
+			#killableCreeps >= 3
+			and mpRatio > 0.25
+			and Fu.CanBeAttacked(killableCreeps[1])
+			and not Fu.IsRunning(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -499,7 +531,10 @@ function X.ConsiderWindrun()
 			if
 				Fu.IsChasingTarget(bot, botTarget)
 				and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
-				and (botTarget:GetCurrentMovementSpeed() > bot:GetCurrentMovementSpeed() + 10 or Fu.GetHP(botTarget) < 0.3)
+				and (
+					botTarget:GetCurrentMovementSpeed() > bot:GetCurrentMovementSpeed() + 10
+					or Fu.GetHP(botTarget) < 0.3
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -521,7 +556,12 @@ function X.ConsiderWindrun()
 		end
 	end
 	if Fu.IsLaning(bot) then
-		if manaAfter > 0.8 and not bot:HasModifier("modifier_fountain_aura_buff") and Fu.IsInLaningPhase() and #nearbyEnemies == 0 then
+		if
+			manaAfter > 0.8
+			and not bot:HasModifier("modifier_fountain_aura_buff")
+			and Fu.IsInLaningPhase()
+			and #nearbyEnemies == 0
+		then
 			local assignedLane = bot:GetAssignedLane()
 			local laneFrontLocation = GetLaneFrontLocation(GetTeam(), assignedLane, 0)
 			if GetUnitToLocationDistance(bot, laneFrontLocation) > 800 then
@@ -622,7 +662,12 @@ function X.ConsiderFocusFire()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and Fu.GetHP(botTarget) > 0.3 and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and Fu.GetHP(botTarget) > 0.3
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -738,7 +783,11 @@ function X.CanShackleToTree(caster, target, shackleDistance, shackleAngle)
 end
 function X.GetShackleTarget(caster, target, shackleDistance, shackleAngle)
 	local shackleUnit = nil
-	if X.CanShackleToHero(caster, target, shackleDistance, shackleAngle) or X.CanShackleToTree(caster, target, shackleDistance, shackleAngle) or X.CanShackleToCreep(caster, target, shackleDistance, shackleAngle) then
+	if
+		X.CanShackleToHero(caster, target, shackleDistance, shackleAngle)
+		or X.CanShackleToTree(caster, target, shackleDistance, shackleAngle)
+		or X.CanShackleToCreep(caster, target, shackleDistance, shackleAngle)
+	then
 		shackleUnit = target
 	else
 		shackleUnit = X.GetShackleCreepTarget(caster, target, shackleDistance, shackleAngle)

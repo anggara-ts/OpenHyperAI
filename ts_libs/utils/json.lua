@@ -229,7 +229,8 @@ encode2 = function(value, indent, level, buffer, bufferLength, tables, globalOrd
 			bufferLength = bufferLength + 1
 			buffer[bufferLength] = "["
 			for i = 1, count do
-				bufferLength, message = encode2(value[i], indent, level, buffer, bufferLength, tables, globalOrder, state)
+				bufferLength, message =
+					encode2(value[i], indent, level, buffer, bufferLength, tables, globalOrder, state)
 				if not bufferLength then
 					return nil, message
 				end
@@ -253,13 +254,35 @@ encode2 = function(value, indent, level, buffer, bufferLength, tables, globalOrd
 					local entryValue = value[key]
 					if entryValue then
 						used[key] = true
-						bufferLength, message = addPair(key, entryValue, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
+						bufferLength, message = addPair(
+							key,
+							entryValue,
+							prev,
+							indent,
+							level,
+							buffer,
+							bufferLength,
+							tables,
+							globalOrder,
+							state
+						)
 						prev = true
 					end
 				end
 				for key, entryValue in pairs(value) do
 					if not used[key] then
-						bufferLength, message = addPair(key, entryValue, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
+						bufferLength, message = addPair(
+							key,
+							entryValue,
+							prev,
+							indent,
+							level,
+							buffer,
+							bufferLength,
+							tables,
+							globalOrder,
+							state
+						)
 						if not bufferLength then
 							return nil, message
 						end
@@ -268,7 +291,8 @@ encode2 = function(value, indent, level, buffer, bufferLength, tables, globalOrd
 				end
 			else
 				for key, entryValue in pairs(value) do
-					bufferLength, message = addPair(key, entryValue, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
+					bufferLength, message =
+						addPair(key, entryValue, prev, indent, level, buffer, bufferLength, tables, globalOrder, state)
 					if not bufferLength then
 						return nil, message
 					end
@@ -283,7 +307,14 @@ encode2 = function(value, indent, level, buffer, bufferLength, tables, globalOrd
 		end
 		tables[value] = nil
 	else
-		return exception("unsupported type", value, state, buffer, bufferLength, "type '" .. valueType .. "' is not supported by JSON.")
+		return exception(
+			"unsupported type",
+			value,
+			state,
+			buffer,
+			bufferLength,
+			"type '" .. valueType .. "' is not supported by JSON."
+		)
 	end
 	return bufferLength
 end
@@ -293,7 +324,16 @@ function json.encode(value, state)
 	local buffer = oldBuffer or {}
 	state.buffer = buffer
 	updateDecimalPoint()
-	local result, message = encode2(value, state.indent, state.level or 0, buffer, state.bufferlen or 0, state.tables or {}, state.keyorder, state)
+	local result, message = encode2(
+		value,
+		state.indent,
+		state.level or 0,
+		buffer,
+		state.bufferlen or 0,
+		state.tables or {},
+		state.keyorder,
+		state
+	)
 	if not result then
 		error(message, 2)
 	elseif oldBuffer == buffer then
@@ -357,9 +397,18 @@ local function unicodeChar(codePoint)
 	elseif codePoint <= 0x07ff then
 		return strchar(0xc0 + floor(codePoint / 0x40), 0x80 + floor(codePoint) % 0x40)
 	elseif codePoint <= 0xffff then
-		return strchar(0xe0 + floor(codePoint / 0x1000), 0x80 + floor(codePoint / 0x40) % 0x40, 0x80 + floor(codePoint) % 0x40)
+		return strchar(
+			0xe0 + floor(codePoint / 0x1000),
+			0x80 + floor(codePoint / 0x40) % 0x40,
+			0x80 + floor(codePoint) % 0x40
+		)
 	elseif codePoint <= 0x10ffff then
-		return strchar(0xf0 + floor(codePoint / 0x40000), 0x80 + floor(codePoint / 0x1000) % 0x40, 0x80 + floor(codePoint / 0x40) % 0x40, 0x80 + floor(codePoint) % 0x40)
+		return strchar(
+			0xf0 + floor(codePoint / 0x40000),
+			0x80 + floor(codePoint / 0x1000) % 0x40,
+			0x80 + floor(codePoint / 0x40) % 0x40,
+			0x80 + floor(codePoint) % 0x40
+		)
 	else
 		return nil
 	end

@@ -40,6 +40,12 @@ function X.buildHeroConfig(bot, heroConfig)
 	return { role = sRole, skillBuild = sSkillList, itemBuild = sRoleItemsBuyList, sellList = heroConfig.sell or {} }
 end
 function X.buildHeroExport(heroConfig, skillsComplement, minionThink)
-	return { sSkillList = heroConfig.skillBuild, sBuyList = heroConfig.itemBuild, sSellList = heroConfig.sellList, SkillsComplement = skillsComplement, MinionThink = minionThink }
+	return {
+		sSkillList = heroConfig.skillBuild,
+		sBuyList = heroConfig.itemBuild,
+		sSellList = heroConfig.sellList,
+		SkillsComplement = skillsComplement,
+		MinionThink = minionThink,
+	}
 end
 return X

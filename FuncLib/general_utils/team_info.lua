@@ -97,7 +97,12 @@ local function installTeamInfo(Fu)
 		local allies = {}
 		for i = 1, #GetTeamPlayers(GetTeam()) do
 			local member = GetTeamMember(i)
-			if member ~= nil and member:IsAlive() and GetUnitToLocationDistance(member, location) <= radius and Fu.IsRetreating(member) then
+			if
+				member ~= nil
+				and member:IsAlive()
+				and GetUnitToLocationDistance(member, location) <= radius
+				and Fu.IsRetreating(member)
+			then
 				table.insert(allies, member)
 			end
 		end
@@ -159,7 +164,11 @@ local function installTeamInfo(Fu)
 		local result = {}
 		local units = GetCachedUnitList(UNIT_LIST_ALL)
 		for _, unit in pairs(units) do
-			if Fu.IsValid(unit) and unit:GetUnitName() == unitName and GetUnitToUnitDistance(unit, target) <= radius then
+			if
+				Fu.IsValid(unit)
+				and unit:GetUnitName() == unitName
+				and GetUnitToUnitDistance(unit, target) <= radius
+			then
 				if onlyTargeting then
 					if unit:GetAttackTarget() == target or Fu.IsChasingTarget(unit, target) then
 						table.insert(result, unit)
@@ -173,7 +182,11 @@ local function installTeamInfo(Fu)
 	end
 	function Fu.IsTargetedByEnemyWithModifier(heroes, modifierName)
 		for _, enemyHero in pairs(heroes) do
-			if Fu.IsValidHero(enemyHero) and enemyHero:HasModifier(modifierName) and (enemyHero:GetAttackTarget() == bot or Fu.IsChasingTarget(enemyHero, bot)) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero:HasModifier(modifierName)
+				and (enemyHero:GetAttackTarget() == bot or Fu.IsChasingTarget(enemyHero, bot))
+			then
 				return true
 			end
 		end
@@ -187,8 +200,10 @@ local function installTeamInfo(Fu)
 		local units = Fu.GetNearbyHeroes(bot, range, true, BOT_MODE_NONE)
 		for _, enemy in pairs(units) do
 			if
-				(includeMagicImmune and Fu.CanCastOnMagicImmune(enemy) or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(enemy))
-				and GetUnitToLocationDistance(enemy, location) <= radius
+				(
+					includeMagicImmune and Fu.CanCastOnMagicImmune(enemy)
+					or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(enemy)
+				) and GetUnitToLocationDistance(enemy, location) <= radius
 			then
 				count = count + 1
 			end
@@ -212,7 +227,10 @@ local function installTeamInfo(Fu)
 		local count = 0
 		if units ~= nil then
 			for _, unit in pairs(units) do
-				if includeMagicImmune and Fu.CanCastOnMagicImmune(unit) or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(unit) then
+				if
+					includeMagicImmune and Fu.CanCastOnMagicImmune(unit)
+					or not includeMagicImmune and Fu.CanCastOnNonMagicImmune(unit)
+				then
 					count = count + 1
 				end
 			end
@@ -388,9 +406,15 @@ local function installTeamInfo(Fu)
 	end
 	function Fu.GetHeroesNearLocation(isEnemy, location, radius)
 		local result = {}
-		local heroes = isEnemy and GetCachedUnitList(UNIT_LIST_ENEMY_HEROES) or GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)
+		local heroes = isEnemy and GetCachedUnitList(UNIT_LIST_ENEMY_HEROES)
+			or GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)
 		for _, hero in pairs(heroes) do
-			if hero ~= nil and hero:IsAlive() and hero:CanBeSeen() and GetUnitToLocationDistance(hero, location) <= radius then
+			if
+				hero ~= nil
+				and hero:IsAlive()
+				and hero:CanBeSeen()
+				and GetUnitToLocationDistance(hero, location) <= radius
+			then
 				table.insert(result, hero)
 			end
 		end
@@ -475,8 +499,10 @@ local function installTeamInfo(Fu)
 		local farthestUnit = sourceUnit
 		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, allies, farthestUnit, distance, location)
 		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, enemies, farthestUnit, distance, location)
-		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, allyCreeps, farthestUnit, distance, location)
-		distance, farthestUnit = Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, enemyCreeps, farthestUnit, distance, location)
+		distance, farthestUnit =
+			Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, allyCreeps, farthestUnit, distance, location)
+		distance, farthestUnit =
+			Fu.GetUnitWithMaxDistanceToLoc(sourceUnit, enemyCreeps, farthestUnit, distance, location)
 		if farthestUnit ~= sourceUnit then
 			return farthestUnit
 		end
@@ -526,7 +552,11 @@ local function installTeamInfo(Fu)
 	function Fu.GetMeepos()
 		local meepos = {}
 		for _, ally in pairs(GetCachedUnitList(UNIT_LIST_ALLIED_HEROES)) do
-			if Fu.IsValidHero(ally) and ally:GetUnitName() == "npc_dota_hero_meepo" and not Fu.IsSuspiciousIllusion(ally) then
+			if
+				Fu.IsValidHero(ally)
+				and ally:GetUnitName() == "npc_dota_hero_meepo"
+				and not Fu.IsSuspiciousIllusion(ally)
+			then
 				table.insert(meepos, ally)
 			end
 		end
@@ -717,7 +747,11 @@ local function installTeamInfo(Fu)
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil then
 					local lastSeen = lastSeenInfo[1]
-					if lastSeen ~= nil and Fu.GetDistance(laneFront, lastSeen.location) < 1600 and lastSeen.time_since_seen < 6 then
+					if
+						lastSeen ~= nil
+						and Fu.GetDistance(laneFront, lastSeen.location) < 1600
+						and lastSeen.time_since_seen < 6
+					then
 						count = count + 1
 					end
 				end
@@ -733,7 +767,12 @@ local function installTeamInfo(Fu)
 		if target ~= nil then
 			if neutralsOnly then
 				for _, creep in pairs(GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)) do
-					if Fu.IsValid(creep) and target ~= creep and GetUnitToUnitDistance(target, creep) <= radius and creep:GetHealth() <= maxHealth then
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
 						table.insert(creeps, creep)
 					end
 				end
@@ -743,7 +782,12 @@ local function installTeamInfo(Fu)
 					units = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
 				end
 				for _, creep in pairs(units) do
-					if Fu.IsValid(creep) and target ~= creep and GetUnitToUnitDistance(target, creep) <= radius and creep:GetHealth() <= maxHealth then
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
 						table.insert(creeps, creep)
 					end
 				end
@@ -753,13 +797,23 @@ local function installTeamInfo(Fu)
 					units = GetUnitList(UNIT_LIST_ENEMY_CREEPS)
 				end
 				for _, creep in pairs(units) do
-					if Fu.IsValid(creep) and target ~= creep and GetUnitToUnitDistance(target, creep) <= radius and creep:GetHealth() <= maxHealth then
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
 						table.insert(creeps, creep)
 					end
 				end
 				units = GetUnitList(UNIT_LIST_NEUTRAL_CREEPS)
 				for _, creep in pairs(units) do
-					if Fu.IsValid(creep) and target ~= creep and GetUnitToUnitDistance(target, creep) <= radius and creep:GetHealth() <= maxHealth then
+					if
+						Fu.IsValid(creep)
+						and target ~= creep
+						and GetUnitToUnitDistance(target, creep) <= radius
+						and creep:GetHealth() <= maxHealth
+					then
 						table.insert(creeps, creep)
 					end
 				end

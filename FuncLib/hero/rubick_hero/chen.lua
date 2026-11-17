@@ -57,7 +57,12 @@ function X.ConsiderPenitence()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -84,12 +89,23 @@ function X.ConsiderPenitence()
 		then
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
-				if Fu.IsChasingTarget(bot, botTarget) and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed() then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
+				if
+					Fu.IsChasingTarget(bot, botTarget)
+					and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed()
+				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
 				targetNearbyEnemies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
-				if Fu.IsInRange(bot, botTarget, attackRange) and Fu.IsAttacking(bot) and Fu.GetHeroCountAttackingTarget(targetNearbyEnemies, botTarget) >= 2 then
+				if
+					Fu.IsInRange(bot, botTarget, attackRange)
+					and Fu.IsAttacking(bot)
+					and Fu.GetHeroCountAttackingTarget(targetNearbyEnemies, botTarget) >= 2
+				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
 			end
@@ -225,7 +241,11 @@ function X.ConsiderDivineFavor()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			local weakestUnit = Fu.GetAttackableWeakestUnit(bot, castRange, true, false)
 			if weakestUnit ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, weakestUnit
@@ -257,7 +277,14 @@ function X.ConsiderDivineFavor()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies and #enemyNearbyEnemies <= 1 or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (
+						#enemyNearbyAllies > #enemyNearbyEnemies and #enemyNearbyEnemies <= 1
+						or bot:WasRecentlyDamagedByAnyHero(2)
+					)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

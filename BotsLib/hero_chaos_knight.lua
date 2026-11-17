@@ -79,7 +79,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade", "item_travel_boot
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = false
@@ -144,7 +145,10 @@ function X.ConsiderQ()
 				Fu.IsValid(enemiesInCastRange[i])
 				and Fu.CanCastOnNonMagicImmune(enemiesInCastRange[i])
 				and Fu.CanCastOnTargetAdvanced(enemiesInCastRange[i])
-				and enemiesInCastRange[i]:GetHealth() < enemiesInCastRange[i]:GetActualIncomingDamage(damage, DAMAGE_TYPE_MAGICAL)
+				and enemiesInCastRange[i]:GetHealth() < enemiesInCastRange[i]:GetActualIncomingDamage(
+					damage,
+					DAMAGE_TYPE_MAGICAL
+				)
 				and GetUnitToUnitDistance(enemiesInCastRange[i], bot) > bot:GetAttackRange() + 60
 				and not Fu.IsDisabled(enemiesInCastRange[i])
 			then
@@ -212,7 +216,13 @@ function X.ConsiderQ()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() > 400 then
 		local attackTarget = bot:GetAttackTarget()
-		if attackTarget ~= nil and attackTarget:IsAlive() and Fu.GetHP(attackTarget) > 0.2 and not Fu.IsDisabled(attackTarget) and not attackTarget:IsDisarmed() then
+		if
+			attackTarget ~= nil
+			and attackTarget:IsAlive()
+			and Fu.GetHP(attackTarget) > 0.2
+			and not Fu.IsDisabled(attackTarget)
+			and not attackTarget:IsDisarmed()
+		then
 			return BOT_ACTION_DESIRE_LOW, attackTarget
 		end
 	end
@@ -232,7 +242,9 @@ function X.ConsiderW()
 		if
 			Fu.IsValidHero(botTarget)
 			and Fu.IsInRange(botTarget, bot, castRange + 50)
-			and (not Fu.IsInRange(bot, botTarget, 200) or not botTarget:HasModifier("modifier_chaos_knight_reality_rift"))
+			and (not Fu.IsInRange(bot, botTarget, 200) or not botTarget:HasModifier(
+				"modifier_chaos_knight_reality_rift"
+			))
 			and Fu.CanCastOnNonMagicImmune(botTarget)
 			and Fu.CanCastOnTargetAdvanced(botTarget)
 			and not Fu.IsDisabled(botTarget)

@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_2" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -98,7 +99,8 @@ X["sSellList"] = { "item_ethereal_blade", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -267,7 +269,11 @@ function X.ConsiderIlluminate()
 	-- target could release this new cast early (only the kill and laning branches set a new status).
 	bot.illuminate_status = nil
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, illuminateRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, illuminateRange)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if
 				Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
 				and not Fu.IsRunning(enemyHero)
@@ -299,7 +305,12 @@ function X.ConsiderIlluminate()
 	end
 	if Fu.IsFarming(bot) and manaAfterCast > 0.25 then
 		local nearbyCreeps = bot:GetNearbyCreeps(800, true)
-		if #nearbyCreeps >= 3 and Fu.IsValid(nearbyCreeps[1]) and Fu.CanBeAttacked(nearbyCreeps[1]) and not Fu.IsRunning(nearbyCreeps[1]) then
+		if
+			#nearbyCreeps >= 3
+			and Fu.IsValid(nearbyCreeps[1])
+			and Fu.CanBeAttacked(nearbyCreeps[1])
+			and not Fu.IsRunning(nearbyCreeps[1])
+		then
 			local aoeLocation = bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), 0, radius, 0, 0)
 			if aoeLocation.count >= 3 or aoeLocation.count >= 2 and nearbyCreeps[1]:IsAncientCreep() then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
@@ -308,14 +319,23 @@ function X.ConsiderIlluminate()
 	end
 	local laneCreeps = bot:GetNearbyLaneCreeps(800, true)
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
-		if #laneCreeps >= 3 and Fu.IsValid(laneCreeps[1]) and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) then
+		if
+			#laneCreeps >= 3
+			and Fu.IsValid(laneCreeps[1])
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+		then
 			local aoeLocation = bot:FindAoELocation(true, false, laneCreeps[1]:GetLocation(), 0, radius, 0, 0)
 			if aoeLocation.count >= 3 then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 		end
 	end
-	if Fu.IsLaning(bot) and (Fu.IsCore(bot) or not Fu.IsCore(bot) and not Fu.IsThereCoreNearby(1200)) and manaAfterCast > 0.28 then
+	if
+		Fu.IsLaning(bot)
+		and (Fu.IsCore(bot) or not Fu.IsCore(bot) and not Fu.IsThereCoreNearby(1200))
+		and manaAfterCast > 0.28
+	then
 		local killableCreeps = {}
 		local enemyTowers = bot:GetNearbyTowers(1600, true)
 		for _, creep in pairs(laneCreeps) do
@@ -330,7 +350,10 @@ function X.ConsiderIlluminate()
 					Fu.IsValidHero(nearbyEnemies[1])
 					and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600
-					and (#enemyTowers == 0 or Fu.IsValidBuilding(enemyTowers[1]) and GetUnitToUnitDistance(enemyTowers[1], creep) > 700)
+					and (
+						#enemyTowers == 0
+						or Fu.IsValidBuilding(enemyTowers[1]) and GetUnitToUnitDistance(enemyTowers[1], creep) > 700
+					)
 				then
 					bot.illuminate_status = { "laning", creep }
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
@@ -345,7 +368,12 @@ function X.ConsiderIlluminate()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(botTarget, bot, castRange) and Fu.CanBeAttacked(botTarget) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+			and Fu.CanBeAttacked(botTarget)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -362,21 +390,20 @@ function X.ConsiderIlluminateEnd()
 	end
 	local maxChannelTime = illuminateAbility:GetSpecialValueInt("max_channel_time")
 	local totalDamage = illuminateAbility:GetSpecialValueInt("total_damage")
-	local currentDamage = RemapValClamped(DotaTime(), illuminateCastTime, illuminateCastTime + maxChannelTime, 0, totalDamage)
+	local currentDamage =
+		RemapValClamped(DotaTime(), illuminateCastTime, illuminateCastTime + maxChannelTime, 0, totalDamage)
 	if bot.illuminate_status ~= nil then
 		if bot.illuminate_status[1] == "kill" then
 			if
-				Fu.IsValidHero(bot.illuminate_status[2]) and Fu.CanKillTarget(
-					bot.illuminate_status[2],
-					currentDamage,
-					DAMAGE_TYPE_MAGICAL
-				)
+				Fu.IsValidHero(bot.illuminate_status[2])
+				and Fu.CanKillTarget(bot.illuminate_status[2], currentDamage, DAMAGE_TYPE_MAGICAL)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		elseif bot.illuminate_status[1] == "laning" then
 			if
-				Fu.IsValid(bot.illuminate_status[2]) and Fu.CanKillTarget(bot.illuminate_status[2], currentDamage, DAMAGE_TYPE_MAGICAL)
+				Fu.IsValid(bot.illuminate_status[2])
+				and Fu.CanKillTarget(bot.illuminate_status[2], currentDamage, DAMAGE_TYPE_MAGICAL)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -395,7 +422,11 @@ function X.ConsiderBlindingLight()
 	local abilityLevel = blindingLightAbility:GetLevel()
 	for _, enemyHero in pairs(nearbyEnemies) do
 		-- Range check added: nearbyEnemies reaches 1600, so a killable enemy 1600 away made Keeper walk up to it.
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+		then
 			if
 				Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
@@ -450,7 +481,12 @@ function X.ConsiderBlindingLight()
 		end
 	end
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and Fu.IsRetreating(allyHero) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.IsRetreating(allyHero)
+			and not allyHero:IsIllusion()
+		then
 			local allyNearbyEnemies = allyHero:GetNearbyHeroes(radius, true, BOT_MODE_NONE)
 			if
 				Fu.IsValidHero(allyNearbyEnemies[1])
@@ -464,8 +500,11 @@ function X.ConsiderBlindingLight()
 				-- Blinding Light knocks units to the edge of the area (datafeed), i.e. away from its centre.
 				-- The centre used to be past the enemy (VectorAway), which knocked the chaser onto the
 				-- retreating ally. Put the centre between them so the chaser is knocked away from the ally.
-				local castLocation = Fu.VectorTowards(allyNearbyEnemies[1]:GetLocation(), allyHero:GetLocation(), radius * 0.4)
-				X.LogKotl("blind-save ally=" .. allyHero:GetUnitName() .. " enemy=" .. allyNearbyEnemies[1]:GetUnitName())
+				local castLocation =
+					Fu.VectorTowards(allyNearbyEnemies[1]:GetLocation(), allyHero:GetLocation(), radius * 0.4)
+				X.LogKotl(
+					"blind-save ally=" .. allyHero:GetUnitName() .. " enemy=" .. allyNearbyEnemies[1]:GetUnitName()
+				)
 				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
@@ -542,7 +581,12 @@ function X.ConsiderSolarBind()
 	end
 	if not Fu.CanCastAbility(blindingLightAbility) then
 		for _, allyHero in pairs(nearbyAllies) do
-			if Fu.IsValidHero(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and Fu.IsRetreating(allyHero) and not allyHero:IsIllusion() then
+			if
+				Fu.IsValidHero(allyHero)
+				and Fu.IsInRange(bot, allyHero, castRange)
+				and Fu.IsRetreating(allyHero)
+				and not allyHero:IsIllusion()
+			then
 				local allyNearbyEnemies = allyHero:GetNearbyHeroes(400, true, BOT_MODE_NONE)
 				if
 					Fu.IsValidHero(allyNearbyEnemies[1])

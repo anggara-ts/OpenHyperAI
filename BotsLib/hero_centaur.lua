@@ -43,7 +43,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -111,7 +112,10 @@ function X.LogStomp(why, heroes)
 		return
 	end
 	bot._stompLogAt = DotaTime() + 3
-	pcall(print, string.format("[OHA-CENTAUR] t=%.0f stomp why=%s heroes=%d hp=%.2f", DotaTime(), why, heroes, Fu.GetHP(bot)))
+	pcall(
+		print,
+		string.format("[OHA-CENTAUR] t=%.0f stomp why=%s heroes=%d hp=%.2f", DotaTime(), why, heroes, Fu.GetHP(bot))
+	)
 end
 function X.ConsiderHoofStomp()
 	if not hoofStompAbility:IsFullyCastable() then
@@ -122,7 +126,11 @@ function X.ConsiderHoofStomp()
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -198,7 +206,13 @@ function X.ConsiderHoofStomp()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -268,13 +282,23 @@ function X.ConsiderDoubleEdge()
 		end
 	end
 	if Fu.IsFarming(bot) then
-		if isAttacking and hpRatio > 0.3 and bot:GetHealth() > damage * 1.5 and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.3 then
+		if
+			isAttacking
+			and hpRatio > 0.3
+			and bot:GetHealth() > damage * 1.5
+			and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.3
+		then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange * 2)
 			if neutralCreeps ~= nil and #neutralCreeps >= 1 and Fu.GetHP(neutralCreeps[1]) > 0.33 then
 				return BOT_ACTION_DESIRE_HIGH, neutralCreeps[1]
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(castRange * 2, true)
-			if laneCreeps ~= nil and #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) and Fu.GetHP(laneCreeps[1]) > 0.33 then
+			if
+				laneCreeps ~= nil
+				and #laneCreeps >= 3
+				and Fu.CanBeAttacked(laneCreeps[1])
+				and Fu.GetHP(laneCreeps[1]) > 0.33
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreeps[1]
 			end
 		end
@@ -299,7 +323,12 @@ function X.ConsiderDoubleEdge()
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), castRange + 75)
-		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and Fu.IsValidTarget(nearbyEnemies[1]) and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.65 then
+		if
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.IsValidTarget(nearbyEnemies[1])
+			and (bot:GetHealth() - damage) / bot:GetMaxHealth() > 0.65
+		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 		end
 	end
@@ -360,7 +389,13 @@ function X.ConsiderStampede()
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and #chaserAllies > #nearbyAllies and #chaserAllies >= 2 and #nearbyAllies <= 1 and hpRatio < 0.5 then
+			if
+				chaserAllies ~= nil
+				and #chaserAllies > #nearbyAllies
+				and #chaserAllies >= 2
+				and #nearbyAllies <= 1
+				and hpRatio < 0.5
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -381,7 +416,15 @@ function X.ConsiderStampede()
 		then
 			if DotaTime() >= (bot._stampedeSaveLogAt or -999) then
 				bot._stampedeSaveLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-CENTAUR] t=%.0f stampede save ally=%s hp=%.2f", DotaTime(), allyHero:GetUnitName(), Fu.GetHP(allyHero)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-CENTAUR] t=%.0f stampede save ally=%s hp=%.2f",
+						DotaTime(),
+						allyHero:GetUnitName(),
+						Fu.GetHP(allyHero)
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -389,7 +432,11 @@ function X.ConsiderStampede()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderWorkHorse()
-	if not workHorseAbility:IsTrained() or not workHorseAbility:IsFullyCastable() or bot:HasModifier("modifier_centaur_stampede") then
+	if
+		not workHorseAbility:IsTrained()
+		or not workHorseAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_centaur_stampede")
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	-- Team fight: Work Horse gives the Stampede run to Centaur only (datafeed), while Stampede
@@ -417,7 +464,13 @@ function X.ConsiderWorkHorse()
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local chaserAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if chaserAllies ~= nil and #chaserAllies > #nearbyAllies and #chaserAllies >= 2 and #nearbyAllies <= 1 and hpRatio < 0.5 then
+			if
+				chaserAllies ~= nil
+				and #chaserAllies > #nearbyAllies
+				and #chaserAllies >= 2
+				and #nearbyAllies <= 1
+				and hpRatio < 0.5
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

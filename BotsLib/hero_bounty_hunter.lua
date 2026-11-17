@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 3, 2, 1, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 3, 2, 1, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -137,7 +138,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() then
 	X["sBuyList"], X["sSellList"] = { "PvN_BH" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -222,7 +224,9 @@ function X.ConsiderQ()
 				for _, unit in pairs(nearbyUnits) do
 					if Fu.IsValid(unit) and Fu.CanCastOnTargetAdvanced(unit) and not unit:IsMagicImmune() then
 						castTarget = unit
-						return BOT_ACTION_DESIRE_HIGH, castTarget, "Q-通过弹射打断施法:" .. Fu.Chat.GetNormName(enemyHero)
+						return BOT_ACTION_DESIRE_HIGH,
+							castTarget,
+							"Q-通过弹射打断施法:" .. Fu.Chat.GetNormName(enemyHero)
 					end
 				end
 			end
@@ -231,12 +235,17 @@ function X.ConsiderQ()
 				return BOT_ACTION_DESIRE_HIGH, castTarget, "Q-直接打断施法:" .. Fu.Chat.GetNormName(castTarget)
 			end
 		end
-		if Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint + GetUnitToUnitDistance(bot, enemyHero) / 1000) then
+		if
+			Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint + GetUnitToUnitDistance(bot, enemyHero) / 1000)
+		then
 			if enemyHero:HasModifier("modifier_bounty_hunter_track") then
 				for _, unit in pairs(nearbyUnits) do
 					if Fu.IsValid(unit) and Fu.CanCastOnTargetAdvanced(unit) and not unit:IsMagicImmune() then
 						castTarget = unit
-						return BOT_ACTION_DESIRE_HIGH, castTarget, "Q-通过弹射击杀:" .. Fu.Chat.GetNormName(enemyHero)
+						return BOT_ACTION_DESIRE_HIGH,
+							castTarget,
+							"Q-通过弹射击杀:" .. Fu.Chat.GetNormName(enemyHero)
 					end
 				end
 			end
@@ -357,7 +366,12 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.GetHP(botTarget) > 0.2 and Fu.IsInRange(botTarget, bot, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.GetHP(botTarget) > 0.2
+			and Fu.IsInRange(botTarget, bot, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -400,7 +414,10 @@ function X.ConsiderE()
 		if enemyHeroes ~= nil and #enemyHeroes == 0 and enemyTowers ~= nil and #enemyTowers == 0 then
 			if DotaTime() >= (bot._bhSneakLogAt or -999) then
 				bot._bhSneakLogAt = DotaTime() + 10
-				pcall(print, string.format("[OHA-BOUNTY] t=%.0f shadow walk in enemy area mana=%d", DotaTime(), bot:GetMana()))
+				pcall(
+					print,
+					string.format("[OHA-BOUNTY] t=%.0f shadow walk in enemy area mana=%d", DotaTime(), bot:GetMana())
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, "E-潜行"
 		end
@@ -442,7 +459,12 @@ function X.ConsiderFriendlyShadow()
 	local castRange = friendlyShadowAbility:GetCastRange()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
-		if Fu.IsGoingOnSomeone(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and Fu.IsNotSelf(bot, allyHero) and not Fu.IsRealInvisible(allyHero) then
+		if
+			Fu.IsGoingOnSomeone(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.IsNotSelf(bot, allyHero)
+			and not Fu.IsRealInvisible(allyHero)
+		then
 			return BOT_ACTION_DESIRE_HIGH, allyHero
 		end
 		if

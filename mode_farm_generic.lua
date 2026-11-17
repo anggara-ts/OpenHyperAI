@@ -130,8 +130,10 @@ function GetDesire()
 	if desire > 0 and Fu.IsInTeamFight(bot, 1200) then
 		desire = desire * 0.4
 	end
-	local maxDefendDesire = math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
-	local maxPushDesire = math.max(GetPushLaneDesire(LANE_TOP), GetPushLaneDesire(LANE_MID), GetPushLaneDesire(LANE_BOT))
+	local maxDefendDesire =
+		math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
+	local maxPushDesire =
+		math.max(GetPushLaneDesire(LANE_TOP), GetPushLaneDesire(LANE_MID), GetPushLaneDesire(LANE_BOT))
 	if desire > 0.3 then
 		if maxDefendDesire > 0.55 then
 			desire = desire * RemapValClamped(maxDefendDesire, 0.4, 0.8, 1, 0.3)
@@ -152,7 +154,11 @@ function GetDesire()
 	-- Do not lock farm when the team should push or defend.
 	local shouldGroup = maxDefendDesire > 0.4
 		or maxPushDesire > 0.35
-		or (Fu.IsLateGame() and Fu.GetNumOfAliveHeroes(false) >= 3 and Fu.GetNumOfAliveHeroes(false) >= Fu.GetNumOfAliveHeroes(true))
+		or (
+			Fu.IsLateGame()
+			and Fu.GetNumOfAliveHeroes(false) >= 3
+			and Fu.GetNumOfAliveHeroes(false) >= Fu.GetNumOfAliveHeroes(true)
+		)
 	if desire > 0.15 and not shouldGroup then
 		bot._farmCommitUntil = DotaTime() + 3.0
 		bot._farmCommitFloor = desire * 0.7
@@ -203,8 +209,12 @@ function GetDesire()
 			and GetUnitToUnitDistance(bot, ally) <= 2500
 		then
 			local target = ally:GetAttackTarget()
-			local hitting = target ~= nil and not target:IsNull() and target:IsHero() and target:GetTeam() ~= bot:GetTeam()
-			local hit = ally:WasRecentlyDamagedByAnyHero(2.0) and #(ally:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) >= 1
+			local hitting = target ~= nil
+				and not target:IsNull()
+				and target:IsHero()
+				and target:GetTeam() ~= bot:GetTeam()
+			local hit = ally:WasRecentlyDamagedByAnyHero(2.0)
+				and #(ally:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) >= 1
 			if hitting or hit then
 				bot._farmCommitUntil = nil
 				bot._farmCommitFloor = nil
@@ -282,7 +292,8 @@ function GetDesireHelper()
 		bot._farmExitReason = "too_early"
 		return 0.0
 	end
-	local maxDefendDesire = math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
+	local maxDefendDesire =
+		math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
 	if maxDefendDesire > 0.5 then
 		local defendLane, defendDesire = Fu.GetMostDefendLaneDesire()
 		local defendFrontLocation = GetLaneFrontLocation(GetTeam(), defendLane, 0)
@@ -353,7 +364,12 @@ function GetDesireHelper()
 	end
 	for i = 1, #GetTeamPlayers(GetTeam()) do
 		local teamMember = GetTeamMember(i)
-		if bot ~= teamMember and Fu.IsValidHero(teamMember) and Fu.IsInRange(bot, teamMember, 2000) and Fu.IsRetreating(teamMember) then
+		if
+			bot ~= teamMember
+			and Fu.IsValidHero(teamMember)
+			and Fu.IsInRange(bot, teamMember, 2000)
+			and Fu.IsRetreating(teamMember)
+		then
 			local enemiesTargetingAlly = Fu.GetHeroesTargetingUnit(nearbyEnemies, teamMember)
 			if #enemiesTargetingAlly >= 2 or teamMember:WasRecentlyDamagedByAnyHero(1.0) then
 				bot._farmExitReason = "retreating_ally"
@@ -406,7 +422,13 @@ function GetDesireHelper()
 						if preferredCamp == nil then
 							preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
 						end
-						return RemapValClamped(Fu.GetHP(bot), 0.2, 0.7, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_VERYHIGH)
+						return RemapValClamped(
+							Fu.GetHP(bot),
+							0.2,
+							0.7,
+							BOT_MODE_DESIRE_MODERATE,
+							BOT_MODE_DESIRE_VERYHIGH
+						)
 					end
 				end
 			end
@@ -427,7 +449,13 @@ function GetDesireHelper()
 						if preferredCamp == nil then
 							preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
 						end
-						return RemapValClamped(Fu.GetHP(bot), 0.2, 0.7, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_VERYHIGH)
+						return RemapValClamped(
+							Fu.GetHP(bot),
+							0.2,
+							0.7,
+							BOT_MODE_DESIRE_MODERATE,
+							BOT_MODE_DESIRE_VERYHIGH
+						)
 					end
 				end
 			end
@@ -477,7 +505,11 @@ function GetDesireHelper()
 		local defendFrontLocation = GetLaneFrontLocation(GetTeam(), defendLane, -600)
 		local alliesAtFront = Fu.GetAlliesNearLoc(defendFrontLocation, 2200)
 		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(Min(bot:GetAttackRange(), 1600))
-		if #nearbyNeutrals == 0 and #alliesAtFront >= 2 and (not isCarry or bot:GetLevel() >= 15 or Fu.IsLateGame()) then
+		if
+			#nearbyNeutrals == 0
+			and #alliesAtFront >= 2
+			and (not isCarry or bot:GetLevel() >= 15 or Fu.IsLateGame())
+		then
 			lastTeamActivityTime = DotaTime()
 		end
 	end
@@ -490,7 +522,11 @@ function GetDesireHelper()
 		local teamMember = GetTeamMember(i)
 		if teamMember ~= nil and teamMember ~= bot and teamMember:IsAlive() then
 			local mode = teamMember:GetActiveMode()
-			if mode == BOT_MODE_PUSH_TOWER_TOP or mode == BOT_MODE_PUSH_TOWER_MID or mode == BOT_MODE_PUSH_TOWER_BOT then
+			if
+				mode == BOT_MODE_PUSH_TOWER_TOP
+				or mode == BOT_MODE_PUSH_TOWER_MID
+				or mode == BOT_MODE_PUSH_TOWER_BOT
+			then
 				pushingAllies = pushingAllies + 1
 			end
 		end
@@ -518,7 +554,10 @@ function GetDesireHelper()
 	local canFarm = GetGameMode() ~= GAMEMODE_MO
 		and isTimeToFarm
 		and (not isDefending or botModeDesire < BOT_MODE_DESIRE_MODERATE)
-		and (bot:GetUnitName() ~= "npc_dota_hero_lone_druid_bear" or bot:HasScepter() and not Fu.IsValid(loneDruid.hero))
+		and (
+			bot:GetUnitName() ~= "npc_dota_hero_lone_druid_bear"
+			or bot:HasScepter() and not Fu.IsValid(loneDruid.hero)
+		)
 	if IsDebug and DotaTime() > 3 * 60 and not canFarm and DotaTime() > (bot._lastFarmBlockLog or 0) + 10 then
 		bot._lastFarmBlockLog = DotaTime()
 		log(
@@ -561,7 +600,10 @@ function GetDesireHelper()
 				if distanceToOurFountain < distanceToEnemyFountain and frontDistance < 6000 then
 					local lastSeenEnemies = Fu.GetLastSeenEnemiesNearLoc(laneFront, 1600)
 					if #lastSeenEnemies == 0 then
-						local score = 1 / math.max(1, frontDistance) * distanceToEnemyFountain / math.max(1, distanceToOurFountain)
+						local score = 1
+							/ math.max(1, frontDistance)
+							* distanceToEnemyFountain
+							/ math.max(1, distanceToOurFountain)
 						if score > bestScore then
 							bestScore = score
 							bestLane = lane
@@ -625,8 +667,10 @@ function GetDesireHelper()
 			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
 		end
 		if preferredCamp ~= nil then
-			local maxPushDesire = math.max(GetPushLaneDesire(LANE_TOP), GetPushLaneDesire(LANE_MID), GetPushLaneDesire(LANE_BOT))
-			local maxDefendDesire = math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
+			local maxPushDesire =
+				math.max(GetPushLaneDesire(LANE_TOP), GetPushLaneDesire(LANE_MID), GetPushLaneDesire(LANE_BOT))
+			local maxDefendDesire =
+				math.max(GetDefendLaneDesire(LANE_TOP), GetDefendLaneDesire(LANE_MID), GetDefendLaneDesire(LANE_BOT))
 			local aliveAllyHeroes = Fu.GetNumOfAliveHeroes(false)
 			local aliveEnemyHeroes = Fu.GetNumOfAliveHeroes(true)
 			-- Do not let this fallback beat push/defend: it used to always return VERYHIGH.
@@ -767,7 +811,11 @@ function Think()
 		local teamMember = GetTeamMember(i)
 		if teamMember ~= nil and teamMember ~= bot and teamMember:IsAlive() then
 			local mode = teamMember:GetActiveMode()
-			if mode == BOT_MODE_PUSH_TOWER_TOP or mode == BOT_MODE_PUSH_TOWER_MID or mode == BOT_MODE_PUSH_TOWER_BOT then
+			if
+				mode == BOT_MODE_PUSH_TOWER_TOP
+				or mode == BOT_MODE_PUSH_TOWER_MID
+				or mode == BOT_MODE_PUSH_TOWER_BOT
+			then
 				if GetUnitToUnitDistance(bot, teamMember) < 5000 then
 					table.insert(pushingAllies, teamMember)
 				end
@@ -786,7 +834,11 @@ function Think()
 		local loneDruid = Utils.GetLoneDruid(bot)
 		if loneDruid and loneDruid.hero and Fu.IsValidHero(loneDruid.hero) then
 			local druidTarget = loneDruid.hero:GetAttackTarget()
-			if Fu.IsValid(druidTarget) and Fu.CanBeAttacked(druidTarget) and GetUnitToUnitDistance(bot, druidTarget) < 1200 then
+			if
+				Fu.IsValid(druidTarget)
+				and Fu.CanBeAttacked(druidTarget)
+				and GetUnitToUnitDistance(bot, druidTarget) < 1200
+			then
 				bot:Action_AttackUnit(druidTarget, true)
 				return
 			end
@@ -844,7 +896,12 @@ function Think()
 		local weakestCreep = nil
 		local minHealth = math.huge
 		for _, creep in pairs(nearbyLaneCreeps) do
-			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRoshan(creep) and not Fu.IsTormentor(creep) then
+			if
+				Fu.IsValid(creep)
+				and Fu.CanBeAttacked(creep)
+				and not Fu.IsRoshan(creep)
+				and not Fu.IsTormentor(creep)
+			then
 				local health = creep:GetHealth()
 				if health < minHealth then
 					weakestCreep = creep
@@ -910,7 +967,13 @@ function Think()
 		local alliesAtCamp = Fu.GetAlliesNearLoc(campLocation, 800)
 		local allyFarmingCamp = false
 		for _, allyHero in pairs(alliesAtCamp) do
-			if allyHero ~= bot and Fu.IsValidHero(allyHero) and not allyHero:IsIllusion() and Fu.IsFarming(allyHero) and Fu.IsAttacking(allyHero) then
+			if
+				allyHero ~= bot
+				and Fu.IsValidHero(allyHero)
+				and not allyHero:IsIllusion()
+				and Fu.IsFarming(allyHero)
+				and Fu.IsAttacking(allyHero)
+			then
 				allyFarmingCamp = true
 				break
 			end
@@ -918,7 +981,8 @@ function Think()
 		-- Another ally is already on this camp: join it unless it is far (game 016: two bots near
 		-- one camp kept turning away from each other; this gave way at 400).
 		if allyFarmingCamp and campDistance > 1200 then
-			Fu.Role["availableCampTable"], preferredCamp = Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
+			Fu.Role["availableCampTable"], preferredCamp =
+				Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
 			availableCamps = Fu.Role["availableCampTable"]
 			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
 		end
@@ -927,7 +991,8 @@ function Think()
 			campLocation = preferredCamp.cattr.location
 			campDistance = GetUnitToLocationDistance(bot, campLocation)
 			campNeutrals = CampNeutrals(bot, campLocation)
-			local campLooksEmpty = (FarmMode.IsLocCanBeSeen(campLocation) and campDistance <= 700) or campDistance <= 300
+			local campLooksEmpty = (FarmMode.IsLocCanBeSeen(campLocation) and campDistance <= 700)
+				or campDistance <= 300
 			if #campNeutrals > 0 then
 				bot._campEmptySince = 0
 			elseif campLooksEmpty then
@@ -937,7 +1002,8 @@ function Think()
 				if now - bot._campEmptySince > 1.2 then
 					bot._campEmptySince = 0
 					bot._farmCommitKind = nil
-					Fu.Role["availableCampTable"], preferredCamp = Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
+					Fu.Role["availableCampTable"], preferredCamp =
+						Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
 					availableCamps = Fu.Role["availableCampTable"]
 					preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
 					farmState = farmStateNone
@@ -950,7 +1016,10 @@ function Think()
 				local anyAlive = nil
 				for _, creep in pairs(campNeutrals) do
 					if IsNeutralCreep(creep) then
-						if anyAlive == nil or GetUnitToUnitDistance(bot, creep) < GetUnitToUnitDistance(bot, anyAlive) then
+						if
+							anyAlive == nil
+							or GetUnitToUnitDistance(bot, creep) < GetUnitToUnitDistance(bot, anyAlive)
+						then
 							anyAlive = creep
 						end
 						if Fu.CanBeAttacked(creep) then
@@ -1034,7 +1103,11 @@ function FarmMode.IsUnitAroundLocation(location, radius)
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 			if lastSeenInfo ~= nil then
 				local seenInfo = lastSeenInfo[1]
-				if seenInfo ~= nil and Fu.GetDistance(location, seenInfo.location) <= radius and seenInfo.time_since_seen < 1.0 then
+				if
+					seenInfo ~= nil
+					and Fu.GetDistance(location, seenInfo.location) <= radius
+					and seenInfo.time_since_seen < 1.0
+				then
 					return true
 				end
 			end
@@ -1056,7 +1129,12 @@ function FarmMode.CouldBlade(bot, location)
 			if tree ~= nil then
 				local treeLocation = GetTreeLocation(tree)
 				local lineInfo = PointToLineDistance(startLocation, endLocation, treeLocation)
-				if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= 96 and Fu.GetLocationToLocationDistance(treeLocation, location) < distance then
+				if
+					lineInfo ~= nil
+					and lineInfo.within
+					and lineInfo.distance <= 96
+					and Fu.GetLocationToLocationDistance(treeLocation, location) < distance
+				then
 					bot:Action_UseAbilityOnTree(quellingBlade, tree)
 					return true
 				end

@@ -87,7 +87,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -97,9 +98,11 @@ end
 local acornShotAbility = SafeAbility(bot:GetAbilityByName("hoodwink_acorn_shot"), "hoodwink_acorn_shot", "hoodwink")
 local bushwhackAbility = SafeAbility(bot:GetAbilityByName("hoodwink_bushwhack"), "hoodwink_bushwhack", "hoodwink")
 local scurryAbility = SafeAbility(bot:GetAbilityByName("hoodwink_scurry"), "hoodwink_scurry", "hoodwink")
-local huntersBoomerangAbility = SafeAbility(bot:GetAbilityByName("hoodwink_hunters_boomerang"), "hoodwink_hunters_boomerang", "hoodwink")
+local huntersBoomerangAbility =
+	SafeAbility(bot:GetAbilityByName("hoodwink_hunters_boomerang"), "hoodwink_hunters_boomerang", "hoodwink")
 local decoyAbility = SafeAbility(bot:GetAbilityByName("hoodwink_decoy"), "hoodwink_decoy", "hoodwink")
-local sharpshooterAbility = SafeAbility(bot:GetAbilityByName("hoodwink_sharpshooter"), "hoodwink_sharpshooter", "hoodwink")
+local sharpshooterAbility =
+	SafeAbility(bot:GetAbilityByName("hoodwink_sharpshooter"), "hoodwink_sharpshooter", "hoodwink")
 local acornShotDesire, acornShotLocation
 local bushwhackDesire, bushwhackLocation
 local scurryDesire
@@ -258,7 +261,11 @@ function X.ConsiderBushwhack()
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			local nearbyTrees = enemyHero:GetNearbyTrees(radius - 25)
 			if nearbyTrees ~= nil and #nearbyTrees > 0 then
 				if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
@@ -280,7 +287,11 @@ function X.ConsiderBushwhack()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and (Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.5)) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and (Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.5))
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -355,7 +366,11 @@ function X.ConsiderBushwhack()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function X.ConsiderScurry()
-	if not scurryAbility:IsFullyCastable() or bot:HasModifier("modifier_hoodwink_scurry_active") or Fu.IsRealInvisible(bot) then
+	if
+		not scurryAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_hoodwink_scurry_active")
+		or Fu.IsRealInvisible(bot)
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if isRetreating then
@@ -477,8 +492,13 @@ function X.ConsiderDecoy()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if
-			isRetreating and bot:GetActiveModeDesire() >= BOT_MODE_DESIRE_HIGH and not bot:HasModifier("modifier_fountain_aura")
-			or botTarget == nil and nearbyEnemies ~= nil and #nearbyEnemies >= 1 and hpRatio < 0.33 + 0.09 * #nearbyEnemies
+			isRetreating
+				and bot:GetActiveModeDesire() >= BOT_MODE_DESIRE_HIGH
+				and not bot:HasModifier("modifier_fountain_aura")
+			or botTarget == nil
+				and nearbyEnemies ~= nil
+				and #nearbyEnemies >= 1
+				and hpRatio < 0.33 + 0.09 * #nearbyEnemies
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end

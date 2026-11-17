@@ -42,11 +42,19 @@ local function GetThinkInterval(minion)
 	return simpleAttackInterval
 end
 local function IsAttackable(unit)
-	return unit ~= nil and not unit:IsNull() and unit:IsAlive() and not unit:IsInvulnerable() and not unit:IsAttackImmune()
+	return unit ~= nil
+		and not unit:IsNull()
+		and unit:IsAlive()
+		and not unit:IsInvulnerable()
+		and not unit:IsAttackImmune()
 end
 local function SimpleAttackThink(bot, minion)
 	local currentTarget = minion:GetAttackTarget()
-	if IsAttackable(currentTarget) and currentTarget:IsHero() and GetUnitToUnitDistance(minion, currentTarget) < 1200 then
+	if
+		IsAttackable(currentTarget)
+		and currentTarget:IsHero()
+		and GetUnitToUnitDistance(minion, currentTarget) < 1200
+	then
 		return
 	end
 	local nearbyEnemyHeroes = minion:GetNearbyHeroes(1000, true, BOT_MODE_NONE)
@@ -177,7 +185,8 @@ function X.MinionThink(minion)
 		return
 	end
 	if
-		minion:IsHero() and minion:IsIllusion() and minion:GetUnitName() ~= "npc_dota_hero_vengefulspirit" or MinionUtils.IsMinionWithNoSkill(minion)
+		minion:IsHero() and minion:IsIllusion() and minion:GetUnitName() ~= "npc_dota_hero_vengefulspirit"
+		or MinionUtils.IsMinionWithNoSkill(minion)
 	then
 		Illusions.Think(bot, minion)
 		return

@@ -74,7 +74,12 @@ local function installHeroInfo(Fu)
 	function Fu.IsThereCoreNearby(radius)
 		for i = 1, #GetTeamPlayers(GetTeam()) do
 			local member = GetTeamMember(i)
-			if member ~= nil and member ~= GetBot() and Fu.IsCore(member) and Fu.IsInRange(GetBot(), member, radius) then
+			if
+				member ~= nil
+				and member ~= GetBot()
+				and Fu.IsCore(member)
+				and Fu.IsInRange(GetBot(), member, radius)
+			then
 				return true
 			end
 		end
@@ -117,7 +122,12 @@ local function installHeroInfo(Fu)
 		end
 		for i = 1, #GetTeamPlayers(GetTeam()) do
 			local member = GetTeamMember(i)
-			if member ~= nil and member:IsAlive() and member ~= hero and member:GetAssignedLane() == hero:GetAssignedLane() then
+			if
+				member ~= nil
+				and member:IsAlive()
+				and member ~= hero
+				and member:GetAssignedLane() == hero:GetAssignedLane()
+			then
 				return member
 			end
 		end
@@ -195,7 +205,10 @@ local function installHeroInfo(Fu)
 				Fu.IsValid(allyHero)
 				and allyHero ~= bot
 				and not allyHero:IsIllusion()
-				and (Fu.GetProperTarget(allyHero) == target or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 20))
+				and (
+					Fu.GetProperTarget(allyHero) == target
+					or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 20)
+				)
 			then
 				return true
 			end
@@ -209,7 +222,10 @@ local function installHeroInfo(Fu)
 			if
 				Fu.IsValid(allyHero)
 				and not allyHero:IsIllusion()
-				and (Fu.GetProperTarget(allyHero) == target or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 12))
+				and (
+					Fu.GetProperTarget(allyHero) == target
+					or not allyHero:IsBot() and allyHero:IsFacingLocation(target:GetLocation(), 12)
+				)
 			then
 				return true
 			end
@@ -277,7 +293,11 @@ local function installHeroInfo(Fu)
 	end
 	function Fu.HasEnemyIceSpireNearby(unit, radius)
 		for _, enemyUnit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-			if Fu.IsValid(enemyUnit) and enemyUnit:GetUnitName() == "npc_dota_lich_ice_spire" and Fu.IsInRange(unit, enemyUnit, radius) then
+			if
+				Fu.IsValid(enemyUnit)
+				and enemyUnit:GetUnitName() == "npc_dota_lich_ice_spire"
+				and Fu.IsInRange(unit, enemyUnit, radius)
+			then
 				return enemyUnit
 			end
 		end
@@ -285,7 +305,12 @@ local function installHeroInfo(Fu)
 	end
 	function Fu.AnyAllyAffectedByChainFrost(unit, radius)
 		for _, allyUnit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-			if Fu.IsValid(allyUnit) and Fu.IsInRange(unit, allyUnit, radius) and allyUnit ~= unit and allyUnit:HasModifier("modifier_lich_chainfrost_slow") then
+			if
+				Fu.IsValid(allyUnit)
+				and Fu.IsInRange(unit, allyUnit, radius)
+				and allyUnit ~= unit
+				and allyUnit:HasModifier("modifier_lich_chainfrost_slow")
+			then
 				return true
 			end
 		end

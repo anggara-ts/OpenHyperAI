@@ -61,7 +61,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -135,7 +136,11 @@ function X.ConsiderGorgonGrasp()
 	local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	local totalDelay = castPoint + delay
 	for _, enemyHero in pairs(nearbyEnemyHeroes) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if enemyHero:HasModifier("modifier_teleporting") then
 				if Fu.GetModifierTime(enemyHero, "modifier_teleporting") > delay + castPoint then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
@@ -305,7 +310,11 @@ function X.ConsiderW()
 		local maxMana = 0
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local enemyMaxMana = enemyHero:GetMaxMana()
 				if enemyMaxMana > maxMana then
 					maxMana = enemyMaxMana
@@ -379,25 +388,31 @@ function X.LogSnake(why, target, heroes)
 		return
 	end
 	bot._snakeLogAt[why] = DotaTime() + 10
-	pcall(print, string.format(
-		"[OHA-MEDUSA] t=%.0f mystic-snake why=%s target=%s heroes=%d mp=%.2f",
-		DotaTime(),
-		why,
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		heroes,
-		Fu.GetMP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-MEDUSA] t=%.0f mystic-snake why=%s target=%s heroes=%d mp=%.2f",
+			DotaTime(),
+			why,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			heroes,
+			Fu.GetMP(bot)
+		)
+	)
 end
 -- [OHA-MEDUSA]: each Stone Gaze with why and how many heroes were looking at her.
 function X.LogGaze(why, looking)
-	pcall(print, string.format(
-		"[OHA-MEDUSA] t=%.0f stone-gaze why=%s looking=%d hp=%.2f mp=%.2f",
-		DotaTime(),
-		why,
-		looking,
-		Fu.GetHP(bot),
-		Fu.GetMP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-MEDUSA] t=%.0f stone-gaze why=%s looking=%d hp=%.2f mp=%.2f",
+			DotaTime(),
+			why,
+			looking,
+			Fu.GetHP(bot),
+			Fu.GetMP(bot)
+		)
+	)
 end
 function X.ConsiderR()
 	if not stoneGazeAbility:IsFullyCastable() then
@@ -502,13 +517,23 @@ function X.GetNearestUnit(unit, heroes, creeps, excluded)
 	local nearestUnit = nil
 	local nearestDistance = 9999
 	for _, candidate in pairs(heroes) do
-		if candidate ~= nil and candidate:IsAlive() and not X.IsExistInTable(candidate, excluded) and GetUnitToUnitDistance(unit, candidate) < nearestDistance then
+		if
+			candidate ~= nil
+			and candidate:IsAlive()
+			and not X.IsExistInTable(candidate, excluded)
+			and GetUnitToUnitDistance(unit, candidate) < nearestDistance
+		then
 			nearestUnit = candidate
 			nearestDistance = GetUnitToUnitDistance(unit, candidate)
 		end
 	end
 	for _, candidate in pairs(creeps) do
-		if candidate ~= nil and candidate:IsAlive() and not X.IsExistInTable(candidate, excluded) and GetUnitToUnitDistance(unit, candidate) < nearestDistance then
+		if
+			candidate ~= nil
+			and candidate:IsAlive()
+			and not X.IsExistInTable(candidate, excluded)
+			and GetUnitToUnitDistance(unit, candidate) < nearestDistance
+		then
 			nearestUnit = candidate
 			nearestDistance = GetUnitToUnitDistance(unit, candidate)
 		end

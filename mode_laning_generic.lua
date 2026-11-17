@@ -107,7 +107,11 @@ function GetDesireRaw()
 			return BOT_MODE_DESIRE_VERYLOW
 		end
 	end
-	if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and (bot:WasRecentlyDamagedByAnyHero(2.0) or Fu.IsGoingOnSomeone(bot)) then
+	if
+		nearbyEnemies ~= nil
+		and #nearbyEnemies >= 1
+		and (bot:WasRecentlyDamagedByAnyHero(2.0) or Fu.IsGoingOnSomeone(bot))
+	then
 		local firstEnemy = nearbyEnemies[1]
 		local distance = Fu.IsValidHero(firstEnemy) and GetUnitToUnitDistance(bot, firstEnemy) or -1
 		if distance >= 0 and distance < 1000 and Fu.GetHP(firstEnemy) < 0.6 then
@@ -455,23 +459,26 @@ local function LogLaning()
 		end
 	end
 	local partner = GetLanePartner()
-	pcall(print, string.format(
-		"[OHA-LANE] t=%.0f %s pos=%d lane=%s range=%d standoff=%d enemyRange=%d creep=%d lh=%d dn=%d partner=%s supTook=%d supLeft=%d hp=%.2f",
-		now,
-		(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-		Fu.GetPosition(bot),
-		tostring(botLane),
-		math.floor(attackRange),
-		math.floor(LaneStandOff()),
-		math.floor(furthestEnemyAttackRange or 0),
-		math.floor(nearest),
-		bot:GetLastHits(),
-		bot:GetDenies(),
-		partner ~= nil and (string.gsub(partner:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		bot._laneSupportTook or 0,
-		bot._laneSupportLeft or 0,
-		Fu.GetHP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-LANE] t=%.0f %s pos=%d lane=%s range=%d standoff=%d enemyRange=%d creep=%d lh=%d dn=%d partner=%s supTook=%d supLeft=%d hp=%.2f",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetPosition(bot),
+			tostring(botLane),
+			math.floor(attackRange),
+			math.floor(LaneStandOff()),
+			math.floor(furthestEnemyAttackRange or 0),
+			math.floor(nearest),
+			bot:GetLastHits(),
+			bot:GetDenies(),
+			partner ~= nil and (string.gsub(partner:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			bot._laneSupportTook or 0,
+			bot._laneSupportLeft or 0,
+			Fu.GetHP(bot)
+		)
+	)
 	bot._laneSupportTook = 0
 	bot._laneSupportLeft = 0
 end
@@ -503,13 +510,16 @@ do
 		if summons >= 2 then
 			if DotaTime() >= (bot._summonStepLogAt or -999) then
 				bot._summonStepLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-LANE] t=%.0f %s summons-step-back count=%d hp=%.2f",
-					DotaTime(),
-					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-					summons,
-					Fu.GetHP(bot)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-LANE] t=%.0f %s summons-step-back count=%d hp=%.2f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						summons,
+						Fu.GetHP(bot)
+					)
+				)
 			end
 			bot:Action_MoveToLocation(Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 500))
 			return
@@ -522,7 +532,9 @@ do
 			local towerDistance = GetUnitToUnitDistance(bot, enemyTowers[1])
 			if towerDistance < 800 and #enemyLaneCreeps < 3 then
 				if DotaTime() >= nextMoveTime then
-					bot:Action_MoveToLocation(Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950) + RandomVector(75))
+					bot:Action_MoveToLocation(
+						Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950) + RandomVector(75)
+					)
 					nextMoveTime = DotaTime() + RandomFloat(1, 3)
 					return
 				end
@@ -584,7 +596,11 @@ do
 				do
 					local spot = bot:GetLocation()
 					if creepDistance > attackRange then
-						spot = Fu.GetXUnitsTowardsLocation2(lastHitCreep:GetLocation(), bot:GetLocation(), attackRange - lastHitCreep:GetBoundingRadius())
+						spot = Fu.GetXUnitsTowardsLocation2(
+							lastHitCreep:GetLocation(),
+							bot:GetLocation(),
+							attackRange - lastHitCreep:GetBoundingRadius()
+						)
 					end
 					local why, harasser = LastHitRisk(lastHitCreep, spot, creepDistance > attackRange)
 					if why ~= nil then
@@ -603,7 +619,8 @@ do
 				end
 				if creepDistance > attackRange then
 					local attackDistance = attackRange - lastHitCreep:GetBoundingRadius()
-					local moveLocation = Fu.GetXUnitsTowardsLocation2(lastHitCreep:GetLocation(), bot:GetLocation(), attackDistance)
+					local moveLocation =
+						Fu.GetXUnitsTowardsLocation2(lastHitCreep:GetLocation(), bot:GetLocation(), attackDistance)
 					bot:Action_MoveDirectly(moveLocation)
 					return
 				else
@@ -739,7 +756,11 @@ do
 			if close >= 2 and nearTower and heroesClose <= 1 then
 				local bait = nil
 				for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
-					if Fu.IsValidHero(enemyHero) and enemyHero:CanBeSeen() and not Fu.IsSuspiciousIllusion(enemyHero) then
+					if
+						Fu.IsValidHero(enemyHero)
+						and enemyHero:CanBeSeen()
+						and not Fu.IsSuspiciousIllusion(enemyHero)
+					then
 						bait = enemyHero
 						break
 					end
@@ -748,14 +769,17 @@ do
 					bot._aggroNextAt = DotaTime() + 8
 					bot._aggroBackUntil = DotaTime() + 1.5
 					bot._aggroBackTo = Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 350)
-					pcall(print, string.format(
-						"[OHA-AGGRO] t=%.0f %s pull creeps=%d bait=%s dist=%d",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						close,
-						(string.gsub(bait:GetUnitName(), "npc_dota_hero_", "")),
-						GetUnitToUnitDistance(bot, bait)
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-AGGRO] t=%.0f %s pull creeps=%d bait=%s dist=%d",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							close,
+							(string.gsub(bait:GetUnitName(), "npc_dota_hero_", "")),
+							GetUnitToUnitDistance(bot, bait)
+						)
+					)
 					bot:Action_AttackUnit(bait, true)
 					return
 				end
@@ -779,7 +803,11 @@ do
 				end
 			end
 			if soon ~= nil then
-				local spot = Fu.GetXUnitsTowardsLocation2(soon:GetLocation(), bot:GetLocation(), attackRange + soon:GetBoundingRadius() + 40)
+				local spot = Fu.GetXUnitsTowardsLocation2(
+					soon:GetLocation(),
+					bot:GetLocation(),
+					attackRange + soon:GetBoundingRadius() + 40
+				)
 				if GetUnitToLocationDistance(bot, spot) > 60 then
 					bot:Action_MoveDirectly(spot)
 				end
@@ -825,7 +853,10 @@ function AnnounceMessages()
 	end
 	if GetGameMode() ~= GAMEMODE_1V1MID and not hasAnnouncedPositions then
 		if DotaTime() >= 0 and humanCount > 0 and botCount > 0 then
-			bot:ActionImmediate_Chat(Localization.Get("pos_select_closed") .. " (" .. tostring(Fu.GetPosition(bot)) .. ")", true)
+			bot:ActionImmediate_Chat(
+				Localization.Get("pos_select_closed") .. " (" .. tostring(Fu.GetPosition(bot)) .. ")",
+				true
+			)
 			hasAnnouncedPositions = true
 		end
 	end

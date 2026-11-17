@@ -113,7 +113,10 @@ function X.ConsiderAcidSpray()
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.5)) then
+			if
+				enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -123,7 +126,12 @@ function X.ConsiderAcidSpray()
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
 		local allyLaneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
 		local enemyLaneFront = GetLaneFrontLocation(GetOpposingTeam(), bot:GetAssignedLane(), 0)
-		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 5 and aoeLocation.count >= 5 and Fu.GetLocationToLocationDistance(allyLaneFront, enemyLaneFront) < 150 then
+		if
+			nearbyLaneCreeps ~= nil
+			and #nearbyLaneCreeps >= 5
+			and aoeLocation.count >= 5
+			and Fu.GetLocationToLocationDistance(allyLaneFront, enemyLaneFront) < 150
+		then
 			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
 		end
 	end
@@ -132,7 +140,13 @@ function X.ConsiderAcidSpray()
 		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(600)
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(600, true)
 		if Fu.IsAttacking(bot) and Fu.GetMP(bot) > 0.33 then
-			if nearbyNeutrals ~= nil and (#nearbyNeutrals >= 3 and aoeLocation.count >= 3 or #nearbyNeutrals >= 2 and aoeLocation.count >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and (
+					#nearbyNeutrals >= 3 and aoeLocation.count >= 3
+					or #nearbyNeutrals >= 2 and aoeLocation.count >= 2 and nearbyNeutrals[1]:IsAncientCreep()
+				)
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and aoeLocation.count >= 4 then
@@ -150,7 +164,12 @@ function X.ConsiderAcidSpray()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -231,7 +250,10 @@ function X.ConsiderUnstableConcoction()
 			and not enemiesInRange[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemiesInRange[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2)) then
+			if
+				enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -307,7 +329,10 @@ function X.ConsiderUnstableConcoctionThrow()
 			and DotaTime() >= concoctionStartTime + minThrowDelay
 		then
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemiesInRange[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2)) then
+			if
+				enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.6 and bot:WasRecentlyDamagedByAnyHero(2.2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemiesInRange[1]
 			end
 		end
@@ -359,7 +384,10 @@ function X.ConsiderChemicalRage()
 			and not enemiesInRange[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemiesInRange[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.35 and bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #nearbyAllies or Fu.GetHP(bot) < 0.35 and bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

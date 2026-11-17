@@ -113,19 +113,28 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local wildAxesAbility = SafeAbility(bot:GetAbilityByName("beastmaster_wild_axes"), "beastmaster_wild_axes", "beastmaster")
-local summonRazorbackAbility = SafeAbility(bot:GetAbilityByName("beastmaster_summon_razorback"), "beastmaster_summon_razorback", "beastmaster")
-	or sAbilityList[2] and SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "beastmaster")
-local summonRaptorAbility = SafeAbility(bot:GetAbilityByName("beastmaster_summon_raptor"), "beastmaster_summon_raptor", "beastmaster")
-	or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "beastmaster")
-local primalRoarAbility = SafeAbility(bot:GetAbilityByName("beastmaster_primal_roar"), "beastmaster_primal_roar", "beastmaster")
+local wildAxesAbility =
+	SafeAbility(bot:GetAbilityByName("beastmaster_wild_axes"), "beastmaster_wild_axes", "beastmaster")
+local summonRazorbackAbility = SafeAbility(
+	bot:GetAbilityByName("beastmaster_summon_razorback"),
+	"beastmaster_summon_razorback",
+	"beastmaster"
+) or sAbilityList[2] and SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "beastmaster")
+local summonRaptorAbility = SafeAbility(
+	bot:GetAbilityByName("beastmaster_summon_raptor"),
+	"beastmaster_summon_raptor",
+	"beastmaster"
+) or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "beastmaster")
+local primalRoarAbility =
+	SafeAbility(bot:GetAbilityByName("beastmaster_primal_roar"), "beastmaster_primal_roar", "beastmaster")
 local wildAxesDesire, wildAxesLocation
 local summonRazorbackDesire
 local summonRaptorDesire
@@ -156,11 +165,18 @@ function X.SkillsComplement()
 		return
 	end
 	wildAxesAbility = SafeAbility(bot:GetAbilityByName("beastmaster_wild_axes"), "beastmaster_wild_axes", "beastmaster")
-	summonRazorbackAbility = SafeAbility(bot:GetAbilityByName("beastmaster_summon_razorback"), "beastmaster_summon_razorback", "beastmaster")
-		or sAbilityList[2] and SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "beastmaster")
-	summonRaptorAbility = SafeAbility(bot:GetAbilityByName("beastmaster_summon_raptor"), "beastmaster_summon_raptor", "beastmaster")
-		or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "beastmaster")
-	primalRoarAbility = SafeAbility(bot:GetAbilityByName("beastmaster_primal_roar"), "beastmaster_primal_roar", "beastmaster")
+	summonRazorbackAbility = SafeAbility(
+		bot:GetAbilityByName("beastmaster_summon_razorback"),
+		"beastmaster_summon_razorback",
+		"beastmaster"
+	) or sAbilityList[2] and SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "beastmaster")
+	summonRaptorAbility = SafeAbility(
+		bot:GetAbilityByName("beastmaster_summon_raptor"),
+		"beastmaster_summon_raptor",
+		"beastmaster"
+	) or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "beastmaster")
+	primalRoarAbility =
+		SafeAbility(bot:GetAbilityByName("beastmaster_primal_roar"), "beastmaster_primal_roar", "beastmaster")
 	botTarget = context.target
 	hpRatio = context.hp
 	blinkRoarDesire, blinkRoarTarget = X.ConsiderBlinkRoar()
@@ -273,7 +289,10 @@ function X.ConsiderWildAxes()
 			and not Fu.IsSuspiciousIllusion(enemiesNearby[1])
 		then
 			local enemiesNearTarget = Fu.GetNearbyHeroes(enemiesNearby[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearby or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				enemiesNearTarget ~= nil
+				and (#enemiesNearTarget > #alliesNearby or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemiesNearby[1]:GetExtrapolatedLocation(castPoint)
 			end
 		end
@@ -330,7 +349,12 @@ function X.ConsiderWildAxes()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -354,7 +378,11 @@ function X.ConsiderCallOfTheWildBoar()
 	-- Running away: an enemy hero chasing him within 700 (the boar fights the chaser).
 	if Fu.IsRetreating(bot) then
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE) or {}) do
-			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -375,7 +403,10 @@ function X.ConsiderCallOfTheWildBoar()
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(attackRange + 75)
 		local laneCreeps = bot:GetNearbyLaneCreeps(attackRange + 75, true)
 		if isAttacking then
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			if laneCreeps ~= nil and #laneCreeps >= 3 then
@@ -440,7 +471,10 @@ function X.ConsiderCallOfTheWildHawk()
 			and not Fu.IsSuspiciousIllusion(enemiesNearby[1])
 		then
 			local enemiesNearTarget = Fu.GetNearbyHeroes(enemiesNearby[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearby or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				enemiesNearTarget ~= nil
+				and (#enemiesNearTarget > #alliesNearby or hpRatio < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

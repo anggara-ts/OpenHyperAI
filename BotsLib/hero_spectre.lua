@@ -42,14 +42,16 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local spectralDaggerAbility = SafeAbility(bot:GetAbilityByName("spectre_spectral_dagger"), "spectre_spectral_dagger", "spectre")
+local spectralDaggerAbility =
+	SafeAbility(bot:GetAbilityByName("spectre_spectral_dagger"), "spectre_spectral_dagger", "spectre")
 local dispersionAbility = SafeAbility(bot:GetAbilityByName("spectre_dispersion"), "spectre_dispersion", "spectre")
 local shadowStepAbility = SafeAbility(bot:GetAbilityByName("spectre_shadow_step"), "spectre_shadow_step", "spectre")
 local hauntAbility = SafeAbility(bot:GetAbilityByName("spectre_haunt"), "spectre_haunt", "spectre")
@@ -138,7 +140,8 @@ function X.ConsiderSpectralDagger()
 		then
 			if Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL) then
 				-- fix: U was a travel time, not a location; aim at the predicted position
-				local targetLocation = Fu.GetCorrectLoc(enemyHero, GetUnitToUnitDistance(bot, enemyHero) / speed + castPoint)
+				local targetLocation =
+					Fu.GetCorrectLoc(enemyHero, GetUnitToUnitDistance(bot, enemyHero) / speed + castPoint)
 				if Fu.IsInRange(bot, enemyHero, castRange / 2 - 150) then
 					targetLocation = enemyHero:GetLocation()
 				end
@@ -183,7 +186,9 @@ function X.ConsiderSpectralDagger()
 			and not Fu.IsDisabled(retreatEnemies[1])
 		then
 			local firstEnemyAllies = Fu.GetNearbyHeroes(retreatEnemies[1], 1200, false, BOT_MODE_NONE)
-			if firstEnemyAllies ~= nil and (#firstEnemyAllies > #retreatAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				firstEnemyAllies ~= nil and (#firstEnemyAllies > #retreatAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, retreatEnemies[1], "unit"
 			end
 		end
@@ -203,7 +208,8 @@ function X.ConsiderSpectralDagger()
 			then
 				if Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL) then
 					-- fix: U was a travel time, not a location; aim at the predicted position
-					local targetLocation = Fu.GetCorrectLoc(enemyHero, GetUnitToUnitDistance(bot, enemyHero) / speed + castPoint)
+					local targetLocation =
+						Fu.GetCorrectLoc(enemyHero, GetUnitToUnitDistance(bot, enemyHero) / speed + castPoint)
 					if Fu.IsInRange(bot, enemyHero, castRange / 2 - 150) then
 						targetLocation = enemyHero:GetLocation()
 					end
@@ -230,7 +236,13 @@ function X.ConsiderSpectralDagger()
 		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
 		if isAttacking and mpRatio > 0.45 then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoe.count >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoe.count >= 2) then
+			if
+				neutralCreeps ~= nil
+				and (
+					#neutralCreeps >= 3 and aoe.count >= 3
+					or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoe.count >= 2
+				)
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc, "loc"
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
@@ -255,7 +267,12 @@ function X.ConsiderSpectralDagger()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "loc"
 		end
 	end
@@ -284,7 +301,12 @@ function X.ConsiderDispersion()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -345,7 +367,12 @@ function X.ConsiderReality()
 				then
 					local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
 					local alliesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, false, BOT_MODE_NONE)
-					if enemiesNearAlly ~= nil and alliesNearAlly ~= nil and #enemiesNearAlly + 1 >= #alliesNearAlly and not (#enemiesNearAlly + 1 >= 2 and #alliesNearAlly <= 1) then
+					if
+						enemiesNearAlly ~= nil
+						and alliesNearAlly ~= nil
+						and #enemiesNearAlly + 1 >= #alliesNearAlly
+						and not (#enemiesNearAlly + 1 >= 2 and #alliesNearAlly <= 1)
+					then
 						return BOT_ACTION_DESIRE_HIGH, allyTarget:GetLocation()
 					end
 				end
@@ -396,7 +423,12 @@ function X.ConsiderShadowStep()
 		then
 			local targetEnemies = Fu.GetNearbyHeroes(weakestTarget, 1200, true, BOT_MODE_NONE)
 			local targetAllies = Fu.GetNearbyHeroes(weakestTarget, 1200, false, BOT_MODE_NONE)
-			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies and not (#targetEnemies >= 2 and #targetAllies <= 1) then
+			if
+				targetEnemies ~= nil
+				and targetAllies ~= nil
+				and #targetEnemies >= #targetAllies
+				and not (#targetEnemies >= 2 and #targetAllies <= 1)
+			then
 				lastShadowStepTarget = weakestTarget
 				return BOT_ACTION_DESIRE_HIGH, weakestTarget
 			end
@@ -423,7 +455,12 @@ function X.ConsiderShadowStep()
 			then
 				local targetEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if lowestHealth > enemyHero:GetHealth() and targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies then
+				if
+					lowestHealth > enemyHero:GetHealth()
+					and targetEnemies ~= nil
+					and targetAllies ~= nil
+					and #targetEnemies >= #targetAllies
+				then
 					lowestHealth = enemyHero:GetHealth()
 					weakestTarget = enemyHero
 				end
@@ -439,7 +476,12 @@ end
 function X.ConsiderHaunt()
 	-- Review fix: Haunt waited for Shadow Step to be on cooldown, but Shadow Step only reaches 1000
 	-- and this case needs the ally fight 1300+ away, so a ready Shadow Step blocked Haunt for good.
-	if not hauntAbility:IsTrained() or not hauntAbility:IsFullyCastable() or hauntAbility:IsHidden() or Fu.IsInLaningPhase() then
+	if
+		not hauntAbility:IsTrained()
+		or not hauntAbility:IsFullyCastable()
+		or hauntAbility:IsHidden()
+		or Fu.IsInLaningPhase()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	hauntDuration = hauntAbility:GetSpecialValueFloat("duration")
@@ -458,10 +500,24 @@ function X.ConsiderHaunt()
 			then
 				local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
 				local alliesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, false, BOT_MODE_NONE)
-				if enemiesNearAlly ~= nil and alliesNearAlly ~= nil and #enemiesNearAlly + 1 >= #alliesNearAlly and not (#enemiesNearAlly + 1 >= 2 and #alliesNearAlly <= 1) then
+				if
+					enemiesNearAlly ~= nil
+					and alliesNearAlly ~= nil
+					and #enemiesNearAlly + 1 >= #alliesNearAlly
+					and not (#enemiesNearAlly + 1 >= 2 and #alliesNearAlly <= 1)
+				then
 					if DotaTime() - (X.lastHauntLog or -99) > 10 then
 						X.lastHauntLog = DotaTime()
-						pcall(print, string.format("[OHA-SPECTRE] t=%.0f haunt ally=%s target=%s step_ready=%s", DotaTime(), allyHero:GetUnitName(), allyTarget:GetUnitName(), tostring(shadowStepAbility:IsFullyCastable())))
+						pcall(
+							print,
+							string.format(
+								"[OHA-SPECTRE] t=%.0f haunt ally=%s target=%s step_ready=%s",
+								DotaTime(),
+								allyHero:GetUnitName(),
+								allyTarget:GetUnitName(),
+								tostring(shadowStepAbility:IsFullyCastable())
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH
 				end

@@ -82,7 +82,8 @@ end
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -94,8 +95,10 @@ local mindFlareAbility = SafeAbility(bot:GetAbilityByName("nyx_assassin_jolt"), 
 local spikedCarapaceAbility =
 	SafeAbility(bot:GetAbilityByName("nyx_assassin_spiked_carapace"), "nyx_assassin_spiked_carapace", "nyx_assassin")
 local burrowAbility = SafeAbility(bot:GetAbilityByName("nyx_assassin_burrow"), "nyx_assassin_burrow", "nyx_assassin")
-local unburrowAbility = SafeAbility(bot:GetAbilityByName("nyx_assassin_unburrow"), "nyx_assassin_unburrow", "nyx_assassin")
-local vendettaAbility = SafeAbility(bot:GetAbilityByName("nyx_assassin_vendetta"), "nyx_assassin_vendetta", "nyx_assassin")
+local unburrowAbility =
+	SafeAbility(bot:GetAbilityByName("nyx_assassin_unburrow"), "nyx_assassin_unburrow", "nyx_assassin")
+local vendettaAbility =
+	SafeAbility(bot:GetAbilityByName("nyx_assassin_vendetta"), "nyx_assassin_vendetta", "nyx_assassin")
 local impaleDesire, impaleLocation
 local mindFlareDesire, mindFlareTarget
 local spikedCarapaceDesire
@@ -184,13 +187,16 @@ function X.LogNyx(kind, target)
 		return
 	end
 	bot._nyxLogAt[key] = DotaTime() + 3
-	pcall(print, string.format(
-		"[OHA-NYX] t=%.0f %s target=%s mp=%.2f",
-		DotaTime(),
-		kind,
-		target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		Fu.GetMP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-NYX] t=%.0f %s target=%s mp=%.2f",
+			DotaTime(),
+			kind,
+			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			Fu.GetMP(bot)
+		)
+	)
 end
 -- Damage Nyx dealt to each enemy hero from his spells and Dagon, for Mind Flare's echo
 -- (15% of the damage he dealt the target in the last 15s, Valve data). Attacks are not counted.
@@ -264,7 +270,8 @@ function X.ComboDamage(target, withVendetta)
 		dealtNow = dealtNow + hit
 	end
 	if spend(impaleAbility) then
-		local hit = target:GetActualIncomingDamage(impaleAbility:GetSpecialValueInt("impale_damage"), DAMAGE_TYPE_MAGICAL)
+		local hit =
+			target:GetActualIncomingDamage(impaleAbility:GetSpecialValueInt("impale_damage"), DAMAGE_TYPE_MAGICAL)
 		total = total + hit
 		dealtNow = dealtNow + hit
 	end
@@ -294,7 +301,12 @@ end
 -- Vendetta not ready: Blink in next to a target his combo kills, then Impale. Same limits as the
 -- Vendetta combo (up to 2 enemy heroes near the target, him above 50% HP).
 function X.ConsiderBlinkCombo()
-	if vendettaAbility:IsFullyCastable() or not impaleAbility:IsFullyCastable() or Fu.GetHP(bot) < 0.5 or Fu.IsRetreating(bot) then
+	if
+		vendettaAbility:IsFullyCastable()
+		or not impaleAbility:IsFullyCastable()
+		or Fu.GetHP(bot) < 0.5
+		or Fu.IsRetreating(bot)
+	then
 		return nil
 	end
 	if bot:HasModifier("modifier_nyx_assassin_vendetta") then
@@ -360,8 +372,11 @@ function X.RecordImpale(loc)
 	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, length + 200, true, BOT_MODE_NONE) or {}) do
 		if Fu.IsValidHero(enemyHero) then
 			local enemyLocation = enemyHero:GetLocation()
-			local along = (enemyLocation.x - botLocation.x) * directionX + (enemyLocation.y - botLocation.y) * directionY
-			local sideOffset = math.abs((enemyLocation.x - botLocation.x) * directionY - (enemyLocation.y - botLocation.y) * directionX)
+			local along = (enemyLocation.x - botLocation.x) * directionX
+				+ (enemyLocation.y - botLocation.y) * directionY
+			local sideOffset = math.abs(
+				(enemyLocation.x - botLocation.x) * directionY - (enemyLocation.y - botLocation.y) * directionX
+			)
 			if along >= 0 and along <= length + 100 and sideOffset <= width + 60 then
 				X.AddDealt(enemyHero, damage)
 			end
@@ -413,7 +428,11 @@ function X.ConsiderImpale()
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
@@ -431,7 +450,12 @@ function X.ConsiderImpale()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and mpRatio > 0.31 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and mpRatio > 0.31
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -491,7 +515,10 @@ function X.ConsiderImpale()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.82 and bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.82 and bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetExtrapolatedLocation(castPoint)
 			end
 		end
@@ -540,7 +567,11 @@ function X.ConsiderMindflare()
 		if
 			Fu.IsValidHero(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
-			and Fu.CanKillTarget(enemyHero, enemyHero:GetMaxMana() * maxManaPct / 100 + X.EchoDamage(enemyHero), DAMAGE_TYPE_MAGICAL)
+			and Fu.CanKillTarget(
+				enemyHero,
+				enemyHero:GetMaxMana() * maxManaPct / 100 + X.EchoDamage(enemyHero),
+				DAMAGE_TYPE_MAGICAL
+			)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
@@ -583,7 +614,11 @@ function X.ConsiderSpikedCarapace()
 		end
 		local enemyCount = 0
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE) or {}) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				enemyCount = enemyCount + 1
 			end
 		end
@@ -600,7 +635,12 @@ function X.ConsiderSpikedCarapace()
 	-- him, or one when he is below 80% HP.
 	local hitters = 0
 	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE) or {}) do
-		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and enemyHero:GetAttackTarget() == bot and not enemyHero:IsDisarmed() then
+		if
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and enemyHero:GetAttackTarget() == bot
+			and not enemyHero:IsDisarmed()
+		then
 			hitters = hitters + 1
 		end
 	end
@@ -639,7 +679,11 @@ function X.ConsiderUnBurrow()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderVendetta()
-	if not vendettaAbility:IsFullyCastable() or bot:HasModifier("modifier_nyx_assassin_burrow") or Fu.IsRealInvisible(bot) then
+	if
+		not vendettaAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_nyx_assassin_burrow")
+		or Fu.IsRealInvisible(bot)
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	botTarget = Fu.GetProperTarget(bot)

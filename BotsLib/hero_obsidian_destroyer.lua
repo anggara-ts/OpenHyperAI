@@ -7,7 +7,8 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } } }
-local tAllAbilityBuildList = { { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 if sRole == "pos_1" then
@@ -81,7 +82,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -166,7 +168,13 @@ function X.ConsiderPrisonHammer()
 		return false
 	end
 	-- The prison did not land: the target is still there and can be hurt.
-	if now - st.confirmedAt > 0.4 and Fu.IsValidHero(st.target) and st.target:CanBeSeen() and not st.target:IsInvulnerable() and now < st.endAt - 0.3 then
+	if
+		now - st.confirmedAt > 0.4
+		and Fu.IsValidHero(st.target)
+		and st.target:CanBeSeen()
+		and not st.target:IsInvulnerable()
+		and now < st.endAt - 0.3
+	then
 		bot._prison = nil
 		return false
 	end
@@ -194,13 +202,16 @@ function X.ConsiderPrisonHammer()
 	if left <= HAMMER_LEAD + 0.05 then
 		if dist <= 580 + 380 then
 			bot._prison = nil
-			pcall(print, string.format(
-				"[OHA-OD] t=%.1f prison-hammer target=%s left=%.2f dist=%d",
-				now,
-				Fu.IsValidHero(st.target) and (string.gsub(st.target:GetUnitName(), "npc_dota_hero_", "")) or "?",
-				left,
-				math.floor(dist)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-OD] t=%.1f prison-hammer target=%s left=%.2f dist=%d",
+					now,
+					Fu.IsValidHero(st.target) and (string.gsub(st.target:GetUnitName(), "npc_dota_hero_", "")) or "?",
+					left,
+					math.floor(dist)
+				)
+			)
 			bot:Action_UseAbilityOnLocation(hammer, aim)
 			return true
 		end
@@ -293,7 +304,8 @@ function X.ConsiderArcaneOrb()
 	local isAutoCast = arcaneOrbAbility:GetAutoCastState()
 	local manaCost = arcaneOrbAbility:GetManaCost()
 	local manaAfter = Fu.GetManaAfter(manaCost)
-	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { astralImprisonmentAbility, objurgationAbility, sanityEclipseAbility })
+	local manaThreshold =
+		Fu.GetManaThreshold(bot, manaCost, { astralImprisonmentAbility, objurgationAbility, sanityEclipseAbility })
 	if abilityLevel == 4 and not isAutoCast then
 		arcaneOrbAbility:ToggleAutoCast()
 	end
@@ -301,7 +313,12 @@ function X.ConsiderArcaneOrb()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) and Fu.IsInRange(bot, enemyHero, attackRange + 300) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanBeAttacked(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, attackRange + 300)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			local travelTime = GetUnitToUnitDistance(bot, enemyHero) / bot:GetAttackProjectileSpeed()
 			if
 				Fu.WillMixedDamageKillTarget(enemyHero, orbPhys, 0, orbPure, travelTime)
@@ -329,7 +346,11 @@ function X.ConsiderArcaneOrb()
 		end
 	end
 	local nearbyCreeps = bot:GetNearbyCreeps(Min(attackRange + 300, 1600), true)
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and isAttacking and manaAfter > manaThreshold + 0.1 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and isAttacking
+		and manaAfter > manaThreshold + 0.1
+	then
 		if Fu.IsValid(botTarget) and Fu.CanBeAttacked(botTarget) and botTarget:IsCreep() then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
@@ -348,7 +369,11 @@ function X.ConsiderArcaneOrb()
 			end
 		end
 		for _, creep in pairs(nearbyCreeps) do
-			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and (Fu.IsCore(bot) or not Fu.IsOtherAllysTarget(creep)) then
+			if
+				Fu.IsValid(creep)
+				and Fu.CanBeAttacked(creep)
+				and (Fu.IsCore(bot) or not Fu.IsOtherAllysTarget(creep))
+			then
 				local travelTime = GetUnitToUnitDistance(bot, creep) / bot:GetAttackProjectileSpeed()
 				if Fu.WillMixedDamageKillTarget(creep, orbPhys, 0, orbPure, travelTime) then
 					return BOT_ACTION_DESIRE_HIGH, creep
@@ -357,7 +382,12 @@ function X.ConsiderArcaneOrb()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, attackRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, attackRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -385,7 +415,15 @@ function X.ConsiderAstralImprisonment()
 	if Fu.GetAttackProjectileDamageByRange(bot, 800) > bot:GetHealth() then
 		if #nearbyAllies < #nearbyEnemies and DotaTime() >= (bot._odSelfLogAt or -999) then
 			bot._odSelfLogAt = DotaTime() + 3
-			pcall(print, string.format("[OHA-OD] t=%.0f self-prison outnumbered allies=%d enemies=%d", DotaTime(), #nearbyAllies, #nearbyEnemies))
+			pcall(
+				print,
+				string.format(
+					"[OHA-OD] t=%.0f self-prison outnumbered allies=%d enemies=%d",
+					DotaTime(),
+					#nearbyAllies,
+					#nearbyEnemies
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH, bot
 	end
@@ -423,7 +461,12 @@ function X.ConsiderAstralImprisonment()
 	end
 	if Fu.IsInTeamFight(bot, 1200) and manaAfter > manaThreshold then
 		for _, allyHero in pairs(nearbyAllies) do
-			if Fu.IsValidHero(allyHero) and Fu.CanBeAttacked(allyHero) and Fu.IsInRange(bot, allyHero, castRange + 300) and not allyHero:IsIllusion() then
+			if
+				Fu.IsValidHero(allyHero)
+				and Fu.CanBeAttacked(allyHero)
+				and Fu.IsInRange(bot, allyHero, castRange + 300)
+				and not allyHero:IsIllusion()
+			then
 				if
 					allyHero:HasModifier("modifier_enigma_black_hole_pull")
 					or allyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
@@ -447,7 +490,8 @@ function X.ConsiderAstralImprisonment()
 				and not Fu.IsDisabled(enemyHero)
 			then
 				if
-					enemyHero:HasModifier("modifier_abaddon_borrowed_time") or enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+					enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+					or enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
@@ -491,7 +535,8 @@ function X.ConsiderAstralImprisonment()
 						and not allyHero:HasModifier("modifier_teleporting")
 						and (allyHero:GetAttackTarget() == botTarget or Fu.IsChasingTarget(allyHero, botTarget))
 					then
-						alliesDamageToTarget = alliesDamageToTarget + allyHero:GetEstimatedDamageToTarget(true, botTarget, prisonDuration, DAMAGE_TYPE_ALL)
+						alliesDamageToTarget = alliesDamageToTarget
+							+ allyHero:GetEstimatedDamageToTarget(true, botTarget, prisonDuration, DAMAGE_TYPE_ALL)
 					end
 				end
 				if alliesDamageToTarget * 1.25 < botTarget:GetHealth() then
@@ -515,9 +560,19 @@ function X.ConsiderAstralImprisonment()
 			end
 		end
 	end
-	if not Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) and not Fu.IsInTeamFight(bot, 1200) and manaAfter > manaThreshold then
+	if
+		not Fu.IsRetreating(bot)
+		and not Fu.IsRealInvisible(bot)
+		and not Fu.IsInTeamFight(bot, 1200)
+		and manaAfter > manaThreshold
+	then
 		for _, allyHero in pairs(nearbyAllies) do
-			if Fu.IsValidHero(allyHero) and bot ~= allyHero and Fu.IsRetreating(allyHero) and not allyHero:IsIllusion() then
+			if
+				Fu.IsValidHero(allyHero)
+				and bot ~= allyHero
+				and Fu.IsRetreating(allyHero)
+				and not allyHero:IsIllusion()
+			then
 				for _, enemyHero in pairs(nearbyEnemies) do
 					if
 						Fu.IsValidHero(enemyHero)
@@ -615,7 +670,11 @@ function X.ConsiderSanitysEclipse()
 		if aoe ~= nil and aoe.count ~= nil and aoe.count >= 3 and aoe.targetloc ~= nil then
 			local hit = 0
 			for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(aoe.targetloc, rad - 50) or {}) do
-				if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+				then
 					local dmg = baseDamage + math.max(0, bot:GetMaxMana() - enemyHero:GetMaxMana()) * damageMultiplier
 					if enemyHero:GetActualIncomingDamage(dmg, DAMAGE_TYPE_MAGICAL) >= enemyHero:GetHealth() * 0.4 then
 						hit = hit + 1
@@ -637,8 +696,17 @@ function X.ConsiderObjurgation()
 	if not objurgationAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) and bot:WasRecentlyDamagedByAnyHero(2.0) and hpRatio < 0.6 then
-		if #nearbyEnemies > #nearbyAllies or bot:IsRooted() or Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot, 6.0) > bot:GetHealth() then
+	if
+		Fu.IsRetreating(bot)
+		and not Fu.IsRealInvisible(bot)
+		and bot:WasRecentlyDamagedByAnyHero(2.0)
+		and hpRatio < 0.6
+	then
+		if
+			#nearbyEnemies > #nearbyAllies
+			or bot:IsRooted()
+			or Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot, 6.0) > bot:GetHealth()
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -648,7 +716,13 @@ function X.ConsiderObjurgation()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and hpRatio < 0.3 then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and isAttacking
+			and hpRatio < 0.3
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

@@ -8,7 +8,8 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_2" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -116,7 +117,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -217,7 +219,12 @@ function X.ConsiderQ()
 	local damage = arcLightningAbility:GetSpecialValueInt("arc_damage")
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemy in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemy) and Fu.CanCastOnNonMagicImmune(enemy) and Fu.CanCastOnTargetAdvanced(enemy) and Fu.GetHP(enemy) <= 0.2 then
+		if
+			Fu.IsValidHero(enemy)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+			and Fu.CanCastOnTargetAdvanced(enemy)
+			and Fu.GetHP(enemy) <= 0.2
+		then
 			return BOT_ACTION_DESIRE_HIGH, enemy
 		end
 	end
@@ -289,7 +296,10 @@ function X.ConsiderQ()
 	end
 	if Fu.IsFarming(bot) and Fu.GetManaAfter(manaCost) > 0.3 then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if #neutralCreeps >= 2 or #neutralCreeps >= 1 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep() then
+		if
+			#neutralCreeps >= 2
+			or #neutralCreeps >= 1 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep()
+		then
 			return BOT_ACTION_DESIRE_HIGH, neutralCreeps[1]
 		end
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -332,7 +342,14 @@ function X.ConsiderW()
 		end
 	end
 	local rangedCreep = X.GetRanged(bot, castRange)
-	if rangedCreep ~= nil and rangedCreep:GetHealth() < rangedCreep:GetActualIncomingDamage(damage + rangedCreep:GetHealth() * staticFieldPct, DAMAGE_TYPE_MAGICAL) then
+	if
+		rangedCreep ~= nil
+		and rangedCreep:GetHealth()
+			< rangedCreep:GetActualIncomingDamage(
+				damage + rangedCreep:GetHealth() * staticFieldPct,
+				DAMAGE_TYPE_MAGICAL
+			)
+	then
 		return BOT_ACTION_DESIRE_HIGH, rangedCreep
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
@@ -374,7 +391,11 @@ function X.ConsiderW2()
 	end
 	if bot:GetActiveMode() ~= BOT_MODE_RETREAT then
 		local target = Fu.GetProperTarget(bot)
-		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and GetUnitToUnitDistance(target, bot) <= radius + castRange then
+		if
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and GetUnitToUnitDistance(target, bot) <= radius + castRange
+		then
 			if nManaPercentage > 0.65 or bot:GetMana() > keepMana * 2 then
 				local castLocation = Fu.GetCastLocation(bot, target, castRange, radius)
 				if castLocation ~= nil then
@@ -412,7 +433,11 @@ function X.ConsiderD()
 		local teamMember = GetTeamMember(i)
 		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
 			local target = Fu.GetProperTarget(teamMember)
-			if Fu.IsValidHero(target) and Fu.IsInRange(teamMember, target, 1200) and Fu.CanCastOnNonMagicImmune(target) then
+			if
+				Fu.IsValidHero(target)
+				and Fu.IsInRange(teamMember, target, 1200)
+				and Fu.CanCastOnNonMagicImmune(target)
+			then
 				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0)
 			end
 		end
@@ -465,7 +490,10 @@ function X.ConsiderR()
 	for _, enemy in pairs(enemyHeroes) do
 		if enemy ~= nil and Fu.CanCastOnNonMagicImmune(enemy) then
 			local totalDamage = damage + enemy:GetHealth() * staticFieldPct
-			if Fu.WillMagicKillTarget(bot, enemy, totalDamage, castPoint) and not Fu.IsOtherAllyCanKillTarget(bot, enemy) then
+			if
+				Fu.WillMagicKillTarget(bot, enemy, totalDamage, castPoint)
+				and not Fu.IsOtherAllyCanKillTarget(bot, enemy)
+			then
 				killableCount = killableCount + 1
 			end
 			if enemy:HasModifier("modifier_warlock_fatal_bonds") then

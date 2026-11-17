@@ -43,7 +43,9 @@ local function installBotMode(Fu)
 			return false
 		end
 		local mode = unit:GetActiveMode()
-		return mode == BOT_MODE_DEFEND_TOWER_TOP or mode == BOT_MODE_DEFEND_TOWER_MID or mode == BOT_MODE_DEFEND_TOWER_BOT
+		return mode == BOT_MODE_DEFEND_TOWER_TOP
+			or mode == BOT_MODE_DEFEND_TOWER_MID
+			or mode == BOT_MODE_DEFEND_TOWER_BOT
 	end
 	function Fu.IsPushing(unit)
 		if not Fu.IsUnitValid(unit) then
@@ -109,7 +111,8 @@ local function installBotMode(Fu)
 		end
 		local mode = unit:GetActiveMode()
 		local target = Fu.GetProperTarget(unit)
-		return mode == BOT_MODE_FARM or target ~= nil and target:IsAlive() and target:GetTeam() == TEAM_NEUTRAL and not Fu.IsRoshan(target)
+		return mode == BOT_MODE_FARM
+			or target ~= nil and target:IsAlive() and target:GetTeam() == TEAM_NEUTRAL and not Fu.IsRoshan(target)
 	end
 	function Fu.IsTeamActivityCount(unit, count)
 		local teamPlayers = GetTeamPlayers(GetTeam())
@@ -151,7 +154,12 @@ local function installBotMode(Fu)
 		local teamPlayers = GetTeamPlayers(GetTeam())
 		for i = 1, #teamPlayers do
 			local member = GetTeamMember(i)
-			if member ~= nil and member:IsAlive() and Fu.IsInTeamFight(member, 1500) and Fu.GetEnemyCount(member, 1400) >= 2 then
+			if
+				member ~= nil
+				and member:IsAlive()
+				and Fu.IsInTeamFight(member, 1500)
+				and Fu.GetEnemyCount(member, 1400) >= 2
+			then
 				local allies = Fu.GetSpecialModeAllies(member, 1400, BOT_MODE_ATTACK)
 				fightLocation = Fu.GetCenterOfUnits(allies)
 				break
@@ -167,7 +175,12 @@ local function installBotMode(Fu)
 		local alliesCount = 0
 		for i = 1, #teamPlayers do
 			local member = GetTeamMember(i)
-			if member ~= nil and member:IsAlive() and Fu.IsInTeamFight(member, 1200) and Fu.GetEnemyCount(member, 1400) >= 2 then
+			if
+				member ~= nil
+				and member:IsAlive()
+				and Fu.IsInTeamFight(member, 1200)
+				and Fu.GetEnemyCount(member, 1400) >= 2
+			then
 				alliesCount = Fu.GetSpecialModeAlliesCount(BOT_MODE_ATTACK)
 				break
 			end

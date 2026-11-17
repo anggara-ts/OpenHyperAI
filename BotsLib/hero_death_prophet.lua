@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -104,7 +105,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_black_king_
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = true
@@ -179,7 +181,11 @@ function X.ConsiderQ()
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange - 50, true, BOT_MODE_NONE)
 	local castLocation = nil
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint)
+		then
 			castLocation = enemyHero:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
@@ -196,7 +202,8 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q对线消耗"
 		end
 		if #nearbyAllies == 1 and mpRatio > 0.38 then
-			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius + 50, 0, damage)
+			local creepAoeLocation =
+				bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius + 50, 0, damage)
 			if creepAoeLocation.count >= 3 then
 				castLocation = creepAoeLocation.targetloc
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q对线补刀" .. creepAoeLocation.count
@@ -211,7 +218,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange - 80) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange - 80)
+		then
 			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.38 then
 				castLocation = botTarget:GetExtrapolatedLocation(castPoint)
 				if Fu.IsInLocRange(bot, castLocation, castRange) then
@@ -258,7 +269,11 @@ function X.ConsiderQ()
 		and #nearbyEnemies == 0
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 400, true)
-		if #laneCreeps >= 3 and Fu.IsValid(laneCreeps[1]) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			#laneCreeps >= 3
+			and Fu.IsValid(laneCreeps[1])
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, damage)
 			if creepAoeLocation.count >= 2 and #nearbyAllies == 1 then
 				castLocation = creepAoeLocation.targetloc
@@ -294,7 +309,11 @@ function X.ConsiderQ()
 		and false
 	then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange - 200) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange - 200)
+			then
 				castLocation = enemyHero:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q通用"
 			end
@@ -374,7 +393,14 @@ function X.ConsiderW()
 				if castLocation ~= nil then
 					if DotaTime() >= (bot._dpSilenceLogAt or -999) then
 						bot._dpSilenceLogAt = DotaTime() + 5
-						pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f silence chaser=%s", DotaTime(), enemyHero:GetUnitName()))
+						pcall(
+							print,
+							string.format(
+								"[OHA-DEATH_PROPHET] t=%.0f silence chaser=%s",
+								DotaTime(),
+								enemyHero:GetUnitName()
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, castLocation, "W-Retreat:" .. Fu.Chat.GetNormName(enemyHero)
 				end
@@ -458,7 +484,10 @@ function X.ConsiderR()
 		if nearFoes ~= nil and #nearFoes >= 2 then
 			if DotaTime() >= (bot._dpExorcismLogAt or -999) then
 				bot._dpExorcismLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-DEATH_PROPHET] t=%.0f exorcism fight heroes=%d", DotaTime(), #nearFoes))
+				pcall(
+					print,
+					string.format("[OHA-DEATH_PROPHET] t=%.0f exorcism fight heroes=%d", DotaTime(), #nearFoes)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, "R-Fight"
 		end

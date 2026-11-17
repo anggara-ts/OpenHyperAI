@@ -71,7 +71,11 @@ function Chat.GetReplyString(message, isAllChat)
 end
 function Chat.AllowTrashTalk(isAllChat)
 	local trashTalkLevel = CustomLoader.Trash_Talk_Level
-	return CustomLoader.Allow_Trash_Talk and (not isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 2) or isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 1))
+	return CustomLoader.Allow_Trash_Talk
+		and (
+			not isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 2)
+			or isAllChat and (trashTalkLevel == nil or trashTalkLevel >= 1)
+		)
 end
 function Chat.GetCheaterReplyString(message)
 	return string.byte(message, 1) == string.byte("-", 1) and "cheater" or nil

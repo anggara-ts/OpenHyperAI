@@ -43,7 +43,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -100,7 +101,12 @@ local mpRatio
 function X.SkillsComplement()
 	-- Sample HP before the early return so the 5s history has no gaps while stunned.
 	local hpFiveSecondsAgo = X.HpFiveSecondsAgo()
-	if geminateAttackAbility ~= nil and not geminateAttackAbility:IsNull() and geminateAttackAbility:IsTrained() and not geminateAttackAbility:GetAutoCastState() then
+	if
+		geminateAttackAbility ~= nil
+		and not geminateAttackAbility:IsNull()
+		and geminateAttackAbility:IsTrained()
+		and not geminateAttackAbility:GetAutoCastState()
+	then
 		geminateAttackAbility:ToggleAutoCast()
 		X.LogWeaver("geminate-autocast-on", "")
 	end
@@ -118,7 +124,13 @@ function X.SkillsComplement()
 	end
 	-- Time Lapse in a fight: it was only considered in retreat mode, so a Weaver burst down while
 	-- attacking (mode not yet retreat) died with it ready. Cast when HP fell hard in the last 5s.
-	if timeLapseAbility:IsFullyCastable() and not isRetreating and hpRatio < 0.3 and hpFiveSecondsAgo - hpRatio >= 0.25 and bot:WasRecentlyDamagedByAnyHero(1.5) then
+	if
+		timeLapseAbility:IsFullyCastable()
+		and not isRetreating
+		and hpRatio < 0.3
+		and hpFiveSecondsAgo - hpRatio >= 0.25
+		and bot:WasRecentlyDamagedByAnyHero(1.5)
+	then
 		X.LogWeaver("lapse-fight", "hp=%.2f hp5=%.2f", hpRatio, hpFiveSecondsAgo)
 		bot:Action_UseAbility(timeLapseAbility)
 		return
@@ -140,8 +152,17 @@ function X.SkillsComplement()
 	-- once inside that radius (the hit has landed).
 	if bot.tryShukuchiKill and not isRetreating then
 		local killTarget = bot.ShukuchiKillTarget
-		if Fu.IsValidHero(killTarget) and GetUnitToUnitDistance(bot, killTarget) > 150 and GetUnitToUnitDistance(bot, killTarget) < 1800 then
-			X.LogWeaver("shukuchi-kill-path", "target=%s dist=%d", killTarget:GetUnitName(), GetUnitToUnitDistance(bot, killTarget))
+		if
+			Fu.IsValidHero(killTarget)
+			and GetUnitToUnitDistance(bot, killTarget) > 150
+			and GetUnitToUnitDistance(bot, killTarget) < 1800
+		then
+			X.LogWeaver(
+				"shukuchi-kill-path",
+				"target=%s dist=%d",
+				killTarget:GetUnitName(),
+				GetUnitToUnitDistance(bot, killTarget)
+			)
 			bot:Action_MoveToLocation(killTarget:GetExtrapolatedLocation(0.3))
 			return
 		end
@@ -198,7 +219,11 @@ function X.ConsiderTheSwarm()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					nearbyEnemies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), spawnRadius)
 					if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyEnemies)
@@ -223,7 +248,12 @@ function X.ConsiderTheSwarm()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -295,7 +325,11 @@ function X.ConsiderShukuchi()
 			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsDisabled(enemyHero) then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -311,7 +345,12 @@ function X.ConsiderShukuchi()
 	end
 	if Fu.IsPushing(bot) and mpRatio > 0.3 then
 		local enemyTowers = bot:GetNearbyTowers(800, true)
-		if enemyTowers ~= nil and #enemyTowers >= 1 and enemyTowers[1] ~= nil and Fu.IsInRange(enemyTowers[1], bot, attackRange) then
+		if
+			enemyTowers ~= nil
+			and #enemyTowers >= 1
+			and enemyTowers[1] ~= nil
+			and Fu.IsInRange(enemyTowers[1], bot, attackRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -344,7 +383,11 @@ function X.ConsiderTimeLapse()
 	if isRetreating then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and not Fu.IsDisabled(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #enemiesNearEnemy > #alliesNearEnemy then

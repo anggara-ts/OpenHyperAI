@@ -128,7 +128,9 @@ function refreshThreatState(team)
 	lastThreatTick = math.floor(gameTime * 10)
 	local gameState = getGlobalGameState()
 	local ourAncient = gameState.ourAncient
-	enemyHeroesAtAncient = ourAncient ~= nil and Fu.Utils.CountEnemyHeroesNear(ourAncient:GetLocation(), ancientThreatRadius) or 0
+	enemyHeroesAtAncient = ourAncient ~= nil
+			and Fu.Utils.CountEnemyHeroesNear(ourAncient:GetLocation(), ancientThreatRadius)
+		or 0
 	enemyHeroesOnHighGround = Fu.Utils.CountEnemyHeroesOnHighGround(team)
 	baseThreat = ReadBaseThreat(ourAncient, enemyHeroesAtAncient, enemyHeroesOnHighGround)
 	laneFrontHasEnemies = {}
@@ -137,7 +139,9 @@ function refreshThreatState(team)
 		laneFrontHasEnemies[lane] = Fu.Utils.CountEnemyHeroesNear(laneFrontLocation, 2200) >= 2
 	end
 	local gameStates = Fu.Utils.GameStates
-	wasDefendPinged = gameStates ~= nil and gameStates.defendPings ~= nil and gameTime - gameStates.defendPings.pingedTime <= 5
+	wasDefendPinged = gameStates ~= nil
+		and gameStates.defendPings ~= nil
+		and gameTime - gameStates.defendPings.pingedTime <= 5
 	recentDefendTime = (gameStates or {}).recentDefendTime or 0
 	teamPushLane = nil
 end
@@ -290,7 +294,10 @@ function Push.GetPushDesireHelper(bot, lane)
 			enemyCoreCount = enemyCoreCount + 1
 		end
 	end
-	if #nearbyAllies < #nearbyEnemies and allyCoreCount < enemyCoreCount or #nearbyAllies <= 1 and #nearbyEnemies > 0 then
+	if
+		#nearbyAllies < #nearbyEnemies and allyCoreCount < enemyCoreCount
+		or #nearbyAllies <= 1 and #nearbyEnemies > 0
+	then
 		return BotModeDesire.None
 	end
 	if activeMode == BotMode.PushTowerTop then
@@ -330,7 +337,10 @@ function Push.GetPushDesireHelper(bot, lane)
 	local ourAncient = gameState.ourAncient
 	if Fu.IsValidBuilding(ourAncient) and Push.IsHealthyInsideFountain(bot) then
 		local enemiesNearAncient = Fu.GetEnemiesNearLoc(ourAncient:GetLocation(), 1000)
-		if gameState.aliveAllyCount >= #enemiesNearAncient and gameState.aliveAllyCoreCount >= gameState.aliveEnemyCoreCount then
+		if
+			gameState.aliveAllyCount >= #enemiesNearAncient
+			and gameState.aliveAllyCoreCount >= gameState.aliveEnemyCoreCount
+		then
 			return 0.6
 		end
 	end
@@ -391,7 +401,9 @@ function Push.GetPushDesireHelper(bot, lane)
 			local teamMember = GetTeamMember(i)
 			if teamMember ~= nil and teamMember:IsAlive() and teamMember ~= bot then
 				local memberMode = teamMember:GetActiveMode()
-				local isMemberPushing = memberMode == BotMode.PushTowerTop or memberMode == BotMode.PushTowerMid or memberMode == BotMode.PushTowerBot
+				local isMemberPushing = memberMode == BotMode.PushTowerTop
+					or memberMode == BotMode.PushTowerMid
+					or memberMode == BotMode.PushTowerBot
 				local isMemberAtFront = GetUnitToLocationDistance(teamMember, laneFrontLocation) < 2500
 				if isMemberPushing or isMemberAtFront then
 					pushingTeammates = pushingTeammates + 1
@@ -401,7 +413,8 @@ function Push.GetPushDesireHelper(bot, lane)
 		end
 	end
 	if isBotOnlyGame == nil then
-		isBotOnlyGame = not Fu.Utils.IsHumanPlayerInTeam(GetTeam()) and not Fu.Utils.IsHumanPlayerInTeam(GetOpposingTeam())
+		isBotOnlyGame = not Fu.Utils.IsHumanPlayerInTeam(GetTeam())
+			and not Fu.Utils.IsHumanPlayerInTeam(GetOpposingTeam())
 	end
 	if isBotOnlyGame and not gameState.isLaningPhase and not gameState.isEarlyGame then
 		if pushingTeammates >= 2 and lane == teamPushLane then
@@ -427,7 +440,13 @@ function Push.GetPushDesireHelper(bot, lane)
 				if #alliesNearBot <= 1 and #enemiesNearBot >= 2 and lockDesire > 0.2 then
 					lockDesire, capReason = 0.2, "alone-vs-2"
 				end
-				if enemyAncient and Push.GetLaneBuildingTier(lane) >= 2 and GetUnitToUnitDistance(bot, enemyAncient) < 6000 and #alliesNearBot < gameState.aliveEnemyCount and lockDesire > 0.4 then
+				if
+					enemyAncient
+					and Push.GetLaneBuildingTier(lane) >= 2
+					and GetUnitToUnitDistance(bot, enemyAncient) < 6000
+					and #alliesNearBot < gameState.aliveEnemyCount
+					and lockDesire > 0.4
+				then
 					lockDesire, capReason = 0.4, "fewer-than-alive"
 				end
 				if isNearEnemyFountain and #alliesNearBot >= 2 then
@@ -441,25 +460,33 @@ function Push.GetPushDesireHelper(bot, lane)
 							end
 						end
 					end
-					if hurtCount >= 2 and hpSum / #alliesNearBot < 0.6 and gameState.aliveEnemyCount >= #alliesNearBot - 2 and lockDesire > 0.15 then
+					if
+						hurtCount >= 2
+						and hpSum / #alliesNearBot < 0.6
+						and gameState.aliveEnemyCount >= #alliesNearBot - 2
+						and lockDesire > 0.15
+					then
 						lockDesire, capReason = 0.15, "group-hurt"
 					end
 				end
 				if capReason ~= nil and DotaTime() >= (bot._pushLockCapLogAt or -999) then
 					bot._pushLockCapLogAt = DotaTime() + 5
-					pcall(print, string.format(
-						"[OHA-PUSH] t=%.0f %s lock-capped lane=%s why=%s desire=%.2f allies=%d enemies=%d alive=%d/%d hg=%s",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						tostring(lane),
-						capReason,
-						lockDesire,
-						#alliesNearBot,
-						#enemiesNearBot,
-						gameState.aliveAllyCount,
-						gameState.aliveEnemyCount,
-						tostring(isNearEnemyFountain)
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-PUSH] t=%.0f %s lock-capped lane=%s why=%s desire=%.2f allies=%d enemies=%d alive=%d/%d hg=%s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(lane),
+							capReason,
+							lockDesire,
+							#alliesNearBot,
+							#enemiesNearBot,
+							gameState.aliveAllyCount,
+							gameState.aliveEnemyCount,
+							tostring(isNearEnemyFountain)
+						)
+					)
 				end
 				return lockDesire
 			else
@@ -491,13 +518,23 @@ function Push.GetPushDesireHelper(bot, lane)
 			laneDesire = laneDesire + RemapValClamped(networthLead, 5000, 10000, 0, 0.5)
 		end
 	end
-	local isReadyToPush = botLevel >= 6 and (not gameState.isLaningPhase or aliveAllyCount >= aliveEnemyCount + 2 or aliveEnemyCount <= 2 and aliveAllyCount >= 4)
+	local isReadyToPush = botLevel >= 6
+		and (
+			not gameState.isLaningPhase
+			or aliveAllyCount >= aliveEnemyCount + 2
+			or aliveEnemyCount <= 2 and aliveAllyCount >= 4
+		)
 	if enemyHeroesOnHighGround >= 2 and DotaTime() - recentDefendTime < 10 then
 		return BotModeDesire.None
 	end
 	if enemyAncient and Push.GetLaneBuildingTier(lane) >= 2 then
 		local distanceToEnemyAncient = GetUnitToUnitDistance(bot, enemyAncient)
-		if distanceToEnemyAncient < 6000 and #alliesNearBot + 1 < aliveEnemyCount and hpRatio < 0.65 and not (killPush and #alliesNearBot >= 2 and #enemiesNearBot < #alliesNearBot) then
+		if
+			distanceToEnemyAncient < 6000
+			and #alliesNearBot + 1 < aliveEnemyCount
+			and hpRatio < 0.65
+			and not (killPush and #alliesNearBot >= 2 and #enemiesNearBot < #alliesNearBot)
+		then
 			return BotModeDesire.None
 		elseif distanceToEnemyAncient < 6000 and #alliesNearBot < aliveEnemyCount then
 			maxPushDesire = math.min(maxPushDesire, 0.4)
@@ -510,7 +547,8 @@ function Push.GetPushDesireHelper(bot, lane)
 		if laneTier >= 3 then
 			local deadEnemyCount = 5 - aliveEnemyCount
 			if deadEnemyCount < 2 then
-				local otherLanes = lane == Lane.Top and { Lane.Mid, Lane.Bot } or (lane == Lane.Mid and { Lane.Top, Lane.Bot } or { Lane.Top, Lane.Mid })
+				local otherLanes = lane == Lane.Top and { Lane.Mid, Lane.Bot }
+					or (lane == Lane.Mid and { Lane.Top, Lane.Bot } or { Lane.Top, Lane.Mid })
 				local anyOtherLaneOpen = arraySome(otherLanes, function(_, otherLane)
 					return Push.GetLaneBuildingTier(otherLane) <= 2
 				end)
@@ -555,13 +593,19 @@ function Push.GetPushDesireHelper(bot, lane)
 			end
 		end
 		if isTeamPushLane and Fu.GetPosition(bot) >= 4 then
-			local laneMode = lane == Lane.Top and BotMode.PushTowerTop or (lane == Lane.Mid and BotMode.PushTowerMid or BotMode.PushTowerBot)
+			local laneMode = lane == Lane.Top and BotMode.PushTowerTop
+				or (lane == Lane.Mid and BotMode.PushTowerMid or BotMode.PushTowerBot)
 			local laneModeAllies = 0
 			do
 				local i = 1
 				while i <= #GetTeamPlayers(GetTeam()) do
 					local teamMember = GetTeamMember(i)
-					if teamMember and teamMember ~= bot and teamMember:IsAlive() and teamMember:GetActiveMode() == laneMode then
+					if
+						teamMember
+						and teamMember ~= bot
+						and teamMember:IsAlive()
+						and teamMember:GetActiveMode() == laneMode
+					then
 						laneModeAllies = laneModeAllies + 1
 					end
 					i = i + 1
@@ -584,7 +628,13 @@ function Push.GetPushDesireHelper(bot, lane)
 		end
 	end
 	-- A fresh kill lifts the high-ground caps. Buyback already returned none above.
-	if killPush and not groupHurt and #alliesNearBot >= 2 and #enemiesNearBot < #alliesNearBot and (teamPushLane == nil or teamPushLane == lane) then
+	if
+		killPush
+		and not groupHurt
+		and #alliesNearBot >= 2
+		and #enemiesNearBot < #alliesNearBot
+		and (teamPushLane == nil or teamPushLane == lane)
+	then
 		-- One death beats farm (VERYHIGH ~0.9) and loses to a close outpost (0.95).
 		-- Two deaths beat the outpost channel itself (0.98 on the point).
 		local floor = 0.91
@@ -592,7 +642,16 @@ function Push.GetPushDesireHelper(bot, lane)
 			floor = 0.99
 		end
 		if pushDesire < floor then
-			KillWindow.LogPush(bot, lane, pushDesire, floor, killWindow, Fu.GetHP(bot), gameState.aliveAllyCount, gameState.aliveEnemyCount)
+			KillWindow.LogPush(
+				bot,
+				lane,
+				pushDesire,
+				floor,
+				killWindow,
+				Fu.GetHP(bot),
+				gameState.aliveAllyCount,
+				gameState.aliveEnemyCount
+			)
 			pushDesire = floor
 		end
 	end
@@ -621,7 +680,10 @@ function getLaneTargetBuilding(lane)
 	end
 	if not target then
 		local barracksIds = lane == Lane.Top and { Barracks.TopRanged, Barracks.TopMelee }
-			or (lane == Lane.Mid and { Barracks.MidRanged, Barracks.MidMelee } or { Barracks.BotRanged, Barracks.BotMelee })
+			or (
+				lane == Lane.Mid and { Barracks.MidRanged, Barracks.MidMelee }
+				or { Barracks.BotRanged, Barracks.BotMelee }
+			)
 		for _, barracksId in ipairs(barracksIds) do
 			local barracks = GetBarracks(enemyTeam, barracksId)
 			if barracks ~= nil and barracks:IsAlive() then
@@ -1199,13 +1261,15 @@ function Push.PushThink(bot, lane)
 			targetLocation = botLocation
 		end
 	end
-	if not botState.distanceToTargetLoc or math.abs(botState.distanceToTargetLoc - GetUnitToLocationDistance(bot, targetLocation)) > 50 then
+	if
+		not botState.distanceToTargetLoc
+		or math.abs(botState.distanceToTargetLoc - GetUnitToLocationDistance(bot, targetLocation)) > 50
+	then
 		getBotState(bot, targetLocation)
 	end
 	if
-		Fu.IsValidBuilding(enemyTowers[1]) and (
-			enemyTowers[1]:GetAttackTarget() == bot or bot:WasRecentlyDamagedByTower(#allyLaneCreeps <= 2 and 4 or 2)
-		)
+		Fu.IsValidBuilding(enemyTowers[1])
+		and (enemyTowers[1]:GetAttackTarget() == bot or bot:WasRecentlyDamagedByTower(#allyLaneCreeps <= 2 and 4 or 2))
 	then
 		local safeDistance = enemyTowers[1]:GetAttackRange() + 200
 		local shouldStepOut = false
@@ -1214,20 +1278,26 @@ function Push.PushThink(bot, lane)
 		if hpRatio < 0.6 or DotaTime() < (bot._deaggroFailedAt or -99) + 6 then
 			shouldStepOut = true
 		else
-			local towerDamage = enemyTowers[1]:GetAttackDamage() * enemyTowers[1]:GetAttackSpeed() * 5 - bot:GetHealthRegen() * 5
+			local towerDamage = enemyTowers[1]:GetAttackDamage() * enemyTowers[1]:GetAttackSpeed() * 5
+				- bot:GetHealthRegen() * 5
 			if bot:GetActualIncomingDamage(towerDamage, DamageType.Physical) / bot:GetHealth() > 0.4 then
 				shouldStepOut = true
 			end
 		end
 		if shouldStepOut then
-			local retreatLocation = Fu.AdjustLocationWithOffsetTowardsFountain(enemyTowers[1]:GetLocation(), safeDistance)
+			local retreatLocation =
+				Fu.AdjustLocationWithOffsetTowardsFountain(enemyTowers[1]:GetLocation(), safeDistance)
 			bot:Action_MoveToLocation(add(retreatLocation, RandomVector(80)))
 			return
 		end
 	end
 	do
 		local laneBuilding = enemyTowers[1] or getLaneTargetBuilding(lane)
-		if laneBuilding ~= nil and Fu.Utils.IsValidTower(laneBuilding) and laneBuilding:HasModifier("modifier_fountain_glyph") then
+		if
+			laneBuilding ~= nil
+			and Fu.Utils.IsValidTower(laneBuilding)
+			and laneBuilding:HasModifier("modifier_fountain_glyph")
+		then
 			local maxEnemyRange = 0
 			local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600)
 			for _, enemyHero in ipairs(nearbyEnemies) do
@@ -1241,7 +1311,11 @@ function Push.PushThink(bot, lane)
 			local backOffset = -1000 - maxEnemyRange
 			local retreatLocation = GetLaneFrontLocation(GetTeam(), lane, backOffset)
 			local enemyCreeps = bot:GetNearbyCreeps(attackRange + 200, true) or {}
-			if #enemyCreeps > 0 and Fu.CanBeAttacked(enemyCreeps[1]) and not enemyCreeps[1]:HasModifier("modifier_fountain_glyph") then
+			if
+				#enemyCreeps > 0
+				and Fu.CanBeAttacked(enemyCreeps[1])
+				and not enemyCreeps[1]:HasModifier("modifier_fountain_glyph")
+			then
 				bot:Action_AttackUnit(enemyCreeps[1], true)
 			else
 				bot:Action_MoveToLocation(add(retreatLocation, RandomVector(200)))
@@ -1302,7 +1376,12 @@ function Push.PushThink(bot, lane)
 		end
 		if distanceToEnemyFountain < 2000 and not bot:WasRecentlyDamagedByAnyHero(1) then
 			enemyAncient = gameState.enemyAncient
-			if enemyAncient and Fu.CanBeAttacked(enemyAncient) and not Push.HasBackdoorProtect(enemyAncient) and botState.distanceToAncient < 1000 then
+			if
+				enemyAncient
+				and Fu.CanBeAttacked(enemyAncient)
+				and not Push.HasBackdoorProtect(enemyAncient)
+				and botState.distanceToAncient < 1000
+			then
 				bot:Action_AttackUnit(enemyAncient, true)
 				return
 			end
@@ -1361,7 +1440,11 @@ function Push.PushThink(bot, lane)
 			local weakestEnemy = nil
 			local lowestHealth = 999999
 			for _, enemyHero in ipairs(nearbyEnemies) do
-				if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanBeAttacked(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+				then
 					local health = enemyHero:GetHealth()
 					if health < lowestHealth then
 						lowestHealth = health
@@ -1400,7 +1483,12 @@ function Push.PushThink(bot, lane)
 		::continue::
 	end
 	local pushTarget = pickPushTarget(bot, lane, targetLocation)
-	if pushTarget and Fu.IsValidBuilding(pushTarget) and Fu.CanBeAttacked(pushTarget) and not Push.HasBackdoorProtect(pushTarget) then
+	if
+		pushTarget
+		and Fu.IsValidBuilding(pushTarget)
+		and Fu.CanBeAttacked(pushTarget)
+		and not Push.HasBackdoorProtect(pushTarget)
+	then
 		if Fu.IsInRange(bot, pushTarget, attackRange + 150) then
 			bot:Action_AttackUnit(pushTarget, true)
 		else
@@ -1410,7 +1498,12 @@ function Push.PushThink(bot, lane)
 		return
 	end
 	local laneTarget = getLaneTargetBuilding(lane)
-	if laneTarget ~= nil and Fu.IsValidBuilding(laneTarget) and Fu.CanBeAttacked(laneTarget) and not Push.HasBackdoorProtect(laneTarget) then
+	if
+		laneTarget ~= nil
+		and Fu.IsValidBuilding(laneTarget)
+		and Fu.CanBeAttacked(laneTarget)
+		and not Push.HasBackdoorProtect(laneTarget)
+	then
 		local distance = GetUnitToUnitDistance(bot, laneTarget)
 		if distance <= attackRange + 150 then
 			bot:Action_AttackUnit(laneTarget, true)
@@ -1509,7 +1602,11 @@ function Push.IsInDangerWithinTower(unit, threshold, seconds)
 			and Fu.IsInRange(unit, enemyHero, 1600)
 			and (enemyHero:GetAttackTarget() == unit or Fu.IsChasingTarget(enemyHero, unit))
 		then
-			incomingDamage = incomingDamage + unit:GetActualIncomingDamage(enemyHero:GetAttackDamage() * enemyHero:GetAttackSpeed() * seconds, DamageType.Physical)
+			incomingDamage = incomingDamage
+				+ unit:GetActualIncomingDamage(
+					enemyHero:GetAttackDamage() * enemyHero:GetAttackSpeed() * seconds,
+					DamageType.Physical
+				)
 		end
 	end
 	return incomingDamage / unit:GetHealth() * 1.2 > threshold
@@ -1535,7 +1632,8 @@ function Push.FindBestHGTarget(bot, maxDistance, targetLocation)
 			or building == GetTower(gameState.enemyTeam, Tower.Bot3)
 	end
 	local function isBaseTower(building)
-		return building == GetTower(gameState.enemyTeam, Tower.Base1) or building == GetTower(gameState.enemyTeam, Tower.Base2)
+		return building == GetTower(gameState.enemyTeam, Tower.Base1)
+			or building == GetTower(gameState.enemyTeam, Tower.Base2)
 	end
 	local meleeBarracks = nil
 	local meleeDistance = math.huge
@@ -1554,28 +1652,57 @@ function Push.FindBestHGTarget(bot, maxDistance, targetLocation)
 				local targetDistance = targetLocation and GetUnitToLocationDistance(building, targetLocation) or 0
 				if isBarracks(building) then
 					if isMelee(building) then
-						if distance < meleeDistance or distance == meleeDistance and targetDistance < (meleeBarracks and GetUnitToLocationDistance(meleeBarracks, targetLocation) or targetDistance) then
+						if
+							distance < meleeDistance
+							or distance == meleeDistance
+								and targetDistance < (meleeBarracks and GetUnitToLocationDistance(
+									meleeBarracks,
+									targetLocation
+								) or targetDistance)
+						then
 							meleeBarracks = building
 							meleeDistance = distance
 						end
 					elseif isRanged(building) then
-						if distance < rangedDistance or distance == rangedDistance and targetDistance < (rangedBarracks and GetUnitToLocationDistance(rangedBarracks, targetLocation) or targetDistance) then
+						if
+							distance < rangedDistance
+							or distance == rangedDistance
+								and targetDistance < (rangedBarracks and GetUnitToLocationDistance(
+									rangedBarracks,
+									targetLocation
+								) or targetDistance)
+						then
 							rangedBarracks = building
 							rangedDistance = distance
 						end
 					end
 				elseif isTier3Tower(building) then
-					if distance < tier3Distance or distance == tier3Distance and targetDistance < (tier3Tower and GetUnitToLocationDistance(tier3Tower, targetLocation) or targetDistance) then
+					if
+						distance < tier3Distance
+						or distance == tier3Distance
+							and targetDistance < (tier3Tower and GetUnitToLocationDistance(tier3Tower, targetLocation) or targetDistance)
+					then
 						tier3Tower = building
 						tier3Distance = distance
 					end
 				elseif isBaseTower(building) then
-					if distance < baseDistance or distance == baseDistance and targetDistance < (baseTower and GetUnitToLocationDistance(baseTower, targetLocation) or targetDistance) then
+					if
+						distance < baseDistance
+						or distance == baseDistance
+							and targetDistance < (baseTower and GetUnitToLocationDistance(baseTower, targetLocation) or targetDistance)
+					then
 						baseTower = building
 						baseDistance = distance
 					end
 				else
-					if distance < otherDistance or distance == otherDistance and targetDistance < (otherBuilding and GetUnitToLocationDistance(otherBuilding, targetLocation) or targetDistance) then
+					if
+						distance < otherDistance
+						or distance == otherDistance
+							and targetDistance < (otherBuilding and GetUnitToLocationDistance(
+								otherBuilding,
+								targetLocation
+							) or targetDistance)
+					then
 						otherBuilding = building
 						otherDistance = distance
 					end

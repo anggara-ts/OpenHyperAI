@@ -78,7 +78,8 @@ X["sSellList"] = { "item_wraith_band", "item_quelling_blade", "item_magic_wand" 
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -114,7 +115,8 @@ local earthbindAbility = SafeAbility(bot:GetAbilityByName("meepo_earthbind"), "m
 local poofAbility = SafeAbility(bot:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
 local digAbility = SafeAbility(bot:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
 local megaMeepoAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
-local megaMeepoFlingAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
+local megaMeepoFlingAbility =
+	SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
 local earthbindDesire, earthbindLocation
 local poofDesire, poofTarget
 local digDesire
@@ -253,7 +255,12 @@ function X.ConsiderEarthBind()
 	local allyHeroesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(allyHeroesInRange) do
 		local allyEnemies = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and mpRatio > 0.48 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and mpRatio > 0.48
+		then
 			if
 				allyEnemies ~= nil
 				and #allyEnemies >= 1
@@ -319,7 +326,12 @@ function X.ConsiderPoof()
 			then
 				local meepoAllies = Fu.GetNearbyHeroes(meepo, 1200, false, BOT_MODE_NONE)
 				local meepoEnemies = Fu.GetNearbyHeroes(meepo, 1200, true, BOT_MODE_NONE)
-				if meepoAllies ~= nil and meepoEnemies ~= nil and #meepoAllies >= #meepoEnemies and #meepoEnemies >= 1 then
+				if
+					meepoAllies ~= nil
+					and meepoEnemies ~= nil
+					and #meepoAllies >= #meepoEnemies
+					and #meepoEnemies >= 1
+				then
 					return BOT_ACTION_DESIRE_HIGH, meepo
 				end
 			end
@@ -345,19 +357,33 @@ function X.ConsiderPoof()
 		end
 		if Fu.IsLaning(bot) and Fu.IsLaning(meepo) and meepo ~= bot then
 			local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
-			if GetUnitToLocationDistance(bot, laneFront) > 1600 and GetUnitToLocationDistance(meepo, laneFront) < 600 then
+			if
+				GetUnitToLocationDistance(bot, laneFront) > 1600
+				and GetUnitToLocationDistance(meepo, laneFront) < 600
+			then
 				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
 		if Fu.IsDoingRoshan(meepo) then
 			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 800, true, BOT_MODE_NONE)
-			if Fu.IsRoshan(meepoTarget) and Fu.IsInRange(meepo, meepoTarget, 400) and Fu.GetHP(meepoTarget) > 0.33 and meepoEnemies ~= nil and #meepoEnemies == 0 then
+			if
+				Fu.IsRoshan(meepoTarget)
+				and Fu.IsInRange(meepo, meepoTarget, 400)
+				and Fu.GetHP(meepoTarget) > 0.33
+				and meepoEnemies ~= nil
+				and #meepoEnemies == 0
+			then
 				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
 		if Fu.IsDoingTormentor(meepo) then
 			local meepoEnemies = Fu.GetNearbyHeroes(meepo, 800, true, BOT_MODE_NONE)
-			if Fu.IsTormentor(meepoTarget) and Fu.IsInRange(meepo, meepoTarget, 400) and meepoEnemies ~= nil and #meepoEnemies == 0 then
+			if
+				Fu.IsTormentor(meepoTarget)
+				and Fu.IsInRange(meepo, meepoTarget, 400)
+				and meepoEnemies ~= nil
+				and #meepoEnemies == 0
+			then
 				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end
@@ -385,7 +411,10 @@ function X.ConsiderPoof()
 				-- Was the farthest Meepo whatever its state: a Meepo fighting elsewhere is no escape.
 				-- Only a Meepo with no enemy hero within 1200 counts.
 				local meepoEnemies = Fu.GetNearbyHeroes(meepo, 1200, true, BOT_MODE_NONE)
-				if (meepoEnemies == nil or #meepoEnemies == 0) and GetUnitToUnitDistance(bot, meepo) > farthestDistance then
+				if
+					(meepoEnemies == nil or #meepoEnemies == 0)
+					and GetUnitToUnitDistance(bot, meepo) > farthestDistance
+				then
 					farthestMeepo = meepo
 					farthestDistance = GetUnitToUnitDistance(bot, meepo)
 				end
@@ -419,7 +448,15 @@ function X.ConsiderPoof()
 			-- [OHA-MEEPO]: lane last-hit Poof (dead before the poof_damage fix), every 10s at most.
 			if DotaTime() >= (bot._poofLaneLogAt or -999) then
 				bot._poofLaneLogAt = DotaTime() + 10
-				pcall(print, string.format("[OHA-MEEPO] t=%.0f poof-lane-lasthit creeps=%d dmg=%d", DotaTime(), killableCount, poofDamage))
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f poof-lane-lasthit creeps=%d dmg=%d",
+						DotaTime(),
+						killableCount,
+						poofDamage
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, bot
 		end
@@ -441,7 +478,10 @@ function X.ConsiderPoof()
 		for _, creep in pairs(laneCreeps) do
 			if
 				Fu.IsValid(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and Fu.CanKillTarget(creep, poofDamage, DAMAGE_TYPE_MAGICAL)
 			then
 				nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
@@ -517,7 +557,11 @@ function X.ConsiderDig()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderMegaMeepo()
-	if not megaMeepoAbility:IsTrained() or not megaMeepoAbility:IsFullyCastable() or bot:HasModifier("modifier_meepo_petrify") then
+	if
+		not megaMeepoAbility:IsTrained()
+		or not megaMeepoAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_meepo_petrify")
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local radius = 600

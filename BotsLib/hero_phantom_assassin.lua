@@ -40,7 +40,8 @@ X["sSellList"] = {}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_PA" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -120,7 +121,10 @@ function X.ConsiderQ()
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
 			and Fu.CanCastOnTargetAdvanced(enemyHero)
 			and GetUnitToUnitDistance(bot, enemyHero) <= castRange + 80
-			and (Fu.CanKillTarget(enemyHero, damage * 1.6, damageType) or enemyHero:IsChanneling() and Fu.CanKillTarget(enemyHero, damage * 4.5, damageType))
+			and (
+				Fu.CanKillTarget(enemyHero, damage * 1.6, damageType)
+				or enemyHero:IsChanneling() and Fu.CanKillTarget(enemyHero, damage * 4.5, damageType)
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
@@ -133,7 +137,13 @@ function X.ConsiderQ()
 			and Fu.CanCastOnTargetAdvanced(target)
 			and Fu.IsInRange(target, bot, castRange + 50)
 		then
-			if abilityLevel >= 3 or mpRatio > 0.6 or hpRatio < 0.4 or Fu.GetHP(target) < 0.38 or DotaTime() > 6 * 60 then
+			if
+				abilityLevel >= 3
+				or mpRatio > 0.6
+				or hpRatio < 0.4
+				or Fu.GetHP(target) < 0.38
+				or DotaTime() > 6 * 60
+			then
 				return BOT_ACTION_DESIRE_HIGH, target
 			end
 		end
@@ -142,7 +152,11 @@ function X.ConsiderQ()
 		local weakestEnemy = nil
 		local lowestHealth = 10000
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local enemyHealth = enemyHero:GetHealth()
 				if enemyHealth < lowestHealth then
 					lowestHealth = enemyHealth
@@ -162,13 +176,19 @@ function X.ConsiderQ()
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
 				and not Fu.IsDisabled(enemyHero)
-				and (bot:IsFacingLocation(enemyHero:GetLocation(), 60) or not Fu.IsInRange(enemyHero, bot, castRange - 300))
+				and (
+					bot:IsFacingLocation(enemyHero:GetLocation(), 60)
+					or not Fu.IsInRange(enemyHero, bot, castRange - 300)
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
 	end
-	if (bot:GetActiveMode() == BOT_MODE_LANING or botLevel <= 14 and not Fu.IsGoingOnSomeone(bot)) and not Fu.IsValid(botTarget) then
+	if
+		(bot:GetActiveMode() == BOT_MODE_LANING or botLevel <= 14 and not Fu.IsGoingOnSomeone(bot))
+		and not Fu.IsValid(botTarget)
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 168, true)
 		local creepType = "ranged"
 		for _, creep in pairs(laneCreeps) do
@@ -258,7 +278,10 @@ function X.ConsiderQ()
 				if
 					not Fu.CanKillTarget(creep, bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 					and not Fu.IsInRange(creep, bot, castRange - 300)
-					and (Fu.CanKillTarget(creep, damage - 2, damageType) or Fu.GetUnitAllyCountAroundEnemyTarget(creep, 450) <= 1)
+					and (
+						Fu.CanKillTarget(creep, damage - 2, damageType)
+						or Fu.GetUnitAllyCountAroundEnemyTarget(creep, 450) <= 1
+					)
 				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
@@ -336,11 +359,18 @@ function X.ConsiderW()
 		and not target:IsAttackImmune()
 		and Fu.CanCastOnNonMagicImmune(target)
 		and GetUnitToUnitDistance(bot, target) <= castRange + 80
-		and (Fu.CanKillTarget(target, damage * 1.28, damageType) or target:IsChanneling() and Fu.CanKillTarget(target, damage * 2.28, damageType))
+		and (
+			Fu.CanKillTarget(target, damage * 1.28, damageType)
+			or target:IsChanneling() and Fu.CanKillTarget(target, damage * 2.28, damageType)
+		)
 	then
 		return BOT_ACTION_DESIRE_HIGH, target
 	end
-	if Fu.IsGoingOnSomeone(bot) and (botLevel >= 2 or #enemiesNearby <= 1) and (#alliesNearby >= 2 or #enemiesNearby <= 1 or botLevel >= 6) then
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and (botLevel >= 2 or #enemiesNearby <= 1)
+		and (#alliesNearby >= 2 or #enemiesNearby <= 1 or botLevel >= 6)
+	then
 		if
 			Fu.IsValidHero(target)
 			and not target:IsAttackImmune()
@@ -372,7 +402,11 @@ function X.ConsiderW()
 			local bestJumpUnit = nil
 			local closestFountainDistance = Fu.GetDistanceFromAllyFountain(bot)
 			for _, unit in pairs(jumpCandidates) do
-				if Fu.IsValid(unit) and GetUnitToUnitDistance(unit, bot) > 260 and Fu.GetDistanceFromAllyFountain(unit) < closestFountainDistance then
+				if
+					Fu.IsValid(unit)
+					and GetUnitToUnitDistance(unit, bot) > 260
+					and Fu.GetDistanceFromAllyFountain(unit) < closestFountainDistance
+				then
 					bestJumpUnit = unit
 					closestFountainDistance = Fu.GetDistanceFromAllyFountain(unit)
 				end
@@ -400,13 +434,20 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if Fu.IsFarming(bot) and (bot:GetAttackTarget() == nil or not bot:GetAttackTarget():IsBuilding()) and botLevel >= 4 then
+	if
+		Fu.IsFarming(bot)
+		and (bot:GetAttackTarget() == nil or not bot:GetAttackTarget():IsBuilding())
+		and botLevel >= 4
+	then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
 		local farmTarget = Fu.GetProperTarget(bot)
 		if
 			Fu.IsValid(farmTarget)
 			and not Fu.IsRoshan(farmTarget)
-			and (not Fu.CanKillTarget(farmTarget, damage * 2, damageType) or GetUnitToUnitDistance(farmTarget, bot) >= 650)
+			and (
+				not Fu.CanKillTarget(farmTarget, damage * 2, damageType)
+				or GetUnitToUnitDistance(farmTarget, bot) >= 650
+			)
 		then
 			if Fu.IsAllowedToSpam(bot, manaCost) then
 				if
@@ -422,13 +463,21 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and botLevel >= 8 and #enemiesNearby == 0 and #alliesNearby <= 2 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and botLevel >= 8
+		and #enemiesNearby == 0
+		and #alliesNearby <= 2
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 300, true)
 		if
 			Fu.IsValid(target)
 			and not target:IsHero()
 			and not target:HasModifier("modifier_fountain_glyph")
-			and (not Fu.IsInRange(bot, target, 630) and bot:GetMana() >= 100 or #laneCreeps >= 3 and Fu.IsAllowedToSpam(bot, manaCost))
+			and (
+				not Fu.IsInRange(bot, target, 630) and bot:GetMana() >= 100
+				or #laneCreeps >= 3 and Fu.IsAllowedToSpam(bot, manaCost)
+			)
 		then
 			if not Fu.IsEnemyHeroAroundLocation(target:GetLocation(), 660) then
 				return BOT_ACTION_DESIRE_HIGH, target
@@ -461,7 +510,12 @@ function X.ConsiderE()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	local enemyTowers = bot:GetNearbyTowers(878, true)
-	if not blurAbility:IsFullyCastable() or bot:IsInvisible() or #enemyTowers >= 1 or bot:DistanceFromFountain() < 600 then
+	if
+		not blurAbility:IsFullyCastable()
+		or bot:IsInvisible()
+		or #enemyTowers >= 1
+		or bot:DistanceFromFountain() < 600
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(3.1) and (botLevel >= 6 or hpRatio <= 0.3) then

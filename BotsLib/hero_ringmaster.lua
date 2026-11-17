@@ -86,28 +86,36 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local tameTheBeastsAbility = SafeAbility(bot:GetAbilityByName("ringmaster_tame_the_beasts"), "ringmaster_tame_the_beasts", "ringmaster")
+local tameTheBeastsAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_tame_the_beasts"), "ringmaster_tame_the_beasts", "ringmaster")
 local tameTheBeastsCrackAbility = SafeAbility(
 	bot:GetAbilityByName("ringmaster_tame_the_beasts_crack"),
 	"ringmaster_tame_the_beasts_crack",
 	"ringmaster"
 )
 local escapeActAbility = SafeAbility(bot:GetAbilityByName("ringmaster_the_box"), "ringmaster_the_box", "ringmaster")
-local impalementArtsAbility = SafeAbility(bot:GetAbilityByName("ringmaster_impalement"), "ringmaster_impalement", "ringmaster")
+local impalementArtsAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_impalement"), "ringmaster_impalement", "ringmaster")
 local spotlightAbility = SafeAbility(bot:GetAbilityByName("ringmaster_spotlight"), "ringmaster_spotlight", "ringmaster")
 local wheelOfWonderAbility = SafeAbility(bot:GetAbilityByName("ringmaster_wheel"), "ringmaster_wheel", "ringmaster")
-local emptySouvenirAbility = SafeAbility(bot:GetAbilityByName("ringmaster_empty_souvenir"), "ringmaster_empty_souvenir", "ringmaster")
-local funhouseMirrorAbility = SafeAbility(bot:GetAbilityByName("ringmaster_funhouse_mirror"), "ringmaster_funhouse_mirror", "ringmaster")
-local strongmanTonicAbility = SafeAbility(bot:GetAbilityByName("ringmaster_strongman_tonic"), "ringmaster_strongman_tonic", "ringmaster")
-local whoopeeCushionAbility = SafeAbility(bot:GetAbilityByName("ringmaster_whoopee_cushion"), "ringmaster_whoopee_cushion", "ringmaster")
-local unicycleAbility = SafeAbility(bot:GetAbilityByName("ringmaster_summon_unicycle"), "ringmaster_summon_unicycle", "ringmaster")
+local emptySouvenirAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_empty_souvenir"), "ringmaster_empty_souvenir", "ringmaster")
+local funhouseMirrorAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_funhouse_mirror"), "ringmaster_funhouse_mirror", "ringmaster")
+local strongmanTonicAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_strongman_tonic"), "ringmaster_strongman_tonic", "ringmaster")
+local whoopeeCushionAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_whoopee_cushion"), "ringmaster_whoopee_cushion", "ringmaster")
+local unicycleAbility =
+	SafeAbility(bot:GetAbilityByName("ringmaster_summon_unicycle"), "ringmaster_summon_unicycle", "ringmaster")
 local tameTheBeastsDesire, tameTheBeastsLocation
 local tameTheBeastsCrackDesire
 local escapeActDesire, escapeActTarget
@@ -218,7 +226,11 @@ function X.ConsiderTameTheBeasts()
 	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if enemyHero:HasModifier("modifier_teleporting") then
 				bot.whip_to_cancel = true
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
@@ -266,7 +278,8 @@ function X.ConsiderTameTheBeasts()
 				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
 				and (hpRatio < 0.65 or Fu.IsChasingTarget(enemyHero, bot))
 			then
-				local aoeLocation = bot:FindAoELocation(true, true, enemyHero:GetLocation(), startWidth, startWidth, 0, 0)
+				local aoeLocation =
+					bot:FindAoELocation(true, true, enemyHero:GetLocation(), startWidth, startWidth, 0, 0)
 				local targetLocation = (bot:GetLocation() + enemyHero:GetLocation()) / 2
 				if aoeLocation.count > 1 then
 					targetLocation = aoeLocation.targetloc
@@ -316,8 +329,13 @@ function X.ConsiderTameTheBeasts()
 	end
 	if Fu.IsFarming(bot) and Fu.GetManaAfter(manaCost) > 0.33 then
 		local nearbyCreeps = bot:GetNearbyCreeps(castRange + 150, true)
-		if Fu.CanBeAttacked(nearbyCreeps[1]) and not Fu.IsRunning(nearbyCreeps[1]) and (#nearbyCreeps >= 2 or #nearbyCreeps >= 1 and nearbyCreeps[1]:IsAncientCreep()) then
-			local aoeLocation = bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), endWidth, endWidth, 0, 0)
+		if
+			Fu.CanBeAttacked(nearbyCreeps[1])
+			and not Fu.IsRunning(nearbyCreeps[1])
+			and (#nearbyCreeps >= 2 or #nearbyCreeps >= 1 and nearbyCreeps[1]:IsAncientCreep())
+		then
+			local aoeLocation =
+				bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), endWidth, endWidth, 0, 0)
 			local targetLocation = Fu.GetCenterOfUnits(nearbyCreeps)
 			if aoeLocation.count >= 4 then
 				targetLocation = aoeLocation.targetloc
@@ -327,13 +345,23 @@ function X.ConsiderTameTheBeasts()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			bot.whip_to_miniboss = true
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			bot.whip_to_miniboss = true
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
@@ -352,7 +380,8 @@ function X.ConsiderTameTheBeasts()
 			end
 		end
 		if Fu.IsValid(killableCreeps[1]) then
-			local aoeLocation = bot:FindAoELocation(true, false, killableCreeps[1]:GetLocation(), endWidth, endWidth, 0, 0)
+			local aoeLocation =
+				bot:FindAoELocation(true, false, killableCreeps[1]:GetLocation(), endWidth, endWidth, 0, 0)
 			if Fu.IsLaning(bot) then
 				if
 					#killableCreeps >= 2
@@ -461,7 +490,10 @@ function X.ConsiderEscapeAct()
 			if
 				Fu.IsValidHero(enemiesNearAlly[1])
 				and not Fu.IsSuspiciousIllusion(enemiesNearAlly[1])
-				and (enemiesNearAlly[1]:GetAttackTarget() == allyHero or Fu.IsChasingTarget(enemiesNearAlly[1], allyHero))
+				and (enemiesNearAlly[1]:GetAttackTarget() == allyHero or Fu.IsChasingTarget(
+					enemiesNearAlly[1],
+					allyHero
+				))
 				and #enemiesNearAlly >= #alliesNearAlly
 				and not allyHero:HasModifier("modifier_teleporting")
 				and not Fu.IsInEtherealForm(allyHero)
@@ -474,7 +506,10 @@ function X.ConsiderEscapeAct()
 	if Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget) then
 		for _, allyHero in pairs(nearbyAllies) do
 			if Fu.IsValidHero(allyHero) and not allyHero:IsIllusion() then
-				if (Fu.IsDoingRoshan(allyHero) or Fu.IsDoingTormentor(allyHero)) and Fu.IsInRange(allyHero, botTarget, 900) then
+				if
+					(Fu.IsDoingRoshan(allyHero) or Fu.IsDoingTormentor(allyHero))
+					and Fu.IsInRange(allyHero, botTarget, 900)
+				then
 					if Fu.GetHP(allyHero) < 0.15 and not allyHero:HasModifier("modifier_teleporting") then
 						return BOT_ACTION_DESIRE_HIGH, allyHero
 					end
@@ -531,7 +566,11 @@ function X.ConsiderImpalementArts()
 			then
 				if
 					Fu.CanKillTarget(enemyHero, impactDamage, DAMAGE_TYPE_MAGICAL)
-					or Fu.CanKillTarget(enemyHero, impactDamage + enemyHero:GetMaxHealth() * bleedHealthPct * bleedDuration, DAMAGE_TYPE_MAGICAL)
+					or Fu.CanKillTarget(
+						enemyHero,
+						impactDamage + enemyHero:GetMaxHealth() * bleedHealthPct * bleedDuration,
+						DAMAGE_TYPE_MAGICAL
+					)
 				then
 					return BOT_ACTION_DESIRE_HIGH, targetLocation
 				end
@@ -567,7 +606,8 @@ function X.ConsiderImpalementArts()
 				and (hpRatio < 0.5 or Fu.IsChasingTarget(enemyHero, bot))
 				and not enemyHero:HasModifier("modifier_ringmaster_impalement_bleed")
 			then
-				local aoeLocation = bot:FindAoELocation(true, true, enemyHero:GetLocation(), daggerWidth, daggerWidth, 0, 0)
+				local aoeLocation =
+					bot:FindAoELocation(true, true, enemyHero:GetLocation(), daggerWidth, daggerWidth, 0, 0)
 				local targetLocation = enemyHero:GetLocation()
 				if aoeLocation.count > 1 then
 					targetLocation = aoeLocation.targetloc
@@ -599,7 +639,14 @@ function X.ConsiderImpalementArts()
 				and not enemyHero:HasModifier("modifier_ringmaster_impalement_bleed")
 			then
 				local travelTime = GetUnitToUnitDistance(bot, enemyHero) / daggerSpeed + castPoint
-				if not X.IsUnitBetweenMeAndLocation(bot, enemyHero, Fu.GetCorrectLoc(enemyHero, travelTime), daggerWidth) then
+				if
+					not X.IsUnitBetweenMeAndLocation(
+						bot,
+						enemyHero,
+						Fu.GetCorrectLoc(enemyHero, travelTime),
+						daggerWidth
+					)
+				then
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, travelTime)
 				end
 			end
@@ -624,7 +671,10 @@ function X.ConsiderSpotlight()
 		if #enemiesInSpotlight >= 2 then
 			if DotaTime() >= (bot._spotlightLogAt or -999) then
 				bot._spotlightLogAt = DotaTime() + 10
-				pcall(print, string.format("[OHA-RINGMASTER] t=%.0f spotlight on %d enemies", DotaTime(), #enemiesInSpotlight))
+				pcall(
+					print,
+					string.format("[OHA-RINGMASTER] t=%.0f spotlight on %d enemies", DotaTime(), #enemiesInSpotlight)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
@@ -658,7 +708,12 @@ function X.ConsiderSpotlight()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.GetHP(botTarget) > 0.5 and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.GetHP(botTarget) > 0.5
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -678,7 +733,10 @@ function X.ConsiderWheelOfWonder()
 		-- datafeed: Wheel has a 700 minimum range (min_range). A spot much closer than that makes the wheel
 		-- stop past the group, so skip spots nearer than min_range minus most of the mesmerize radius.
 		local minRange = wheelOfWonderAbility:GetSpecialValueInt("min_range")
-		if #enemiesInWheel >= 2 and GetUnitToLocationDistance(bot, aoeLocation.targetloc) >= minRange - mesmerizeRadius * 0.6 then
+		if
+			#enemiesInWheel >= 2
+			and GetUnitToLocationDistance(bot, aoeLocation.targetloc) >= minRange - mesmerizeRadius * 0.6
+		then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
@@ -705,7 +763,11 @@ function X.ConsiderFunhouseMirror()
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
 		-- was Fu.IsTormentor(bot) (Ringmaster himself), never true
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, 900) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, 900)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -748,7 +810,10 @@ function X.ConsiderStrongmanTonic()
 	if Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget) then
 		for _, allyHero in pairs(nearbyAllies) do
 			if Fu.IsValidHero(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and not allyHero:IsIllusion() then
-				if (Fu.IsDoingRoshan(allyHero) or Fu.IsDoingTormentor(allyHero)) and Fu.IsInRange(allyHero, botTarget, 900) then
+				if
+					(Fu.IsDoingRoshan(allyHero) or Fu.IsDoingTormentor(allyHero))
+					and Fu.IsInRange(allyHero, botTarget, 900)
+				then
 					if Fu.GetHP(allyHero) < 0.15 then
 						return BOT_ACTION_DESIRE_HIGH, allyHero
 					end

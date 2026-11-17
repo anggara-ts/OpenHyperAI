@@ -138,7 +138,11 @@ local function installDebugHelpers(Fu)
 				local movedDistance = Fu.GetLocationToLocationDistance(idleState.botLocation, bot:GetLocation())
 				if not Fu.IsTryingtoUseAbility(bot) and not Fu.IsAttacking(bot) and movedDistance <= idleDistance then
 					idleState.idleCount = idleState.idleCount + 1
-					if bot:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE or activeMode == BOT_MODE_ITEM or activeMode == BOT_MODE_FARM then
+					if
+						bot:GetCurrentActionType() == BOT_ACTION_TYPE_IDLE
+						or activeMode == BOT_MODE_ITEM
+						or activeMode == BOT_MODE_FARM
+					then
 						local queuedCount = bot:NumQueuedActions()
 						if queuedCount > 0 then
 							for i = 1, queuedCount do

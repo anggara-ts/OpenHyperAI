@@ -43,7 +43,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_PL" }, { "item_manta", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -155,7 +156,11 @@ function X.ConsiderQ()
 	end
 	if Fu.IsFarming(bot) then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsValid(attackTarget) and not attackTarget:HasModifier("modifier_fountain_glyph") and Fu.IsInRange(bot, attackTarget, 500) then
+		if
+			Fu.IsValid(attackTarget)
+			and not attackTarget:HasModifier("modifier_fountain_glyph")
+			and Fu.IsInRange(bot, attackTarget, 500)
+		then
 			return BOT_ACTION_DESIRE_HIGH, attackTarget, "Q-打钱"
 		end
 	end
@@ -236,12 +241,15 @@ function X.ConsiderW()
 		then
 			if DotaTime() >= (bot._nagaNetLogAt or -999) then
 				bot._nagaNetLogAt = DotaTime() + 3
-				pcall(print, string.format(
-					"[OHA-NAGA] t=%.0f ensnare-interrupt target=%s tp=%s",
-					DotaTime(),
-					(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-					tostring(enemyHero:HasModifier("modifier_teleporting"))
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-NAGA] t=%.0f ensnare-interrupt target=%s tp=%s",
+						DotaTime(),
+						(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(enemyHero:HasModifier("modifier_teleporting"))
+					)
+				)
 			end
 			castTarget = enemyHero
 			castReason = "W-打断TP:" .. Fu.Chat.GetNormName(enemyHero)
@@ -271,7 +279,10 @@ function X.ConsiderW()
 					or enemyHero:HasModifier("modifier_item_shadow_amulet_fade")
 				then
 					if
-						(Fu.CanCastOnNonMagicImmune(enemyHero) or Fu.CanCastOnMagicImmune(enemyHero) and bot:HasScepter())
+						(
+							Fu.CanCastOnNonMagicImmune(enemyHero)
+							or Fu.CanCastOnMagicImmune(enemyHero) and bot:HasScepter()
+						)
 						and Fu.CanCastOnTargetAdvanced(enemyHero)
 						and not enemyHero:HasModifier("modifier_item_dustofappearance")
 						and not enemyHero:HasModifier("modifier_slardar_amplify_damage")
@@ -326,7 +337,11 @@ function X.ConsiderR()
 	if Fu.IsInTeamFight(bot, 1200) then
 		local foes = 0
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, radius - 50, true, BOT_MODE_NONE) or {}) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				foes = foes + 1
 			end
 		end
@@ -340,13 +355,16 @@ function X.ConsiderR()
 				then
 					if DotaTime() >= (bot._nagaSongLogAt or -999) then
 						bot._nagaSongLogAt = DotaTime() + 3
-						pcall(print, string.format(
-							"[OHA-NAGA] t=%.0f song-save ally=%s hp=%.2f foes=%d",
-							DotaTime(),
-							(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
-							Fu.GetHP(ally),
-							foes
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-NAGA] t=%.0f song-save ally=%s hp=%.2f foes=%d",
+								DotaTime(),
+								(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+								Fu.GetHP(ally),
+								foes
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, ally, "R-save"
 				end
@@ -374,7 +392,12 @@ function X.ConsiderR()
 	end
 	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(3.0) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsDisabled(enemyHero) and not enemyHero:IsDisarmed() then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and not enemyHero:IsDisarmed()
+			then
 				castTarget = enemyHero
 				castReason = "R-撤退" .. Fu.Chat.GetNormName(castTarget)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason

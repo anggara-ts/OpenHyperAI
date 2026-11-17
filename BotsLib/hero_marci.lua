@@ -12,7 +12,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
 -- Rebound maxed first, Dispose second, Bodyguard last (Dotabuff most picked order).
-local tAllAbilityBuildList = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" then
@@ -107,7 +108,8 @@ X["sSellList"] = sRoleSellList[sRole] or {}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_marci" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -122,7 +124,8 @@ local disposeAbility = SafeAbility(bot:GetAbilityByName("marci_grapple"), "marci
 local reboundAbility = SafeAbility(bot:GetAbilityByName("marci_companion_run"), "marci_companion_run", "marci")
 local unleashAbility = SafeAbility(bot:GetAbilityByName("marci_unleash"), "marci_unleash", "marci")
 local bodyguardAbility = SafeAbility(bot:GetAbilityByName("marci_bodyguard"), "marci_bodyguard", "marci")
-local specialDeliveryAbility = SafeAbility(bot:GetAbilityByName("marci_special_delivery"), "marci_special_delivery", "marci")
+local specialDeliveryAbility =
+	SafeAbility(bot:GetAbilityByName("marci_special_delivery"), "marci_special_delivery", "marci")
 local disposeDesire, disposeTarget
 local reboundDesire, reboundTarget
 local unleashDesire
@@ -185,12 +188,15 @@ function X.ConsiderBodyguard()
 		then
 			if DotaTime() >= (bot._ohaMarciGuardLogAt or -999) then
 				bot._ohaMarciGuardLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-MARCI] t=%.0f bodyguard save on %s hp=%.2f",
-					DotaTime(),
-					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
-					Fu.GetHP(ally)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-MARCI] t=%.0f bodyguard save on %s hp=%.2f",
+						DotaTime(),
+						(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+						Fu.GetHP(ally)
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, ally
 		end
@@ -200,8 +206,14 @@ function X.ConsiderBodyguard()
 		or Fu.IsPushing(bot) and #nearbyEnemies > 0
 		or Fu.IsDefending(bot) and #nearbyEnemies > 0
 		or Fu.IsLaning(bot) and #enemyLaneCreeps >= 3
-		or Fu.IsDoingRoshan(bot) and Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and Fu.CanBeAttacked(botTarget)
-		or Fu.IsDoingTormentor(bot) and Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and Fu.CanBeAttacked(botTarget)
+		or Fu.IsDoingRoshan(bot) and Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 800) and isAttacking and Fu.CanBeAttacked(
+			botTarget
+		)
+		or Fu.IsDoingTormentor(bot)
+			and Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 800)
+			and isAttacking
+			and Fu.CanBeAttacked(botTarget)
 	then
 		local weakestAlly = nil
 		local minHealth = math.huge
@@ -292,10 +304,8 @@ function X.ConsiderDispose()
 				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
 			then
 				if
-					GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) > GetUnitToLocationDistance(
-						enemyHero,
-						Fu.GetTeamFountain()
-					)
+					GetUnitToLocationDistance(bot, Fu.GetTeamFountain())
+					> GetUnitToLocationDistance(enemyHero, Fu.GetTeamFountain())
 				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
@@ -305,7 +315,11 @@ function X.ConsiderDispose()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function X.ConsiderRebound()
-	if not Fu.CanCastAbility(reboundAbility) or bot:IsRooted() or bot:HasModifier("modifier_marci_unleash") and not Fu.IsRetreating(bot) then
+	if
+		not Fu.CanCastAbility(reboundAbility)
+		or bot:IsRooted()
+		or bot:HasModifier("modifier_marci_unleash") and not Fu.IsRetreating(bot)
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = reboundAbility:GetCastRange()
@@ -362,11 +376,14 @@ function X.ConsiderRebound()
 								-- Landing direction can't be set (no vector-target order); log to check it.
 								if DotaTime() >= (bot._ohaMarciReboundLogAt or -999) then
 									bot._ohaMarciReboundLogAt = DotaTime() + 5
-									pcall(print, string.format(
-										"[OHA-MARCI] t=%.0f rebound escape via %s",
-										DotaTime(),
-										allyUnit:GetUnitName()
-									))
+									pcall(
+										print,
+										string.format(
+											"[OHA-MARCI] t=%.0f rebound escape via %s",
+											DotaTime(),
+											allyUnit:GetUnitName()
+										)
+									)
 								end
 								return BOT_ACTION_DESIRE_HIGH, allyUnit
 							end
@@ -376,14 +393,26 @@ function X.ConsiderRebound()
 			end
 			if allyUnit:IsHero() then
 				local creepsNearAlly = allyUnit:GetNearbyCreeps(landingRadius, true)
-				if Fu.IsPushing(bot) and isAttacking and manaAfter > manaThreshold and #nearbyAllies <= 2 and #nearbyEnemies == 0 then
+				if
+					Fu.IsPushing(bot)
+					and isAttacking
+					and manaAfter > manaThreshold
+					and #nearbyAllies <= 2
+					and #nearbyEnemies == 0
+				then
 					if Fu.IsValid(creepsNearAlly[1]) and Fu.CanBeAttacked(creepsNearAlly[1]) then
 						if #creepsNearAlly >= 4 then
 							return BOT_ACTION_DESIRE_HIGH, allyUnit
 						end
 					end
 				end
-				if Fu.IsDefending(bot) and isAttacking and manaAfter > manaThreshold and #nearbyAllies <= 3 and #nearbyEnemies == 0 then
+				if
+					Fu.IsDefending(bot)
+					and isAttacking
+					and manaAfter > manaThreshold
+					and #nearbyAllies <= 3
+					and #nearbyEnemies == 0
+				then
 					if Fu.IsValid(creepsNearAlly[1]) and Fu.CanBeAttacked(creepsNearAlly[1]) then
 						if #creepsNearAlly >= 4 then
 							return BOT_ACTION_DESIRE_HIGH, allyUnit
@@ -392,31 +421,51 @@ function X.ConsiderRebound()
 				end
 				if Fu.IsFarming(bot) and isAttacking and manaAfter > manaThreshold then
 					if Fu.IsValid(creepsNearAlly[1]) and Fu.CanBeAttacked(creepsNearAlly[1]) then
-						if #creepsNearAlly >= 3 or #creepsNearAlly >= 2 and creepsNearAlly[1]:IsAncientCreep() or #creepsNearAlly >= 1 and creepsNearAlly[1]:GetHealth() >= 550 then
+						if
+							#creepsNearAlly >= 3
+							or #creepsNearAlly >= 2 and creepsNearAlly[1]:IsAncientCreep()
+							or #creepsNearAlly >= 1 and creepsNearAlly[1]:GetHealth() >= 550
+						then
 							return BOT_ACTION_DESIRE_HIGH, allyUnit
 						end
 					end
 				end
 				if Fu.IsLaning(bot) and Fu.IsEarlyGame() and manaAfter > manaThreshold and #nearbyEnemies == 0 then
-					local aoe = bot:FindAoELocation(true, false, allyUnit:GetLocation(), 0, landingRadius - 75, 0, impactDamage)
+					local aoe =
+						bot:FindAoELocation(true, false, allyUnit:GetLocation(), 0, landingRadius - 75, 0, impactDamage)
 					if aoe.count >= 3 then
 						return BOT_ACTION_DESIRE_HIGH, allyUnit
 					end
 				end
 				if Fu.IsDoingRoshan(bot) then
-					if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(allyUnit, botTarget, landingRadius) and isAttacking and manaAfter > manaThreshold + 0.1 then
+					if
+						Fu.IsRoshan(botTarget)
+						and Fu.CanBeAttacked(botTarget)
+						and Fu.IsInRange(allyUnit, botTarget, landingRadius)
+						and isAttacking
+						and manaAfter > manaThreshold + 0.1
+					then
 						return BOT_ACTION_DESIRE_HIGH, allyUnit
 					end
 				end
 				if Fu.IsDoingTormentor(bot) then
-					if Fu.IsTormentor(botTarget) and Fu.IsInRange(allyUnit, botTarget, landingRadius) and isAttacking and manaAfter > manaThreshold + 0.1 then
+					if
+						Fu.IsTormentor(botTarget)
+						and Fu.IsInRange(allyUnit, botTarget, landingRadius)
+						and isAttacking
+						and manaAfter > manaThreshold + 0.1
+					then
 						return BOT_ACTION_DESIRE_HIGH, allyUnit
 					end
 				end
 			end
 			local enemiesNearAlly = Fu.GetEnemiesNearLoc(allyUnit:GetLocation(), landingRadius)
 			for _, enemyHero in pairs(enemiesNearAlly) do
-				if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanBeAttacked(enemyHero)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+				then
 					if enemyHero:HasModifier("modifier_teleporting") then
 						return BOT_ACTION_DESIRE_HIGH, allyUnit
 					end
@@ -447,7 +496,11 @@ function X.ConsiderUnleash()
 	-- was still walking in and lose seconds of it. Now an enemy hero must be within 500.
 	local enemyClose = false
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and Fu.IsInRange(bot, enemyHero, 500) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, 500)
+		then
 			enemyClose = true
 			break
 		end
@@ -486,7 +539,10 @@ function X.ConsiderUnleash()
 			local alliesNear = Fu.GetAlliesNearLoc(bot:GetLocation(), 800)
 			local enemiesNear = Fu.GetEnemiesNearLoc(bot:GetLocation(), 800)
 			if #alliesNear < #enemiesNear + 2 then
-				if Fu.GetTotalEstimatedDamageToTarget(alliesNear, botTarget) > botTarget:GetHealth() or isAttacking and hpRatio < 0.35 then
+				if
+					Fu.GetTotalEstimatedDamageToTarget(alliesNear, botTarget) > botTarget:GetHealth()
+					or isAttacking and hpRatio < 0.35
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

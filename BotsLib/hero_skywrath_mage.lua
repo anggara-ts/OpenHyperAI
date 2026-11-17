@@ -97,7 +97,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -161,7 +162,8 @@ function X.ConsiderQ()
 	local castPoint = arcaneBoltAbility:GetCastPoint()
 	local manaCost = arcaneBoltAbility:GetManaCost()
 	-- datafeed: Arcane Bolt int_multiplier=1.5 (was 1.6)
-	local damage = arcaneBoltAbility:GetSpecialValueInt("bolt_damage") + bot:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.5
+	local damage = arcaneBoltAbility:GetSpecialValueInt("bolt_damage")
+		+ bot:GetAttributeValue(ATTRIBUTE_INTELLECT) * 1.5
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local nInRangeEnemyHeroList = Fu.GetNearbyHeroes(bot, math.min(castRange + 50, 1600), true, BOT_MODE_NONE)
 	local attackDamage = bot:GetAttackDamage()
@@ -190,7 +192,10 @@ function X.ConsiderQ()
 					and creep:GetHealth() > damage * 0.68
 				then
 					local hitDelay = castPoint + GetUnitToUnitDistance(bot, creep) / 500
-					if Fu.WillKillTarget(creep, damage, damageType, hitDelay * 0.9) and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, hitDelay) then
+					if
+						Fu.WillKillTarget(creep, damage, damageType, hitDelay * 0.9)
+						and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, hitDelay)
+					then
 						return BOT_ACTION_DESIRE_HIGH, creep, "Q对线"
 					end
 				end
@@ -205,7 +210,11 @@ function X.ConsiderQ()
 	end
 	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(2.0) then
 		local weakestEnemy = Fu.GetVulnerableWeakestUnit(bot, true, true, castRange)
-		if weakestEnemy ~= nil and bot:IsFacingLocation(weakestEnemy:GetLocation(), 30) and Fu.CanCastOnTargetAdvanced(weakestEnemy) then
+		if
+			weakestEnemy ~= nil
+			and bot:IsFacingLocation(weakestEnemy:GetLocation(), 30)
+			and Fu.CanCastOnTargetAdvanced(weakestEnemy)
+		then
 			return BOT_ACTION_DESIRE_HIGH, weakestEnemy, "Q撤退"
 		end
 	end
@@ -225,7 +234,10 @@ function X.ConsiderQ()
 				and creep:GetHealth() > damage * 0.68
 			then
 				local hitDelay = castPoint + GetUnitToUnitDistance(bot, creep) / 500
-				if Fu.WillKillTarget(creep, damage, damageType, hitDelay * 0.8) and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, hitDelay) then
+				if
+					Fu.WillKillTarget(creep, damage, damageType, hitDelay * 0.8)
+					and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, hitDelay)
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q推进"
 				end
 			end
@@ -433,7 +445,11 @@ function X.ConsiderR()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange + 200) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + 200)
+		then
 			-- Review fix: a standing or disabled target was flared 148 units ahead of where it faces,
 			-- near the edge of the 170 radius, so one step took it out. Centre on it then, and lead
 			-- the shot only for a slowed target that is still moving.
@@ -458,7 +474,15 @@ function X.ConsiderR()
 			then
 				if DotaTime() - (X.lastFlareLog or -99) > 10 then
 					X.lastFlareLog = DotaTime()
-					pcall(print, string.format("[OHA-SKYWRATH] t=%.0f flare-retreat target=%s ms=%d", DotaTime(), enemyHero:GetUnitName(), enemyHero:GetCurrentMovementSpeed()))
+					pcall(
+						print,
+						string.format(
+							"[OHA-SKYWRATH] t=%.0f flare-retreat target=%s ms=%d",
+							DotaTime(),
+							enemyHero:GetUnitName(),
+							enemyHero:GetCurrentMovementSpeed()
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "R撤退"
 			end

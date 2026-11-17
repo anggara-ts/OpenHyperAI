@@ -125,7 +125,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -252,7 +253,10 @@ function X.ConsiderQ()
 			if
 				Fu.IsValid(enemyHero)
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or bot:GetActiveModeDesire() > BOT_ACTION_DESIRE_VERYHIGH)
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 4.0)
+					or bot:GetActiveModeDesire() > BOT_ACTION_DESIRE_VERYHIGH
+				)
 			then
 				castLocation = Fu.GetDelayCastLocation(bot, enemyHero, castRange - 140, radius, castDelay + 0.3)
 				if not bot:IsFacingLocation(enemyHero:GetLocation(), 50) then
@@ -264,9 +268,18 @@ function X.ConsiderQ()
 			end
 		end
 	end
-	if bot:WasRecentlyDamagedByAnyHero(3.0) and botLevel >= 6 and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 then
+	if
+		bot:WasRecentlyDamagedByAnyHero(3.0)
+		and botLevel >= 6
+		and bot:GetActiveMode() ~= BOT_MODE_RETREAT
+		and #enemiesInRange >= 1
+	then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and bot:IsFacingLocation(enemyHero:GetLocation(), 60) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and bot:IsFacingLocation(enemyHero:GetLocation(), 60)
+			then
 				castLocation = Fu.GetDelayCastLocation(bot, enemyHero, castRange, radius - 30, castDelay + 0.2)
 				if castLocation ~= nil then
 					return BOT_ACTION_DESIRE_HIGH, castLocation, "Q自保" .. Fu.Chat.GetNormName(enemyHero)
@@ -298,13 +311,19 @@ function X.ConsiderQ()
 		and #nearbyEnemies == 0
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 400, true)
-		if #laneCreeps >= 4 and Fu.IsValid(laneCreeps[1]) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			local lastHitAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange + 220, radius, castDelay, damage)
+		if
+			#laneCreeps >= 4
+			and Fu.IsValid(laneCreeps[1])
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
+			local lastHitAoeLocation =
+				bot:FindAoELocation(true, false, bot:GetLocation(), castRange + 220, radius, castDelay, damage)
 			if lastHitAoeLocation.count >= 3 then
 				castLocation = lastHitAoeLocation.targetloc
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线补刀" .. lastHitAoeLocation.count
 			end
-			local clearAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange + 220, radius + 50, 0.8, 0)
+			local clearAoeLocation =
+				bot:FindAoELocation(true, false, bot:GetLocation(), castRange + 220, radius + 50, 0.8, 0)
 			if clearAoeLocation.count >= 4 then
 				castLocation = clearAoeLocation.targetloc
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线清兵" .. clearAoeLocation.count
@@ -407,7 +426,12 @@ function X.ConsiderW()
 		end
 	end
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and Fu.IsRunning(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(4.0) then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and Fu.IsRunning(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(4.0)
+		then
 			local allyNearbyEnemies = Fu.GetEnemyList(allyHero, 1000)
 			if #allyNearbyEnemies >= 2 then
 				for _, enemyHero in pairs(nearbyEnemies) do
@@ -421,7 +445,11 @@ function X.ConsiderW()
 				end
 			else
 				local enemyHero = allyNearbyEnemies[1]
-				if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.IsInRange(bot, enemyHero, castRange)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "W-Retreat:" .. Fu.Chat.GetNormName(enemyHero)
 				end
 			end
@@ -491,7 +519,9 @@ function X.ConsiderR()
 		if #enemiesInFightRange >= 2 then
 			local alliedUnits = GetUnitList(UNIT_LIST_ALLIES)
 			for _, alliedUnit in pairs(alliedUnits) do
-				if string.find(alliedUnit:GetUnitName(), "nether_ward") and Fu.IsInRange(bot, alliedUnit, castRange) then
+				if
+					string.find(alliedUnit:GetUnitName(), "nether_ward") and Fu.IsInRange(bot, alliedUnit, castRange)
+				then
 					-- The debug label read GetNormName(botTarget), which errors when botTarget is nil
 					-- and aborted the whole think; the ward's own name is enough.
 					return BOT_ACTION_DESIRE_HIGH, alliedUnit, "Nether Ward"

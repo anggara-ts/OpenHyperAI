@@ -134,7 +134,9 @@ function X.Think()
 	if Fu.IsValidBuilding(enemyTowers[1]) then
 		local towerDistance = GetUnitToUnitDistance(bot, enemyTowers[1])
 		if towerDistance < 800 and #enemyCreeps < 3 then
-			bot:Action_MoveToLocation(Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950) + RandomVector(75))
+			bot:Action_MoveToLocation(
+				Fu.VectorAway(bot:GetLocation(), enemyTowers[1]:GetLocation(), 950) + RandomVector(75)
+			)
 			return
 		end
 		if towerDistance < 900 and bot:WasRecentlyDamagedByTower(2.0) then
@@ -163,7 +165,9 @@ function X.Think()
 			bCanLastHit = isBear
 				or lanePartner == nil
 				or Fu.IsCore(bot)
-				or not Fu.IsCore(bot) and Fu.IsCore(lanePartner) and (not lanePartner:IsAlive() or not Fu.IsInRange(bot, lanePartner, 800))
+				or not Fu.IsCore(bot)
+					and Fu.IsCore(lanePartner)
+					and (not lanePartner:IsAlive() or not Fu.IsInRange(bot, lanePartner, 800))
 		end
 		if bCanLastHit then
 			if GetUnitToUnitDistance(bot, lastHitCreep) > attackRange then
@@ -332,7 +336,10 @@ function GetHarassTarget(enemies)
 			-- Skip tower-hugging bait.
 			if Fu.IsValidBuilding(enemyTowers[1]) then
 				local towerRange = (enemyTowers[1]:GetAttackRange() or 700) + 200
-				if GetUnitToUnitDistance(bot, enemyTowers[1]) < towerRange or GetUnitToUnitDistance(enemy, enemyTowers[1]) < towerRange + 80 then
+				if
+					GetUnitToUnitDistance(bot, enemyTowers[1]) < towerRange
+					or GetUnitToUnitDistance(enemy, enemyTowers[1]) < towerRange + 80
+				then
 					goto continue_harass
 				end
 			end
@@ -381,7 +388,10 @@ function ConsiderTango()
 			if
 				IsLocationVisible(treeLocation)
 				and IsLocationPassable(treeLocation)
-				and (#nearbyEnemies == 0 or GetUnitToLocationDistance(bot, treeLocation) * 1.6 < GetUnitToUnitDistance(bot, nearestEnemy))
+				and (#nearbyEnemies == 0 or GetUnitToLocationDistance(bot, treeLocation) * 1.6 < GetUnitToUnitDistance(
+					bot,
+					nearestEnemy
+				))
 				and (#enemyTowers == 0 or GetUnitToLocationDistance(nearestTower, treeLocation) > 920)
 			then
 				return BOT_ACTION_DESIRE_HIGH, tree

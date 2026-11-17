@@ -42,7 +42,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -197,7 +198,11 @@ function X.ConsiderLucentBeam()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -209,7 +214,10 @@ function X.ConsiderLucentBeam()
 			if
 				Fu.IsValid(creep)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL)
 				and not Fu.IsInRange(bot, creep, bot:GetAttackRange() + 80)
 			then
@@ -245,7 +253,13 @@ function X.ConsiderLucentBeam()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -299,7 +313,12 @@ function X.ConsiderLunarOrbit()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if isGoingOnSomeone then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, radius) and bot:WasRecentlyDamagedByAnyHero(1) and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and bot:WasRecentlyDamagedByAnyHero(1)
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -315,7 +334,11 @@ function X.ConsiderLunarOrbit()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -339,7 +362,11 @@ function X.ConsiderMoonGlaives()
 	-- datafeed: Moon Glaives is passive (behavior 2); never try to cast it (if a passive reads as
 	-- castable, the early return in SkillsComplement would skip Lucent Beam / Eclipse). The active is
 	-- Lunar Orbit (ConsiderLunarOrbit).
-	if not moonGlaiveAbility:IsTrained() or not moonGlaiveAbility:IsFullyCastable() or moonGlaiveAbility:IsPassive() then
+	if
+		not moonGlaiveAbility:IsTrained()
+		or not moonGlaiveAbility:IsFullyCastable()
+		or moonGlaiveAbility:IsPassive()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local radius = 175
@@ -348,7 +375,12 @@ function X.ConsiderMoonGlaives()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if isGoingOnSomeone then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, radius) and bot:WasRecentlyDamagedByAnyHero(1) and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and bot:WasRecentlyDamagedByAnyHero(1)
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -364,7 +396,11 @@ function X.ConsiderMoonGlaives()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -421,12 +457,15 @@ function X.ConsiderEclipse()
 			if canKillHero then
 				if share > 1 and DotaTime() >= (bot._ohaLunaEclipseLogAt or -999) then
 					bot._ohaLunaEclipseLogAt = DotaTime() + 5
-					pcall(print, string.format(
-						"[OHA-LUNA] t=%.0f eclipse team fight heroes=%d beams/hero=%d",
-						DotaTime(),
-						#nearbyEnemies,
-						share
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-LUNA] t=%.0f eclipse team fight heroes=%d beams/hero=%d",
+							DotaTime(),
+							#nearbyEnemies,
+							share
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -442,7 +481,12 @@ function X.ConsiderEclipse()
 		then
 			local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius + 75, true, BOT_MODE_NONE)
 			local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
-			if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and nearbyAllies ~= nil and #nearbyAllies >= #nearbyEnemies then
+			if
+				nearbyEnemies ~= nil
+				and #nearbyEnemies >= 1
+				and nearbyAllies ~= nil
+				and #nearbyAllies >= #nearbyEnemies
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

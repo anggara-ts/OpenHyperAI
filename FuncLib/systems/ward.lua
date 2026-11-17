@@ -12,7 +12,13 @@ local UberWardSpots = {
 }
 local RoshSpots = {
 	{ location = Vector(-3379, 743, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
-	{ location = Vector(1230, -3082, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
+	{
+		location = Vector(1230, -3082, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "radiant",
+	},
 	{ location = Vector(-1700, 2728, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
 	{ location = Vector(2588, -1248, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire" },
 }
@@ -24,32 +30,126 @@ local HuntSpots = {
 }
 -- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
 local GateSpots = {
-	{ location = Vector(-7421, 4238, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
-	{ location = Vector(7309, -4419, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
-	{ location = Vector(-6244, 7147, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant", deep = true },
-	{ location = Vector(6206, -6958, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "dire", deep = true },
+	{
+		location = Vector(-7421, 4238, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "radiant",
+		deep = true,
+	},
+	{
+		location = Vector(7309, -4419, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "dire",
+		deep = true,
+	},
+	{
+		location = Vector(-6244, 7147, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "radiant",
+		deep = true,
+	},
+	{
+		location = Vector(6206, -6958, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "dire",
+		deep = true,
+	},
 }
 local radiantEarlyWardSpots = {
 	-- Radiant mid: the user's safe spots, pinged in game 022 (2026-11-16), on Radiant's side of the
 	-- river so the support does not cross it. Replace the Dire bank of the top rune (-627, 850),
 	-- where Mirana was killed walking back (game 020 and 021), and (-245, -996). safe = true lets
 	-- them through the "early wards go on the enemy side" filter.
-	[1] = { location = Vector(-1386, -171, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
-	[2] = { location = Vector(-303, -1001, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
-	[3] = { location = Vector(-882, -1000, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant", safe = true },
-	[4] = { location = Vector(6113, -3427, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[5] = { location = Vector(5308, -4362, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	[1] = {
+		location = Vector(-1386, -171, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "radiant",
+		safe = true,
+	},
+	[2] = {
+		location = Vector(-303, -1001, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "radiant",
+		safe = true,
+	},
+	[3] = {
+		location = Vector(-882, -1000, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "radiant",
+		safe = true,
+	},
+	[4] = {
+		location = Vector(6113, -3427, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+	},
+	[5] = {
+		location = Vector(5308, -4362, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "radiant",
+	},
 }
 local direEarlyWardSpots = {
 	-- Dire mid: the user's safe spots, pinged in game 022 (2026-11-16): (-501, 696), (12, 257) and
 	-- (632, -281), on Dire's side of the river. Replace the Radiant bank of the bottom rune
 	-- (44, -1232; it planted, but across the river) and (-627, 850). safe = true lets them through
 	-- the "early wards go on the enemy side" filter.
-	[1] = { location = Vector(-501, 696, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
-	[2] = { location = Vector(12, 257, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
-	[3] = { location = Vector(632, -281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire", safe = true },
-	[4] = { location = Vector(-5305, 4281, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "dire" },
-	[5] = { location = Vector(-5862, 3476, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "early", side = "radiant" },
+	[1] = {
+		location = Vector(-501, 696, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+		safe = true,
+	},
+	[2] = {
+		location = Vector(12, 257, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+		safe = true,
+	},
+	[3] = {
+		location = Vector(632, -281, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+		safe = true,
+	},
+	[4] = {
+		location = Vector(-5305, 4281, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+	},
+	[5] = {
+		location = Vector(-5862, 3476, 0),
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "radiant",
+	},
 }
 function Ward.GetEarlyGameWardSpots()
 	return GetTeam() == TEAM_RADIANT and radiantEarlyWardSpots or direEarlyWardSpots
@@ -203,8 +303,17 @@ local ENEMY_TOWER_GAP = 1200
 local function NearEnemyTower(loc)
 	local enemy = GetOpposingTeam()
 	for _, id in ipairs({
-		TOWER_TOP_1, TOWER_TOP_2, TOWER_TOP_3, TOWER_MID_1, TOWER_MID_2, TOWER_MID_3,
-		TOWER_BOT_1, TOWER_BOT_2, TOWER_BOT_3, TOWER_BASE_1, TOWER_BASE_2,
+		TOWER_TOP_1,
+		TOWER_TOP_2,
+		TOWER_TOP_3,
+		TOWER_MID_1,
+		TOWER_MID_2,
+		TOWER_MID_3,
+		TOWER_BOT_1,
+		TOWER_BOT_2,
+		TOWER_BOT_3,
+		TOWER_BASE_1,
+		TOWER_BASE_2,
 	}) do
 		local tower = GetTower(enemy, id)
 		if tower ~= nil and GetUnitToLocationDistance(tower, loc) <= ENEMY_TOWER_GAP then
@@ -237,12 +346,15 @@ local function LaneSpots()
 				end
 			end
 			-- Not inside either base: a front pushed to a barracks is a siege, not a ward spot.
-			local inBase = fountain ~= nil and enemyFountain ~= nil and loc ~= nil
+			local inBase = fountain ~= nil
+				and enemyFountain ~= nil
+				and loc ~= nil
 				and (Fu.GetDistance(loc, fountain) < 4000 or Fu.GetDistance(loc, enemyFountain) < 4000)
 			if loc ~= nil and not inBase then
 				local cur = laneSpots[lane]
 				if cur == nil or Fu.GetDistance(cur.location, loc) >= 900 then
-					local ours = fountain ~= nil and enemyFountain ~= nil
+					local ours = fountain ~= nil
+						and enemyFountain ~= nil
 						and Fu.GetDistance(loc, fountain) < Fu.GetDistance(loc, enemyFountain)
 					local ourSide = TeamSide()
 					local side = ours and ourSide or (ourSide == "radiant" and "dire" or "radiant")
@@ -265,7 +377,12 @@ local function EnemySideCovered(bot, loc)
 	end
 	local allies = 0
 	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-		if ally ~= bot and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, loc) <= 1800 then
+		if
+			ally ~= bot
+			and ally:IsAlive()
+			and not ally:IsIllusion()
+			and GetUnitToLocationDistance(ally, loc) <= 1800
+		then
 			allies = allies + 1
 		end
 	end
@@ -424,7 +541,10 @@ local function ObjectiveTarget()
 	-- The enemy-side outpost: the one farther from our fountain.
 	local fountain = Fu.GetTeamFountain and Fu.GetTeamFountain() or nil
 	local enemyOutpost = OBJECTIVE_OUTPOSTS[2]
-	if fountain ~= nil and Fu.GetDistance(OBJECTIVE_OUTPOSTS[1], fountain) > Fu.GetDistance(OBJECTIVE_OUTPOSTS[2], fountain) then
+	if
+		fountain ~= nil
+		and Fu.GetDistance(OBJECTIVE_OUTPOSTS[1], fountain) > Fu.GetDistance(OBJECTIVE_OUTPOSTS[2], fountain)
+	then
 		enemyOutpost = OBJECTIVE_OUTPOSTS[1]
 	end
 	for i = 1, 5 do
@@ -434,7 +554,11 @@ local function ObjectiveTarget()
 			if mode == BOT_MODE_ROSHAN and rosh ~= nil then
 				return rosh, "roshan"
 			end
-			if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST and GetUnitToLocationDistance(ally, enemyOutpost) <= 4000 then
+			if
+				BOT_MODE_OUTPOST ~= nil
+				and mode == BOT_MODE_OUTPOST
+				and GetUnitToLocationDistance(ally, enemyOutpost) <= 4000
+			then
 				return enemyOutpost, "enemy-outpost"
 			end
 		end
@@ -551,9 +675,16 @@ function Ward.IsOtherWardClose(location, unitName, radius, isAllied, requireFres
 		wards = GetUnitList(UNIT_LIST_ENEMY_WARDS)
 	end
 	for _, ward in pairs(wards) do
-		if Fu.IsValid(ward) and string.find(ward:GetUnitName(), unitName) and GetUnitToLocationDistance(ward, location) <= radius then
+		if
+			Fu.IsValid(ward)
+			and string.find(ward:GetUnitName(), unitName)
+			and GetUnitToLocationDistance(ward, location) <= radius
+		then
 			if requireFreshWard then
-				if unitName == "item_ward_observer" and Fu.GetModifierTime(ward, "modifier_item_buff_ward") >= 360 / 2 then
+				if
+					unitName == "item_ward_observer"
+					and Fu.GetModifierTime(ward, "modifier_item_buff_ward") >= 360 / 2
+				then
 					return true
 				end
 			else
@@ -566,7 +697,11 @@ end
 function Ward.IsThereEnemySentry(location, radius)
 	local enemyWards = GetUnitList(UNIT_LIST_ENEMY_WARDS)
 	for _, ward in pairs(enemyWards) do
-		if Fu.IsValid(ward) and ward:GetUnitName() == "npc_dota_sentry_wards" and GetUnitToLocationDistance(ward, location) <= radius then
+		if
+			Fu.IsValid(ward)
+			and ward:GetUnitName() == "npc_dota_sentry_wards"
+			and GetUnitToLocationDistance(ward, location) <= radius
+		then
 			return true
 		end
 	end

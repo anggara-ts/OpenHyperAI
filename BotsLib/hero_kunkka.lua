@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -102,7 +103,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -145,7 +147,11 @@ function X.SkillsComplement()
 	if
 		returnAbility:IsHidden() == false
 		and returnAbility:IsFullyCastable()
-		and (combo3StartTime ~= 0 and DotaTime() >= combo3StartTime + combo3ReturnDelay or combo1StartTime ~= 0 and DotaTime() >= combo1StartTime + combo1ReturnDelay or combo2StartTime ~= 0 and DotaTime() >= combo2StartTime + combo2ReturnDelay)
+		and (
+			combo3StartTime ~= 0 and DotaTime() >= combo3StartTime + combo3ReturnDelay
+			or combo1StartTime ~= 0 and DotaTime() >= combo1StartTime + combo1ReturnDelay
+			or combo2StartTime ~= 0 and DotaTime() >= combo2StartTime + combo2ReturnDelay
+		)
 	then
 		combo1StartTime = 0
 		combo2StartTime = 0
@@ -230,7 +236,11 @@ function X.GetTowardsFountainLocation(location, distance)
 	return Vector(towardsLocation[1], towardsLocation[2])
 end
 function X.ConsiderCombo1()
-	if not torrentAbility:IsFullyCastable() or not xMarksAbility:IsFullyCastable() or not ghostshipAbility:IsFullyCastable() then
+	if
+		not torrentAbility:IsFullyCastable()
+		or not xMarksAbility:IsFullyCastable()
+		or not ghostshipAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local mana = bot:GetMana()
@@ -264,14 +274,22 @@ function X.ConsiderCombo2()
 	local castRange = xMarksAbility:GetCastRange() + 38
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = bot:GetTarget()
-		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and GetUnitToUnitDistance(target, bot) < castRange then
+		if
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and GetUnitToUnitDistance(target, bot) < castRange
+		then
 			return BOT_ACTION_DESIRE_HIGH, target, target:GetLocation()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, {}
 end
 function X.ConsiderCombo3()
-	if not torrentAbility:IsFullyCastable() or not xMarksAbility:IsFullyCastable() or ghostshipAbility:IsFullyCastable() then
+	if
+		not torrentAbility:IsFullyCastable()
+		or not xMarksAbility:IsFullyCastable()
+		or ghostshipAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, nil, {}
 	end
 	local mana = bot:GetMana()
@@ -288,7 +306,11 @@ function X.ConsiderCombo3()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = bot:GetTarget()
-		if Fu.IsValidHero(target) and Fu.CanCastOnNonMagicImmune(target) and GetUnitToUnitDistance(target, bot) < castRange then
+		if
+			Fu.IsValidHero(target)
+			and Fu.CanCastOnNonMagicImmune(target)
+			and GetUnitToUnitDistance(target, bot) < castRange
+		then
 			return BOT_ACTION_DESIRE_HIGH, target, Fu.GetFaceTowardDistanceLocation(target, 40)
 		end
 	end
@@ -319,7 +341,10 @@ function X.ConsiderQ()
 		if enemy:IsChanneling() then
 			if DotaTime() >= (bot._kunkkaLogAt or -999) then
 				bot._kunkkaLogAt = DotaTime() + 3
-				pcall(print, string.format("[OHA-KUNKKA] t=%.0f torrent-channel target=%s", DotaTime(), enemy:GetUnitName()))
+				pcall(
+					print,
+					string.format("[OHA-KUNKKA] t=%.0f torrent-channel target=%s", DotaTime(), enemy:GetUnitName())
+				)
 			end
 			return BOT_ACTION_DESIRE_MODERATE, enemy:GetLocation()
 		end
@@ -345,7 +370,11 @@ function X.ConsiderQ()
 	return BOT_ACTION_DESIRE_NONE, {}
 end
 function X.ConsiderE()
-	if not xMarksAbility:IsFullyCastable() or torrentAbility:IsFullyCastable() or ghostshipAbility:IsFullyCastable() then
+	if
+		not xMarksAbility:IsFullyCastable()
+		or torrentAbility:IsFullyCastable()
+		or ghostshipAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = xMarksAbility:GetCastRange()
@@ -426,7 +455,11 @@ function X.ConsiderW()
 	-- Only stop to cleave a unit in front when the cleave (cleave_distance 650-1025, game KV) reaches the
 	-- real target; it used to fire whenever the target was out of attack range, which stalled chases.
 	local cleave = tidebringerAbility:GetSpecialValueInt("cleave_distance")
-	if Fu.IsValid(frontUnit) and GetUnitToUnitDistance(target, bot) > attackRange and GetUnitToUnitDistance(frontUnit, target) <= cleave * 0.8 then
+	if
+		Fu.IsValid(frontUnit)
+		and GetUnitToUnitDistance(target, bot) > attackRange
+		and GetUnitToUnitDistance(frontUnit, target) <= cleave * 0.8
+	then
 		return BOT_ACTION_DESIRE_HIGH, frontUnit
 	end
 	return BOT_ACTION_DESIRE_NONE

@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 }, { 3, 1, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 3, 1, 3, 2, 3, 6, 3, 1, 1, 1, 6, 2, 2, 2, 6 }, { 3, 1, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" then
@@ -93,7 +94,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -170,7 +172,11 @@ function X.ConsiderAvalanche()
 	botTarget = Fu.GetProperTarget(bot)
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
@@ -244,19 +250,32 @@ function X.ConsiderAvalanche()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
 				end
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -278,8 +297,16 @@ function X.ConsiderToss()
 	end
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
-			if (enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero)) and avalancheAbility:IsTrained() and not avalancheAbility:IsCooldownReady() then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
+			if
+				(enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero))
+				and avalancheAbility:IsTrained()
+				and not avalancheAbility:IsCooldownReady()
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			if
@@ -349,7 +376,11 @@ function X.ConsiderToss()
 					local enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), grabRadius)
 					if enemiesNearTarget ~= nil and #enemiesNearTarget <= 1 then
 						local alliesInGrabRadius = Fu.GetNearbyHeroes(bot, grabRadius, false, BOT_MODE_NONE)
-						if alliesInGrabRadius ~= nil and #alliesInGrabRadius >= 1 and GetUnitToUnitDistance(bot, botTarget) > grabRadius + 75 then
+						if
+							alliesInGrabRadius ~= nil
+							and #alliesInGrabRadius >= 1
+							and GetUnitToUnitDistance(bot, botTarget) > grabRadius + 75
+						then
 							return BOT_ACTION_DESIRE_HIGH, botTarget
 						end
 					end
@@ -392,12 +423,22 @@ function X.ConsiderTreeGrab()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE)
-	if not isRetreating and bot:GetHealth() > 0.15 and bot:DistanceFromFountain() > 800 and nearbyEnemies ~= nil and #nearbyEnemies == 0 then
+	if
+		not isRetreating
+		and bot:GetHealth() > 0.15
+		and bot:DistanceFromFountain() > 800
+		and nearbyEnemies ~= nil
+		and #nearbyEnemies == 0
+	then
 		local nearbyTrees = bot:GetNearbyTrees(1200)
 		if
 			nearbyTrees ~= nil
 			and #nearbyTrees > 0
-			and (IsLocationVisible(GetTreeLocation(nearbyTrees[1])) or IsLocationPassable(GetTreeLocation(nearbyTrees[1])))
+			and (
+				IsLocationVisible(GetTreeLocation(nearbyTrees[1])) or IsLocationPassable(
+					GetTreeLocation(nearbyTrees[1])
+				)
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 		end
@@ -414,9 +455,16 @@ function X.ConsiderTreeThrow()
 	botTarget = Fu.GetProperTarget(bot)
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if
-				(Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PHYSICAL) or isRetreating and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PHYSICAL))
+				(
+					Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PHYSICAL)
+					or isRetreating and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PHYSICAL)
+				)
 				and not enemyHero:HasModifier("modifier_abaddon_aphotic_shield")
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
@@ -474,7 +522,11 @@ function X.ConsiderTreeThrow()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 600
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -495,7 +547,8 @@ function X.ConsiderTreeVolley()
 	if Fu.IsInTeamFight(bot, 1200) then
 		local nearbyTrees = bot:GetNearbyTrees(treeGrabRadius)
 		if #nearbyTrees >= 3 then
-			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, splashRadius, castPoint, 0)
+			local aoeLocation =
+				bot:FindAoELocation(true, true, bot:GetLocation(), castRange, splashRadius, castPoint, 0)
 			if aoeLocation.count >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end

@@ -124,7 +124,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -132,7 +133,8 @@ function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
 local telekinesisAbility = SafeAbility(bot:GetAbilityByName("rubick_telekinesis"), "rubick_telekinesis", "rubick")
-local telekinesisLandAbility = SafeAbility(bot:GetAbilityByName("rubick_telekinesis_land"), "rubick_telekinesis_land", "rubick")
+local telekinesisLandAbility =
+	SafeAbility(bot:GetAbilityByName("rubick_telekinesis_land"), "rubick_telekinesis_land", "rubick")
 local fadeBoltAbility = SafeAbility(bot:GetAbilityByName("rubick_fade_bolt"), "rubick_fade_bolt", "rubick")
 local stolenSpell1 = SafeAbility(bot:GetAbilityByName("rubick_empty1"), "rubick_empty1", "rubick")
 local stolenSpell2 = SafeAbility(bot:GetAbilityByName("rubick_empty2"), "rubick_empty2", "rubick")
@@ -153,7 +155,11 @@ function X.SkillsComplement()
 	end
 	local context = AbilityContext.Build(bot)
 	isRetreating = context.isRetreating
-	if Fu.GetHP(bot) > 0.3 and not isRetreating and (bot:IsChanneling() or bot:IsUsingAbility() or bot:IsCastingAbility()) then
+	if
+		Fu.GetHP(bot) > 0.3
+		and not isRetreating
+		and (bot:IsChanneling() or bot:IsUsingAbility() or bot:IsCastingAbility())
+	then
 		-- nRadius is a local of ConsiderFadeBolt and nil here, so this line raised an error every
 		-- time he was casting; use the 1200 radius the rest of the file checks.
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
@@ -201,7 +207,8 @@ function X.ConsiderTelekinesis()
 	local castRange = Fu.GetProperCastRange(false, bot, telekinesisAbility:GetCastRange())
 	-- Clear the landing reason: flags were only cleared when Land was cast, so a lift that ended without
 	-- a Land left a stale flag that the next lift's landing used first.
-	bot.isChannelLand, bot.isSaveUltLand, bot.isEngagingLand, bot.isRetreatLand, bot.isSaveAllyLand = false, false, false, false, false
+	bot.isChannelLand, bot.isSaveUltLand, bot.isEngagingLand, bot.isRetreatLand, bot.isSaveAllyLand =
+		false, false, false, false, false
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 300, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
@@ -254,7 +261,12 @@ function X.ConsiderTelekinesis()
 		then
 			nearbyAllies = Fu.GetAlliesNearLoc(botTarget:GetLocation(), 1200)
 			nearbyEnemies = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), 1200)
-			if nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyAllies >= #nearbyEnemies and not (#nearbyEnemies == 0 and #nearbyAllies >= #nearbyEnemies + 2) then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
+				and #nearbyAllies >= #nearbyEnemies
+				and not (#nearbyEnemies == 0 and #nearbyAllies >= #nearbyEnemies + 2)
+			then
 				bot.isEngagingLand = true
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
@@ -273,7 +285,11 @@ function X.ConsiderTelekinesis()
 			then
 				local ourHeroesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local theirHeroesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if ourHeroesNearTarget ~= nil and theirHeroesNearTarget ~= nil and (#theirHeroesNearTarget > #ourHeroesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					ourHeroesNearTarget ~= nil
+					and theirHeroesNearTarget ~= nil
+					and (#theirHeroesNearTarget > #ourHeroesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					bot.isRetreatLand = true
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
@@ -283,7 +299,12 @@ function X.ConsiderTelekinesis()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2)
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -343,11 +364,13 @@ function X.ConsiderTelekinesisLand()
 					return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 				end
 				if not Fu.IsInRange(bot, bot.teleTarget, landDistance) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, bot:GetLocation(), landDistance)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, bot:GetLocation(), landDistance)
 				end
 			end
 			if #nearbyEnemies > #nearbyAllies then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetEnemyFountain(), landDistance)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetEnemyFountain(), landDistance)
 			end
 		end
 		if bot.isSaveUltLand ~= nil and bot.isSaveUltLand == true then
@@ -361,11 +384,13 @@ function X.ConsiderTelekinesisLand()
 		-- dropped the chaser next to Rubick or onto the fleeing ally. Throw it toward its own fountain.
 		if bot.isRetreatLand ~= nil and bot.isRetreatLand == true then
 			X.LogLand("retreat")
-			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot.teleTarget, Fu.GetEnemyFountain(), landDistance)
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.Site.GetXUnitsTowardsLocation(bot.teleTarget, Fu.GetEnemyFountain(), landDistance)
 		end
 		if bot.isSaveAllyLand ~= nil and bot.isSaveAllyLand == true then
 			X.LogLand("save-ally")
-			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot.teleTarget, Fu.GetEnemyFountain(), landDistance)
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.Site.GetXUnitsTowardsLocation(bot.teleTarget, Fu.GetEnemyFountain(), landDistance)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -376,12 +401,15 @@ function X.LogLand(why)
 		return
 	end
 	bot._landLogAt = DotaTime() + 5
-	pcall(print, string.format(
-		"[OHA-RUBICK] t=%.0f tele-land %s target=%s",
-		DotaTime(),
-		why,
-		Fu.IsValid(bot.teleTarget) and bot.teleTarget:GetUnitName() or "-"
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUBICK] t=%.0f tele-land %s target=%s",
+			DotaTime(),
+			why,
+			Fu.IsValid(bot.teleTarget) and bot.teleTarget:GetUnitName() or "-"
+		)
+	)
 end
 function X.ConsiderFadeBolt()
 	if not fadeBoltAbility:IsFullyCastable() then
@@ -417,7 +445,12 @@ function X.ConsiderFadeBolt()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -501,7 +534,11 @@ function X.ConsiderFadeBolt()
 			then
 				local ourHeroesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local theirHeroesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if ourHeroesNearTarget ~= nil and theirHeroesNearTarget ~= nil and (#theirHeroesNearTarget > #ourHeroesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					ourHeroesNearTarget ~= nil
+					and theirHeroesNearTarget ~= nil
+					and (#theirHeroesNearTarget > #ourHeroesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -521,11 +558,18 @@ function X.ConsiderFadeBolt()
 			if
 				Fu.IsValid(creep)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= damage
 				and Fu.GetMP(bot) > 0.3
 			then
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) < 500 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) < 500
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -533,7 +577,13 @@ function X.ConsiderFadeBolt()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if Fu.GetMP(bot) > 0.3 and nearbyEnemies ~= nil and #nearbyEnemies >= 1 and #killableCreeps >= 2 and Fu.CanBeAttacked(killableCreeps[1]) then
+		if
+			Fu.GetMP(bot) > 0.3
+			and nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and #killableCreeps >= 2
+			and Fu.CanBeAttacked(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 	end
@@ -595,7 +645,12 @@ function X.ConsiderSpellSteal()
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and not Fu.IsMeepoClone(enemyHero)
 		then
-			if enemyHero:IsUsingAbility() or enemyHero:IsCastingAbility() or Fu.IsCastingUltimateAbility(enemyHero) or enemyHero:GetLevel() > 10 then
+			if
+				enemyHero:IsUsingAbility()
+				or enemyHero:IsCastingAbility()
+				or Fu.IsCastingUltimateAbility(enemyHero)
+				or enemyHero:GetLevel() > 10
+			then
 				-- The weight table is keyed by spell NAME; passing the handle always gave the default 1,
 				-- and "weight*100*100 >= rand(1,70)" was always true, so Rubick re-stole every cooldown and
 				-- threw away good stolen spells. Now: weight of the held spell (0 keep .. 1 replace) against
@@ -624,14 +679,17 @@ function X.ConsiderSpellSteal()
 				if steal then
 					if DotaTime() >= (bot._stealLogAt or -999) then
 						bot._stealLogAt = DotaTime() + 5
-						pcall(print, string.format(
-							"[OHA-RUBICK] t=%.0f spell-steal from=%s held=%s w=%.0f roll=%d",
-							DotaTime(),
-							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-							stolenSpell1:GetName(),
-							heldSpellWeight,
-							stealRoll
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-RUBICK] t=%.0f spell-steal from=%s held=%s w=%.0f roll=%d",
+								DotaTime(),
+								(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+								stolenSpell1:GetName(),
+								heldSpellWeight,
+								stealRoll
+							)
+						)
 					end
 					bot._stealRollAt = -999
 					return BOT_ACTION_DESIRE_HIGH, enemyHero

@@ -64,7 +64,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -149,7 +150,11 @@ function X.ConsiderSpearOfMars()
 	local manaAfter = Fu.GetManaAfter(spearAbility:GetManaCost())
 	local abilityLevel = spearAbility:GetLevel()
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, spearRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, spearRange)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
@@ -223,11 +228,18 @@ function X.ConsiderSpearOfMars()
 			if
 				Fu.IsValid(creep)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL)
 				and not Fu.IsRunning(creep)
 			then
-				if Fu.IsValidHero(nearbyEnemies[1]) and GetUnitToUnitDistance(nearbyEnemies[1], creep) < 500 and mpRatio > 0.75 then
+				if
+					Fu.IsValidHero(nearbyEnemies[1])
+					and GetUnitToUnitDistance(nearbyEnemies[1], creep) < 500
+					and mpRatio > 0.75
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
 				end
 			end
@@ -270,7 +282,13 @@ function X.ConsiderSpearOfMars()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, spearRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, spearRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -357,7 +375,11 @@ function X.ConsiderGodsRebuke()
 					totalHealth = totalHealth + creep:GetHealth()
 					table.insert(hittableCreeps, creep)
 					local enemiesNear = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
-					if enemiesNear ~= nil and #enemiesNear >= 1 and Fu.CanKillTarget(creep, critDamage, DAMAGE_TYPE_PHYSICAL) then
+					if
+						enemiesNear ~= nil
+						and #enemiesNear >= 1
+						and Fu.CanKillTarget(creep, critDamage, DAMAGE_TYPE_PHYSICAL)
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemiesNear[1]:GetLocation()
 					end
 				end
@@ -368,7 +390,12 @@ function X.ConsiderGodsRebuke()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -461,7 +488,8 @@ function X.ConsiderArenaOfBlood()
 				and enemies ~= nil
 				and #allies >= #enemies
 				and #allies < #enemies + 2
-				and bot:GetEstimatedDamageToTarget(true, botTarget, duration, DAMAGE_TYPE_ALL) >= botTarget:GetHealth()
+				and bot:GetEstimatedDamageToTarget(true, botTarget, duration, DAMAGE_TYPE_ALL)
+					>= botTarget:GetHealth()
 			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 			end
@@ -531,12 +559,15 @@ function X.ConsiderSpearToAlly()
 					if GetUnitToLocationDistance(bot, blinkLoc) <= 1150 and IsLocationPassable(blinkLoc) then
 						if DotaTime() >= (bot._spearAllyLogAt or -999) then
 							bot._spearAllyLogAt = DotaTime() + 5
-							pcall(print, string.format(
-								"[OHA-MARS] t=%.0f blink-spear target=%s toward=%s",
-								DotaTime(),
-								(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-								(string.gsub(furthestAlly:GetUnitName(), "npc_dota_hero_", ""))
-							))
+							pcall(
+								print,
+								string.format(
+									"[OHA-MARS] t=%.0f blink-spear target=%s toward=%s",
+									DotaTime(),
+									(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+									(string.gsub(furthestAlly:GetUnitName(), "npc_dota_hero_", ""))
+								)
+							)
 						end
 						return BOT_ACTION_DESIRE_HIGH, furthestAlly:GetLocation(), blinkLoc
 					end
@@ -602,7 +633,8 @@ function X.GetSpearToLocation(range, width, castPoint, speed, target)
 				pointLine ~= nil
 				and pointLine.within
 				and pointLine.distance <= width
-				and Fu.GetDistance(targetLocation, buildingLocation) < GetUnitToLocationDistance(bot, buildingLocation)
+				and Fu.GetDistance(targetLocation, buildingLocation)
+					< GetUnitToLocationDistance(bot, buildingLocation)
 			then
 				return buildingLocation
 			end

@@ -13,15 +13,19 @@ local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 -- Heaven's Halberd only against heavy right-click damage that does not come through
 -- illusions; otherwise the slot is skipped. It used to be a random pick, a second BKB 1 in 3.
-local heavyPhysical, physicalHeroes = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").EnemyHeavyPhysical()
+local heavyPhysical, physicalHeroes =
+	require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy").EnemyHeavyPhysical()
 local sHalberd = heavyPhysical and "item_heavens_halberd" or false
 if sRole == "pos_3" then
-	pcall(print, string.format(
-		"[OHA-BUY] t=%.0f bristleback halberd=%s physical=%s",
-		DotaTime(),
-		tostring(heavyPhysical),
-		table.concat(physicalHeroes, ",")
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-BUY] t=%.0f bristleback halberd=%s physical=%s",
+			DotaTime(),
+			tostring(heavyPhysical),
+			table.concat(physicalHeroes, ",")
+		)
+	)
 end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
@@ -147,7 +151,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -156,8 +161,10 @@ function X.MinionThink(hMinionUnit)
 end
 local viscousNasalGooAbility =
 	SafeAbility(bot:GetAbilityByName("bristleback_viscous_nasal_goo"), "bristleback_viscous_nasal_goo", "bristleback")
-local quillSprayAbility = SafeAbility(bot:GetAbilityByName("bristleback_quill_spray"), "bristleback_quill_spray", "bristleback")
-local bristlebackAbility = SafeAbility(bot:GetAbilityByName("bristleback_bristleback"), "bristleback_bristleback", "bristleback")
+local quillSprayAbility =
+	SafeAbility(bot:GetAbilityByName("bristleback_quill_spray"), "bristleback_quill_spray", "bristleback")
+local bristlebackAbility =
+	SafeAbility(bot:GetAbilityByName("bristleback_bristleback"), "bristleback_bristleback", "bristleback")
 local hairballAbility = SafeAbility(bot:GetAbilityByName("bristleback_hairball"), "bristleback_hairball", "bristleback")
 local warpathAbility = SafeAbility(bot:GetAbilityByName("bristleback_warpath"), "bristleback_warpath", "bristleback")
 local viscousNasalGooDesire, viscousNasalGooTarget
@@ -271,7 +278,10 @@ function X.ConsiderViscousNasalGoo()
 				and Fu.CanCastOnTargetAdvanced(nearbyEnemies[1])
 				and bot:WasRecentlyDamagedByHero(nearbyEnemies[1], 3.0)
 			then
-				if Fu.IsChasingTarget(nearbyEnemies[1], bot) or #nearbyEnemies > #nearbyAllies and nearbyEnemies[1]:GetAttackTarget() == bot then
+				if
+					Fu.IsChasingTarget(nearbyEnemies[1], bot)
+					or #nearbyEnemies > #nearbyAllies and nearbyEnemies[1]:GetAttackTarget() == bot
+				then
 					return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 				end
 			end
@@ -315,7 +325,14 @@ function X.ConsiderViscousNasalGoo()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and manaAfter > 0.4 and manaAfter > manaThreshold and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and manaAfter > 0.4
+			and manaAfter > manaThreshold
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -352,15 +369,18 @@ function X.LogQuill(why, kills, heroes, mana)
 		return
 	end
 	bot._quillLogAt[why] = DotaTime() + 10
-	pcall(print, string.format(
-		"[OHA-QUILL] t=%.0f %s %s kills=%d heroes=%d mana=%.2f",
-		DotaTime(),
-		(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-		why,
-		kills,
-		heroes,
-		mana
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-QUILL] t=%.0f %s %s kills=%d heroes=%d mana=%.2f",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			why,
+			kills,
+			heroes,
+			mana
+		)
+	)
 end
 function X.ConsiderQuillSpray()
 	if not Fu.CanCastAbility(quillSprayAbility) then
@@ -393,7 +413,10 @@ function X.ConsiderQuillSpray()
 				Fu.IsValidHero(enemyHero)
 				and Fu.CanBeAttacked(enemyHero)
 				and Fu.IsInRange(bot, enemyHero, radius)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or enemyHero:HasModifier("modifier_bristleback_quill_spray"))
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 4.0)
+					or enemyHero:HasModifier("modifier_bristleback_quill_spray")
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -440,7 +463,12 @@ function X.ConsiderQuillSpray()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) and isAttacking then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -493,7 +521,12 @@ function X.ConsiderBristleback()
 		end
 	end
 	local nearbyCreeps = bot:GetNearbyCreeps(800, true)
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and manaAfter > manaThreshold + 0.1 and isAttacking and #nearbyEnemies == 0 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and manaAfter > manaThreshold + 0.1
+		and isAttacking
+		and #nearbyEnemies == 0
+	then
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
@@ -514,12 +547,23 @@ function X.ConsiderBristleback()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, radius * 2) and manaAfter > manaThreshold and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius * 2)
+			and manaAfter > manaThreshold
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius * 2) and manaAfter > manaThreshold and isAttacking then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius * 2)
+			and manaAfter > manaThreshold
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -561,7 +605,10 @@ function X.ConsiderHairball()
 				and Fu.IsInRange(bot, enemyHero, castRange)
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
-				if Fu.IsChasingTarget(enemyHero, bot) or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot then
+				if
+					Fu.IsChasingTarget(enemyHero, bot)
+					or #nearbyEnemies > #nearbyAllies and enemyHero:GetAttackTarget() == bot
+				then
 					return BOT_ACTION_DESIRE_HIGH, (bot:GetLocation() + enemyHero:GetLocation()) / 2
 				end
 			end
@@ -582,8 +629,15 @@ function X.ConsiderWarpath()
 	end
 	if isRetreating and not Fu.IsRealInvisible(bot) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 500) and Fu.IsChasingTarget(enemyHero, bot) then
-				if Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot, 8.0) > bot:GetHealth() * 1.15 or #nearbyEnemies > #nearbyAllies and botHp < 0.4 then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, 500)
+				and Fu.IsChasingTarget(enemyHero, bot)
+			then
+				if
+					Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot, 8.0) > bot:GetHealth() * 1.15
+					or #nearbyEnemies > #nearbyAllies and botHp < 0.4
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

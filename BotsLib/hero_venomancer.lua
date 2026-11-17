@@ -110,17 +110,21 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local venomousGaleAbility = SafeAbility(bot:GetAbilityByName("venomancer_venomous_gale"), "venomancer_venomous_gale", "venomancer")
+local venomousGaleAbility =
+	SafeAbility(bot:GetAbilityByName("venomancer_venomous_gale"), "venomancer_venomous_gale", "venomancer")
 local snakebiteAbility = SafeAbility(bot:GetAbilityByName("venomancer_snakebite"), "venomancer_snakebite", "venomancer")
-local plagueWardAbility = SafeAbility(bot:GetAbilityByName("venomancer_plague_ward"), "venomancer_plague_ward", "venomancer")
-local noxiousPlagueAbility = SafeAbility(bot:GetAbilityByName("venomancer_noxious_plague"), "venomancer_noxious_plague", "venomancer")
+local plagueWardAbility =
+	SafeAbility(bot:GetAbilityByName("venomancer_plague_ward"), "venomancer_plague_ward", "venomancer")
+local noxiousPlagueAbility =
+	SafeAbility(bot:GetAbilityByName("venomancer_noxious_plague"), "venomancer_noxious_plague", "venomancer")
 local venomousGaleDesire, venomousGaleLocation
 local snakebiteDesire, snakebiteTarget
 local plagueWardDesire, plagueWardTarget, plagueWardOnEntity
@@ -173,13 +177,20 @@ function X.ConsiderVenomousGale()
 	local tickDamage = venomousGaleAbility:GetSpecialValueInt("tick_damage")
 	-- datafeed: Venomous Gale deals strike_damage once plus tick_damage every tick_interval (3s) over duration (15s).
 	-- The old kill check used strike * tick (25 * 10 = 250 at level 1, real total 75).
-	local nGaleTicks = math.floor(venomousGaleAbility:GetSpecialValueInt("duration") / math.max(1, venomousGaleAbility:GetSpecialValueInt("tick_interval")))
+	local nGaleTicks = math.floor(
+		venomousGaleAbility:GetSpecialValueInt("duration")
+			/ math.max(1, venomousGaleAbility:GetSpecialValueInt("tick_interval"))
+	)
 	local nearbyEnemies = bot:GetNearbyHeroes(castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
-			and (Fu.CanKillTarget(enemyHero, strikeDamage, DAMAGE_TYPE_MAGICAL) or Fu.CanKillTarget(enemyHero, strikeDamage + tickDamage * nGaleTicks, DAMAGE_TYPE_MAGICAL))
+			and (Fu.CanKillTarget(enemyHero, strikeDamage, DAMAGE_TYPE_MAGICAL) or Fu.CanKillTarget(
+				enemyHero,
+				strikeDamage + tickDamage * nGaleTicks,
+				DAMAGE_TYPE_MAGICAL
+			))
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
@@ -189,7 +200,12 @@ function X.ConsiderVenomousGale()
 		then
 			if Fu.IsInLaningPhase() then
 				local allyTowers = enemyHero:GetNearbyTowers(700, true)
-				if allyTowers ~= nil and #allyTowers >= 1 and Fu.IsValidBuilding(allyTowers[1]) and allyTowers[1]:GetAttackTarget() == enemyHero then
+				if
+					allyTowers ~= nil
+					and #allyTowers >= 1
+					and Fu.IsValidBuilding(allyTowers[1])
+					and allyTowers[1]:GetAttackTarget() == enemyHero
+				then
 					local enemiesNearTarget = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), radius)
 					if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
@@ -204,7 +220,12 @@ function X.ConsiderVenomousGale()
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = allyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesNearAlly) do
-			if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+			if
+				Fu.IsValidHero(allyHero)
+				and Fu.IsRetreating(allyHero)
+				and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+				and not allyHero:IsIllusion()
+			then
 				if
 					Fu.IsValidHero(enemyHero)
 					and Fu.CanCastOnNonMagicImmune(enemyHero)
@@ -254,7 +275,11 @@ function X.ConsiderVenomousGale()
 			then
 				local alliesNearTarget = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					enemiesNearTarget = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), radius)
 					if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
@@ -286,12 +311,24 @@ function X.ConsiderVenomousGale()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if killableCreepCount >= 2 and mpRatio > 0.41 and nearbyEnemies ~= nil and #nearbyEnemies >= 1 and Fu.CanBeAttacked(killableCreeps[1]) and not Fu.IsThereCoreNearby(1200) then
+		if
+			killableCreepCount >= 2
+			and mpRatio > 0.41
+			and nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.CanBeAttacked(killableCreeps[1])
+			and not Fu.IsThereCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -351,25 +388,37 @@ function X.ConsiderPlagueWard()
 	-- (same reserve idiom as Snakebite), and only with no enemy hero within 1600.
 	if
 		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
-		and Fu.GetManaAfter(plagueWardAbility:GetManaCost()) > Fu.GetManaThreshold(bot, plagueWardAbility:GetManaCost(), { venomousGaleAbility, snakebiteAbility, noxiousPlagueAbility })
+		and Fu.GetManaAfter(plagueWardAbility:GetManaCost()) > Fu.GetManaThreshold(
+			bot,
+			plagueWardAbility:GetManaCost(),
+			{ venomousGaleAbility, snakebiteAbility, noxiousPlagueAbility }
+		)
 		and #nearbyEnemies == 0
 	then
 		local spot = nil
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 then
 			spot = Fu.GetCenterOfUnits(nearbyLaneCreeps)
-		elseif Fu.IsFarming(bot) and Fu.IsValid(botTarget) and botTarget:GetTeam() == TEAM_NEUTRAL and Fu.IsInRange(bot, botTarget, castRange) then
+		elseif
+			Fu.IsFarming(bot)
+			and Fu.IsValid(botTarget)
+			and botTarget:GetTeam() == TEAM_NEUTRAL
+			and Fu.IsInRange(bot, botTarget, castRange)
+		then
 			spot = botTarget:GetLocation()
 		end
 		if spot ~= nil then
 			if DotaTime() >= (bot._wardLogAt or -999) then
 				bot._wardLogAt = DotaTime() + 15
-				pcall(print, string.format(
-					"[OHA-VENOMANCER] t=%.0f plague-ward clear creeps=%d farm=%s",
-					DotaTime(),
-					nearbyLaneCreeps ~= nil and #nearbyLaneCreeps or 0,
-					tostring(Fu.IsFarming(bot))
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-VENOMANCER] t=%.0f plague-ward clear creeps=%d farm=%s",
+						DotaTime(),
+						nearbyLaneCreeps ~= nil and #nearbyLaneCreeps or 0,
+						tostring(Fu.IsFarming(bot))
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, spot, false
 		end
@@ -401,7 +450,13 @@ function X.ConsiderNoxiousPlague()
 				local alliesNearTarget = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 5, DAMAGE_TYPE_ALL)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and #alliesNearTarget < #enemiesNearTarget + 2 and maxEstimatedDamage < estimatedDamage then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and #alliesNearTarget >= #enemiesNearTarget
+					and #alliesNearTarget < #enemiesNearTarget + 2
+					and maxEstimatedDamage < estimatedDamage
+				then
 					maxEstimatedDamage = estimatedDamage
 					bestTarget = enemyHero
 				end
@@ -424,7 +479,8 @@ function X.ConsiderSnakebite()
 	local castRange = snakebiteAbility:GetCastRange()
 	local manaCost = snakebiteAbility:GetManaCost()
 	local manaAfter = Fu.GetManaAfter(manaCost)
-	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { venomousGaleAbility, plagueWardAbility, noxiousPlagueAbility })
+	local manaThreshold =
+		Fu.GetManaThreshold(bot, manaCost, { venomousGaleAbility, plagueWardAbility, noxiousPlagueAbility })
 	local hitByHero = bot:WasRecentlyDamagedByAnyHero(1.5)
 	local hitByCreep = bot:WasRecentlyDamagedByCreep(1.5)
 	if Fu.IsGoingOnSomeone(bot) and not Fu.IsRetreating(bot) then
@@ -444,7 +500,13 @@ function X.ConsiderSnakebite()
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and isAttacking and manaAfter > manaThreshold and not hitByHero and not hitByCreep then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and isAttacking
+		and manaAfter > manaThreshold
+		and not hitByHero
+		and not hitByCreep
+	then
 		if
 			Fu.IsValid(botTarget)
 			and Fu.CanBeAttacked(botTarget)
@@ -469,7 +531,12 @@ function X.ConsiderSnakebite()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and manaAfter > manaThreshold + 0.1 then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > manaThreshold + 0.1
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end

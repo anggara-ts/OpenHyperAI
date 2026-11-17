@@ -39,7 +39,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -59,7 +60,8 @@ local whirlingAxesMeleeAbility = SafeAbility(
 	"troll_warlord_whirling_axes_melee",
 	"troll_warlord"
 )
-local battleTranceAbility = SafeAbility(bot:GetAbilityByName("troll_warlord_battle_trance"), "troll_warlord_battle_trance", "troll_warlord")
+local battleTranceAbility =
+	SafeAbility(bot:GetAbilityByName("troll_warlord_battle_trance"), "troll_warlord_battle_trance", "troll_warlord")
 local berserkersRageDesire
 local whirlingAxesRangedDesire, whirlingAxesRangedLocation
 local whirlingAxesMeleeDesire
@@ -77,11 +79,14 @@ function X.SkillsComplement()
 	if bot._trollTranceAt ~= nil and DotaTime() > bot._trollTranceAt + 1 then
 		if DotaTime() >= (bot._trollTranceLogAt or -999) then
 			bot._trollTranceLogAt = DotaTime() + 10
-			pcall(print, string.format(
-				"[OHA-TROLL] t=%.0f battle-trance order cooldownStarted=%s",
-				DotaTime(),
-				tostring(battleTranceAbility:GetCooldownTimeRemaining() > 0)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TROLL] t=%.0f battle-trance order cooldownStarted=%s",
+					DotaTime(),
+					tostring(battleTranceAbility:GetCooldownTimeRemaining() > 0)
+				)
+			)
 		end
 		bot._trollTranceAt = nil
 	end
@@ -140,7 +145,12 @@ function X.ConsiderBerserkersRage(stanceAbility)
 					return BOT_ACTION_DESIRE_NONE
 				end
 			else
-				if isAttacking and Fu.IsInRange(bot, botTarget, 150) and stanceAbility:GetToggleState() == false and not Fu.IsChasingTarget(bot, botTarget) then
+				if
+					isAttacking
+					and Fu.IsInRange(bot, botTarget, 150)
+					and stanceAbility:GetToggleState() == false
+					and not Fu.IsChasingTarget(bot, botTarget)
+				then
 					if stanceAbility:GetToggleState() == false then
 						return BOT_ACTION_DESIRE_HIGH
 					else
@@ -162,7 +172,10 @@ function X.ConsiderBerserkersRage(stanceAbility)
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				if
 					nearbyEnemies[1]:GetCurrentMovementSpeed() > bot:GetCurrentMovementSpeed()
 					and nearbyEnemies[1]:GetCurrentMovementSpeed() < bot:GetCurrentMovementSpeed() + bonusMoveSpeed
@@ -201,7 +214,11 @@ function X.ConsiderBerserkersRage(stanceAbility)
 	if Fu.IsLaning(bot) then
 		local maxEnemyAttackRange = 0
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and enemyHero:GetAttackRange() > maxEnemyAttackRange then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and enemyHero:GetAttackRange() > maxEnemyAttackRange
+			then
 				maxEnemyAttackRange = enemyHero:GetAttackRange()
 			end
 		end
@@ -290,7 +307,10 @@ function X.ConsiderWhirlingAxesRanged()
 			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 			end
 		end
@@ -349,7 +369,13 @@ function X.ConsiderWhirlingAxesRanged()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if killableCount >= 2 and mpRatio > 0.25 and laneEnemies ~= nil and #laneEnemies >= 1 and Fu.CanBeAttacked(killableCreeps[1]) then
+		if
+			killableCount >= 2
+			and mpRatio > 0.25
+			and laneEnemies ~= nil
+			and #laneEnemies >= 1
+			and Fu.CanBeAttacked(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
 		end
 		if
@@ -431,7 +457,10 @@ function X.ConsiderWhirlingAxesMelee()
 			and not nearbyEnemies[1]:HasModifier("modifier_troll_warlord_whirling_axes_slow")
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1.5))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -460,7 +489,11 @@ function X.ConsiderWhirlingAxesMelee()
 	if Fu.IsFarming(bot) then
 		if isAttacking then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(maxRange)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) and mpRatio > 0.3 then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+				and mpRatio > 0.3
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(neutralCreeps)
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(maxRange, true)
@@ -480,7 +513,13 @@ function X.ConsiderWhirlingAxesMelee()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if killableCount >= 2 and mpRatio > 0.25 and laneEnemies ~= nil and #laneEnemies >= 1 and Fu.CanBeAttacked(killableCreeps[1]) then
+		if
+			killableCount >= 2
+			and mpRatio > 0.25
+			and laneEnemies ~= nil
+			and #laneEnemies >= 1
+			and Fu.CanBeAttacked(killableCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if
@@ -530,8 +569,15 @@ function X.ConsiderBattleTrance()
 		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			local estimatedDamage = bot:GetEstimatedDamageToTarget(false, botTarget, tranceDuration, DAMAGE_TYPE_PHYSICAL)
-			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and #alliesNearTarget < #enemiesNearTarget + 2 and estimatedDamage >= botTarget:GetHealth() then
+			local estimatedDamage =
+				bot:GetEstimatedDamageToTarget(false, botTarget, tranceDuration, DAMAGE_TYPE_PHYSICAL)
+			if
+				alliesNearTarget ~= nil
+				and enemiesNearTarget ~= nil
+				and #alliesNearTarget >= #enemiesNearTarget
+				and #alliesNearTarget < #enemiesNearTarget + 2
+				and estimatedDamage >= botTarget:GetHealth()
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -570,7 +616,13 @@ function X.ConsiderBattleTrance()
 	end
 	if isRetreating then
 		local closeEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 500)
-		if closeEnemies ~= nil and #closeEnemies >= 1 and hpRatio < 0.3 and Fu.IsValidHero(closeEnemies[1]) and closeEnemies[1]:IsFacingLocation(bot:GetLocation(), 35) then
+		if
+			closeEnemies ~= nil
+			and #closeEnemies >= 1
+			and hpRatio < 0.3
+			and Fu.IsValidHero(closeEnemies[1])
+			and closeEnemies[1]:IsFacingLocation(bot:GetLocation(), 35)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

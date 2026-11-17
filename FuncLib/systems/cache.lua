@@ -142,7 +142,13 @@ local function deleteProperty(target, key)
 	local descriptor = descriptors[key]
 	if descriptor then
 		if not descriptor.configurable then
-			error(newInstance(TypeError, ((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."), 0)
+			error(
+				newInstance(
+					TypeError,
+					((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."
+				),
+				0
+			)
 		end
 		descriptors[key] = nil
 		return true

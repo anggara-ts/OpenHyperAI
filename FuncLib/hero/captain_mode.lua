@@ -181,7 +181,12 @@ function isExcludedHero(heroName)
 end
 function randomAvailableHero()
 	local heroName = heroPool[RandomInt(1, #heroPool)]
-	while isExcludedHero(heroName) or IsCMPickedHero(GetTeam(), heroName) or IsCMPickedHero(GetOpposingTeam(), heroName) or IsCMBannedHero(heroName) do
+	while
+		isExcludedHero(heroName)
+		or IsCMPickedHero(GetTeam(), heroName)
+		or IsCMPickedHero(GetOpposingTeam(), heroName)
+		or IsCMBannedHero(heroName)
+	do
 		heroName = heroPool[RandomInt(1, #heroPool)]
 	end
 	return heroName
@@ -333,7 +338,11 @@ function X.CaptainModeLogic(heroList)
 	elseif pickState >= HeroPickState.CmBan1 and pickState <= 20 and GetCMPhaseTimeRemaining() <= pickDelay then
 		banHero()
 		pickDelay = 0
-	elseif pickState >= HeroPickState.CmSelect1 and pickState <= HeroPickState.CmSelect10 and GetCMPhaseTimeRemaining() <= pickDelay then
+	elseif
+		pickState >= HeroPickState.CmSelect1
+		and pickState <= HeroPickState.CmSelect10
+		and GetCMPhaseTimeRemaining() <= pickDelay
+	then
 		pickHero()
 		pickDelay = 0
 	elseif pickState == HeroPickState.CmPick then

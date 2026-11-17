@@ -148,14 +148,16 @@ local function TickRaw()
 				slot.pending = false
 				pushLockUntil = -999
 				if ShouldLog() then
-					Print(string.format(
-						"[OHA-FIGHT] t=%.0f %s death %s respawn=%.0fs known=%s push+rosh up",
-						now,
-						TeamLabel(),
-						slot.name,
-						respawnFor,
-						tostring(known)
-					))
+					Print(
+						string.format(
+							"[OHA-FIGHT] t=%.0f %s death %s respawn=%.0fs known=%s push+rosh up",
+							now,
+							TeamLabel(),
+							slot.name,
+							respawnFor,
+							tostring(known)
+						)
+					)
 				end
 			elseif not slot.alive and alive then
 				slot.alive = true
@@ -182,24 +184,28 @@ local function TickRaw()
 					if kind ~= "aegis" then
 						pushLockUntil = now + LOCK_SECONDS
 						if ShouldLog() then
-							Print(string.format(
-								"[OHA-FIGHT] t=%.0f %s %s %s deadFor=%.0fs push down %ds",
-								now,
-								TeamLabel(),
-								kind,
-								slot.name,
-								elapsed,
-								LOCK_SECONDS
-							))
+							Print(
+								string.format(
+									"[OHA-FIGHT] t=%.0f %s %s %s deadFor=%.0fs push down %ds",
+									now,
+									TeamLabel(),
+									kind,
+									slot.name,
+									elapsed,
+									LOCK_SECONDS
+								)
+							)
 						end
 					elseif ShouldLog() then
-						Print(string.format(
-							"[OHA-FIGHT] t=%.0f %s aegis %s deadFor=%.0fs push stays",
-							now,
-							TeamLabel(),
-							slot.name,
-							elapsed
-						))
+						Print(
+							string.format(
+								"[OHA-FIGHT] t=%.0f %s aegis %s deadFor=%.0fs push stays",
+								now,
+								TeamLabel(),
+								slot.name,
+								elapsed
+							)
+						)
 					end
 					slot.pending = false
 				elseif seenFresh then
@@ -301,20 +307,22 @@ function KillWindow.LogPush(bot, lane, was, floor, snap, hp, allies, enemiesAliv
 		return
 	end
 	pushLogged[id] = now + 4
-	Print(string.format(
-		"[OHA-FIGHT] t=%.0f %s push %s lane=%s was=%.2f floor=%.2f dead=%d (%s) allies=%d enemies=%d hp=%.2f",
-		now,
-		TeamLabel(),
-		ShortName(bot:GetUnitName()),
-		tostring(lane),
-		was,
-		floor,
-		snap.fresh or 0,
-		snap.names or "",
-		allies or 0,
-		enemiesAlive or 0,
-		hp or 0
-	))
+	Print(
+		string.format(
+			"[OHA-FIGHT] t=%.0f %s push %s lane=%s was=%.2f floor=%.2f dead=%d (%s) allies=%d enemies=%d hp=%.2f",
+			now,
+			TeamLabel(),
+			ShortName(bot:GetUnitName()),
+			tostring(lane),
+			was,
+			floor,
+			snap.fresh or 0,
+			snap.names or "",
+			allies or 0,
+			enemiesAlive or 0,
+			hp or 0
+		)
+	)
 end
 
 -- A kill window is open but the push floor is held because our base is being hit.
@@ -328,16 +336,18 @@ function KillWindow.LogPushHeld(bot, lane, snap, why)
 		return
 	end
 	heldLogged[id] = now + 4
-	Print(string.format(
-		"[OHA-FIGHT] t=%.0f %s push-held %s lane=%s dead=%d (%s) why=%s",
-		now,
-		TeamLabel(),
-		ShortName(bot:GetUnitName()),
-		tostring(lane),
-		snap.fresh or 0,
-		snap.names or "",
-		(why ~= nil and why ~= "") and why or "?"
-	))
+	Print(
+		string.format(
+			"[OHA-FIGHT] t=%.0f %s push-held %s lane=%s dead=%d (%s) why=%s",
+			now,
+			TeamLabel(),
+			ShortName(bot:GetUnitName()),
+			tostring(lane),
+			snap.fresh or 0,
+			snap.names or "",
+			(why ~= nil and why ~= "") and why or "?"
+		)
+	)
 end
 
 function KillWindow.LogRosh(bot, was, floor, snap)
@@ -350,16 +360,18 @@ function KillWindow.LogRosh(bot, was, floor, snap)
 		return
 	end
 	roshLogged[id] = now + 4
-	Print(string.format(
-		"[OHA-FIGHT] t=%.0f %s rosh %s was=%.2f floor=%.2f dead=%d (%s)",
-		now,
-		TeamLabel(),
-		ShortName(bot:GetUnitName()),
-		was,
-		floor,
-		snap.fresh or 0,
-		snap.names or ""
-	))
+	Print(
+		string.format(
+			"[OHA-FIGHT] t=%.0f %s rosh %s was=%.2f floor=%.2f dead=%d (%s)",
+			now,
+			TeamLabel(),
+			ShortName(bot:GetUnitName()),
+			was,
+			floor,
+			snap.fresh or 0,
+			snap.names or ""
+		)
+	)
 end
 
 return KillWindow

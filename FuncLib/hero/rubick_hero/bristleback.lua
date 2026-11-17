@@ -77,12 +77,21 @@ function X.ConsiderViscousNasalGoo()
 		end
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_LOW, botTarget
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1400) and bot:HasScepter() then
-		if enemiesInScepterRadius ~= nil and #enemiesInScepterRadius >= 1 and Fu.IsValidHero(enemiesInScepterRadius[1]) and Fu.CanCastOnNonMagicImmune(enemiesInScepterRadius[1]) then
+		if
+			enemiesInScepterRadius ~= nil
+			and #enemiesInScepterRadius >= 1
+			and Fu.IsValidHero(enemiesInScepterRadius[1])
+			and Fu.CanCastOnNonMagicImmune(enemiesInScepterRadius[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, enemiesInScepterRadius[1]
 		end
 	end
@@ -121,7 +130,10 @@ function X.ConsiderQuillSpray()
 	local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 	if Fu.IsRetreating(bot) and #enemiesInRadius > 0 then
 		for _, enemyHero in pairs(enemiesInRadius) do
-			if bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or enemyHero:HasModifier("modifier_bristleback_quill_spray") then
+			if
+				bot:WasRecentlyDamagedByHero(enemyHero, 4.0)
+				or enemyHero:HasModifier("modifier_bristleback_quill_spray")
+			then
 				return BOT_ACTION_DESIRE_MODERATE
 			end
 		end
@@ -149,10 +161,19 @@ function X.ConsiderQuillSpray()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, radius - 100) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius - 100)
+		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
-		if Fu.IsValidHero(botTarget) and Fu.IsAllowedToSpam(bot, manaCost) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, radius) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsAllowedToSpam(bot, manaCost)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+		then
 			local nearbyCreeps = bot:GetNearbyCreeps(800, true)
 			if #nearbyCreeps >= 1 then
 				return BOT_ACTION_DESIRE_HIGH
@@ -170,7 +191,11 @@ function X.ConsiderQuillSpray()
 	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderBristleback()
-	if bristlebackAbility:IsPassive() or not bristlebackAbility:IsTrained() or not bristlebackAbility:IsFullyCastable() then
+	if
+		bristlebackAbility:IsPassive()
+		or not bristlebackAbility:IsTrained()
+		or not bristlebackAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if Fu.IsInTeamFight(bot, 1400) then

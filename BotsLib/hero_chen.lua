@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 1, 2, 6, 2, 3, 3, 3, 6, 3, 1, 1, 6 }, { 1, 2, 2, 3, 2, 6, 2, 1, 1, 3, 6, 3, 3, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 1, 2, 6, 2, 3, 3, 3, 6, 3, 1, 1, 6 }, { 1, 2, 2, 3, 2, 6, 2, 1, 1, 3, 6, 3, 3, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_4" then
@@ -90,7 +91,8 @@ X["sSellList"] = { "item_shivas_guard", "item_magic_wand", "item_sheepstick", "i
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -153,7 +155,12 @@ function X.ConsiderPenitence()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -171,15 +178,26 @@ function X.ConsiderPenitence()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
-				if Fu.IsChasingTarget(bot, botTarget) and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed() then
+				if
+					Fu.IsChasingTarget(bot, botTarget)
+					and bot:GetCurrentMovementSpeed() < botTarget:GetCurrentMovementSpeed()
+				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
 				alliesNearTarget = Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
-				if Fu.IsInRange(bot, botTarget, attackRange) and isAttacking and Fu.GetHeroCountAttackingTarget(alliesNearTarget, botTarget) >= 2 then
+				if
+					Fu.IsInRange(bot, botTarget, attackRange)
+					and isAttacking
+					and Fu.GetHeroCountAttackingTarget(alliesNearTarget, botTarget) >= 2
+				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
 			end
@@ -251,7 +269,13 @@ function X.ConsiderHolyPersuasion()
 		-- (datafeed level_req 3/4), ancients need the shard, and past max_units each cast just swaps
 		-- a creep, so Chen kept re-casting (and returning before Divine Favor). Same limits as below.
 		for _, creep in pairs(nearbyNeutrals) do
-			if Fu.IsValid(creep) and controlledCreeps ~= nil and #controlledCreeps < maxUnits and creep:GetLevel() <= levelReq and not creep:IsAncientCreep() then
+			if
+				Fu.IsValid(creep)
+				and controlledCreeps ~= nil
+				and #controlledCreeps < maxUnits
+				and creep:GetLevel() <= levelReq
+				and not creep:IsAncientCreep()
+			then
 				return BOT_ACTION_DESIRE_HIGH, creep
 			end
 		end
@@ -319,7 +343,11 @@ function X.ConsiderDivineFavor()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			local weakestUnit = Fu.GetAttackableWeakestUnit(bot, castRange, true, false)
 			if weakestUnit ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, weakestUnit
@@ -337,7 +365,14 @@ function X.ConsiderDivineFavor()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser and #alliesNearChaser <= 1 or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (
+						#enemiesNearChaser > #alliesNearChaser and #alliesNearChaser <= 1
+						or bot:WasRecentlyDamagedByAnyHero(2)
+					)
+				then
 					-- datafeed: Divine Favor targets allies only; self-cast also buffs all units Chen controls
 					return BOT_ACTION_DESIRE_HIGH, bot
 				end

@@ -86,7 +86,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -98,7 +99,8 @@ end
 local vacuumAbility = SafeAbility(bot:GetAbilityByName("dark_seer_vacuum"), "dark_seer_vacuum", "dark_seer")
 local ionShellAbility = SafeAbility(bot:GetAbilityByName("dark_seer_ion_shell"), "dark_seer_ion_shell", "dark_seer")
 local surgeAbility = SafeAbility(bot:GetAbilityByName("dark_seer_surge"), "dark_seer_surge", "dark_seer")
-local wallOfReplicaAbility = SafeAbility(bot:GetAbilityByName("dark_seer_wall_of_replica"), "dark_seer_wall_of_replica", "dark_seer")
+local wallOfReplicaAbility =
+	SafeAbility(bot:GetAbilityByName("dark_seer_wall_of_replica"), "dark_seer_wall_of_replica", "dark_seer")
 local vacuumDesire, vacuumLocation
 local ionShellDesire, ionShellTarget
 local surgeDesire, surgeTarget
@@ -123,7 +125,14 @@ function X.SkillsComplement()
 	if vacuumWallDesire > 0 then
 		if DotaTime() >= (bot._vacWallLogAt or -999) then
 			bot._vacWallLogAt = DotaTime() + 5
-			pcall(print, string.format("[OHA-DARK_SEER] t=%.0f blink-vacuum-wall dist=%d", DotaTime(), GetUnitToLocationDistance(bot, vacuumWallLocation)))
+			pcall(
+				print,
+				string.format(
+					"[OHA-DARK_SEER] t=%.0f blink-vacuum-wall dist=%d",
+					DotaTime(),
+					GetUnitToLocationDistance(bot, vacuumWallLocation)
+				)
+			)
 		end
 		bot:Action_ClearActions(false)
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, vacuumWallLocation)
@@ -202,7 +211,8 @@ function X.ConsiderVacuum()
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 				if not Fu.IsInRange(bot, botTarget, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				else
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
@@ -245,7 +255,12 @@ function X.ConsiderIonShell()
 						end
 					end
 					for _, creep in pairs(enemyCreepsNearAlly) do
-						if creep ~= nil and creep:IsAlive() and creep:GetAttackTarget() == allyHero and creep:GetAttackRange() <= 326 then
+						if
+							creep ~= nil
+							and creep:IsAlive()
+							and creep:GetAttackTarget() == allyHero
+							and creep:GetAttackRange() <= 326
+						then
 							attackerCount = attackerCount + 1
 						end
 					end
@@ -277,7 +292,10 @@ function X.ConsiderIonShell()
 					and not allyHero:HasModifier("modifier_dark_seer_ion_shell")
 					and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 					and GetUnitToUnitDistance(allyHero, botTarget) <= radius + 150
-					and (best == nil or GetUnitToUnitDistance(allyHero, botTarget) < GetUnitToUnitDistance(best, botTarget))
+					and (
+						best == nil
+						or GetUnitToUnitDistance(allyHero, botTarget) < GetUnitToUnitDistance(best, botTarget)
+					)
 				then
 					best = allyHero
 				end
@@ -285,7 +303,14 @@ function X.ConsiderIonShell()
 			shellTarget = best
 			if shellTarget ~= nil and DotaTime() >= (bot._shellFallbackLogAt or -999) then
 				bot._shellFallbackLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-DARK_SEER] t=%.0f ion shell fight fallback on=%s", DotaTime(), shellTarget:GetUnitName()))
+				pcall(
+					print,
+					string.format(
+						"[OHA-DARK_SEER] t=%.0f ion shell fight fallback on=%s",
+						DotaTime(),
+						shellTarget:GetUnitName()
+					)
+				)
 			end
 		end
 		if shellTarget ~= nil then
@@ -306,7 +331,11 @@ function X.ConsiderIonShell()
 			then
 				local chaserEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local chaserAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if chaserEnemies ~= nil and chaserAllies ~= nil and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					chaserEnemies ~= nil
+					and chaserAllies ~= nil
+					and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
@@ -351,8 +380,20 @@ function X.ConsiderIonShell()
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		local enemyTowers = bot:GetNearbyTowers(700, true)
 		-- #enemyTowers == 0: the tower list was fetched but #nearbyEnemies was tested twice, so he shelled under towers.
-		if laneCreeps ~= nil and #laneCreeps >= 3 and nearbyEnemies ~= nil and #nearbyEnemies == 0 and enemyTowers ~= nil and #enemyTowers == 0 and abilityLevel >= 2 then
-			if Fu.IsAttacking(bot) and Fu.CanBeAttacked(laneCreeps[1]) and not bot:HasModifier("modifier_dark_seer_ion_shell") then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 3
+			and nearbyEnemies ~= nil
+			and #nearbyEnemies == 0
+			and enemyTowers ~= nil
+			and #enemyTowers == 0
+			and abilityLevel >= 2
+		then
+			if
+				Fu.IsAttacking(bot)
+				and Fu.CanBeAttacked(laneCreeps[1])
+				and not bot:HasModifier("modifier_dark_seer_ion_shell")
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end
@@ -423,7 +464,11 @@ function X.ConsiderSurge()
 			then
 				local chaserEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local chaserAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if chaserEnemies ~= nil and chaserAllies ~= nil and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					chaserEnemies ~= nil
+					and chaserAllies ~= nil
+					and (#chaserAllies > #chaserEnemies or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
@@ -452,7 +497,12 @@ function X.ConsiderSurge()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1

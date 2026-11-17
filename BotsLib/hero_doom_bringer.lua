@@ -13,7 +13,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 1, 2, 1, 2, 1, 6, 2, 2, 1, 3, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 2, 1, 2, 1, 6, 2, 2, 1, 3, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -76,7 +77,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -84,8 +86,10 @@ function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
 local devourAbility = SafeAbility(bot:GetAbilityByName("doom_bringer_devour"), "doom_bringer_devour", "doom_bringer")
-local scorchedEarthAbility = SafeAbility(bot:GetAbilityByName("doom_bringer_scorched_earth"), "doom_bringer_scorched_earth", "doom_bringer")
-local infernalBladeAbility = SafeAbility(bot:GetAbilityByName("doom_bringer_infernal_blade"), "doom_bringer_infernal_blade", "doom_bringer")
+local scorchedEarthAbility =
+	SafeAbility(bot:GetAbilityByName("doom_bringer_scorched_earth"), "doom_bringer_scorched_earth", "doom_bringer")
+local infernalBladeAbility =
+	SafeAbility(bot:GetAbilityByName("doom_bringer_infernal_blade"), "doom_bringer_infernal_blade", "doom_bringer")
 local doomAbility = SafeAbility(bot:GetAbilityByName("doom_bringer_doom"), "doom_bringer_doom", "doom_bringer")
 local empty1Ability = SafeAbility(bot:GetAbilityByName("doom_bringer_empty1"), "doom_bringer_empty1", "doom_bringer")
 local empty2Ability = SafeAbility(bot:GetAbilityByName("doom_bringer_empty2"), "doom_bringer_empty2", "doom_bringer")
@@ -145,12 +149,15 @@ function X.SkillsComplement()
 	local scorchWhy
 	scorchedEarthDesire, scorchWhy = X.ConsiderScorchedEarth()
 	if scorchedEarthDesire > 0 then
-		pcall(print, string.format(
-			"[OHA-DOOM] t=%.0f scorched why=%s hp=%.2f",
-			DotaTime(),
-			tostring(scorchWhy or "?"),
-			Fu.GetHP(bot)
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-DOOM] t=%.0f scorched why=%s hp=%.2f",
+				DotaTime(),
+				tostring(scorchWhy or "?"),
+				Fu.GetHP(bot)
+			)
+		)
 		bot:Action_UseAbility(scorchedEarthAbility)
 		return
 	end
@@ -256,7 +263,8 @@ function X.ConsiderScorchedEarth()
 			and (#enemyCreeps >= 3 or #enemyCreeps >= 2 and enemyCreeps[1]:IsAncientCreep())
 			and Fu.CanBeAttacked(enemyCreeps[1])
 			and isAttacking
-			and Fu.GetManaAfter(scorchedEarthAbility:GetManaCost()) * bot:GetMana() > doomAbility:GetManaCost() * 1.75
+			and Fu.GetManaAfter(scorchedEarthAbility:GetManaCost()) * bot:GetMana()
+				> doomAbility:GetManaCost() * 1.75
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -310,7 +318,12 @@ function X.ConsiderInfernalBlade()
 				end
 			end
 			if
-				Fu.WillKillTarget(enemyHero, burnDamage + enemyHero:GetMaxHealth() * burnDamagePct, DAMAGE_TYPE_MAGICAL, burnDuration)
+				Fu.WillKillTarget(
+					enemyHero,
+					burnDamage + enemyHero:GetMaxHealth() * burnDamagePct,
+					DAMAGE_TYPE_MAGICAL,
+					burnDuration
+				)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -362,7 +375,11 @@ function X.ConsiderInfernalBlade()
 			then
 				local allyHeroes = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if allyHeroes ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					allyHeroes ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -387,11 +404,18 @@ function X.ConsiderInfernalBlade()
 			if
 				Fu.IsValid(creep)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= burnDamage
 			then
 				local enemiesNearby = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if enemiesNearby ~= nil and #enemiesNearby >= 1 and GetUnitToUnitDistance(creep, enemiesNearby[1]) < 500 then
+				if
+					enemiesNearby ~= nil
+					and #enemiesNearby >= 1
+					and GetUnitToUnitDistance(creep, enemiesNearby[1]) < 500
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -450,7 +474,10 @@ function X.ConsiderDoom()
 			if allyHeroes ~= nil and enemyHeroes ~= nil then
 				if Fu.IsInLaningPhase() then
 					if #allyHeroes < #enemyHeroes + 2 and Fu.IsAttacking(bestTarget) then
-						if bestTarget:GetHealth() <= bot:GetEstimatedDamageToTarget(true, bestTarget, doomDuration, DAMAGE_TYPE_ALL) then
+						if
+							bestTarget:GetHealth()
+							<= bot:GetEstimatedDamageToTarget(true, bestTarget, doomDuration, DAMAGE_TYPE_ALL)
+						then
 							return BOT_ACTION_DESIRE_HIGH, bestTarget
 						end
 					end
@@ -487,7 +514,15 @@ function X.ConsiderDoom()
 		if best ~= nil then
 			if DotaTime() >= (bot._doomRetreatLogAt or -999) then
 				bot._doomRetreatLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-DOOM] t=%.0f doom retreat target=%s hp=%.2f", DotaTime(), best:GetUnitName(), Fu.GetHP(bot)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-DOOM] t=%.0f doom retreat target=%s hp=%.2f",
+						DotaTime(),
+						best:GetUnitName(),
+						Fu.GetHP(bot)
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, best
 		end
@@ -559,7 +594,11 @@ function X.ConsiderGenericDevourAbility(ability)
 		return BOT_ACTION_DESIRE_NONE, nil, ""
 	end
 	local target = nil
-	if (isGoingOnSomeone or Fu.IsInTeamFight(bot, 1200)) and Fu.IsValidHero(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+	if
+		(isGoingOnSomeone or Fu.IsInTeamFight(bot, 1200))
+		and Fu.IsValidHero(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+	then
 		target = botTarget
 	elseif isRetreating then
 		for _, foe in pairs(foesNear) do
@@ -625,7 +664,11 @@ function X.ConsiderDevourAbility(stolenAbility)
 				then
 					local allyHeroes = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 					local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-					if allyHeroes ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2)) then
+					if
+						allyHeroes ~= nil
+						and enemiesNearChaser ~= nil
+						and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2))
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyHero, "unit"
 					end
 				end
@@ -695,18 +738,30 @@ function X.ConsiderDevourAbility(stolenAbility)
 				then
 					local allyHeroes = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 					local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-					if allyHeroes ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2)) then
+					if
+						allyHeroes ~= nil
+						and enemiesNearChaser ~= nil
+						and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2))
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyHero, "unit"
 					end
 				end
 			end
 		end
-		if Fu.IsFarming(bot) and Fu.GetManaAfter(stolenAbility:GetManaCost()) * bot:GetMana() > doomAbility:GetManaCost() * 2 then
+		if
+			Fu.IsFarming(bot)
+			and Fu.GetManaAfter(stolenAbility:GetManaCost()) * bot:GetMana() > doomAbility:GetManaCost() * 2
+		then
 			local enemyCreeps = bot:GetNearbyCreeps(1600, true)
-			if enemyCreeps ~= nil and (#enemyCreeps >= 3 or #enemyCreeps >= 2 and enemyCreeps[1]:IsAncientCreep()) and isAttacking then
+			if
+				enemyCreeps ~= nil
+				and (#enemyCreeps >= 3 or #enemyCreeps >= 2 and enemyCreeps[1]:IsAncientCreep())
+				and isAttacking
+			then
 				for _, creep in pairs(enemyCreeps) do
 					if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
-						local nearbyUnitCount = Fu.GetNearbyAroundLocationUnitCount(true, false, jumpRange, creep:GetLocation())
+						local nearbyUnitCount =
+							Fu.GetNearbyAroundLocationUnitCount(true, false, jumpRange, creep:GetLocation())
 						if nearbyUnitCount >= 2 then
 							return BOT_ACTION_DESIRE_HIGH, creep, "unit"
 						end
@@ -715,7 +770,12 @@ function X.ConsiderDevourAbility(stolenAbility)
 			end
 		end
 		if Fu.IsDoingRoshan(bot) then
-			if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+			if
+				Fu.IsRoshan(botTarget)
+				and Fu.CanCastOnNonMagicImmune(botTarget)
+				and Fu.IsInRange(bot, botTarget, castRange)
+				and isAttacking
+			then
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "unit"
 			end
 		end
@@ -730,7 +790,11 @@ function X.ConsiderDevourAbility(stolenAbility)
 		radius = stolenAbility:GetSpecialValueInt("radius")
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				if enemyHero:IsChanneling() then
 					return BOT_ACTION_DESIRE_HIGH, nil, ""
 				end
@@ -781,7 +845,10 @@ function X.ConsiderDevourAbility(stolenAbility)
 				and not enemyHeroes[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHeroes[1], 1200, false, BOT_MODE_NONE)
-				if enemiesNearChaser ~= nil and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, nil, ""
 				end
 			end
@@ -835,13 +902,21 @@ function X.ConsiderDevourAbility(stolenAbility)
 				and not enemyHeroes[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 			then
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHeroes[1], 1200, false, BOT_MODE_NONE)
-				if enemiesNearChaser ~= nil and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #allyHeroes or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH, nil, ""
 				end
 			end
 		end
 		if Fu.IsDoingRoshan(bot) then
-			if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking and not Fu.IsDisabled(botTarget) then
+			if
+				Fu.IsRoshan(botTarget)
+				and Fu.IsInRange(bot, botTarget, radius)
+				and isAttacking
+				and not Fu.IsDisabled(botTarget)
+			then
 				return BOT_ACTION_DESIRE_HIGH, nil, ""
 			end
 		end
@@ -880,7 +955,10 @@ function X.ConsiderDevourAbility(stolenAbility)
 				and not enemyHero:IsInvulnerable()
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 			then
-				if enemyHero:HasModifier("modifier_item_satanic_unholy") or enemyHero:HasModifier("modifier_rune_doubledamage") then
+				if
+					enemyHero:HasModifier("modifier_item_satanic_unholy")
+					or enemyHero:HasModifier("modifier_rune_doubledamage")
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "unit"
 				end
 			end

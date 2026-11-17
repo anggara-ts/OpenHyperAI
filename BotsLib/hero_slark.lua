@@ -65,7 +65,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_melee_carry" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -147,7 +148,11 @@ function X.ConsiderSaltwaterShiv()
 	if Fu.IsRetreating(bot) and hpRatio < 0.6 then
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) and enemyHero:IsFacingLocation(bot:GetLocation(), 30) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanBeAttacked(enemyHero)
+				and enemyHero:IsFacingLocation(bot:GetLocation(), 30)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -194,7 +199,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 400) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 400)
+		then
 			local enemyFutureLocation = botTarget:GetExtrapolatedLocation(delay)
 			if Fu.GetLocationToLocationDistance(botFutureLocation, enemyFutureLocation) < radius - 50 then
 				target = botTarget
@@ -208,7 +217,11 @@ function X.ConsiderQ()
 			if
 				Fu.IsValid(enemyHero)
 				and Fu.CanCastOnMagicImmune(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 3.0) or bot:GetCurrentMovementSpeed() < 200 or bot:IsRooted())
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
+					or bot:GetCurrentMovementSpeed() < 200
+					or bot:IsRooted()
+				)
 			then
 				target = enemyHero
 				reason = "Q-撤退" .. Fu.Chat.GetNormName(target)
@@ -229,7 +242,12 @@ function X.ConsiderQ()
 	end
 	if Fu.IsFarming(bot) and DotaTime() > 6 * 60 and Fu.IsAllowedToSpam(bot, manaCost) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius + 300)
-		if (#neutralCreeps >= 3 or #neutralCreeps >= 2 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep()) and Fu.IsValid(botTarget) then
+		if
+			(
+				#neutralCreeps >= 3
+				or #neutralCreeps >= 2 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep()
+			) and Fu.IsValid(botTarget)
+		then
 			target = botTarget
 			reason = "Q-打野AOE" .. #neutralCreeps
 			return BOT_ACTION_DESIRE_HIGH, reason
@@ -238,7 +256,11 @@ function X.ConsiderQ()
 	if bot:IsDisarmed() or bot:IsRooted() or bot:IsBlind() then
 		return BOT_ACTION_DESIRE_HIGH, "Q-self-dispel"
 	end
-	if (Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot)) and Fu.IsAttacking(bot) and Fu.IsAllowedToSpam(bot, manaCost) then
+	if
+		(Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot))
+		and Fu.IsAttacking(bot)
+		and Fu.IsAllowedToSpam(bot, manaCost)
+	then
 		return BOT_ACTION_DESIRE_HIGH, "Q-roshan/tormentor"
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -276,7 +298,10 @@ function X.ConsiderW()
 		for _, enemyHero in pairs(enemiesNearby) do
 			if Fu.IsValid(enemyHero) and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or #enemiesNearby >= 3) then
 				local firstEnemy = enemiesNearby[1]
-				if bot:IsFacingLocation(GetAncient(GetTeam()):GetLocation(), 20) and not Fu.IsInRange(bot, firstEnemy, 100) then
+				if
+					bot:IsFacingLocation(GetAncient(GetTeam()):GetLocation(), 20)
+					and not Fu.IsInRange(bot, firstEnemy, 100)
+				then
 					target = enemyHero
 					reason = "W-逃离:" .. Fu.Chat.GetNormName(target)
 					return BOT_ACTION_DESIRE_HIGH, reason
@@ -427,7 +452,11 @@ function X.IsEnemyCastAbility()
 			if activeAbility ~= nil then
 				local behavior = activeAbility:GetBehavior()
 				local abilityName = activeAbility:GetName()
-				if behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5) and ignoredEnemyAbilities[abilityName] ~= true then
+				if
+					behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET
+					and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5)
+					and ignoredEnemyAbilities[abilityName] ~= true
+				then
 					return true
 				end
 				if

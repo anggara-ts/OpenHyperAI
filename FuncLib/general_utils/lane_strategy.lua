@@ -4,7 +4,9 @@ local function installLaneStrategy(Fu)
 		local assignedLane = bot:GetAssignedLane()
 		return Fu.IsInLaningPhase()
 			and GetHeroDeaths(bot:GetPlayerID()) >= 4
-			and (GetHeroKills(bot:GetPlayerID()) == 0 or GetHeroKills(bot:GetPlayerID()) / GetHeroDeaths(bot:GetPlayerID()) < 0.5)
+			and (GetHeroKills(bot:GetPlayerID()) == 0 or GetHeroKills(bot:GetPlayerID()) / GetHeroDeaths(
+				bot:GetPlayerID()
+			) < 0.5)
 			and Fu.IsCore(bot)
 			and bot:GetLevel() >= 4
 			and bot:GetLevel() < 10
@@ -65,7 +67,10 @@ local function installLaneStrategy(Fu)
 					and not string.find(building:GetUnitName(), "fillers")
 				then
 					local buildingName = building:GetUnitName()
-					if Fu.GetDistance(building:GetLocation(), ping.location) <= maxDistance and GameTime() < ping.time + maxPingAge then
+					if
+						Fu.GetDistance(building:GetLocation(), ping.location) <= maxDistance
+						and GameTime() < ping.time + maxPingAge
+					then
 						local lane = LANE_MID
 						if string.find(buildingName, "_fort") then
 							lane = LANE_MID

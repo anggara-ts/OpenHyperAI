@@ -95,7 +95,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -103,11 +104,16 @@ function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
 local laserAbility = SafeAbility(bot:GetAbilityByName("tinker_laser"), "tinker_laser", "tinker")
-local marchOfTheMachinesAbility = SafeAbility(bot:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
-local deployTurretsAbility = SafeAbility(bot:GetAbilityByName("tinker_deploy_turrets"), "tinker_deploy_turrets", "tinker")
-	or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "tinker")
+local marchOfTheMachinesAbility =
+	SafeAbility(bot:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
+local deployTurretsAbility = SafeAbility(
+	bot:GetAbilityByName("tinker_deploy_turrets"),
+	"tinker_deploy_turrets",
+	"tinker"
+) or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "tinker")
 local warpFlareAbility = SafeAbility(bot:GetAbilityByName("tinker_warp_grenade"), "tinker_warp_grenade", "tinker")
-local keenConveyanceAbility = SafeAbility(bot:GetAbilityByName("tinker_keen_teleport"), "tinker_keen_teleport", "tinker")
+local keenConveyanceAbility =
+	SafeAbility(bot:GetAbilityByName("tinker_keen_teleport"), "tinker_keen_teleport", "tinker")
 local rearmAbility = SafeAbility(bot:GetAbilityByName("tinker_rearm"), "tinker_rearm", "tinker")
 local lastMarchTime = -999
 local laserDesire, laserTarget
@@ -141,7 +147,8 @@ function X.SkillsComplement()
 		bot.healInBase = false
 	end
 	laserAbility = SafeAbility(bot:GetAbilityByName("tinker_laser"), "tinker_laser", "tinker")
-	marchOfTheMachinesAbility = SafeAbility(bot:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
+	marchOfTheMachinesAbility =
+		SafeAbility(bot:GetAbilityByName("tinker_march_of_the_machines"), "tinker_march_of_the_machines", "tinker")
 	deployTurretsAbility = SafeAbility(bot:GetAbilityByName("tinker_deploy_turrets"), "tinker_deploy_turrets", "tinker")
 		or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "tinker")
 	warpFlareAbility = SafeAbility(bot:GetAbilityByName("tinker_warp_grenade"), "tinker_warp_grenade", "tinker")
@@ -296,7 +303,12 @@ function X.ConsiderLaser()
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and mpRatio > 0.35 then
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, explosionRadius, 0, 0)
 		if isAttacking then
-			if Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and #laneCreeps >= 2 and aoeLocation.count >= 2 then
+			if
+				Fu.CanBeAttacked(laneCreeps[1])
+				and not Fu.IsRunning(laneCreeps[1])
+				and #laneCreeps >= 2
+				and aoeLocation.count >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreeps[1]
 			end
 		end
@@ -306,13 +318,21 @@ function X.ConsiderLaser()
 			local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 1200, explosionRadius, 0, 0)
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
 			if
-				Fu.IsValid(neutralCreeps[1]) and (
-					#neutralCreeps >= 2 and aoeLocation.count >= 2 or #neutralCreeps == 1 and (neutralCreeps[1]:IsAncientCreep() or Fu.GetHP(neutralCreeps[1]) > 0.5)
+				Fu.IsValid(neutralCreeps[1])
+				and (
+					#neutralCreeps >= 2 and aoeLocation.count >= 2
+					or #neutralCreeps == 1
+						and (neutralCreeps[1]:IsAncientCreep() or Fu.GetHP(neutralCreeps[1]) > 0.5)
 				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, neutralCreeps[1]
 			end
-			if Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and #laneCreeps >= 2 and aoeLocation.count >= 2 then
+			if
+				Fu.CanBeAttacked(laneCreeps[1])
+				and not Fu.IsRunning(laneCreeps[1])
+				and #laneCreeps >= 2
+				and aoeLocation.count >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreeps[1]
 			end
 		end
@@ -324,10 +344,17 @@ function X.ConsiderLaser()
 				Fu.IsValid(creep)
 				and Fu.IsInRange(bot, creep, castRange)
 				and Fu.CanBeAttacked(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= damage
 			then
-				if Fu.IsValidHero(nearbyEnemies[1]) and GetUnitToUnitDistance(creep, nearbyEnemies[1]) < 600 and mpRatio > 0.3 then
+				if
+					Fu.IsValidHero(nearbyEnemies[1])
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) < 600
+					and mpRatio > 0.3
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -404,8 +431,12 @@ function X.ConsiderMarchOfTheMachines()
 		local allyAoeLocation = bot:FindAoELocation(false, true, bot:GetLocation(), marchDistance / 2, radius, 0, 0)
 		local enemyAoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), marchDistance / 2, radius, 0, 0)
 		if not Fu.IsCore(bot) then
-			if allyAoeLocation.count > 0 and Fu.GetDistance(allyAoeLocation.targetloc, enemyAoeLocation.targetloc) <= marchDistance then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, allyAoeLocation.targetloc, castRange)
+			if
+				allyAoeLocation.count > 0
+				and Fu.GetDistance(allyAoeLocation.targetloc, enemyAoeLocation.targetloc) <= marchDistance
+			then
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, allyAoeLocation.targetloc, castRange)
 			end
 		end
 		if
@@ -424,7 +455,8 @@ function X.ConsiderMarchOfTheMachines()
 	local laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and mpRatio > 0.35 then
 		if #laneCreeps >= 2 and Fu.CanBeAttacked(laneCreeps[1]) then
-			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(laneCreeps), castRange)
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(laneCreeps), castRange)
 		end
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), marchDistance / 2, radius, castPoint, 0)
 		if aoeLocation.count >= 1 then
@@ -437,17 +469,28 @@ function X.ConsiderMarchOfTheMachines()
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
 			if
 				Fu.CanBeAttacked(neutralCreeps[1])
-				and (#neutralCreeps >= 2 and aoeLocation.count >= 2 or #neutralCreeps == 1 and (neutralCreeps[1]:IsAncientCreep() or Fu.GetHP(neutralCreeps[1]) > 0.5))
+				and (
+					#neutralCreeps >= 2 and aoeLocation.count >= 2
+					or #neutralCreeps == 1
+						and (neutralCreeps[1]:IsAncientCreep() or Fu.GetHP(neutralCreeps[1]) > 0.5)
+				)
 			then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(neutralCreeps), castRange)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(neutralCreeps), castRange)
 			end
 			if #laneCreeps >= 2 and Fu.CanBeAttacked(laneCreeps[1]) then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(laneCreeps), castRange)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(laneCreeps), castRange)
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, marchDistance) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, marchDistance)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 		end
 	end
@@ -514,7 +557,11 @@ function X.ConsiderDeployTurrets()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -522,7 +569,10 @@ function X.ConsiderDeployTurrets()
 end
 local teleportRetryDelay = 7
 function X.ConsiderKeenConveyance()
-	if not Fu.CanCastAbility(keenConveyanceAbility) or bot.healInBase and GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) < 1000 then
+	if
+		not Fu.CanCastAbility(keenConveyanceAbility)
+		or bot.healInBase and GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) < 1000
+	then
 		return BOT_ACTION_DESIRE_NONE, nil, ""
 	end
 	local roshanLocation = Fu.GetCurrentRoshanLocation()
@@ -531,7 +581,12 @@ function X.ConsiderKeenConveyance()
 	local activeMode = bot:GetActiveMode()
 	local channelTime = keenConveyanceAbility:GetChannelTime()
 	local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), bot:GetCurrentVisionRange())
-	if bot.healInBase and GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) > 3200 and nearbyEnemies ~= nil and #nearbyEnemies == 0 then
+	if
+		bot.healInBase
+		and GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) > 3200
+		and nearbyEnemies ~= nil
+		and #nearbyEnemies == 0
+	then
 		if Fu.IsInLaningPhase() then
 			if GetLaneFrontAmount(GetTeam(), LANE_MID, true) < 0.28 then
 				if bot:GetHealth() > Fu.GetTotalEstimatedDamageToTarget(nearbyEnemies, bot) then
@@ -568,18 +623,35 @@ function X.ConsiderKeenConveyance()
 	local laneDistanceSum = { 0, 0, 0 }
 	local laneAllyCount = { 0, 0, 0 }
 	for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-		if Fu.IsValidHero(allyHero) and bot ~= allyHero and not Fu.IsSuspiciousIllusion(allyHero) and not Fu.IsMeepoClone(allyHero) then
-			if allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_TOP and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_TOP then
+		if
+			Fu.IsValidHero(allyHero)
+			and bot ~= allyHero
+			and not Fu.IsSuspiciousIllusion(allyHero)
+			and not Fu.IsMeepoClone(allyHero)
+		then
+			if
+				allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_TOP
+				and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_TOP
+			then
 				laneAllyCount[1] = laneAllyCount[1] + 1
-				laneDistanceSum[1] = laneDistanceSum[1] + GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_TOP, 0))
+				laneDistanceSum[1] = laneDistanceSum[1]
+					+ GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_TOP, 0))
 			end
-			if allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_MID and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_MID then
+			if
+				allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_MID
+				and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_MID
+			then
 				laneAllyCount[2] = laneAllyCount[2] + 1
-				laneDistanceSum[2] = laneDistanceSum[2] + GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_MID, 0))
+				laneDistanceSum[2] = laneDistanceSum[2]
+					+ GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_MID, 0))
 			end
-			if allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_BOT and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_BOT then
+			if
+				allyHero:GetActiveMode() == BOT_MODE_PUSH_TOWER_BOT
+				and bot:GetActiveMode() == BOT_MODE_PUSH_TOWER_BOT
+			then
 				laneAllyCount[3] = laneAllyCount[3] + 1
-				laneDistanceSum[3] = laneDistanceSum[3] + GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_BOT, 0))
+				laneDistanceSum[3] = laneDistanceSum[3]
+					+ GetUnitToLocationDistance(allyHero, GetLaneFrontLocation(GetTeam(), LANE_BOT, 0))
 			end
 		end
 	end
@@ -681,7 +753,14 @@ function X.ConsiderRearm()
 	end
 	local channelTime = rearmAbility:GetChannelTime()
 	local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600)
-	if bot.healInBase and nearbyEnemies ~= nil and #nearbyEnemies == 0 and keenConveyanceAbility ~= nil and keenConveyanceAbility:IsTrained() and keenConveyanceAbility:GetCooldownTimeRemaining() > channelTime then
+	if
+		bot.healInBase
+		and nearbyEnemies ~= nil
+		and #nearbyEnemies == 0
+		and keenConveyanceAbility ~= nil
+		and keenConveyanceAbility:IsTrained()
+		and keenConveyanceAbility:GetCooldownTimeRemaining() > channelTime
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	-- Review fix: Rearm (100-200 mana, 1.25-2.75s channel) fired whenever Laser or March was on
@@ -691,14 +770,27 @@ function X.ConsiderRearm()
 	-- Now it needs a spell to refresh plus a reason: a fight he is in (not retreating), or the
 	-- push/farm/Roshan cases below.
 	local function spellOnCd()
-		return laserAbility ~= nil and laserAbility:IsTrained() and laserAbility:GetCooldownTimeRemaining() > channelTime
+		return laserAbility ~= nil
+				and laserAbility:IsTrained()
+				and laserAbility:GetCooldownTimeRemaining() > channelTime
 			or marchOfTheMachinesAbility ~= nil and marchOfTheMachinesAbility:IsTrained() and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime
-			or deployTurretsAbility ~= nil and deployTurretsAbility:IsTrained() and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime
+			or deployTurretsAbility ~= nil
+				and deployTurretsAbility:IsTrained()
+				and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime
 	end
-	if (isGoingOnSomeone or isInTeamFight) and not isRetreating and spellOnCd() and nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
+	if
+		(isGoingOnSomeone or isInTeamFight)
+		and not isRetreating
+		and spellOnCd()
+		and nearbyEnemies ~= nil
+		and #nearbyEnemies >= 1
+	then
 		if DotaTime() - (X.lastRearmLog or -99) > 10 then
 			X.lastRearmLog = DotaTime()
-			pcall(print, string.format("[OHA-TINKER] t=%.0f rearm-fight enemies=%d mp=%.2f", DotaTime(), #nearbyEnemies, mpRatio))
+			pcall(
+				print,
+				string.format("[OHA-TINKER] t=%.0f rearm-fight enemies=%d mp=%.2f", DotaTime(), #nearbyEnemies, mpRatio)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
@@ -724,7 +816,11 @@ function X.ConsiderRearm()
 				neutralCreeps ~= nil
 				and (#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep())
 				and mpRatio > 0.25
-				and (laserAbility ~= nil and laserAbility:GetCooldownTimeRemaining() > channelTime or marchOfTheMachinesAbility ~= nil and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime)
+				and (
+					laserAbility ~= nil and laserAbility:GetCooldownTimeRemaining() > channelTime
+					or marchOfTheMachinesAbility ~= nil
+						and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -732,7 +828,11 @@ function X.ConsiderRearm()
 				laneCreeps ~= nil
 				and #laneCreeps >= 2
 				and mpRatio > 0.25
-				and (laserAbility ~= nil and laserAbility:GetCooldownTimeRemaining() > channelTime or marchOfTheMachinesAbility ~= nil and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime)
+				and (
+					laserAbility ~= nil and laserAbility:GetCooldownTimeRemaining() > channelTime
+					or marchOfTheMachinesAbility ~= nil
+						and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -743,7 +843,11 @@ function X.ConsiderRearm()
 			Fu.IsRoshan(botTarget)
 			and Fu.IsInRange(bot, botTarget, 800)
 			and isAttacking
-			and (deployTurretsAbility ~= nil and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime or marchOfTheMachinesAbility ~= nil and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime)
+			and (
+				deployTurretsAbility ~= nil and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime
+				or marchOfTheMachinesAbility ~= nil
+					and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -753,7 +857,11 @@ function X.ConsiderRearm()
 			Fu.IsTormentor(botTarget)
 			and Fu.IsInRange(bot, botTarget, 800)
 			and isAttacking
-			and (deployTurretsAbility ~= nil and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime or marchOfTheMachinesAbility ~= nil and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime)
+			and (
+				deployTurretsAbility ~= nil and deployTurretsAbility:GetCooldownTimeRemaining() > channelTime
+				or marchOfTheMachinesAbility ~= nil
+					and marchOfTheMachinesAbility:GetCooldownTimeRemaining() > channelTime
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -777,7 +885,11 @@ function X.ConsiderWarpFlare()
 			then
 				local alliesNearChaser = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

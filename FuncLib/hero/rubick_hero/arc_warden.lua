@@ -60,7 +60,11 @@ function X.ConsiderFlux()
 		local maxDamage = 0
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(false, bot, 3.0, DAMAGE_TYPE_ALL)
 				if estimatedDamage > maxDamage then
 					maxDamage = estimatedDamage
@@ -73,7 +77,11 @@ function X.ConsiderFlux()
 		end
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_LOW, botTarget
 		end
 	end
@@ -119,7 +127,11 @@ function X.ConsiderMagneticField()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and not bot:HasModifier("modifier_arc_warden_magnetic_field") then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and Fu.CanCastOnMagicImmune(attackTarget) and Fu.IsInRange(attackTarget, bot, castRange) then
+		if
+			Fu.IsRoshan(attackTarget)
+			and Fu.CanCastOnMagicImmune(attackTarget)
+			and Fu.IsInRange(attackTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_LOW, bot:GetLocation()
 		end
 	end
@@ -137,7 +149,8 @@ function X.ConsiderMagneticField()
 				Fu.IsValidHero(alliesNearLoc[1])
 				and not alliesNearLoc[1]:HasModifier("modifier_arc_warden_magnetic_field")
 				and alliesNearLoc[1]:GetAttackTarget() ~= nil
-				and GetUnitToUnitDistance(alliesNearLoc[1], alliesNearLoc[1]:GetAttackTarget()) <= alliesNearLoc[1]:GetAttackRange() + 50
+				and GetUnitToUnitDistance(alliesNearLoc[1], alliesNearLoc[1]:GetAttackTarget())
+					<= alliesNearLoc[1]:GetAttackRange() + 50
 			then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
@@ -157,7 +170,9 @@ function X.ConsiderMagneticField()
 			for _, allyHero in pairs(nearbyAllies) do
 				if
 					Fu.IsValid(allyHero)
-					and (Fu.IsInRange(allyHero, bot, castRange) and not allyHero:HasModifier("modifier_arc_warden_magnetic_field"))
+					and (Fu.IsInRange(allyHero, bot, castRange) and not allyHero:HasModifier(
+						"modifier_arc_warden_magnetic_field"
+					))
 					and (
 						Fu.IsValid(allyHero:GetAttackTarget())
 						and GetUnitToUnitDistance(allyHero, allyHero:GetAttackTarget()) <= allyHero:GetAttackRange()
@@ -185,7 +200,11 @@ function X.ConsiderSparkWraith()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and Fu.IsInRange(attackTarget, bot, castRange) and Fu.GetHP(attackTarget) > 0.2 then
+		if
+			Fu.IsRoshan(attackTarget)
+			and Fu.IsInRange(attackTarget, bot, castRange)
+			and Fu.GetHP(attackTarget) > 0.2
+		then
 			return BOT_ACTION_DESIRE_LOW, attackTarget:GetLocation()
 		end
 	end
@@ -196,7 +215,11 @@ function X.ConsiderSparkWraith()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_MODERATE, botTarget:GetExtrapolatedLocation(activationDelay)
 		end
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), 1400, radius, 2.0, 0)
@@ -214,7 +237,11 @@ function X.ConsiderSparkWraith()
 	then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 1.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 1.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
@@ -237,7 +264,11 @@ function X.ConsiderSparkWraith()
 			end
 		end
 	end
-	if sparkWraithAbility:GetLevel() >= 3 and bot:GetActiveMode() ~= BOT_MODE_LANING and Fu.IsAllowedToSpam(bot, 80) then
+	if
+		sparkWraithAbility:GetLevel() >= 3
+		and bot:GetActiveMode() ~= BOT_MODE_LANING
+		and Fu.IsAllowedToSpam(bot, 80)
+	then
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), 1400, radius, 2.0, 0)
 		if aoeLocation.count >= 2 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
@@ -252,7 +283,11 @@ function X.ConsiderSparkWraith()
 		local weakestEnemy = nil
 		local minHealth = 99999
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsValidHero(enemyHero) and GetUnitToUnitDistance(bot, enemyHero) <= castRange and enemyHero:GetHealth() < minHealth then
+			if
+				Fu.IsValidHero(enemyHero)
+				and GetUnitToUnitDistance(bot, enemyHero) <= castRange
+				and enemyHero:GetHealth() < minHealth
+			then
 				weakestEnemy = enemyHero
 				minHealth = enemyHero:GetHealth()
 			end

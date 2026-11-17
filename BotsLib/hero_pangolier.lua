@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 1, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 1, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 2, 1, 3, 2, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -76,7 +77,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -85,12 +87,17 @@ function X.MinionThink(minionUnit)
 		Minion.IllusionThink(minionUnit)
 	end
 end
-local swashbuckleAbility = SafeAbility(bot:GetAbilityByName("pangolier_swashbuckle"), "pangolier_swashbuckle", "pangolier")
-local shieldCrashAbility = SafeAbility(bot:GetAbilityByName("pangolier_shield_crash"), "pangolier_shield_crash", "pangolier")
+local swashbuckleAbility =
+	SafeAbility(bot:GetAbilityByName("pangolier_swashbuckle"), "pangolier_swashbuckle", "pangolier")
+local shieldCrashAbility =
+	SafeAbility(bot:GetAbilityByName("pangolier_shield_crash"), "pangolier_shield_crash", "pangolier")
 local rollUpAbility = SafeAbility(bot:GetAbilityByName("pangolier_rollup"), "pangolier_rollup", "pangolier")
-local endRollUpAbility = SafeAbility(bot:GetAbilityByName("pangolier_rollup_stop"), "pangolier_rollup_stop", "pangolier")
-local rollingThunderAbility = SafeAbility(bot:GetAbilityByName("pangolier_gyroshell"), "pangolier_gyroshell", "pangolier")
-local endRollingThunderAbility = SafeAbility(bot:GetAbilityByName("pangolier_gyroshell_stop"), "pangolier_gyroshell_stop", "pangolier")
+local endRollUpAbility =
+	SafeAbility(bot:GetAbilityByName("pangolier_rollup_stop"), "pangolier_rollup_stop", "pangolier")
+local rollingThunderAbility =
+	SafeAbility(bot:GetAbilityByName("pangolier_gyroshell"), "pangolier_gyroshell", "pangolier")
+local endRollingThunderAbility =
+	SafeAbility(bot:GetAbilityByName("pangolier_gyroshell_stop"), "pangolier_gyroshell_stop", "pangolier")
 local swashbuckleDesire, swashbuckleLocation
 local shieldCrashDesire
 local rollUpDesire
@@ -112,12 +119,15 @@ function X.SkillsComplement()
 	hpRatio = Fu.GetHP(bot)
 	mpRatio = Fu.GetMP(bot)
 	isInTeamFight = Fu.IsInTeamFight(bot, 1200)
-	swashbuckleAbility = SafeAbility(bot:GetAbilityByName("pangolier_swashbuckle"), "pangolier_swashbuckle", "pangolier")
-	shieldCrashAbility = SafeAbility(bot:GetAbilityByName("pangolier_shield_crash"), "pangolier_shield_crash", "pangolier")
+	swashbuckleAbility =
+		SafeAbility(bot:GetAbilityByName("pangolier_swashbuckle"), "pangolier_swashbuckle", "pangolier")
+	shieldCrashAbility =
+		SafeAbility(bot:GetAbilityByName("pangolier_shield_crash"), "pangolier_shield_crash", "pangolier")
 	rollUpAbility = SafeAbility(bot:GetAbilityByName("pangolier_rollup"), "pangolier_rollup", "pangolier")
 	endRollUpAbility = SafeAbility(bot:GetAbilityByName("pangolier_rollup_stop"), "pangolier_rollup_stop", "pangolier")
 	rollingThunderAbility = SafeAbility(bot:GetAbilityByName("pangolier_gyroshell"), "pangolier_gyroshell", "pangolier")
-	endRollingThunderAbility = SafeAbility(bot:GetAbilityByName("pangolier_gyroshell_stop"), "pangolier_gyroshell_stop", "pangolier")
+	endRollingThunderAbility =
+		SafeAbility(bot:GetAbilityByName("pangolier_gyroshell_stop"), "pangolier_gyroshell_stop", "pangolier")
 	botTarget = Fu.GetProperTarget(bot)
 	local botHp = hpRatio
 	local allyHeroes = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
@@ -189,7 +199,8 @@ function X.ConsiderSwashbuckle()
 					and not Fu.IsInRange(bot, enemyHero, dashRange)
 					and not enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, enemyHero:GetLocation(), dashRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, enemyHero:GetLocation(), dashRange)
 				end
 			end
 		end
@@ -209,7 +220,12 @@ function X.ConsiderSwashbuckle()
 			and not weakestTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local targetAllies = Fu.GetNearbyHeroes(weakestTarget, 800, false, BOT_MODE_NONE)
-			if allyHeroes ~= nil and targetAllies ~= nil and #allyHeroes >= #targetAllies and bot:IsFacingLocation(weakestTarget:GetLocation(), 30) then
+			if
+				allyHeroes ~= nil
+				and targetAllies ~= nil
+				and #allyHeroes >= #targetAllies
+				and bot:IsFacingLocation(weakestTarget:GetLocation(), 30)
+			then
 				if Fu.IsInRange(bot, weakestTarget, dashRange) then
 					if #allyHeroes >= #targetAllies + 2 then
 						return BOT_ACTION_DESIRE_HIGH, weakestTarget:GetLocation()
@@ -222,7 +238,8 @@ function X.ConsiderSwashbuckle()
 					and not Fu.IsInRange(bot, weakestTarget, dashRange)
 					and not weakestTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, weakestTarget:GetLocation(), dashRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, weakestTarget:GetLocation(), dashRange)
 				end
 			end
 		end
@@ -242,7 +259,10 @@ function X.ConsiderSwashbuckle()
 			and not enemyHeroes[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local firstEnemyAllies = Fu.GetNearbyHeroes(enemyHeroes[1], 1000, false, BOT_MODE_NONE)
-			if firstEnemyAllies ~= nil and (#firstEnemyAllies > #allyHeroes or hpRatio < 0.68 and bot:WasRecentlyDamagedByAnyHero(1.6)) then
+			if
+				firstEnemyAllies ~= nil
+				and (#firstEnemyAllies > #allyHeroes or hpRatio < 0.68 and bot:WasRecentlyDamagedByAnyHero(1.6))
+			then
 				local escapeLocation = Fu.GetEscapeLoc()
 				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, dashRange)
 			end
@@ -252,7 +272,14 @@ function X.ConsiderSwashbuckle()
 		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), strikeRange, radius, 0, 0)
 		local laneCreeps = bot:GetNearbyLaneCreeps(strikeRange, true)
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-		if laneCreeps ~= nil and #laneCreeps >= 4 and aoe.count >= 4 and enemyHeroes ~= nil and #enemyHeroes == 0 and bot:IsFacingLocation(aoe.targetloc, 10) then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 4
+			and aoe.count >= 4
+			and enemyHeroes ~= nil
+			and #enemyHeroes == 0
+			and bot:IsFacingLocation(aoe.targetloc, 10)
+		then
 			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 		end
 		aoe = bot:FindAoELocation(true, true, bot:GetLocation(), strikeRange, radius, 0, 0)
@@ -289,7 +316,13 @@ function X.ConsiderSwashbuckle()
 			end
 		end
 		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), 1000, radius, 0, 0)
-		if killableCount >= 2 and enemyHeroes ~= nil and #enemyHeroes >= 1 and aoe.count >= 2 and bot:IsFacingLocation(aoe.targetloc, 15) then
+		if
+			killableCount >= 2
+			and enemyHeroes ~= nil
+			and #enemyHeroes >= 1
+			and aoe.count >= 2
+			and bot:IsFacingLocation(aoe.targetloc, 15)
+		then
 			if GetUnitToLocationDistance(bot, aoe.targetloc) <= dashRange then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
@@ -302,12 +335,22 @@ function X.ConsiderSwashbuckle()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and bot:IsFacingLocation(botTarget:GetLocation(), 10) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and bot:IsFacingLocation(botTarget:GetLocation(), 10)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking and bot:IsFacingLocation(botTarget:GetLocation(), 10) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 400)
+			and isAttacking
+			and bot:IsFacingLocation(botTarget:GetLocation(), 10)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -358,7 +401,12 @@ function X.ConsiderShieldCrash()
 			and not weakestTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			local targetAllies = Fu.GetNearbyHeroes(weakestTarget, 1200, false, BOT_MODE_NONE)
-			if allyHeroes ~= nil and targetAllies ~= nil and #allyHeroes >= #targetAllies and bot:IsFacingLocation(weakestTarget:GetLocation(), 30) then
+			if
+				allyHeroes ~= nil
+				and targetAllies ~= nil
+				and #allyHeroes >= #targetAllies
+				and bot:IsFacingLocation(weakestTarget:GetLocation(), 30)
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -429,10 +477,21 @@ function X.ConsiderShieldCrash()
 				table.insert(killableCreeps, creep)
 			end
 		end
-		if killableCount >= 2 and mpRatio > 0.25 and enemyHeroes ~= nil and #enemyHeroes >= 1 and bot:IsFacingLocation(Fu.GetCenterOfUnits(killableCreeps), 15) then
+		if
+			killableCount >= 2
+			and mpRatio > 0.25
+			and enemyHeroes ~= nil
+			and #enemyHeroes >= 1
+			and bot:IsFacingLocation(Fu.GetCenterOfUnits(killableCreeps), 15)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
-		if enemyHeroes ~= nil and #enemyHeroes >= 1 and bot:IsFacingLocation(enemyHeroes[1]:GetLocation(), 15) and Fu.IsInRange(bot, enemyHeroes[1], radius) then
+		if
+			enemyHeroes ~= nil
+			and #enemyHeroes >= 1
+			and bot:IsFacingLocation(enemyHeroes[1]:GetLocation(), 15)
+			and Fu.IsInRange(bot, enemyHeroes[1], radius)
+		then
 			local enemyTowers = enemyHeroes[1]:GetNearbyTowers(700, false)
 			if enemyTowers ~= nil and #enemyTowers == 0 then
 				return BOT_ACTION_DESIRE_HIGH
@@ -440,12 +499,22 @@ function X.ConsiderShieldCrash()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and bot:IsFacingLocation(botTarget:GetLocation(), 15) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and bot:IsFacingLocation(botTarget:GetLocation(), 15)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking and bot:IsFacingLocation(botTarget:GetLocation(), 15) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 400)
+			and isAttacking
+			and bot:IsFacingLocation(botTarget:GetLocation(), 15)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -473,7 +542,10 @@ function X.ConsiderRollingThunder()
 			and not Fu.IsSuspiciousIllusion(enemyHeroes[1])
 		then
 			local firstEnemyAllies = Fu.GetNearbyHeroes(enemyHeroes[1], 1000, false, BOT_MODE_NONE)
-			if firstEnemyAllies ~= nil and (#firstEnemyAllies > #allyHeroes and (hpRatio < 0.55 and bot:WasRecentlyDamagedByAnyHero(2))) then
+			if
+				firstEnemyAllies ~= nil
+				and (#firstEnemyAllies > #allyHeroes and (hpRatio < 0.55 and bot:WasRecentlyDamagedByAnyHero(2)))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -509,7 +581,10 @@ function X.ConsiderRollUp()
 		end
 		local weakestTarget = Fu.GetVulnerableWeakestUnit(bot, true, true, 1200)
 		if Fu.IsValidTarget(weakestTarget) and not Fu.IsSuspiciousIllusion(weakestTarget) then
-			if bot:HasModifier("modifier_pangolier_gyroshell") and not bot:IsFacingLocation(weakestTarget:GetLocation(), 90) then
+			if
+				bot:HasModifier("modifier_pangolier_gyroshell")
+				and not bot:IsFacingLocation(weakestTarget:GetLocation(), 90)
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

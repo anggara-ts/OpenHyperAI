@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 1, 2, 6, 2, 3, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 1, 2, 6, 2, 3, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" or sRole == "pos_2" then
@@ -69,7 +70,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -145,12 +147,18 @@ function X.ConsiderQ()
 			if Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint + distance / 636) then
 				return BOT_ACTION_DESIRE_HIGH, "Q击杀" .. Fu.Chat.GetNormName(enemyHero)
 			end
-			if enemyHero:HasModifier("modifier_flask_healing") and Fu.GetModifierTime(enemyHero, "modifier_flask_healing") > 3.0 then
+			if
+				enemyHero:HasModifier("modifier_flask_healing")
+				and Fu.GetModifierTime(enemyHero, "modifier_flask_healing") > 3.0
+			then
 				return BOT_ACTION_DESIRE_HIGH, "Q断药" .. Fu.Chat.GetNormName(enemyHero)
 			end
 			if
 				Fu.IsRetreating(bot)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+					or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, "Q撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
@@ -159,7 +167,12 @@ function X.ConsiderQ()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and #alliesNearby < 3 and botLevel > 7 and Fu.IsAllowedToSpam(bot, manaCost) then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and #alliesNearby < 3
+		and botLevel > 7
+		and Fu.IsAllowedToSpam(bot, manaCost)
+	then
 		local killableCount = 0
 		local creepCount = 0
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius + 100, true)
@@ -291,7 +304,10 @@ function X.ConsiderW()
 				and not enemyHero:HasModifier("modifier_razor_static_link_debuff")
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 3.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
+					or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "W撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
@@ -353,7 +369,10 @@ function X.ConsiderR()
 			if
 				Fu.IsValidHero(enemyHero)
 				and Fu.CanCastOnMagicImmune(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+					or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH
+				)
 			then
 				return BOT_ACTION_DESIRE_HIGH, "R撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end

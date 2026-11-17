@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 1, 2, 1, 6, 2, 2, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 1, 2, 1, 6, 2, 2, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -100,20 +101,27 @@ X["sSellList"] = { "item_vanguard", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local onslaughtAbility = SafeAbility(bot:GetAbilityByName("primal_beast_onslaught"), "primal_beast_onslaught", "primal_beast")
+local onslaughtAbility =
+	SafeAbility(bot:GetAbilityByName("primal_beast_onslaught"), "primal_beast_onslaught", "primal_beast")
 local trampleAbility = SafeAbility(bot:GetAbilityByName("primal_beast_trample"), "primal_beast_trample", "primal_beast")
 local uproarAbility = SafeAbility(bot:GetAbilityByName("primal_beast_uproar"), "primal_beast_uproar", "primal_beast")
-local rockThrowAbility = SafeAbility(bot:GetAbilityByName("primal_beast_rock_throw"), "primal_beast_rock_throw", "primal_beast")
-local pulverizeAbility = SafeAbility(bot:GetAbilityByName("primal_beast_pulverize"), "primal_beast_pulverize", "primal_beast")
-local onslaughtReleaseAbility =
-	SafeAbility(bot:GetAbilityByName("primal_beast_onslaught_release"), "primal_beast_onslaught_release", "primal_beast")
+local rockThrowAbility =
+	SafeAbility(bot:GetAbilityByName("primal_beast_rock_throw"), "primal_beast_rock_throw", "primal_beast")
+local pulverizeAbility =
+	SafeAbility(bot:GetAbilityByName("primal_beast_pulverize"), "primal_beast_pulverize", "primal_beast")
+local onslaughtReleaseAbility = SafeAbility(
+	bot:GetAbilityByName("primal_beast_onslaught_release"),
+	"primal_beast_onslaught_release",
+	"primal_beast"
+)
 local botTarget, nearbyEnemies, nearbyAllies
 local onslaughtDesire, onslaughtLocation
 local onslaughtReleaseDesire
@@ -132,11 +140,14 @@ function X.SkillsComplement()
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
 	hpRatio = Fu.GetHP(bot)
-	onslaughtAbility = SafeAbility(bot:GetAbilityByName("primal_beast_onslaught"), "primal_beast_onslaught", "primal_beast")
+	onslaughtAbility =
+		SafeAbility(bot:GetAbilityByName("primal_beast_onslaught"), "primal_beast_onslaught", "primal_beast")
 	trampleAbility = SafeAbility(bot:GetAbilityByName("primal_beast_trample"), "primal_beast_trample", "primal_beast")
 	uproarAbility = SafeAbility(bot:GetAbilityByName("primal_beast_uproar"), "primal_beast_uproar", "primal_beast")
-	rockThrowAbility = SafeAbility(bot:GetAbilityByName("primal_beast_rock_throw"), "primal_beast_rock_throw", "primal_beast")
-	pulverizeAbility = SafeAbility(bot:GetAbilityByName("primal_beast_pulverize"), "primal_beast_pulverize", "primal_beast")
+	rockThrowAbility =
+		SafeAbility(bot:GetAbilityByName("primal_beast_rock_throw"), "primal_beast_rock_throw", "primal_beast")
+	pulverizeAbility =
+		SafeAbility(bot:GetAbilityByName("primal_beast_pulverize"), "primal_beast_pulverize", "primal_beast")
 	onslaughtReleaseAbility = SafeAbility(
 		bot:GetAbilityByName("primal_beast_onslaught_release"),
 		"primal_beast_onslaught_release",
@@ -158,7 +169,10 @@ function X.SkillsComplement()
 		if X.ConsiderUproar() > 0 then
 			if DotaTime() >= (bot._uproarTrampleLogAt or -999) then
 				bot._uproarTrampleLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f uproar during trample hp=%.2f", DotaTime(), hpRatio))
+				pcall(
+					print,
+					string.format("[OHA-PRIMAL_BEAST] t=%.0f uproar during trample hp=%.2f", DotaTime(), hpRatio)
+				)
 			end
 			bot:Action_UseAbility(uproarAbility)
 			return
@@ -221,7 +235,11 @@ function X.ConsiderOnslaught()
 	local knockbackDistance = onslaughtAbility:GetSpecialValueInt("knockback_distance")
 	local chargeupTime = onslaughtAbility:GetSpecialValueFloat("chargeup_time")
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 600) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, 600)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			local alliesNearEnemy = Fu.GetAlliesNearLoc(enemyHero:GetLocation(), 1200)
 			local enemiesNearEnemy = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 1200)
 			if #alliesNearEnemy >= #enemiesNearEnemy and enemyHero:HasModifier("modifier_teleporting") then
@@ -251,11 +269,25 @@ function X.ConsiderOnslaught()
 			end
 		end
 	end
-	if isRetreating and not Fu.IsRealInvisible(bot) and bot:WasRecentlyDamagedByAnyHero(4) and bot:GetActiveModeDesire() > 0.7 then
-		if Fu.IsValidHero(nearbyEnemies[1]) and (not Fu.WeAreStronger(bot, 1200) and hpRatio < 0.75 or Fu.IsChasingTarget(nearbyEnemies[1], bot)) then
+	if
+		isRetreating
+		and not Fu.IsRealInvisible(bot)
+		and bot:WasRecentlyDamagedByAnyHero(4)
+		and bot:GetActiveModeDesire() > 0.7
+	then
+		if
+			Fu.IsValidHero(nearbyEnemies[1])
+			and (not Fu.WeAreStronger(bot, 1200) and hpRatio < 0.75 or Fu.IsChasingTarget(nearbyEnemies[1], bot))
+		then
 			-- chargeTime is already a charge TIME (0.6-1.0 x chargeup_time); remapping it again as a distance
 			-- (100..max_distance) always gave the 0.3s floor, so the escape charge went only a few hundred units.
-			local chargeTime = RemapValClamped(GetUnitToUnitDistance(bot, nearbyEnemies[1]), 600, 1200, chargeupTime * 0.6, chargeupTime)
+			local chargeTime = RemapValClamped(
+				GetUnitToUnitDistance(bot, nearbyEnemies[1]),
+				600,
+				1200,
+				chargeupTime * 0.6,
+				chargeupTime
+			)
 			onslaughtChargeTime = chargeTime
 			X.LogOnslaughtRetreat(onslaughtChargeTime)
 			bot.onslaught_status = { "retreat", Fu.GetTeamFountain() }
@@ -273,7 +305,8 @@ function X.ConsiderOnslaught()
 			and Fu.CanBeAttacked(nearbyCreeps[1])
 			and isAttacking
 		then
-			local aoeLocation = bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), 0, knockbackDistance, 0, 0)
+			local aoeLocation =
+				bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), 0, knockbackDistance, 0, 0)
 			if
 				#nearbyCreeps >= 4 and aoeLocation.count >= 4 and not Fu.HasItem(bot, "item_radiance")
 				or #nearbyCreeps >= 2 and aoeLocation.count >= 2 and nearbyCreeps[1]:IsAncientCreep()
@@ -293,7 +326,15 @@ function X.LogOnslaughtRetreat(chargeTime)
 		return
 	end
 	bot._onslaughtLogAt = DotaTime() + 5
-	pcall(print, string.format("[OHA-PRIMAL_BEAST] t=%.0f onslaught retreat charge=%.2fs hp=%.2f", DotaTime(), chargeTime, hpRatio))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PRIMAL_BEAST] t=%.0f onslaught retreat charge=%.2fs hp=%.2f",
+			DotaTime(),
+			chargeTime,
+			hpRatio
+		)
+	)
 end
 function X.ConsiderBeginOnslaughtDesire()
 	if not Fu.CanCastAbility(onslaughtReleaseAbility) then
@@ -353,8 +394,18 @@ function X.ConsiderTrample()
 		end
 	end
 	if Fu.IsLaning(bot) and #nearbyEnemies == 0 then
-		if #nearbyCreeps >= 3 and Fu.IsValid(nearbyCreeps[1]) and not Fu.IsRunning(nearbyCreeps[1]) and Fu.CanBeAttacked(nearbyCreeps[1]) and isAttacking then
-			if #nearbyTowers == 0 or Fu.IsValidBuilding(nearbyTowers[1]) and GetUnitToUnitDistance(nearbyCreeps[1], nearbyTowers[1]) > 900 then
+		if
+			#nearbyCreeps >= 3
+			and Fu.IsValid(nearbyCreeps[1])
+			and not Fu.IsRunning(nearbyCreeps[1])
+			and Fu.CanBeAttacked(nearbyCreeps[1])
+			and isAttacking
+		then
+			if
+				#nearbyTowers == 0
+				or Fu.IsValidBuilding(nearbyTowers[1])
+					and GetUnitToUnitDistance(nearbyCreeps[1], nearbyTowers[1]) > 900
+			then
 				bot.trample_status = { "laning", 0, nil }
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -378,7 +429,12 @@ function X.ConsiderTrample()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and not botTarget:IsAttackImmune() and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and not botTarget:IsAttackImmune()
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			bot.trample_status = { "miniboss", botTarget:GetLocation(), botTarget }
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -404,7 +460,12 @@ function X.ConsiderUproar()
 			and not Fu.IsDisabled(botTarget)
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			if uproarStacks >= 4 or Fu.IsChasingTarget(bot, botTarget) and uproarStacks >= 2 or hpRatio < 0.5 and uproarStacks >= 3 or hpRatio < 0.25 and uproarStacks >= 1 then
+			if
+				uproarStacks >= 4
+				or Fu.IsChasingTarget(bot, botTarget) and uproarStacks >= 2
+				or hpRatio < 0.5 and uproarStacks >= 3
+				or hpRatio < 0.25 and uproarStacks >= 1
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -464,7 +525,11 @@ function X.ConsiderRockThrow()
 	-- distance over 550-1800). Was never thrown to start a fight or to stop a chaser.
 	local function Flight(unit)
 		local distance = Clamp(GetUnitToUnitDistance(bot, unit), minRange, 1800)
-		return castPoint + rockThrowAbility:GetSpecialValueFloat("min_travel_time") + (distance - minRange) / math.max(1800 - minRange, 1) * (maxTravelTime - rockThrowAbility:GetSpecialValueFloat("min_travel_time"))
+		return castPoint
+			+ rockThrowAbility:GetSpecialValueFloat("min_travel_time")
+			+ (distance - minRange)
+				/ math.max(1800 - minRange, 1)
+				* (maxTravelTime - rockThrowAbility:GetSpecialValueFloat("min_travel_time"))
 	end
 	local function Usable(unit)
 		return Fu.IsValidHero(unit)
@@ -474,13 +539,29 @@ function X.ConsiderRockThrow()
 			and Fu.IsInRange(bot, unit, castRange)
 	end
 	if isGoingOnSomeone and Usable(botTarget) and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe") then
-		print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=engage target=%s dist=%d", botTarget:GetUnitName(), GetUnitToUnitDistance(bot, botTarget)))
+		print(
+			string.format(
+				"[OHA-PRIMAL_BEAST] rock-throw why=engage target=%s dist=%d",
+				botTarget:GetUnitName(),
+				GetUnitToUnitDistance(bot, botTarget)
+			)
+		)
 		return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(botTarget, Flight(botTarget))
 	end
 	if isRetreating then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Usable(enemyHero) and Fu.IsInRange(bot, enemyHero, 1200) and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or Fu.IsChasingTarget(enemyHero, bot)) then
-				print(string.format("[OHA-PRIMAL_BEAST] rock-throw why=retreat target=%s dist=%d", enemyHero:GetUnitName(), GetUnitToUnitDistance(bot, enemyHero)))
+			if
+				Usable(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, 1200)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 2.0) or Fu.IsChasingTarget(enemyHero, bot))
+			then
+				print(
+					string.format(
+						"[OHA-PRIMAL_BEAST] rock-throw why=retreat target=%s dist=%d",
+						enemyHero:GetUnitName(),
+						GetUnitToUnitDistance(bot, enemyHero)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(enemyHero, Flight(enemyHero))
 			end
 		end

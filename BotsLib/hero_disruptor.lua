@@ -81,18 +81,23 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_cyclone", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local thunderStrikeAbility = SafeAbility(bot:GetAbilityByName("disruptor_thunder_strike"), "disruptor_thunder_strike", "disruptor")
+local thunderStrikeAbility =
+	SafeAbility(bot:GetAbilityByName("disruptor_thunder_strike"), "disruptor_thunder_strike", "disruptor")
 local glimpseAbility = SafeAbility(bot:GetAbilityByName("disruptor_glimpse"), "disruptor_glimpse", "disruptor")
-local kineticFieldAbility = SafeAbility(bot:GetAbilityByName("disruptor_kinetic_field"), "disruptor_kinetic_field", "disruptor")
-local kineticFenceAbility = SafeAbility(bot:GetAbilityByName("disruptor_kinetic_fence"), "disruptor_kinetic_fence", "disruptor")
-local staticStormAbility = SafeAbility(bot:GetAbilityByName("disruptor_static_storm"), "disruptor_static_storm", "disruptor")
+local kineticFieldAbility =
+	SafeAbility(bot:GetAbilityByName("disruptor_kinetic_field"), "disruptor_kinetic_field", "disruptor")
+local kineticFenceAbility =
+	SafeAbility(bot:GetAbilityByName("disruptor_kinetic_fence"), "disruptor_kinetic_fence", "disruptor")
+local staticStormAbility =
+	SafeAbility(bot:GetAbilityByName("disruptor_static_storm"), "disruptor_static_storm", "disruptor")
 local thunderStrikeDesire, thunderStrikeTarget
 local glimpseDesire, glimpseTarget
 local kineticFieldDesire, kineticFieldLocation
@@ -146,7 +151,11 @@ end
 -- Glimpse -> Kinetic Field on the return spot -> Static Storm there when 2+ enemy heroes will be
 -- in it or it is a team fight. The field forms in 1s, so it is up when the target lands.
 function X.ConsiderGlimpseCombo()
-	if not (isGoingOnSomeone or isInTeamFight) or not glimpseAbility:IsFullyCastable() or not kineticFieldAbility:IsFullyCastable() then
+	if
+		not (isGoingOnSomeone or isInTeamFight)
+		or not glimpseAbility:IsFullyCastable()
+		or not kineticFieldAbility:IsFullyCastable()
+	then
 		return nil
 	end
 	local mana = bot:GetMana() - glimpseAbility:GetManaCost() - kineticFieldAbility:GetManaCost()
@@ -182,8 +191,14 @@ function X.ConsiderGlimpseCombo()
 				local foes = #(Fu.GetNearbyHeroes(candidate, 1200, false, BOT_MODE_NONE) or {})
 				if allies >= foes - 1 then
 					local storm = false
-					if staticStormAbility:IsTrained() and staticStormAbility:IsFullyCastable() and mana >= staticStormAbility:GetManaCost() then
-						local inStorm = #(Fu.GetEnemiesNearLoc(spot, staticStormAbility:GetSpecialValueInt("radius")) or {}) + 1
+					if
+						staticStormAbility:IsTrained()
+						and staticStormAbility:IsFullyCastable()
+						and mana >= staticStormAbility:GetManaCost()
+					then
+						local inStorm = #(
+								Fu.GetEnemiesNearLoc(spot, staticStormAbility:GetSpecialValueInt("radius")) or {}
+							) + 1
 						storm = inStorm >= 2 or isInTeamFight
 					end
 					return candidate, spot, storm
@@ -216,12 +231,15 @@ function X.SkillsComplement()
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 			then
-				pcall(print, string.format(
-					"[OHA-DISRUPTOR] t=%.0f glimpse-tp target=%s dist=%d",
-					DotaTime(),
-					(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-					GetUnitToUnitDistance(bot, enemyHero)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-DISRUPTOR] t=%.0f glimpse-tp target=%s dist=%d",
+						DotaTime(),
+						(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToUnitDistance(bot, enemyHero)
+					)
+				)
 				bot:Action_UseAbilityOnEntity(glimpseAbility, enemyHero)
 				return
 			end
@@ -229,13 +247,16 @@ function X.SkillsComplement()
 	end
 	local comboTarget, comboSpot, comboStorm = X.ConsiderGlimpseCombo()
 	if comboTarget ~= nil then
-		pcall(print, string.format(
-			"[OHA-DISRUPTOR] t=%.0f glimpse-combo target=%s back=%d storm=%s",
-			DotaTime(),
-			(string.gsub(comboTarget:GetUnitName(), "npc_dota_hero_", "")),
-			GetUnitToLocationDistance(comboTarget, comboSpot),
-			tostring(comboStorm)
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-DISRUPTOR] t=%.0f glimpse-combo target=%s back=%d storm=%s",
+				DotaTime(),
+				(string.gsub(comboTarget:GetUnitName(), "npc_dota_hero_", "")),
+				GetUnitToLocationDistance(comboTarget, comboSpot),
+				tostring(comboStorm)
+			)
+		)
 		bot:Action_ClearActions(false)
 		bot:ActionQueue_UseAbilityOnEntity(glimpseAbility, comboTarget)
 		bot:ActionQueue_Delay(0.1)
@@ -266,7 +287,8 @@ function X.SkillsComplement()
 	if kineticFieldDesire > 0 then
 		-- Static Storm on the same spot right behind the field when it is ready, an enemy hero
 		-- is inside the field's radius, and he is engaging or in a team fight.
-		local inField = Fu.GetEnemiesNearLoc(kineticFieldLocation, kineticFieldAbility:GetSpecialValueInt("radius")) or {}
+		local inField = Fu.GetEnemiesNearLoc(kineticFieldLocation, kineticFieldAbility:GetSpecialValueInt("radius"))
+			or {}
 		local coreIn = false
 		for _, enemyHero in pairs(inField) do
 			local okP, pos = pcall(Fu.GetPosition, enemyHero)
@@ -285,7 +307,15 @@ function X.SkillsComplement()
 			bot:ActionQueue_UseAbilityOnLocation(kineticFieldAbility, kineticFieldLocation)
 			bot:ActionQueue_Delay(0.05)
 			bot:ActionQueue_UseAbilityOnLocation(staticStormAbility, kineticFieldLocation)
-			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f field-storm at=%.0f,%.0f", DotaTime(), kineticFieldLocation.x, kineticFieldLocation.y))
+			pcall(
+				print,
+				string.format(
+					"[OHA-DISRUPTOR] t=%.0f field-storm at=%.0f,%.0f",
+					DotaTime(),
+					kineticFieldLocation.x,
+					kineticFieldLocation.y
+				)
+			)
 			return
 		end
 		bot:Action_UseAbilityOnLocation(kineticFieldAbility, kineticFieldLocation)
@@ -394,7 +424,11 @@ function X.ConsiderThunderStrike()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -431,7 +465,12 @@ function X.ConsiderThunderStrike()
 	end
 	local nearbyNeutrals = bot:GetNearbyNeutralCreeps(castRange)
 	for _, creep in pairs(nearbyNeutrals) do
-		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and creep:GetHealth() > strikeDamage * strikeCount / 2 and creep:GetHealth() <= strikeDamage * strikeCount then
+		if
+			Fu.IsValid(creep)
+			and Fu.CanBeAttacked(creep)
+			and creep:GetHealth() > strikeDamage * strikeCount / 2
+			and creep:GetHealth() <= strikeDamage * strikeCount
+		then
 			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end
@@ -461,12 +500,15 @@ function X.ConsiderGlimpse()
 					and GetUnitToLocationDistance(enemyHero, spot) >= 400
 					and GetUnitToLocationDistance(bot, spot) + 300 < GetUnitToUnitDistance(bot, enemyHero)
 				then
-					pcall(print, string.format(
-						"[OHA-DISRUPTOR] t=%.0f glimpse-flee target=%s back=%d",
-						DotaTime(),
-						(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-						GetUnitToLocationDistance(enemyHero, spot)
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-DISRUPTOR] t=%.0f glimpse-flee target=%s back=%d",
+							DotaTime(),
+							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+							GetUnitToLocationDistance(enemyHero, spot)
+						)
+					)
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -487,7 +529,9 @@ function X.ConsiderGlimpse()
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
-			if enemyHero:HasModifier("modifier_teleporting") or enemyHero:HasModifier("modifier_fountain_aura_buff") then
+			if
+				enemyHero:HasModifier("modifier_teleporting") or enemyHero:HasModifier("modifier_fountain_aura_buff")
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			if isGoingOnSomeone then
@@ -518,7 +562,11 @@ function X.ConsiderGlimpse()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
@@ -575,7 +623,10 @@ function X.ConsiderGlimpse()
 	if realHeroCount == 0 and illusionCount >= 1 then
 		if DotaTime() >= (bot._glimpseIllLogAt or -999) then
 			bot._glimpseIllLogAt = DotaTime() + 5
-			pcall(print, string.format("[OHA-DISRUPTOR] t=%.0f glimpse illusion=%s", DotaTime(), illusionTarget:GetUnitName()))
+			pcall(
+				print,
+				string.format("[OHA-DISRUPTOR] t=%.0f glimpse illusion=%s", DotaTime(), illusionTarget:GetUnitName())
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH, illusionTarget
 	end
@@ -595,7 +646,8 @@ function X.ConsiderKineticFence()
 	local formationTime = kineticFenceAbility:GetSpecialValueInt("formation_time")
 	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	if isInTeamFight then
-		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint + formationTime, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint + formationTime, 0)
 		local nearbyEnemies = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if #nearbyEnemies >= 2 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
@@ -677,8 +729,12 @@ function X.ConsiderKineticField()
 						if Fu.IsInRange(bot, botTarget, castRange) then
 							return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(castPoint)
 						end
-						if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+						if
+							Fu.IsInRange(bot, botTarget, castRange + radius)
+							and not Fu.IsInRange(bot, botTarget, castRange)
+						then
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 						end
 					end
 				else
@@ -690,12 +746,16 @@ function X.ConsiderKineticField()
 							return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(castPoint)
 						end
 					end
-					if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
+					if
+						Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange)
+					then
 						enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius * 0.8)
 						if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
 						else
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 						end
 					end
 				end
@@ -716,7 +776,11 @@ function X.ConsiderKineticField()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					if GetUnitToLocationDistance(bot, nearbyEnemies[1]:GetExtrapolatedLocation(castPoint)) > radius then
 						return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 					else
@@ -750,7 +814,8 @@ function X.ConsiderKineticField()
 				and not Fu.IsSuspiciousIllusion(allyNearbyEnemies[1])
 				and not allyNearbyEnemies[1]:IsMagicImmune()
 				and not allyNearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
-				and GetUnitToUnitDistance(allyHero, allyNearbyEnemies[1]) < GetUnitToUnitDistance(bot, allyNearbyEnemies[1])
+				and GetUnitToUnitDistance(allyHero, allyNearbyEnemies[1])
+					< GetUnitToUnitDistance(bot, allyNearbyEnemies[1])
 			then
 				return BOT_ACTION_DESIRE_HIGH, (allyHero:GetLocation() + allyNearbyEnemies[1]:GetLocation()) / 2
 			end
@@ -791,7 +856,13 @@ function X.ConsiderKineticStorm()
 			-- high-value core: estimated position 1 or 2 (user call). An unknown role reads as 3 and
 			-- does not count.
 			local oneOk = false
-			if isGoingOnSomeone and nearbyEnemies ~= nil and #nearbyEnemies == 1 and Fu.IsValidHero(botTarget) and nearbyEnemies[1] == botTarget then
+			if
+				isGoingOnSomeone
+				and nearbyEnemies ~= nil
+				and #nearbyEnemies == 1
+				and Fu.IsValidHero(botTarget)
+				and nearbyEnemies[1] == botTarget
+			then
 				local okP, pos = pcall(Fu.GetPosition, botTarget)
 				oneOk = okP and type(pos) == "number" and pos <= 2
 			end

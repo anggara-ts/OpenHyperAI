@@ -104,7 +104,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -112,10 +113,13 @@ function X.MinionThink(minion)
 	Minion.MinionThink(minion)
 end
 local stickyBombAbility = SafeAbility(bot:GetAbilityByName("techies_sticky_bomb"), "techies_sticky_bomb", "techies")
-local reactiveTazerAbility = SafeAbility(bot:GetAbilityByName("techies_reactive_tazer"), "techies_reactive_tazer", "techies")
-local tazerStopAbility = SafeAbility(bot:GetAbilityByName("techies_reactive_tazer_stop"), "techies_reactive_tazer_stop", "techies")
+local reactiveTazerAbility =
+	SafeAbility(bot:GetAbilityByName("techies_reactive_tazer"), "techies_reactive_tazer", "techies")
+local tazerStopAbility =
+	SafeAbility(bot:GetAbilityByName("techies_reactive_tazer_stop"), "techies_reactive_tazer_stop", "techies")
 local blastOffAbility = SafeAbility(bot:GetAbilityByName("techies_suicide"), "techies_suicide", "techies")
-local minefieldSignAbility = SafeAbility(bot:GetAbilityByName("techies_minefield_sign"), "techies_minefield_sign", "techies")
+local minefieldSignAbility =
+	SafeAbility(bot:GetAbilityByName("techies_minefield_sign"), "techies_minefield_sign", "techies")
 local proximityMinesAbility = SafeAbility(bot:GetAbilityByName("techies_land_mines"), "techies_land_mines", "techies")
 local mad = SafeAbility(
 	bot:GetAbilityByName("techies_mutually_assured_destruction"),
@@ -153,12 +157,12 @@ local function MadCandidates()
 			local name = ability:GetName()
 			if
 				string.find(name, "techies", 1, true)
-				and (
-					string.find(name, "mutually", 1, true)
-					or string.find(name, "detonate", 1, true)
-					or string.find(name, "barrel", 1, true)
-					or string.find(name, "_mad", 1, true)
-				)
+				and (string.find(name, "mutually", 1, true) or string.find(name, "detonate", 1, true) or string.find(
+					name,
+					"barrel",
+					1,
+					true
+				) or string.find(name, "_mad", 1, true))
 				and not string.find(name, "sticky", 1, true)
 			then
 				list[#list + 1] = ability
@@ -220,7 +224,10 @@ function X.WatchBarrel()
 	if found ~= nil and not bot._barrelSeen then
 		bot._barrelSeen = true
 		local location = found:GetLocation()
-		pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-barrel seen at=%.0f,%.0f", DotaTime(), location.x, location.y))
+		pcall(
+			print,
+			string.format("[OHA-TECHIES] t=%.0f mad-barrel seen at=%.0f,%.0f", DotaTime(), location.x, location.y)
+		)
 	elseif found == nil and bot._barrelSeen then
 		bot._barrelSeen = false
 		pcall(print, string.format("[OHA-TECHIES] t=%.0f mad-barrel gone", DotaTime()))
@@ -261,7 +268,8 @@ function X.MadDetonate()
 				return ability:IsPassive()
 			end)
 			local behavior = Behavior(ability)
-			local noTarget = Fu.CheckBitfieldFlag(behavior, BEH_NO_TARGET) and not Fu.CheckBitfieldFlag(behavior, BEH_POINT)
+			local noTarget = Fu.CheckBitfieldFlag(behavior, BEH_NO_TARGET)
+				and not Fu.CheckBitfieldFlag(behavior, BEH_POINT)
 			if not (ok and passive) and noTarget then
 				if string.find(ability:GetName(), "detonate", 1, true) then
 					return ability
@@ -375,16 +383,19 @@ function X.SkillsComplement()
 	-- 1s cast point while being hit): log what stopped it.
 	if bot._escapeBlastAt ~= nil and DotaTime() - bot._escapeBlastAt >= 1.6 then
 		if blastOffAbility:IsTrained() and blastOffAbility:GetCooldownTimeRemaining() <= 0 then
-			pcall(print, string.format(
-				"[OHA-TECHIES] t=%.0f escape-not-cast stun=%s hex=%s silence=%s mode=%d act=%d hp=%.2f",
-				DotaTime(),
-				tostring(bot:IsStunned()),
-				tostring(bot:IsHexed()),
-				tostring(bot:IsSilenced()),
-				bot:GetActiveMode(),
-				bot:GetCurrentActionType(),
-				Fu.GetHP(bot)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TECHIES] t=%.0f escape-not-cast stun=%s hex=%s silence=%s mode=%d act=%d hp=%.2f",
+					DotaTime(),
+					tostring(bot:IsStunned()),
+					tostring(bot:IsHexed()),
+					tostring(bot:IsSilenced()),
+					bot:GetActiveMode(),
+					bot:GetCurrentActionType(),
+					Fu.GetHP(bot)
+				)
+			)
 		end
 		bot._escapeBlastAt = nil
 	end
@@ -461,7 +472,12 @@ function X.SkillsComplement()
 		-- Blast Off goes alone, as before; Sticky never holds it back.
 		local stickyFirst = false
 		local manaLeft = bot:GetMana() - blastOffAbility:GetManaCost()
-		if blastOffWhy ~= "escape" and stickyBombAbility:IsTrained() and stickyBombAbility:IsFullyCastable() and manaLeft >= stickyBombAbility:GetManaCost() then
+		if
+			blastOffWhy ~= "escape"
+			and stickyBombAbility:IsTrained()
+			and stickyBombAbility:IsFullyCastable()
+			and manaLeft >= stickyBombAbility:GetManaCost()
+		then
 			local range = stickyBombAbility:GetCastRange() + 100
 			local best, bestDist = nil, math.huge
 			for _, enemy in pairs(Fu.GetNearbyHeroes(bot, range, true, BOT_MODE_NONE) or {}) do
@@ -514,7 +530,11 @@ function X.SkillsComplement()
 				pcall(ChargeTracker.Issued, bot, proximityMinesAbility, nil, planted)
 			end
 		end
-		X.LogTechies(string.format("blast why=%s tazer=%s", blastOffWhy or "?", tostring(tazer)), planted, blastOffLocation)
+		X.LogTechies(
+			string.format("blast why=%s tazer=%s", blastOffWhy or "?", tostring(tazer)),
+			planted,
+			blastOffLocation
+		)
 		if blastOffWhy == "escape" then
 			bot._escapeBlastAt = DotaTime()
 		end
@@ -570,7 +590,8 @@ end
 local function StickyHeroSpot(hero, range, speed, accel)
 	local loc = hero:GetLocation()
 	if not Fu.IsDisabled(hero) then
-		local eta = stickyBombAbility:GetCastPoint() + Fu.GetETAWithAcceleration(GetUnitToUnitDistance(bot, hero), speed, accel)
+		local eta = stickyBombAbility:GetCastPoint()
+			+ Fu.GetETAWithAcceleration(GetUnitToUnitDistance(bot, hero), speed, accel)
 		loc = hero:GetExtrapolatedLocation(eta)
 	end
 	if GetUnitToLocationDistance(bot, loc) > range then
@@ -694,7 +715,11 @@ function X.ConsiderStickyBomb()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(enemyHero, castRange, speed, acceleration)
 				end
 			end
@@ -709,7 +734,10 @@ function X.ConsiderStickyBomb()
 	if Fu.IsFarming(bot) and Fu.GetManaAfter(stickyBombAbility:GetManaCost()) > 0.3 then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange + STICKY_AOE)
 		local spot, count = StickyCreepSpot(neutralCreeps, castRange)
-		if spot ~= nil and (count >= 2 or count >= 1 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			spot ~= nil
+			and (count >= 2 or count >= 1 and Fu.IsValid(neutralCreeps[1]) and neutralCreeps[1]:IsAncientCreep())
+		then
 			return BOT_ACTION_DESIRE_HIGH, spot
 		end
 		spot, count = StickyCreepSpot(bot:GetNearbyLaneCreeps(castRange + STICKY_AOE, true), castRange)
@@ -722,9 +750,18 @@ function X.ConsiderStickyBomb()
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				local enemyTowers = enemyHero:GetNearbyTowers(600, true)
-				if enemyTowers ~= nil and #enemyTowers >= 1 and Fu.IsValidBuilding(enemyTowers[1]) and enemyTowers[1]:GetAttackTarget() == enemyHero then
+				if
+					enemyTowers ~= nil
+					and #enemyTowers >= 1
+					and Fu.IsValidBuilding(enemyTowers[1])
+					and enemyTowers[1]:GetAttackTarget() == enemyHero
+				then
 					return BOT_ACTION_DESIRE_HIGH, StickyHeroSpot(enemyHero, castRange, speed, acceleration)
 				end
 			end
@@ -751,12 +788,23 @@ function X.ConsiderStickyBomb()
 			end
 		end
 		local spot, count = StickyCreepSpot(killableCreeps, castRange)
-		if spot ~= nil and count >= 2 and Fu.GetMP(bot) > 0.35 and Fu.CanBeAttacked(killableCreeps[1]) and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			spot ~= nil
+			and count >= 2
+			and Fu.GetMP(bot) > 0.35
+			and Fu.CanBeAttacked(killableCreeps[1])
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, spot
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -855,14 +903,17 @@ local function AllyIsInitiating(ally)
 end
 -- [OHA-TECHIES] tazer target=... why=..., every cast.
 function X.LogTazer(target, why)
-	pcall(print, string.format(
-		"[OHA-TECHIES] t=%.0f tazer target=%s why=%s targetHp=%.2f mode=%d",
-		DotaTime(),
-		target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		why,
-		Fu.GetHP(target),
-		target:GetActiveMode()
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TECHIES] t=%.0f tazer target=%s why=%s targetHp=%.2f mode=%d",
+			DotaTime(),
+			target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			why,
+			Fu.GetHP(target),
+			target:GetActiveMode()
+		)
+	)
 end
 function X.ConsiderReactiveTazer()
 	if not X.TazerUsable() then
@@ -929,13 +980,16 @@ function X.ConsiderReactiveTazer()
 	if (initiate ~= nil or selfEngage) and X.ComboReady() then
 		if DotaTime() >= (bot._tazerHeldLogAt or -999) then
 			bot._tazerHeldLogAt = DotaTime() + 10
-			pcall(print, string.format(
-				"[OHA-TECHIES] t=%.0f tazer-held for=%s pid=%d mp=%.2f",
-				DotaTime(),
-				initiate ~= nil and (string.gsub(initiate:GetUnitName(), "npc_dota_hero_", "")) or "self",
-				bot:GetPlayerID(),
-				Fu.GetMP(bot)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TECHIES] t=%.0f tazer-held for=%s pid=%d mp=%.2f",
+					DotaTime(),
+					initiate ~= nil and (string.gsub(initiate:GetUnitName(), "npc_dota_hero_", "")) or "self",
+					bot:GetPlayerID(),
+					Fu.GetMP(bot)
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
@@ -962,7 +1016,12 @@ local function TazerHost()
 	return nil
 end
 function X.ConsiderDetonateTazer()
-	if tazerStopAbility == nil or tazerStopAbility:IsNull() or tazerStopAbility:IsHidden() or not tazerStopAbility:IsFullyCastable() then
+	if
+		tazerStopAbility == nil
+		or tazerStopAbility:IsNull()
+		or tazerStopAbility:IsHidden()
+		or not tazerStopAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local host = TazerHost()
@@ -1022,7 +1081,11 @@ function X.ConsiderPlantMad()
 			return unit:GetLocation()
 		end
 		if dist <= castRange + 250 then
-			return Fu.Utils.GetOffsetLocationTowardsTargetLocation(bot:GetLocation(), unit:GetLocation(), castRange - 40)
+			return Fu.Utils.GetOffsetLocationTowardsTargetLocation(
+				bot:GetLocation(),
+				unit:GetLocation(),
+				castRange - 40
+			)
 		end
 		return nil
 	end
@@ -1035,7 +1098,12 @@ function X.ConsiderPlantMad()
 			end
 		end
 	end
-	if isEngaging and Fu.IsValidTarget(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) and GetUnitToUnitDistance(bot, botTarget) > 400 then
+	if
+		isEngaging
+		and Fu.IsValidTarget(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+		and GetUnitToUnitDistance(bot, botTarget) > 400
+	then
 		-- Where the target will be when it blows: 1s plant + 1.5s fuse.
 		local loc = Toward(botTarget)
 		if loc ~= nil then
@@ -1127,7 +1195,11 @@ function X.ConsiderDetonateMad()
 	if bot._madLoc ~= nil and now - (bot._madPlantAt or now) > 3.5 then
 		local plantAbility = bot:GetAbilityByName("techies_mutually_assured_destruction")
 		local cast = plantAbility ~= nil and plantAbility:GetCooldownTimeRemaining() > 0
-		X.LogTechies("mad-plant-failed (" .. (cast and "no detonate" or "not cast") .. ")" .. PlantFailWhy(), 0, bot._madLoc)
+		X.LogTechies(
+			"mad-plant-failed (" .. (cast and "no detonate" or "not cast") .. ")" .. PlantFailWhy(),
+			0,
+			bot._madLoc
+		)
 		bot._madLoc = nil
 		bot._madDetonateAt = nil
 	end
@@ -1165,16 +1237,19 @@ function X.ConsiderSoulRingForBlast()
 	local ok = after >= 0.4 * bot:GetMaxHealth() and after >= 300
 	if DotaTime() >= (bot._soulRingLogAt or -999) then
 		bot._soulRingLogAt = DotaTime() + 5
-		pcall(print, string.format(
-			"[OHA-TECHIES] t=%.0f soul-ring %s for=blast-%s hpAfter=%.0f max=%.0f mana=%.0f cost=%.0f",
-			DotaTime(),
-			ok and "used" or "skipped-hp",
-			tostring(why),
-			after,
-			bot:GetMaxHealth(),
-			mana,
-			cost
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-TECHIES] t=%.0f soul-ring %s for=blast-%s hpAfter=%.0f max=%.0f mana=%.0f cost=%.0f",
+				DotaTime(),
+				ok and "used" or "skipped-hp",
+				tostring(why),
+				after,
+				bot:GetMaxHealth(),
+				mana,
+				cost
+			)
+		)
 	end
 	if not ok then
 		return false
@@ -1191,7 +1266,11 @@ end
 function X.ComboDamage()
 	local dmg = blastOffAbility:GetSpecialValueInt("damage")
 	local mana = bot:GetMana() - blastOffAbility:GetManaCost()
-	if stickyBombAbility:IsTrained() and stickyBombAbility:IsFullyCastable() and mana >= stickyBombAbility:GetManaCost() then
+	if
+		stickyBombAbility:IsTrained()
+		and stickyBombAbility:IsFullyCastable()
+		and mana >= stickyBombAbility:GetManaCost()
+	then
 		dmg = dmg + stickyBombAbility:GetSpecialValueInt("damage")
 		mana = mana - stickyBombAbility:GetManaCost()
 	end
@@ -1235,20 +1314,24 @@ function X.LogBlastSkip(target, why)
 		return
 	end
 	bot._blastSkipLogAt = DotaTime()
-	pcall(print, string.format(
-		"[OHA-TECHIES] t=%.0f blast-skip why=%s target=%s combo=%d dealt=%d allies=%d hp=%d/%d",
-		DotaTime(),
-		why,
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		X.ComboDamage(),
-		target:GetActualIncomingDamage(X.ComboDamage(), DAMAGE_TYPE_MAGICAL),
-		X.FollowUpAllies(target),
-		target:GetHealth(),
-		target:GetMaxHealth()
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TECHIES] t=%.0f blast-skip why=%s target=%s combo=%d dealt=%d allies=%d hp=%d/%d",
+			DotaTime(),
+			why,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			X.ComboDamage(),
+			target:GetActualIncomingDamage(X.ComboDamage(), DAMAGE_TYPE_MAGICAL),
+			X.FollowUpAllies(target),
+			target:GetHealth(),
+			target:GetMaxHealth()
+		)
+	)
 end
 function X.ConsiderBlastOff(ignoreMana)
-	local ready = ignoreMana and blastOffAbility:IsTrained() and blastOffAbility:GetCooldownTimeRemaining() <= 0 or blastOffAbility:IsFullyCastable()
+	local ready = ignoreMana and blastOffAbility:IsTrained() and blastOffAbility:GetCooldownTimeRemaining() <= 0
+		or blastOffAbility:IsFullyCastable()
 	if not ready or blastOffAbility:IsHidden() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
@@ -1274,7 +1357,10 @@ function X.ConsiderBlastOff(ignoreMana)
 			if enemyHero:IsChanneling() then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if (hpRatio or 1) >= 0.3 or alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy then
+				if
+					(hpRatio or 1) >= 0.3
+					or alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "channel"
 				end
 			end
@@ -1283,7 +1369,11 @@ function X.ConsiderBlastOff(ignoreMana)
 	if Fu.IsInTeamFight(bot, 1200) then
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius * 0.8)
-		if enemiesInRadius ~= nil and #enemiesInRadius >= 2 and not Fu.IsLocationInChrono(Fu.GetCenterOfUnits(enemiesInRadius)) then
+		if
+			enemiesInRadius ~= nil
+			and #enemiesInRadius >= 2
+			and not Fu.IsLocationInChrono(Fu.GetCenterOfUnits(enemiesInRadius))
+		then
 			local kills = false
 			for _, enemy in pairs(enemiesInRadius) do
 				if X.ComboKills(enemy) then
@@ -1297,7 +1387,12 @@ function X.ConsiderBlastOff(ignoreMana)
 			X.LogBlastSkip(enemiesInRadius[1], "fight-no-kill")
 		end
 	end
-	if isEngaging and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and not X.ComboKills(botTarget) then
+	if
+		isEngaging
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+		and not X.ComboKills(botTarget)
+	then
 		X.LogBlastSkip(botTarget, "no-kill")
 	end
 	if isEngaging then
@@ -1346,19 +1441,33 @@ function X.ConsiderBlastOff(ignoreMana)
 	if isRetreating then
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					-- Game 031, 6:59: low and chased, he blasted onto the chaser (last-stand) and stayed
 					-- in the fight. Run away (user call); onto the chaser only when the blast kills him.
 					if
 						Fu.CanCastOnNonMagicImmune(enemyHero)
-						and Fu.CanKillTarget(enemyHero, blastOffAbility:GetSpecialValueInt("damage"), DAMAGE_TYPE_MAGICAL)
+						and Fu.CanKillTarget(
+							enemyHero,
+							blastOffAbility:GetSpecialValueInt("damage"),
+							DAMAGE_TYPE_MAGICAL
+						)
 					then
 						return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "last-stand"
 					else
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange), "escape"
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange),
+							"escape"
 					end
 				end
 			end
@@ -1369,7 +1478,11 @@ end
 function X.ConsiderMineFieldSign()
 	-- Minefield Sign stays hidden without Scepter but still reports castable. Ordering it
 	-- then is refused by the server and freezes Techies in place every think.
-	if not proximityMinesAbility:IsTrained() or minefieldSignAbility:IsHidden() or not minefieldSignAbility:IsFullyCastable() then
+	if
+		not proximityMinesAbility:IsTrained()
+		or minefieldSignAbility:IsHidden()
+		or not minefieldSignAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local auraRadius = minefieldSignAbility:GetSpecialValueInt("aura_radius")
@@ -1461,17 +1574,20 @@ function X.LogTechies(kind, mines, center)
 		return
 	end
 	bot._techiesLogAt[kind] = DotaTime() + 5
-	pcall(print, string.format(
-		"[OHA-TECHIES] t=%.0f %s pid=%d mines=%d charges=%d at=%.0f,%.0f mp=%.2f",
-		DotaTime(),
-		kind,
-		bot:GetPlayerID(),
-		mines,
-		X.MineCharges(),
-		center and center.x or 0,
-		center and center.y or 0,
-		Fu.GetMP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TECHIES] t=%.0f %s pid=%d mines=%d charges=%d at=%.0f,%.0f mp=%.2f",
+			DotaTime(),
+			kind,
+			bot:GetPlayerID(),
+			mines,
+			X.MineCharges(),
+			center and center.x or 0,
+			center and center.y or 0,
+			Fu.GetMP(bot)
+		)
+	)
 end
 -- A mine spot of the triangle around the last Blast Off landing, 1.75s to 3.5s after the order
 -- (1s cast point and 0.75s flight, Valve data, then the stun). Spots already mined are skipped.
@@ -1482,16 +1598,19 @@ function X.OrderMine(loc, kind)
 	if loc == nil then
 		return
 	end
-	pcall(print, string.format(
-		"[OHA-TECHIES] t=%.0f mine-order kind=%s at=%.2f,%.2f dist=%d range=%d charges=%d",
-		DotaTime(),
-		kind,
-		loc.x,
-		loc.y,
-		math.floor(GetUnitToLocationDistance(bot, loc)),
-		proximityMinesAbility:GetCastRange(),
-		X.MineCharges()
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-TECHIES] t=%.0f mine-order kind=%s at=%.2f,%.2f dist=%d range=%d charges=%d",
+			DotaTime(),
+			kind,
+			loc.x,
+			loc.y,
+			math.floor(GetUnitToLocationDistance(bot, loc)),
+			proximityMinesAbility:GetCastRange(),
+			X.MineCharges()
+		)
+	)
 	pcall(ChargeTracker.Issued, bot, proximityMinesAbility)
 	bot:Action_UseAbilityOnLocation(proximityMinesAbility, loc)
 end
@@ -1584,7 +1703,11 @@ function X.ConsiderPostBlastSticky()
 	if bot._blastAt == nil or DotaTime() - bot._blastAt < 1.75 or DotaTime() - bot._blastAt > 5 then
 		return nil
 	end
-	if bot._stickyBlastAt == bot._blastAt or not stickyBombAbility:IsTrained() or not stickyBombAbility:IsFullyCastable() then
+	if
+		bot._stickyBlastAt == bot._blastAt
+		or not stickyBombAbility:IsTrained()
+		or not stickyBombAbility:IsFullyCastable()
+	then
 		return nil
 	end
 	local range = stickyBombAbility:GetCastRange() + 100
@@ -1610,7 +1733,12 @@ function X.ConsiderPostBlastSign()
 	if land == nil or DotaTime() < land or DotaTime() > land + 2 then
 		return false
 	end
-	if not bot:HasScepter() or minefieldSignAbility:IsHidden() or not minefieldSignAbility:IsFullyCastable() or not proximityMinesAbility:IsTrained() then
+	if
+		not bot:HasScepter()
+		or minefieldSignAbility:IsHidden()
+		or not minefieldSignAbility:IsFullyCastable()
+		or not proximityMinesAbility:IsTrained()
+	then
 		return false
 	end
 	return true
@@ -1619,7 +1747,12 @@ function X.ConsiderPostBlastMines()
 	if bot._blastAt == nil or bot._blastLoc == nil or DotaTime() - bot._blastAt > 3.5 then
 		return nil
 	end
-	if DotaTime() - bot._blastAt < 1.75 or not proximityMinesAbility:IsTrained() or proximityMinesAbility:IsHidden() or not proximityMinesAbility:IsFullyCastable() then
+	if
+		DotaTime() - bot._blastAt < 1.75
+		or not proximityMinesAbility:IsTrained()
+		or proximityMinesAbility:IsHidden()
+		or not proximityMinesAbility:IsFullyCastable()
+	then
 		return nil
 	end
 	-- Around Techies himself: he has just landed among the stunned enemies, so no walking.
@@ -1659,10 +1792,14 @@ function X.ConsiderProximityMines()
 		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if Fu.CanKillTarget(botTarget, twoMinesDamage, DAMAGE_TYPE_MAGICAL) or alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
+			if
+				Fu.CanKillTarget(botTarget, twoMinesDamage, DAMAGE_TYPE_MAGICAL)
+				or alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget
+			then
 				enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), Techies.nMinMineDistance)
 				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
-					local placeScore, placeLocation = Techies.GetGoodPlaceForMiningNear(Fu.GetCenterOfUnits(enemiesNearTarget))
+					local placeScore, placeLocation =
+						Techies.GetGoodPlaceForMiningNear(Fu.GetCenterOfUnits(enemiesNearTarget))
 					if placeScore > 0 then
 						return BOT_ACTION_DESIRE_HIGH, placeLocation
 					end
@@ -1696,7 +1833,11 @@ function X.ConsiderProximityMines()
 				if GetUnitToLocationDistance(bot, mineSpot) < castRange + 100 then
 					return BOT_ACTION_DESIRE_HIGH, mineSpot
 				end
-				mineSpot = Fu.Utils.GetOffsetLocationTowardsTargetLocation(bot:GetLocation(), enemyHero:GetLocation(), castRange)
+				mineSpot = Fu.Utils.GetOffsetLocationTowardsTargetLocation(
+					bot:GetLocation(),
+					enemyHero:GetLocation(),
+					castRange
+				)
 				if GetUnitToLocationDistance(bot, mineSpot) < castRange + 100 then
 					return BOT_ACTION_DESIRE_HIGH, mineSpot
 				end
@@ -1733,10 +1874,20 @@ function X.ConsiderProximityMines()
 	end
 	if Fu.IsPushing(bot) then
 		local enemyTowers = bot:GetNearbyTowers(1200, true)
-		if enemyTowers ~= nil and #enemyTowers >= 1 and Fu.IsValidBuilding(enemyTowers[1]) and Fu.CanBeAttacked(enemyTowers[1]) then
+		if
+			enemyTowers ~= nil
+			and #enemyTowers >= 1
+			and Fu.IsValidBuilding(enemyTowers[1])
+			and Fu.CanBeAttacked(enemyTowers[1])
+		then
 			local alliesNearTower = Fu.GetAlliesNearLoc(enemyTowers[1]:GetLocation(), bot:GetAttackRange())
 			local enemiesNearTower = Fu.GetEnemiesNearLoc(enemyTowers[1]:GetLocation(), 1600)
-			if alliesNearTower ~= nil and #alliesNearTower >= 1 and enemiesNearTower ~= nil and #enemiesNearTower == 0 then
+			if
+				alliesNearTower ~= nil
+				and #alliesNearTower >= 1
+				and enemiesNearTower ~= nil
+				and #enemiesNearTower == 0
+			then
 				-- Mines deal 30% to buildings. Ring the tower with the 350-spaced triangle
 				-- instead of one random spot that blocks the next mine.
 				local spots = X.MineTriangle(enemyTowers[1]:GetLocation(), 250)
@@ -1759,7 +1910,12 @@ function X.ConsiderProximityMines()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and not Techies.IsOtherMinesClose(botTarget:GetLocation()) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and not Techies.IsOtherMinesClose(botTarget:GetLocation())
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -1814,7 +1970,11 @@ function X.IsEnemyCloserToWardLocation(location, distance)
 		local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 		if lastSeenInfo ~= nil then
 			local lastSeen = lastSeenInfo[1]
-			if lastSeen ~= nil and lastSeen.time_since_seen < 5 and Fu.GetDistance(lastSeen.location, location) < distance then
+			if
+				lastSeen ~= nil
+				and lastSeen.time_since_seen < 5
+				and Fu.GetDistance(lastSeen.location, location) < distance
+			then
 				return true
 			end
 		end
@@ -1830,14 +1990,17 @@ function X.TazerUsable()
 	if reactiveTazerAbility:IsHidden() then
 		if DotaTime() >= (bot._tazerHiddenLogAt or -999) then
 			bot._tazerHiddenLogAt = DotaTime() + 30
-			pcall(print, string.format(
-				"[OHA-TECHIES] t=%.0f tazer-hidden pid=%d lvl=%d stopHidden=%s buff=%s",
-				DotaTime(),
-				bot:GetPlayerID(),
-				reactiveTazerAbility:GetLevel(),
-				tostring(tazerStopAbility == nil or tazerStopAbility:IsNull() or tazerStopAbility:IsHidden()),
-				tostring(bot:HasModifier("modifier_techies_reactive_tazer"))
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TECHIES] t=%.0f tazer-hidden pid=%d lvl=%d stopHidden=%s buff=%s",
+					DotaTime(),
+					bot:GetPlayerID(),
+					reactiveTazerAbility:GetLevel(),
+					tostring(tazerStopAbility == nil or tazerStopAbility:IsNull() or tazerStopAbility:IsHidden()),
+					tostring(bot:HasModifier("modifier_techies_reactive_tazer"))
+				)
+			)
 		end
 		return false
 	end

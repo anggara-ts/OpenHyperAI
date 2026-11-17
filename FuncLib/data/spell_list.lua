@@ -1,7 +1,10 @@
 -- Lookup table: spell list.
 local SpellList = {}
 SpellList["spells"] = {
-	["npc_dota_hero_abaddon"] = { ["abaddon_death_coil"] = { weight = 0.8 }, ["abaddon_aphotic_shield"] = { weight = 0.8 } },
+	["npc_dota_hero_abaddon"] = {
+		["abaddon_death_coil"] = { weight = 0.8 },
+		["abaddon_aphotic_shield"] = { weight = 0.8 },
+	},
 	["npc_dota_hero_abyssal_underlord"] = {
 		["abyssal_underlord_firestorm"] = { weight = 0.5 },
 		["abyssal_underlord_pit_of_malice"] = { weight = 0.5 },

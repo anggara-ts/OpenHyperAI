@@ -51,7 +51,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -94,7 +95,12 @@ function X.ConsiderQ()
 	if Fu.GetHP(bot) < 0.9 and bot:DistanceFromFountain() < 450 then
 		return 0
 	end
-	if distanceFromHero > 3000 and Fu.GetHP(bot) > 0.25 and not Fu.IsRetreating(bot) and not Fu.Item.HasItem(bot, "item_ultimate_scepter") then
+	if
+		distanceFromHero > 3000
+		and Fu.GetHP(bot) > 0.25
+		and not Fu.IsRetreating(bot)
+		and not Fu.Item.HasItem(bot, "item_ultimate_scepter")
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if
@@ -130,7 +136,11 @@ function X.ConsiderSavageRoar()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, radius) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

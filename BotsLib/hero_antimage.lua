@@ -39,7 +39,8 @@ X["sSellList"] = { "item_skadi", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -51,7 +52,8 @@ function X.MinionThink(hMinionUnit)
 	end
 end
 local blinkAbility = SafeAbility(bot:GetAbilityByName("antimage_blink"), "antimage_blink", "antimage")
-local counterspellAbility = SafeAbility(bot:GetAbilityByName("antimage_counterspell"), "antimage_counterspell", "antimage")
+local counterspellAbility =
+	SafeAbility(bot:GetAbilityByName("antimage_counterspell"), "antimage_counterspell", "antimage")
 local manaVoidAbility = SafeAbility(bot:GetAbilityByName("antimage_mana_void"), "antimage_mana_void", "antimage")
 local blinkDesire, blinkLocation
 local counterspellDesire
@@ -110,10 +112,17 @@ function X.ConsiderBlink()
 		local escapeLocation = Fu.GetEscapeLoc()
 		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, blinkRange)
 	end
-	if (Fu.IsStunProjectileIncoming(bot, 600) or Fu.IsUnitTargetProjectileIncoming(bot, 400)) and not counterspellAbility:IsFullyCastable() then
+	if
+		(Fu.IsStunProjectileIncoming(bot, 600) or Fu.IsUnitTargetProjectileIncoming(bot, 400))
+		and not counterspellAbility:IsFullyCastable()
+	then
 		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), blinkRange)
 	end
-	if not bot:HasModifier("modifier_sniper_assassinate") and not bot:IsMagicImmune() and not counterspellAbility:IsFullyCastable() then
+	if
+		not bot:HasModifier("modifier_sniper_assassinate")
+		and not bot:IsMagicImmune()
+		and not counterspellAbility:IsFullyCastable()
+	then
 		if Fu.IsWillBeCastUnitTargetSpell(bot, 400) then
 			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), blinkRange)
 		end
@@ -167,9 +176,14 @@ function X.ConsiderBlink()
 				if
 					alliesNearEnemy ~= nil
 					and enemiesNearEnemy ~= nil
-					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2) or Fu.GetHP(bot) < 0.2 and Fu.IsChasingTarget(enemyHero, bot))
+					and (
+						#enemiesNearEnemy > #alliesNearEnemy
+						or bot:WasRecentlyDamagedByAnyHero(2)
+						or Fu.GetHP(bot) < 0.2 and Fu.IsChasingTarget(enemyHero, bot)
+					)
 				then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), blinkRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), blinkRange)
 				end
 			end
 		end
@@ -234,7 +248,11 @@ function X.ConsiderBlink()
 		if GetUnitToLocationDistance(bot, tormentorLocation) > blinkRange then
 			local blinkLocation = Fu.Site.GetXUnitsTowardsLocation(bot, tormentorLocation, blinkRange)
 			local enemiesNearBlinkLocation = Fu.GetEnemiesNearLoc(blinkLocation, 1600)
-			if enemiesNearBlinkLocation ~= nil and #enemiesNearBlinkLocation == 0 and IsLocationPassable(blinkLocation) then
+			if
+				enemiesNearBlinkLocation ~= nil
+				and #enemiesNearBlinkLocation == 0
+				and IsLocationPassable(blinkLocation)
+			then
 				return BOT_ACTION_DESIRE_HIGH, blinkLocation
 			end
 		end

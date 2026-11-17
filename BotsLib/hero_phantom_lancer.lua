@@ -43,7 +43,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_PL" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -71,7 +72,11 @@ local aetherRange = 0
 local phantomRushDistance = 0
 local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
-	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() or bot:HasModifier("modifier_phantom_lancer_phantom_edge_boost") then
+	if
+		Fu.CanNotUseAbility(bot)
+		or bot:IsInvisible()
+		or bot:HasModifier("modifier_phantom_lancer_phantom_edge_boost")
+	then
 		return
 	end
 	local context = AbilityContext.Build(bot)
@@ -116,7 +121,11 @@ function X.ConsiderR()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1200) and not Fu.IsInRange(bot, botTarget, 650) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1200)
+			and not Fu.IsInRange(bot, botTarget, 650)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -167,10 +176,15 @@ function X.ConsiderQ()
 		end
 	end
 	if
-		Fu.IsRetreating(bot) and (bot:WasRecentlyDamagedByAnyHero(2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+		Fu.IsRetreating(bot)
+		and (bot:WasRecentlyDamagedByAnyHero(2.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
 	then
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "Q撤退" .. enemyHero:GetUnitName()
 			end
 		end
@@ -198,13 +212,22 @@ function X.ConsiderQ()
 		end
 		if Fu.IsInTeamFight(bot, 900) and botLevel > 5 then
 			for _, enemyHero in pairs(enemyHeroes) do
-				if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+					and Fu.CanCastOnTargetAdvanced(enemyHero)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "Q团战" .. Fu.Chat.GetNormName(enemyHero)
 				end
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and #nearbyAllies <= 2 and botLevel >= 8 and Fu.IsAllowedToSpam(bot, 30) then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and #nearbyAllies <= 2
+		and botLevel >= 8
+		and Fu.IsAllowedToSpam(bot, 30)
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 220, true)
 		for _, creep in pairs(laneCreeps) do
 			if
@@ -215,7 +238,10 @@ function X.ConsiderQ()
 				and creep:GetHealth() > damage * 0.88
 			then
 				local delay = castPoint + GetUnitToUnitDistance(bot, creep) / 1000
-				if Fu.WillKillTarget(creep, damage, damageType, delay * 0.98) and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, delay) then
+				if
+					Fu.WillKillTarget(creep, damage, damageType, delay * 0.98)
+					and not Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, delay)
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q推线1"
 				end
 				local allyLaneCreeps = bot:GetNearbyLaneCreeps(1200, false)
@@ -261,7 +287,13 @@ function X.ConsiderW()
 			and Fu.CanCastOnMagicImmune(botTarget)
 			and not Fu.IsDisabled(botTarget)
 			and (X.IsEnemyCastAbility() or hpRatio < 0.2)
-			and (abilityLevel >= 3 or mpRatio > 0.6 or hpRatio < 0.4 or Fu.GetHP(botTarget) < 0.4 or DotaTime() > 9 * 60)
+			and (
+				abilityLevel >= 3
+				or mpRatio > 0.6
+				or hpRatio < 0.4
+				or Fu.GetHP(botTarget) < 0.4
+				or DotaTime() > 9 * 60
+			)
 		then
 			local bestLocation = nil
 			local bestDistance = 9999
@@ -269,7 +301,11 @@ function X.ConsiderW()
 			for distance = 30, castRange, 30 do
 				local candidateLocation = Fu.GetFaceTowardDistanceLocation(bot, distance)
 				local distanceToTarget = Fu.GetLocationToLocationDistance(targetLocation, candidateLocation)
-				if distanceToTarget > 300 and (distanceToTarget < phantomRushDistance - 300 or distanceToTarget < 500) and distanceToTarget < bestDistance then
+				if
+					distanceToTarget > 300
+					and (distanceToTarget < phantomRushDistance - 300 or distanceToTarget < 500)
+					and distanceToTarget < bestDistance
+				then
 					bestDistance = distanceToTarget
 					bestLocation = candidateLocation
 				end
@@ -289,8 +325,17 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and #nearbyAllies <= 2 and botLevel >= 9 and Fu.IsAllowedToSpam(bot, 100) then
-		if Fu.IsValid(botTarget) and not Fu.IsInRange(bot, botTarget, phantomRushDistance + 300) and Fu.IsInRange(bot, botTarget, phantomRushDistance + 1200) then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and #nearbyAllies <= 2
+		and botLevel >= 9
+		and Fu.IsAllowedToSpam(bot, 100)
+	then
+		if
+			Fu.IsValid(botTarget)
+			and not Fu.IsInRange(bot, botTarget, phantomRushDistance + 300)
+			and Fu.IsInRange(bot, botTarget, phantomRushDistance + 1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetUnitTowardDistanceLocation(bot, botTarget, castRange), "W打钱"
 		end
 	end
@@ -332,7 +377,11 @@ function X.IsEnemyCastAbility()
 			if activeAbility ~= nil then
 				local behavior = activeAbility:GetBehavior()
 				local abilityName = activeAbility:GetName()
-				if behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5) and ignoredEnemyAbilities[abilityName] ~= true then
+				if
+					behavior ~= ABILITY_BEHAVIOR_UNIT_TARGET
+					and (enemyHero:IsBot() or enemyHero:GetLevel() >= 5)
+					and ignoredEnemyAbilities[abilityName] ~= true
+				then
 					return true
 				end
 				if

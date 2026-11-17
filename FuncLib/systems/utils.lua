@@ -228,7 +228,13 @@ local function deleteProperty(target, key)
 	local descriptor = descriptors[key]
 	if descriptor then
 		if not descriptor.configurable then
-			error(newInstance(TypeError, ((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."), 0)
+			error(
+				newInstance(
+					TypeError,
+					((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."
+				),
+				0
+			)
 		end
 		descriptors[key] = nil
 		return true
@@ -593,7 +599,10 @@ function Utils.GetLastSeenEnemyIdsNearLocation(location, radius)
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 			if lastSeenInfo ~= nil and lastSeenInfo[1] ~= nil then
 				local info = lastSeenInfo[1]
-				if Utils.GetLocationToLocationDistance(info.location, location) <= radius and info.time_since_seen <= 3 then
+				if
+					Utils.GetLocationToLocationDistance(info.location, location) <= radius
+					and info.time_since_seen <= 3
+				then
 					enemyIds[#enemyIds + 1] = playerId
 				end
 			end
@@ -605,7 +614,11 @@ end
 function Utils.GetEnemyIdsInTpToLocation(location, radius)
 	local enemyIds = {}
 	for _, teleport in ipairs(GetIncomingTeleports()) do
-		if teleport ~= nil and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius and not IsTeamPlayer(teleport.playerid) then
+		if
+			teleport ~= nil
+			and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius
+			and not IsTeamPlayer(teleport.playerid)
+		then
 			enemyIds[#enemyIds + 1] = teleport.playerid
 		end
 	end
@@ -644,7 +657,14 @@ Utils.RadiantFountainTpPoint = Vector(-7172, -6652, 384)
 Utils.DireFountainTpPoint = Vector(6982, 6422, 392)
 Utils.RadiantRoshanLoc = Vector(-2984, 2349, 384)
 Utils.DireRoshanLoc = Vector(2980, -2816, 384)
-Utils.BarrackList = { Barracks.TopMelee, Barracks.TopRanged, Barracks.MidMelee, Barracks.MidRanged, Barracks.BotMelee, Barracks.BotRanged }
+Utils.BarrackList = {
+	Barracks.TopMelee,
+	Barracks.TopRanged,
+	Barracks.MidMelee,
+	Barracks.MidRanged,
+	Barracks.BotMelee,
+	Barracks.BotRanged,
+}
 Utils.WisdomRunes = { [Team.Radiant] = Vector(-8126, -320, 256), [Team.Dire] = Vector(8319, 266, 256) }
 -- Lotus pool centers (7.41 map). Prefer live npc_dota_lotus_pool discovery in modes.
 Utils.LotusPools = {
@@ -665,8 +685,21 @@ Utils.BuggyHeroesDueToValveTooLazy = {
 Utils.HighGroundTowers = { Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
 Utils.FirstTierTowers = { Tower.Top1, Tower.Mid1, Tower.Bot1 }
 Utils.SecondTierTowers = { Tower.Top2, Tower.Mid2, Tower.Bot2 }
-Utils.AllTowers = { Tower.Top1, Tower.Mid1, Tower.Bot1, Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
-Utils.NonTier1Towers = { Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
+Utils.AllTowers = {
+	Tower.Top1,
+	Tower.Mid1,
+	Tower.Bot1,
+	Tower.Top2,
+	Tower.Mid2,
+	Tower.Bot2,
+	Tower.Top3,
+	Tower.Mid3,
+	Tower.Bot3,
+	Tower.Base1,
+	Tower.Base2,
+}
+Utils.NonTier1Towers =
+	{ Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
 Utils.CachedVarsCleanTime = 5
 local initiatorRequirements = {
 	[HeroName.Axe] = { minLevel = 4, requiredItems = {}, requiredModifiers = {} },
@@ -741,7 +774,11 @@ Utils.ImportantSpells = {
 	[HeroName.Pugna] = { "pugna_life_drain" },
 	[HeroName.QueenOfPain] = { "queenofpain_sonic_wave" },
 	[HeroName.Ringmaster] = { "ringmaster_wheel" },
-	[HeroName.ShadowDeamon] = { "shadow_demon_disruption", "shadow_demon_demonic_cleanse", "shadow_demon_demonic_purge" },
+	[HeroName.ShadowDeamon] = {
+		"shadow_demon_disruption",
+		"shadow_demon_demonic_cleanse",
+		"shadow_demon_demonic_purge",
+	},
 	[HeroName.ShadowShaman] = { "shadow_shaman_mass_serpent_ward" },
 	[HeroName.Silencer] = { "silencer_global_silence" },
 	[HeroName.SkywrathMage] = { "skywrath_mage_mystic_flare" },
@@ -908,10 +945,8 @@ function Utils.Shuffle(list)
 end
 function Utils.SetFrameProcessTime(bot)
 	if bot.frameProcessTime == nil then
-		bot.frameProcessTime = Utils.FrameProcessTime + numberToFixed(
-			math.fmod(bot:GetPlayerID() / 1000, Utils.FrameProcessTime / 10) * 3,
-			2
-		)
+		bot.frameProcessTime = Utils.FrameProcessTime
+			+ numberToFixed(math.fmod(bot:GetPlayerID() / 1000, Utils.FrameProcessTime / 10) * 3, 2)
 	end
 end
 function Utils.GetHumanPing()
@@ -992,7 +1027,14 @@ function Utils.CountEnemyHeroesNear(location, radius)
 	end
 	return count
 end
-local barracksList = { Barracks.TopMelee, Barracks.TopRanged, Barracks.MidMelee, Barracks.MidRanged, Barracks.BotMelee, Barracks.BotRanged }
+local barracksList = {
+	Barracks.TopMelee,
+	Barracks.TopRanged,
+	Barracks.MidMelee,
+	Barracks.MidRanged,
+	Barracks.BotMelee,
+	Barracks.BotRanged,
+}
 local highGroundTowers = { Tower.Top3, Tower.Mid3, Tower.Bot3 }
 function Utils.CountEnemyHeroesOnHighGround(team)
 	local cacheKey = 60000 + (team or 0)
@@ -1284,7 +1326,8 @@ end
 local throttleState = {}
 local function throttle(interval, func)
 	local funcKey = tostring(func)
-	throttleState[funcKey] = { lastCallTime = DotaTime() + RandomInt(0, interval * 1000) / 1000, interval = interval, startup = true }
+	throttleState[funcKey] =
+		{ lastCallTime = DotaTime() + RandomInt(0, interval * 1000) / 1000, interval = interval, startup = true }
 	return function(...)
 		local state = throttleState[funcKey]
 		if state.startup then
@@ -1298,7 +1341,9 @@ local function throttle(interval, func)
 	end
 end
 function Utils.RecentlyTookDamage(bot, duration)
-	return bot:WasRecentlyDamagedByAnyHero(duration) or bot:WasRecentlyDamagedByTower(duration) or bot:WasRecentlyDamagedByCreep(duration)
+	return bot:WasRecentlyDamagedByAnyHero(duration)
+		or bot:WasRecentlyDamagedByTower(duration)
+		or bot:WasRecentlyDamagedByCreep(duration)
 end
 function Utils.IsUnitWithName(unit, name)
 	local matches = { string.find(unit:GetUnitName(), name) }
@@ -1344,9 +1389,12 @@ function Utils.DetermineEnemyBotRole(bot)
 end
 function Utils.QueryCounters(heroId)
 	log("heroId=%s", heroId)
-	Request:RawGetRequest(("https://api.opendota.com/api/heroes/" .. tostring(heroId)) .. "/matchups", function(response)
-		Utils.PrintTable(response)
-	end)
+	Request:RawGetRequest(
+		("https://api.opendota.com/api/heroes/" .. tostring(heroId)) .. "/matchups",
+		function(response)
+			Utils.PrintTable(response)
+		end
+	)
 end
 function Utils.InitiStats()
 	Request:GetUUID(function(uuid)
@@ -1742,7 +1790,8 @@ function Utils.SmartSpreadOut(bot, radius, distance, extraUnits, onlyExtraUnits)
 	if #extraUnits == 0 then
 		teamSideDirection = multiply(teamSideDirection, 0.5)
 	end
-	local direction = add(multiply(apartDirection, apartWeight), multiply(teamSideDirection, teamSideWeight)):Normalized()
+	local direction =
+		add(multiply(apartDirection, apartWeight), multiply(teamSideDirection, teamSideWeight)):Normalized()
 	local offset = multiply(direction, distance)
 	local towardEnemyDirection = sub(Utils.GetEnemyFountainTpPoint(), botLocation):Normalized()
 	if dot(offset:Normalized(), towardEnemyDirection) > 0 then
@@ -1779,7 +1828,11 @@ end
 function Utils.GetAllyIdsInTpToLocation(location, radius)
 	local allyIds = {}
 	for _, teleport in ipairs(GetIncomingTeleports()) do
-		if teleport ~= nil and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius and IsTeamPlayer(teleport.playerid) then
+		if
+			teleport ~= nil
+			and Utils.GetLocationToLocationDistance(location, teleport.location) <= radius
+			and IsTeamPlayer(teleport.playerid)
+		then
 			allyIds[#allyIds + 1] = teleport.playerid
 		end
 	end
@@ -1807,7 +1860,10 @@ function Utils.ConsiderTPToTarget(bot, targetLocation, includeAncient)
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil and lastSeenInfo[1] ~= nil then
 					local info = lastSeenInfo[1]
-					if Utils.GetLocationToLocationDistance(midpoint, info.location) <= 1600 and info.time_since_seen <= 5 then
+					if
+						Utils.GetLocationToLocationDistance(midpoint, info.location) <= 1600
+						and info.time_since_seen <= 5
+					then
 						enemiesOnPath = true
 						break
 					end
@@ -1848,7 +1904,13 @@ function Utils.ConsiderTPToTarget(bot, targetLocation, includeAncient)
 		local dy = fountain.y - buildingLocation.y
 		local length = math.max(1, math.sqrt(dx * dx + dy * dy))
 		local tpLocation = Vector(buildingLocation.x + dx / length * 200, buildingLocation.y + dy / length * 200, 0)
-		log("[TP] %s t=%.0f DEFEND tp to building at (%.0f,%.0f)", bot:GetUnitName(), DotaTime(), tpLocation.x, tpLocation.y)
+		log(
+			"[TP] %s t=%.0f DEFEND tp to building at (%.0f,%.0f)",
+			bot:GetUnitName(),
+			DotaTime(),
+			tpLocation.x,
+			tpLocation.y
+		)
 		bot:Action_UseAbilityOnLocation(tpScroll, tpLocation)
 		return true
 	end

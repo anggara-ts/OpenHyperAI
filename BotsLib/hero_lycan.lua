@@ -9,7 +9,8 @@ local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
 -- fix: build 1 had the 2nd Shapeshift point at entry 12 (level 13); entry 11 is level 12
-local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_1" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -101,7 +102,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -187,11 +189,14 @@ function X.ConsiderWolfBite()
 		bot._ohaWolfBiteTryAt = DotaTime()
 		if DotaTime() >= (bot._ohaWolfBiteLogAt or -999) then
 			bot._ohaWolfBiteLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-LYCAN] t=%.0f wolf bite on %s",
-				DotaTime(),
-				(string.gsub(bestAlly:GetUnitName(), "npc_dota_hero_", ""))
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-LYCAN] t=%.0f wolf bite on %s",
+					DotaTime(),
+					(string.gsub(bestAlly:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH, bestAlly
 	end
@@ -391,7 +396,12 @@ function X.ConsiderShapeShift()
 	end
 	if Fu.IsRetreating(bot) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE)
-		if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and Fu.GetHP(bot) < 0.3 and bot:WasRecentlyDamagedByAnyHero(2.0) then
+		if
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 1
+			and Fu.GetHP(bot) < 0.3
+			and bot:WasRecentlyDamagedByAnyHero(2.0)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

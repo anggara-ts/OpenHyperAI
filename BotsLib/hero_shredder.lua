@@ -66,7 +66,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -75,12 +76,17 @@ function X.MinionThink(minionUnit)
 		Minion.IllusionThink(minionUnit)
 	end
 end
-local whirlingDeathAbility = SafeAbility(bot:GetAbilityByName("shredder_whirling_death"), "shredder_whirling_death", "shredder")
-local timberChainAbility = SafeAbility(bot:GetAbilityByName("shredder_timber_chain"), "shredder_timber_chain", "shredder")
-local reactiveArmorAbility = SafeAbility(bot:GetAbilityByName("shredder_reactive_armor"), "shredder_reactive_armor", "shredder")
+local whirlingDeathAbility =
+	SafeAbility(bot:GetAbilityByName("shredder_whirling_death"), "shredder_whirling_death", "shredder")
+local timberChainAbility =
+	SafeAbility(bot:GetAbilityByName("shredder_timber_chain"), "shredder_timber_chain", "shredder")
+local reactiveArmorAbility =
+	SafeAbility(bot:GetAbilityByName("shredder_reactive_armor"), "shredder_reactive_armor", "shredder")
 local chakramAbility = SafeAbility(bot:GetAbilityByName("shredder_chakram"), "shredder_chakram", "shredder")
-local returnChakramAbility = SafeAbility(bot:GetAbilityByName("shredder_return_chakram"), "shredder_return_chakram", "shredder")
-local flamethrowerAbility = SafeAbility(bot:GetAbilityByName("shredder_flamethrower"), "shredder_flamethrower", "shredder")
+local returnChakramAbility =
+	SafeAbility(bot:GetAbilityByName("shredder_return_chakram"), "shredder_return_chakram", "shredder")
+local flamethrowerAbility =
+	SafeAbility(bot:GetAbilityByName("shredder_flamethrower"), "shredder_flamethrower", "shredder")
 local whirlingDeathDesire
 local timberChainDesire, timberChainLocation
 local reactiveArmorDesire
@@ -210,7 +216,10 @@ function X.ConsiderWhirlingDeath()
 	if Fu.IsFarming(bot) then
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
-		if neutralCreeps ~= nil and #neutralCreeps >= 2 or laneCreeps ~= nil and #laneCreeps >= 4 and mpRatio > 0.33 then
+		if
+			neutralCreeps ~= nil and #neutralCreeps >= 2
+			or laneCreeps ~= nil and #laneCreeps >= 4 and mpRatio > 0.33
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -223,19 +232,34 @@ function X.ConsiderWhirlingDeath()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-				if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 and GetUnitToUnitDistance(creep, nearbyEnemyHeroes[1]) <= 600 then
+				if
+					nearbyEnemyHeroes ~= nil
+					and #nearbyEnemyHeroes >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemyHeroes[1]) <= 600
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.GetHP(botTarget) > 0.25 and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.GetHP(botTarget) > 0.25
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.GetHP(botTarget) > 0.5 and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.GetHP(botTarget) > 0.5
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -271,9 +295,14 @@ function X.ConsiderTimberChain()
 			and #nearbyAllies >= #nearbyEnemyHeroes
 		then
 			local travelTime = GetUnitToUnitDistance(bot, botTarget) / speed + castPoint
-			local bestTree = Fu.GetBestTree(bot, botTarget:GetExtrapolatedLocation(travelTime), botTarget, castRange, radius)
+			local bestTree =
+				Fu.GetBestTree(bot, botTarget:GetExtrapolatedLocation(travelTime), botTarget, castRange, radius)
 			if bestTree ~= nil then
-				if bot:GetLevel() < 6 and whirlingDeathAbility:IsTrained() and not Fu.CanKillTarget(botTarget, damage + whirlingDamage, DAMAGE_TYPE_PURE) then
+				if
+					bot:GetLevel() < 6
+					and whirlingDeathAbility:IsTrained()
+					and not Fu.CanKillTarget(botTarget, damage + whirlingDamage, DAMAGE_TYPE_PURE)
+				then
 					return BOT_ACTION_DESIRE_LOW, GetTreeLocation(bestTree)
 				end
 				return BOT_ACTION_DESIRE_HIGH, GetTreeLocation(bestTree)
@@ -324,7 +353,12 @@ function X.ConsiderReactiveArmor()
 	end
 	if isRetreating then
 		local nearbyEnemyHeroes = bot:GetNearbyHeroes(600, true, BOT_MODE_NONE)
-		if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 and hpRatio < 0.51 and bot:WasRecentlyDamagedByAnyHero(1.5) then
+		if
+			nearbyEnemyHeroes ~= nil
+			and #nearbyEnemyHeroes >= 1
+			and hpRatio < 0.51
+			and bot:WasRecentlyDamagedByAnyHero(1.5)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -405,7 +439,11 @@ function X.ConsiderChakram()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-				if nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 and GetUnitToUnitDistance(creep, nearbyEnemyHeroes[1]) <= 600 then
+				if
+					nearbyEnemyHeroes ~= nil
+					and #nearbyEnemyHeroes >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemyHeroes[1]) <= 600
+				then
 					local travelTime = GetUnitToUnitDistance(bot, creep) / speed + castPoint
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation(), travelTime
 				end
@@ -415,7 +453,12 @@ function X.ConsiderChakram()
 	return BOT_ACTION_DESIRE_NONE, 0, 0
 end
 function X.ConsiderChakramReturn()
-	if chakramLandLocation == 0 or chakramLandLocation == nil or not returnChakramAbility:IsFullyCastable() or returnChakramAbility:IsHidden() then
+	if
+		chakramLandLocation == 0
+		or chakramLandLocation == nil
+		or not returnChakramAbility:IsFullyCastable()
+		or returnChakramAbility:IsHidden()
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if DotaTime() < chakramCastTime + chakramFlightTime or StillTraveling(1) then
@@ -439,13 +482,22 @@ function X.ConsiderChakramReturn()
 			heroesUnder = heroesUnder + 1
 		end
 	end
-	if heroesUnder > 0 and creepsUnder == 0 and mpRatio >= 0.15 and GetUnitToLocationDistance(bot, chakramLandLocation) <= 1600 then
+	if
+		heroesUnder > 0
+		and creepsUnder == 0
+		and mpRatio >= 0.15
+		and GetUnitToLocationDistance(bot, chakramLandLocation) <= 1600
+	then
 		if DotaTime() >= (bot._chakramLogAt or -999) then
 			bot._chakramLogAt = DotaTime() + 10
 			pcall(print, string.format("[OHA-SHREDDER] t=%.0f chakram kept on %d heroes", DotaTime(), heroesUnder))
 		end
 	end
-	if mpRatio < 0.15 or GetUnitToLocationDistance(bot, chakramLandLocation) > 1600 or creepsUnder + heroesUnder == 0 then
+	if
+		mpRatio < 0.15
+		or GetUnitToLocationDistance(bot, chakramLandLocation) > 1600
+		or creepsUnder + heroesUnder == 0
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if isRetreating or isGoingOnSomeone then

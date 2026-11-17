@@ -138,8 +138,28 @@ local direAggressiveSpot1 = radiantTop1FallSpot
 local direAggressiveSpot2 = radiantTop2FallSpot
 local direAggressiveSpot3 = radiantMid2FallSpot
 local direAggressiveSpot4 = radiantBot2FallSpot
-local radiantTowerFallSpots = { radiantTop1FallSpot, radiantMid1FallSpot, radiantBot1FallSpot, radiantTop2FallSpot, radiantMid2FallSpot, radiantBot2FallSpot, radiantTop3FallSpot, radiantMid3FallSpot, radiantBot3FallSpot }
-local direTowerFallSpots = { direTop1FallSpot, direMid1FallSpot, direBot1FallSpot, direTop2FallSpot, direMid2FallSpot, direBot2FallSpot, direTop3FallSpot, direMid3FallSpot, direBot3FallSpot }
+local radiantTowerFallSpots = {
+	radiantTop1FallSpot,
+	radiantMid1FallSpot,
+	radiantBot1FallSpot,
+	radiantTop2FallSpot,
+	radiantMid2FallSpot,
+	radiantBot2FallSpot,
+	radiantTop3FallSpot,
+	radiantMid3FallSpot,
+	radiantBot3FallSpot,
+}
+local direTowerFallSpots = {
+	direTop1FallSpot,
+	direMid1FallSpot,
+	direBot1FallSpot,
+	direTop2FallSpot,
+	direMid2FallSpot,
+	direBot2FallSpot,
+	direTop3FallSpot,
+	direMid3FallSpot,
+	direBot3FallSpot,
+}
 local campStackSpots = {
 	Vector(1854, -4469, 0),
 	Vector(1249, -2416, 0),
@@ -173,7 +193,19 @@ for _, unit in ipairs(allUnits) do
 	end
 end
 Site.nWatchTowerList = { firstOutpost, secondOutpost }
-Site.nTowerList = { Tower.Top1, Tower.Mid1, Tower.Bot1, Tower.Top2, Tower.Mid2, Tower.Bot2, Tower.Top3, Tower.Mid3, Tower.Bot3, Tower.Base1, Tower.Base2 }
+Site.nTowerList = {
+	Tower.Top1,
+	Tower.Mid1,
+	Tower.Bot1,
+	Tower.Top2,
+	Tower.Mid2,
+	Tower.Bot2,
+	Tower.Top3,
+	Tower.Mid3,
+	Tower.Bot3,
+	Tower.Base1,
+	Tower.Base2,
+}
 Site.nRuneList = { Rune.Power1, Rune.Power2, Rune.Bounty1, Rune.Bounty2 }
 Site.nShopList = { Shop.Home, Shop.Side, Shop.Side2, Shop.Secret, Shop.Secret2 }
 Site.top_power_rune = Vector(-1767, 1233, 0)
@@ -205,7 +237,15 @@ Site.GetMandatorySpot = function()
 		return GetTeam() == Team.Radiant and { radiantMandatorySpot1 } or { direMandatorySpot1 }
 	end
 	if DotaTime() > 12 * 60 then
-		return GetTeam() == Team.Radiant and { radiantMandatorySpot1, radiantMandatorySpot2, radiantTop1FallSpot, radiantMid1FallSpot, radiantBot1FallSpot } or { direMandatorySpot2, direMandatorySpot1, direTop1FallSpot, direMid1FallSpot, direBot1FallSpot }
+		return GetTeam() == Team.Radiant
+				and {
+					radiantMandatorySpot1,
+					radiantMandatorySpot2,
+					radiantTop1FallSpot,
+					radiantMid1FallSpot,
+					radiantBot1FallSpot,
+				}
+			or { direMandatorySpot2, direMandatorySpot1, direTop1FallSpot, direMid1FallSpot, direBot1FallSpot }
 	end
 	return GetTeam() == Team.Radiant and radiantSpots or direSpots
 end
@@ -216,7 +256,8 @@ Site.GetWardSpotWhenTowerFall = function()
 		while i < #Site.nTowerList do
 			local tower = GetTower(GetTeam(), Site.nTowerList[i + 1])
 			if not tower then
-				wardSpots[#wardSpots + 1] = GetTeam() == Team.Radiant and radiantTowerFallSpots[i + 1] or direTowerFallSpots[i + 1]
+				wardSpots[#wardSpots + 1] = GetTeam() == Team.Radiant and radiantTowerFallSpots[i + 1]
+					or direTowerFallSpots[i + 1]
 			end
 			i = i + 1
 		end
@@ -225,7 +266,8 @@ Site.GetWardSpotWhenTowerFall = function()
 end
 Site.GetAggressiveSpot = function()
 	local direSpots = { direAggressiveSpot1, direAggressiveSpot2, direAggressiveSpot3, direAggressiveSpot4 }
-	local radiantSpots = { radiantAggressiveSpot1, radiantAggressiveSpot2, radiantAggressiveSpot3, radiantAggressiveSpot4 }
+	local radiantSpots =
+		{ radiantAggressiveSpot1, radiantAggressiveSpot2, radiantAggressiveSpot3, radiantAggressiveSpot4 }
 	return GetTeam() == Team.Radiant and radiantSpots or direSpots
 end
 Site.GetItemWard = function(bot)
@@ -540,7 +582,12 @@ Site.FindFarmNeutralTarget = function(creeps)
 			target = Site.GetMinHPCreep(creeps)
 		end
 	end
-	if HasItem(bot, "item_bfury") or HasItem(bot, "item_maelstrom") or HasItem(bot, "item_mjollnir") or HasItem(bot, "item_radiance") then
+	if
+		HasItem(bot, "item_bfury")
+		or HasItem(bot, "item_maelstrom")
+		or HasItem(bot, "item_mjollnir")
+		or HasItem(bot, "item_radiance")
+	then
 		target = Site.GetMaxHPCreep(creeps)
 	end
 	return target or Site.GetMinHPCreep(creeps)
@@ -585,7 +632,11 @@ Site.ConsiderFarmNeutralType = {
 		local bot = GetBot()
 		local anchorSmashAbility = bot:GetAbilityByName("tidehunter_anchor_smash")
 		local ravageAbility = bot:GetAbilityByName("tidehunter_ravage")
-		if anchorSmashAbility:IsTrained() and ravageAbility:IsTrained() and bot:GetMana() > ravageAbility:GetManaCost() + 200 then
+		if
+			anchorSmashAbility:IsTrained()
+			and ravageAbility:IsTrained()
+			and bot:GetMana() > ravageAbility:GetManaCost() + 200
+		then
 			return "maxHP"
 		end
 		return "minHP"
@@ -622,7 +673,15 @@ end
 Site.IsModeSuitableToFarm = function(bot)
 	local mode = bot:GetActiveMode()
 	local botLevel = bot:GetLevel()
-	if botLevel <= 8 and (mode == BotMode.PushTowerTop or mode == BotMode.PushTowerMid or mode == BotMode.PushTowerBot or mode == BotMode.Laning) then
+	if
+		botLevel <= 8
+		and (
+			mode == BotMode.PushTowerTop
+			or mode == BotMode.PushTowerMid
+			or mode == BotMode.PushTowerBot
+			or mode == BotMode.Laning
+		)
+	then
 		local enemyAncient = GetAncient(GetOpposingTeam())
 		if GetUnitToUnitDistance(bot, enemyAncient) > 6300 then
 			return false
@@ -670,11 +729,21 @@ Site.IsTimeToFarm = function(bot)
 		local enemyAncient = GetAncient(GetOpposingTeam())
 		local nearbyAllies = bot:GetNearbyHeroes(1400, false, BotMode.None)
 		local distanceToEnemyAncient = GetUnitToUnitDistance(bot, enemyAncient)
-		if distanceToEnemyAncient < 2800 and distanceToEnemyAncient > 1400 and bot:GetActiveModeDesire() < BotModeDesire.High and #nearbyAllies <= 1 then
+		if
+			distanceToEnemyAncient < 2800
+			and distanceToEnemyAncient > 1400
+			and bot:GetActiveModeDesire() < BotModeDesire.High
+			and #nearbyAllies <= 1
+		then
 			return true
 		end
 		if Site.IsShouldFarmHero(bot) then
-			if bot:GetActiveModeDesire() < BotModeDesire.Moderate and distanceToEnemyAncient > 1600 and distanceToEnemyAncient < 5600 and #nearbyAllies <= 1 then
+			if
+				bot:GetActiveModeDesire() < BotModeDesire.Moderate
+				and distanceToEnemyAncient > 1600
+				and distanceToEnemyAncient < 5600
+				and #nearbyAllies <= 1
+			then
 				return true
 			end
 		end

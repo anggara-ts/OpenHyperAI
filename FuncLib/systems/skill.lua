@@ -75,9 +75,15 @@ function Skill.GetAbilityList(hero)
 						heroName
 					)
 				end
-			elseif Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) and ability:IsHidden() then
+			elseif
+				Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE)
+				and ability:IsHidden()
+			then
 			elseif ability:IsUltimate() and slot >= 4 then
-				if Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE) or ability:IsHidden() then
+				if
+					Utils.AbilityBehaviorHasFlag(ability:GetBehavior(), DOTA_ABILITY_BEHAVIOR_NOT_LEARNABLE)
+					or ability:IsHidden()
+				then
 					log(
 						"[WARN] The ability %s on slot %s seems to be an ultimate for hero: %s. But it is not learnable OR hidden. Check if there is anything wrong with this hero.",
 						abilityName,

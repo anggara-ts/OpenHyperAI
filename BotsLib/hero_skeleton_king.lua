@@ -63,7 +63,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_heavens_halberd", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = false
@@ -76,9 +77,12 @@ local hellfireBlastAbility =
 	SafeAbility(bot:GetAbilityByName("skeleton_king_hellfire_blast"), "skeleton_king_hellfire_blast", "skeleton_king")
 -- datafeed: skeleton_king_spectral_blade no longer exists; W is skeleton_king_bone_guard. The old
 -- fallback below never ran (the safe proxy's IsHidden() returns false), so ConsiderW could not cast it.
-local boneGuardAbility = SafeAbility(bot:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
-local mortalStrikeAbility = SafeAbility(bot:GetAbilityByName("skeleton_king_mortal_strike"), "skeleton_king_mortal_strike", "skeleton_king")
-local reincarnationAbility = SafeAbility(bot:GetAbilityByName("skeleton_king_reincarnation"), "skeleton_king_reincarnation", "skeleton_king")
+local boneGuardAbility =
+	SafeAbility(bot:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
+local mortalStrikeAbility =
+	SafeAbility(bot:GetAbilityByName("skeleton_king_mortal_strike"), "skeleton_king_mortal_strike", "skeleton_king")
+local reincarnationAbility =
+	SafeAbility(bot:GetAbilityByName("skeleton_king_reincarnation"), "skeleton_king_reincarnation", "skeleton_king")
 local talent5 = SafeAbility(bot:GetAbilityByName(sTalentList[5]), "sTalentList[5]", "skeleton_king")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "skeleton_king")
 local hellfireBlastDesire, hellfireBlastTarget
@@ -90,7 +94,8 @@ function X.SkillsComplement()
 		return
 	end
 	if not boneGuardAbility or boneGuardAbility:IsHidden() then
-		boneGuardAbility = SafeAbility(bot:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
+		boneGuardAbility =
+			SafeAbility(bot:GetAbilityByName("skeleton_king_bone_guard"), "skeleton_king_bone_guard", "skeleton_king")
 	end
 	local abilityContext = AbilityContext.Build(bot)
 	botLevel = abilityContext.level
@@ -135,11 +140,18 @@ function X.ConsiderQ()
 	local enemiesInCastRange = Fu.GetNearbyHeroes(bot, castRange + 43, true, BOT_MODE_NONE)
 	local enemiesInWideRange = Fu.GetNearbyHeroes(bot, castRange + 330, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInWideRange) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
-			if GetUnitToUnitDistance(bot, enemyHero) <= castRange + 80 and Fu.CanKillTarget(enemyHero, damage * 1.68, damageType) then
+			if
+				GetUnitToUnitDistance(bot, enemyHero) <= castRange + 80
+				and Fu.CanKillTarget(enemyHero, damage * 1.68, damageType)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -198,7 +210,10 @@ function X.ConsiderQ()
 		for _, enemyHero in pairs(enemiesInCastRange) do
 			if
 				Fu.IsValid(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or mpRatio > 0.8 or GetUnitToUnitDistance(bot, enemyHero) <= 400)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or mpRatio > 0.8 or GetUnitToUnitDistance(
+					bot,
+					enemyHero
+				) <= 400)
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
 				and not Fu.IsDisabled(enemyHero)
@@ -208,7 +223,13 @@ function X.ConsiderQ()
 			end
 		end
 	end
-	if Fu.IsFarming(bot) and abilityLevel >= 3 and (bot:GetAttackDamage() < 200 or mpRatio > 0.88) and mpRatio > 0.71 and #nearbyEnemies == 0 then
+	if
+		Fu.IsFarming(bot)
+		and abilityLevel >= 3
+		and (bot:GetAttackDamage() < 200 or mpRatio > 0.88)
+		and mpRatio > 0.71
+		and #nearbyEnemies == 0
+	then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange + 100)
 		local strongestCreep = Fu.GetMostHpUnit(neutralCreeps)
 		if
@@ -226,7 +247,12 @@ function X.ConsiderQ()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() >= 600 then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and not Fu.IsDisabled(attackTarget) and not attackTarget:IsDisarmed() and Fu.IsInRange(attackTarget, bot, castRange) then
+		if
+			Fu.IsRoshan(attackTarget)
+			and not Fu.IsDisabled(attackTarget)
+			and not attackTarget:IsDisarmed()
+			and Fu.IsInRange(attackTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, attackTarget
 		end
 	end
@@ -286,7 +312,12 @@ function X.ConsiderW()
 	local maxCharges = boneGuardAbility:GetSpecialValueInt("max_skeleton_charges")
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	local botTarget = Fu.GetProperTarget(bot)
-	if Fu.IsValidHero(botTarget) and #enemyHeroes == 1 and Fu.IsInRange(botTarget, bot, 650) and (skeletonCharges / maxCharges >= 0.6 or talent6:IsTrained()) then
+	if
+		Fu.IsValidHero(botTarget)
+		and #enemyHeroes == 1
+		and Fu.IsInRange(botTarget, bot, 650)
+		and (skeletonCharges / maxCharges >= 0.6 or talent6:IsTrained())
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	-- Review fix: the fight case above needs exactly one enemy hero within 1600, so in a real
@@ -300,11 +331,23 @@ function X.ConsiderW()
 	then
 		if DotaTime() - (X.lastBoneGuardLog or -99) > 10 then
 			X.lastBoneGuardLog = DotaTime()
-			pcall(print, string.format("[OHA-WK] t=%.0f bone-guard fight charges=%d enemies=%d", DotaTime(), skeletonCharges, #enemyHeroes))
+			pcall(
+				print,
+				string.format(
+					"[OHA-WK] t=%.0f bone-guard fight charges=%d enemies=%d",
+					DotaTime(),
+					skeletonCharges,
+					#enemyHeroes
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if (skeletonCharges == maxCharges or talent6:IsTrained()) and botLevel >= 4 and (X.IsNearLaneFront(bot) or Fu.IsFarming(bot)) then
+	if
+		(skeletonCharges == maxCharges or talent6:IsTrained())
+		and botLevel >= 4
+		and (X.IsNearLaneFront(bot) or Fu.IsFarming(bot))
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return 0

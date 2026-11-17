@@ -93,7 +93,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_skadi", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -102,11 +103,14 @@ X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local arcticBurnAbility = SafeAbility(bot:GetAbilityByName("winter_wyvern_arctic_burn"), "winter_wyvern_arctic_burn", "winter_wyvern")
+local arcticBurnAbility =
+	SafeAbility(bot:GetAbilityByName("winter_wyvern_arctic_burn"), "winter_wyvern_arctic_burn", "winter_wyvern")
 local splinterBlastAbility =
 	SafeAbility(bot:GetAbilityByName("winter_wyvern_splinter_blast"), "winter_wyvern_splinter_blast", "winter_wyvern")
-local coldEmbraceAbility = SafeAbility(bot:GetAbilityByName("winter_wyvern_cold_embrace"), "winter_wyvern_cold_embrace", "winter_wyvern")
-local wintersCurseAbility = SafeAbility(bot:GetAbilityByName("winter_wyvern_winters_curse"), "winter_wyvern_winters_curse", "winter_wyvern")
+local coldEmbraceAbility =
+	SafeAbility(bot:GetAbilityByName("winter_wyvern_cold_embrace"), "winter_wyvern_cold_embrace", "winter_wyvern")
+local wintersCurseAbility =
+	SafeAbility(bot:GetAbilityByName("winter_wyvern_winters_curse"), "winter_wyvern_winters_curse", "winter_wyvern")
 -- [OHA-WYVERN] lines: throttled per reason, at most once per 5s.
 function X.LogWyvern(why, fmt, ...)
 	bot._wwLogAt = bot._wwLogAt or {}
@@ -207,7 +211,11 @@ function X.ConsiderArcticBurn()
 				then
 					local nearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 					local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-					if nearbyAllies ~= nil and targetAllies ~= nil and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2)) then
+					if
+						nearbyAllies ~= nil
+						and targetAllies ~= nil
+						and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2))
+					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				end
@@ -260,7 +268,11 @@ function X.ConsiderArcticBurn()
 				then
 					local nearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 					local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-					if nearbyAllies ~= nil and targetAllies ~= nil and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2)) then
+					if
+						nearbyAllies ~= nil
+						and targetAllies ~= nil
+						and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2))
+					then
 						if arcticBurnAbility:GetToggleState() == false then
 							return BOT_ACTION_DESIRE_HIGH
 						else
@@ -312,8 +324,18 @@ function X.ConsiderSplinterBlast()
 			end
 			local targetAllies = Fu.GetNearbyHeroes(enemyHero, splitRadius, false, BOT_MODE_NONE)
 			for _, heroNearTarget in pairs(targetAllies) do
-				if Fu.IsValidHero(heroNearTarget) and Fu.CanCastOnNonMagicImmune(heroNearTarget) and Fu.IsNotSelf(enemyHero, heroNearTarget) and Fu.IsInRange(bot, heroNearTarget, castRange) then
-					X.LogWyvern("splinter-kill", "target=%s via=%s", enemyHero:GetUnitName(), heroNearTarget:GetUnitName())
+				if
+					Fu.IsValidHero(heroNearTarget)
+					and Fu.CanCastOnNonMagicImmune(heroNearTarget)
+					and Fu.IsNotSelf(enemyHero, heroNearTarget)
+					and Fu.IsInRange(bot, heroNearTarget, castRange)
+				then
+					X.LogWyvern(
+						"splinter-kill",
+						"target=%s via=%s",
+						enemyHero:GetUnitName(),
+						heroNearTarget:GetUnitName()
+					)
 					return BOT_ACTION_DESIRE_HIGH, heroNearTarget
 				end
 			end
@@ -340,7 +362,11 @@ function X.ConsiderSplinterBlast()
 				end
 				local targetAllies = Fu.GetNearbyHeroes(botTarget, splitRadius, false, BOT_MODE_NONE)
 				for _, enemyHero in pairs(targetAllies) do
-					if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsNotSelf(botTarget, enemyHero) then
+					if
+						Fu.IsValidHero(enemyHero)
+						and Fu.CanCastOnNonMagicImmune(enemyHero)
+						and Fu.IsNotSelf(botTarget, enemyHero)
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyHero
 					end
 				end
@@ -360,7 +386,11 @@ function X.ConsiderSplinterBlast()
 			then
 				local nearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if nearbyAllies ~= nil and targetAllies ~= nil and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					nearbyAllies ~= nil
+					and targetAllies ~= nil
+					and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					local creepsNearTarget = enemyHero:GetNearbyCreeps(splitRadius, true)
 					for _, creep in pairs(creepsNearTarget) do
 						if Fu.IsValid(creep) and Fu.CanCastOnNonMagicImmune(creep) then
@@ -369,7 +399,11 @@ function X.ConsiderSplinterBlast()
 					end
 					targetAllies = Fu.GetNearbyHeroes(enemyHero, splitRadius, false, BOT_MODE_NONE)
 					for _, heroNearTarget in pairs(targetAllies) do
-						if Fu.IsValidHero(heroNearTarget) and Fu.CanCastOnNonMagicImmune(heroNearTarget) and Fu.IsNotSelf(enemyHero, heroNearTarget) then
+						if
+							Fu.IsValidHero(heroNearTarget)
+							and Fu.CanCastOnNonMagicImmune(heroNearTarget)
+							and Fu.IsNotSelf(enemyHero, heroNearTarget)
+						then
 							return BOT_ACTION_DESIRE_HIGH, heroNearTarget
 						end
 					end
@@ -391,10 +425,20 @@ function X.ConsiderSplinterBlast()
 				end
 			end
 		end
-		if toughCreep ~= nil and #killableCreeps >= 3 and Fu.GetManaAfter(manaCost) > 0.4 and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			toughCreep ~= nil
+			and #killableCreeps >= 3
+			and Fu.GetManaAfter(manaCost) > 0.4
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, toughCreep
 		end
-		if toughCreep == nil and #killableCreeps >= 4 and Fu.GetManaAfter(manaCost) > 0.4 and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			toughCreep == nil
+			and #killableCreeps >= 4
+			and Fu.GetManaAfter(manaCost) > 0.4
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 		if laneCreeps ~= nil and #laneCreeps >= 4 and Fu.GetManaAfter(manaCost) > 0.4 then
@@ -402,7 +446,12 @@ function X.ConsiderSplinterBlast()
 		end
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), 1600, splitRadius, 0, 0)
 		local nearbyEnemies = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, splitRadius)
-		if nearbyEnemies ~= nil and #nearbyEnemies >= 2 and Fu.Utils.IsValidUnit(nearbyEnemies[1]) and Fu.IsInRange(bot, nearbyEnemies[1], castRange) then
+		if
+			nearbyEnemies ~= nil
+			and #nearbyEnemies >= 2
+			and Fu.Utils.IsValidUnit(nearbyEnemies[1])
+			and Fu.IsInRange(bot, nearbyEnemies[1], castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 		end
 	end
@@ -420,10 +469,20 @@ function X.ConsiderSplinterBlast()
 				end
 			end
 		end
-		if toughCreep ~= nil and #killableCreeps >= 3 and Fu.GetManaAfter(manaCost) > 0.5 and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			toughCreep ~= nil
+			and #killableCreeps >= 3
+			and Fu.GetManaAfter(manaCost) > 0.5
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, toughCreep
 		end
-		if toughCreep == nil and #killableCreeps >= 4 and Fu.GetManaAfter(manaCost) > 0.5 and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			toughCreep == nil
+			and #killableCreeps >= 4
+			and Fu.GetManaAfter(manaCost) > 0.5
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			return BOT_ACTION_DESIRE_HIGH, killableCreeps[1]
 		end
 		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), castRange)
@@ -451,7 +510,11 @@ function X.ConsiderSplinterBlast()
 						end
 						local targetAllies = Fu.GetNearbyHeroes(enemyHero, splitRadius, false, BOT_MODE_NONE)
 						for _, heroNearTarget in pairs(targetAllies) do
-							if Fu.IsValidHero(heroNearTarget) and Fu.CanCastOnNonMagicImmune(heroNearTarget) and Fu.IsNotSelf(enemyHero, heroNearTarget) then
+							if
+								Fu.IsValidHero(heroNearTarget)
+								and Fu.CanCastOnNonMagicImmune(heroNearTarget)
+								and Fu.IsNotSelf(enemyHero, heroNearTarget)
+							then
 								return BOT_ACTION_DESIRE_HIGH, heroNearTarget
 							end
 						end
@@ -481,7 +544,11 @@ function X.ConsiderColdEmbrace()
 		then
 			local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1600, true, BOT_MODE_NONE)
 			for _, enemyHero in pairs(enemiesNearAlly) do
-				if Fu.IsValidHero(enemyHero) and enemyHero:GetAttackTarget() == allyHero and not Fu.IsSuspiciousIllusion(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and enemyHero:GetAttackTarget() == allyHero
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+				then
 					if
 						allyHero:HasModifier("modifier_legion_commander_duel") and Fu.GetHP(allyHero) < 0.25
 						or allyHero:HasModifier("modifier_enigma_black_hole_pull")
@@ -494,7 +561,11 @@ function X.ConsiderColdEmbrace()
 		end
 	end
 	if isEngaging then
-		if Fu.IsValidTarget(botTarget) and Fu.IsInRange(bot, botTarget, bot:GetCurrentVisionRange()) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.IsInRange(bot, botTarget, bot:GetCurrentVisionRange())
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local nearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and nearbyEnemies ~= nil and #alliesNearTarget >= #nearbyEnemies then
@@ -542,7 +613,11 @@ function X.ConsiderColdEmbrace()
 			then
 				local nearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if nearbyAllies ~= nil and targetAllies ~= nil and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1)) then
+				if
+					nearbyAllies ~= nil
+					and targetAllies ~= nil
+					and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(1))
+				then
 					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
@@ -641,7 +716,11 @@ function X.ConsiderWintersCurse()
 					local nearbyAllies = Fu.GetAlliesNearLoc(enemyHero:GetLocation(), 400)
 					local targetAllies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 1200)
 					local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, duration, DAMAGE_TYPE_ALL)
-					if (nearbyAllies == nil or #nearbyAllies <= 0) and targetAllies ~= nil and estimatedDamage > highestDamage then
+					if
+						(nearbyAllies == nil or #nearbyAllies <= 0)
+						and targetAllies ~= nil
+						and estimatedDamage > highestDamage
+					then
 						targetAllies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), curseRadius)
 						if targetAllies ~= nil and #targetAllies >= 2 then
 							highestDamage = estimatedDamage
@@ -674,11 +753,20 @@ function X.ConsiderWintersCurse()
 				-- Was "#nearbyAllies >= 2" (an ally besides Wyvern) and "#targetAllies >= 1" in radius, which enemyHero alone met:
 				-- a Wyvern fleeing alone never cursed two chasers. Now: an ally there, or a second
 				-- enemy in the curse radius to be cursed into attacking enemyHero.
-				if nearbyAllies ~= nil and targetAllies ~= nil and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2.5)) then
+				if
+					nearbyAllies ~= nil
+					and targetAllies ~= nil
+					and (#targetAllies > #nearbyAllies or bot:WasRecentlyDamagedByAnyHero(2.5))
+				then
 					targetAllies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), curseRadius)
 					if targetAllies ~= nil and (#nearbyAllies >= 2 and #targetAllies >= 1 or #targetAllies >= 2) then
 						if #nearbyAllies < 2 then
-							X.LogWyvern("curse-escape", "target=%s cursed=%d", enemyHero:GetUnitName(), #targetAllies - 1)
+							X.LogWyvern(
+								"curse-escape",
+								"target=%s cursed=%d",
+								enemyHero:GetUnitName(),
+								#targetAllies - 1
+							)
 						end
 						return BOT_ACTION_DESIRE_HIGH, enemyHero
 					end
@@ -700,7 +788,11 @@ function X.ConsiderWintersCurse()
 			local nearbyAllies = Fu.GetAlliesNearLoc(enemyHero:GetLocation(), 400)
 			local retreatingAllies = Fu.GetRetreatingAlliesNearLoc(enemyHero:GetLocation(), 400)
 			local nearbyEnemies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), curseRadius)
-			if (nearbyAllies == nil or #nearbyAllies <= 0 or #retreatingAllies > 0) and nearbyEnemies ~= nil and #nearbyEnemies >= 2 then
+			if
+				(nearbyAllies == nil or #nearbyAllies <= 0 or #retreatingAllies > 0)
+				and nearbyEnemies ~= nil
+				and #nearbyEnemies >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end

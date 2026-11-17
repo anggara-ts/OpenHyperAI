@@ -89,7 +89,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -101,7 +102,8 @@ end
 local naturesGraspAbility = SafeAbility(bot:GetAbilityByName("treant_natures_grasp"), "treant_natures_grasp", "treant")
 local leechSeedAbility = SafeAbility(bot:GetAbilityByName("treant_leech_seed"), "treant_leech_seed", "treant")
 local livingArmorAbility = SafeAbility(bot:GetAbilityByName("treant_living_armor"), "treant_living_armor", "treant")
-local eyesInTheForestAbility = SafeAbility(bot:GetAbilityByName("treant_eyes_in_the_forest"), "treant_eyes_in_the_forest", "treant")
+local eyesInTheForestAbility =
+	SafeAbility(bot:GetAbilityByName("treant_eyes_in_the_forest"), "treant_eyes_in_the_forest", "treant")
 local overgrowthAbility = SafeAbility(bot:GetAbilityByName("treant_overgrowth"), "treant_overgrowth", "treant")
 local naturesGraspDesire, naturesGraspLocation
 local leechSeedDesire, leechSeedTarget
@@ -205,7 +207,10 @@ function X.ConsiderNaturesGrasp()
 			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1000, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or hpRatio < 0.75 and bot:WasRecentlyDamagedByAnyHero(1)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or hpRatio < 0.75 and bot:WasRecentlyDamagedByAnyHero(1))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 			end
 		end
@@ -237,13 +242,23 @@ function X.ConsiderNaturesGrasp()
 		if not Fu.IsInLaningPhase() then
 			local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, latchRange, 0, 0)
 			local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
-			if laneCreeps ~= nil and #laneCreeps >= 3 and aoeLocation.count >= 3 and Fu.CanBeAttacked(laneCreeps[1]) then
+			if
+				laneCreeps ~= nil
+				and #laneCreeps >= 3
+				and aoeLocation.count >= 3
+				and Fu.CanBeAttacked(laneCreeps[1])
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -262,7 +277,11 @@ function X.ConsiderLeechSeed()
 	botTarget = Fu.GetProperTarget(bot)
 	local radius = leechSeedAbility:GetSpecialValueInt("radius")
 	if isEngaging then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and not Fu.IsChasingTarget(bot, botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and not Fu.IsChasingTarget(bot, botTarget)
+		then
 			local aoeLocation = bot:FindAoELocation(true, true, botTarget:GetLocation(), 0, radius, 0, 0)
 			-- datafeed: unit-target now, so seed the hero itself (it was a point cast on the group).
 			if aoeLocation.count >= 2 and Fu.IsInRange(bot, botTarget, castRange) then
@@ -287,7 +306,12 @@ function X.ConsiderLeechSeed()
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(false, bot, 5, DAMAGE_TYPE_ALL)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy and estimatedDamage > highestDamage then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and #alliesNearEnemy >= #enemiesNearEnemy
+					and estimatedDamage > highestDamage
+				then
 					highestDamage = estimatedDamage
 					bestTarget = enemyHero
 				end
@@ -317,7 +341,12 @@ function X.ConsiderLeechSeed()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			-- datafeed: unit-target now; seed Roshan instead of a point at Treant's feet.
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
@@ -356,12 +385,15 @@ function X.ConsiderLivingArmor()
 		if save ~= nil then
 			if DotaTime() >= (bot._treantArmorLogAt or -999) then
 				bot._treantArmorLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-TREANT] t=%.0f armor-save ally=%s hp=%.2f",
-					DotaTime(),
-					(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
-					saveHP
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-TREANT] t=%.0f armor-save ally=%s hp=%.2f",
+						DotaTime(),
+						(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
+						saveHP
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, save
 		end
@@ -411,7 +443,10 @@ function X.ConsiderLivingArmor()
 	local lowestBuildingHpRatio = 0.8
 	for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS)) do
 		if Fu.IsValidBuilding(building) and not building:HasModifier("modifier_treant_living_armor") then
-			if building:GetHealth() / building:GetMaxHealth() < lowestBuildingHpRatio and building:GetHealth() / building:GetMaxHealth() < 0.8 then
+			if
+				building:GetHealth() / building:GetMaxHealth() < lowestBuildingHpRatio
+				and building:GetHealth() / building:GetMaxHealth() < 0.8
+			then
 				lowestBuildingHpRatio = building:GetHealth() / building:GetMaxHealth()
 				weakestBuilding = building
 			end
@@ -447,12 +482,15 @@ function X.ConsiderOvergrowth()
 	then
 		if not isInTeamFight and DotaTime() >= (bot._treantOvergrowthLogAt or -999) then
 			bot._treantOvergrowthLogAt = DotaTime() + 10
-			pcall(print, string.format(
-				"[OHA-TREANT] t=%.0f overgrowth enemies=%d engaging=%s (not a team fight)",
-				DotaTime(),
-				#nearbyEnemies,
-				tostring(isEngaging)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TREANT] t=%.0f overgrowth enemies=%d engaging=%s (not a team fight)",
+					DotaTime(),
+					#nearbyEnemies,
+					tostring(isEngaging)
+				)
+			)
 		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
@@ -475,7 +513,14 @@ function X.ConsiderEyesInTheForest()
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			local nearbyTrees = bot:GetNearbyTrees(castRange)
-			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and #alliesNearTarget >= 1 and nearbyTrees ~= nil and #nearbyTrees >= 1 then
+			if
+				alliesNearTarget ~= nil
+				and enemiesNearTarget ~= nil
+				and #alliesNearTarget >= #enemiesNearTarget
+				and #alliesNearTarget >= 1
+				and nearbyTrees ~= nil
+				and #nearbyTrees >= 1
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 			end
 		end

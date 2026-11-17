@@ -475,7 +475,15 @@ function Dispel.AnalyzeDebuffs(unit)
 			end
 		end
 	end
-	return { score = score, worstSeverity = worstSeverity, hasSilence = hasSilence, hasDisable = hasDisable, hasRoot = hasRoot, canBasicDispel = canBasicDispel, canStrongDispel = canStrongDispel }
+	return {
+		score = score,
+		worstSeverity = worstSeverity,
+		hasSilence = hasSilence,
+		hasDisable = hasDisable,
+		hasRoot = hasRoot,
+		canBasicDispel = canBasicDispel,
+		canStrongDispel = canStrongDispel,
+	}
 end
 function Dispel.IsProtected(unit)
 	for _, modifierName in ipairs(protectionModifiers) do

@@ -79,15 +79,18 @@ end
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local spiritBearAbility = SafeAbility(bot:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid")
-local savageRoarAbility = SafeAbility(bot:GetAbilityByName("lone_druid_savage_roar"), "lone_druid_savage_roar", "lone_druid")
+local spiritBearAbility =
+	SafeAbility(bot:GetAbilityByName("lone_druid_spirit_bear"), "lone_druid_spirit_bear", "lone_druid")
+local savageRoarAbility =
+	SafeAbility(bot:GetAbilityByName("lone_druid_savage_roar"), "lone_druid_savage_roar", "lone_druid")
 local trueFormAbility = SafeAbility(bot:GetAbilityByName("lone_druid_true_form"), "lone_druid_true_form", "lone_druid")
 -- datafeed: Entangle is an active point/AoE spell (behavior 48) and was never cast
 local entangle = SafeAbility(bot:GetAbilityByName("lone_druid_entangle"), "lone_druid_entangle", "lone_druid")
@@ -230,7 +233,12 @@ function X.ConsiderTrueForm()
 		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and hpRatio < 0.85 then
+			if
+				alliesNearTarget ~= nil
+				and enemiesNearTarget ~= nil
+				and #alliesNearTarget >= #enemiesNearTarget
+				and hpRatio < 0.85
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -250,7 +258,11 @@ function X.ConsiderTrueForm()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

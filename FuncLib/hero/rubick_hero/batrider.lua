@@ -108,7 +108,10 @@ function X.ConsiderStickyNapalm()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetExtrapolatedLocation(castPoint)
 			end
 		end
@@ -150,12 +153,22 @@ function X.ConsiderStickyNapalm()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -221,7 +234,10 @@ function X.ConsiderFlamebreak()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.7))
+			then
 				if GetUnitToUnitDistance(bot, nearbyEnemies[1]) < radius - 50 then
 					return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 				else
@@ -254,7 +270,12 @@ function X.ConsiderFlamebreak()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and Fu.GetMP(bot) > 0.48 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and Fu.GetMP(bot) > 0.48
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -314,7 +335,10 @@ function X.ConsiderFirefly()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.1)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.57 and bot:WasRecentlyDamagedByAnyHero(2.1))
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

@@ -61,7 +61,11 @@ function X.ConsiderStoneForm(minion, ability)
 		end
 	end
 	local attackTarget = minion:GetAttackTarget()
-	if Fu.IsValidHero(attackTarget) and not Fu.IsSuspiciousIllusion(attackTarget) and not Fu.IsDisabled(attackTarget) then
+	if
+		Fu.IsValidHero(attackTarget)
+		and not Fu.IsSuspiciousIllusion(attackTarget)
+		and not Fu.IsDisabled(attackTarget)
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -115,7 +119,12 @@ function X.ConsiderFamiliarMove(minion)
 	end
 	local nearbyEnemies = minion:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and enemyHero:IsChanneling()
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			local enemyEnemies = enemyHero:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 			local enemiesNearby = enemyHero:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 			if #enemyEnemies >= #enemiesNearby then

@@ -32,7 +32,10 @@ function X.FamiliarThink(hero, familiar)
 	end
 end
 function ConsiderStoneForm(familiar, stoneFormAbility)
-	if not stoneFormAbility:IsFullyCastable() or familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
+	if
+		not stoneFormAbility:IsFullyCastable()
+		or familiar:HasModifier("modifier_visage_summon_familiars_stone_form_buff")
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local stunRadius = stoneFormAbility:GetSpecialValueInt("stun_radius")
@@ -49,7 +52,11 @@ function ConsiderStoneForm(familiar, stoneFormAbility)
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or ownerHero:WasRecentlyDamagedByAnyHero(2.5)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or ownerHero:WasRecentlyDamagedByAnyHero(2.5))
+				then
 					local enemiesInStunRadius = familiar:GetNearbyHeroes(stunRadius, true, BOT_MODE_NONE)
 					if enemiesInStunRadius ~= nil and #enemiesInStunRadius >= 1 then
 						return BOT_ACTION_DESIRE_HIGH
@@ -63,12 +70,21 @@ function ConsiderStoneForm(familiar, stoneFormAbility)
 	end
 	local nearbyEnemies = familiar:GetNearbyHeroes(stunRadius, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and enemyHero:IsChanneling()
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	local attackTarget = familiar:GetAttackTarget()
-	if Fu.IsValidHero(attackTarget) and not Fu.IsSuspiciousIllusion(attackTarget) and not Fu.IsDisabled(attackTarget) then
+	if
+		Fu.IsValidHero(attackTarget)
+		and not Fu.IsSuspiciousIllusion(attackTarget)
+		and not Fu.IsDisabled(attackTarget)
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -107,7 +123,11 @@ function ConsiderFamiliarAttack(familiar)
 			and not familiar:WasRecentlyDamagedByTower(1)
 		then
 			local enemiesNearTower = Fu.GetEnemiesNearLoc(tower:GetLocation(), 700)
-			if enemiesNearTower ~= nil and #enemiesNearTower == 0 and GetUnitToUnitDistance(ownerHero, familiar) < 1600 then
+			if
+				enemiesNearTower ~= nil
+				and #enemiesNearTower == 0
+				and GetUnitToUnitDistance(ownerHero, familiar) < 1600
+			then
 				isFamiliarBusy = true
 				return BOT_ACTION_DESIRE_HIGH, tower
 			end
@@ -122,7 +142,12 @@ function ConsiderFamiliarMove(familiar)
 	end
 	local nearbyEnemies = familiar:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and enemyHero:IsChanneling()
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 			if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #alliesNearEnemy >= #enemiesNearEnemy then
@@ -239,7 +264,11 @@ function ConsiderBearAttack(bear)
 		end
 	end
 	if Fu.IsDoingRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero) then
-		if (Fu.IsRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero)) and Fu.IsInRange(ownerHero, bearTarget, 500) and Fu.IsAttacking(ownerHero) then
+		if
+			(Fu.IsRoshan(ownerHero) or Fu.IsDoingTormentor(ownerHero))
+			and Fu.IsInRange(ownerHero, bearTarget, 500)
+			and Fu.IsAttacking(ownerHero)
+		then
 			bear:SetTarget(bearTarget)
 			return BOT_ACTION_DESIRE_HIGH, bearTarget
 		end

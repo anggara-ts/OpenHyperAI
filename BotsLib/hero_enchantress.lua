@@ -13,7 +13,8 @@ local tTalentTreeList = {
 }
 -- tAllAbilityBuildList[2] (pos 4/5): Impetus first, then Nature's Attendants, Enchant last, as Dotabuff's most picked
 -- order (the support Enchantress there is a right-click Impetus build: Treads, Pike, Scepter).
-local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_3" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -114,7 +115,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_cyclone", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -125,8 +127,10 @@ local impetusAbility = SafeAbility(bot:GetAbilityByName("enchantress_impetus"), 
 local enchantAbility = SafeAbility(bot:GetAbilityByName("enchantress_enchant"), "enchantress_enchant", "enchantress")
 local naturesAttendantsAbility =
 	SafeAbility(bot:GetAbilityByName("enchantress_natures_attendants"), "enchantress_natures_attendants", "enchantress")
-local sproinkAbility = SafeAbility(bot:GetAbilityByName("enchantress_bunny_hop"), "enchantress_bunny_hop", "enchantress")
-local littleFriendsAbility = SafeAbility(bot:GetAbilityByName("enchantress_little_friends"), "enchantress_little_friends", "enchantress")
+local sproinkAbility =
+	SafeAbility(bot:GetAbilityByName("enchantress_bunny_hop"), "enchantress_bunny_hop", "enchantress")
+local littleFriendsAbility =
+	SafeAbility(bot:GetAbilityByName("enchantress_little_friends"), "enchantress_little_friends", "enchantress")
 local impetusDesire
 local enchantDesire, enchantTarget
 local naturesAttendantsDesire
@@ -280,7 +284,10 @@ function X.ConsiderEnchant()
 			and not botTarget:HasModifier("modifier_faceless_void_chronosphere")
 			and nInRangeAlly ~= nil
 			and nInRangeEnemy ~= nil
-			and (#nInRangeAlly >= #nInRangeEnemy or #nInRangeEnemy > #nInRangeAlly and Fu.WeAreStronger(bot, castRange + 100))
+			and (
+				#nInRangeAlly >= #nInRangeEnemy
+				or #nInRangeEnemy > #nInRangeAlly and Fu.WeAreStronger(bot, castRange + 100)
+			)
 		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
@@ -323,7 +330,15 @@ function X.ConsiderNaturesAttendant()
 		end
 		for _, ally in pairs(Fu.GetNearbyHeroes(bot, healRadius, false, BOT_MODE_NONE) or {}) do
 			if ally ~= bot and Fu.IsValidHero(ally) and not ally:IsIllusion() and Fu.GetHP(ally) < 0.45 then
-				pcall(print, string.format("[OHA-ENCHANTRESS] t=%.0f attendants for %s hp=%.2f", DotaTime(), ally:GetUnitName(), Fu.GetHP(ally)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-ENCHANTRESS] t=%.0f attendants for %s hp=%.2f",
+						DotaTime(),
+						ally:GetUnitName(),
+						Fu.GetHP(ally)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -348,7 +363,11 @@ function X.ConsiderSproink()
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemyHero)
-			and Fu.CanKillTarget(enemyHero, impetusDamagePerDistance * GetUnitToUnitDistance(bot, enemyHero), DAMAGE_TYPE_PURE)
+			and Fu.CanKillTarget(
+				enemyHero,
+				impetusDamagePerDistance * GetUnitToUnitDistance(bot, enemyHero),
+				DAMAGE_TYPE_PURE
+			)
 			and bot:IsFacingLocation(enemyHero:GetLocation(), 15)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
@@ -418,7 +437,10 @@ function X.ConsiderLittleFriends()
 			and not tgt:HasModifier("modifier_abaddon_borrowed_time")
 			and not tgt:HasModifier("modifier_faceless_void_chronosphere")
 		then
-			pcall(print, string.format("[OHA-ENCHANTRESS] t=%.0f little friends engage %s", DotaTime(), tgt:GetUnitName()))
+			pcall(
+				print,
+				string.format("[OHA-ENCHANTRESS] t=%.0f little friends engage %s", DotaTime(), tgt:GetUnitName())
+			)
 			return BOT_ACTION_DESIRE_HIGH, tgt
 		end
 	end
@@ -438,7 +460,11 @@ function X.ConsiderLittleFriends()
 	end
 	if Fu.IsDoingRoshan(bot) then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and Fu.CanCastOnNonMagicImmune(attackTarget) and Fu.IsInRange(bot, attackTarget, castRange) then
+		if
+			Fu.IsRoshan(attackTarget)
+			and Fu.CanCastOnNonMagicImmune(attackTarget)
+			and Fu.IsInRange(bot, attackTarget, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, attackTarget
 		end
 	end

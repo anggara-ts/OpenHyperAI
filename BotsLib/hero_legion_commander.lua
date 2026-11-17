@@ -41,7 +41,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -50,7 +51,8 @@ X["bDeafaultItem"] = false
 function X.MinionThink(minion)
 	Minion.MinionThink(minion)
 end
-local overwhelmingOddsAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "legion_commander")
+local overwhelmingOddsAbility =
+	SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "legion_commander")
 local pressTheAttackAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "legion_commander")
 local momentOfCourageAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "legion_commander")
 local duelAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "legion_commander")
@@ -75,13 +77,21 @@ function X.SkillsComplement()
 		-- Clear once, then queue all three: the old Action_UseAbilityOnEntity for Duel cleared the
 		-- queue, so the Press the Attack and Blade Mail queued before it never went out.
 		bot:Action_ClearActions(false)
-		if pressTheAttackAbility:IsTrained() and pressTheAttackAbility:IsFullyCastable() and bot:GetMana() > pressTheAttackAbility:GetManaCost() + duelAbility:GetManaCost() then
+		if
+			pressTheAttackAbility:IsTrained()
+			and pressTheAttackAbility:IsFullyCastable()
+			and bot:GetMana() > pressTheAttackAbility:GetManaCost() + duelAbility:GetManaCost()
+		then
 			-- datafeed: Press the Attack is unit-target (behavior 8); sTalentList[5] is now the Duel duration
 			-- talent, not an AoE talent, so the old point-cast branch could never cast.
 			bot:ActionQueue_UseAbilityOnEntity(pressTheAttackAbility, bot)
 		end
 		local bladeMail = Fu.IsItemAvailable("item_blade_mail")
-		if bladeMail ~= nil and bladeMail:IsFullyCastable() and bot:GetMana() > bladeMail:GetManaCost() + duelAbility:GetManaCost() then
+		if
+			bladeMail ~= nil
+			and bladeMail:IsFullyCastable()
+			and bot:GetMana() > bladeMail:GetManaCost() + duelAbility:GetManaCost()
+		then
 			bot:ActionQueue_UseAbility(bladeMail)
 		end
 		bot:ActionQueue_UseAbilityOnEntity(duelAbility, duelTarget)
@@ -92,11 +102,19 @@ function X.SkillsComplement()
 	local blinkTarget = X.ConsiderBlinkDuel()
 	if blinkTarget ~= nil then
 		bot:Action_ClearActions(false)
-		if pressTheAttackAbility:IsTrained() and pressTheAttackAbility:IsFullyCastable() and bot:GetMana() > pressTheAttackAbility:GetManaCost() + duelAbility:GetManaCost() then
+		if
+			pressTheAttackAbility:IsTrained()
+			and pressTheAttackAbility:IsFullyCastable()
+			and bot:GetMana() > pressTheAttackAbility:GetManaCost() + duelAbility:GetManaCost()
+		then
 			bot:ActionQueue_UseAbilityOnEntity(pressTheAttackAbility, bot)
 		end
 		local bladeMail = Fu.IsItemAvailable("item_blade_mail")
-		if bladeMail ~= nil and bladeMail:IsFullyCastable() and bot:GetMana() > bladeMail:GetManaCost() + duelAbility:GetManaCost() then
+		if
+			bladeMail ~= nil
+			and bladeMail:IsFullyCastable()
+			and bot:GetMana() > bladeMail:GetManaCost() + duelAbility:GetManaCost()
+		then
 			bot:ActionQueue_UseAbility(bladeMail)
 		end
 		bot:ActionQueue_UseAbilityOnLocation(bot.Blink, blinkTarget:GetLocation())
@@ -133,7 +151,11 @@ function X.ConsiderQ()
 	local castLocation = nil
 	local castReason = nil
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint)
+		then
 			castLocation = enemyHero:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
@@ -158,7 +180,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange - 80) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange - 80)
+		then
 			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.38 then
 				castLocation = Fu.GetCastLocation(bot, botTarget, 10, 490)
 				if castLocation ~= nil then
@@ -169,7 +195,11 @@ function X.ConsiderQ()
 	end
 	if Fu.IsRetreating(bot) and not bot:HasModifier("modifier_legion_commander_overwhelming_odds") then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 5.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 5.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				castLocation = enemyHero:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-撤退" .. Fu.Chat.GetNormName(enemyHero)
 			end
@@ -199,7 +229,11 @@ function X.ConsiderQ()
 		and #nearbyEnemies == 0
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1400, true)
-		if #laneCreeps >= 4 and Fu.IsValid(laneCreeps[1]) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			#laneCreeps >= 4
+			and Fu.IsValid(laneCreeps[1])
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 30, 400, 0, 0)
 			if creepAoeLocation.count >= 4 then
 				castLocation = creepAoeLocation.targetloc
@@ -315,7 +349,12 @@ function X.ConsiderR()
 			local totalDamage = botDamage * 0.8 + allyDamage * 1.2
 			if totalDamage > botTarget:GetHealth() + botTarget:GetHealthRegen() * duelDuration then
 				castTarget = botTarget
-				castReason = "R-激进的决斗:" .. Fu.Chat.GetNormName(castTarget) .. " 攻击:" .. botDamage .. "队友:" .. allyDamage
+				castReason = "R-激进的决斗:"
+					.. Fu.Chat.GetNormName(castTarget)
+					.. " 攻击:"
+					.. botDamage
+					.. "队友:"
+					.. allyDamage
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 			end
 		end
@@ -352,7 +391,12 @@ function X.ConsiderR()
 				local botDamageToEnemy = bot:GetEstimatedDamageToTarget(true, enemyHero, 3.0, DAMAGE_TYPE_PHYSICAL)
 				if bot:GetHealth() * 1.1 / enemyDamageToBot > enemyHero:GetHealth() / botDamageToEnemy then
 					castTarget = enemyHero
-					castReason = "R-保守的决斗:" .. Fu.Chat.GetNormName(castTarget) .. " 攻击:" .. botDamage .. "队友:" .. allyDamage
+					castReason = "R-保守的决斗:"
+						.. Fu.Chat.GetNormName(castTarget)
+						.. " 攻击:"
+						.. botDamage
+						.. "队友:"
+						.. allyDamage
 					return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 				end
 			end

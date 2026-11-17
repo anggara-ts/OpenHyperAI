@@ -71,7 +71,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -83,7 +84,8 @@ end
 local burrowstrikeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "sand_king")
 local sandStormAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "sand_king")
 local thirdSlotAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "sand_king")
-local scorpionStrikeAbility = SafeAbility(bot:GetAbilityByName("sandking_scorpion_strike"), "sandking_scorpion_strike", "sand_king")
+local scorpionStrikeAbility =
+	SafeAbility(bot:GetAbilityByName("sandking_scorpion_strike"), "sandking_scorpion_strike", "sand_king")
 local epicenterAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "sand_king")
 local burrowstrikeDesire, burrowstrikeLocation
 local sandStormDesire
@@ -170,7 +172,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.38 then
 				nTargetLocation = botTarget:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "Q-攻击:" .. Fu.Chat.GetNormName(botTarget)
@@ -215,8 +221,13 @@ function X.ConsiderQ()
 		and #nearbyEnemies == 0
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1300, true)
-		if #laneCreeps >= 5 and Fu.IsValid(laneCreeps[1]) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
-			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, burrowWidth + 90, 0, 0)
+		if
+			#laneCreeps >= 5
+			and Fu.IsValid(laneCreeps[1])
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
+			local creepAoeLocation =
+				bot:FindAoELocation(true, false, bot:GetLocation(), castRange, burrowWidth + 90, 0, 0)
 			if creepAoeLocation.count >= 3 then
 				nTargetLocation = creepAoeLocation.targetloc
 				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "Q-推线" .. creepAoeLocation.count
@@ -256,7 +267,11 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, radius / 3) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius / 3)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			if abilityLevel >= 3 or mpRatio > 0.88 or Fu.GetHP(botTarget) < 0.4 then
 				return BOT_ACTION_DESIRE_HIGH, "W-进攻:" .. Fu.Chat.GetNormName(botTarget)
 			end
@@ -298,7 +313,10 @@ function X.ConsiderW()
 	end
 	if Fu.IsRetreating(bot) and (abilityLevel >= 3 or hpRatio < 0.5) then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or bot:GetActiveModeDesire() > 0.7) then
+			if
+				Fu.IsValid(enemyHero)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or bot:GetActiveModeDesire() > 0.7)
+			then
 				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "W-撤退:" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
@@ -327,15 +345,18 @@ function X.ConsiderStinger()
 				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
 					if
 						GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearTarget)) > castRange
-						and GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearTarget)) < castRange + radius
+						and GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearTarget))
+							< castRange + radius
 					then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 					end
 				end
 				if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				else
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
@@ -366,9 +387,17 @@ function X.ConsiderStinger()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost() then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost()
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
-		if laneCreeps ~= nil and #laneCreeps >= 5 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 5
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+		then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 		end
 	end
@@ -379,12 +408,21 @@ function X.ConsiderStinger()
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(neutralCreeps)
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(700, true)
-			if laneCreeps ~= nil and #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) then
+			if
+				laneCreeps ~= nil
+				and #laneCreeps >= 3
+				and Fu.CanBeAttacked(laneCreeps[1])
+				and not Fu.IsRunning(laneCreeps[1])
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(laneCreeps)
 			end
 		end
 	end
-	if Fu.IsLaning(bot) and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost() and abilityLevel >= 2 then
+	if
+		Fu.IsLaning(bot)
+		and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost()
+		and abilityLevel >= 2
+	then
 		local enemiesInRange = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + radius, true)
 		if
@@ -400,11 +438,19 @@ function X.ConsiderStinger()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost() then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 600) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 600)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
-	if Fu.IsDoingTormentor(bot) and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost() then
+	if
+		Fu.IsDoingTormentor(bot)
+		and manaAfterCast > burrowstrikeAbility:GetManaCost() + sandStormAbility:GetManaCost()
+	then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 600) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
@@ -445,7 +491,11 @@ function X.ConsiderR()
 			local disabledCount = 0
 			local enemyCount = 0
 			for _, enemyHero in pairs(nearbyEnemies) do
-				if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 1000) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.IsInRange(bot, enemyHero, 1000)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+				then
 					enemyCount = enemyCount + 1
 					if Fu.IsDisabled(enemyHero) or enemyHero:IsSilenced() or enemyHero:GetMana() < 50 then
 						disabledCount = disabledCount + 1
@@ -458,13 +508,19 @@ function X.ConsiderR()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 1000) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1000)
+		then
 			local attackDamage = bot:GetEstimatedDamageToTarget(true, botTarget, 6.0, DAMAGE_TYPE_PHYSICAL)
 			if not Fu.CanKillTarget(botTarget, attackDamage, DAMAGE_TYPE_PHYSICAL) then
 				if (bot:IsInvisible() or bot:IsMagicImmune()) and Fu.IsInRange(bot, botTarget, radius + 200) then
 					return BOT_ACTION_DESIRE_HIGH, "R-隐身或魔免开大进攻" .. Fu.Chat.GetNormName(botTarget)
 				end
-				if (Fu.IsDisabled(botTarget) or botTarget:IsSilenced()) and Fu.IsInRange(bot, botTarget, radius + 150) then
+				if
+					(Fu.IsDisabled(botTarget) or botTarget:IsSilenced()) and Fu.IsInRange(bot, botTarget, radius + 150)
+				then
 					return BOT_ACTION_DESIRE_HIGH, "R-找机会开大进攻" .. Fu.Chat.GetNormName(botTarget)
 				end
 			end

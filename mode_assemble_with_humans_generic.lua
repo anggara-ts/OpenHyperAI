@@ -79,16 +79,25 @@ function GetDesireHelper()
 				aliveAllyCount = aliveAllyCount + 1
 				if not member:IsBot() then
 					if bot.tormentor_state == false and Fu.IsValidHero(member) then
-						if GetUnitToLocationDistance(member, tormentorLocation) <= 1300 and IsLocationVisible(tormentorLocation) then
+						if
+							GetUnitToLocationDistance(member, tormentorLocation) <= 1300
+							and IsLocationVisible(tormentorLocation)
+						then
 							local neutralCreeps = member:GetNearbyNeutralCreeps(1300)
 							for j = #neutralCreeps, 1, -1 do
-								if Fu.IsValid(neutralCreeps[j]) and string.find(neutralCreeps[j]:GetUnitName(), "miniboss") then
+								if
+									Fu.IsValid(neutralCreeps[j])
+									and string.find(neutralCreeps[j]:GetUnitName(), "miniboss")
+								then
 									bot.tormentor_state = true
 								end
 							end
 						end
 					end
-					if GetUnitToLocationDistance(member, tormentorLocation) <= 1600 or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 1600 then
+					if
+						GetUnitToLocationDistance(member, tormentorLocation) <= 1600
+						or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 1600
+					then
 						humansNearTormentor = humansNearTormentor + 1
 					end
 				end
@@ -103,11 +112,17 @@ function GetDesireHelper()
 					bot.tormentor_team_healthy = true
 				end
 				if Fu.IsCore(member) then
-					if GetUnitToLocationDistance(member, tormentorLocation) <= 900 or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 900 then
+					if
+						GetUnitToLocationDistance(member, tormentorLocation) <= 900
+						or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 900
+					then
 						coresNearTormentor = coresNearTormentor + 1
 					end
 				else
-					if GetUnitToLocationDistance(member, tormentorLocation) <= 900 or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 900 then
+					if
+						GetUnitToLocationDistance(member, tormentorLocation) <= 900
+						or GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 900
+					then
 						supportsNearTormentor = supportsNearTormentor + 1
 					end
 				end
@@ -140,7 +155,11 @@ function GetDesireHelper()
 			end
 		end
 	end
-	if #alliesNearTormentor <= 1 and humansNearTormentor == 0 and DotaTime() > (Fu.IsModeTurbo() and 25 * 60 or 40 * 60) then
+	if
+		#alliesNearTormentor <= 1
+		and humansNearTormentor == 0
+		and DotaTime() > (Fu.IsModeTurbo() and 25 * 60 or 40 * 60)
+	then
 		return BOT_MODE_DESIRE_NONE, "late_no_allies"
 	end
 	local enemyAncient = GetAncient(GetOpposingTeam())
@@ -149,7 +168,8 @@ function GetDesireHelper()
 		and humansNearTormentor == 0
 		and GetUnitToLocationDistance(bot, tormentorLocation) > 1600
 		and (
-			GetUnitToUnitDistance(bot, enemyAncient) < 4000 and #Fu.GetEnemiesNearLoc(enemyAncient:GetLocation(), 4000) > 0
+			GetUnitToUnitDistance(bot, enemyAncient) < 4000
+				and #Fu.GetEnemiesNearLoc(enemyAncient:GetLocation(), 4000) > 0
 			or Fu.IsDoingRoshan(bot) and bot:GetActiveModeDesire() >= BOT_MODE_DESIRE_HIGH
 		)
 	then
@@ -172,8 +192,15 @@ function GetDesireHelper()
 		if why ~= nil then
 			if bot.tormentor_state == true and DotaTime() >= (bot._tormentorStayLogAt or -999) then
 				bot._tormentorStayLogAt = DotaTime() + 10
-				pcall(print, string.format("[OHA-TORMENTOR] t=%.0f %s stay why=%s", DotaTime(),
-					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")), why))
+				pcall(
+					print,
+					string.format(
+						"[OHA-TORMENTOR] t=%.0f %s stay why=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						why
+					)
+				)
 			end
 			return BOT_MODE_DESIRE_NONE, "lane_threatened"
 		end
@@ -267,14 +294,24 @@ function GetDesireHelper()
 			return BOT_MODE_DESIRE_NONE, "team_not_healthy"
 		end
 		canDoTormentor = true
-		if Fu.GetHP(bot) < 0.3 and not bot:HasModifier("modifier_item_crimson_guard_extra") and Fu.IsTormentor(tormentorUnit) then
+		if
+			Fu.GetHP(bot) < 0.3
+			and not bot:HasModifier("modifier_item_crimson_guard_extra")
+			and Fu.IsTormentor(tormentorUnit)
+		then
 			local tormentorHp = Fu.GetHP(tormentorUnit)
 			if tormentorHp > 0.15 and Fu.GetHP(bot) < tormentorHp then
 				return BOT_MODE_DESIRE_NONE, "bot_low_hp"
 			end
 		end
 		local desire = BOT_MODE_DESIRE_VERYHIGH
-		if #alliesNearTormentor >= 2 or #alliesNearWaitingSpot >= 2 or coresNearTormentor >= 1 or supportsNearTormentor >= 2 or humansNearTormentor >= 1 then
+		if
+			#alliesNearTormentor >= 2
+			or #alliesNearWaitingSpot >= 2
+			or coresNearTormentor >= 1
+			or supportsNearTormentor >= 2
+			or humansNearTormentor >= 1
+		then
 			desire = BOT_MODE_DESIRE_VERYHIGH
 		else
 			desire = BOT_MODE_DESIRE_HIGH
@@ -323,7 +360,10 @@ function Think()
 			return
 		end
 		-- Far from the Tormentor gather spot: TP or Twin Gate when clearly faster.
-		if GetUnitToLocationDistance(bot, tormentorWaitingLocation) > 3000 and ObjectiveTravel.Go(bot, tormentorWaitingLocation, "tormentor") then
+		if
+			GetUnitToLocationDistance(bot, tormentorWaitingLocation) > 3000
+			and ObjectiveTravel.Go(bot, tormentorWaitingLocation, "tormentor")
+		then
 			return
 		end
 		if DotaTime() >= nextWaitMoveTime then
@@ -333,7 +373,10 @@ function Think()
 		end
 	else
 		if GetUnitToLocationDistance(bot, tormentorLocation) > bot:GetAttackRange() + 50 then
-			if GetUnitToLocationDistance(bot, tormentorLocation) > 3000 and ObjectiveTravel.Go(bot, tormentorLocation, "tormentor") then
+			if
+				GetUnitToLocationDistance(bot, tormentorLocation) > 3000
+				and ObjectiveTravel.Go(bot, tormentorLocation, "tormentor")
+			then
 				return
 			end
 			bot:Action_MoveToLocation(tormentorLocation)
@@ -414,7 +457,8 @@ function X.IsEnoughAllies(location, radius)
 	for i = 1, 5 do
 		local member = GetTeamMember(i)
 		if member ~= nil and member:IsAlive() then
-			local here = GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 1600 or GetUnitToLocationDistance(member, tormentorLocation) <= 900
+			local here = GetUnitToLocationDistance(member, tormentorWaitingLocation) <= 1600
+				or GetUnitToLocationDistance(member, tormentorLocation) <= 900
 			if here or member == bot or (member:IsBot() and Fu.IsDoingTormentor(member)) or callAge < 5 then
 				avail = avail + 1
 				if Fu.IsCore(member) then
@@ -429,16 +473,19 @@ function X.IsEnoughAllies(location, radius)
 	local allComing = alliesInRange >= math.max(3, avail) and coresInRange >= needCores
 	if radius >= 1600 and #declined > 0 and DotaTime() >= (bot._tormentorAckLogAt or -999) then
 		bot._tormentorAckLogAt = DotaTime() + 10
-		pcall(print, string.format(
-			"[OHA-TORMENTOR] t=%.0f %s gather here=%d/%d cores=%d/%d declined=%s",
-			DotaTime(),
-			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-			alliesInRange,
-			avail,
-			coresInRange,
-			needCores,
-			table.concat(declined, ",")
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-TORMENTOR] t=%.0f %s gather here=%d/%d cores=%d/%d declined=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				alliesInRange,
+				avail,
+				coresInRange,
+				needCores,
+				table.concat(declined, ",")
+			)
+		)
 	end
 	-- Four heroes with two cores waited ~75s for the fifth (28:00) while a creep wave grew on
 	-- our high ground. Once four with two cores have been gathered for 20s, they start.
@@ -531,7 +578,10 @@ local humanPinged = false
 function X.DidHumanPingedOrAtLocation()
 	local humanPlayer, ping = Fu.GetHumanPing()
 	if bot.tormentor_state == true and humanPlayer and ping and not humanPinged then
-		if Fu.GetDistance(ping.location, tormentorWaitingLocation) <= 800 or Fu.GetDistance(ping.location, tormentorLocation) <= 800 then
+		if
+			Fu.GetDistance(ping.location, tormentorWaitingLocation) <= 800
+			or Fu.GetDistance(ping.location, tormentorLocation) <= 800
+		then
 			if GameTime() < ping.time + 15 then
 				humanPinged = true
 			end

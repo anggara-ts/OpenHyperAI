@@ -77,7 +77,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -94,7 +95,8 @@ local hunterInTheNightAbility = SafeAbility(
 )
 local midnightFeastAbility =
 	SafeAbility(bot:GetAbilityByName("night_stalker_midnight_feast"), "night_stalker_midnight_feast", "night_stalker")
-local darknessAbility = SafeAbility(bot:GetAbilityByName("night_stalker_darkness"), "night_stalker_darkness", "night_stalker")
+local darknessAbility =
+	SafeAbility(bot:GetAbilityByName("night_stalker_darkness"), "night_stalker_darkness", "night_stalker")
 local voidDesire, voidTarget
 local cripplingFearDesire
 local hunterInTheNightDesire, hunterInTheNightTarget
@@ -159,12 +161,18 @@ function X.ConsiderVoid()
 	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			-- Void returns a unit everywhere below (unit-target per datafeed; no Scepter point-cast)
 			-- Interrupt only at night: Void mini-stuns only then (datafeed, "At night, Void also
 			-- mini-stuns, interrupting channeling abilities"). "a or b and night" let any channel through
 			-- by day, where Void does not stop it. Night here also counts the 30s after Dark Ascension.
-			local darkUntil = (bot._nsDarkAt or -999) + math.max(darknessAbility:GetSpecialValueFloat("duration"), 0) + 0.5
+			local darkUntil = (bot._nsDarkAt or -999)
+				+ math.max(darknessAbility:GetSpecialValueFloat("duration"), 0)
+				+ 0.5
 			local isNight = timeOfDay == "night" or DotaTime() < darkUntil
 			if (enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero)) and isNight then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
@@ -227,13 +235,21 @@ function X.ConsiderVoid()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 		then
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if enemiesNearChaser ~= nil and (#enemiesNearChaser > #nearbyAllies or Fu.GetHP(bot) < 0.52 and bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #nearbyAllies or Fu.GetHP(bot) < 0.52 and bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -245,7 +261,12 @@ function X.ConsiderVoid()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and mpRatio > 0.5 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and mpRatio > 0.5
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -307,7 +328,10 @@ function X.ConsiderCripplingFear()
 	if Fu.IsFarming(bot) and mpRatio > 0.25 then
 		if isAttacking then
 			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(radius)
-			if nearbyNeutrals ~= nil and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)
@@ -317,7 +341,12 @@ function X.ConsiderCripplingFear()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -334,7 +363,8 @@ function X.ConsiderHunterInTheNight()
 	end
 	-- datafeed has no "shard_cast_range" on Hunter in the Night (it read 0, so no creep was ever found);
 	-- fall back to the engine cast range for the Shard cast
-	local castRange = math.max(hunterInTheNightAbility:GetSpecialValueInt("shard_cast_range"), hunterInTheNightAbility:GetCastRange())
+	local castRange =
+		math.max(hunterInTheNightAbility:GetSpecialValueInt("shard_cast_range"), hunterInTheNightAbility:GetCastRange())
 	local timeOfDay = Fu.CheckTimeOfDay()
 	if Fu.IsFarming(bot) then
 		local nearbyCreeps = bot:GetNearbyCreeps(castRange, true)
@@ -417,7 +447,13 @@ function X.ConsiderMidnightFeast()
 	-- Did the last try start the cooldown? Logs the gold change once so we learn if eating gives bounty.
 	if feastTryCd ~= nil and now - feastTryAt > 1 then
 		local cdNow = midnightFeastAbility:GetCooldownTimeRemaining()
-		print(string.format("[OHA-NS] feast result started=%s goldDelta=%d", tostring(cdNow > 0), bot:GetGold() - (feastGold or bot:GetGold())))
+		print(
+			string.format(
+				"[OHA-NS] feast result started=%s goldDelta=%d",
+				tostring(cdNow > 0),
+				bot:GetGold() - (feastGold or bot:GetGold())
+			)
+		)
 		feastTryCd, feastGold = nil, nil
 	end
 	if
@@ -429,7 +465,9 @@ function X.ConsiderMidnightFeast()
 		or midnightFeastAbility:GetCooldownTimeRemaining() > 0
 		or now - feastTryAt < 3
 		or not FeastIsNight()
-		or Fu.IsRetreating(bot) and Fu.IsRealInvisible(bot) and #Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) > 0
+		or Fu.IsRetreating(bot)
+			and Fu.IsRealInvisible(bot)
+			and #Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) > 0
 	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
@@ -444,14 +482,27 @@ function X.ConsiderMidnightFeast()
 		why = "heal"
 	end
 	-- Farm: no enemy hero near, use it on cooldown like Devour / Midas (it also tops up HP and mana).
-	if creep == nil and nEnemies == 0 and (Fu.IsFarming(bot) or Fu.IsLaning(bot) or Fu.IsPushing(bot) or hp < 0.9 or mpRatio < 0.9) then
+	if
+		creep == nil
+		and nEnemies == 0
+		and (Fu.IsFarming(bot) or Fu.IsLaning(bot) or Fu.IsPushing(bot) or hp < 0.9 or mpRatio < 0.9)
+	then
 		creep = BestFeastCreep(450)
 		why = "farm"
 	end
 	if creep ~= nil and Fu.CanCastOnTargetAdvanced(creep) then
 		feastTryAt, feastTryCd, feastGold = now, midnightFeastAbility:GetCooldownTimeRemaining(), bot:GetGold()
-		print(string.format("[OHA-NS] feast try why=%s creep=%s passive=%s castable=%s hp=%.2f mp=%.2f",
-			why, creep:GetUnitName(), tostring(midnightFeastAbility:IsPassive()), tostring(midnightFeastAbility:IsFullyCastable()), hp, mpRatio))
+		print(
+			string.format(
+				"[OHA-NS] feast try why=%s creep=%s passive=%s castable=%s hp=%.2f mp=%.2f",
+				why,
+				creep:GetUnitName(),
+				tostring(midnightFeastAbility:IsPassive()),
+				tostring(midnightFeastAbility:IsFullyCastable()),
+				hp,
+				mpRatio
+			)
+		)
 		return BOT_ACTION_DESIRE_HIGH, creep
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

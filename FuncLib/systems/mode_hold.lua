@@ -39,7 +39,18 @@ function M.Hold(bot, key, mode, desire, cond)
 		-- (once per 15s per bot) to see whether this branch runs at all.
 		if now >= (bot._modeHoldLogAt or -999) then
 			bot._modeHoldLogAt = now + 15
-			pcall(print, string.format("[OHA-HOLD] t=%.1f %s %s raw=%.2f held=%.2f age=%.1f", now, (string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")), key, desire, held.d * 0.95, now - held.t))
+			pcall(
+				print,
+				string.format(
+					"[OHA-HOLD] t=%.1f %s %s raw=%.2f held=%.2f age=%.1f",
+					now,
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					key,
+					desire,
+					held.d * 0.95,
+					now - held.t
+				)
+			)
 		end
 		return held.d * 0.95
 	end

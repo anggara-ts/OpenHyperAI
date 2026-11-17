@@ -19,7 +19,11 @@ local function installTargeting(Fu)
 			units = bot:GetNearbyLaneCreeps(searchRadius, isEnemy)
 		end
 		for _, unit in pairs(units) do
-			if GetUnitToLocationDistance(unit, location) < radius and unit:GetHealth() < lowestHealth and Fu.CanCastOnNonMagicImmune(unit) then
+			if
+				GetUnitToLocationDistance(unit, location) < radius
+				and unit:GetHealth() < lowestHealth
+				and Fu.CanCastOnNonMagicImmune(unit)
+			then
 				weakestUnit = unit
 				lowestHealth = unit:GetHealth()
 			end
@@ -166,7 +170,10 @@ local function installTargeting(Fu)
 			attackRange = 350
 		end
 		local weakestHero = Fu.GetAttackableWeakestUnit(bot, attackRange, true, true)
-		if Fu.IsValidHero(weakestHero) and (GetUnitToUnitDistance(target, bot) > attackRange or Fu.HasForbiddenModifier(target)) then
+		if
+			Fu.IsValidHero(weakestHero)
+			and (GetUnitToUnitDistance(target, bot) > attackRange or Fu.HasForbiddenModifier(target))
+		then
 			bot:SetTarget(weakestHero)
 			return
 		end
@@ -176,7 +183,12 @@ local function installTargeting(Fu)
 		local bestUnit = nil
 		for _, unit in pairs(units) do
 			local hpPercent = unit:GetHealth() / unit:GetMaxHealth()
-			if (allowMagicImmune and Fu.CanCastOnMagicImmune(unit) or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)) and hpPercent > mostHpPercent then
+			if
+				(
+					allowMagicImmune and Fu.CanCastOnMagicImmune(unit)
+					or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)
+				) and hpPercent > mostHpPercent
+			then
 				bestUnit = unit
 				mostHpPercent = hpPercent
 			end
@@ -187,7 +199,10 @@ local function installTargeting(Fu)
 		local killableUnit = nil
 		for _, unit in pairs(units) do
 			if
-				(allowMagicImmune and Fu.CanCastOnMagicImmune(unit) or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)) and Fu.CanKillTarget(unit, damage, damageType)
+				(
+					allowMagicImmune and Fu.CanCastOnMagicImmune(unit)
+					or not allowMagicImmune and Fu.CanCastOnNonMagicImmune(unit)
+				) and Fu.CanKillTarget(unit, damage, damageType)
 			then
 				killableUnit = unit
 			end

@@ -122,7 +122,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_satanic",
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_heavens_halberd", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -133,10 +134,12 @@ function X.MinionThink(hMinionUnit)
 end
 local gushAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "tidehunter")
 local krakenShellAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "tidehunter")
-krakenShellAbility = SafeAbility(bot:GetAbilityByName("tidehunter_kraken_shell"), "tidehunter_kraken_shell", "tidehunter")
+krakenShellAbility =
+	SafeAbility(bot:GetAbilityByName("tidehunter_kraken_shell"), "tidehunter_kraken_shell", "tidehunter")
 local anchorSmashAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "tidehunter")
 local ravageAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "tidehunter")
-local deadInTheWaterAbility = SafeAbility(bot:GetAbilityByName("tidehunter_dead_in_the_water"), "tidehunter_dead_in_the_water", "tidehunter")
+local deadInTheWaterAbility =
+	SafeAbility(bot:GetAbilityByName("tidehunter_dead_in_the_water"), "tidehunter_dead_in_the_water", "tidehunter")
 local talent3 = SafeAbility(bot:GetAbilityByName(sTalentList[3]), "sTalentList[3]", "tidehunter")
 local gushDesire, gushTarget
 local krakenShellDesire, krakenShellTarget
@@ -218,7 +221,12 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(botTarget, bot, 600) and Fu.IsAttacking(bot) and hpRatio < 0.25 then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(botTarget, bot, 600)
+			and Fu.IsAttacking(bot)
+			and hpRatio < 0.25
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -388,7 +396,11 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, radius - 50) and Fu.CanCastOnMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius - 50)
+			and Fu.CanCastOnMagicImmune(botTarget)
+		then
 			target = botTarget
 			reason = "E-攻击" .. Fu.Chat.GetNormName(target)
 			return BOT_ACTION_DESIRE_HIGH, reason
@@ -452,9 +464,16 @@ function X.ConsiderE()
 			return BOT_ACTION_DESIRE_HIGH, "E消耗"
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost * 0.32) and #nearbyAllies <= 3 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost * 0.32)
+		and #nearbyAllies <= 3
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
-		if (#laneCreeps >= 3 or #laneCreeps >= 2 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			(#laneCreeps >= 3 or #laneCreeps >= 2 and mpRatio > 0.82)
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			target = laneCreeps[1] -- was the undefined global creep (nil); Anchor Smash is no-target
 			reason = "E-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, reason
@@ -511,7 +530,15 @@ function X.ConsiderR()
 		then
 			if DotaTime() - (X.lastRavageLog or -99) > 10 then
 				X.lastRavageLog = DotaTime()
-				pcall(print, string.format("[OHA-TIDE] t=%.0f ravage-engage heroes=%d targetHp=%.2f", DotaTime(), inRavage, Fu.GetHP(botTarget)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-TIDE] t=%.0f ravage-engage heroes=%d targetHp=%.2f",
+						DotaTime(),
+						inRavage,
+						Fu.GetHP(botTarget)
+					)
+				)
 			end
 			target = botTarget
 			reason = "R-先手" .. Fu.Chat.GetNormName(target)

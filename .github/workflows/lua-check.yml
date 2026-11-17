@@ -40,3 +40,14 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lua-check
       - name: Run luacheck
         run: luacheck . --formatter plain --codes
+
+  format:
+    name: Format (StyLua)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: 2.6.0
+          args: --check .

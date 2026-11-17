@@ -73,16 +73,20 @@ X["sSellList"] = { "item_cyclone", "item_magic_wand", "item_ultimate_scepter", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local disruptionAbility = SafeAbility(bot:GetAbilityByName("shadow_demon_disruption"), "shadow_demon_disruption", "shadow_demon")
-local disseminateAbility = SafeAbility(bot:GetAbilityByName("shadow_demon_disseminate"), "shadow_demon_disseminate", "shadow_demon")
-local shadowPoisonAbility = SafeAbility(bot:GetAbilityByName("shadow_demon_shadow_poison"), "shadow_demon_shadow_poison", "shadow_demon")
+local disruptionAbility =
+	SafeAbility(bot:GetAbilityByName("shadow_demon_disruption"), "shadow_demon_disruption", "shadow_demon")
+local disseminateAbility =
+	SafeAbility(bot:GetAbilityByName("shadow_demon_disseminate"), "shadow_demon_disseminate", "shadow_demon")
+local shadowPoisonAbility =
+	SafeAbility(bot:GetAbilityByName("shadow_demon_shadow_poison"), "shadow_demon_shadow_poison", "shadow_demon")
 local shadowPoisonReleaseAbility = SafeAbility(
 	bot:GetAbilityByName("shadow_demon_shadow_poison_release"),
 	"shadow_demon_shadow_poison_release",
@@ -90,7 +94,8 @@ local shadowPoisonReleaseAbility = SafeAbility(
 )
 local demonicCleanseAbility =
 	SafeAbility(bot:GetAbilityByName("shadow_demon_demonic_cleanse"), "shadow_demon_demonic_cleanse", "shadow_demon")
-local demonicPurgeAbility = SafeAbility(bot:GetAbilityByName("shadow_demon_demonic_purge"), "shadow_demon_demonic_purge", "shadow_demon")
+local demonicPurgeAbility =
+	SafeAbility(bot:GetAbilityByName("shadow_demon_demonic_purge"), "shadow_demon_demonic_purge", "shadow_demon")
 local disruptionDesire, disruptionTarget
 local disseminateDesire, disseminateTarget
 local shadowPoisonDesire, shadowPoisonLocation
@@ -120,7 +125,9 @@ function X.SkillsComplement()
 			end)
 			bot._disrupted = {
 				loc = disruptionTarget:GetLocation(),
-				untilAt = DotaTime() + math.max(0, disruptionAbility:GetCastPoint()) + ((ok and type(duration) == "number" and duration > 0) and duration or 2.75),
+				untilAt = DotaTime()
+					+ math.max(0, disruptionAbility:GetCastPoint())
+					+ ((ok and type(duration) == "number" and duration > 0) and duration or 2.75),
 			}
 		end
 		bot:Action_UseAbilityOnEntity(disruptionAbility, disruptionTarget)
@@ -247,7 +254,10 @@ function X.ConsiderDisruption()
 			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 1000, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.75 and bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.75 and bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
@@ -340,7 +350,11 @@ function X.ConsiderDisseminate()
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 		local enemiesNearLocation = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if enemiesNearLocation ~= nil and #enemiesNearLocation >= 2 then
-			if Fu.IsValidHero(enemiesNearLocation[1]) and Fu.CanCastOnNonMagicImmune(enemiesNearLocation[1]) and Fu.CanCastOnTargetAdvanced(enemiesNearLocation[1]) then
+			if
+				Fu.IsValidHero(enemiesNearLocation[1])
+				and Fu.CanCastOnNonMagicImmune(enemiesNearLocation[1])
+				and Fu.CanCastOnTargetAdvanced(enemiesNearLocation[1])
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemiesNearLocation[1]
 			end
 		end
@@ -373,12 +387,20 @@ function X.ConsiderShadowPoisonRelease()
 	end
 	local stackMultiplier = { 1, 2, 4, 8, 16 }
 	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES)) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(enemyHero, bot, 3000) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(enemyHero, bot, 3000)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			local stackCount = Fu.GetModifierCount(enemyHero, "modifier_shadow_demon_shadow_poison")
 			local stackDamage = shadowPoisonAbility:GetSpecialValueFloat("stack_damage")
 			-- datafeed: release deals 1/2/4/8/16 times the stack damage for 1-5 stacks. The extra "* stackCount"
 			-- overrated it (3 stacks counted 12x instead of 4x), so Release fired early on targets it could not kill.
-			if stackCount >= 5 or stackCount > 0 and Fu.CanKillTarget(enemyHero, stackDamage * stackMultiplier[stackCount], DAMAGE_TYPE_MAGICAL) then
+			if
+				stackCount >= 5
+				or stackCount > 0
+					and Fu.CanKillTarget(enemyHero, stackDamage * stackMultiplier[stackCount], DAMAGE_TYPE_MAGICAL)
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -448,7 +470,12 @@ function X.ConsiderShadowPoison()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 400) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 400)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -519,7 +546,13 @@ function X.ConsiderDemonicPurge()
 		then
 			local targetAllies = Fu.GetNearbyHeroes(strongestEnemy, 1200, false, BOT_MODE_NONE)
 			local targetEnemies = Fu.GetNearbyHeroes(strongestEnemy, 1200, true, BOT_MODE_NONE)
-			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies and (#targetEnemies == 1 or #targetEnemies == 2) and #targetAllies <= 1 then
+			if
+				targetEnemies ~= nil
+				and targetAllies ~= nil
+				and #targetEnemies >= #targetAllies
+				and (#targetEnemies == 1 or #targetEnemies == 2)
+				and #targetAllies <= 1
+			then
 				return BOT_ACTION_DESIRE_HIGH, strongestEnemy
 			end
 		end

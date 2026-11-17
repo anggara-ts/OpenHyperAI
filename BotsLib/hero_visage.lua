@@ -96,7 +96,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -104,10 +105,14 @@ function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
 local graveChillAbility = SafeAbility(bot:GetAbilityByName("visage_grave_chill"), "visage_grave_chill", "visage")
-local soulAssumptionAbility = SafeAbility(bot:GetAbilityByName("visage_soul_assumption"), "visage_soul_assumption", "visage")
-local gravekeepersCloakAbility = SafeAbility(bot:GetAbilityByName("visage_gravekeepers_cloak"), "visage_gravekeepers_cloak", "visage")
-local silentAsTheGraveAbility = SafeAbility(bot:GetAbilityByName("visage_silent_as_the_grave"), "visage_silent_as_the_grave", "visage")
-local summonFamiliarsAbility = SafeAbility(bot:GetAbilityByName("visage_summon_familiars"), "visage_summon_familiars", "visage")
+local soulAssumptionAbility =
+	SafeAbility(bot:GetAbilityByName("visage_soul_assumption"), "visage_soul_assumption", "visage")
+local gravekeepersCloakAbility =
+	SafeAbility(bot:GetAbilityByName("visage_gravekeepers_cloak"), "visage_gravekeepers_cloak", "visage")
+local silentAsTheGraveAbility =
+	SafeAbility(bot:GetAbilityByName("visage_silent_as_the_grave"), "visage_silent_as_the_grave", "visage")
+local summonFamiliarsAbility =
+	SafeAbility(bot:GetAbilityByName("visage_summon_familiars"), "visage_summon_familiars", "visage")
 local graveChillDesire, graveChillTarget
 local soulAssumptionDesire, soulAssumptionTarget
 local gravekeepersCloakDesire
@@ -169,7 +174,12 @@ function X.ConsiderGraveChill()
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				local attackSpeed = enemyHero:GetAttackSpeed()
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and attackSpeed > highestAttackSpeed then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and #alliesNearTarget >= #enemiesNearTarget
+					and attackSpeed > highestAttackSpeed
+				then
 					highestAttackSpeed = attackSpeed
 					bestTarget = enemyHero
 				end
@@ -191,14 +201,23 @@ function X.ConsiderGraveChill()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -265,7 +284,12 @@ function X.ConsiderSoulAssumption()
 				local health = enemyHero:GetHealth()
 				-- Lowest-HP target: it read "lowestHealth < health" with lowestHealth = 20000, so only a hero above 20000 HP
 				-- qualified and the full-stack engage cast never fired.
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget and health < lowestHealth then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and #alliesNearTarget >= #enemiesNearTarget
+					and health < lowestHealth
+				then
 					lowestHealth = health
 					bestTarget = enemyHero
 				end
@@ -288,7 +312,12 @@ function X.ConsiderSoulAssumption()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and soulStacks == stackLimit then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and soulStacks == stackLimit
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -356,7 +385,11 @@ function X.ConsiderSilentAsTheGrave()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2.5)) then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget ~= nil
+					and (#enemiesNearTarget > #alliesNearTarget or bot:WasRecentlyDamagedByAnyHero(2.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

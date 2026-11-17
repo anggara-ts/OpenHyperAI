@@ -19,18 +19,42 @@ local dbgWhy = ""
 local dbgLoc = nil
 
 local function ModeTag(mode)
-	if mode == BOT_MODE_NONE then return "none" end
-	if mode == BOT_MODE_LANING then return "laning" end
-	if mode == BOT_MODE_ATTACK then return "attack" end
-	if mode == BOT_MODE_ROAM then return "roam" end
-	if mode == BOT_MODE_RETREAT then return "retreat" end
-	if mode == BOT_MODE_FARM then return "farm" end
-	if mode == BOT_MODE_WARD then return "ward" end
-	if mode == BOT_MODE_RUNE then return "rune" end
-	if mode == BOT_MODE_TEAM_ROAM then return "team_roam" end
-	if BOT_MODE_LOTUS_POOL ~= nil and mode == BOT_MODE_LOTUS_POOL then return "lotus" end
-	if BOT_MODE_WISDOM_SHRINE ~= nil and mode == BOT_MODE_WISDOM_SHRINE then return "wisdom" end
-	if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST then return "outpost" end
+	if mode == BOT_MODE_NONE then
+		return "none"
+	end
+	if mode == BOT_MODE_LANING then
+		return "laning"
+	end
+	if mode == BOT_MODE_ATTACK then
+		return "attack"
+	end
+	if mode == BOT_MODE_ROAM then
+		return "roam"
+	end
+	if mode == BOT_MODE_RETREAT then
+		return "retreat"
+	end
+	if mode == BOT_MODE_FARM then
+		return "farm"
+	end
+	if mode == BOT_MODE_WARD then
+		return "ward"
+	end
+	if mode == BOT_MODE_RUNE then
+		return "rune"
+	end
+	if mode == BOT_MODE_TEAM_ROAM then
+		return "team_roam"
+	end
+	if BOT_MODE_LOTUS_POOL ~= nil and mode == BOT_MODE_LOTUS_POOL then
+		return "lotus"
+	end
+	if BOT_MODE_WISDOM_SHRINE ~= nil and mode == BOT_MODE_WISDOM_SHRINE then
+		return "wisdom"
+	end
+	if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST then
+		return "outpost"
+	end
 	return "m" .. tostring(mode)
 end
 
@@ -83,7 +107,9 @@ local function LotusDbg(desire, kind)
 		if sinceLastLog < 0.25 or (why == dbgWhy and sinceLastLog < 1) then
 			return
 		end
-		local stuck = (sinceLastLog >= 0.8 and type(dist) == "number" and dist <= 900 and moved >= 0 and moved < 40) and 1 or 0
+		local stuck = (sinceLastLog >= 0.8 and type(dist) == "number" and dist <= 900 and moved >= 0 and moved < 40)
+				and 1
+			or 0
 		dbgAt = now
 		dbgWhy = why
 		dbgLoc = pos
@@ -94,22 +120,42 @@ local function LotusDbg(desire, kind)
 		local mode = bot:GetActiveMode()
 		local modeDesire = bot:GetActiveModeDesire() or 0
 		local shown = (kind == "lotus" and desire) or 0
-		print(string.format(
-			"[OHA-LOTUS] %s/%s t=%.1f xy=%.0f,%.0f pos=%s mode=%s/%.2f des=%.2f obj=%s why=%s dist=%s eta=%s beside=%s lost=%s in=%s room=%s hp=%s walk=%s pools=%s count=%s skip=%s toNext=%.0f since=%.0f foes=%s/%s danger=%s mango=%d do=%s moved=%.0f stuck=%d",
-			hero, team, now, pos.x, pos.y, tostring(role),
-			ModeTag(mode), modeDesire, shown, tostring(kind or "none"), why,
-			Num(lotusInfo.dist or dist, "%.0f"), Num(lotusInfo.eta, "%.0f"),
-			tostring(lotusInfo.beside or 0), tostring(lotusInfo.lost or 0), tostring(lotusInfo.inwin or 0), tostring(lotusInfo.room or 0),
-			Num(lotusInfo.hp, "%.2f"), Num(lotusInfo.walk, "%.0f"),
-			tostring(lotusInfo.pools ~= nil and lotusInfo.pools or "?"), lotusInfo.count == nil and "?" or tostring(lotusInfo.count),
-			Num(lotusInfo.skip, "%.0f"),
-			toNext, since,
-			tostring(lotusInfo.foes ~= nil and lotusInfo.foes or "?"), tostring(lotusInfo.friends ~= nil and lotusInfo.friends or "?"),
-			tostring(lotusInfo.danger or 0),
-			FamangoCount(),
-			tostring(bot._lotusDo or "-"),
-			moved, stuck
-		))
+		print(
+			string.format(
+				"[OHA-LOTUS] %s/%s t=%.1f xy=%.0f,%.0f pos=%s mode=%s/%.2f des=%.2f obj=%s why=%s dist=%s eta=%s beside=%s lost=%s in=%s room=%s hp=%s walk=%s pools=%s count=%s skip=%s toNext=%.0f since=%.0f foes=%s/%s danger=%s mango=%d do=%s moved=%.0f stuck=%d",
+				hero,
+				team,
+				now,
+				pos.x,
+				pos.y,
+				tostring(role),
+				ModeTag(mode),
+				modeDesire,
+				shown,
+				tostring(kind or "none"),
+				why,
+				Num(lotusInfo.dist or dist, "%.0f"),
+				Num(lotusInfo.eta, "%.0f"),
+				tostring(lotusInfo.beside or 0),
+				tostring(lotusInfo.lost or 0),
+				tostring(lotusInfo.inwin or 0),
+				tostring(lotusInfo.room or 0),
+				Num(lotusInfo.hp, "%.2f"),
+				Num(lotusInfo.walk, "%.0f"),
+				tostring(lotusInfo.pools ~= nil and lotusInfo.pools or "?"),
+				lotusInfo.count == nil and "?" or tostring(lotusInfo.count),
+				Num(lotusInfo.skip, "%.0f"),
+				toNext,
+				since,
+				tostring(lotusInfo.foes ~= nil and lotusInfo.foes or "?"),
+				tostring(lotusInfo.friends ~= nil and lotusInfo.friends or "?"),
+				tostring(lotusInfo.danger or 0),
+				FamangoCount(),
+				tostring(bot._lotusDo or "-"),
+				moved,
+				stuck
+			)
+		)
 	end)
 	if not ok then
 		print("[OHA-LOTUS] err " .. tostring(err))

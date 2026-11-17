@@ -104,7 +104,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -117,7 +118,8 @@ local shockwaveAbility = SafeAbility(bot:GetAbilityByName("magnataur_shockwave")
 local empowerAbility = SafeAbility(bot:GetAbilityByName("magnataur_empower"), "magnataur_empower", "magnataur")
 local skewerAbility = SafeAbility(bot:GetAbilityByName("magnataur_skewer"), "magnataur_skewer", "magnataur")
 local hornTossAbility = SafeAbility(bot:GetAbilityByName("magnataur_horn_toss"), "magnataur_horn_toss", "magnataur")
-local reversePolarityAbility = SafeAbility(bot:GetAbilityByName("magnataur_reverse_polarity"), "magnataur_reverse_polarity", "magnataur")
+local reversePolarityAbility =
+	SafeAbility(bot:GetAbilityByName("magnataur_reverse_polarity"), "magnataur_reverse_polarity", "magnataur")
 local shockwaveDesire, shockwaveLocation
 local empowerDesire, empowerTarget
 local skewerDesire, skewerLocation
@@ -183,7 +185,10 @@ function X.SkillsComplement()
 		bot:ActionQueue_Delay(0.3)
 		-- Was ConsiderSkewer2(), evaluated now at the pre-blink spot (no enemy within 145 there), so the
 		-- Skewer after Blink + RP was never queued. Aim it from the blink spot blinkLocation toward allies instead.
-		bot:ActionQueue_UseAbilityOnLocation(skewerAbility, SkewerDestination(blinkLocation, skewerAbility:GetSpecialValueInt("range")))
+		bot:ActionQueue_UseAbilityOnLocation(
+			skewerAbility,
+			SkewerDestination(blinkLocation, skewerAbility:GetSpecialValueInt("range"))
+		)
 		LogCombo("blink + RP + skewer")
 		return
 	end
@@ -196,7 +201,10 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnLocation(blinkItem, blinkLocation)
 		bot:ActionQueue_Delay(0.1)
 		-- Same pre-blink evaluation bug as above: Skewer from the blink spot (on the target) to allies.
-		bot:ActionQueue_UseAbilityOnLocation(skewerAbility, SkewerDestination(blinkLocation, skewerAbility:GetSpecialValueInt("range")))
+		bot:ActionQueue_UseAbilityOnLocation(
+			skewerAbility,
+			SkewerDestination(blinkLocation, skewerAbility:GetSpecialValueInt("range"))
+		)
 		LogCombo("blink + skewer")
 		return
 	end
@@ -337,11 +345,18 @@ function X.ConsiderShockwave()
 		for _, creep in pairs(nearbyLaneCreeps) do
 			if
 				Fu.IsValid(creep)
-				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit("flagbearer", creep))
+				and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) or Fu.IsKeyWordUnit(
+					"flagbearer",
+					creep
+				))
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
 				end
 			end
@@ -355,7 +370,12 @@ function X.ConsiderShockwave()
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.1) and not allyHero:IsIllusion() and mpRatio > 0.48 then
+		if
+			Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.1)
+			and not allyHero:IsIllusion()
+			and mpRatio > 0.48
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -383,7 +403,11 @@ function X.ConsiderEmpower()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	-- Casting on an ally also empowers Magnus. Keep enough mana to still Reverse Polarity.
-	if reversePolarityAbility ~= nil and reversePolarityAbility:GetLevel() > 0 and reversePolarityAbility:GetCooldownTimeRemaining() < 2 then
+	if
+		reversePolarityAbility ~= nil
+		and reversePolarityAbility:GetLevel() > 0
+		and reversePolarityAbility:GetCooldownTimeRemaining() < 2
+	then
 		if bot:GetMana() < empowerAbility:GetManaCost() + reversePolarityAbility:GetManaCost() + 30 then
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
@@ -441,7 +465,10 @@ function X.ConsiderSkewer()
 			and nearbyEnemies
 			and #nearbyAllies >= #nearbyEnemies
 		then
-			if Fu.IsEnemyBetweenMeAndLocation(bot, Fu.GetEscapeLoc(), skewerRange) and Fu.IsInRange(bot, botTarget, radius) then
+			if
+				Fu.IsEnemyBetweenMeAndLocation(bot, Fu.GetEscapeLoc(), skewerRange)
+				and Fu.IsInRange(bot, botTarget, radius)
+			then
 				-- nearbyAllies[#nearbyAllies] could be Magnus himself (see SkewerDestination). Skewer toward a real ally, else
 				-- toward safety.
 				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(bot:GetLocation(), skewerRange)
@@ -500,7 +527,11 @@ function X.ConsiderReversePolarity()
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, pullRadius + 200, false, BOT_MODE_NONE)
 		local enemiesInPull = Fu.GetNearbyHeroes(bot, pullRadius, true, BOT_MODE_NONE)
-		if nearbyAllies ~= nil and enemiesInPull and (#enemiesInPull > #nearbyAllies or hpRatio < 0.5 and bot:WasRecentlyDamagedByAnyHero(1.6)) then
+		if
+			nearbyAllies ~= nil
+			and enemiesInPull
+			and (#enemiesInPull > #nearbyAllies or hpRatio < 0.5 and bot:WasRecentlyDamagedByAnyHero(1.6))
+		then
 			for _, enemyHero in pairs(enemiesInPull) do
 				if
 					Fu.IsValidHero(enemyHero)
@@ -550,7 +581,11 @@ function X.ConsiderHornToss()
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, radius + 200, false, BOT_MODE_NONE)
 		local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
-		if nearbyAllies ~= nil and enemiesInRadius and (#enemiesInRadius > #nearbyAllies or hpRatio < 0.61 and bot:WasRecentlyDamagedByAnyHero(2)) then
+		if
+			nearbyAllies ~= nil
+			and enemiesInRadius
+			and (#enemiesInRadius > #nearbyAllies or hpRatio < 0.61 and bot:WasRecentlyDamagedByAnyHero(2))
+		then
 			for _, enemyHero in pairs(enemiesInRadius) do
 				if
 					Fu.IsValidHero(enemyHero)
@@ -641,7 +676,10 @@ function X.ConsiderSkewer2()
 			and nearbyEnemies
 			and #nearbyAllies >= #nearbyEnemies
 		then
-			if Fu.IsEnemyBetweenMeAndLocation(bot, Fu.GetEscapeLoc(), skewerRange) and Fu.IsInRange(bot, enemyHero, radius) then
+			if
+				Fu.IsEnemyBetweenMeAndLocation(bot, Fu.GetEscapeLoc(), skewerRange)
+				and Fu.IsInRange(bot, enemyHero, radius)
+			then
 				-- Same Magnus-in-his-own-ally-list bug as in ConsiderSkewer.
 				return BOT_ACTION_DESIRE_HIGH, SkewerDestination(bot:GetLocation(), skewerRange)
 			end
@@ -720,8 +758,16 @@ function X.ConsiderBlinkForHornTossSkewer()
 	return BOT_ACTION_DESIRE_NONE
 end
 function CanDoBlinkHornTossSkewer()
-	if hornTossAbility:IsTrained() and hornTossAbility:IsFullyCastable() and skewerAbility:IsFullyCastable() and reversePolarityAbility:IsFullyCastable() and HasBlink() then
-		local manaCost = skewerAbility:GetManaCost() + reversePolarityAbility:GetManaCost() + hornTossAbility:GetManaCost()
+	if
+		hornTossAbility:IsTrained()
+		and hornTossAbility:IsFullyCastable()
+		and skewerAbility:IsFullyCastable()
+		and reversePolarityAbility:IsFullyCastable()
+		and HasBlink()
+	then
+		local manaCost = skewerAbility:GetManaCost()
+			+ reversePolarityAbility:GetManaCost()
+			+ hornTossAbility:GetManaCost()
 		if bot:GetMana() >= manaCost then
 			bot.shouldBlink = true
 			return true

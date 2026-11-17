@@ -109,7 +109,8 @@ X["sSellList"] = { "item_kaya", "item_quelling_blade", "item_octarine_core", "it
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -192,7 +193,13 @@ function X.SkillsComplement()
 	end
 end
 function X.ConsiderN()
-	if not slot4Ability:IsTrained() or slot4Ability:IsPassive() or not slot4Ability:IsFullyCastable() or bot:IsDisarmed() or slot4Ability:GetAutoCastState() then
+	if
+		not slot4Ability:IsTrained()
+		or slot4Ability:IsPassive()
+		or not slot4Ability:IsFullyCastable()
+		or bot:IsDisarmed()
+		or slot4Ability:GetAutoCastState()
+	then
 		return 0
 	end
 	if not slot4Ability:GetAutoCastState() then
@@ -218,12 +225,21 @@ function X.ConsiderR()
 	end
 	for _, enemyHero in pairs(enemiesIn350) do
 		local cycloneTime = Fu.GetModifierTime(enemyHero, "modifier_brewmaster_storm_cyclone")
-		if Fu.IsValidHero(enemyHero) and (cycloneTime > 0 and cycloneTime <= 1.66 or Fu.Utils.IsTruelyInvisible(bot)) and enemyHero:GetHealth() > 700 then
+		if
+			Fu.IsValidHero(enemyHero)
+			and (cycloneTime > 0 and cycloneTime <= 1.66 or Fu.Utils.IsTruelyInvisible(bot))
+			and enemyHero:GetHealth() > 700
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1000) or Fu.IsGoingOnSomeone(bot) then
-		if #enemiesIn750 >= 3 or #enemiesIn350 >= 1 and #enemiesIn750 >= 2 or #enemiesIn1200 >= 3 and #enemiesIn750 >= 2 or #enemiesIn1200 >= 4 and #enemiesIn350 >= 1 then
+		if
+			#enemiesIn750 >= 3
+			or #enemiesIn350 >= 1 and #enemiesIn750 >= 2
+			or #enemiesIn1200 >= 3 and #enemiesIn750 >= 2
+			or #enemiesIn1200 >= 4 and #enemiesIn350 >= 1
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), 100, 800, 1.67, 0)
@@ -271,7 +287,11 @@ function X.ConsiderBlinkRequiem()
 	end
 	local foes = 0
 	for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(aoe.targetloc, 450) or {}) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			foes = foes + 1
 		end
 	end
@@ -280,12 +300,15 @@ function X.ConsiderBlinkRequiem()
 	end
 	if DotaTime() >= (bot._sfBlinkLogAt or -999) then
 		bot._sfBlinkLogAt = DotaTime() + 3
-		pcall(print, string.format(
-			"[OHA-SF] t=%.0f blink-requiem foes=%d dist=%d",
-			DotaTime(),
-			foes,
-			math.floor(GetUnitToLocationDistance(bot, aoe.targetloc))
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-SF] t=%.0f blink-requiem foes=%d dist=%d",
+				DotaTime(),
+				foes,
+				math.floor(GetUnitToLocationDistance(bot, aoe.targetloc))
+			)
+		)
 	end
 	bot._sfBlinkAt = DotaTime()
 	bot:Action_UseAbilityOnLocation(bot.Blink, aoe.targetloc)
@@ -424,7 +447,10 @@ function X.ConsiderFeastOfSouls()
 	if Fu.IsFarming(bot) and manaAfter > 0.3 then
 		if isAttacking then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(1000)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+			if
+				neutralCreeps ~= nil
+				and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(1000, true)
@@ -435,7 +461,13 @@ function X.ConsiderFeastOfSouls()
 	end
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1000, true)
-		if laneCreeps ~= nil and #laneCreeps >= 4 and nearbyEnemies ~= nil and #nearbyEnemies == 0 and manaAfter > 0.3 then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 4
+			and nearbyEnemies ~= nil
+			and #nearbyEnemies == 0
+			and manaAfter > 0.3
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		if Fu.IsValidBuilding(botTarget) and Fu.CanBeAttacked(botTarget) and isAttacking then
@@ -443,7 +475,11 @@ function X.ConsiderFeastOfSouls()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, attackRange) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, attackRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

@@ -68,7 +68,8 @@ X["sSellList"] = { "item_cyclone", "item_magic_wand", "item_ultimate_scepter", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -81,7 +82,8 @@ local etherShockAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sA
 local hexAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "shadow_shaman")
 local shacklesAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "shadow_shaman")
 local serpentWardAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "shadow_shaman")
-local urnacondaAbility = SafeAbility(bot:GetAbilityByName("shadow_shaman_urnaconda"), "shadow_shaman_urnaconda", "shadow_shaman")
+local urnacondaAbility =
+	SafeAbility(bot:GetAbilityByName("shadow_shaman_urnaconda"), "shadow_shaman_urnaconda", "shadow_shaman")
 local talent3 = SafeAbility(bot:GetAbilityByName(sTalentList[3]), "sTalentList[3]", "shadow_shaman")
 local talent7 = SafeAbility(bot:GetAbilityByName(sTalentList[7]), "sTalentList[7]", "shadow_shaman")
 local etherShockDesire, etherShockTarget
@@ -220,8 +222,14 @@ function X.ConsiderQ()
 		if #nearbyAllies <= 1 or Fu.IsCore(bot) then
 			local laneCreeps = bot:GetNearbyLaneCreeps(800, true)
 			for _, creep in pairs(laneCreeps) do
-				if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and not Fu.IsAllysTarget(creep) then
-					if Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, damage, damageType, castPoint) then
+				if
+					Fu.IsValid(creep)
+					and not creep:HasModifier("modifier_fountain_glyph")
+					and not Fu.IsAllysTarget(creep)
+				then
+					if
+						Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, damage, damageType, castPoint)
+					then
 						return BOT_ACTION_DESIRE_HIGH, creep, "Q-LaneRanged"
 					end
 					if
@@ -246,7 +254,11 @@ function X.ConsiderQ()
 		local laneCreeps = bot:GetNearbyLaneCreeps(999, true)
 		local allyLaneCreeps = bot:GetNearbyLaneCreeps(888, false)
 		for _, creep in pairs(laneCreeps) do
-			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and Fu.IsInRange(creep, bot, castRange + 300) then
+			if
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.IsInRange(creep, bot, castRange + 300)
+			then
 				if #allyLaneCreeps == 0 and Fu.GetAroundTargetEnemyUnitCount(creep, 380) >= 2 and #laneCreeps >= 4 then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q-PushAoe"
 				end
@@ -363,7 +375,12 @@ function X.ConsiderW()
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "W-Attack:" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
-	if bot:WasRecentlyDamagedByAnyHero(3.0) and botLevel >= 10 and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 then
+	if
+		bot:WasRecentlyDamagedByAnyHero(3.0)
+		and botLevel >= 10
+		and bot:GetActiveMode() ~= BOT_MODE_RETREAT
+		and #enemiesInRange >= 1
+	then
 		for _, enemy in pairs(enemiesInRange) do
 			if
 				Fu.IsValid(enemy)
@@ -528,7 +545,11 @@ function X.ConsiderR()
 	end
 	if Fu.IsRetreating(bot) then
 		for _, enemy in pairs(enemiesInRange) do
-			if Fu.IsValidHero(enemy) and Fu.CanCastOnMagicImmune(enemy) and bot:WasRecentlyDamagedByHero(enemy, 3.0) then
+			if
+				Fu.IsValidHero(enemy)
+				and Fu.CanCastOnMagicImmune(enemy)
+				and bot:WasRecentlyDamagedByHero(enemy, 3.0)
+			then
 				castLocation = enemy:GetExtrapolatedLocation(castPoint)
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "R-Retreat:" .. Fu.Chat.GetNormName(enemy)
 			end
@@ -570,7 +591,8 @@ function X.ConsiderUrnaconda()
 	local radius = urnacondaAbility:GetSpecialValueInt("impact_radius")
 	local manaCost = urnacondaAbility:GetManaCost()
 	local manaAfter = Fu.GetManaAfter(manaCost)
-	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { etherShockAbility, hexAbility, shacklesAbility, serpentWardAbility })
+	local manaThreshold =
+		Fu.GetManaThreshold(bot, manaCost, { etherShockAbility, hexAbility, shacklesAbility, serpentWardAbility })
 	local enemyHeroes = bot:GetNearbyHeroes(castRange + 300, true, BOT_MODE_NONE)
 	local allyHeroes = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	for _, enemy in pairs(enemyHeroes) do
@@ -659,7 +681,8 @@ function X.ConsiderUrnaconda()
 				local unitName = building:GetUnitName()
 				if #alliesNearby <= 3 or string.find(unitName, "barracks") or building == enemyAncient then
 					if building:GetHealthRegen() == 0 or bot:GetAttackTarget() == building then
-						return BOT_ACTION_DESIRE_HIGH, Fu.VectorTowards(building:GetLocation(), bot:GetLocation(), radius)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.VectorTowards(building:GetLocation(), bot:GetLocation(), radius)
 					end
 				end
 			end

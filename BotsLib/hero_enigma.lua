@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }, { 2, 1, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_3" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -104,7 +105,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_cyclone", "
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -114,11 +116,15 @@ function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
 local maleficeAbility = SafeAbility(bot:GetAbilityByName("enigma_malefice"), "enigma_malefice", "enigma")
-local demonicConversionAbility = SafeAbility(bot:GetAbilityByName("enigma_demonic_conversion"), "enigma_demonic_conversion", "enigma")
-local midnightPulseAbility = SafeAbility(bot:GetAbilityByName("enigma_midnight_pulse"), "enigma_midnight_pulse", "enigma")
+local demonicConversionAbility =
+	SafeAbility(bot:GetAbilityByName("enigma_demonic_conversion"), "enigma_demonic_conversion", "enigma")
+local midnightPulseAbility =
+	SafeAbility(bot:GetAbilityByName("enigma_midnight_pulse"), "enigma_midnight_pulse", "enigma")
 local blackHoleAbility = SafeAbility(bot:GetAbilityByName("enigma_black_hole"), "enigma_black_hole", "enigma")
-local maleficeTalent = SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_2"), "special_bonus_unique_enigma_2", "enigma")
-local midnightPulseTalent = SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_6"), "special_bonus_unique_enigma_6", "enigma")
+local maleficeTalent =
+	SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_2"), "special_bonus_unique_enigma_2", "enigma")
+local midnightPulseTalent =
+	SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_6"), "special_bonus_unique_enigma_6", "enigma")
 local maleficeDesire, maleficeTarget
 local demonicConversionDesire, demonicConversionLocation
 local midnightPulseDesire, midnightPulseLocation
@@ -154,7 +160,11 @@ function X.SkillsComplement()
 	end
 	blinkPulseHoleDesire, blinkPulseHoleLocation = X.ConsiderBlinkPulseHole()
 	if blinkPulseHoleDesire > 0 then
-		X.LogBlackHole("blink-pulse", #Fu.GetEnemiesNearLoc(blinkPulseHoleLocation, blackHoleAbility:GetSpecialValueInt("radius")), nil)
+		X.LogBlackHole(
+			"blink-pulse",
+			#Fu.GetEnemiesNearLoc(blinkPulseHoleLocation, blackHoleAbility:GetSpecialValueInt("radius")),
+			nil
+		)
 		bot:Action_ClearActions(false)
 		if X.CanBKB() and not bot:IsMagicImmune() then
 			bot:ActionQueue_UseAbility(blackKingBar)
@@ -169,7 +179,11 @@ function X.SkillsComplement()
 	end
 	blinkHoleDesire, blinkHoleLocation = X.ConsiderBlinkHole()
 	if blinkHoleDesire > 0 then
-		X.LogBlackHole("blink", #Fu.GetEnemiesNearLoc(blinkHoleLocation, blackHoleAbility:GetSpecialValueInt("radius")), nil)
+		X.LogBlackHole(
+			"blink",
+			#Fu.GetEnemiesNearLoc(blinkHoleLocation, blackHoleAbility:GetSpecialValueInt("radius")),
+			nil
+		)
 		bot:Action_ClearActions(false)
 		if X.CanBKB() and not bot:IsMagicImmune() then
 			bot:ActionQueue_UseAbility(blackKingBar)
@@ -275,7 +289,11 @@ function X.ConsiderMalefice()
 		then
 			local alliesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, true, BOT_MODE_NONE)
 			local enemiesNearChaser = Fu.GetNearbyHeroes(nearbyEnemies[1], 1200, false, BOT_MODE_NONE)
-			if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				alliesNearChaser ~= nil
+				and enemiesNearChaser ~= nil
+				and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]
 			end
 		end
@@ -367,7 +385,8 @@ function X.ConsiderDemonicSummoning()
 						if Fu.IsInRange(bot, botTarget, castRange) then
 							return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 						else
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 						end
 					else
 						if Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) then
@@ -388,7 +407,8 @@ function X.ConsiderDemonicSummoning()
 			local nearbyBarracks = bot:GetNearbyBarracks(800, true)
 			local nearbyFillers = bot:GetNearbyFillers(800, true)
 			if
-				Fu.IsValidBuilding(bot:GetAttackTarget()) and (
+				Fu.IsValidBuilding(bot:GetAttackTarget())
+				and (
 					nearbyTowers ~= nil and #nearbyTowers >= 1
 					or nearbyBarracks ~= nil and #nearbyBarracks >= 1
 					or nearbyFillers ~= nil and #nearbyFillers >= 1
@@ -398,7 +418,12 @@ function X.ConsiderDemonicSummoning()
 			end
 		end
 	end
-	if Fu.IsFarming(bot) and Fu.GetHealthAfter(hpCost) > 0.5 and Fu.GetManaAfter(demonicConversionAbility:GetManaCost()) > 0.33 and isAttacking then
+	if
+		Fu.IsFarming(bot)
+		and Fu.GetHealthAfter(hpCost) > 0.5
+		and Fu.GetManaAfter(demonicConversionAbility:GetManaCost()) > 0.33
+		and isAttacking
+	then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1000, true)
 		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 then
 			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
@@ -424,18 +449,31 @@ function X.ConsiderDemonicSummoning()
 			why = "creeps"
 		end
 		if why == nil then
-			pcall(print, string.format(
-				"[OHA-ENIGMA] t=%.0f summon why=lane creeps=%d hpAfter=%.2f mpAfter=%.2f",
-				DotaTime(), #nearbyLaneCreeps, hpAfter, mpAfter
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ENIGMA] t=%.0f summon why=lane creeps=%d hpAfter=%.2f mpAfter=%.2f",
+					DotaTime(),
+					#nearbyLaneCreeps,
+					hpAfter,
+					mpAfter
+				)
+			)
 			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 		end
 		if DotaTime() >= (bot._summonSkipLogAt or -999) then
 			bot._summonSkipLogAt = DotaTime() + 20
-			pcall(print, string.format(
-				"[OHA-ENIGMA] t=%.0f summon-skip why=%s creeps=%d hpAfter=%.2f mpAfter=%.2f",
-				DotaTime(), why, #nearbyLaneCreeps, hpAfter, mpAfter
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ENIGMA] t=%.0f summon-skip why=%s creeps=%d hpAfter=%.2f mpAfter=%.2f",
+					DotaTime(),
+					why,
+					#nearbyLaneCreeps,
+					hpAfter,
+					mpAfter
+				)
+			)
 		end
 	end
 	if Fu.IsDoingRoshan(bot) and Fu.GetHealthAfter(hpCost) > 0.5 then
@@ -456,7 +494,11 @@ function X.ConsiderMidnightPulse()
 	end
 	-- Pulse only adds to Black Hole. With Black Hole off cooldown, a Pulse on its own must leave
 	-- mana for it (Black Hole queues its own Pulse when both fit). Otherwise Pulse is free.
-	if blackHoleAbility:IsTrained() and blackHoleAbility:GetCooldownTimeRemaining() <= 0 and bot:GetMana() - midnightPulseAbility:GetManaCost() < blackHoleAbility:GetManaCost() then
+	if
+		blackHoleAbility:IsTrained()
+		and blackHoleAbility:GetCooldownTimeRemaining() <= 0
+		and bot:GetMana() - midnightPulseAbility:GetManaCost() < blackHoleAbility:GetManaCost()
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, midnightPulseAbility:GetCastRange())
@@ -472,7 +514,11 @@ function X.ConsiderMidnightPulse()
 		end
 	end
 	if isGoingOnSomeone then
-		if Fu.IsValidTarget(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+		if
+			Fu.IsValidTarget(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+		then
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1400, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1400, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
@@ -488,15 +534,25 @@ function X.ConsiderMidnightPulse()
 						return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(1)
 					end
 				else
-					if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) and not Fu.IsChasingTarget(bot, botTarget) then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					if
+						Fu.IsInRange(bot, botTarget, castRange + radius)
+						and not Fu.IsInRange(bot, botTarget, castRange)
+						and not Fu.IsChasingTarget(bot, botTarget)
+					then
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 					end
 				end
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -561,14 +617,17 @@ function X.LogBlackHole(why, heroes, target)
 		return
 	end
 	bot._blackHoleLogAt = DotaTime() + 5
-	pcall(print, string.format(
-		"[OHA-ENIGMA] t=%.0f black-hole why=%s heroes=%d target=%s pulseReady=%s",
-		DotaTime(),
-		why,
-		heroes,
-		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		tostring(midnightPulseAbility:IsFullyCastable())
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ENIGMA] t=%.0f black-hole why=%s heroes=%d target=%s pulseReady=%s",
+			DotaTime(),
+			why,
+			heroes,
+			target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			tostring(midnightPulseAbility:IsFullyCastable())
+		)
+	)
 end
 -- Refresher for a second Black Hole: the first one went out within the last 15s, Refresher
 -- and a Black Hole both fit in current mana, and 2+ enemy heroes are still grouped in reach.
@@ -598,23 +657,37 @@ function X.CanUseRefresherShard()
 		return false
 	end
 	local reach = Fu.GetProperCastRange(false, bot, blackHoleAbility:GetCastRange()) + 300
-	local spot = bot:FindAoELocation(true, true, bot:GetLocation(), reach, blackHoleAbility:GetSpecialValueInt("radius") * 0.8, 0, 0)
+	local spot = bot:FindAoELocation(
+		true,
+		true,
+		bot:GetLocation(),
+		reach,
+		blackHoleAbility:GetSpecialValueInt("radius") * 0.8,
+		0,
+		0
+	)
 	local enemiesInRadius = Fu.GetEnemiesNearLoc(spot.targetloc, blackHoleAbility:GetSpecialValueInt("radius"))
 	if enemiesInRadius == nil or #enemiesInRadius < 2 then
 		return false
 	end
-	pcall(print, string.format(
-		"[OHA-ENIGMA] t=%.0f refresher heroes=%d mana=%.0f need=%.0f",
-		DotaTime(),
-		#enemiesInRadius,
-		bot:GetMana(),
-		refresher:GetManaCost() + blackHoleAbility:GetManaCost()
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ENIGMA] t=%.0f refresher heroes=%d mana=%.0f need=%.0f",
+			DotaTime(),
+			#enemiesInRadius,
+			bot:GetMana(),
+			refresher:GetManaCost() + blackHoleAbility:GetManaCost()
+		)
+	)
 	return true
 end
 -- Midnight Pulse in front of Black Hole when it is ready and there is mana for both.
 function X.QueuePulseBefore(loc)
-	if midnightPulseAbility:IsFullyCastable() and bot:GetMana() >= midnightPulseAbility:GetManaCost() + blackHoleAbility:GetManaCost() then
+	if
+		midnightPulseAbility:IsFullyCastable()
+		and bot:GetMana() >= midnightPulseAbility:GetManaCost() + blackHoleAbility:GetManaCost()
+	then
 		bot:ActionQueue_UseAbilityOnLocation(midnightPulseAbility, loc)
 		bot:ActionQueue_Delay(0.1)
 	end

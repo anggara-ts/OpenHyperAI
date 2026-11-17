@@ -89,7 +89,8 @@ X["sSellList"] = { "item_circlet", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -173,7 +174,11 @@ function X.ConsiderE()
 	local castTarget = nil
 	local castReason = nil
 	for _, enemyHero in pairs(enemiesInRangeWide) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				castTarget = enemyHero
 				castReason = "E-打断" .. Fu.Chat.GetNormName(castTarget)
@@ -203,7 +208,11 @@ function X.ConsiderE()
 		for _, enemyHero in pairs(nearbyEnemies) do
 			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
 				castableEnemyCount = castableEnemyCount + 1
-				if Fu.CanCastOnTargetAdvanced(enemyHero) and not Fu.IsDisabled(enemyHero) and not enemyHero:IsDisarmed() then
+				if
+					Fu.CanCastOnTargetAdvanced(enemyHero)
+					and not Fu.IsDisabled(enemyHero)
+					and not enemyHero:IsDisarmed()
+				then
 					local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 6.0, DAMAGE_TYPE_ALL)
 					if estimatedDamage > maxEstimatedDamage then
 						maxEstimatedDamage = estimatedDamage
@@ -272,7 +281,11 @@ function X.ConsiderW()
 	local castReason = nil
 	local missingHealth = bot:GetMaxHealth() - bot:GetHealth()
 	for _, enemyHero in pairs(enemiesInRangeWide) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			if Fu.CanKillTarget(enemyHero, damage, damageType) then
 				castTarget = enemyHero
 				castReason = "W-击杀敌人" .. Fu.Chat.GetNormName(castTarget)
@@ -287,7 +300,11 @@ function X.ConsiderW()
 		local weakestEnemy = nil
 		local lowestHealth = 99999
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local enemyHealth = enemyHero:GetHealth()
 				if enemyHealth < lowestHealth then
 					lowestHealth = enemyHealth
@@ -349,7 +366,12 @@ function X.ConsiderW()
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 			end
 		end
-		if #nearbyEnemies == 0 and botLevel >= 10 and not bot:WasRecentlyDamagedByAnyHero(3.0) and missingHealth > damage * 1.5 then
+		if
+			#nearbyEnemies == 0
+			and botLevel >= 10
+			and not bot:WasRecentlyDamagedByAnyHero(3.0)
+			and missingHealth > damage * 1.5
+		then
 			local nearbyCreeps = bot:GetNearbyCreeps(1000, true)
 			for _, creep in pairs(nearbyCreeps) do
 				if Fu.IsValid(creep) and Fu.CanCastOnNonMagicImmune(creep) then
@@ -422,7 +444,11 @@ function X.ConsiderW()
 		and missingHealth > damage
 	then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				castTarget = enemyHero
 				castReason = "W-通用情况"
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason

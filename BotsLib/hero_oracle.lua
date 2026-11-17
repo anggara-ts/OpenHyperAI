@@ -68,7 +68,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_shivas_gu
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = true
@@ -82,7 +83,8 @@ local falsePromiseAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "
 local talent3 = SafeAbility(bot:GetAbilityByName(sTalentList[3]), "sTalentList[3]", "oracle")
 -- datafeed: Rain of Destiny is the Shard ability "oracle_rain_of_destiny" (hidden + not learnable,
 -- so GetAbilityList skips it and sAbilityList[4] can be the innate Prognosticate). Fetch it by name.
-local rainOfDestinyAbility = SafeAbility(bot:GetAbilityByName("oracle_rain_of_destiny"), "oracle_rain_of_destiny", "oracle")
+local rainOfDestinyAbility =
+	SafeAbility(bot:GetAbilityByName("oracle_rain_of_destiny"), "oracle_rain_of_destiny", "oracle")
 local fortunesEndDesire, fortunesEndTarget
 local fatesEdictDesire, fatesEdictTarget
 local purifyingFlamesDesire, purifyingFlamesTarget
@@ -123,7 +125,12 @@ function X.SkillsComplement()
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnEntity(fortunesEndAbility, fortunesEndTarget)
 		-- Purifying Flames after it on an enemy only: on an ally just dispelled it would be damage.
-		if purifyingFlamesAbility:IsFullyCastable() and fortunesEndTarget ~= nil and fortunesEndTarget.GetTeam ~= nil and fortunesEndTarget:GetTeam() ~= GetTeam() then
+		if
+			purifyingFlamesAbility:IsFullyCastable()
+			and fortunesEndTarget ~= nil
+			and fortunesEndTarget.GetTeam ~= nil
+			and fortunesEndTarget:GetTeam() ~= GetTeam()
+		then
 			bot:ActionQueue_UseAbilityOnEntity(purifyingFlamesAbility, fortunesEndTarget)
 		end
 		return
@@ -199,12 +206,23 @@ function X.ConsiderQ()
 			and not ally:IsMagicImmune()
 			and #(Fu.GetEnemiesNearLoc(ally:GetLocation(), 900) or {}) >= 1
 		then
-			pcall(print, string.format("[OHA-ORACLE] t=%.0f fortunes_end-dispel ally=%s", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ORACLE] t=%.0f fortunes_end-dispel ally=%s",
+					DotaTime(),
+					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
 			return BOT_ACTION_DESIRE_HIGH, ally, "Q-Dispel" .. Fu.Chat.GetNormName(ally)
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack" .. Fu.Chat.GetNormName(botTarget)
 		end
 	end
@@ -235,7 +253,15 @@ function X.ConsiderW()
 			and not ally:IsMagicImmune()
 			and not ally:HasModifier("modifier_oracle_fates_edict")
 		then
-			pcall(print, string.format("[OHA-ORACLE] t=%.0f edict-save ally=%s hp=%.2f", DotaTime(), (string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")), Fu.GetHP(ally)))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ORACLE] t=%.0f edict-save ally=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+					Fu.GetHP(ally)
+				)
+			)
 			return BOT_ACTION_DESIRE_HIGH, ally, "W-Save" .. Fu.Chat.GetNormName(ally)
 		end
 	end
@@ -295,12 +321,20 @@ function X.ConsiderE()
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint)
+		then
 			return BOT_ACTION_DESIRE_HIGH, enemyHero, "E-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
 	end
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsValidHero(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and Fu.CanCastOnNonMagicImmune(allyHero) then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.CanCastOnNonMagicImmune(allyHero)
+		then
 			if
 				allyHero:GetMagicResist() > 0.42
 				and Fu.GetHP(allyHero) < 0.8
@@ -344,7 +378,12 @@ function X.ConsiderE()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and #nearbyAllies <= 2 and abilityLevel >= 3 and Fu.IsAllowedToSpam(bot, 30) then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and #nearbyAllies <= 2
+		and abilityLevel >= 3
+		and Fu.IsAllowedToSpam(bot, 30)
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 350, true)
 		for _, creep in pairs(laneCreeps) do
 			if
@@ -370,7 +409,11 @@ function X.ConsiderE()
 		if #nearbyAllies <= 1 then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange + 150)
 			for _, creep in pairs(neutralCreeps) do
-				if Fu.IsValid(creep) and creep:GetHealth() > damage * 0.45 and Fu.WillKillTarget(creep, damage, damageType, castRange) then
+				if
+					Fu.IsValid(creep)
+					and creep:GetHealth() > damage * 0.45
+					and Fu.WillKillTarget(creep, damage, damageType, castRange)
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep, "E-补刀野怪"
 				end
 			end
@@ -390,7 +433,11 @@ function X.ConsiderR()
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
-		if Fu.IsInRange(bot, allyHero, castRange + 50) and allyHero:WasRecentlyDamagedByAnyHero(2.0) and Fu.GetHP(allyHero) < 0.55 then
+		if
+			Fu.IsInRange(bot, allyHero, castRange + 50)
+			and allyHero:WasRecentlyDamagedByAnyHero(2.0)
+			and Fu.GetHP(allyHero) < 0.55
+		then
 			if Fu.IsRetreating(allyHero) and (allyHero ~= bot or hpRatio < 0.25) then
 				return BOT_ACTION_DESIRE_HIGH, allyHero, "R-protect" .. Fu.Chat.GetNormName(allyHero)
 			end

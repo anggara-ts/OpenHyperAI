@@ -72,16 +72,20 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local rocketBarrageAbility = SafeAbility(bot:GetAbilityByName("gyrocopter_rocket_barrage"), "gyrocopter_rocket_barrage", "gyrocopter")
-local homingMissileAbility = SafeAbility(bot:GetAbilityByName("gyrocopter_homing_missile"), "gyrocopter_homing_missile", "gyrocopter")
-local flakCannonAbility = SafeAbility(bot:GetAbilityByName("gyrocopter_flak_cannon"), "gyrocopter_flak_cannon", "gyrocopter")
+local rocketBarrageAbility =
+	SafeAbility(bot:GetAbilityByName("gyrocopter_rocket_barrage"), "gyrocopter_rocket_barrage", "gyrocopter")
+local homingMissileAbility =
+	SafeAbility(bot:GetAbilityByName("gyrocopter_homing_missile"), "gyrocopter_homing_missile", "gyrocopter")
+local flakCannonAbility =
+	SafeAbility(bot:GetAbilityByName("gyrocopter_flak_cannon"), "gyrocopter_flak_cannon", "gyrocopter")
 local callDownAbility = SafeAbility(bot:GetAbilityByName("gyrocopter_call_down"), "gyrocopter_call_down", "gyrocopter")
 local rocketBarrageDesire
 local homingMissileDesire, homingMissileTarget
@@ -199,7 +203,12 @@ function X.ConsiderRocketBarrage()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -293,7 +302,11 @@ function X.ConsiderHomingMissile()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -365,7 +378,10 @@ function X.ConsiderFlakCannon()
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		enemiesInRadius = Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE)
 		if enemiesInRadius ~= nil and #enemiesInRadius == 0 then
-			if nearbyNeutrals ~= nil and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep()) then
+			if
+				nearbyNeutrals ~= nil
+				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 then

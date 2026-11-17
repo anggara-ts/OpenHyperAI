@@ -95,9 +95,9 @@ function X.ConsiderMistCoil()
 		if
 			nearbyAllies ~= nil
 			and nearbyEnemies ~= nil
-			and (#nearbyAllies == 0 and #nearbyEnemies >= 1 or #nearbyAllies >= 1 and Fu.GetHP(bot) < 0.25 and bot:WasRecentlyDamagedByAnyHero(1) and not bot:HasModifier(
-				"modifier_abaddon_borrowed_time"
-			))
+			and (#nearbyAllies == 0 and #nearbyEnemies >= 1 or #nearbyAllies >= 1 and Fu.GetHP(bot) < 0.25 and bot:WasRecentlyDamagedByAnyHero(
+				1
+			) and not bot:HasModifier("modifier_abaddon_borrowed_time"))
 			and Fu.IsValidHero(nearbyEnemies[1])
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 			and not Fu.IsDisabled(nearbyEnemies[1])
@@ -106,7 +106,12 @@ function X.ConsiderMistCoil()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -155,7 +160,11 @@ function X.ConsiderAphoticShield()
 			and Fu.IsNotSelf(bot, allyHero)
 		then
 			local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 800, true, BOT_MODE_NONE)
-			if Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.6) and not allyHero:IsIllusion() then
+			if
+				Fu.IsRetreating(allyHero)
+				and allyHero:WasRecentlyDamagedByAnyHero(1.6)
+				and not allyHero:IsIllusion()
+			then
 				if
 					enemiesNearAlly ~= nil
 					and #enemiesNearAlly >= 1
@@ -259,7 +268,10 @@ function X.ConsiderAphoticShield()
 			and not nearbyEnemies[1]:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
 			local targetAllies = Fu.GetNearbyHeroes(nearbyEnemies[1], 800, false, BOT_MODE_NONE)
-			if targetAllies ~= nil and (#targetAllies > #nearbyAllies or Fu.GetHP(bot) < 0.55 and bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				targetAllies ~= nil
+				and (#targetAllies > #nearbyAllies or Fu.GetHP(bot) < 0.55 and bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot
 			end
 		end

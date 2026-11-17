@@ -109,7 +109,11 @@ function X.ConsiderBrainSap()
 	local enemiesInWideRange = Fu.GetAroundEnemyHeroList(castRange + 200)
 	local missingHealth = bot:GetMaxHealth() - bot:GetHealth()
 	for _, enemyHero in pairs(enemiesInWideRange) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			if Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
@@ -122,7 +126,11 @@ function X.ConsiderBrainSap()
 		local weakestTarget = nil
 		local lowestHealth = 99999
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local health = enemyHero:GetHealth()
 				if health < lowestHealth then
 					lowestHealth = health
@@ -176,7 +184,12 @@ function X.ConsiderBrainSap()
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
-		if #nearbyEnemies == 0 and botLevel >= 10 and not bot:WasRecentlyDamagedByAnyHero(3.0) and missingHealth > damage * 1.5 then
+		if
+			#nearbyEnemies == 0
+			and botLevel >= 10
+			and not bot:WasRecentlyDamagedByAnyHero(3.0)
+			and missingHealth > damage * 1.5
+		then
 			local nearbyCreeps = bot:GetNearbyCreeps(1000, true)
 			for _, creep in pairs(nearbyCreeps) do
 				if Fu.IsValid(creep) and Fu.CanCastOnNonMagicImmune(creep) then
@@ -233,7 +246,11 @@ function X.ConsiderBrainSap()
 		and missingHealth > damage
 	then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -265,7 +282,11 @@ function X.ConsiderNightmare()
 		local enemyCount = 0
 		local enemiesInCastRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemiesInCastRange) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				enemyCount = enemyCount + 1
 				if
 					Fu.CanCastOnTargetAdvanced(enemyHero)
@@ -316,7 +337,12 @@ function X.ConsiderNightmare()
 			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 				enemyHeroes = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-				if alliesNearTarget ~= nil and enemyHeroes ~= nil and #alliesNearTarget >= #enemyHeroes and #alliesNearTarget < #enemyHeroes + 2 then
+				if
+					alliesNearTarget ~= nil
+					and enemyHeroes ~= nil
+					and #alliesNearTarget >= #enemyHeroes
+					and #alliesNearTarget < #enemyHeroes + 2
+				then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
 			end
@@ -334,7 +360,11 @@ function X.ConsiderNightmare()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

@@ -202,8 +202,7 @@ function MatchTrace.PerfSample(label, elapsedSec)
 		local parts = {}
 		for i = 1, math.min(8, #rows) do
 			local row = rows[i]
-			parts[#parts + 1] =
-				string.format("%s avg=%.2f max=%.2f n=%d", row.name, row.avg, row.max, row.n)
+			parts[#parts + 1] = string.format("%s avg=%.2f max=%.2f n=%d", row.name, row.avg, row.max, row.n)
 		end
 		if #parts > 0 then
 			print(string.format("[OHA-PERF top] t=%.1f %s", DotaTime(), table.concat(parts, " | ")))
@@ -239,13 +238,7 @@ function MatchTrace.Event(bot, kind, detail)
 	if not enabled or bot == nil then
 		return
 	end
-	local line = string.format(
-		"[OHA-DEV %s] t=%.1f %s %s",
-		kind,
-		DotaTime(),
-		HeroTag(bot),
-		detail or ""
-	)
+	local line = string.format("[OHA-DEV %s] t=%.1f %s %s", kind, DotaTime(), HeroTag(bot), detail or "")
 	print(line)
 	WriteFile(bot, line)
 end
@@ -278,13 +271,7 @@ function MatchTrace.Item(bot, itemName, reason, detail)
 end
 
 function MatchTrace.Buy(bot, itemName, detail)
-	MatchTrace.Decide(
-		bot,
-		"buy",
-		itemName,
-		string.format("%s %s", tostring(itemName), detail or ""),
-		0.5
-	)
+	MatchTrace.Decide(bot, "buy", itemName, string.format("%s %s", tostring(itemName), detail or ""), 0.5)
 end
 
 local function StandingStillOk(bot, mode)
@@ -320,14 +307,16 @@ function MatchTrace.MatchMarker(phase, detail)
 		return
 	end
 	markerSent[phase] = true
-	print(string.format(
-		"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
-		phase,
-		TeamTag(GetTeam()),
-		DotaTime(),
-		version,
-		detail or ""
-	))
+	print(
+		string.format(
+			"[OHA-MATCH] %s team=%s t=%.1f version=%s %s",
+			phase,
+			TeamTag(GetTeam()),
+			DotaTime(),
+			version,
+			detail or ""
+		)
+	)
 end
 
 local function AncientDead(team)
@@ -336,10 +325,7 @@ local function AncientDead(team)
 end
 
 function MatchTrace.Markers()
-	MatchTrace.MatchMarker(
-		"game",
-		string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE))
-	)
+	MatchTrace.MatchMarker("game", string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE)))
 	if markerSent["end"] or DotaTime() < nextEndCheck then
 		return
 	end
@@ -431,15 +417,18 @@ local function DeathWatch(bot)
 		-- 12-18s late). t= is the last snapshot taken alive (within 0.5s of the death), and the
 		-- snapshot ages are counted from there.
 		local diedAt = last ~= nil and last.t or now
-		pcall(print, string.format(
-			"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
-			diedAt,
-			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-			count,
-			now,
-			SnapText(last, diedAt),
-			SnapText(before, diedAt)
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-DEATH] t=%.0f %s deaths=%d respawned=%.0f last: %s | before: %s",
+				diedAt,
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				count,
+				now,
+				SnapText(last, diedAt),
+				SnapText(before, diedAt)
+			)
+		)
 		watch.count = count
 		watch.snaps = {}
 	end
@@ -486,16 +475,7 @@ function MatchTrace.Tick(bot)
 	if not state.started then
 		state.started = true
 		local path = MatchTrace.LogPath(bot)
-		MatchTrace.Event(
-			bot,
-			"start",
-			string.format(
-				"version=%s verbose=%s file=%s",
-				version,
-				tostring(verbose),
-				path
-			)
-		)
+		MatchTrace.Event(bot, "start", string.format("version=%s verbose=%s file=%s", version, tostring(verbose), path))
 	end
 	-- Post-game end marker (once).
 	local gameState = GetGameState()

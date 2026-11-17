@@ -82,7 +82,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -156,7 +157,8 @@ function X.ConsiderDecay()
 			local enemiesInRadius = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), radius)
 			if enemiesInRadius ~= nil and #enemiesInRadius >= 1 then
 				if not Fu.IsInRange(bot, enemyHero, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesInRadius), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesInRadius), castRange)
 				else
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesInRadius)
 				end
@@ -178,20 +180,26 @@ function X.ConsiderDecay()
 	if Fu.IsGoingOnSomeone(bot) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + radius, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 					nearbyEnemies = Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), radius)
 					if nearbyEnemies ~= nil and #nearbyEnemies >= 1 then
 						if not Fu.IsInRange(bot, enemyHero, castRange) then
-							return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemies), castRange)
+							return BOT_ACTION_DESIRE_HIGH,
+								Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemies), castRange)
 						else
 							return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyEnemies)
 						end
 					end
 					if not Fu.IsInRange(bot, enemyHero, castRange) then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, enemyHero:GetLocation(), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, enemyHero:GetLocation(), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 					end
@@ -224,14 +232,21 @@ function X.ConsiderDecay()
 		nearbyEnemies = Fu.GetEnemiesNearLoc(aoe.targetloc, radius)
 		if nearbyEnemies ~= nil and #nearbyEnemies >= 2 and Fu.IsInLaningPhase() and abilityLevel >= 2 then
 			if GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(nearbyEnemies)) > castRange then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemies), castRange)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(nearbyEnemies), castRange)
 			else
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyEnemies)
 			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and abilityLevel >= 3 then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and abilityLevel >= 3
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -265,12 +280,16 @@ function X.ConsiderSoulRip()
 			-- datafeed: damage_per_unit for each unit, up to max_units. It multiplied heroes by
 			-- creeps (and kept growing damage across the loop), and then returned Undying himself, so
 			-- the "kill" cast healed him. Aim it at the enemy, within cast range.
-			local units = (enemiesInRadius ~= nil and #enemiesInRadius or 0) + (enemyCreeps ~= nil and #enemyCreeps or 0)
+			local units = (enemiesInRadius ~= nil and #enemiesInRadius or 0)
+				+ (enemyCreeps ~= nil and #enemyCreeps or 0)
 			local maxUnits = soulRipAbility:GetSpecialValueInt("max_units")
 			if maxUnits ~= nil and maxUnits > 0 then
 				units = math.min(units, maxUnits)
 			end
-			if Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanKillTarget(enemyHero, damage * units, DAMAGE_TYPE_MAGICAL) then
+			if
+				Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanKillTarget(enemyHero, damage * units, DAMAGE_TYPE_MAGICAL)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -306,14 +325,17 @@ function X.ConsiderSoulRip()
 		if save ~= nil then
 			if DotaTime() >= (bot._undyingSaveLogAt or -999) then
 				bot._undyingSaveLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-UNDYING] t=%.0f save-rip ally=%s hp=%.2f units=%d heal=%d",
-					DotaTime(),
-					(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
-					saveHP,
-					units,
-					damage * units
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-UNDYING] t=%.0f save-rip ally=%s hp=%.2f units=%d heal=%d",
+						DotaTime(),
+						(string.gsub(save:GetUnitName(), "npc_dota_hero_", "")),
+						saveHP,
+						units,
+						damage * units
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, save
 		end
@@ -327,7 +349,11 @@ function X.ConsiderSoulRip()
 				local enemiesInRadius = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
 				local enemyCreeps = bot:GetNearbyCreeps(radius, true)
 				local allyHealth = allyHero:GetHealth()
-				if allyHealth < lowestHealth and Fu.GetHP(allyHero) < 0.75 and (enemiesInRadius ~= nil and #enemiesInRadius >= 1 or enemyCreeps ~= nil and #enemyCreeps >= 2) then
+				if
+					allyHealth < lowestHealth
+					and Fu.GetHP(allyHero) < 0.75
+					and (enemiesInRadius ~= nil and #enemiesInRadius >= 1 or enemyCreeps ~= nil and #enemyCreeps >= 2)
+				then
 					lowestHealth = allyHealth
 					healTarget = allyHero
 				end
@@ -348,7 +374,15 @@ function X.ConsiderSoulRip()
 			then
 				local alliesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearChaser = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearChaser ~= nil and enemiesNearChaser ~= nil and (#enemiesNearChaser > #alliesNearChaser or bot:WasRecentlyDamagedByAnyHero(1.5) or hpRatio < 0.5) then
+				if
+					alliesNearChaser ~= nil
+					and enemiesNearChaser ~= nil
+					and (
+						#enemiesNearChaser > #alliesNearChaser
+						or bot:WasRecentlyDamagedByAnyHero(1.5)
+						or hpRatio < 0.5
+					)
+				then
 					return BOT_ACTION_DESIRE_HIGH, bot
 				end
 			end
@@ -371,7 +405,11 @@ function X.ConsiderSoulRip()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			local healTarget = nil
 			local lowestHealth = math.huge -- was 1000 (absolute HP): no ally above 1000 HP was ever healed
 			local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
@@ -396,7 +434,13 @@ function X.ConsiderSoulRip()
 		if Fu.IsValidHero(allyHero) and not Fu.IsSuspiciousIllusion(allyHero) then
 			local enemyCreeps = bot:GetNearbyCreeps(radius, true)
 			local allyHealth = allyHero:GetHealth()
-			if allyHealth < lowestHealth and Fu.GetHP(allyHero) < 0.75 and mpRatio > 0.35 and enemyCreeps ~= nil and #enemyCreeps >= 4 then
+			if
+				allyHealth < lowestHealth
+				and Fu.GetHP(allyHero) < 0.75
+				and mpRatio > 0.35
+				and enemyCreeps ~= nil
+				and #enemyCreeps >= 4
+			then
 				lowestHealth = allyHealth
 				healTarget = allyHero
 			end
@@ -418,7 +462,11 @@ function X.ConsiderTombstone()
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoe.targetloc, radius / 2)
 		if enemiesInRadius ~= nil and #enemiesInRadius >= 2 then
 			local enemyCenter = Fu.GetCenterOfUnits(enemiesInRadius)
-			if Fu.IsLocationInChrono(enemyCenter) or Fu.IsLocationInBlackHole(enemyCenter) or Fu.IsLocationInArena(enemyCenter, radius / 2) then
+			if
+				Fu.IsLocationInChrono(enemyCenter)
+				or Fu.IsLocationInBlackHole(enemyCenter)
+				or Fu.IsLocationInArena(enemyCenter, radius / 2)
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 			-- datafeed: zombies spawn by every enemy within radius (1200) of the Tombstone, cast range

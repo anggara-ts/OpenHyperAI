@@ -92,7 +92,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -203,7 +204,8 @@ function X.ConsiderQ()
 		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 		end
-		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
 		if aoeLocation.count >= 2 and #nearbyEnemies >= 2 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
@@ -226,7 +228,12 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -251,7 +258,11 @@ function X.ConsiderW()
 	local nearbyEnemies = bot:GetNearbyHeroes(castRange + 200, true, BOT_MODE_NONE)
 	local enemiesInRange = bot:GetNearbyHeroes(castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange + 200) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange + 200)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
@@ -259,7 +270,8 @@ function X.ConsiderW()
 	end
 	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) then
 		if #nearbyEnemies > 0 and bot:WasRecentlyDamagedByAnyHero(2.0) then
-			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
+			local aoeLocation =
+				bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
 			if aoeLocation.count >= 1 and #enemiesInRange >= 1 then
 				return BOT_ACTION_DESIRE_LOW, aoeLocation.targetloc
 			end
@@ -273,7 +285,8 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1300) then
-		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, pathDelay + castPoint, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, pathDelay + castPoint, 0)
 		local enemiesNearLocation = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if #enemiesNearLocation >= 2 then
 			return BOT_ACTION_DESIRE_LOW, aoeLocation.targetloc
@@ -372,12 +385,21 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -400,7 +422,11 @@ function X.ConsiderAS()
 	-- datafeed: Liquid Frost "does not apply to buildings", so the tower/barracks branches copied from
 	-- Liquid Fire (ConsiderE, which already covers buildings) were removed; heroes only.
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -433,7 +459,8 @@ function X.ConsiderR()
 	end
 	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) then
 		if #nearbyEnemies > 0 and bot:WasRecentlyDamagedByAnyHero(2.0) then
-			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
+			local aoeLocation =
+				bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 100, radius * 1.6, castPoint, 0)
 			local enemiesNearLocation = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 			if #enemiesNearLocation >= 2 then
 				return BOT_ACTION_DESIRE_LOW, aoeLocation.targetloc

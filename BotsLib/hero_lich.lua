@@ -102,7 +102,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -358,7 +359,10 @@ function X.ConsiderQ()
 			if
 				Fu.IsValidHero(enemyHero)
 				and Fu.IsInRange(bot, enemyHero, baseCastRange)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or mpRatio > 0.68 or GetUnitToUnitDistance(bot, enemyHero) <= 400)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or mpRatio > 0.68 or GetUnitToUnitDistance(
+					bot,
+					enemyHero
+				) <= 400)
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
 			then
@@ -415,11 +419,17 @@ function X.ConsiderQ()
 		local laneCreeps = bot:GetNearbyLaneCreeps(999, true)
 		local allyLaneCreeps = bot:GetNearbyLaneCreeps(888, false)
 		for _, creep in pairs(laneCreeps) do
-			if Fu.IsValid(creep) and not creep:HasModifier("modifier_fountain_glyph") and Fu.IsInRange(creep, bot, castRange + 300) then
+			if
+				Fu.IsValid(creep)
+				and not creep:HasModifier("modifier_fountain_glyph")
+				and Fu.IsInRange(creep, bot, castRange + 300)
+			then
 				if #allyLaneCreeps == 0 and Fu.GetAroundTargetEnemyUnitCount(creep, radius) >= 4 then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q-推线AoE"
 				end
-				if Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, totalDamage, damageType, castPoint) then
+				if
+					Fu.IsKeyWordUnit("ranged", creep) and Fu.WillKillTarget(creep, totalDamage, damageType, castPoint)
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep, "Q-推线补刀远程"
 				end
 				if
@@ -442,7 +452,12 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
-	if bot:WasRecentlyDamagedByAnyHero(3.0) and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 and abilityLevel >= 4 then
+	if
+		bot:WasRecentlyDamagedByAnyHero(3.0)
+		and bot:GetActiveMode() ~= BOT_MODE_RETREAT
+		and #enemiesInRange >= 1
+		and abilityLevel >= 4
+	then
 		for _, enemyHero in pairs(enemiesInRange) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -495,7 +510,9 @@ function X.ConsiderW()
 			local allyEnemyCreeps = allyHero:GetNearbyCreeps(1000, true)
 			local threat = 0
 			for _, enemyHero in pairs(allyEnemies) do
-				if enemyHero:GetAttackTarget() == allyHero or enemyHero:IsFacingLocation(allyHero:GetLocation(), 12) then
+				if
+					enemyHero:GetAttackTarget() == allyHero or enemyHero:IsFacingLocation(allyHero:GetLocation(), 12)
+				then
 					threat = threat + 30
 				end
 			end
@@ -591,9 +608,15 @@ function X.ConsiderW()
 		end
 		if Fu.IsGoingOnSomeone(allyHero) then
 			local allyTarget = Fu.GetProperTarget(allyHero)
-			if Fu.IsValidHero(allyTarget) and Fu.CanCastOnNonMagicImmune(allyTarget) and Fu.IsInRange(allyHero, allyTarget, radius) then
+			if
+				Fu.IsValidHero(allyTarget)
+				and Fu.CanCastOnNonMagicImmune(allyTarget)
+				and Fu.IsInRange(allyHero, allyTarget, radius)
+			then
 				if allyTarget:GetAttackTarget() == allyHero then
-					return BOT_ACTION_DESIRE_HIGH, allyHero, "W-保护被攻击队友" .. Fu.Chat.GetNormName(allyTarget)
+					return BOT_ACTION_DESIRE_HIGH,
+						allyHero,
+						"W-保护被攻击队友" .. Fu.Chat.GetNormName(allyTarget)
 				end
 				if
 					allyHero:IsFacingLocation(allyTarget:GetLocation(), 20)
@@ -608,13 +631,25 @@ function X.ConsiderW()
 		-- level 4, at most two allies, and 4+ creeps, and defending was not covered at all
 		-- (game 016: never cast while defending top). Now level 2+, pushing or defending, 3+
 		-- creeps around the ally, any number of allies, mana kept as before.
-		if (Fu.IsPushing(allyHero) or Fu.IsDefending(allyHero)) and abilityLevel >= 2 and Fu.IsAllowedToSpam(bot, manaCost) and #nearbyEnemies == 0 and CreepManaOk() then
+		if
+			(Fu.IsPushing(allyHero) or Fu.IsDefending(allyHero))
+			and abilityLevel >= 2
+			and Fu.IsAllowedToSpam(bot, manaCost)
+			and #nearbyEnemies == 0
+			and CreepManaOk()
+		then
 			local laneCreeps = allyHero:GetNearbyLaneCreeps(radius, true)
 			if #laneCreeps >= 3 and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
 				return BOT_ACTION_DESIRE_HIGH, allyHero, "W-wave" .. #laneCreeps
 			end
 		end
-		if Fu.IsFarming(allyHero) and abilityLevel >= 2 and Fu.IsAllowedToSpam(bot, manaCost) and #nearbyEnemies == 0 and CreepManaOk() then
+		if
+			Fu.IsFarming(allyHero)
+			and abilityLevel >= 2
+			and Fu.IsAllowedToSpam(bot, manaCost)
+			and #nearbyEnemies == 0
+			and CreepManaOk()
+		then
 			local neutralCreeps = allyHero:GetNearbyNeutralCreeps(radius)
 			if #neutralCreeps >= 3 and neutralCreeps[1]:GetMagicResist() < 0.3 then
 				return BOT_ACTION_DESIRE_HIGH, allyHero, "W-camp" .. #neutralCreeps
@@ -675,7 +710,9 @@ function X.ConsiderE()
 				end
 			end
 			if mostDangerousEnemy ~= nil and Fu.IsInRange(bot, mostDangerousEnemy, castRange + 50) then
-				return BOT_ACTION_DESIRE_HIGH, mostDangerousEnemy, "E-团战控制:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
+				return BOT_ACTION_DESIRE_HIGH,
+					mostDangerousEnemy,
+					"E-团战控制:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
 			end
 		end
 	end
@@ -751,7 +788,11 @@ function X.ConsiderR()
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 	local bounceRadius = chainFrostAbility:GetSpecialValueInt("jump_range") / 2
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
 			local delay = castPoint + GetUnitToUnitDistance(bot, enemyHero) / 850
 			if Fu.WillMagicKillTarget(bot, enemyHero, damage, delay) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "R-直接击杀:" .. Fu.Chat.GetNormName(enemyHero)
@@ -775,9 +816,16 @@ function X.ConsiderR()
 	end
 	-- Our Ice Spire beside a lone target: the orb bounces between them (Valve data: Chain Frost can
 	-- bounce to the Spire when no other enemy is in range).
-	if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) then
+	if
+		Fu.IsValidHero(botTarget)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+	then
 		local spire = X.GetOwnSpire()
-		if spire ~= nil and GetUnitToUnitDistance(spire, botTarget) <= chainFrostAbility:GetSpecialValueInt("jump_range") then
+		if
+			spire ~= nil
+			and GetUnitToUnitDistance(spire, botTarget) <= chainFrostAbility:GetSpecialValueInt("jump_range")
+		then
 			bot._chainAt = DotaTime()
 			X.LogLich("chain-spire", botTarget)
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "R-spire"
@@ -851,13 +899,16 @@ function X.LogLich(kind, target)
 		return
 	end
 	bot._lichLogAt[kind] = DotaTime() + 3
-	pcall(print, string.format(
-		"[OHA-LICH] t=%.0f %s target=%s mp=%.2f",
-		DotaTime(),
-		kind,
-		target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		Fu.GetMP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-LICH] t=%.0f %s target=%s mp=%.2f",
+			DotaTime(),
+			kind,
+			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			Fu.GetMP(bot)
+		)
+	)
 end
 -- Frost Shield on our Ice Spire: each shield tick heals it by one hero hit (Valve data). Cast
 -- when the spire has lost HP (a Chain Frost bounce costs it a hit, so that is covered too) or
@@ -905,7 +956,12 @@ end
 -- Ice Spire within Chain Frost's bounce range of a lone target (no other enemy hero within 1200),
 -- when Chain Frost is up with mana for both. Returns the spot or nil.
 function X.ConsiderSpireCombo()
-	if not iceSpireAbility:IsTrained() or iceSpireAbility:IsHidden() or not iceSpireAbility:IsFullyCastable() or not chainFrostAbility:IsFullyCastable() then
+	if
+		not iceSpireAbility:IsTrained()
+		or iceSpireAbility:IsHidden()
+		or not iceSpireAbility:IsFullyCastable()
+		or not chainFrostAbility:IsFullyCastable()
+	then
 		return nil
 	end
 	if bot:GetMana() < iceSpireAbility:GetManaCost() + chainFrostAbility:GetManaCost() or X.GetOwnSpire() ~= nil then
@@ -939,7 +995,13 @@ function X.ConsiderGazeWeave()
 	if not Fu.IsValidHero(target) then
 		return false
 	end
-	if iceSpireAbility:IsTrained() and not iceSpireAbility:IsHidden() and iceSpireAbility:IsFullyCastable() and X.GetOwnSpire() == nil and Fu.IsInRange(bot, target, iceSpireAbility:GetCastRange()) then
+	if
+		iceSpireAbility:IsTrained()
+		and not iceSpireAbility:IsHidden()
+		and iceSpireAbility:IsFullyCastable()
+		and X.GetOwnSpire() == nil
+		and Fu.IsInRange(bot, target, iceSpireAbility:GetCastRange())
+	then
 		X.LogLich("gaze-weave-spire", target)
 		bot:Action_UseAbilityOnLocation(iceSpireAbility, target:GetLocation())
 		return true
@@ -959,14 +1021,22 @@ function X.ConsiderGazeWeave()
 	end
 	local spireNear = X.GetOwnSpire() ~= nil and GetUnitToUnitDistance(X.GetOwnSpire(), target) <= jump
 	local chainWorth = others >= 1 or spireNear or Fu.GetHP(target) < 0.5
-	if chainWorth and chainFrostAbility:IsFullyCastable() and Fu.IsInRange(bot, target, chainFrostAbility:GetCastRange()) then
+	if
+		chainWorth
+		and chainFrostAbility:IsFullyCastable()
+		and Fu.IsInRange(bot, target, chainFrostAbility:GetCastRange())
+	then
 		X.LogLich("gaze-weave-chain", target)
 		bot._chainAt = DotaTime()
 		bot:Action_UseAbilityOnEntity(chainFrostAbility, target)
 		return true
 	end
 	local spire = X.GetOwnSpire()
-	if spire ~= nil and frostShieldAbility:IsFullyCastable() and GetUnitToUnitDistance(bot, spire) <= frostShieldAbility:GetCastRange() then
+	if
+		spire ~= nil
+		and frostShieldAbility:IsFullyCastable()
+		and GetUnitToUnitDistance(bot, spire) <= frostShieldAbility:GetCastRange()
+	then
 		X.LogLich("gaze-weave-shield", nil)
 		bot:Action_UseAbilityOnEntity(frostShieldAbility, spire)
 		return true
@@ -1041,15 +1111,25 @@ function X.ConsiderSacrifice()
 		if bestCreep ~= nil and bestGain < need then
 			if DotaTime() >= (bot._sacSkipLogAt or -999) then
 				bot._sacSkipLogAt = DotaTime() + 10
-				pcall(print, string.format(
-					"[OHA-LICH] t=%.0f sacrifice-skip best=%.0f need=%d creeps=%d mp=%.2f",
-					DotaTime(), bestGain, need, #allyLaneCreeps, mp
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-LICH] t=%.0f sacrifice-skip best=%.0f need=%d creeps=%d mp=%.2f",
+						DotaTime(),
+						bestGain,
+						need,
+						#allyLaneCreeps,
+						mp
+					)
+				)
 			end
 			bestCreep = nil
 		end
 		if bestCreep then
-			X.LogLich("sacrifice-mana charges=" .. tostring(charges) .. " gain=" .. string.format("%.0f", bestGain), nil)
+			X.LogLich(
+				"sacrifice-mana charges=" .. tostring(charges) .. " gain=" .. string.format("%.0f", bestGain),
+				nil
+			)
 			return BOT_ACTION_DESIRE_HIGH, bestCreep
 		end
 	end

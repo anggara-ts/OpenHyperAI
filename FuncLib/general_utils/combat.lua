@@ -33,7 +33,8 @@ local function installCombat(Fu)
 				local memberTarget = Fu.GetProperTarget(member)
 				if memberTarget == nil or memberTarget == target or Fu.IsHumanPlayer(member) then
 					local duration = Fu.IsHumanPlayer(member) and 6.0 or 2.0
-					totalDamage = totalDamage + member:GetEstimatedDamageToTarget(true, target, duration, DAMAGE_TYPE_PHYSICAL)
+					totalDamage = totalDamage
+						+ member:GetEstimatedDamageToTarget(true, target, duration, DAMAGE_TYPE_PHYSICAL)
 				end
 			end
 		end
@@ -68,9 +69,11 @@ local function installCombat(Fu)
 				if attackerTarget == target then
 					local approachTime = math.max(
 						0,
-						(GetUnitToUnitDistance(attacker, target) - attacker:GetAttackRange()) / math.max(1, attacker:GetCurrentMovementSpeed())
+						(GetUnitToUnitDistance(attacker, target) - attacker:GetAttackRange())
+							/ math.max(1, attacker:GetCurrentMovementSpeed())
 					)
-					incomingDamage = incomingDamage + attacker:GetAttackDamage() * attacker:GetAttackSpeed() * math.max(1, 3 - approachTime)
+					incomingDamage = incomingDamage
+						+ attacker:GetAttackDamage() * attacker:GetAttackSpeed() * math.max(1, 3 - approachTime)
 				end
 			end
 		end
@@ -209,7 +212,11 @@ local function installCombat(Fu)
 			return false
 		end
 		local reach = math.max((bot:GetAttackRange() or 150) + 750, 1100)
-		if Fu.IsValidHero(target) and GetUnitToUnitDistance(bot, target) <= reach and Fu.IsOneAutoAttackKill(bot, target) then
+		if
+			Fu.IsValidHero(target)
+			and GetUnitToUnitDistance(bot, target) <= reach
+			and Fu.IsOneAutoAttackKill(bot, target)
+		then
 			return true
 		end
 		local enemies = bot:GetNearbyHeroes(math.min(reach, 1200), true, BOT_MODE_NONE) or {}
@@ -369,7 +376,12 @@ local function installCombat(Fu)
 		end
 		local delay = attackPointTime + cooldownLeft * 0.98
 		local distance = GetUnitToUnitDistance(bot, creep)
-		if bot:CanBeSeen() and bot:GetAttackTarget() == creep and bot:GetAnimActivity() == 1503 and bot:GetAnimCycle() < attackPoint then
+		if
+			bot:CanBeSeen()
+			and bot:GetAttackTarget() == creep
+			and bot:GetAnimActivity() == 1503
+			and bot:GetAnimCycle() < attackPoint
+		then
 			delay = 0.9 * (attackPoint - bot:GetAnimCycle()) / attackSpeed
 		end
 		if attackRange > 320 or botName == "npc_dota_hero_templar_assassin" then
@@ -414,14 +426,21 @@ local function installCombat(Fu)
 				local attackPoint = creep:GetAttackPoint()
 				local animCycle = creep:GetAnimCycle()
 				local secondsPerAttack = creep:GetSecondsPerAttack()
-				if Fu.IsKeyWordUnit("melee", creep) and animCycle < attackPoint and (attackPoint - animCycle) * secondsPerAttack < timeWindow * (0.99 - botLevel / 300) then
+				if
+					Fu.IsKeyWordUnit("melee", creep)
+					and animCycle < attackPoint
+					and (attackPoint - animCycle) * secondsPerAttack < timeWindow * (0.99 - botLevel / 300)
+				then
 					totalDamage = totalDamage + creep:GetAttackDamage() * 1
 				end
 				if Fu.IsKeyWordUnit("ranged", creep) and animCycle < attackPoint then
 					local distance = GetUnitToUnitDistance(creep, unit) - 22
 					local projectileSpeed = creep:GetAttackProjectileSpeed()
 					local travelTime = distance / (projectileSpeed + 1)
-					if (attackPoint - animCycle) * secondsPerAttack + travelTime < timeWindow * (0.98 - botLevel / 200) then
+					if
+						(attackPoint - animCycle) * secondsPerAttack + travelTime
+						< timeWindow * (0.98 - botLevel / 200)
+					then
 						totalDamage = totalDamage + creep:GetAttackDamage() * 1
 					end
 				end
@@ -456,13 +475,18 @@ local function installCombat(Fu)
 		return unit:GetActualIncomingDamage(totalDamage, DAMAGE_TYPE_PHYSICAL)
 	end
 	function Fu.GetTotalAttackWillRealDamage(unit, timeWindow)
-		return Fu.GetCreepAttackProjectileWillRealDamage(unit, timeWindow) + Fu.GetCreepAttackActivityWillRealDamage(unit, timeWindow)
+		return Fu.GetCreepAttackProjectileWillRealDamage(unit, timeWindow)
+			+ Fu.GetCreepAttackActivityWillRealDamage(unit, timeWindow)
 	end
 	function Fu.GetAttackProjectileDamageByRange(unit, radius)
 		local totalDamage = 0
 		local projectiles = unit:GetIncomingTrackingProjectiles()
 		for _, projectile in pairs(projectiles) do
-			if projectile.is_attack and projectile.caster ~= nil and GetUnitToLocationDistance(unit, projectile.location) < radius then
+			if
+				projectile.is_attack
+				and projectile.caster ~= nil
+				and GetUnitToLocationDistance(unit, projectile.location) < radius
+			then
 				totalDamage = totalDamage + projectile.caster:GetAttackDamage() * 1
 			end
 		end
@@ -481,15 +505,18 @@ local function installCombat(Fu)
 		local hpScore = Fu.GetHP(hero) + hero:GetHealthRegen() * 5.0 / hero:GetMaxHealth()
 		local mpScore = Fu.GetMP(hero) + hero:GetManaRegen() * 5.0 / hero:GetMaxMana()
 		if unitName == "npc_dota_hero_huskar" then
-			hpScore = getEffectiveHealth(hero:GetHealth(), hero:GetArmor()) / hero:GetMaxHealth() + hero:GetHealthRegen() * 5.0 / hero:GetMaxHealth()
+			hpScore = getEffectiveHealth(hero:GetHealth(), hero:GetArmor()) / hero:GetMaxHealth()
+				+ hero:GetHealthRegen() * 5.0 / hero:GetMaxHealth()
 			readiness = RemapValClamped(hpScore, 0, 0.5, 0.5, 1)
 		elseif unitName == "npc_dota_hero_medusa" then
 			local effectiveHealth = getEffectiveHealth(hero:GetHealth() - hero:GetMana(), hero:GetArmor())
 			local maxHealthPool = hero:GetMaxHealth() - hero:GetMaxMana()
-			local score = RemapValClamped(effectiveHealth / maxHealthPool, 0, 1, 0, 1) * 0.2 + RemapValClamped(mpScore, 0, 0.75, 0, 1) * 0.8
+			local score = RemapValClamped(effectiveHealth / maxHealthPool, 0, 1, 0, 1) * 0.2
+				+ RemapValClamped(mpScore, 0, 0.75, 0, 1) * 0.8
 			readiness = RemapValClamped(score, 0.5, 1, 0.5, 1)
 		else
-			hpScore = getEffectiveHealth(hero:GetHealth(), hero:GetArmor()) / hero:GetMaxHealth() + hero:GetHealthRegen() * 5.0 / hero:GetMaxHealth()
+			hpScore = getEffectiveHealth(hero:GetHealth(), hero:GetArmor()) / hero:GetMaxHealth()
+				+ hero:GetHealthRegen() * 5.0 / hero:GetMaxHealth()
 			local score = RemapValClamped(hpScore, 0, 0.75, 0, 1) * 0.8 + RemapValClamped(mpScore, 0, 1, 0, 1) * 0.2
 			readiness = RemapValClamped(score, 0.5, 1, 0.5, 1)
 		end
@@ -590,8 +617,14 @@ local function installCombat(Fu)
 					if not unit:HasModifier("modifier_arc_warden_tempest_double") and Fu.IsSuspiciousIllusion(unit) then
 						local illusionDamage = getIllusionAttackDamage(unit, 5.0, true)
 						if illusionDamage then
-							allyPower = allyPower + math.log(1 + unit:GetOffensivePower()) * math.sqrt(Max(0, illusionDamage)) * hpWeight
-							allyRawPower = allyRawPower + math.log(1 + unit:GetRawOffensivePower()) * math.sqrt(Max(0, illusionDamage)) * hpWeight
+							allyPower = allyPower
+								+ math.log(1 + unit:GetOffensivePower())
+									* math.sqrt(Max(0, illusionDamage))
+									* hpWeight
+							allyRawPower = allyRawPower
+								+ math.log(1 + unit:GetRawOffensivePower())
+									* math.sqrt(Max(0, illusionDamage))
+									* hpWeight
 						end
 					else
 						if
@@ -614,7 +647,10 @@ local function installCombat(Fu)
 					if not unit:HasModifier("modifier_arc_warden_tempest_double") and Fu.IsSuspiciousIllusion(unit) then
 						local illusionDamage = getIllusionAttackDamage(unit, 5.0, true)
 						if illusionDamage then
-							enemyRawPower = enemyRawPower + math.log(1 + unit:GetRawOffensivePower()) * math.sqrt(Max(0, illusionDamage)) * hpWeight
+							enemyRawPower = enemyRawPower
+								+ math.log(1 + unit:GetRawOffensivePower())
+									* math.sqrt(Max(0, illusionDamage))
+									* hpWeight
 						end
 					else
 						if
@@ -635,11 +671,13 @@ local function installCombat(Fu)
 		local allyTowers = bot:GetNearbyTowers(600, false)
 		if Fu.IsValidBuilding(allyTowers[1]) then
 			if allyTowers[1]:HasModifier("modifier_fountain_glyph") then
-				local towerPower = #allyTowers * math.sqrt(Max(0, allyTowers[1]:GetAttackDamage() * allyTowers[1]:GetAttackSpeed() * 5.0 * 2))
+				local towerPower = #allyTowers
+					* math.sqrt(Max(0, allyTowers[1]:GetAttackDamage() * allyTowers[1]:GetAttackSpeed() * 5.0 * 2))
 				allyPower = allyPower + towerPower
 				allyRawPower = allyRawPower + towerPower
 			else
-				local towerPower = #allyTowers * math.sqrt(Max(0, allyTowers[1]:GetAttackDamage() * allyTowers[1]:GetAttackSpeed() * 5.0))
+				local towerPower = #allyTowers
+					* math.sqrt(Max(0, allyTowers[1]:GetAttackDamage() * allyTowers[1]:GetAttackSpeed() * 5.0))
 				allyPower = allyPower + towerPower
 				allyRawPower = allyRawPower + towerPower
 			end
@@ -650,11 +688,18 @@ local function installCombat(Fu)
 			local glyphMultiplier = enemyTowers[1]:HasModifier("modifier_fountain_glyph") and 2 or 1
 			enemyRawPower = enemyRawPower
 				+ #enemyTowers
-					* math.sqrt(Max(0, enemyTowers[1]:GetAttackDamage() * enemyTowers[1]:GetAttackSpeed() * 5.0 * glyphMultiplier))
+					* math.sqrt(
+						Max(
+							0,
+							enemyTowers[1]:GetAttackDamage() * enemyTowers[1]:GetAttackSpeed() * 5.0 * glyphMultiplier
+						)
+					)
 		end
 		if not Fu.IsEarlyGame() and Fu.IsInTeamFight(bot, 1600) and #allyHeroes >= #enemyHeroes then
 			local teamFightLocation = Fu.GetTeamFightLocation(bot)
-			if teamFightLocation ~= nil and (Fu.IsHumanInLoc(teamFightLocation, 1200) or #allyHeroes > #enemyHeroes) then
+			if
+				teamFightLocation ~= nil and (Fu.IsHumanInLoc(teamFightLocation, 1200) or #allyHeroes > #enemyHeroes)
+			then
 				allyPower = allyPower * 1.20
 				allyRawPower = allyRawPower * 1.20
 			end
@@ -698,11 +743,19 @@ local function installCombat(Fu)
 			armorReduction = armorReduction + 2
 		end
 		local darkLordAbility = hero:GetAbilityByName("nevermore_dark_lord")
-		if hero:GetUnitName() == "npc_dota_hero_nevermore" and darkLordAbility ~= nil and darkLordAbility:GetLevel() > 0 then
+		if
+			hero:GetUnitName() == "npc_dota_hero_nevermore"
+			and darkLordAbility ~= nil
+			and darkLordAbility:GetLevel() > 0
+		then
 			armorReduction = armorReduction + darkLordAbility:GetSpecialValueInt("presence_armor_reduction")
 		end
 		local ripTideAbility = hero:GetAbilityByName("naga_siren_rip_tide")
-		if hero:GetUnitName() == "npc_dota_hero_naga_siren" and ripTideAbility ~= nil and ripTideAbility:GetLevel() > 0 then
+		if
+			hero:GetUnitName() == "npc_dota_hero_naga_siren"
+			and ripTideAbility ~= nil
+			and ripTideAbility:GetLevel() > 0
+		then
 			armorReduction = armorReduction + ripTideAbility:GetSpecialValueInt("armor_reduction")
 		end
 		return armorReduction
@@ -717,7 +770,9 @@ local function installCombat(Fu)
 		local roshanHealthPerMinute = 130 * 2
 		local roshanHealth = roshanBaseHealth + roshanHealthPerMinute * math.floor(DotaTime() / 60)
 		for _, hero in pairs(heroes) do
-			local roshanArmor = roshanBaseArmor + roshanArmorPerMinute * math.floor(DotaTime() / 60) - Fu.GetArmorReducers(hero)
+			local roshanArmor = roshanBaseArmor
+				+ roshanArmorPerMinute * math.floor(DotaTime() / 60)
+				- Fu.GetArmorReducers(hero)
 			local attackDamage = hero:GetAttackDamage()
 			local attackSpeed = hero:GetAttackSpeed()
 			local dps = attackDamage * attackSpeed * (1 - roshanArmor / (roshanArmor + 20))

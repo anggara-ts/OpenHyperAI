@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 3, 1, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_2" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -140,17 +141,21 @@ X["sSellList"] = { "item_shivas_guard", "item_magic_wand", "item_sheepstick", "i
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local curseOfTheSilentAbility = SafeAbility(bot:GetAbilityByName("silencer_curse_of_the_silent"), "silencer_curse_of_the_silent", "silencer")
-local glaivesOfWisdomAbility = SafeAbility(bot:GetAbilityByName("silencer_glaives_of_wisdom"), "silencer_glaives_of_wisdom", "silencer")
+local curseOfTheSilentAbility =
+	SafeAbility(bot:GetAbilityByName("silencer_curse_of_the_silent"), "silencer_curse_of_the_silent", "silencer")
+local glaivesOfWisdomAbility =
+	SafeAbility(bot:GetAbilityByName("silencer_glaives_of_wisdom"), "silencer_glaives_of_wisdom", "silencer")
 local lastWordAbility = SafeAbility(bot:GetAbilityByName("silencer_last_word"), "silencer_last_word", "silencer")
-local globalSilenceAbility = SafeAbility(bot:GetAbilityByName("silencer_global_silence"), "silencer_global_silence", "silencer")
+local globalSilenceAbility =
+	SafeAbility(bot:GetAbilityByName("silencer_global_silence"), "silencer_global_silence", "silencer")
 local talent4 = nil
 local curseDesire, curseLocation = 0
 local glaivesDesire, glaivesTarget = 0
@@ -212,7 +217,8 @@ function X.ConsiderQ()
 	local castRange = curseOfTheSilentAbility:GetCastRange() + aetherRange
 	local castPoint = curseOfTheSilentAbility:GetCastPoint()
 	local manaCost = curseOfTheSilentAbility:GetManaCost()
-	local totalDamage = curseOfTheSilentAbility:GetSpecialValueInt("duration") * curseOfTheSilentAbility:GetSpecialValueInt("damage")
+	local totalDamage = curseOfTheSilentAbility:GetSpecialValueInt("duration")
+		* curseOfTheSilentAbility:GetSpecialValueInt("damage")
 	local abilityLevel = curseOfTheSilentAbility:GetLevel()
 	local enemiesInRange = bot:GetNearbyHeroes(castRange + radius, true, BOT_MODE_NONE)
 	local enemiesInRangeWide = bot:GetNearbyHeroes(castRange + radius + 80, true, BOT_MODE_NONE)
@@ -251,7 +257,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if heroAoe.count >= 2 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange and Fu.IsValidHero(weakestEnemyWide) then
+		if
+			heroAoe.count >= 2
+			and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange
+			and Fu.IsValidHero(weakestEnemyWide)
+		then
 			return BOT_ACTION_DESIRE_HIGH, heroAoe.targetloc
 		end
 		local target = Fu.GetProperTarget(bot)
@@ -262,7 +272,10 @@ function X.ConsiderQ()
 					return BOT_ACTION_DESIRE_HIGH, castLocation
 				end
 			end
-			if target:GetHealth() / target:GetMaxHealth() < 0.4 and GetUnitToUnitDistance(target, bot) <= radius + castRange then
+			if
+				target:GetHealth() / target:GetMaxHealth() < 0.4
+				and GetUnitToUnitDistance(target, bot) <= radius + castRange
+			then
 				local castLocation = Fu.GetCastLocation(bot, target, castRange, radius)
 				if castLocation ~= nil then
 					return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -307,7 +320,11 @@ function X.ConsiderQ()
 			if heroAoe.count >= 3 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange then
 				return BOT_ACTION_DESIRE_VERYHIGH, heroAoe.targetloc
 			end
-			if heroAoe.count >= 2 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange and bot:GetMana() > manaReserve then
+			if
+				heroAoe.count >= 2
+				and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange
+				and bot:GetMana() > manaReserve
+			then
 				return BOT_ACTION_DESIRE_HIGH, heroAoe.targetloc
 			end
 			if Fu.IsValidHero(weakestEnemyWide) then
@@ -317,7 +334,10 @@ function X.ConsiderQ()
 						return BOT_ACTION_DESIRE_HIGH, castLocation
 					end
 				end
-				if weakestEnemyWide:GetHealth() / weakestEnemyWide:GetMaxHealth() <= 0.4 and GetUnitToUnitDistance(weakestEnemyWide, bot) <= radius + castRange then
+				if
+					weakestEnemyWide:GetHealth() / weakestEnemyWide:GetMaxHealth() <= 0.4
+					and GetUnitToUnitDistance(weakestEnemyWide, bot) <= radius + castRange
+				then
 					local castLocation = Fu.GetCastLocation(bot, weakestEnemyWide, castRange, radius)
 					if castLocation ~= nil then
 						return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -397,7 +417,12 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if botLevel <= 9 and hpRatio > 0.55 and Fu.IsValidHero(botTarget) and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, botTarget, attackRange + 29)) then
+	if
+		botLevel <= 9
+		and hpRatio > 0.55
+		and Fu.IsValidHero(botTarget)
+		and (not Fu.IsRunning(bot) or Fu.IsInRange(bot, botTarget, attackRange + 29))
+	then
 		if not botTarget:IsAttackImmune() and GetUnitToUnitDistance(bot, botTarget) < attackRange + 99 then
 			nTargetUint = botTarget
 			return BOT_ACTION_DESIRE_HIGH, nTargetUint
@@ -445,7 +470,10 @@ function X.ConsiderW()
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
 			local incomingDamage = Fu.GetTotalAttackWillRealDamage(creep, attackDelay)
 			local glaiveHitDamage = X.sil_RealDamage(attackDamage, glaiveDamage, creep)
-			if incomingDamage + glaiveHitDamage > creep:GetHealth() + 1 and not Fu.CanKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL) then
+			if
+				incomingDamage + glaiveHitDamage > creep:GetHealth() + 1
+				and not Fu.CanKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL)
+			then
 				return BOT_ACTION_DESIRE_HIGH, creep
 			end
 		end
@@ -536,7 +564,10 @@ function X.ConsiderE()
 			-- difference counted as 0 (the feed does not say how it is handled).
 			local totalDamage = damage
 				+ lastWordAbility:GetSpecialValueFloat("int_multiplier")
-					* math.max(0, bot:GetAttributeValue(ATTRIBUTE_INTELLECT) - enemyHero:GetAttributeValue(ATTRIBUTE_INTELLECT))
+					* math.max(
+						0,
+						bot:GetAttributeValue(ATTRIBUTE_INTELLECT) - enemyHero:GetAttributeValue(ATTRIBUTE_INTELLECT)
+					)
 			if Fu.CanKillTarget(enemyHero, totalDamage, DAMAGE_TYPE_MAGICAL) then
 				if hasAoeTalent then
 					local aoe = bot:FindAoELocation(true, true, enemyHero:GetLocation(), 0, radius, 0, 0)
@@ -637,7 +668,12 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) and bot:GetMana() >= 500 then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, false
 		end
 	end
@@ -708,11 +744,10 @@ function X.IsChannelingUltimate(unit)
 	end
 	if DotaTime() >= (bot._globalLogAt or -999) then
 		bot._globalLogAt = DotaTime() + 10
-		pcall(print, string.format(
-			"[OHA-SILENCER] t=%.0f global-silence vs channel %s",
-			DotaTime(),
-			activeAbility:GetName()
-		))
+		pcall(
+			print,
+			string.format("[OHA-SILENCER] t=%.0f global-silence vs channel %s", DotaTime(), activeAbility:GetName())
+		)
 	end
 	return true
 end
@@ -720,7 +755,12 @@ function X.sil_GetWeakestUnit(units)
 	local weakestUnit = nil
 	local lowestHealth = 10000
 	for _, unit in pairs(units) do
-		if Fu.IsValid(unit) and unit:IsAlive() and Fu.CanCastOnNonMagicImmune(unit) and Fu.CanCastOnTargetAdvanced(unit) then
+		if
+			Fu.IsValid(unit)
+			and unit:IsAlive()
+			and Fu.CanCastOnNonMagicImmune(unit)
+			and Fu.CanCastOnTargetAdvanced(unit)
+		then
 			if unit:GetHealth() < lowestHealth then
 				lowestHealth = unit:GetHealth()
 				weakestUnit = unit
@@ -731,7 +771,8 @@ function X.sil_GetWeakestUnit(units)
 end
 function X.sil_RealDamage(attackDamage, bonusDamage, target)
 	-- datafeed: Glaives of Wisdom bonus damage is magical (damage 2), not pure
-	local totalDamage = target:GetActualIncomingDamage(attackDamage, DAMAGE_TYPE_PHYSICAL) + target:GetActualIncomingDamage(bonusDamage, DAMAGE_TYPE_MAGICAL)
+	local totalDamage = target:GetActualIncomingDamage(attackDamage, DAMAGE_TYPE_PHYSICAL)
+		+ target:GetActualIncomingDamage(bonusDamage, DAMAGE_TYPE_MAGICAL)
 	return totalDamage
 end
 return X

@@ -53,7 +53,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -116,7 +117,11 @@ function X.ConsiderQ()
 	local castTarget = nil
 	local castLog = nil
 	if Fu.IsGoingOnSomeone(bot) and Fu.IsRunning(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1600) and not Fu.IsInRange(bot, botTarget, 200) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, 1600)
+			and not Fu.IsInRange(bot, botTarget, 200)
+		then
 			castTarget = botTarget
 			castLog = "Q-进攻:" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castLog
@@ -147,7 +152,11 @@ function X.ConsiderW()
 	local castTarget = nil
 	local castLog = nil
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and (Fu.CanKillTarget(enemyHero, damage, damageType) or enemyHero:IsChanneling()) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and (Fu.CanKillTarget(enemyHero, damage, damageType) or enemyHero:IsChanneling())
+		then
 			castTarget = enemyHero
 			castLog = "W-击杀打断" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castLog
@@ -195,9 +204,16 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and #nearbyAllies <= 2 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost)
+		and #nearbyAllies <= 2
+	then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(crushRadius, true)
-		if (#nearbyLaneCreeps >= 4 or #nearbyLaneCreeps >= 3 and mpRatio > 0.82) and not nearbyLaneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			(#nearbyLaneCreeps >= 4 or #nearbyLaneCreeps >= 3 and mpRatio > 0.82)
+			and not nearbyLaneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			castTarget = nearbyLaneCreeps[1] -- was the undefined global creep (nil); Crush is no-target
 			castLog = "W-带线AOE" .. #nearbyLaneCreeps
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castLog
@@ -213,7 +229,12 @@ function X.ConsiderW()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() >= 400 then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and not Fu.IsDisabled(attackTarget) and not attackTarget:IsDisarmed() and Fu.IsInRange(attackTarget, bot, crushRadius) then
+		if
+			Fu.IsRoshan(attackTarget)
+			and not Fu.IsDisabled(attackTarget)
+			and not attackTarget:IsDisarmed()
+			and Fu.IsInRange(attackTarget, bot, crushRadius)
+		then
 			castTarget = botTarget
 			castLog = "W-打肉山"
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castLog

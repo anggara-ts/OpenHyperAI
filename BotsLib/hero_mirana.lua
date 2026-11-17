@@ -71,7 +71,8 @@ X["sSellList"] = { "item_maelstrom", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -84,7 +85,8 @@ local starstormAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAb
 local sacredArrowAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "mirana")
 local leapAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "mirana")
 local moonlightShadowAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "mirana")
-local celestialQuiverAbility = SafeAbility(bot:GetAbilityByName("mirana_celestial_quiver"), "mirana_celestial_quiver", "mirana")
+local celestialQuiverAbility =
+	SafeAbility(bot:GetAbilityByName("mirana_celestial_quiver"), "mirana_celestial_quiver", "mirana")
 local starstormDesire
 local sacredArrowDesire, sacredArrowLocation
 local leapDesire, leapLocation
@@ -128,11 +130,14 @@ function X.SkillsComplement()
 	end
 	if leapDesire > 0 then
 		pcall(ChargeTracker.Issued, bot, leapAbility)
-		pcall(print, string.format(
-			"[OHA-MIRANA] t=%.0f leap-cast charges=%s",
-			DotaTime(),
-			tostring(ChargeTracker.Count(bot, leapAbility))
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-MIRANA] t=%.0f leap-cast charges=%s",
+				DotaTime(),
+				tostring(ChargeTracker.Count(bot, leapAbility))
+			)
+		)
 		-- Game 036: Leap re-ordered 10-26 times per burst with "can't be used while rooted" although
 		-- IsRooted() was false. A second order within 1.5s means the first did not go off: list her
 		-- modifiers (once per 10s) to find the root-like state the check misses.
@@ -143,8 +148,15 @@ function X.SkillsComplement()
 			for i = 0, bot:NumModifiers() - 1 do
 				mods[#mods + 1] = tostring(bot:GetModifierName(i))
 			end
-			pcall(_G.print, string.format("[OHA-MIRANA] t=%.0f leap-reorder rooted=%s mods=%s", now,
-				tostring(bot:IsRooted()), table.concat(mods, ",")))
+			pcall(
+				_G.print,
+				string.format(
+					"[OHA-MIRANA] t=%.0f leap-reorder rooted=%s mods=%s",
+					now,
+					tostring(bot:IsRooted()),
+					table.concat(mods, ",")
+				)
+			)
 		end
 		bot._leapOrderAt = now
 		Fu.SetQueuePtToINT(bot, false)
@@ -181,7 +193,11 @@ function X.ConsiderQ()
 	local castTarget = nil
 	local castReason = nil
 	for _, enemyHero in pairs(enemiesInRadius) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint)
+		then
 			castTarget = enemyHero
 			castReason = "Q-击杀:" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
@@ -199,7 +215,11 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 		end
 	end
-	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(3.0) and (#enemiesInSecondaryRadius >= 1 or hpRatio < 0.6) then
+	if
+		Fu.IsRetreating(bot)
+		and bot:WasRecentlyDamagedByAnyHero(3.0)
+		and (#enemiesInSecondaryRadius >= 1 or hpRatio < 0.6)
+	then
 		for _, enemyHero in pairs(enemiesInRadius) do
 			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
 				castTarget = enemyHero
@@ -229,11 +249,23 @@ function X.ConsiderQ()
 				end
 			end
 		end
-		if (meleeKillCount + rangedKillCount >= 3 or rangedKillCount >= 1 and meleeKillCount >= 1) and DotaTime() >= (bot._starLaneLogAt or -999) then
+		if
+			(meleeKillCount + rangedKillCount >= 3 or rangedKillCount >= 1 and meleeKillCount >= 1)
+			and DotaTime() >= (bot._starLaneLogAt or -999)
+		then
 			-- [OHA-MIRANA]: lane last-hit Starstorm (dead before the "damage" key fix), every 10s at most.
 			bot._starLaneLogAt = DotaTime() + 10
 			-- _G.print: the file mutes print (line 2) and this log checks the build-122 fix (game 036 review).
-			pcall(_G.print, string.format("[OHA-MIRANA] t=%.0f starstorm-lane melee=%d ranged=%d dmg=%d", DotaTime(), meleeKillCount, rangedKillCount, damage))
+			pcall(
+				_G.print,
+				string.format(
+					"[OHA-MIRANA] t=%.0f starstorm-lane melee=%d ranged=%d dmg=%d",
+					DotaTime(),
+					meleeKillCount,
+					rangedKillCount,
+					damage
+				)
+			)
 		end
 		if meleeKillCount + rangedKillCount >= 3 then
 			castTarget = bot
@@ -290,14 +322,17 @@ function X.LogTeleportArrowSkip(why, target)
 		return
 	end
 	bot._arrowSkipLogAt = DotaTime() + 5
-	pcall(print, string.format(
-		"[OHA-MIRANA] t=%.0f arrow-skip why=%s target=%s dist=%d mp=%.2f",
-		DotaTime(),
-		why,
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		math.floor(GetUnitToUnitDistance(bot, target)),
-		bot:GetMana() / math.max(1, bot:GetMaxMana())
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-MIRANA] t=%.0f arrow-skip why=%s target=%s dist=%d mp=%.2f",
+			DotaTime(),
+			why,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(GetUnitToUnitDistance(bot, target)),
+			bot:GetMana() / math.max(1, bot:GetMaxMana())
+		)
+	)
 end
 function X.ConsiderW()
 	if not sacredArrowAbility:IsFullyCastable() then
@@ -353,13 +388,16 @@ function X.ConsiderW()
 		if X.HoldArrowForAtos(target) then
 			return 0
 		end
-		pcall(print, string.format(
-			"[OHA-MIRANA] t=%.0f arrow target=%s dist=%d mode=%d",
-			DotaTime(),
-			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-			math.floor(GetUnitToUnitDistance(bot, target)),
-			bot:GetActiveMode()
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-MIRANA] t=%.0f arrow target=%s dist=%d mode=%d",
+				DotaTime(),
+				(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+				math.floor(GetUnitToUnitDistance(bot, target)),
+				bot:GetActiveMode()
+			)
+		)
 		return BOT_ACTION_DESIRE_HIGH, loc
 	end
 
@@ -456,12 +494,15 @@ function X.ConsiderW()
 					if easy then
 						local loc = arrowLoc(enemyHero)
 						if clearShot(enemyHero, loc) then
-							pcall(print, string.format(
-								"[OHA-MIRANA] t=%.0f arrow-free target=%s dist=%d",
-								DotaTime(),
-								(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-								dist
-							))
+							pcall(
+								print,
+								string.format(
+									"[OHA-MIRANA] t=%.0f arrow-free target=%s dist=%d",
+									DotaTime(),
+									(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+									dist
+								)
+							)
 							return releaseArrow(enemyHero, loc)
 						end
 						blocked = blocked or enemyHero
@@ -470,12 +511,15 @@ function X.ConsiderW()
 			end
 			if blocked ~= nil and DotaTime() >= (bot._arrowBlockedLogAt or -999) then
 				bot._arrowBlockedLogAt = DotaTime() + 5
-				pcall(print, string.format(
-					"[OHA-MIRANA] t=%.0f arrow-skip why=blocked target=%s dist=%d",
-					DotaTime(),
-					(string.gsub(blocked:GetUnitName(), "npc_dota_hero_", "")),
-					GetUnitToUnitDistance(bot, blocked)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-MIRANA] t=%.0f arrow-skip why=blocked target=%s dist=%d",
+						DotaTime(),
+						(string.gsub(blocked:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToUnitDistance(bot, blocked)
+					)
+				)
 			end
 		end
 	end
@@ -616,7 +660,11 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, arrowRange) and not Fu.IsInRange(bot, botTarget, 300) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, arrowRange)
+			and not Fu.IsInRange(bot, botTarget, 300)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -665,7 +713,13 @@ function X.HoldArrowForAtos(target)
 	return false
 end
 function X.LeapReady()
-	if leapAbility == nil or leapAbility:IsNull() or leapAbility:IsHidden() or not leapAbility:IsTrained() or not leapAbility:IsActivated() then
+	if
+		leapAbility == nil
+		or leapAbility:IsNull()
+		or leapAbility:IsHidden()
+		or not leapAbility:IsTrained()
+		or not leapAbility:IsActivated()
+	then
 		return false
 	end
 	if bot:GetMana() < leapAbility:GetManaCost() then
@@ -695,7 +749,11 @@ function X.ConsiderE()
 	-- just ahead never got leapt on (5:00, game 014). Now: where she lands is checked against
 	-- where the target will be, and a fleeing target inside 620 counts too.
 	local chaseWhy = nil
-	if Fu.IsGoingOnSomeone(bot) and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, leapDistance + attackRange + 300) then
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, leapDistance + attackRange + 300)
+	then
 		local fleeing = not botTarget:IsFacingLocation(bot:GetLocation(), 90)
 		local dist = GetUnitToUnitDistance(bot, botTarget)
 		local face = bot:GetFacing() * math.pi / 180
@@ -723,13 +781,16 @@ function X.ConsiderE()
 		-- Logged again (the other Mirana lines stay off) while this rule is new.
 		if chaseWhy ~= nil and DotaTime() >= (bot._leapChaseLogAt or -999) then
 			bot._leapChaseLogAt = DotaTime() + 5
-			pcall(_G.print, string.format(
-				"[OHA-MIRANA] t=%.0f leap-skip why=chase-%s target=%s dist=%d",
-				DotaTime(),
-				chaseWhy,
-				(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-				dist
-			))
+			pcall(
+				_G.print,
+				string.format(
+					"[OHA-MIRANA] t=%.0f leap-skip why=chase-%s target=%s dist=%d",
+					DotaTime(),
+					chaseWhy,
+					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+					dist
+				)
+			)
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) and chaseWhy == nil then
@@ -746,12 +807,15 @@ function X.ConsiderE()
 				castTarget = botTarget
 				castReason = "E-进攻:" .. Fu.Chat.GetNormName(castTarget)
 				bot._chaseLeapAt = DotaTime()
-				pcall(_G.print, string.format(
-					"[OHA-MIRANA] t=%.0f leap why=chase target=%s dist=%d",
-					DotaTime(),
-					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-					GetUnitToUnitDistance(bot, botTarget)
-				))
+				pcall(
+					_G.print,
+					string.format(
+						"[OHA-MIRANA] t=%.0f leap why=chase target=%s dist=%d",
+						DotaTime(),
+						(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+						GetUnitToUnitDistance(bot, botTarget)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 			end
 		end
@@ -810,14 +874,17 @@ function X.ConsiderE()
 			then
 				castTarget = closeEnemies[1]
 				castReason = "E-逃跑"
-				pcall(print, string.format(
-					"[OHA-MIRANA] t=%.0f leap why=escape foes=%d closest=%d->%d hp=%.2f",
-					DotaTime(),
-					#foes,
-					math.floor(Closest(me)),
-					math.floor(Closest(land)),
-					Fu.GetHP(bot)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-MIRANA] t=%.0f leap why=escape foes=%d closest=%d->%d hp=%.2f",
+						DotaTime(),
+						#foes,
+						math.floor(Closest(me)),
+						math.floor(Closest(land)),
+						Fu.GetHP(bot)
+					)
+				)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 			end
 		end
@@ -835,12 +902,15 @@ function X.ConsiderE()
 			end
 			if DotaTime() >= (bot._leapTurnLogAt or -999) then
 				bot._leapTurnLogAt = DotaTime() + 3
-				pcall(print, string.format(
-					"[OHA-MIRANA] t=%.0f leap-turn enemies800=%d hp=%.2f",
-					DotaTime(),
-					#closeEnemies,
-					Fu.GetHP(bot)
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-MIRANA] t=%.0f leap-turn enemies800=%d hp=%.2f",
+						DotaTime(),
+						#closeEnemies,
+						Fu.GetHP(bot)
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, Vector(me.x + dx / len * 300, me.y + dy / len * 300, me.z), "turn"
 		end
@@ -848,13 +918,16 @@ function X.ConsiderE()
 		-- turned away; Leap goes the way she faces). At most every 5s.
 		if DotaTime() >= (bot._leapSkipLogAt or -999) then
 			bot._leapSkipLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-MIRANA] t=%.0f leap-skip why=%s enemies1200=%d hp=%.2f",
-				DotaTime(),
-				why,
-				#enemiesInRange,
-				Fu.GetHP(bot)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-MIRANA] t=%.0f leap-skip why=%s enemies1200=%d hp=%.2f",
+					DotaTime(),
+					why,
+					#enemiesInRange,
+					Fu.GetHP(bot)
+				)
+			)
 		end
 	end
 	if Fu.IsFarming(bot) and botLevel >= 12 then
@@ -892,7 +965,11 @@ function X.ConsiderR()
 		if teamMember ~= nil and teamMember:IsAlive() and not teamMember:IsInvisible() then
 			if Fu.IsGoingOnSomeone(teamMember) then
 				local memberTarget = Fu.GetProperTarget(teamMember)
-				if Fu.IsValidHero(memberTarget) and not Fu.IsInRange(teamMember, memberTarget, 1600) and Fu.IsInRange(teamMember, memberTarget, 2800) then
+				if
+					Fu.IsValidHero(memberTarget)
+					and not Fu.IsInRange(teamMember, memberTarget, 1600)
+					and Fu.IsInRange(teamMember, memberTarget, 2800)
+				then
 					local alliesNearMember = Fu.GetAlliesNearLoc(teamMember:GetLocation(), 1000)
 					if #alliesNearMember >= 2 then
 						castTarget = teamMember
@@ -995,7 +1072,12 @@ function X.ConsiderCelestialQuiver()
 			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			if
-				Fu.WillKillTarget(enemyHero, bot:GetAttackDamage() + bonusDamage, DAMAGE_TYPE_MAGICAL, bot:GetAttackSpeed())
+				Fu.WillKillTarget(
+					enemyHero,
+					bot:GetAttackDamage() + bonusDamage,
+					DAMAGE_TYPE_MAGICAL,
+					bot:GetAttackSpeed()
+				)
 				and not Fu.WillKillTarget(enemyHero, bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL, bot:GetAttackSpeed())
 			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
@@ -1036,8 +1118,19 @@ function X.ConsiderCelestialQuiver()
 				and not Fu.CanKillTarget(creep, bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 			then
 				local aoeLocation = bot:FindAoELocation(true, true, creep:GetLocation(), 0, 650, 0, 0)
-				if Fu.WillKillTarget(creep, bot:GetAttackDamage() + bonusDamage, DAMAGE_TYPE_MAGICAL, bot:GetAttackSpeed()) then
-					if aoeLocation.count > 0 or Fu.IsUnitTargetedByTower(creep, false) or Fu.IsEnemyTargetUnit(creep, 1200) then
+				if
+					Fu.WillKillTarget(
+						creep,
+						bot:GetAttackDamage() + bonusDamage,
+						DAMAGE_TYPE_MAGICAL,
+						bot:GetAttackSpeed()
+					)
+				then
+					if
+						aoeLocation.count > 0
+						or Fu.IsUnitTargetedByTower(creep, false)
+						or Fu.IsEnemyTargetUnit(creep, 1200)
+					then
 						return BOT_ACTION_DESIRE_HIGH, creep
 					end
 				end

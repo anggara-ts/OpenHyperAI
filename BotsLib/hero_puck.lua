@@ -65,7 +65,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -181,7 +182,12 @@ function X.ConsiderIllusoryOrb()
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
-		if nearbyAllies ~= nil and nearbyEnemyHeroes ~= nil and Fu.IsValidHero(nearbyEnemyHeroes[1]) and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1]) then
+		if
+			nearbyAllies ~= nil
+			and nearbyEnemyHeroes ~= nil
+			and Fu.IsValidHero(nearbyEnemyHeroes[1])
+			and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
+		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1000, false, BOT_MODE_NONE)
 			if enemyAllies ~= nil and #enemyAllies > #nearbyAllies then
 				isOrbEscaping = true
@@ -207,7 +213,13 @@ function X.ConsiderIllusoryOrb()
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, castPoint, 0)
 		if isAttacking then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoeLocation.count >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2) then
+			if
+				neutralCreeps ~= nil
+				and (
+					#neutralCreeps >= 3 and aoeLocation.count >= 3
+					or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2
+				)
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -232,7 +244,12 @@ function X.ConsiderIllusoryOrb()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -303,24 +320,35 @@ function X.ConsiderWaningRift()
 			and not Fu.IsDisabled(nearbyEnemyHeroes[1])
 		then
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1200, false, BOT_MODE_NONE)
-			if enemyAllies ~= nil and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.65 and bot:WasRecentlyDamagedByAnyHero(2)) then
+			if
+				enemyAllies ~= nil
+				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.65 and bot:WasRecentlyDamagedByAnyHero(2))
+			then
 				local escapeLocation = Fu.GetEscapeLoc()
 				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, radius)
 			end
 		end
 	end
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
-		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
 	if Fu.IsFarming(bot) then
-		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
 		if isAttacking then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoeLocation.count >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2) then
+			if
+				neutralCreeps ~= nil
+				and (
+					#neutralCreeps >= 3 and aoeLocation.count >= 3
+					or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2
+				)
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 			end
 			local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
@@ -393,7 +421,11 @@ function X.ConsiderPhaseShift()
 		local linearProjectiles = GetLinearProjectiles()
 		for _, projectile in pairs(linearProjectiles) do
 			-- ability can be nil on a linear projectile (hero_ancient_apparition guards it too)
-			if projectile ~= nil and projectile.ability ~= nil and projectile.ability:GetName() == "puck_illusory_orb" then
+			if
+				projectile ~= nil
+				and projectile.ability ~= nil
+				and projectile.ability:GetName() == "puck_illusory_orb"
+			then
 				if GetUnitToLocationDistance(bot, projectile.location) < 300 then
 					return BOT_ACTION_DESIRE_HIGH
 				end
@@ -402,7 +434,13 @@ function X.ConsiderPhaseShift()
 	end
 	local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 800)
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
-	if nearbyEnemies ~= nil and #nearbyEnemies >= 2 and nearbyAllies ~= nil and #nearbyEnemies > #nearbyAllies and bot:WasRecentlyDamagedByAnyHero(1.5) then
+	if
+		nearbyEnemies ~= nil
+		and #nearbyEnemies >= 2
+		and nearbyAllies ~= nil
+		and #nearbyEnemies > #nearbyAllies
+		and bot:WasRecentlyDamagedByAnyHero(1.5)
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -438,7 +476,12 @@ function X.ConsiderEtherealJaunt()
 								local alliesNearOrb = Fu.GetAlliesNearLoc(projectile.location, 700)
 								local enemiesNearOrb = Fu.GetEnemiesNearLoc(projectile.location, 700)
 								if #alliesNearOrb >= #enemiesNearOrb then
-									if #alliesNearOrb <= 1 and #enemiesNearOrb == 1 and targetTowers ~= nil and #targetAllies == 0 then
+									if
+										#alliesNearOrb <= 1
+										and #enemiesNearOrb == 1
+										and targetTowers ~= nil
+										and #targetAllies == 0
+									then
 										return BOT_ACTION_DESIRE_HIGH
 									end
 									if #alliesNearOrb >= 2 then
@@ -475,13 +518,16 @@ function X.LogCoil(reason, target)
 		return
 	end
 	bot._coilLogAt = DotaTime() + 10
-	pcall(print, string.format(
-		"[OHA-PUCK] t=%.0f coil why=%s target=%s hp=%.2f",
-		DotaTime(),
-		reason,
-		(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-		Fu.GetHP(target)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f coil why=%s target=%s hp=%.2f",
+			DotaTime(),
+			reason,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(target)
+		)
+	)
 end
 function X.ConsiderDreamCoil()
 	if not dreamCoilAbility:IsFullyCastable() or bot:HasModifier("modifier_puck_phase_shift") then
@@ -522,7 +568,12 @@ function X.ConsiderDreamCoil()
 			-- coil a lone target.
 			local enemiesNearTarget = Fu.GetEnemiesNearLoc(strongestTarget:GetLocation(), 1000)
 			if nearbyAllies ~= nil and enemiesNearTarget and #nearbyAllies >= #enemiesNearTarget then
-				if #nearbyAllies == 1 and #enemiesNearTarget <= 1 and Fu.GetHP(strongestTarget) > 0.55 and isAttacking then
+				if
+					#nearbyAllies == 1
+					and #enemiesNearTarget <= 1
+					and Fu.GetHP(strongestTarget) > 0.55
+					and isAttacking
+				then
 					X.LogCoil("solo", strongestTarget)
 					return BOT_ACTION_DESIRE_HIGH, strongestTarget:GetLocation()
 				end
@@ -586,15 +637,24 @@ function X.ConsiderPhaseOrb()
 			and (isRetreating or Fu.GetHP(bot) < 0.4 and bot:WasRecentlyDamagedByAnyHero(2))
 		then
 			local escapeLocation = Fu.GetEscapeLoc()
-			return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange), phaseDuration
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange),
+				phaseDuration
 		end
 		if isRetreating then
 			local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
-			if nearbyAllies ~= nil and nearbyEnemyHeroes ~= nil and Fu.IsValidHero(nearbyEnemyHeroes[1]) and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1]) then
+			if
+				nearbyAllies ~= nil
+				and nearbyEnemyHeroes ~= nil
+				and Fu.IsValidHero(nearbyEnemyHeroes[1])
+				and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
+			then
 				local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1000, false, BOT_MODE_NONE)
 				if enemyAllies ~= nil and #enemyAllies > #nearbyAllies then
 					local escapeLocation = Fu.GetEscapeLoc()
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange), phaseDuration
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange),
+						phaseDuration
 				end
 			end
 		end

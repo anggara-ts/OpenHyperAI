@@ -22,61 +22,58 @@ local spiritsMinCreeps = 2
 local spiritsManaThreshold = 0.4
 local bot = GetBot()
 local Minion = dofile(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local heroConfig = buildHeroConfig(
-	bot,
-	{
-		skills = { default = { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } },
-		talents = { default = { t25 = { 10, 0 }, t20 = { 10, 0 }, t15 = { 0, 10 }, t10 = { 0, 10 } } },
-		items = {
-			pos_1 = {
-				"item_tango",
-				"item_faerie_fire",
-				"item_gauntlets",
-				"item_gauntlets",
-				"item_gauntlets",
-				"item_boots",
-				"item_armlet",
-				"item_black_king_bar",
-				"item_sange",
-				"item_ultimate_scepter",
-				"item_heavens_halberd",
-				"item_travel_boots",
-				"item_satanic",
-				"item_aghanims_shard",
-				"item_assault",
-				"item_travel_boots_2",
-				"item_ultimate_scepter_2",
-				"item_moon_shard",
-			},
-			pos_4 = {
-				"item_priest_outfit",
-				"item_mekansm",
-				"item_holy_locket",
-				"item_glimmer_cape",
-				"item_guardian_greaves",
-				"item_spirit_vessel",
-				"item_shivas_guard",
-				"item_moon_shard",
-				"item_ultimate_scepter_2",
-			},
-			pos_5 = {
-				"item_blood_grenade",
-				"item_mage_outfit",
-				"item_holy_locket",
-				"item_glimmer_cape",
-				"item_mekansm",
-				"item_ultimate_scepter",
-				"item_shivas_guard",
-				"item_cyclone",
-				"item_sheepstick",
-				"item_wind_waker",
-				"item_moon_shard",
-				"item_ultimate_scepter_2",
-			},
+local heroConfig = buildHeroConfig(bot, {
+	skills = { default = { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } },
+	talents = { default = { t25 = { 10, 0 }, t20 = { 10, 0 }, t15 = { 0, 10 }, t10 = { 0, 10 } } },
+	items = {
+		pos_1 = {
+			"item_tango",
+			"item_faerie_fire",
+			"item_gauntlets",
+			"item_gauntlets",
+			"item_gauntlets",
+			"item_boots",
+			"item_armlet",
+			"item_black_king_bar",
+			"item_sange",
+			"item_ultimate_scepter",
+			"item_heavens_halberd",
+			"item_travel_boots",
+			"item_satanic",
+			"item_aghanims_shard",
+			"item_assault",
+			"item_travel_boots_2",
+			"item_ultimate_scepter_2",
+			"item_moon_shard",
 		},
-		sell = { "item_black_king_bar", "item_quelling_blade" },
-	}
-)
+		pos_4 = {
+			"item_priest_outfit",
+			"item_mekansm",
+			"item_holy_locket",
+			"item_glimmer_cape",
+			"item_guardian_greaves",
+			"item_spirit_vessel",
+			"item_shivas_guard",
+			"item_moon_shard",
+			"item_ultimate_scepter_2",
+		},
+		pos_5 = {
+			"item_blood_grenade",
+			"item_mage_outfit",
+			"item_holy_locket",
+			"item_glimmer_cape",
+			"item_mekansm",
+			"item_ultimate_scepter",
+			"item_shivas_guard",
+			"item_cyclone",
+			"item_sheepstick",
+			"item_wind_waker",
+			"item_moon_shard",
+			"item_ultimate_scepter_2",
+		},
+	},
+	sell = { "item_black_king_bar", "item_quelling_blade" },
+})
 local tetherAbility = bot:GetAbilityByName("wisp_tether")
 local spiritsAbility = bot:GetAbilityByName("wisp_spirits")
 local overchargeAbility = bot:GetAbilityByName("wisp_overcharge")
@@ -123,7 +120,12 @@ local function considerTether()
 					shouldContinue = true
 					break
 				end
-				if Fu.GetHP(allyHero) < tetherAllyHpThreshold or Fu.GetMP(bot) > tetherManaThreshold or isHealing(bot) or isFighting(allyHero) then
+				if
+					Fu.GetHP(allyHero) < tetherAllyHpThreshold
+					or Fu.GetMP(bot) > tetherManaThreshold
+					or isHealing(bot)
+					or isFighting(allyHero)
+				then
 					return BotActionDesire.High, allyHero
 				end
 				shouldContinue = true
@@ -220,15 +222,23 @@ local function skillsComplement()
 	-- Follow the tethered ally: the tether breaks past 1000 range (MAX TETHER DISTANCE in the
 	-- datafeed) and nothing kept Io near the ally, so modes walked Io away and broke it.
 	local tetheredHero = bot.stateTetheredHero
-	if isTethered() and IsValidHero(tetheredHero) and not Fu.IsRetreating(bot) and GetUnitToUnitDistance(bot, tetheredHero) > 650 then
+	if
+		isTethered()
+		and IsValidHero(tetheredHero)
+		and not Fu.IsRetreating(bot)
+		and GetUnitToUnitDistance(bot, tetheredHero) > 650
+	then
 		if DotaTime() >= (bot._wispFollowLogAt or -999) then
 			bot._wispFollowLogAt = DotaTime() + 5
-			pcall(print, string.format(
-				"[OHA-WISP] t=%.0f follow-tether ally=%s dist=%d",
-				DotaTime(),
-				tetheredHero:GetUnitName(),
-				GetUnitToUnitDistance(bot, tetheredHero)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-WISP] t=%.0f follow-tether ally=%s dist=%d",
+					DotaTime(),
+					tetheredHero:GetUnitName(),
+					GetUnitToUnitDistance(bot, tetheredHero)
+				)
+			)
 		end
 		bot:Action_MoveToLocation(tetheredHero:GetLocation())
 	end

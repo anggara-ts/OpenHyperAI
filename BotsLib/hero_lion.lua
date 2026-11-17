@@ -89,7 +89,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_octarine_
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -177,14 +178,21 @@ function X.ConsiderStopDrain()
 	-- 5s channel blocked every other spell, so he kept draining a creep while being jumped.
 	if X.IsAbilityEChanneling() and (earthSpikeAbility:IsFullyCastable() or hexAbility:IsFullyCastable()) then
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 700, true, BOT_MODE_NONE) or {}) do
-			if Fu.IsValidHero(enemyHero) and not enemyHero:HasModifier("modifier_lion_mana_drain") and not Fu.IsSuspiciousIllusion(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and not enemyHero:HasModifier("modifier_lion_mana_drain")
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
 				if DotaTime() >= (bot._drainStopLogAt or -999) then
 					bot._drainStopLogAt = DotaTime() + 5
-					pcall(print, string.format(
-						"[OHA-LION] t=%.0f stop drain for %s",
-						DotaTime(),
-						(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", ""))
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-LION] t=%.0f stop drain for %s",
+							DotaTime(),
+							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", ""))
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -225,7 +233,11 @@ function X.ConsiderQ()
 	local enemiesInBonusRange = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)
 	local castLocation = nil
 	for _, enemyHero in pairs(enemiesInBonusRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.WillMagicKillTarget(bot, enemyHero, damage, 5.0) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.WillMagicKillTarget(bot, enemyHero, damage, 5.0)
+		then
 			castLocation = enemyHero:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
@@ -243,7 +255,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + 300) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 300)
+		then
 			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.5 then
 				local delay = castPoint + GetUnitToUnitDistance(bot, botTarget) / 1600
 				castLocation = Fu.GetDelayCastLocation(bot, botTarget, castRange, 260, delay)
@@ -293,7 +309,11 @@ function X.ConsiderQ()
 		and not bot:HasScepter()
 	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1300, true)
-		if #laneCreeps >= 5 and Fu.IsValid(laneCreeps[1]) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			#laneCreeps >= 5
+			and Fu.IsValid(laneCreeps[1])
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			local creepAoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, width + 90, 0, 0)
 			if creepAoe.count >= 3 then
 				castLocation = creepAoe.targetloc
@@ -319,7 +339,11 @@ function X.ConsiderQ()
 		and botLevel >= 15
 	then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+			then
 				castLocation = enemyHero:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-常规"
 			end
@@ -351,7 +375,11 @@ function X.ConsiderW()
 	-- The "or talent7:IsTrained()" Linken's bypass is gone here and below: talent7 used to be the wrong talent
 	-- (never trained), and whether the AoE hex gets past Linken's is not in the data.
 	for _, enemyHero in pairs(enemiesInBonusRange) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				if talent7:IsTrained() then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "W-打断吟唱:" .. Fu.Chat.GetNormName(enemyHero)
@@ -409,9 +437,13 @@ function X.ConsiderW()
 		end
 		if mostDangerousEnemy ~= nil and Fu.IsInRange(bot, mostDangerousEnemy, castRange + 50) then
 			if talent7:IsTrained() then
-				return BOT_ACTION_DESIRE_HIGH, mostDangerousEnemy, "W-团战:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
+				return BOT_ACTION_DESIRE_HIGH,
+					mostDangerousEnemy,
+					"W-团战:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
 			else
-				return BOT_ACTION_DESIRE_HIGH, mostDangerousEnemy, "W-团战:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
+				return BOT_ACTION_DESIRE_HIGH,
+					mostDangerousEnemy,
+					"W-团战:" .. Fu.Chat.GetNormName(mostDangerousEnemy)
 			end
 		end
 	end
@@ -432,7 +464,12 @@ function X.ConsiderW()
 			end
 		end
 	end
-	if bot:WasRecentlyDamagedByAnyHero(3.0) and botLevel >= 10 and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 then
+	if
+		bot:WasRecentlyDamagedByAnyHero(3.0)
+		and botLevel >= 10
+		and bot:GetActiveMode() ~= BOT_MODE_RETREAT
+		and #enemiesInRange >= 1
+	then
 		for _, enemyHero in pairs(enemiesInRange) do
 			if
 				Fu.IsValid(enemyHero)
@@ -471,12 +508,15 @@ function X.ConsiderW()
 				then
 					if DotaTime() >= (bot._hexSaveLogAt or -999) then
 						bot._hexSaveLogAt = DotaTime() + 5
-						pcall(print, string.format(
-							"[OHA-LION] t=%.0f hex save %s from %s",
-							DotaTime(),
-							(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
-							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", ""))
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-LION] t=%.0f hex save %s from %s",
+								DotaTime(),
+								(string.gsub(ally:GetUnitName(), "npc_dota_hero_", "")),
+								(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", ""))
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "W-save"
 				end
@@ -542,7 +582,11 @@ function X.ConsiderE()
 	then
 		local creeps = bot:GetNearbyCreeps(1600, true)
 		for _, creep in pairs(creeps) do
-			if Fu.IsValid(creep) and (creep:GetMana() > drainAmount * 0.8 or creep:GetMana() > 349) and Fu.CanCastOnNonMagicImmune(creep) then
+			if
+				Fu.IsValid(creep)
+				and (creep:GetMana() > drainAmount * 0.8 or creep:GetMana() > 349)
+				and Fu.CanCastOnNonMagicImmune(creep)
+			then
 				return BOT_ACTION_DESIRE_HIGH, creep, "E-补篮"
 			end
 		end
@@ -567,7 +611,9 @@ function X.ConsiderE()
 			end
 		end
 		if strongestIllusion ~= nil and (illusionCount >= 2 or Fu.GetHP(strongestIllusion) > 0.9) then
-			return BOT_ACTION_DESIRE_HIGH, strongestIllusion, "E-清理幻像:" .. Fu.Chat.GetNormName(strongestIllusion)
+			return BOT_ACTION_DESIRE_HIGH,
+				strongestIllusion,
+				"E-清理幻像:" .. Fu.Chat.GetNormName(strongestIllusion)
 		end
 	end
 	if X.IsOtherAbilityFullyCastable() or abilityLevel <= 1 then
@@ -663,7 +709,11 @@ function X.ConsiderR()
 				then
 					local hitCount = 0
 					for _, otherEnemy in pairs(enemiesInSplash) do
-						if Fu.IsInRange(enemyHero, otherEnemy, splashRadius) and not otherEnemy:IsMagicImmune() and not otherEnemy:IsInvulnerable() then
+						if
+							Fu.IsInRange(enemyHero, otherEnemy, splashRadius)
+							and not otherEnemy:IsMagicImmune()
+							and not otherEnemy:IsInvulnerable()
+						then
 							hitCount = hitCount + 1
 						end
 					end
@@ -679,8 +729,15 @@ function X.ConsiderR()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, castRange + 200) and X.CanCastAbilityROnTarget(botTarget) then
-			if Fu.WillMagicKillTarget(bot, botTarget, damage, castPoint + 0.25) or hpRatio < 0.2 and abilityLevel >= 2 then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + 200)
+			and X.CanCastAbilityROnTarget(botTarget)
+		then
+			if
+				Fu.WillMagicKillTarget(bot, botTarget, damage, castPoint + 0.25)
+				or hpRatio < 0.2 and abilityLevel >= 2
+			then
 				return BOT_ACTION_DESIRE_HIGH, botTarget, "R打架" .. Fu.Chat.GetNormName(botTarget)
 			end
 		end
@@ -692,7 +749,13 @@ function X.ConsiderR()
 			end
 		end
 	end
-	if bot:HasScepter() and (Fu.IsPushing(bot) or Fu.IsFarming(bot) or Fu.IsDefending(bot)) and abilityLevel >= 3 and #nearbyEnemies == 0 and #nearbyAllies <= 2 then
+	if
+		bot:HasScepter()
+		and (Fu.IsPushing(bot) or Fu.IsFarming(bot) or Fu.IsDefending(bot))
+		and abilityLevel >= 3
+		and #nearbyEnemies == 0
+		and #nearbyAllies <= 2
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1200, true)
 		if #laneCreeps >= 5 and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
 			local maxHitCount = 4

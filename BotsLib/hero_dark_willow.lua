@@ -79,18 +79,23 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
-local brambleMazeAbility = SafeAbility(bot:GetAbilityByName("dark_willow_bramble_maze"), "dark_willow_bramble_maze", "dark_willow")
-local shadowRealmAbility = SafeAbility(bot:GetAbilityByName("dark_willow_shadow_realm"), "dark_willow_shadow_realm", "dark_willow")
-local cursedCrownAbility = SafeAbility(bot:GetAbilityByName("dark_willow_cursed_crown"), "dark_willow_cursed_crown", "dark_willow")
+local brambleMazeAbility =
+	SafeAbility(bot:GetAbilityByName("dark_willow_bramble_maze"), "dark_willow_bramble_maze", "dark_willow")
+local shadowRealmAbility =
+	SafeAbility(bot:GetAbilityByName("dark_willow_shadow_realm"), "dark_willow_shadow_realm", "dark_willow")
+local cursedCrownAbility =
+	SafeAbility(bot:GetAbilityByName("dark_willow_cursed_crown"), "dark_willow_cursed_crown", "dark_willow")
 local bedlamAbility = SafeAbility(bot:GetAbilityByName("dark_willow_bedlam"), "dark_willow_bedlam", "dark_willow")
-local terrorizeAbility = SafeAbility(bot:GetAbilityByName("dark_willow_terrorize"), "dark_willow_terrorize", "dark_willow")
+local terrorizeAbility =
+	SafeAbility(bot:GetAbilityByName("dark_willow_terrorize"), "dark_willow_terrorize", "dark_willow")
 local brambleMazeDesire, brambleMazeLocation
 local shadowRealmDesire
 local cursedCrownDesire, cursedCrownTarget
@@ -334,7 +339,8 @@ function X.ConsiderBedlam()
 	-- Bedlam has no cast range: the wisp circles 200 around her and hits within 300 (datafeed
 	-- roaming_radius, attack_radius). GetProperCastRange(0) gave attack range + 200, so it was cast
 	-- on heroes the wisp could not reach.
-	local castRange = bedlamAbility:GetSpecialValueInt("roaming_radius") + bedlamAbility:GetSpecialValueInt("attack_radius")
+	local castRange = bedlamAbility:GetSpecialValueInt("roaming_radius")
+		+ bedlamAbility:GetSpecialValueInt("attack_radius")
 	if castRange <= 0 then
 		castRange = 500
 	end
@@ -371,7 +377,11 @@ function X.ConsiderTerrorize()
 		end
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		for _, enemy in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) and enemy:HasModifier("modifier_mars_arena_of_blood") then
+			if
+				Fu.IsValidHero(enemy)
+				and not Fu.IsSuspiciousIllusion(enemy)
+				and enemy:HasModifier("modifier_mars_arena_of_blood")
+			then
 				arenaEnemyCount = arenaEnemyCount + 1
 			end
 		end
@@ -385,7 +395,11 @@ function X.ConsiderTerrorize()
 			if Fu.IsValidHero(ally) and Fu.IsDisabled(ally) and not ally:IsIllusion() then
 				disabledAllyCount = disabledAllyCount + 1
 			end
-			if Fu.IsValidHero(ally) and Fu.IsCore(ally) and ally:HasModifier("modifier_faceless_void_chronosphere_freeze") then
+			if
+				Fu.IsValidHero(ally)
+				and Fu.IsCore(ally)
+				and ally:HasModifier("modifier_faceless_void_chronosphere_freeze")
+			then
 				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 400, true, BOT_MODE_NONE)
 				if enemiesNearAlly ~= nil and #enemiesNearAlly >= 1 then
 					hasChronoAlly = true
@@ -413,7 +427,10 @@ function X.ConsiderTerrorize()
 			if realFeared ~= nil and #realFeared >= 3 then
 				if DotaTime() >= (bot._terrorizeLogAt or -999) then
 					bot._terrorizeLogAt = DotaTime() + 5
-					pcall(print, string.format("[OHA-DARK_WILLOW] t=%.0f terrorize fight heroes=%d", DotaTime(), #realFeared))
+					pcall(
+						print,
+						string.format("[OHA-DARK_WILLOW] t=%.0f terrorize fight heroes=%d", DotaTime(), #realFeared)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
@@ -446,7 +463,10 @@ function X.ConsiderTerrorize()
 	for _, ally in pairs(nearbyAllies) do
 		if
 			Fu.IsValidHero(ally) and Fu.IsRetreating(ally)
-			or Fu.IsRetreating(ally) and Fu.GetHP(ally) < 0.4 and Fu.IsCore(ally) and ally:WasRecentlyDamagedByAnyHero(2)
+			or Fu.IsRetreating(ally)
+				and Fu.GetHP(ally) < 0.4
+				and Fu.IsCore(ally)
+				and ally:WasRecentlyDamagedByAnyHero(2)
 		then
 			local aoe = bot:FindAoELocation(true, true, ally:GetLocation(), castRange, radius, 0, 0)
 			if aoe.count >= 2 then

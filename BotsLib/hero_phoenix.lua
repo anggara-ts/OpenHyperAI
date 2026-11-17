@@ -71,7 +71,8 @@ X["sSellList"] = { "item_heart", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -81,12 +82,15 @@ function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
 local icarusDiveAbility = SafeAbility(bot:GetAbilityByName("phoenix_icarus_dive"), "phoenix_icarus_dive", "phoenix")
-local icarusDiveStopAbility = SafeAbility(bot:GetAbilityByName("phoenix_icarus_dive_stop"), "phoenix_icarus_dive_stop", "phoenix")
+local icarusDiveStopAbility =
+	SafeAbility(bot:GetAbilityByName("phoenix_icarus_dive_stop"), "phoenix_icarus_dive_stop", "phoenix")
 local fireSpiritsAbility = SafeAbility(bot:GetAbilityByName("phoenix_fire_spirits"), "phoenix_fire_spirits", "phoenix")
-local launchFireSpiritAbility = SafeAbility(bot:GetAbilityByName("phoenix_launch_fire_spirit"), "phoenix_launch_fire_spirit", "phoenix")
+local launchFireSpiritAbility =
+	SafeAbility(bot:GetAbilityByName("phoenix_launch_fire_spirit"), "phoenix_launch_fire_spirit", "phoenix")
 local sunRayAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray"), "phoenix_sun_ray", "phoenix")
 local sunRayStopAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray_stop"), "phoenix_sun_ray_stop", "phoenix")
-local sunRayToggleMoveAbility = SafeAbility(bot:GetAbilityByName("phoenix_sun_ray_toggle_move"), "phoenix_sun_ray_toggle_move", "phoenix")
+local sunRayToggleMoveAbility =
+	SafeAbility(bot:GetAbilityByName("phoenix_sun_ray_toggle_move"), "phoenix_sun_ray_toggle_move", "phoenix")
 local supernovaAbility = SafeAbility(bot:GetAbilityByName("phoenix_supernova"), "phoenix_supernova", "phoenix")
 local icarusDiveDesire, icarusDiveLocation
 local icarusDiveStopDesire
@@ -239,11 +243,13 @@ function X.ConsiderIcarusDive()
 	end
 	-- Not diving now: clear the reason flags so a past retreat dive does not make the next engage
 	-- dive stop halfway (they were never reset before).
-	bot.icarus_dive_kill, bot.icarus_dive_engage, bot.icarus_dive_stuck, bot.icarus_dive_retreat = false, false, false, false
+	bot.icarus_dive_kill, bot.icarus_dive_engage, bot.icarus_dive_stuck, bot.icarus_dive_retreat =
+		false, false, false, false
 	local dashLength = icarusDiveAbility:GetSpecialValueInt("dash_length")
 	local dashWidth = icarusDiveAbility:GetSpecialValueInt("dash_width")
 	local hpCost = icarusDiveAbility:GetSpecialValueInt("hp_cost_perc") / 100 * bot:GetHealth()
-	local damage = icarusDiveAbility:GetSpecialValueInt("damage_per_second") * icarusDiveAbility:GetSpecialValueFloat("burn_duration")
+	local damage = icarusDiveAbility:GetSpecialValueInt("damage_per_second")
+		* icarusDiveAbility:GetSpecialValueFloat("burn_duration")
 	local hpAfterCast = (bot:GetHealth() - hpCost) / bot:GetMaxHealth()
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
@@ -337,7 +343,10 @@ function X.ConsiderIcarusDiveStop()
 		if DotaTime() > lastDiveTime + diveDuration / 2 then
 			if DotaTime() >= (bot._diveStopLogAt or -999) then
 				bot._diveStopLogAt = DotaTime() + 5
-				pcall(print, string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), Fu.GetHP(bot)))
+				pcall(
+					print,
+					string.format("[OHA-PHOENIX] t=%.0f dive-stop at far end hp=%.2f", DotaTime(), Fu.GetHP(bot))
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH
 		end
@@ -356,7 +365,8 @@ function X.ConsiderFireSpirits()
 	local castRange = Fu.GetProperCastRange(false, bot, fireSpiritsAbility:GetCastRange())
 	local radius = fireSpiritsAbility:GetSpecialValueInt("radius")
 	local hpCost = fireSpiritsAbility:GetSpecialValueInt("hp_cost_perc") / 100 * bot:GetHealth()
-	local damage = fireSpiritsAbility:GetSpecialValueInt("damage_per_second") * fireSpiritsAbility:GetSpecialValueFloat("duration")
+	local damage = fireSpiritsAbility:GetSpecialValueInt("damage_per_second")
+		* fireSpiritsAbility:GetSpecialValueFloat("duration")
 	local spiritSpeed = fireSpiritsAbility:GetSpecialValueInt("spirit_speed")
 	local hpAfterCast = (bot:GetHealth() - hpCost) / bot:GetMaxHealth()
 	botTarget = Fu.GetProperTarget(bot)
@@ -404,7 +414,11 @@ function X.ConsiderFireSpirits()
 					if
 						Fu.IsValidHero(ally)
 						and not ally:IsIllusion()
-						and (Fu.IsAttacking(strongestEnemy) == ally or Fu.IsChasingTarget(strongestEnemy, ally) or strongestEnemy:GetAttackTarget() == ally)
+						and (
+							Fu.IsAttacking(strongestEnemy) == ally
+							or Fu.IsChasingTarget(strongestEnemy, ally)
+							or strongestEnemy:GetAttackTarget() == ally
+						)
 					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
@@ -561,13 +575,20 @@ function X.ConsiderFireSpiritsLaunch()
 			local travelTime = GetUnitToUnitDistance(bot, strongestEnemy) / spiritSpeed
 			local predictedLocation = Fu.GetCorrectLoc(strongestEnemy, travelTime)
 			local aoe = bot:FindAoELocation(true, true, predictedLocation, castRange, radius, 0, 0)
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(strongestEnemy, "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(strongestEnemy, "modifier_phoenix_fire_spirit_burn")
+			then
 				if Fu.IsInLaningPhase() then
 					for _, ally in pairs(nearbyAllies) do
 						if
 							Fu.IsValidHero(ally)
 							and not ally:IsIllusion()
-							and (Fu.IsAttacking(strongestEnemy) == ally or Fu.IsChasingTarget(strongestEnemy, ally) or strongestEnemy:GetAttackTarget() == ally)
+							and (
+								Fu.IsAttacking(strongestEnemy) == ally
+								or Fu.IsChasingTarget(strongestEnemy, ally)
+								or strongestEnemy:GetAttackTarget() == ally
+							)
 						then
 							if aoe.count >= 2 then
 								return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
@@ -607,7 +628,10 @@ function X.ConsiderFireSpiritsLaunch()
 				if farming or nearWave then
 					local travelTime = GetUnitToUnitDistance(bot, enemy) / spiritSpeed
 					local predictedLocation = Fu.GetCorrectLoc(enemy, travelTime)
-					if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(enemy, "modifier_phoenix_fire_spirit_burn") then
+					if
+						DotaTime() > lastLaunchTime + travelTime + 0.25
+						and travelTime > X.GetModifierTime(enemy, "modifier_phoenix_fire_spirit_burn")
+					then
 						return BOT_ACTION_DESIRE_HIGH, predictedLocation
 					end
 				end
@@ -617,9 +641,17 @@ function X.ConsiderFireSpiritsLaunch()
 	local laneCreeps = bot:GetNearbyLaneCreeps(math.min(castRange, 1600), true)
 	local laneCreepCenter = Fu.GetCenterOfUnits(laneCreeps)
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not Fu.IsThereNonSelfCoreNearby(1200) then
-		if #laneCreeps >= 4 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and #nearbyEnemies == 0 then
+		if
+			#laneCreeps >= 4
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+			and #nearbyEnemies == 0
+		then
 			local travelTime = GetUnitToLocationDistance(bot, laneCreepCenter) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreepCenter
 			end
 		end
@@ -627,15 +659,28 @@ function X.ConsiderFireSpiritsLaunch()
 	if Fu.IsFarming(bot) then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(math.min(castRange, 1600))
 		local neutralCreepCenter = Fu.GetCenterOfUnits(neutralCreeps)
-		if (#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep()) and not Fu.IsRunning(bot) then
+		if
+			(#neutralCreeps >= 2 or #neutralCreeps >= 1 and neutralCreeps[1]:IsAncientCreep()) and not Fu.IsRunning(bot)
+		then
 			local travelTime = GetUnitToLocationDistance(bot, neutralCreepCenter) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(neutralCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(neutralCreeps[1], "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, neutralCreepCenter
 			end
 		end
-		if #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) and not Fu.IsThereNonSelfCoreNearby(1200) then
+		if
+			#laneCreeps >= 3
+			and Fu.CanBeAttacked(laneCreeps[1])
+			and not Fu.IsRunning(laneCreeps[1])
+			and not Fu.IsThereNonSelfCoreNearby(1200)
+		then
 			local travelTime = GetUnitToLocationDistance(bot, laneCreepCenter) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(laneCreeps[1], "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, laneCreepCenter
 			end
 		end
@@ -650,7 +695,10 @@ function X.ConsiderFireSpiritsLaunch()
 			and isAttacking
 		then
 			local travelTime = GetUnitToUnitDistance(bot, botTarget) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
@@ -663,7 +711,10 @@ function X.ConsiderFireSpiritsLaunch()
 			and not botTarget:HasModifier("modifier_phoenix_fire_spirit_burn")
 		then
 			local travelTime = GetUnitToUnitDistance(bot, botTarget) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(botTarget, "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 			end
 		end
@@ -673,7 +724,10 @@ function X.ConsiderFireSpiritsLaunch()
 		local aoe = bot:FindAoELocation(true, false, Fu.GetCenterOfUnits(nearbyCreeps), radius, radius, 0, 0)
 		if aoe.count >= 3 then
 			local travelTime = GetUnitToLocationDistance(bot, aoe.targetloc) / spiritSpeed
-			if DotaTime() > lastLaunchTime + travelTime + 0.25 and travelTime > X.GetModifierTime(nearbyCreeps[2], "modifier_phoenix_fire_spirit_burn") then
+			if
+				DotaTime() > lastLaunchTime + travelTime + 0.25
+				and travelTime > X.GetModifierTime(nearbyCreeps[2], "modifier_phoenix_fire_spirit_burn")
+			then
 				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
 		end
@@ -749,13 +803,16 @@ function X.LogSunRaySpirits(kind, target)
 		return
 	end
 	bot._sunRaySpiritsLogAt[kind] = DotaTime() + 2
-	pcall(print, string.format(
-		"[OHA-PHOENIX] t=%.0f sun-ray-spirits %s target=%s hp=%.2f",
-		DotaTime(),
-		kind,
-		target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-		Fu.GetHP(bot)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PHOENIX] t=%.0f sun-ray-spirits %s target=%s hp=%.2f",
+			DotaTime(),
+			kind,
+			target and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			Fu.GetHP(bot)
+		)
+	)
 end
 -- Rod of Atos and the enemy to root while an engage Sun Ray is on it, or nil.
 function X.ConsiderAtosOnSunRay()
@@ -763,7 +820,11 @@ function X.ConsiderAtosOnSunRay()
 		return nil
 	end
 	local sunRayTarget = bot.sun_ray_target
-	if not Fu.IsValidHero(sunRayTarget) or sunRayTarget:GetTeam() == bot:GetTeam() or Fu.IsSuspiciousIllusion(sunRayTarget) then
+	if
+		not Fu.IsValidHero(sunRayTarget)
+		or sunRayTarget:GetTeam() == bot:GetTeam()
+		or Fu.IsSuspiciousIllusion(sunRayTarget)
+	then
 		return nil
 	end
 	local slot = bot:FindItemSlot("item_rod_of_atos")
@@ -783,13 +844,16 @@ function X.ConsiderAtosOnSunRay()
 	then
 		return nil
 	end
-	pcall(print, string.format(
-		"[OHA-PHOENIX] t=%.0f atos-sun-ray target=%s hp=%.2f dist=%d",
-		DotaTime(),
-		(string.gsub(sunRayTarget:GetUnitName(), "npc_dota_hero_", "")),
-		Fu.GetHP(sunRayTarget),
-		math.floor(GetUnitToUnitDistance(bot, sunRayTarget))
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-PHOENIX] t=%.0f atos-sun-ray target=%s hp=%.2f dist=%d",
+			DotaTime(),
+			(string.gsub(sunRayTarget:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(sunRayTarget),
+			math.floor(GetUnitToUnitDistance(bot, sunRayTarget))
+		)
+	)
 	return atos, sunRayTarget
 end
 function X.ConsiderSunRayStop()
@@ -814,7 +878,12 @@ function X.ConsiderSunRayStop()
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if bot.sun_ray_engage then
-		if underFire and currentHp < 0.35 or #nearbyAllies + 1 < #nearbyEnemies or #nearbyEnemies == 0 or #nearbyAllies == 0 and #nearbyEnemies == 0 then
+		if
+			underFire and currentHp < 0.35
+			or #nearbyAllies + 1 < #nearbyEnemies
+			or #nearbyEnemies == 0
+			or #nearbyAllies == 0 and #nearbyEnemies == 0
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

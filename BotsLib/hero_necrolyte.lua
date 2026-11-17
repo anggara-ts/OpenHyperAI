@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 }, { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -98,7 +99,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_wind_wake
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_priest" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = true
@@ -210,7 +212,9 @@ function X.ConsiderQ()
 	if
 		not deathPulseAbility:IsFullyCastable()
 		or bot:IsInvisible()
-		or Fu.GetHP(bot) > 0.62 and reapersScytheAbility:GetCooldownTimeRemaining() < 6 and bot:GetMana() < reapersScytheAbility:GetManaCost()
+		or Fu.GetHP(bot) > 0.62
+			and reapersScytheAbility:GetCooldownTimeRemaining() < 6
+			and bot:GetMana() < reapersScytheAbility:GetManaCost()
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
@@ -287,7 +291,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, radius) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
@@ -300,7 +308,12 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(botTarget, bot, radius) and Fu.CanBeAttacked(botTarget) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -369,7 +382,10 @@ function X.ConsiderR()
 			and not enemyHero:HasModifier("modifier_arc_warden_tempest_double")
 		then
 			local estimatedDamage = X.GetEstDamage(bot, enemyHero, damagePerHealth)
-			if Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanKillTarget(enemyHero, estimatedDamage, DAMAGE_TYPE_MAGICAL) then
+			if
+				Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanKillTarget(enemyHero, estimatedDamage, DAMAGE_TYPE_MAGICAL)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end
@@ -387,7 +403,8 @@ function X.GetEstDamage(caster, target, damagePerHealth)
 		magicMultiplier = 0.1
 	end
 	local regenAmount = target:GetHealthRegen() * 2
-	local estimatedDamage = (maxHealth - target:GetHealth() - regenAmount) * damagePerHealth - regenAmount / magicMultiplier
+	local estimatedDamage = (maxHealth - target:GetHealth() - regenAmount) * damagePerHealth
+		- regenAmount / magicMultiplier
 	if caster:GetLevel() >= 9 then
 		estimatedDamage = estimatedDamage + maxHealth * 0.026
 	end
@@ -411,7 +428,9 @@ function X.GetEstDamage(caster, target, damagePerHealth)
 			estimatedDamage = estimatedDamage * 0.4 + manaShieldDamage - target:GetMana() * 2.5
 		end
 	end
-	if target:GetUnitName() == "npc_dota_hero_bristleback" and not target:IsFacingLocation(GetBot():GetLocation(), 120) then
+	if
+		target:GetUnitName() == "npc_dota_hero_bristleback" and not target:IsFacingLocation(GetBot():GetLocation(), 120)
+	then
 		estimatedDamage = estimatedDamage * 0.7
 	end
 	if target:HasModifier("modifier_kunkka_ghost_ship_damage_delay") then
@@ -439,7 +458,10 @@ function X.ConsiderAS()
 	-- creep in cast range that is nearest our fountain, if that is 300+ nearer than he is. It was only
 	-- ever cast on enemies, so it pulled him into fights and never out of one.
 	if Fu.IsRetreating(bot) and bot:WasRecentlyDamagedByAnyHero(2.0) and hpRatio < 0.5 and not bot:IsRooted() then
-		local friendlyUnits = Fu.CombineTwoTable(Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE) or {}, bot:GetNearbyCreeps(castRange, false) or {})
+		local friendlyUnits = Fu.CombineTwoTable(
+			Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE) or {},
+			bot:GetNearbyCreeps(castRange, false) or {}
+		)
 		local bestUnit, bestDistance = nil, Fu.GetDistanceFromAllyFountain(bot) - 300
 		for _, friendlyUnit in pairs(friendlyUnits) do
 			if Fu.IsValid(friendlyUnit) and friendlyUnit ~= bot and GetUnitToUnitDistance(bot, friendlyUnit) > 300 then
@@ -452,13 +474,16 @@ function X.ConsiderAS()
 		if bestUnit ~= nil then
 			if DotaTime() >= (bot._necroSeekLogAt or -999) then
 				bot._necroSeekLogAt = DotaTime() + 3
-				pcall(print, string.format(
-					"[OHA-NECRO] t=%.0f death-seeker-escape to=%s dist=%d hp=%.2f",
-					DotaTime(),
-					bestUnit:GetUnitName(),
-					math.floor(GetUnitToUnitDistance(bot, bestUnit)),
-					hpRatio
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-NECRO] t=%.0f death-seeker-escape to=%s dist=%d hp=%.2f",
+						DotaTime(),
+						bestUnit:GetUnitName(),
+						math.floor(GetUnitToUnitDistance(bot, bestUnit)),
+						hpRatio
+					)
+				)
 			end
 			return BOT_ACTION_DESIRE_HIGH, bestUnit
 		end
@@ -467,7 +492,11 @@ function X.ConsiderAS()
 		local bestTarget = nil
 		local mostHeroes = 2
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and Fu.CanCastOnTargetAdvanced(enemyHero)
+			then
 				local enemiesAroundTarget = Fu.GetNearbyHeroes(enemyHero, 500, false, BOT_MODE_NONE)
 				local alliesAroundTarget = Fu.GetNearbyHeroes(enemyHero, 500, true, BOT_MODE_NONE)
 				if enemiesAroundTarget == nil then

@@ -122,7 +122,9 @@ function normalizeScores(heroInfos)
 		local netWorthScore = info.netWorth / maxNetWorth
 		local powerScore = info.offensivePower / maxPower
 		local levelScore = info.level / maxLevel
-		info.totalScore = netWorthScore * NET_WORTH_WEIGHT + powerScore * OFFENSIVE_POWER_WEIGHT + levelScore * LEVEL_WEIGHT
+		info.totalScore = netWorthScore * NET_WORTH_WEIGHT
+			+ powerScore * OFFENSIVE_POWER_WEIGHT
+			+ levelScore * LEVEL_WEIGHT
 	end
 end
 local heroInfoByPlayer = {}
@@ -174,8 +176,16 @@ local function updateHeroInfos(heroes)
 			local offensivePower = calculateOffensivePower(hero)
 			local level = hero:GetLevel()
 			local playerId = hero:GetPlayerID()
-			local totalScore = netWorth * NET_WORTH_WEIGHT + offensivePower * OFFENSIVE_POWER_WEIGHT + level * LEVEL_WEIGHT
-			heroInfoByPlayer[playerId] = { hero = hero, netWorth = netWorth, offensivePower = offensivePower, level = level, totalScore = totalScore }
+			local totalScore = netWorth * NET_WORTH_WEIGHT
+				+ offensivePower * OFFENSIVE_POWER_WEIGHT
+				+ level * LEVEL_WEIGHT
+			heroInfoByPlayer[playerId] = {
+				hero = hero,
+				netWorth = netWorth,
+				offensivePower = offensivePower,
+				level = level,
+				totalScore = totalScore,
+			}
 		end
 	end
 end

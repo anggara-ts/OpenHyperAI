@@ -52,16 +52,19 @@ function AbilityContext.IsCornered(unit)
 	end
 	if DotaTime() >= (unit._corneredLogAt or -999) then
 		unit._corneredLogAt = DotaTime() + 5
-		pcall(print, string.format(
-			"[OHA-CORNERED] t=%.0f %s enemies=%d allies=%d hp=%.2f ms=%d rooted=%s",
-			DotaTime(),
-			(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
-			#foes,
-			friends,
-			hp,
-			math.floor(unit:GetCurrentMovementSpeed()),
-			tostring(unit:IsRooted())
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-CORNERED] t=%.0f %s enemies=%d allies=%d hp=%.2f ms=%d rooted=%s",
+				DotaTime(),
+				(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+				#foes,
+				friends,
+				hp,
+				math.floor(unit:GetCurrentMovementSpeed()),
+				tostring(unit:IsRooted())
+			)
+		)
 	end
 	return true, nearest, foes
 end

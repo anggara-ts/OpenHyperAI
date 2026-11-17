@@ -12,7 +12,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
 -- tAllAbilityBuildList[2]: Skeleton Walk (ultimate) moved to entry 11 (level 12); it sat at entry 12 (level 13), a level late.
-local tAllAbilityBuildList = { { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 }, { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 }, { 2, 3, 2, 3, 3, 6, 2, 2, 1, 1, 6, 1, 1, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" then
@@ -80,7 +81,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -89,10 +91,12 @@ function X.MinionThink(hMinionUnit)
 end
 local strafeAbility = SafeAbility(bot:GetAbilityByName("clinkz_strafe"), "clinkz_strafe", "clinkz")
 local deathPactAbility = SafeAbility(bot:GetAbilityByName("clinkz_death_pact"), "clinkz_death_pact", "clinkz")
-local burningBarrageAbility = SafeAbility(bot:GetAbilityByName("clinkz_burning_barrage"), "clinkz_burning_barrage", "clinkz")
+local burningBarrageAbility =
+	SafeAbility(bot:GetAbilityByName("clinkz_burning_barrage"), "clinkz_burning_barrage", "clinkz")
 local burningArmyAbility = SafeAbility(bot:GetAbilityByName("clinkz_burning_army"), "clinkz_burning_army", "clinkz")
 local skeletonWalkAbility = SafeAbility(bot:GetAbilityByName("clinkz_wind_walk"), "clinkz_wind_walk", "clinkz")
-local searingArrowsAbility = SafeAbility(bot:GetAbilityByName("clinkz_searing_arrows"), "clinkz_searing_arrows", "clinkz")
+local searingArrowsAbility =
+	SafeAbility(bot:GetAbilityByName("clinkz_searing_arrows"), "clinkz_searing_arrows", "clinkz")
 local strafeDesire
 local deathPactDesire, deathPactTarget
 local burningBarrageDesire, burningBarrageLocation
@@ -166,9 +170,14 @@ function X.ConsiderStrafe()
 	if Fu.IsFarming(bot) then
 		if isAttacking then
 			local nearbyNeutralCreeps = bot:GetNearbyNeutralCreeps(1000)
-			if nearbyNeutralCreeps ~= nil and (#nearbyNeutralCreeps >= 3 or #nearbyNeutralCreeps >= 2 and nearbyNeutralCreeps[1]:IsAncientCreep()) then
+			if
+				nearbyNeutralCreeps ~= nil
+				and (#nearbyNeutralCreeps >= 3 or #nearbyNeutralCreeps >= 2 and nearbyNeutralCreeps[1]:IsAncientCreep())
+			then
 				if skeletonWalkAbility:IsTrained() then
-					if Fu.GetManaAfter(strafeAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost() then
+					if
+						Fu.GetManaAfter(strafeAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost()
+					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				else
@@ -180,7 +189,9 @@ function X.ConsiderStrafe()
 			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1000, true)
 			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 then
 				if skeletonWalkAbility:IsTrained() then
-					if Fu.GetManaAfter(strafeAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost() then
+					if
+						Fu.GetManaAfter(strafeAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost()
+					then
 						return BOT_ACTION_DESIRE_HIGH
 					end
 				else
@@ -206,7 +217,11 @@ function X.ConsiderStrafe()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, attackRange) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, attackRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -226,7 +241,10 @@ function X.ConsiderDeathPact()
 				if
 					Fu.IsValid(creep)
 					and Fu.CanBeAttacked(creep)
-					and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep) and creep:GetLevel() <= maxCreepLevel)
+					and (
+						Fu.IsKeyWordUnit("ranged", creep)
+						or Fu.IsKeyWordUnit("siege", creep) and creep:GetLevel() <= maxCreepLevel
+					)
 				then
 					local nearbyAllies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
 					if
@@ -250,7 +268,11 @@ function X.ConsiderDeathPact()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function X.ConsiderSkeletonWalk()
-	if not skeletonWalkAbility:IsFullyCastable() or bot:HasModifier("modifier_clinkz_wind_walk") or Fu.IsRealInvisible(bot) then
+	if
+		not skeletonWalkAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_clinkz_wind_walk")
+		or Fu.IsRealInvisible(bot)
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local roshanLocation = Fu.GetCurrentRoshanLocation()
@@ -281,7 +303,11 @@ function X.ConsiderSkeletonWalk()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -330,7 +356,11 @@ function X.ConsiderSearingArrows()
 	local attackRange = bot:GetAttackRange()
 	local manaCost = searingArrowsAbility:GetManaCost()
 	local manaAfter = Fu.GetManaAfter(manaCost)
-	local manaThreshold = Fu.GetManaThreshold(bot, manaCost, { strafeAbility, deathPactAbility, burningBarrageAbility, burningArmyAbility, skeletonWalkAbility })
+	local manaThreshold = Fu.GetManaThreshold(
+		bot,
+		manaCost,
+		{ strafeAbility, deathPactAbility, burningBarrageAbility, burningArmyAbility, skeletonWalkAbility }
+	)
 	local isAutoCastOn = searingArrowsAbility:GetAutoCastState()
 	if isGoingOnSomeone then
 		if
@@ -386,7 +416,13 @@ function X.ConsiderSearingArrows()
 			end
 		end
 	end
-	if Fu.IsValidHero(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, attackRange + 100) and not botTarget:IsMagicImmune() and manaAfter > manaThreshold then
+	if
+		Fu.IsValidHero(botTarget)
+		and Fu.CanBeAttacked(botTarget)
+		and Fu.IsInRange(bot, botTarget, attackRange + 100)
+		and not botTarget:IsMagicImmune()
+		and manaAfter > manaThreshold
+	then
 		if not isAutoCastOn then
 			searingArrowsAbility:ToggleAutoCast()
 		end
@@ -402,7 +438,11 @@ function X.ConsiderBurningBarrage()
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	-- datafeed: Burning Barrage has no cast range and no "radius"; its arrows fly "range" (850), "projectile_width" (200) wide
-	local castRange = Fu.GetProperCastRange(false, bot, math.max(burningBarrageAbility:GetCastRange(), burningBarrageAbility:GetSpecialValueInt("range")))
+	local castRange = Fu.GetProperCastRange(
+		false,
+		bot,
+		math.max(burningBarrageAbility:GetCastRange(), burningBarrageAbility:GetSpecialValueInt("range"))
+	)
 	local projectileWidth = burningBarrageAbility:GetSpecialValueInt("projectile_width")
 	if isGoingOnSomeone then
 		if
@@ -425,7 +465,13 @@ function X.ConsiderBurningBarrage()
 	end
 	if Fu.IsFarming(bot) then
 		local nearbyNeutralCreeps = bot:GetNearbyNeutralCreeps(1000)
-		if nearbyNeutralCreeps ~= nil and #nearbyNeutralCreeps >= 1 and isAttacking and Fu.GetManaAfter(burningBarrageAbility:GetManaCost()) * bot:GetMana() > skeletonWalkAbility:GetManaCost() then
+		if
+			nearbyNeutralCreeps ~= nil
+			and #nearbyNeutralCreeps >= 1
+			and isAttacking
+			and Fu.GetManaAfter(burningBarrageAbility:GetManaCost()) * bot:GetMana()
+				> skeletonWalkAbility:GetManaCost()
+		then
 			if Fu.IsBigCamp(nearbyNeutralCreeps) or nearbyNeutralCreeps[1]:IsAncientCreep() then
 				if #nearbyNeutralCreeps >= 2 then
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyNeutralCreeps)
@@ -448,7 +494,11 @@ function X.ConsiderBurningBarrage()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		if (Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget)) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and isAttacking then
+		if
+			(Fu.IsRoshan(botTarget) or Fu.IsTormentor(botTarget))
+			and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -467,7 +517,8 @@ function X.ConsiderBurningArmy()
 		local enemiesNearLocation = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		if enemiesNearLocation ~= nil and #enemiesNearLocation >= 2 then
 			if GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearLocation)) > castRange then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearLocation), castRange)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearLocation), castRange)
 			else
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearLocation)
 			end
@@ -486,13 +537,15 @@ function X.ConsiderBurningArmy()
 				enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), radius)
 				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
 					if GetUnitToLocationDistance(bot, Fu.GetCenterOfUnits(enemiesNearTarget)) > castRange then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 					end
 				else
 					if GetUnitToUnitDistance(bot, botTarget) > castRange then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 					else
 						return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(0.5)
 					end

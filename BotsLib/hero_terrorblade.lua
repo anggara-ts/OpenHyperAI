@@ -42,7 +42,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -53,11 +54,16 @@ function X.MinionThink(hMinionUnit)
 		end
 	end
 end
-local reflectionAbility = SafeAbility(bot:GetAbilityByName("terrorblade_reflection"), "terrorblade_reflection", "terrorblade")
-local conjureImageAbility = SafeAbility(bot:GetAbilityByName("terrorblade_conjure_image"), "terrorblade_conjure_image", "terrorblade")
-local metamorphosisAbility = SafeAbility(bot:GetAbilityByName("terrorblade_metamorphosis"), "terrorblade_metamorphosis", "terrorblade")
-local demonZealAbility = SafeAbility(bot:GetAbilityByName("terrorblade_demon_zeal"), "terrorblade_demon_zeal", "terrorblade")
-local terrorWaveAbility = SafeAbility(bot:GetAbilityByName("terrorblade_terror_wave"), "terrorblade_terror_wave", "terrorblade")
+local reflectionAbility =
+	SafeAbility(bot:GetAbilityByName("terrorblade_reflection"), "terrorblade_reflection", "terrorblade")
+local conjureImageAbility =
+	SafeAbility(bot:GetAbilityByName("terrorblade_conjure_image"), "terrorblade_conjure_image", "terrorblade")
+local metamorphosisAbility =
+	SafeAbility(bot:GetAbilityByName("terrorblade_metamorphosis"), "terrorblade_metamorphosis", "terrorblade")
+local demonZealAbility =
+	SafeAbility(bot:GetAbilityByName("terrorblade_demon_zeal"), "terrorblade_demon_zeal", "terrorblade")
+local terrorWaveAbility =
+	SafeAbility(bot:GetAbilityByName("terrorblade_terror_wave"), "terrorblade_terror_wave", "terrorblade")
 local sunderAbility = SafeAbility(bot:GetAbilityByName("terrorblade_sunder"), "terrorblade_sunder", "terrorblade")
 local reflectionDesire, reflectionLocation
 local conjureImageDesire
@@ -193,7 +199,11 @@ function X.ConsiderConjureImage()
 	if Fu.IsRetreating(bot) then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE)
-		if nearbyAllies ~= nil and nearbyEnemies ~= nil and (#nearbyEnemies > #nearbyAllies or hpRatio < 0.5 and bot:WasRecentlyDamagedByAnyHero(2)) then
+		if
+			nearbyAllies ~= nil
+			and nearbyEnemies ~= nil
+			and (#nearbyEnemies > #nearbyAllies or hpRatio < 0.5 and bot:WasRecentlyDamagedByAnyHero(2))
+		then
 			return BOT_ACTION_DESIRE_MODERATE
 		end
 	end
@@ -265,7 +275,12 @@ function X.ConsiderSunder()
 	-- Review fix: Sunder went out even when the target's HP% was no higher than TB's (no gain).
 	-- Only swap when it actually gains TB health.
 	local swapTarget = Fu.GetMostHPPercent(enemiesInRange, true)
-	if hpRatio < 0.35 and swapTarget ~= nil and not Fu.IsSuspiciousIllusion(swapTarget) and Fu.GetHP(swapTarget) > hpRatio + 0.15 then
+	if
+		hpRatio < 0.35
+		and swapTarget ~= nil
+		and not Fu.IsSuspiciousIllusion(swapTarget)
+		and Fu.GetHP(swapTarget) > hpRatio + 0.15
+	then
 		return BOT_ACTION_DESIRE_HIGH, swapTarget
 	end
 	return BOT_ACTION_DESIRE_NONE, nil

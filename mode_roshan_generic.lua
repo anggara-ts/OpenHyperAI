@@ -65,13 +65,16 @@ end
 local unusedTimer = 0
 local lastLogTime = 0
 local function RoshLog(fmt, ...)
-	pcall(print, string.format(
-		"[OHA-ROSH] t=%.0f %s %s " .. fmt,
-		DotaTime(),
-		GetTeam() == TEAM_DIRE and "dire" or "radiant",
-		(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-		...
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ROSH] t=%.0f %s %s " .. fmt,
+			DotaTime(),
+			GetTeam() == TEAM_DIRE and "dire" or "radiant",
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			...
+		)
+	)
 end
 -- One line when this bot's Roshan desire turns on or off, with the reason.
 local function LogDesireChange(final)
@@ -276,7 +279,12 @@ local function EnemiesHeldAtBase()
 	end
 	local creeps = 0
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIED_CREEPS) or {}) do
-		if unit ~= nil and not unit:IsNull() and unit:IsAlive() and GetUnitToUnitDistance(unit, enemyAncient) <= 3000 then
+		if
+			unit ~= nil
+			and not unit:IsNull()
+			and unit:IsAlive()
+			and GetUnitToUnitDistance(unit, enemyAncient) <= 3000
+		then
 			creeps = creeps + 1
 		end
 	end
@@ -287,7 +295,11 @@ local function EnemiesHeldAtBase()
 		if IsHeroAlive(pid) then
 			local info = GetHeroLastSeenInfo(pid)
 			local lastSeen = info ~= nil and info[1] or nil
-			if lastSeen ~= nil and lastSeen.time_since_seen <= 5 and GetUnitToLocationDistance(enemyAncient, lastSeen.location) <= 3500 then
+			if
+				lastSeen ~= nil
+				and lastSeen.time_since_seen <= 5
+				and GetUnitToLocationDistance(enemyAncient, lastSeen.location) <= 3500
+			then
 				heldN = heldN + 1
 			end
 		end
@@ -357,7 +369,8 @@ local function TakeTimeNeeded(roshanLocation)
 			-- only made an ally across the map look too slow for every kill window.
 			local eta = ObjectiveTravel.Eta(ally, rally)
 			local secondsPerAttack = ally:GetSecondsPerAttack()
-			local hit = (secondsPerAttack ~= nil and secondsPerAttack > 0) and ally:GetAttackDamage() / secondsPerAttack or 0
+			local hit = (secondsPerAttack ~= nil and secondsPerAttack > 0) and ally:GetAttackDamage() / secondsPerAttack
+				or 0
 			etas[#etas + 1] = { eta = eta, dps = hit }
 		end
 	end
@@ -397,7 +410,9 @@ local function TakeFitsWindow(roshanLocation)
 	-- (15:12: called with 2 alive, 4 alive next think).
 	local need0 = TakeTimeNeeded(roshanLocation)
 	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
-	local everyone = math.max(0, Fu.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase()) + (killWindowState.fresh or 0) + back
+	local everyone = math.max(0, Fu.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase())
+		+ (killWindowState.fresh or 0)
+		+ back
 	if FreshTakeNumbers(alliesAlive, everyone, missing) then
 		return true, "no-window-needed"
 	end
@@ -422,7 +437,13 @@ local function RunningCallFits(roshanLocation)
 	local killWindowState = KillWindow.Tick()
 	local need0, eta0 = TakeTimeNeeded(roshanLocation)
 	local back = KillWindow.RespawningWithin and KillWindow.RespawningWithin(need0) or 0
-	if FreshTakeNumbers(alliesAlive, math.max(0, Fu.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase()) + (killWindowState.fresh or 0) + back, missing) then
+	if
+		FreshTakeNumbers(
+			alliesAlive,
+			math.max(0, Fu.GetNumOfAliveHeroes(true) - EnemiesHeldAtBase()) + (killWindowState.fresh or 0) + back,
+			missing
+		)
+	then
 		return true, "running-no-window-needed"
 	end
 	local left = KillWindow.WindowLeft()
@@ -441,7 +462,13 @@ local function Ret(desire, why, call)
 	return desire, call
 end
 function GetDesireHelper()
-	if bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() or not string.find(botName, "hero") or bot:IsIllusion() then
+	if
+		bot:IsInvulnerable()
+		or not bot:IsHero()
+		or not bot:IsAlive()
+		or not string.find(botName, "hero")
+		or bot:IsIllusion()
+	then
 		return Ret(BOT_MODE_DESIRE_NONE, "invalid")
 	end
 	local ourAncient = GetAncient(GetTeam())
@@ -491,7 +518,9 @@ function GetDesireHelper()
 		local safeFinish, finishWhy = IsRoshanEngageSafe(roshanLocation, true)
 		-- Finishing needs company in the pit, unless he can finish Roshan alone in about 5s.
 		local secondsPerAttack = bot:GetSecondsPerAttack()
-		local myDps = (secondsPerAttack ~= nil and secondsPerAttack > 0) and bot:GetAttackDamage() / secondsPerAttack * 0.5 or 0
+		local myDps = (secondsPerAttack ~= nil and secondsPerAttack > 0)
+				and bot:GetAttackDamage() / secondsPerAttack * 0.5
+			or 0
 		local soloFinish = Fu.Utils.IsValidUnit(roshan) and roshan:GetHealth() <= myDps * 5
 		if safeFinish and (alliesInPit >= 2 or soloFinish) then
 			local roshanHpRatio = roshan:GetHealth() / roshan:GetMaxHealth()
@@ -514,12 +543,20 @@ function GetDesireHelper()
 				hitting = hitting + 1
 			end
 		end
-		if hitting >= 2 and #(Fu.GetEnemiesNearLoc(roshanLocation, 1600) or {}) == 0 and bot._roshCommitUntil - DotaTime() < 8 then
+		if
+			hitting >= 2
+			and #(Fu.GetEnemiesNearLoc(roshanLocation, 1600) or {}) == 0
+			and bot._roshCommitUntil - DotaTime() < 8
+		then
 			bot._roshCommitUntil = DotaTime() + 10
 			if DotaTime() >= (bot._roshExtendLogAt or -999) then
 				bot._roshExtendLogAt = DotaTime() + 10
-				RoshLog("commit-extend hitting=%d inPit=%d roshHp=%.2f", hitting, alliesInPit,
-					roshan:GetHealth() / math.max(roshan:GetMaxHealth(), 1))
+				RoshLog(
+					"commit-extend hitting=%d inPit=%d roshHp=%.2f",
+					hitting,
+					alliesInPit,
+					roshan:GetHealth() / math.max(roshan:GetMaxHealth(), 1)
+				)
 			end
 		end
 	end
@@ -568,7 +605,11 @@ function GetDesireHelper()
 	local killWindowState = KillWindow.Tick()
 	-- The kill window stays open until a respawned enemy could be back at the pit.
 	local inTransit = KillWindow.EnemiesInTransit(KillWindow.TransitGrace(roshanLocation))
-	local killRosh = (killWindowState.fresh >= 1 or inTransit >= 1) and isRoshanAlive and hasEnoughDps and not Fu.IsEarlyGame() and DotaTime() > 8 * 60
+	local killRosh = (killWindowState.fresh >= 1 or inTransit >= 1)
+		and isRoshanAlive
+		and hasEnoughDps
+		and not Fu.IsEarlyGame()
+		and DotaTime() > 8 * 60
 	-- Hold a kill-window call for 8s: the fresh-kill / in-transit counts flicker, and a call
 	-- dropped as "too-early-no-kill" two seconds later was re-called five seconds after that.
 	if killRosh then
@@ -604,7 +645,8 @@ function GetDesireHelper()
 					return Ret(BOT_MODE_DESIRE_LOW, "human-invite")
 				else
 					humanInviteStartTime = 0
-					humanInviteCooldownUntil = DotaTime() + (Fu.IsModeTurbo() and humanInviteCooldownTurbo or humanInviteCooldown)
+					humanInviteCooldownUntil = DotaTime()
+						+ (Fu.IsModeTurbo() and humanInviteCooldownTurbo or humanInviteCooldown)
 					return Ret(BOT_MODE_DESIRE_NONE, "human-invite-expired")
 				end
 			else
@@ -800,7 +842,8 @@ function Think()
 	end
 	bot._roshThinkAt = now
 	bot._roshAckSet = bot._roshAckSet or {}
-	local grouped, pending, required, declined, coming = RoshanGather(roshanLocation, now - bot._roshGatherAt, bot._roshAckSet)
+	local grouped, pending, required, declined, coming =
+		RoshanGather(roshanLocation, now - bot._roshGatherAt, bot._roshAckSet)
 	local elapsed = now - bot._roshGatherAt
 	-- Nobody else acked: drop the call (no solo Roshan) and do not re-call for 30s.
 	if elapsed >= ACK_GRACE and required < 2 then

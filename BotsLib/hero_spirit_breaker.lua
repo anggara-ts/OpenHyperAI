@@ -77,7 +77,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -89,7 +90,8 @@ local chargeOfDarknessAbility = SafeAbility(
 	"spirit_breaker_charge_of_darkness",
 	"spirit_breaker"
 )
-local bulldozeAbility = SafeAbility(bot:GetAbilityByName("spirit_breaker_bulldoze"), "spirit_breaker_bulldoze", "spirit_breaker")
+local bulldozeAbility =
+	SafeAbility(bot:GetAbilityByName("spirit_breaker_bulldoze"), "spirit_breaker_bulldoze", "spirit_breaker")
 local greaterBashAbility =
 	SafeAbility(bot:GetAbilityByName("spirit_breaker_greater_bash"), "spirit_breaker_greater_bash", "spirit_breaker")
 local planarPocketAbility =
@@ -126,7 +128,11 @@ function X.SkillsComplement()
 	end
 	chargeOfDarknessDesire, chargeOfDarknessTarget = X.ConsiderChargeOfDarkness()
 	if chargeOfDarknessDesire > 0 then
-		if chargeOfDarknessAbility:GetLevel() >= 3 and bulldozeAbility:IsTrained() and bulldozeAbility:IsFullyCastable() then
+		if
+			chargeOfDarknessAbility:GetLevel() >= 3
+			and bulldozeAbility:IsTrained()
+			and bulldozeAbility:IsFullyCastable()
+		then
 			bot:Action_UseAbility(bulldozeAbility)
 		end
 		bot:Action_UseAbilityOnEntity(chargeOfDarknessAbility, chargeOfDarknessTarget)
@@ -151,7 +157,9 @@ function X.SkillsComplement()
 	end
 end
 function X.ConsiderChargeOfDarkness()
-	if not chargeOfDarknessAbility:IsFullyCastable() or bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") then
+	if
+		not chargeOfDarknessAbility:IsFullyCastable() or bot:HasModifier("modifier_spirit_breaker_charge_of_darkness")
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if not isRetreating then
@@ -175,7 +183,11 @@ function X.ConsiderChargeOfDarkness()
 		end
 	end
 	local teamFightLocation = Fu.GetTeamFightLocation(bot)
-	if teamFightLocation ~= nil and GetUnitToLocationDistance(bot, teamFightLocation) > 1600 and not Fu.IsInLaningPhase() then
+	if
+		teamFightLocation ~= nil
+		and GetUnitToLocationDistance(bot, teamFightLocation) > 1600
+		and not Fu.IsInLaningPhase()
+	then
 		-- Review fix: this charged nearbyEnemies[1], the nearest enemy within 1600 of Spirit Breaker, i.e. NOT
 		-- one at the fight (which is 1600+ away), and needed an enemy next to him to fire at all.
 		-- Charge (global cast range) an enemy hero standing at the fight instead.
@@ -189,7 +201,15 @@ function X.ConsiderChargeOfDarkness()
 				then
 					if DotaTime() - (X.lastChargeLog or -99) > 10 then
 						X.lastChargeLog = DotaTime()
-						pcall(print, string.format("[OHA-SB] t=%.0f charge-fight target=%s dist=%d", DotaTime(), enemyHero:GetUnitName(), GetUnitToUnitDistance(bot, enemyHero)))
+						pcall(
+							print,
+							string.format(
+								"[OHA-SB] t=%.0f charge-fight target=%s dist=%d",
+								DotaTime(),
+								enemyHero:GetUnitName(),
+								GetUnitToUnitDistance(bot, enemyHero)
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
@@ -213,7 +233,12 @@ function X.ConsiderChargeOfDarkness()
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 5, DAMAGE_TYPE_ALL)
-				if alliesNearTarget ~= nil and enemiesNearTarget and #alliesNearTarget >= #enemiesNearTarget and estimatedDamage > highestDamage then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget
+					and #alliesNearTarget >= #enemiesNearTarget
+					and estimatedDamage > highestDamage
+				then
 					highestDamage = estimatedDamage
 					bestTarget = enemyHero
 				end
@@ -223,7 +248,12 @@ function X.ConsiderChargeOfDarkness()
 			return BOT_ACTION_DESIRE_HIGH, bestTarget
 		end
 	end
-	if isRetreating and Fu.GetHP(bot) < 0.5 and Fu.IsValidHero(nearbyEnemies[1]) and Fu.IsInRange(bot, nearbyEnemies[1], 500) then
+	if
+		isRetreating
+		and Fu.GetHP(bot) < 0.5
+		and Fu.IsValidHero(nearbyEnemies[1])
+		and Fu.IsInRange(bot, nearbyEnemies[1], 500)
+	then
 		-- Review fix: the escape charge took the first creep 1600+ away in any direction, often
 		-- one deeper in enemy territory. Only charge a creep that is clearly nearer our escape spot.
 		local escape = Fu.GetEscapeLoc()
@@ -250,17 +280,25 @@ function X.ConsiderChargeOfDarkness()
 		end
 	end
 	if Fu.IsPushing(bot) then
-		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetCurrentVisionRange(), bashRadius, 0, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetCurrentVisionRange(), bashRadius, 0, 0)
 		local laneCreeps = bot:GetNearbyLaneCreeps(bashRadius, true)
 		if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
 			return BOT_ACTION_DESIRE_HIGH, laneCreeps[4]
 		end
 	end
 	if Fu.IsFarming(bot) then
-		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetCurrentVisionRange(), bashRadius, 0, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetCurrentVisionRange(), bashRadius, 0, 0)
 		if isAttacking and Fu.GetMP(bot) > 0.25 then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(bashRadius)
-			if neutralCreeps ~= nil and (#neutralCreeps >= 3 and aoeLocation.count >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2) then
+			if
+				neutralCreeps ~= nil
+				and (
+					#neutralCreeps >= 3 and aoeLocation.count >= 3
+					or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep() and aoeLocation.count >= 2
+				)
+			then
 				if Fu.CanBeAttacked(neutralCreeps[1]) then
 					return BOT_ACTION_DESIRE_HIGH, neutralCreeps[2]
 				end
@@ -325,7 +363,11 @@ function X.ConsiderChargeOfDarkness()
 				and not Fu.IsLocationInChrono(allyTarget:GetLocation())
 			then
 				local distance = GetUnitToUnitDistance(bot, allyTarget)
-				if (Fu.IsChasingTarget(allyHero, allyTarget) or Fu.IsAttacking(allyHero)) and distance > 600 and distance < 1900 then
+				if
+					(Fu.IsChasingTarget(allyHero, allyTarget) or Fu.IsAttacking(allyHero))
+					and distance > 600
+					and distance < 1900
+				then
 					-- fix: charge the ally's validated target allyTarget, not our own (possibly nil) botTarget
 					return BOT_ACTION_DESIRE_HIGH, allyTarget
 				end
@@ -415,7 +457,12 @@ function X.ConsiderNetherStrike()
 				local alliesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearTarget = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 5, DAMAGE_TYPE_ALL)
-				if alliesNearTarget ~= nil and enemiesNearTarget and #alliesNearTarget >= #enemiesNearTarget and estimatedDamage > highestDamage then
+				if
+					alliesNearTarget ~= nil
+					and enemiesNearTarget
+					and #alliesNearTarget >= #enemiesNearTarget
+					and estimatedDamage > highestDamage
+				then
 					highestDamage = estimatedDamage
 					bestTarget = enemyHero
 				end
@@ -428,7 +475,11 @@ function X.ConsiderNetherStrike()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function X.ConsiderPlanarPocket()
-	if not planarPocketAbility:IsTrained() or not planarPocketAbility:IsFullyCastable() or bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") then
+	if
+		not planarPocketAbility:IsTrained()
+		or not planarPocketAbility:IsFullyCastable()
+		or bot:HasModifier("modifier_spirit_breaker_charge_of_darkness")
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local radius = planarPocketAbility:GetSpecialValueInt("radius")
@@ -456,7 +507,11 @@ function X.ConsiderPlanarPocket()
 			end
 			-- no hurt ally: still cast for the magic resistance, on a nearby enemy hero
 			for _, enemyHero in pairs(enemiesInRadius) do
-				if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and not Fu.IsSuspiciousIllusion(enemyHero) then
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.IsInRange(bot, enemyHero, castRange)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				end
 			end

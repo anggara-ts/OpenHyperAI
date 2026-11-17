@@ -204,7 +204,9 @@ local function IsRepeatedPurchase(itemName)
 end
 local function HasEnoughTpScrolls()
 	local tpCharges = Item.GetItemCharges(bot, "item_tpscroll")
-	return tpCharges >= 2 or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots") or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots_2")
+	return tpCharges >= 2
+		or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots")
+		or tpCharges >= 1 and Item.HasItem(bot, "item_travel_boots_2")
 end
 local function FinishBasicItem()
 	bot.countInvCheck = 0
@@ -366,13 +368,7 @@ local function QueueRightclickCounters()
 				return
 			end
 		end
-		if
-			bAssigned
-			and bOwnLock
-			and not bTeamHex
-			and not bStr
-			and DotaTime() > 25 * 60
-		then
+		if bAssigned and bOwnLock and not bTeamHex and not bStr and DotaTime() > 25 * 60 then
 			local nHexPos = nil
 			for _, pos in ipairs({ 2, 3, 1 }) do
 				if IsLockdownBuyer(pos, tLockdownBotPositions, 2) and tLockdownStrByPos[pos] == false then
@@ -479,16 +475,19 @@ local function PreferBloodGrenadeOverBranch()
 				local it = bot:GetItemInSlot(slot)
 				pack[#pack + 1] = it ~= nil and (string.gsub(it:GetName(), "^item_", "")) or "-"
 			end
-			pcall(print, string.format(
-				"[OHA-ITEM] t=%.0f %s grenade-moved from=%d to=%d mode=%s main=%s pack=%s",
-				DotaTime(),
-				(string.gsub(botName, "npc_dota_hero_", "")),
-				bot._grenadeLastSlot or -1,
-				grenadeSlot,
-				tostring(bot:GetActiveMode()),
-				table.concat(main, ","),
-				table.concat(pack, ",")
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s grenade-moved from=%d to=%d mode=%s main=%s pack=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					bot._grenadeLastSlot or -1,
+					grenadeSlot,
+					tostring(bot:GetActiveMode()),
+					table.concat(main, ","),
+					table.concat(pack, ",")
+				)
+			)
 		end
 		bot._grenadeLastSlot = grenadeSlot
 	end
@@ -513,12 +512,15 @@ local function PreferBloodGrenadeOverBranch()
 	end
 	if bot._grenadeDroppedAt ~= nil and not bot._grenadeRepickLogged then
 		bot._grenadeRepickLogged = true
-		pcall(print, string.format(
-			"[OHA-ITEM] t=%.0f %s grenade-repicked after=%.0fs",
-			DotaTime(),
-			(string.gsub(botName, "npc_dota_hero_", "")),
-			DotaTime() - bot._grenadeDroppedAt
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s grenade-repicked after=%.0fs",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				DotaTime() - bot._grenadeDroppedAt
+			)
+		)
 	end
 	local how
 	if bot:DistanceFromFountain() <= 1600 then
@@ -533,13 +535,16 @@ local function PreferBloodGrenadeOverBranch()
 	end
 	if DotaTime() >= (bot._grenadeDisposeLogAt or -999) then
 		bot._grenadeDisposeLogAt = DotaTime() + 10
-		pcall(print, string.format(
-			"[OHA-ITEM] t=%.0f %s grenade-%s slot=%d",
-			DotaTime(),
-			(string.gsub(botName, "npc_dota_hero_", "")),
-			how,
-			grenadeSlot
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s grenade-%s slot=%d",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				how,
+				grenadeSlot
+			)
+		)
 	end
 end
 local function PromoteBackpackCounters()
@@ -599,12 +604,10 @@ local function ShortItem(name)
 end
 -- [OHA-BUY] lines: every purchase, and every recipe held back for a missing ingredient.
 local function BuyLog(fmt, ...)
-	pcall(print, string.format(
-		"[OHA-BUY] t=%.0f %s " .. fmt,
-		DotaTime(),
-		(string.gsub(botName, "npc_dota_hero_", "")),
-		...
-	))
+	pcall(
+		print,
+		string.format("[OHA-BUY] t=%.0f %s " .. fmt, DotaTime(), (string.gsub(botName, "npc_dota_hero_", "")), ...)
+	)
 end
 local function IsBasicItem(name)
 	if type(Item[name]) == "table" then
@@ -947,13 +950,23 @@ local function BuyBasicItem()
 					requiredGold = reserveTo
 					if DotaTime() >= (bot._bbHoldLogAt or -999) then
 						bot._bbHoldLogAt = DotaTime() + 30
-						BuyLog("hold-for-buyback item=%s gold=%d need=%d buyback=%d held=%.0fs",
-							ShortItem(bot.currBuyingBasicItem), bot:GetGold(), math.floor(reserveTo), bot:GetBuybackCost(), held)
+						BuyLog(
+							"hold-for-buyback item=%s gold=%d need=%d buyback=%d held=%.0fs",
+							ShortItem(bot.currBuyingBasicItem),
+							bot:GetGold(),
+							math.floor(reserveTo),
+							bot:GetBuybackCost(),
+							held
+						)
 					end
 				elseif not bot._bbHoldReleased then
 					bot._bbHoldReleased = true
-					BuyLog("hold-for-buyback released item=%s gold=%d after=%.0fs",
-						ShortItem(bot.currBuyingBasicItem), bot:GetGold(), held)
+					BuyLog(
+						"hold-for-buyback released item=%s gold=%d after=%.0fs",
+						ShortItem(bot.currBuyingBasicItem),
+						bot:GetGold(),
+						held
+					)
 				end
 			else
 				requiredGold = reserveTo
@@ -980,7 +993,11 @@ local function BuyBasicItem()
 		return
 	end
 	if bot:GetGold() >= requiredGold and bot:GetItemInSlot(14) == nil then
-		if DotaTime() < 20 and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1) and bot:DistanceFromSecretShop() > 300 then
+		if
+			DotaTime() < 20
+			and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1)
+			and bot:DistanceFromSecretShop() > 300
+		then
 			return
 		end
 		if courier == nil then
@@ -1092,7 +1109,11 @@ local function BuyBasicItemTurbo()
 		return
 	end
 	if bot:GetGold() >= requiredGold and bot:GetItemInSlot(14) == nil then
-		if DotaTime() < 20 and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1) and bot:DistanceFromSecretShop() > 300 then
+		if
+			DotaTime() < 20
+			and (bot:DistanceFromFountain() > 1000 or Item.GetEmptyInventoryAmount(bot) < 1)
+			and bot:DistanceFromSecretShop() > 300
+		then
 			return
 		end
 		local result = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
@@ -1753,7 +1774,11 @@ function ItemPurchaseThink()
 	-- Witch Doctor: when packed, consume Gris-Gris (right-click Consume == Action_UseAbility; not SellItem).
 	-- Skip early game — starting consumables fill the bag; keep Gris-Gris until ~15m (turbo ~9m).
 	local grisMinTime = (GetGameMode() == GAMEMODE_TURBO or GetGameMode() == 23) and (9 * 60) or (15 * 60)
-	if botName == "npc_dota_hero_witch_doctor" and now >= grisMinTime and now > (bot._grisPurchaseCheck or -100) + 2.0 then
+	if
+		botName == "npc_dota_hero_witch_doctor"
+		and now >= grisMinTime
+		and now > (bot._grisPurchaseCheck or -100) + 2.0
+	then
 		bot._grisPurchaseCheck = now
 		local mainEmpty = Item.GetEmptyNonBackpackInventoryAmount(bot)
 		local packEmpty = Utils.CountBackpackEmptySpace(bot)
@@ -1805,7 +1830,10 @@ function ItemPurchaseThink()
 		end
 	end
 	if
-		GetGameMode() ~= 23 and botLevel > 6 and now > bot.fullInvCheck + 1.0 and (fountainDistance <= 200 or bot:DistanceFromSecretShop() <= 200)
+		GetGameMode() ~= 23
+			and botLevel > 6
+			and now > bot.fullInvCheck + 1.0
+			and (fountainDistance <= 200 or bot:DistanceFromSecretShop() <= 200)
 		or GetGameMode() == 23 and botLevel > 9 and now > bot.fullInvCheck + 1.0
 	then
 		local emptyInventory = Item.GetEmptyInventoryAmount(bot)
@@ -1859,7 +1887,11 @@ function ItemPurchaseThink()
 		bot.fullInvCheck = now
 	end
 	local backpackEmpty = Utils.CountBackpackEmptySpace(bot)
-	if now > bot.sell_time + 0.5 and backpackEmpty <= 1 and (fountainDistance <= 100 or bot:DistanceFromSecretShop() <= 100) then
+	if
+		now > bot.sell_time + 0.5
+		and backpackEmpty <= 1
+		and (fountainDistance <= 100 or bot:DistanceFromSecretShop() <= 100)
+	then
 		bot.sell_time = now
 		SetPairedItems(Item.sSellList)
 		SetPairedItems(sellList)
@@ -1869,7 +1901,8 @@ function ItemPurchaseThink()
 			end
 		end
 		if
-			(now > 18 * 60 or netWorth > 20000) and (Item.HasItem(bot, "item_travel_boots") or Item.HasItem(bot, "item_travel_boots_2"))
+			(now > 18 * 60 or netWorth > 20000)
+			and (Item.HasItem(bot, "item_travel_boots") or Item.HasItem(bot, "item_travel_boots_2"))
 		then
 			for i = 1, #Item["tEarlyBoots"] do
 				local bootsSlot = bot:FindItemSlot(Item["tEarlyBoots"][i])
@@ -1921,11 +1954,7 @@ function ItemPurchaseThink()
 			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
-				if
-					name == "item_famango"
-					or name == "item_great_famango"
-					or name == "item_greater_famango"
-				then
+				if name == "item_famango" or name == "item_great_famango" or name == "item_greater_famango" then
 					return name, slot, it
 				end
 			end
@@ -1937,11 +1966,7 @@ function ItemPurchaseThink()
 			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
-				if
-					name == "item_foragers_health"
-					or name == "item_foragers_stats"
-					or name == "item_foragers_mana"
-				then
+				if name == "item_foragers_health" or name == "item_foragers_stats" or name == "item_foragers_mana" then
 					return name, slot, it
 				end
 			end
@@ -1970,15 +1995,18 @@ function ItemPurchaseThink()
 				-- and this step never logged a use. Log each try (once per 15s).
 				if now >= (bot._forageLogAt or -999) then
 					bot._forageLogAt = now + 15
-					pcall(print, string.format(
-						"[OHA-FORAGE] t=%.0f %s swap %s slot%d->%d moved=%s",
-						now,
-						(string.gsub(botName, "npc_dota_hero_", "")),
-						forageName,
-						forageSlot,
-						dest,
-						moved ~= nil and not moved:IsNull() and moved:GetName() or "-"
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-FORAGE] t=%.0f %s swap %s slot%d->%d moved=%s",
+							now,
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							forageName,
+							forageSlot,
+							dest,
+							moved ~= nil and not moved:IsNull() and moved:GetName() or "-"
+						)
+					)
 				end
 				if moved ~= nil and not moved:IsNull() and moved:GetName() == forageName then
 					MatchTrace.Buy(bot, forageName, "backpack forage swap and use")
@@ -2004,7 +2032,10 @@ function ItemPurchaseThink()
 			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
-				if name == "item_enchanted_mango" or name == "item_clarity" and not bot:WasRecentlyDamagedByAnyHero(4.0) then
+				if
+					name == "item_enchanted_mango"
+					or name == "item_clarity" and not bot:WasRecentlyDamagedByAnyHero(4.0)
+				then
 					manaSlot, manaName = slot, name
 					if name == "item_enchanted_mango" then
 						break
@@ -2049,17 +2080,20 @@ function ItemPurchaseThink()
 			-- [OHA-MANA] unverified: whether the swap lands (swaps were often no-ops in earlier builds).
 			-- moved= shows what sits in the main slot right after the order.
 			local moved = dest ~= nil and bot:GetItemInSlot(dest) or nil
-			pcall(print, string.format(
-				"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s mp=%.2f",
-				now,
-				(string.gsub(botName, "npc_dota_hero_", "")),
-				(string.gsub(manaName, "item_", "")),
-				manaSlot,
-				dest ~= nil and tostring(dest) or "none",
-				out ~= nil and not out:IsNull() and (string.gsub(out:GetName(), "item_", "")) or "-",
-				moved ~= nil and not moved:IsNull() and (string.gsub(moved:GetName(), "item_", "")) or "-",
-				Fu.GetMP(bot)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-MANA] t=%.0f %s backpack %s slot%d->%s out=%s moved=%s mp=%.2f",
+					now,
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					(string.gsub(manaName, "item_", "")),
+					manaSlot,
+					dest ~= nil and tostring(dest) or "none",
+					out ~= nil and not out:IsNull() and (string.gsub(out:GetName(), "item_", "")) or "-",
+					moved ~= nil and not moved:IsNull() and (string.gsub(moved:GetName(), "item_", "")) or "-",
+					Fu.GetMP(bot)
+				)
+			)
 		end
 	end
 	-- A lotus in the backpack is never cast. Hand it to a support, swap it out and use it, or drop it.
@@ -2238,11 +2272,7 @@ function ItemPurchaseThink()
 			bot.currBuyingBasicItemRefList = resume.ref
 			bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
 			bot._recipeTarget = resume.target or {}
-			BuyLog(
-				"resume %s left=%d",
-				ShortItem(bot.currBuyingItemInPurchaseList),
-				#bot.currBuyingBasicItemList
-			)
+			BuyLog("resume %s left=%d", ShortItem(bot.currBuyingItemInPurchaseList), #bot.currBuyingBasicItemList)
 			NextBasicItem()
 			return
 		end
@@ -2393,9 +2423,11 @@ local function NeededLater(name)
 		-- held Helm of Iron Will was not seen as a Crimson Guard part, marked unused and sold, then
 		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). An owned-count
 		-- table that is always 0 makes it list every basic part.
-		local none = setmetatable({}, { __index = function()
-			return 0
-		end })
+		local none = setmetatable({}, {
+			__index = function()
+				return 0
+			end,
+		})
 		local ok, parts = pcall(Item.GetBasicItems, { it }, none)
 		if ok and type(parts) == "table" then
 			for _, part in ipairs(parts) do
@@ -2450,11 +2482,14 @@ function SellMarkedItems()
 		return
 	end
 	bot._sellMarkAt = now
-	local fountainDist, secretShopDist, sideShopDist = bot:DistanceFromFountain(), bot:DistanceFromSecretShop(), bot:DistanceFromSideShop()
+	local fountainDist, secretShopDist, sideShopDist =
+		bot:DistanceFromFountain(), bot:DistanceFromSecretShop(), bot:DistanceFromSideShop()
 	-- DistanceFromSideShop() is -2147483648 on this map (no side shops; game 018 sell-failed
 	-- lines), so "<= 200" passed everywhere and sells were tried far from any shop. Only a real,
 	-- non-negative distance counts.
-	local atShop = (fountainDist >= 0 and fountainDist <= 500) or (secretShopDist >= 0 and secretShopDist <= 200) or (sideShopDist >= 0 and sideShopDist <= 200)
+	local atShop = (fountainDist >= 0 and fountainDist <= 500)
+		or (secretShopDist >= 0 and secretShopDist <= 200)
+		or (sideShopDist >= 0 and sideShopDist <= 200)
 	-- Something waits to be sold: the fountain TP-out rule holds while this is set (game 031,
 	-- 66:48: Medusa walked home to 1942 from the fountain and teleported out at once, and kept her
 	-- Power Treads next to Boots of Travel; the sale needs the fountain within 500).
@@ -2490,22 +2525,25 @@ function SellMarkedItems()
 				end
 				return "?"
 			end
-			pcall(print, string.format(
-				"[OHA-ITEM] t=%.0f %s sell-failed %s slot=%d at=%.0f,%.0f fountain=%d secret=%d side=%d shops secret=%s secret2=%s side=%s side2=%s",
-				now,
-				(string.gsub(botName, "npc_dota_hero_", "")),
-				(string.gsub(last.name, "^item_", "")),
-				slot0,
-				myLocation.x,
-				myLocation.y,
-				math.floor(fountainDist),
-				math.floor(secretShopDist),
-				math.floor(sideShopDist),
-				shopAt(SHOP_SECRET),
-				shopAt(SHOP_SECRET2),
-				shopAt(SHOP_SIDE),
-				shopAt(SHOP_SIDE2)
-			))
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s sell-failed %s slot=%d at=%.0f,%.0f fountain=%d secret=%d side=%d shops secret=%s secret2=%s side=%s side2=%s",
+					now,
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					(string.gsub(last.name, "^item_", "")),
+					slot0,
+					myLocation.x,
+					myLocation.y,
+					math.floor(fountainDist),
+					math.floor(secretShopDist),
+					math.floor(sideShopDist),
+					shopAt(SHOP_SECRET),
+					shopAt(SHOP_SECRET2),
+					shopAt(SHOP_SIDE),
+					shopAt(SHOP_SIDE2)
+				)
+			)
 		end
 	end
 	for name, why in pairs(MarkedForSale()) do

@@ -51,7 +51,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_str_carry" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -127,7 +128,12 @@ function X.ConsiderQ()
 	local enemiesInBonusRange = Fu.GetNearbyHeroes(bot, castRange + 350, true, BOT_MODE_NONE)
 	local nearbyCreeps = bot:GetNearbyCreeps(castRange + 43, true)
 	for _, enemyHero in pairs(enemiesInBonusRange) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) and not Fu.IsDisabled(enemyHero) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+			and not Fu.IsDisabled(enemyHero)
+		then
 			if enemyHero:IsChanneling() or Fu.CanKillTarget(enemyHero, damage, damageType) then
 				local boltTarget = nil
 				local unitsInRange = Fu.CombineTwoTable(enemiesInRange, nearbyCreeps)
@@ -216,7 +222,10 @@ function X.ConsiderQ()
 		for _, enemyHero in pairs(enemiesInRange) do
 			if
 				Fu.IsValid(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or mpRatio > 0.8 or GetUnitToUnitDistance(bot, enemyHero) <= 400)
+				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or mpRatio > 0.8 or GetUnitToUnitDistance(
+					bot,
+					enemyHero
+				) <= 400)
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
 				and Fu.CanCastOnTargetAdvanced(enemyHero)
 				and not Fu.IsDisabled(enemyHero)
@@ -230,7 +239,11 @@ function X.ConsiderQ()
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(700)
 		if #neutralCreeps >= 3 then
 			for _, creep in pairs(neutralCreeps) do
-				if Fu.IsValid(creep) and Fu.IsInRange(creep, bot, castRange) and Fu.GetAroundTargetEnemyUnitCount(creep, boltRadius) >= 3 then
+				if
+					Fu.IsValid(creep)
+					and Fu.IsInRange(creep, bot, castRange)
+					and Fu.GetAroundTargetEnemyUnitCount(creep, boltRadius) >= 3
+				then
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -282,7 +295,12 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, botTarget, ""
 		end
 	end
-	if bot:WasRecentlyDamagedByAnyHero(3.0) and bot:GetActiveMode() ~= BOT_MODE_RETREAT and #enemiesInRange >= 1 and botLevel >= 7 then
+	if
+		bot:WasRecentlyDamagedByAnyHero(3.0)
+		and bot:GetActiveMode() ~= BOT_MODE_RETREAT
+		and #enemiesInRange >= 1
+		and botLevel >= 7
+	then
 		for _, enemyHero in pairs(enemiesInRange) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -359,11 +377,20 @@ function X.ConsiderE()
 	if allyCount >= requiredAllies and #allyEnemies >= 1 and weakestAlly:WasRecentlyDamagedByAnyHero(4.0) then
 		return BOT_ACTION_DESIRE_HIGH
 	end
-	if Fu.IsRetreating(weakestAlly) and weakestAlly:GetHealth() < 800 and Fu.IsRunning(weakestAlly) and weakestAlly:WasRecentlyDamagedByAnyHero(3.0) then
+	if
+		Fu.IsRetreating(weakestAlly)
+		and weakestAlly:GetHealth() < 800
+		and Fu.IsRunning(weakestAlly)
+		and weakestAlly:WasRecentlyDamagedByAnyHero(3.0)
+	then
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, 600) and bot:IsFacingLocation(botTarget:GetLocation(), 15) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, 600)
+			and bot:IsFacingLocation(botTarget:GetLocation(), 15)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -435,7 +462,15 @@ function X.SvenConsiderTarget()
 	then
 		if DotaTime() - (X.lastRetargetLog or -99) > 10 then
 			X.lastRetargetLog = DotaTime()
-			pcall(print, string.format("[OHA-SVEN] t=%.0f retarget from=%s to=%s", DotaTime(), botTarget:GetUnitName(), newTarget:GetUnitName()))
+			pcall(
+				print,
+				string.format(
+					"[OHA-SVEN] t=%.0f retarget from=%s to=%s",
+					DotaTime(),
+					botTarget:GetUnitName(),
+					newTarget:GetUnitName()
+				)
+			)
 		end
 		bot:SetTarget(newTarget)
 		return

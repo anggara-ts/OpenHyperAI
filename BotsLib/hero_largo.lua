@@ -12,7 +12,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 -- Catchy Lick maxed first, Frogstomp second, Croak of Genius last (Dotabuff most picked order).
-local tAllAbilityBuildList = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 }, { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_5" then
@@ -114,7 +115,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -123,11 +125,14 @@ function X.MinionThink(hMinionUnit)
 end
 local catchyLickAbility = SafeAbility(bot:GetAbilityByName("largo_catchy_lick"), "largo_catchy_lick", "largo")
 local frogstompAbility = SafeAbility(bot:GetAbilityByName("largo_frogstomp"), "largo_frogstomp", "largo")
-local croakOfGeniusAbility = SafeAbility(bot:GetAbilityByName("largo_croak_of_genius"), "largo_croak_of_genius", "largo")
-local amphibianRhapsodyAbility = SafeAbility(bot:GetAbilityByName("largo_amphibian_rhapsody"), "largo_amphibian_rhapsody", "largo")
+local croakOfGeniusAbility =
+	SafeAbility(bot:GetAbilityByName("largo_croak_of_genius"), "largo_croak_of_genius", "largo")
+local amphibianRhapsodyAbility =
+	SafeAbility(bot:GetAbilityByName("largo_amphibian_rhapsody"), "largo_amphibian_rhapsody", "largo")
 local fightSongAbility = SafeAbility(bot:GetAbilityByName("largo_song_fight_song"), "largo_song_fight_song", "largo")
 local doubleTimeAbility = SafeAbility(bot:GetAbilityByName("largo_song_double_time"), "largo_song_double_time", "largo")
-local goodVibrationsAbility = SafeAbility(bot:GetAbilityByName("largo_song_good_vibrations"), "largo_song_good_vibrations", "largo")
+local goodVibrationsAbility =
+	SafeAbility(bot:GetAbilityByName("largo_song_good_vibrations"), "largo_song_good_vibrations", "largo")
 local catchyLickDesire, catchyLickTarget
 local frogstompDesire, frogstompLocation
 local croakOfGeniusDesire, croakOfGeniusTarget
@@ -215,7 +220,8 @@ function X.ConsiderCatchLick()
 					and not allyTarget:IsFacingLocation(allyHero:GetLocation(), 40)
 					and #nearbyAllies >= 3
 				then
-					local lineInfo = PointToLineDistance(allyTarget:GetLocation(), allyHero:GetLocation(), bot:GetLocation())
+					local lineInfo =
+						PointToLineDistance(allyTarget:GetLocation(), allyHero:GetLocation(), bot:GetLocation())
 					if lineInfo and lineInfo.within and lineInfo.distance <= 600 then
 						return BOT_ACTION_DESIRE_HIGH, allyHero
 					end
@@ -267,7 +273,8 @@ function X.ConsiderCatchLick()
 				-- Stun only when the lick is a strong dispel: it is a basic dispel (strong_dispel 0 in the
 				-- game KV, no talent changes it) and a stun needs a strong dispel, so licking a stunned
 				-- ally only moved it and wasted the cast.
-				or catchyLickAbility:GetSpecialValueInt("strong_dispel") > 0 and Fu.GetModifierTime(allyHero, "modifier_stunned") > 2
+				or catchyLickAbility:GetSpecialValueInt("strong_dispel") > 0
+					and Fu.GetModifierTime(allyHero, "modifier_stunned") > 2
 			then
 				return BOT_ACTION_DESIRE_HIGH, allyHero
 			end
@@ -421,7 +428,13 @@ function X.ConsiderFrogstomp()
 		end
 	end
 	local nearbyCreeps = bot:GetNearbyCreeps(Min(castRange + 300, 1600), true)
-	if Fu.IsPushing(bot) and #nearbyAllies <= 2 and isAttacking and manaAfter > manaThreshold and #nearbyEnemies == 0 then
+	if
+		Fu.IsPushing(bot)
+		and #nearbyAllies <= 2
+		and isAttacking
+		and manaAfter > manaThreshold
+		and #nearbyEnemies == 0
+	then
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
@@ -435,7 +448,10 @@ function X.ConsiderFrogstomp()
 		for _, creep in pairs(nearbyCreeps) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) and not Fu.IsRunning(creep) then
 				local aoeLocation = bot:FindAoELocation(true, false, creep:GetLocation(), 0, radius, 0, 0)
-				if aoeLocation.count >= 4 or aoeLocation.count >= 3 and string.find(creep:GetUnitName(), "upgraded") then
+				if
+					aoeLocation.count >= 4
+					or aoeLocation.count >= 3 and string.find(creep:GetUnitName(), "upgraded")
+				then
 					return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 				end
 			end
@@ -456,12 +472,23 @@ function X.ConsiderFrogstomp()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanBeAttacked(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and manaAfter > manaThreshold then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > manaThreshold
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking and manaAfter > manaThreshold then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+			and manaAfter > manaThreshold
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -488,7 +515,11 @@ function X.ConsiderCroakOfGenius()
 			and not allyHero:HasModifier("modifier_teleporting")
 		then
 			local allyTarget = Fu.GetProperTarget(allyHero)
-			if Fu.IsValidHero(allyTarget) and Fu.CanBeAttacked(allyTarget) and not Fu.IsSuspiciousIllusion(allyTarget) then
+			if
+				Fu.IsValidHero(allyTarget)
+				and Fu.CanBeAttacked(allyTarget)
+				and not Fu.IsSuspiciousIllusion(allyTarget)
+			then
 				local estimatedDamage = allyHero:GetEstimatedDamageToTarget(true, allyTarget, 5.0, DAMAGE_TYPE_MAGICAL)
 				if estimatedDamage > bestDamage then
 					bestAlly = allyHero
@@ -607,7 +638,11 @@ function X.ConsiderAmphibianRhapsody()
 			end
 			if bot ~= allyHero and Fu.IsCore(allyHero) and mpRatio > manaThreshold + 0.1 then
 				if Fu.IsDoingRoshan(allyHero) and Fu.IsDoingRoshan(bot) then
-					if Fu.IsRoshan(allyTarget) and Fu.CanBeAttacked(allyTarget) and Fu.IsInRange(allyHero, allyTarget, 1200) then
+					if
+						Fu.IsRoshan(allyTarget)
+						and Fu.CanBeAttacked(allyTarget)
+						and Fu.IsInRange(allyHero, allyTarget, 1200)
+					then
 						if not isToggledOn and Fu.IsAttacking(allyHero) then
 							return BOT_ACTION_DESIRE_HIGH
 						else
@@ -649,7 +684,8 @@ end
 function X.Strum(firstSong, secondSong)
 	local gracePeriod = amphibianRhapsodyAbility:GetSpecialValueFloat("rhythm_grace_period")
 	local now = DotaTime()
-	local isInWindow = songState.strumTime == 0 or now >= songState.strumTime - gracePeriod and now <= songState.strumTime + gracePeriod
+	local isInWindow = songState.strumTime == 0
+		or now >= songState.strumTime - gracePeriod and now <= songState.strumTime + gracePeriod
 	if isInWindow and not songState.wasInWindow then
 		if firstSong and secondSong == nil then
 			bot:Action_UseAbility(firstSong)

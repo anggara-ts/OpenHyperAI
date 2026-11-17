@@ -66,7 +66,12 @@ function X.ConsiderColdFeet()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 150, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -211,7 +216,12 @@ function X.ConsiderIceVortex()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -226,7 +236,8 @@ function X.ConsiderChillingTouch()
 	if not chillingTouchAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local castRange = Fu.GetProperCastRange(false, bot, chillingTouchAbility:GetCastRange()) + chillingTouchAbility:GetSpecialValueInt("attack_range_bonus")
+	local castRange = Fu.GetProperCastRange(false, bot, chillingTouchAbility:GetCastRange())
+		+ chillingTouchAbility:GetSpecialValueInt("attack_range_bonus")
 	local damage = chillingTouchAbility:GetSpecialValueInt("damage")
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 150, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
@@ -247,7 +258,12 @@ function X.ConsiderChillingTouch()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 150, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -308,7 +324,12 @@ function X.ConsiderChillingTouch()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.IsAttacking(bot) then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.IsAttacking(bot)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -356,7 +377,10 @@ function X.ConsiderIceBlastRelease()
 	local linearProjectiles = GetLinearProjectiles()
 	for _, projectile in pairs(linearProjectiles) do
 		if projectile ~= nil and projectile.ability:GetName() == "ancient_apparition_ice_blast" then
-			if iceBlastCastLocation ~= nil and Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location) < 100 then
+			if
+				iceBlastCastLocation ~= nil
+				and Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location) < 100
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

@@ -164,7 +164,9 @@ local function installPositioning(Fu)
 		return vector
 	end
 	function Fu.GetDistance(first, second)
-		return math.sqrt((first[1] - second[1]) * (first[1] - second[1]) + (first[2] - second[2]) * (first[2] - second[2]))
+		return math.sqrt(
+			(first[1] - second[1]) * (first[1] - second[1]) + (first[2] - second[2]) * (first[2] - second[2])
+		)
 	end
 	function Fu.IsHeroBetweenMeAndLocation(unit, location, radius)
 		local startLocation = unit:GetLocation()
@@ -368,8 +370,14 @@ local function installPositioning(Fu)
 					lineA = -(treeLocation.y - botLocation.y) / (treeLocation.x - botLocation.x)
 					lineC = -(treeLocation.y + treeLocation.x * lineA)
 				end
-				local distanceToLine = math.abs((lineA * targetLocation.x + lineB * targetLocation.y + lineC) / math.sqrt(lineA * lineA + lineB * lineB))
-				if distanceToLine <= radius and GetUnitToLocationDistance(bot, loc) > Fu.GetDistance(treeLocation, loc) + 50 then
+				local distanceToLine = math.abs(
+					(lineA * targetLocation.x + lineB * targetLocation.y + lineC)
+						/ math.sqrt(lineA * lineA + lineB * lineB)
+				)
+				if
+					distanceToLine <= radius
+					and GetUnitToLocationDistance(bot, loc) > Fu.GetDistance(treeLocation, loc) + 50
+				then
 					return true
 				end
 			end
@@ -427,11 +435,15 @@ local function installPositioning(Fu)
 					lineA = -(treeLocation.y - botLocation.y) / (treeLocation.x - botLocation.x)
 					lineC = -(treeLocation.y + treeLocation.x * lineA)
 				end
-				local distanceToLine = math.abs((lineA * targetLocation.x + lineB * targetLocation.y + lineC) / math.sqrt(lineA * lineA + lineB * lineB))
+				local distanceToLine = math.abs(
+					(lineA * targetLocation.x + lineB * targetLocation.y + lineC)
+						/ math.sqrt(lineA * lineA + lineB * lineB)
+				)
 				if
 					distanceToLine <= radius
 					and minDistance > GetUnitToLocationDistance(target, treeLocation)
-					and GetUnitToLocationDistance(target, treeLocation) <= GetUnitToLocationDistance(bot, treeLocation)
+					and GetUnitToLocationDistance(target, treeLocation)
+						<= GetUnitToLocationDistance(bot, treeLocation)
 				then
 					bestTree = tree
 					minDistance = GetUnitToLocationDistance(target, treeLocation)
@@ -449,8 +461,10 @@ local function installPositioning(Fu)
 		local botLocation = bot:GetLocation()
 		local targetLocation = target:GetLocation()
 		local quadA = velocity.x * velocity.x + velocity.y * velocity.y - projectileSpeed * projectileSpeed
-		local quadB = -2 * (velocity.x * (botLocation.x - targetLocation.x) + velocity.y * (botLocation.y - targetLocation.y))
-		local quadC = (botLocation.x - targetLocation.x) * (botLocation.x - targetLocation.x) + (botLocation.y - targetLocation.y) * (botLocation.y - targetLocation.y)
+		local quadB = -2
+			* (velocity.x * (botLocation.x - targetLocation.x) + velocity.y * (botLocation.y - targetLocation.y))
+		local quadC = (botLocation.x - targetLocation.x) * (botLocation.x - targetLocation.x)
+			+ (botLocation.y - targetLocation.y) * (botLocation.y - targetLocation.y)
 		local hitTime = math.max(
 			(-quadB + math.sqrt(quadB * quadB - 4 * quadA * quadC)) / (2 * quadA),
 			(-quadB - math.sqrt(quadB * quadB - 4 * quadA * quadC)) / (2 * quadA)

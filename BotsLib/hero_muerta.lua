@@ -63,7 +63,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -148,7 +149,11 @@ function X.ConsiderTarget()
 	local weakestUnit = Fu.GetAttackableWeakestUnit(bot, searchRange, true, true)
 	local currentTarget = Fu.GetProperTarget(bot)
 	local newTarget = nil
-	if Fu.IsValidHero(currentTarget) and GetUnitToUnitDistance(currentTarget, bot) > searchRange and Fu.IsValidHero(weakestUnit) then
+	if
+		Fu.IsValidHero(currentTarget)
+		and GetUnitToUnitDistance(currentTarget, bot) > searchRange
+		and Fu.IsValidHero(weakestUnit)
+	then
 		newTarget = weakestUnit
 		bot:SetTarget(newTarget)
 		return
@@ -187,7 +192,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.CanCastOnTargetAdvanced(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.CanCastOnTargetAdvanced(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget, "Q-Attack"
 		end
 	end
@@ -257,9 +266,14 @@ function X.ConsiderW()
 			and Fu.IsInRange(botTarget, bot, castRange + 300)
 			and (abilityLevel >= 3 or bot:GetMana() >= minManaForCalling)
 		then
-			if botTarget:IsFacingLocation(Fu.GetEnemyFountain(), 30) and Fu.GetHP(botTarget) < 0.4 and Fu.IsRunning(botTarget) then
+			if
+				botTarget:IsFacingLocation(Fu.GetEnemyFountain(), 30)
+				and Fu.GetHP(botTarget) < 0.4
+				and Fu.IsRunning(botTarget)
+			then
 				for offset = 0, 800, 200 do
-					local location = Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius + 800 - offset)
+					local location =
+						Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius + 800 - offset)
 					if GetUnitToLocationDistance(bot, location) <= castRange + 200 then
 						return BOT_ACTION_DESIRE_HIGH, location
 					end
@@ -287,7 +301,8 @@ function X.ConsiderW()
 				end
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetUnitTowardDistanceLocation(bot, botTarget, distance)
 			end
-			return BOT_ACTION_DESIRE_HIGH, Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius / 2)
+			return BOT_ACTION_DESIRE_HIGH,
+				Fu.GetLocationTowardDistanceLocation(botTarget, Fu.GetEnemyFountain(), radius / 2)
 		end
 	end
 	if Fu.IsRetreating(bot) and not bot:IsInvisible() then
@@ -298,7 +313,11 @@ function X.ConsiderW()
 		if bot:GetActiveModeDesire() > 0.8 then
 			local nearbyEnemies = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
 			for _, enemyHero in pairs(nearbyEnemies) do
-				if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 2.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+				if
+					Fu.IsValid(enemyHero)
+					and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+				then
 					local location = (botLocation + enemyHero:GetLocation()) / 2
 					return BOT_ACTION_DESIRE_HIGH, location
 				end
@@ -307,7 +326,11 @@ function X.ConsiderW()
 	end
 	if Fu.IsFarming(bot) and bot:GetMana() >= minManaForCalling then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(800)
-		if #neutralCreeps >= 4 and Fu.IsValid(botTarget) and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 3.88, DAMAGE_TYPE_PHYSICAL) then
+		if
+			#neutralCreeps >= 4
+			and Fu.IsValid(botTarget)
+			and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 3.88, DAMAGE_TYPE_PHYSICAL)
+		then
 			local creepAoe = bot:FindAoELocation(true, false, botLocation, castRange, radius, 0.8, 0)
 			if creepAoe.count >= 5 then
 				return BOT_ACTION_DESIRE_HIGH, creepAoe.targetloc
@@ -352,7 +375,12 @@ function X.ConsiderR()
 	-- not magic immune (Pierce the Veil turns her attacks into magic damage, datafeed).
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = Fu.GetProperTarget(bot)
-		if Fu.IsValidHero(target) and Fu.IsInRange(target, bot, attackRange + 50) and not target:IsMagicImmune() and not Fu.IsSuspiciousIllusion(target) then
+		if
+			Fu.IsValidHero(target)
+			and Fu.IsInRange(target, bot, attackRange + 50)
+			and not target:IsMagicImmune()
+			and not Fu.IsSuspiciousIllusion(target)
+		then
 			local targetHpRatio = Fu.GetHP(target)
 			if targetHpRatio >= 0.4 and targetHpRatio <= 0.9 then
 				return BOT_ACTION_DESIRE_HIGH
@@ -406,7 +434,11 @@ function X.ConsiderAS()
 		for _, enemyHero in pairs(nearbyEnemies) do
 			if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
 				targetableCount = targetableCount + 1
-				if Fu.CanCastOnTargetAdvanced(enemyHero) and not Fu.IsDisabled(enemyHero) and not enemyHero:IsDisarmed() then
+				if
+					Fu.CanCastOnTargetAdvanced(enemyHero)
+					and not Fu.IsDisabled(enemyHero)
+					and not enemyHero:IsDisarmed()
+				then
 					local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 6.0, DAMAGE_TYPE_ALL)
 					if estimatedDamage > highestDamage then
 						highestDamage = estimatedDamage

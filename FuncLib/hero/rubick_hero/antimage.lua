@@ -100,7 +100,11 @@ function X.ConsiderBlink()
 		then
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
 				local blinkLocation = botTarget:GetExtrapolatedLocation(castPoint + 0.53)
 				if GetUnitToUnitDistance(bot, botTarget) > castRange then
 					blinkLocation = Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
@@ -137,9 +141,14 @@ function X.ConsiderBlink()
 				if
 					enemyNearbyEnemies ~= nil
 					and enemyNearbyAllies ~= nil
-					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(2) or Fu.GetHP(bot) < 0.2 and Fu.IsChasingTarget(enemyHero, bot))
+					and (
+						#enemyNearbyAllies > #enemyNearbyEnemies
+						or bot:WasRecentlyDamagedByAnyHero(2)
+						or Fu.GetHP(bot) < 0.2 and Fu.IsChasingTarget(enemyHero, bot)
+					)
 				then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange)
 				end
 			end
 		end
@@ -274,7 +283,11 @@ function X.ConsiderManaVoid()
 			local targetNearbyEnemies = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local targetNearbyAllies = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			local damage = damagePerMana * (botTarget:GetMaxMana() - botTarget:GetMana())
-			if targetNearbyEnemies ~= nil and targetNearbyAllies ~= nil and #targetNearbyEnemies >= #targetNearbyAllies then
+			if
+				targetNearbyEnemies ~= nil
+				and targetNearbyAllies ~= nil
+				and #targetNearbyEnemies >= #targetNearbyAllies
+			then
 				if Fu.CanKillTarget(botTarget, damage, DAMAGE_TYPE_MAGICAL) then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
 				end
@@ -328,7 +341,12 @@ function X.ConsiderBlinkFragment()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and #enemyNearbyEnemies >= #enemyNearbyAllies and targetHealth < enemyHero:GetHealth() then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and #enemyNearbyEnemies >= #enemyNearbyAllies
+					and targetHealth < enemyHero:GetHealth()
+				then
 					targetHealth = enemyHero:GetHealth()
 					blinkTarget = enemyHero
 				end
@@ -350,7 +368,11 @@ function X.ConsiderBlinkFragment()
 			then
 				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if enemyNearbyEnemies ~= nil and enemyNearbyAllies ~= nil and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(1.2)) then
+				if
+					enemyNearbyEnemies ~= nil
+					and enemyNearbyAllies ~= nil
+					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(1.2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end

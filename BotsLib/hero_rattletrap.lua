@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 }, { 2, 1, 2, 3, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_4" then
@@ -68,18 +69,23 @@ X["sSellList"] = { "item_heavens_halberd", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local batteryAssaultAbility = SafeAbility(bot:GetAbilityByName("rattletrap_battery_assault"), "rattletrap_battery_assault", "rattletrap")
-local powerCogsAbility = SafeAbility(bot:GetAbilityByName("rattletrap_power_cogs"), "rattletrap_power_cogs", "rattletrap")
-local rocketFlareAbility = SafeAbility(bot:GetAbilityByName("rattletrap_rocket_flare"), "rattletrap_rocket_flare", "rattletrap")
+local batteryAssaultAbility =
+	SafeAbility(bot:GetAbilityByName("rattletrap_battery_assault"), "rattletrap_battery_assault", "rattletrap")
+local powerCogsAbility =
+	SafeAbility(bot:GetAbilityByName("rattletrap_power_cogs"), "rattletrap_power_cogs", "rattletrap")
+local rocketFlareAbility =
+	SafeAbility(bot:GetAbilityByName("rattletrap_rocket_flare"), "rattletrap_rocket_flare", "rattletrap")
 local jetpackAbility = SafeAbility(bot:GetAbilityByName("rattletrap_jetpack"), "rattletrap_jetpack", "rattletrap")
-local overclockingAbility = SafeAbility(bot:GetAbilityByName("rattletrap_overclocking"), "rattletrap_overclocking", "rattletrap")
+local overclockingAbility =
+	SafeAbility(bot:GetAbilityByName("rattletrap_overclocking"), "rattletrap_overclocking", "rattletrap")
 local hookshotAbility = SafeAbility(bot:GetAbilityByName("rattletrap_hookshot"), "rattletrap_hookshot", "rattletrap")
 local batteryAssaultDesire
 local powerCogsDesire
@@ -191,7 +197,11 @@ function X.ConsiderBatteryAssault()
 			then
 				local ourHeroesNearby = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local theirHeroesNearby = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if ourHeroesNearby ~= nil and theirHeroesNearby ~= nil and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(1.5)) then
+				if
+					ourHeroesNearby ~= nil
+					and theirHeroesNearby ~= nil
+					and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -204,7 +214,12 @@ function X.ConsiderBatteryAssault()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -252,7 +267,11 @@ function X.ConsiderPowerCogs()
 			then
 				local ourHeroesNearby = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local theirHeroesNearby = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if ourHeroesNearby ~= nil and theirHeroesNearby ~= nil and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					ourHeroesNearby ~= nil
+					and theirHeroesNearby ~= nil
+					and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -326,7 +345,11 @@ function X.ConsiderRocketFlare()
 			then
 				local ourHeroesNearby = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local theirHeroesNearby = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if ourHeroesNearby ~= nil and theirHeroesNearby ~= nil and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					ourHeroesNearby ~= nil
+					and theirHeroesNearby ~= nil
+					and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -344,7 +367,12 @@ function X.ConsiderRocketFlare()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 		if
@@ -398,7 +426,8 @@ function X.ConsiderHookshot()
 				then
 					if #ourHeroesNearby == 0 and #theirHeroesNearby == 0 then
 						if
-							bot:GetEstimatedDamageToTarget(true, enemyHero, 5, DAMAGE_TYPE_ALL) > enemyHero:GetHealth()
+							bot:GetEstimatedDamageToTarget(true, enemyHero, 5, DAMAGE_TYPE_ALL)
+								> enemyHero:GetHealth()
 							and Fu.CanCastAbility(powerCogsAbility)
 							and Fu.CanCastAbility(batteryAssaultAbility)
 						then
@@ -427,7 +456,11 @@ function X.ConsiderHookshot()
 			then
 				local ourHeroesNearby = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local theirHeroesNearby = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if ourHeroesNearby ~= nil and theirHeroesNearby ~= nil and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					ourHeroesNearby ~= nil
+					and theirHeroesNearby ~= nil
+					and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					for _, allyHero in pairs(nearbyAllies) do
 						if
 							Fu.IsValidHero(allyHero)
@@ -473,12 +506,15 @@ function X.ConsiderHookshot()
 				then
 					if DotaTime() >= (bot._hookCampLogAt or -999) then
 						bot._hookCampLogAt = DotaTime() + 10
-						pcall(print, string.format(
-							"[OHA-RATTLETRAP] t=%.0f hookshot escape onto %s dist=%d",
-							DotaTime(),
-							neutralCreep:GetUnitName(),
-							math.floor(GetUnitToUnitDistance(bot, neutralCreep))
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-RATTLETRAP] t=%.0f hookshot escape onto %s dist=%d",
+								DotaTime(),
+								neutralCreep:GetUnitName(),
+								math.floor(GetUnitToUnitDistance(bot, neutralCreep))
+							)
+						)
 					end
 					return BOT_ACTION_DESIRE_HIGH, creepLocation
 				end
@@ -502,7 +538,11 @@ function X.ConsiderJetpack()
 			then
 				local ourHeroesNearby = enemyHero:GetNearbyHeroes(1200, true, BOT_MODE_NONE)
 				local theirHeroesNearby = enemyHero:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
-				if ourHeroesNearby ~= nil and theirHeroesNearby ~= nil and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2.5)) then
+				if
+					ourHeroesNearby ~= nil
+					and theirHeroesNearby ~= nil
+					and (#theirHeroesNearby > #ourHeroesNearby or bot:WasRecentlyDamagedByAnyHero(2.5))
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

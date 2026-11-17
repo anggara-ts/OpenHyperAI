@@ -65,7 +65,8 @@ if Fu.Role.IsPvNMode() then
 	X["sBuyList"], X["sSellList"] =
 		{ "PvN_BH" }, { { "item_power_treads", "item_quelling_blade" }, "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -162,7 +163,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			castLocation = Fu.GetDelayCastLocation(bot, botTarget, castRange, radius, castPoint + 0.3)
 			if castLocation ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-进攻" .. Fu.Chat.GetNormName(botTarget)
@@ -179,7 +184,10 @@ function X.ConsiderQ()
 			if
 				Fu.IsValid(enemyHero)
 				and Fu.CanCastOnNonMagicImmune(enemyHero)
-				and (bot:WasRecentlyDamagedByHero(enemyHero, 4.0) or bot:GetActiveModeDesire() > BOT_ACTION_DESIRE_VERYHIGH)
+				and (
+					bot:WasRecentlyDamagedByHero(enemyHero, 4.0)
+					or bot:GetActiveModeDesire() > BOT_ACTION_DESIRE_VERYHIGH
+				)
 			then
 				castLocation = Fu.GetDelayCastLocation(bot, enemyHero, castRange, radius, castPoint + 0.2)
 				if castLocation ~= nil then
@@ -233,7 +241,8 @@ function X.ConsiderW()
 			and Fu.IsInRange(bot, enemyHero, castRange + 100)
 			and (
 				Fu.WillMixedDamageKillTarget(enemyHero, attackDamage + bonusDamage, 0, 0, castPoint)
-				or enemyHero:IsChanneling() and Fu.WillMixedDamageKillTarget(enemyHero, attackDamage * 3 + bonusDamage, 0, 0, castPoint * 3)
+				or enemyHero:IsChanneling()
+					and Fu.WillMixedDamageKillTarget(enemyHero, attackDamage * 3 + bonusDamage, 0, 0, castPoint * 3)
 			)
 		then
 			target = enemyHero
@@ -267,7 +276,11 @@ function X.ConsiderW()
 			return BOT_ACTION_DESIRE_HIGH, target, "W-团战攻击最弱的:" .. Fu.Chat.GetNormName(target)
 		end
 	end
-	if Fu.IsGoingOnSomeone(bot) and (botLevel >= 2 or #nearbyEnemies <= 1) and (#nearbyAllies >= 2 or #nearbyEnemies <= 1 or botLevel >= 20) then
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and (botLevel >= 2 or #nearbyEnemies <= 1)
+		and (#nearbyAllies >= 2 or #nearbyEnemies <= 1 or botLevel >= 20)
+	then
 		if
 			Fu.IsValidHero(botTarget)
 			and not botTarget:IsAttackImmune()
@@ -345,7 +358,11 @@ function X.ConsiderW()
 			end
 		end
 		local firstCreep = laneCreeps[1]
-		if Fu.IsValid(firstCreep) and not Fu.IsInRange(bot, firstCreep, 650) and not firstCreep:HasModifier("modifier_fountain_glyph") then
+		if
+			Fu.IsValid(firstCreep)
+			and not Fu.IsInRange(bot, firstCreep, 650)
+			and not firstCreep:HasModifier("modifier_fountain_glyph")
+		then
 			target = firstCreep
 			lastBlinkStrikeTime = DotaTime()
 			return BOT_ACTION_DESIRE_HIGH, target, "W-推线闪烁"
@@ -405,7 +422,11 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange + radius) and Fu.CanCastOnMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + radius)
+			and Fu.CanCastOnMagicImmune(botTarget)
+		then
 			local targetLocation = Fu.GetCorrectLoc(botTarget, castPoint)
 			if Fu.IsInLocRange(bot, targetLocation, castRange) then
 				return BOT_ACTION_DESIRE_HIGH, targetLocation, "E-进攻:" .. Fu.Chat.GetNormName(botTarget)
@@ -413,10 +434,15 @@ function X.ConsiderE()
 		end
 	end
 	if
-		Fu.IsRetreating(bot) and (bot:WasRecentlyDamagedByAnyHero(3.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
+		Fu.IsRetreating(bot)
+		and (bot:WasRecentlyDamagedByAnyHero(3.0) or bot:GetActiveModeDesire() > BOT_MODE_DESIRE_VERYHIGH)
 	then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 560) and bot:WasRecentlyDamagedByHero(enemyHero, 5.0) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, 560)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 5.0)
+			then
 				local distance = GetUnitToUnitDistance(bot, enemyHero)
 				castLocation = Fu.GetUnitTowardDistanceLocation(enemyHero, bot, distance + castRange)
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "E-撤退:" .. Fu.Chat.GetNormName(enemyHero)
@@ -437,7 +463,11 @@ function X.ConsiderAS()
 	local manaCost = slot4Ability:GetManaCost()
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(enemyHeroes) do
-		if Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanCastOnTargetAdvanced(enemyHero) and enemyHero:IsChanneling() then
+		if
+			Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+			and enemyHero:IsChanneling()
+		then
 			return BOT_ACTION_DESIRE_HIGH, enemyHero, "AS-打断"
 		end
 	end
@@ -489,7 +519,11 @@ function X.ConsiderAS()
 			local enemyHeroesInRange = Fu.GetNearbyHeroes(bot, castRange, true, BOT_ACTION_DESIRE_NONE)
 			if #enemyHeroesInRange >= 2 then
 				for _, enemyHero in pairs(enemyHeroesInRange) do
-					if enemyHero ~= botTarget and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsDisabled(enemyHero) then
+					if
+						enemyHero ~= botTarget
+						and Fu.CanCastOnNonMagicImmune(enemyHero)
+						and not Fu.IsDisabled(enemyHero)
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyHero, "AS-睡眠敌方"
 					end
 				end

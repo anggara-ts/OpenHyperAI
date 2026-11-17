@@ -94,7 +94,8 @@ X["sSellList"] = { "item_shivas_guard", "item_magic_wand", "item_cyclone", "item
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -103,11 +104,14 @@ function X.MinionThink(minionUnit)
 		Minion.IllusionThink(minionUnit)
 	end
 end
-local staticRemnantAbility = SafeAbility(bot:GetAbilityByName("storm_spirit_static_remnant"), "storm_spirit_static_remnant", "storm_spirit")
+local staticRemnantAbility =
+	SafeAbility(bot:GetAbilityByName("storm_spirit_static_remnant"), "storm_spirit_static_remnant", "storm_spirit")
 local electricVortexAbility =
 	SafeAbility(bot:GetAbilityByName("storm_spirit_electric_vortex"), "storm_spirit_electric_vortex", "storm_spirit")
-local overloadAbility = SafeAbility(bot:GetAbilityByName("storm_spirit_overload"), "storm_spirit_overload", "storm_spirit")
-local ballLightningAbility = SafeAbility(bot:GetAbilityByName("storm_spirit_ball_lightning"), "storm_spirit_ball_lightning", "storm_spirit")
+local overloadAbility =
+	SafeAbility(bot:GetAbilityByName("storm_spirit_overload"), "storm_spirit_overload", "storm_spirit")
+local ballLightningAbility =
+	SafeAbility(bot:GetAbilityByName("storm_spirit_ball_lightning"), "storm_spirit_ball_lightning", "storm_spirit")
 local staticRemnantDesire, staticRemnantLocation
 local electricVortexDesire, electricVortexTarget
 local overloadDesire
@@ -148,7 +152,10 @@ function X.SkillsComplement()
 		else
 			-- Review fix: the test was reversed (cost > mana + 150), so the Vortex+Remnant follow-up was
 			-- queued only when Storm could NOT pay for both. Queue it when he can, with 150 to spare.
-			if Fu.CanCastAbility(staticRemnantAbility) and staticRemnantAbility:GetManaCost() + electricVortexAbility:GetManaCost() + 150 < bot:GetMana() then
+			if
+				Fu.CanCastAbility(staticRemnantAbility)
+				and staticRemnantAbility:GetManaCost() + electricVortexAbility:GetManaCost() + 150 < bot:GetMana()
+			then
 				Fu.SetQueuePtToINT(bot, true)
 				bot:ActionQueue_UseAbilityOnEntity(electricVortexAbility, electricVortexTarget)
 				bot:ActionQueue_Delay(0.3 + 0.77)
@@ -157,7 +164,15 @@ function X.SkillsComplement()
 				bot:ActionQueue_UseAbilityOnLocation(staticRemnantAbility, bot:GetLocation())
 				if DotaTime() - (X.lastVortexLog or -99) > 10 then
 					X.lastVortexLog = DotaTime()
-					pcall(print, string.format("[OHA-STORM] t=%.0f vortex-remnant target=%s mana=%d", DotaTime(), electricVortexTarget:GetUnitName(), bot:GetMana()))
+					pcall(
+						print,
+						string.format(
+							"[OHA-STORM] t=%.0f vortex-remnant target=%s mana=%d",
+							DotaTime(),
+							electricVortexTarget:GetUnitName(),
+							bot:GetMana()
+						)
+					)
 				end
 				return
 			else
@@ -225,9 +240,16 @@ function X.ConsiderStaticRemnant()
 	end
 	if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				local isChasingBot = Fu.IsChasingTarget(enemyHero, bot)
-				if isChasingBot and #nearbyAllies < #nearbyEnemies and hpRatio < 0.75 or hpRatio < 0.5 and bot:WasRecentlyDamagedByHero(enemyHero, 3.0) then
+				if
+					isChasingBot and #nearbyAllies < #nearbyEnemies and hpRatio < 0.75
+					or hpRatio < 0.5 and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 				end
 			end
@@ -251,7 +273,12 @@ function X.ConsiderStaticRemnant()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -412,11 +439,15 @@ function X.CanDoBallVortex()
 		if isInTeamFight then
 			local maxMana = bot:GetMaxMana()
 			local initialManaBase = ballLightningAbility:GetSpecialValueInt("ball_lightning_initial_mana_base")
-			local initialManaPercentage = ballLightningAbility:GetSpecialValueFloat("ball_lightning_initial_mana_percentage") / 100
+			local initialManaPercentage = ballLightningAbility:GetSpecialValueFloat(
+				"ball_lightning_initial_mana_percentage"
+			) / 100
 			local teamFightLocation = Fu.GetTeamFightLocation(bot)
 			if teamFightLocation ~= nil and GetUnitToLocationDistance(bot, teamFightLocation) <= 1200 then
 				local distanceToFight = GetUnitToLocationDistance(bot, teamFightLocation)
-				local ballManaCost = initialManaBase + initialManaPercentage * maxMana + (10 + 0.0065 * maxMana) * distanceToFight / 100
+				local ballManaCost = initialManaBase
+					+ initialManaPercentage * maxMana
+					+ (10 + 0.0065 * maxMana) * distanceToFight / 100
 				local totalManaCost = ballManaCost + electricVortexAbility:GetManaCost()
 				if bot:GetMana() >= totalManaCost then
 					return true

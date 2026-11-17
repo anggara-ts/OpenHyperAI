@@ -67,7 +67,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -78,10 +79,14 @@ function X.MinionThink(hMinionUnit)
 		end
 	end
 end
-local aetherRemnantAbility = SafeAbility(bot:GetAbilityByName("void_spirit_aether_remnant"), "void_spirit_aether_remnant", "void_spirit")
-local dissimilateAbility = SafeAbility(bot:GetAbilityByName("void_spirit_dissimilate"), "void_spirit_dissimilate", "void_spirit")
-local resonantPulseAbility = SafeAbility(bot:GetAbilityByName("void_spirit_resonant_pulse"), "void_spirit_resonant_pulse", "void_spirit")
-local astralStepAbility = SafeAbility(bot:GetAbilityByName("void_spirit_astral_step"), "void_spirit_astral_step", "void_spirit")
+local aetherRemnantAbility =
+	SafeAbility(bot:GetAbilityByName("void_spirit_aether_remnant"), "void_spirit_aether_remnant", "void_spirit")
+local dissimilateAbility =
+	SafeAbility(bot:GetAbilityByName("void_spirit_dissimilate"), "void_spirit_dissimilate", "void_spirit")
+local resonantPulseAbility =
+	SafeAbility(bot:GetAbilityByName("void_spirit_resonant_pulse"), "void_spirit_resonant_pulse", "void_spirit")
+local astralStepAbility =
+	SafeAbility(bot:GetAbilityByName("void_spirit_astral_step"), "void_spirit_astral_step", "void_spirit")
 local aetherRemnantDesire, aetherRemnantLocation
 local dissimilateDesire
 local resonantPulseDesire
@@ -318,7 +323,11 @@ function X.ConsiderResonantPulse()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if Fu.IsFarming(bot) and mpRatio > 0.38 and not bot:HasModifier("modifier_void_spirit_resonant_pulse_physical_buff") then
+	if
+		Fu.IsFarming(bot)
+		and mpRatio > 0.38
+		and not bot:HasModifier("modifier_void_spirit_resonant_pulse_physical_buff")
+	then
 		local nearbyNeutrals = bot:GetNearbyNeutralCreeps(radius)
 		if nearbyNeutrals ~= nil and #nearbyNeutrals >= 3 then
 			return BOT_ACTION_DESIRE_HIGH
@@ -333,7 +342,11 @@ function X.ConsiderResonantPulse()
 				and creep:GetHealth() <= damage
 			then
 				local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-				if nearbyEnemies ~= nil and #nearbyEnemies >= 1 and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500 then
+				if
+					nearbyEnemies ~= nil
+					and #nearbyEnemies >= 1
+					and GetUnitToUnitDistance(creep, nearbyEnemies[1]) <= 500
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

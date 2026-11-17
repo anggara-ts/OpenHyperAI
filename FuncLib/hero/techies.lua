@@ -3,8 +3,17 @@ local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 X.nMinMineDistance = 350
 X.nProximityMineDmgRadius = 500
-local towerOrder =
-	{ TOWER_TOP_1, TOWER_MID_1, TOWER_BOT_1, TOWER_TOP_2, TOWER_MID_2, TOWER_BOT_2, TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
+local towerOrder = {
+	TOWER_TOP_1,
+	TOWER_MID_1,
+	TOWER_BOT_1,
+	TOWER_TOP_2,
+	TOWER_MID_2,
+	TOWER_BOT_2,
+	TOWER_TOP_3,
+	TOWER_MID_3,
+	TOWER_BOT_3,
+}
 local radiantMineSpots = {
 	[TOWER_TOP_1] = { Vector(-5011, 2799, 74), Vector(-4288, 2089, 76), Vector(-3663, 3500, 128) },
 	[TOWER_MID_1] = { Vector(-1921, 377, 68), Vector(-1459, 1120, 0), Vector(1030, -1195, 0), Vector(1916, -2890, 128) },

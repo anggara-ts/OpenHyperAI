@@ -57,16 +57,19 @@ local function LogRuneSpot(id, why)
 		end
 	end
 	local okT, rType = pcall(GetRuneType, id)
-	pcall(print, string.format(
-		"[OHA-RUNE] t=%.1f spot rune=%s why=%s type=%s status=%s units=%s items=%s",
-		DotaTime(),
-		tostring(id),
-		why,
-		tostring(okT and rType),
-		tostring(GetRuneStatus(id)),
-		#units > 0 and table.concat(units, ",") or "-",
-		#items > 0 and table.concat(items, ",") or "-"
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.1f spot rune=%s why=%s type=%s status=%s units=%s items=%s",
+			DotaTime(),
+			tostring(id),
+			why,
+			tostring(okT and rType),
+			tostring(GetRuneStatus(id)),
+			#units > 0 and table.concat(units, ",") or "-",
+			#items > 0 and table.concat(items, ",") or "-"
+		)
+	)
 end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
@@ -74,7 +77,13 @@ local function GetRuneStatus(id)
 	-- Not in the first 10s of a spawn: a new rune can read as not there for a moment.
 	-- River runes only. Game 031, 20:09-20:49: the bottom jungle bounty read available with type -1
 	-- in our vision (Doom 160 away, Mirana 257), this turned it into missing, and nobody took it.
-	if IsRiverRune(id) and status == RUNE_STATUS_AVAILABLE and DotaTime() >= 60 and DotaTime() % RuneCycle(id) >= 10 and GetRuneType ~= nil then
+	if
+		IsRiverRune(id)
+		and status == RUNE_STATUS_AVAILABLE
+		and DotaTime() >= 60
+		and DotaTime() % RuneCycle(id) >= 10
+		and GetRuneType ~= nil
+	then
 		local okT, rType = pcall(GetRuneType, id)
 		if okT and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
 			local okV, seen = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
@@ -103,39 +112,87 @@ local function give(desire, why)
 	return desire
 end
 local function ModeTag(mode)
-	if mode == BOT_MODE_NONE then return "none" end
-	if mode == BOT_MODE_LANING then return "laning" end
-	if mode == BOT_MODE_ATTACK then return "attack" end
-	if mode == BOT_MODE_ROAM then return "roam" end
-	if mode == BOT_MODE_RETREAT then return "retreat" end
-	if mode == BOT_MODE_FARM then return "farm" end
-	if mode == BOT_MODE_WARD then return "ward" end
-	if mode == BOT_MODE_RUNE then return "rune" end
-	if mode == BOT_MODE_TEAM_ROAM then return "team_roam" end
-	if BOT_MODE_LOTUS_POOL ~= nil and mode == BOT_MODE_LOTUS_POOL then return "lotus" end
-	if BOT_MODE_WISDOM_SHRINE ~= nil and mode == BOT_MODE_WISDOM_SHRINE then return "wisdom" end
-	if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST then return "outpost" end
+	if mode == BOT_MODE_NONE then
+		return "none"
+	end
+	if mode == BOT_MODE_LANING then
+		return "laning"
+	end
+	if mode == BOT_MODE_ATTACK then
+		return "attack"
+	end
+	if mode == BOT_MODE_ROAM then
+		return "roam"
+	end
+	if mode == BOT_MODE_RETREAT then
+		return "retreat"
+	end
+	if mode == BOT_MODE_FARM then
+		return "farm"
+	end
+	if mode == BOT_MODE_WARD then
+		return "ward"
+	end
+	if mode == BOT_MODE_RUNE then
+		return "rune"
+	end
+	if mode == BOT_MODE_TEAM_ROAM then
+		return "team_roam"
+	end
+	if BOT_MODE_LOTUS_POOL ~= nil and mode == BOT_MODE_LOTUS_POOL then
+		return "lotus"
+	end
+	if BOT_MODE_WISDOM_SHRINE ~= nil and mode == BOT_MODE_WISDOM_SHRINE then
+		return "wisdom"
+	end
+	if BOT_MODE_OUTPOST ~= nil and mode == BOT_MODE_OUTPOST then
+		return "outpost"
+	end
 	return "m" .. tostring(mode)
 end
 local function RuneTag(id)
-	if id == RUNE_BOUNTY_1 then return "b1" end
-	if id == RUNE_BOUNTY_2 then return "b2" end
-	if id == RUNE_POWERUP_1 then return "p1" end
-	if id == RUNE_POWERUP_2 then return "p2" end
+	if id == RUNE_BOUNTY_1 then
+		return "b1"
+	end
+	if id == RUNE_BOUNTY_2 then
+		return "b2"
+	end
+	if id == RUNE_POWERUP_1 then
+		return "p1"
+	end
+	if id == RUNE_POWERUP_2 then
+		return "p2"
+	end
 	return tostring(id)
 end
 local function StatusTag(status)
-	if status == RUNE_STATUS_AVAILABLE then return "up" end
-	if status == RUNE_STATUS_MISSING then return "miss" end
-	if status == RUNE_STATUS_UNKNOWN then return "unk" end
+	if status == RUNE_STATUS_AVAILABLE then
+		return "up"
+	end
+	if status == RUNE_STATUS_MISSING then
+		return "miss"
+	end
+	if status == RUNE_STATUS_UNKNOWN then
+		return "unk"
+	end
 	return tostring(status)
 end
 local function ActTag(action)
-	if action == BOT_ACTION_TYPE_IDLE then return "idle" end
-	if action == BOT_ACTION_TYPE_MOVE_TO then return "move" end
-	if action == BOT_ACTION_TYPE_ATTACK then return "attack" end
-	if action == BOT_ACTION_TYPE_PICK_UP_RUNE then return "pickup" end
-	if action == BOT_ACTION_TYPE_USE_ABILITY then return "ability" end
+	if action == BOT_ACTION_TYPE_IDLE then
+		return "idle"
+	end
+	if action == BOT_ACTION_TYPE_MOVE_TO then
+		return "move"
+	end
+	if action == BOT_ACTION_TYPE_ATTACK then
+		return "attack"
+	end
+	if action == BOT_ACTION_TYPE_PICK_UP_RUNE then
+		return "pickup"
+	end
+	if action == BOT_ACTION_TYPE_USE_ABILITY then
+		return "ability"
+	end
 	return "a" .. tostring(action)
 end
 local function HeroTag()
@@ -181,22 +238,41 @@ function RuneMode.RuneDbg(desire)
 		local runeInfo = bot.rune and bot.rune.normal
 		local best = "none"
 		if runeInfo ~= nil and runeInfo.location ~= nil then
-			best = string.format("%s:%s:%.0f", RuneTag(runeInfo.location), StatusTag(runeInfo.status), runeInfo.distance or -1)
+			best = string.format(
+				"%s:%s:%.0f",
+				RuneTag(runeInfo.location),
+				StatusTag(runeInfo.status),
+				runeInfo.distance or -1
+			)
 		end
-		print(string.format(
-			"[OHA-RUNE] %s t=%.1f xy=%.0f,%.0f pos=%s mode=%s/%.2f des=%.2f why=%s best=%s near=%s:%.0f commit=%s n=%d/%d act=%s runeDo=%s moved=%.0f stuck=%d hp=%.2f cant=%s q=%d runes=%s",
-			HeroTag(), now, loc.x, loc.y, tostring(botPosition),
-			ModeTag(activeMode), activeModeDesire or 0, desire or 0, why, best,
-			RuneTag(nearId), nearDist,
-			bot._earlyRuneCommit and "1" or "0",
-			#(nearbyEnemies or {}), #(nearbyAllies or {}),
-			ActTag(bot:GetCurrentActionType()),
-			tostring(bot._runeDo or "-"),
-			moved, stuck, hpRatio or 0,
-			Fu.CanNotUseAction(bot) and "1" or "0",
-			bot.NumQueuedActions and bot:NumQueuedActions() or 0,
-			runeList
-		))
+		print(
+			string.format(
+				"[OHA-RUNE] %s t=%.1f xy=%.0f,%.0f pos=%s mode=%s/%.2f des=%.2f why=%s best=%s near=%s:%.0f commit=%s n=%d/%d act=%s runeDo=%s moved=%.0f stuck=%d hp=%.2f cant=%s q=%d runes=%s",
+				HeroTag(),
+				now,
+				loc.x,
+				loc.y,
+				tostring(botPosition),
+				ModeTag(activeMode),
+				activeModeDesire or 0,
+				desire or 0,
+				why,
+				best,
+				RuneTag(nearId),
+				nearDist,
+				bot._earlyRuneCommit and "1" or "0",
+				#(nearbyEnemies or {}),
+				#(nearbyAllies or {}),
+				ActTag(bot:GetCurrentActionType()),
+				tostring(bot._runeDo or "-"),
+				moved,
+				stuck,
+				hpRatio or 0,
+				Fu.CanNotUseAction(bot) and "1" or "0",
+				bot.NumQueuedActions and bot:NumQueuedActions() or 0,
+				runeList
+			)
+		)
 	end)
 	if not ok then
 		print("[OHA-RUNE] err " .. tostring(err))
@@ -213,10 +289,17 @@ local function doing(name)
 	end
 	bot._runeDoPrev = name
 	local loc = bot:GetLocation()
-	print(string.format(
-		"[OHA-RUNE] %s t=%.1f do=%s xy=%.0f,%.0f mode=%s",
-		HeroTag(), DotaTime(), name, loc.x, loc.y, ModeTag(bot:GetActiveMode())
-	))
+	print(
+		string.format(
+			"[OHA-RUNE] %s t=%.1f do=%s xy=%.0f,%.0f mode=%s",
+			HeroTag(),
+			DotaTime(),
+			name,
+			loc.x,
+			loc.y,
+			ModeTag(bot:GetActiveMode())
+		)
+	)
 end
 local function IsHumanClaimingRune(runeId)
 	local runeLocation = GetRuneSpawnLocation(runeId)
@@ -231,7 +314,12 @@ local function IsHumanClaimingRune(runeId)
 				return true
 			end
 			local ping = member:GetMostRecentPing()
-			if ping ~= nil and ping.normal_ping and Fu.GetDistance(ping.location, runeLocation) < 800 and GameTime() - ping.time < 5 then
+			if
+				ping ~= nil
+				and ping.normal_ping
+				and Fu.GetDistance(ping.location, runeLocation) < 800
+				and GameTime() - ping.time < 5
+			then
 				humanClaimTime[runeId] = GameTime()
 				return true
 			end
@@ -320,13 +408,16 @@ function RuneMode.RuneProbe()
 			okT and tostring(runeType) or "err"
 		)
 	end
-	pcall(print, string.format(
-		"[OHA-RUNE] t=%.1f probe-%s %s %s",
-		now,
-		stage,
-		GetTeam() == TEAM_RADIANT and "radiant" or "dire",
-		table.concat(parts, " ")
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.1f probe-%s %s %s",
+			now,
+			stage,
+			GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+			table.concat(parts, " ")
+		)
+	)
 end
 -- Water runes (2:00, 4:00): the bot API never reports them at the river spot (game 031, 4:02: the
 -- top spot read "missing" though seen 2s before, the rune lying there), and only Valve's default
@@ -411,7 +502,15 @@ function RuneMode.RuneWatch()
 			pcall(LogRuneSpot, id, "watch")
 		end
 	end
-	pcall(print, string.format("[OHA-RUNE] t=%.0f watch %s %s", now, GetTeam() == TEAM_RADIANT and "radiant" or "dire", table.concat(parts, " ")))
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.0f watch %s %s",
+			now,
+			GetTeam() == TEAM_RADIANT and "radiant" or "dire",
+			table.concat(parts, " ")
+		)
+	)
 end
 -- River gold id test (user call): on the gold, try rune ids 0-7 with Action_PickUpRune, then with
 -- ActionPush_PickUpRune, 0.4s each, and log the one after which his gold jumps by 30+. Sticky:
@@ -430,19 +529,28 @@ function RuneMode.GoldCycleStep()
 	end
 	local gained = bot:GetGold() - goldCycle.g0
 	if gained >= 30 and goldCycle.last ~= nil then
-		finish(string.format(
-			"[OHA-RUNE] %s t=%.1f river-gold PICKED spot=%s id=%d order=%s gold+%d",
-			HeroTag(),
-			now,
-			tostring(goldCycle.spot),
-			goldCycle.last.id,
-			goldCycle.last.push and "ActionPush_PickUpRune" or "Action_PickUpRune",
-			gained
-		))
+		finish(
+			string.format(
+				"[OHA-RUNE] %s t=%.1f river-gold PICKED spot=%s id=%d order=%s gold+%d",
+				HeroTag(),
+				now,
+				tostring(goldCycle.spot),
+				goldCycle.last.id,
+				goldCycle.last.push and "ActionPush_PickUpRune" or "Action_PickUpRune",
+				gained
+			)
+		)
 		return false
 	end
 	if now >= 15 or not bot:IsAlive() then
-		finish(string.format("[OHA-RUNE] %s t=%.1f river-gold test cut at try %d (time or death)", HeroTag(), now, goldCycle.k))
+		finish(
+			string.format(
+				"[OHA-RUNE] %s t=%.1f river-gold test cut at try %d (time or death)",
+				HeroTag(),
+				now,
+				goldCycle.k
+			)
+		)
 		return false
 	end
 	if GetUnitToLocationDistance(bot, goldCycle.gold) > 40 then
@@ -455,7 +563,14 @@ function RuneMode.GoldCycleStep()
 		return true
 	end
 	if goldCycle.k >= 16 then
-		finish(string.format("[OHA-RUNE] %s t=%.1f river-gold tried ids 0-7 x2 at spot=%s, no gold", HeroTag(), now, tostring(goldCycle.spot)))
+		finish(
+			string.format(
+				"[OHA-RUNE] %s t=%.1f river-gold tried ids 0-7 x2 at spot=%s, no gold",
+				HeroTag(),
+				now,
+				tostring(goldCycle.spot)
+			)
+		)
 		return false
 	end
 	local id = goldCycle.k % 8
@@ -539,7 +654,12 @@ function GetDesireRaw()
 	do
 		local MapObj = require(GetScriptDirectory() .. "/FuncLib/systems/map_objectives")
 		local desire, loc, kind = MapObj.ConsiderObjectiveDesire(bot)
-		if laneBusy and loc ~= nil and GetUnitToLocationDistance(bot, loc) > 500 and not (lotusContest and kind == "lotus") then
+		if
+			laneBusy
+			and loc ~= nil
+			and GetUnitToLocationDistance(bot, loc) > 500
+			and not (lotusContest and kind == "lotus")
+		then
 			desire = 0
 		end
 		-- A rune within 1000 that reads available (its spot in vision) beats a lotus or wisdom
@@ -547,7 +667,11 @@ function GetDesireRaw()
 		-- 8:24-8:43: Disruptor was heading for the bottom jungle bounty and turned off to walk
 		-- to the bottom lotus pool 17-28s before its spawn.
 		local nearRune = RuneMode.ClosestAvailableRune(1000)
-		if nearRune ~= nil and GetRuneStatus(nearRune) == RUNE_STATUS_AVAILABLE and desire < BOT_MODE_DESIRE_ABSOLUTE then
+		if
+			nearRune ~= nil
+			and GetRuneStatus(nearRune) == RUNE_STATUS_AVAILABLE
+			and desire < BOT_MODE_DESIRE_ABSOLUTE
+		then
 			desire = 0
 		end
 		if desire > 0 and loc ~= nil and kind ~= nil then
@@ -598,17 +722,27 @@ function GetDesireRaw()
 	-- and no enemy is closer or about to take it. Laning used to need it within 500, and after
 	-- laning it had to be the "best" rune and the bot not pushing or defending.
 	-- Not while enemy heroes are at our Ancient (that exit now comes after this grab).
-	if not dying and hpRatio >= 0.35 and Fu.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200) == 0 then
+	if
+		not dying
+		and hpRatio >= 0.35
+		and Fu.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200) == 0
+	then
 		-- Power runes too (user call), with the laning rules for who takes the river runes.
 		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
 			if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
 				local loc = GetRuneSpawnLocation(id)
 				local mine = GetUnitToLocationDistance(bot, loc)
-				local riverOk = not IsRiverRune(id) or not (RuneMode.SidelaneSkipsRiver(id, mine) or RuneMode.SkipSecondLaningRune(id))
+				local riverOk = not IsRiverRune(id)
+					or not (RuneMode.SidelaneSkipsRiver(id, mine) or RuneMode.SkipSecondLaningRune(id))
 				if mine <= 1000 and riverOk and not RuneMode.RuneSkipped(id) and not RuneMode.IsEnemyPickRune(id) then
 					local allyCloser = false
 					for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-						if ally ~= bot and ally:IsAlive() and not ally:IsIllusion() and GetUnitToLocationDistance(ally, loc) < mine then
+						if
+							ally ~= bot
+							and ally:IsAlive()
+							and not ally:IsIllusion()
+							and GetUnitToLocationDistance(ally, loc) < mine
+						then
 							allyCloser = true
 							break
 						end
@@ -619,7 +753,10 @@ function GetDesireRaw()
 						runeInfo.distance = mine
 						runeInfo.status = RUNE_STATUS_AVAILABLE
 						runeInfo.type = GetRuneType(id)
-						return give(mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH, IsRiverRune(id) and "power-passing" or "bounty-passing")
+						return give(
+							mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH,
+							IsRiverRune(id) and "power-passing" or "bounty-passing"
+						)
 					end
 				end
 			end
@@ -643,7 +780,11 @@ function GetDesireRaw()
 			return give(BOT_MODE_DESIRE_NONE, "pushing")
 		end
 		local currentMode = bot:GetActiveMode()
-		if currentMode == BOT_MODE_PUSH_TOWER_TOP or currentMode == BOT_MODE_PUSH_TOWER_MID or currentMode == BOT_MODE_PUSH_TOWER_BOT then
+		if
+			currentMode == BOT_MODE_PUSH_TOWER_TOP
+			or currentMode == BOT_MODE_PUSH_TOWER_MID
+			or currentMode == BOT_MODE_PUSH_TOWER_BOT
+		then
 			return give(BOT_MODE_DESIRE_NONE, "push-mode")
 		end
 	end
@@ -701,7 +842,11 @@ function GetDesireRaw()
 			local runeLocation = GetRuneSpawnLocation(runeInfo.location)
 			if runeInfo.distance < 1200 then
 				for _, allyHero in pairs(nearbyAllies) do
-					if allyHero ~= nil and not allyHero:IsBot() and GetUnitToLocationDistance(allyHero, runeLocation) < 2000 then
+					if
+						allyHero ~= nil
+						and not allyHero:IsBot()
+						and GetUnitToLocationDistance(allyHero, runeLocation) < 2000
+					then
 						return give(BOT_MODE_DESIRE_NONE, "human-near")
 					end
 				end
@@ -731,14 +876,20 @@ function GetDesireRaw()
 					and DotaTime() > 3 * 60 + 50
 					and (currentMinute % 4 == 0 or currentMinute % 4 == 3 and currentSecond > 45)
 				then
-					return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange), "bounty-unknown")
+					return give(
+						RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange),
+						"bounty-unknown"
+					)
 				elseif
 					runeInfo.status == RUNE_STATUS_MISSING
 					and runeInfo.distance <= searchRange * 1.5
 					and DotaTime() > 3 * 60 + 50
 					and (currentMinute % 4 == 3 or currentSecond > 52)
 				then
-					return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5), "bounty-missing")
+					return give(
+						RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5),
+						"bounty-missing"
+					)
 				end
 			else
 				if runeInfo.status == RUNE_STATUS_AVAILABLE then
@@ -757,26 +908,43 @@ function GetDesireRaw()
 							local baseDesire = isMidLaning and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH
 							desire = RuneMode.GetScaledDesire(baseDesire, runeInfo.distance, searchRange * 2.5)
 						else
-							desire = RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5)
+							desire =
+								RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5)
 						end
 					end
 					-- Starting river gold/bounty sits on power-rune spots — gate early lane oscillation.
 					return give(RuneMode.ApplyEarlyLaneRuneGate(desire, runeInfo.distance, runeInfo.status, "power"))
 				elseif runeInfo.status == RUNE_STATUS_UNKNOWN and DotaTime() > 113 then
 					if hasBottle or not Fu.IsEarlyGame() and botPosition <= 3 then
-						return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5), "power-unknown")
+						return give(
+							RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2.5),
+							"power-unknown"
+						)
 					else
-						return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange), "power-unknown")
+						return give(
+							RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange),
+							"power-unknown"
+						)
 					end
-				elseif runeInfo.status == RUNE_STATUS_MISSING and DotaTime() > 60 and (currentMinute % 2 == 1 and currentSecond > 53) then
-					return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange), "power-missing")
+				elseif
+					runeInfo.status == RUNE_STATUS_MISSING
+					and DotaTime() > 60
+					and (currentMinute % 2 == 1 and currentSecond > 53)
+				then
+					return give(
+						RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange),
+						"power-missing"
+					)
 				elseif
 					runeInfo.status == RUNE_STATUS_UNKNOWN
 					and RuneMode.IsTeamMustSaveRune(runeInfo.location)
 					and DotaTime() > 113
 					and runeInfo.distance <= searchRange * 2
 				then
-					return give(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2), "power-save")
+					return give(
+						RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, runeInfo.distance, searchRange * 2),
+						"power-save"
+					)
 				end
 			end
 			return give(BOT_MODE_DESIRE_NONE, "status-" .. StatusTag(runeInfo.status))
@@ -1046,15 +1214,18 @@ function Think()
 					local gold = runeLocation + Vector(-40, 85, 0)
 					if not freshTry.goldLogged then
 						freshTry.goldLogged = true
-						pcall(print, string.format(
-							"[OHA-RUNE] %s t=%.1f river-gold spot=%s gold=%.0f,%.0f dist=%.0f",
-							HeroTag(),
-							now0,
-							tostring(runeInfo.location),
-							gold.x,
-							gold.y,
-							GetUnitToLocationDistance(bot, gold)
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-RUNE] %s t=%.1f river-gold spot=%s gold=%.0f,%.0f dist=%.0f",
+								HeroTag(),
+								now0,
+								tostring(runeInfo.location),
+								gold.x,
+								gold.y,
+								GetUnitToLocationDistance(bot, gold)
+							)
+						)
 					end
 					-- A teammate is running the id test here: stay where you are and leave the gold to
 					-- the tester (bots group up on the rune spots at the start; game 024, three Dire bots
@@ -1062,7 +1233,12 @@ function Think()
 					if bot._goldCycle == nil then
 						for i = 1, 5 do
 							local member = GetTeamMember(i)
-							if member ~= nil and member ~= bot and member._goldCycle ~= nil and member._goldCycle.spot == runeInfo.location then
+							if
+								member ~= nil
+								and member ~= bot
+								and member._goldCycle ~= nil
+								and member._goldCycle.spot == runeInfo.location
+							then
 								if GetUnitToLocationDistance(bot, gold) < 160 then
 									bot:Action_MoveToLocation(Fu.AdjustLocationWithOffsetTowardsFountain(gold, 200))
 								end
@@ -1077,17 +1253,27 @@ function Think()
 						return
 					end
 					-- On the gold: start the id test (sticky, see RuneMode.GoldCycleStep).
-					if GetUnitToLocationDistance(bot, gold) <= 60 and bot._goldCycle == nil and not bot._goldCycleDone then
+					if
+						GetUnitToLocationDistance(bot, gold) <= 60
+						and bot._goldCycle == nil
+						and not bot._goldCycleDone
+					then
 						-- One tester per spot: three bots on one spot block each other (game 024).
 						local busy = false
 						for i = 1, 5 do
 							local member = GetTeamMember(i)
-							if member ~= nil and member ~= bot and member._goldCycle ~= nil and member._goldCycle.spot == runeInfo.location then
+							if
+								member ~= nil
+								and member ~= bot
+								and member._goldCycle ~= nil
+								and member._goldCycle.spot == runeInfo.location
+							then
 								busy = true
 							end
 						end
 						if not busy then
-							bot._goldCycle = { spot = runeInfo.location, gold = gold, k = 0, at = now0 - 1, g0 = bot:GetGold() }
+							bot._goldCycle =
+								{ spot = runeInfo.location, gold = gold, k = 0, at = now0 - 1, g0 = bot:GetGold() }
 						end
 					end
 					if bot._goldCycle ~= nil and RuneMode.GoldCycleStep() then
@@ -1108,14 +1294,17 @@ function Think()
 					freshTry.backUntil = now0 + 1
 					if not freshTry.logged then
 						freshTry.logged = true
-						pcall(print, string.format(
-							"[OHA-RUNE] %s t=%.1f pickup-stepback rune=%s dist=%.0f type=%s",
-							HeroTag(),
-							now0,
-							tostring(runeInfo.location),
-							liveDist,
-							tostring(rType)
-						))
+						pcall(
+							print,
+							string.format(
+								"[OHA-RUNE] %s t=%.1f pickup-stepback rune=%s dist=%.0f type=%s",
+								HeroTag(),
+								now0,
+								tostring(runeInfo.location),
+								liveDist,
+								tostring(rType)
+							)
+						)
 					end
 					bot:Action_MoveToLocation(freshTry.backTo)
 					doing("pickup-stepback")
@@ -1142,9 +1331,23 @@ function Think()
 				and (lastSweep == nil or math.floor(lastSweep / cycle) < math.floor(now0 / cycle))
 			local function StartSweep(why)
 				bot._bountySwept[runeInfo.location] = now0
-				bot._bountySweep = { id = runeInfo.location, seen = now0, sweepUntil = now0 + SweepTime(runeInfo.location), ringStart = now0 }
+				bot._bountySweep = {
+					id = runeInfo.location,
+					seen = now0,
+					sweepUntil = now0 + SweepTime(runeInfo.location),
+					ringStart = now0,
+				}
 				bot._runePickTry = nil
-				pcall(print, string.format("[OHA-RUNE] %s t=%.1f bounty-sweep why=%s rune=%s", HeroTag(), now0, why, tostring(runeInfo.location)))
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] %s t=%.1f bounty-sweep why=%s rune=%s",
+						HeroTag(),
+						now0,
+						why,
+						tostring(runeInfo.location)
+					)
+				)
 				doing("sweep-start")
 			end
 			if IsRiverRune(runeInfo.location) then
@@ -1155,7 +1358,16 @@ function Think()
 				return
 			end
 			if rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID) then
-				pcall(print, string.format("[OHA-RUNE] %s t=%.1f no-rune rune=%s dist=%.0f", HeroTag(), now0, tostring(runeInfo.location), liveDist))
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] %s t=%.1f no-rune rune=%s dist=%.0f",
+						HeroTag(),
+						now0,
+						tostring(runeInfo.location),
+						liveDist
+					)
+				)
 				bot._runePickTry = nil
 				RuneMode.SkipRune(runeInfo.location, 30)
 				bot:Action_MoveToLocation(laneBack)
@@ -1184,7 +1396,11 @@ function Think()
 			-- over 3s+ on the same rune that is still up (3 orders, each now waited on for up to 3s): skip
 			-- it for 30s and say so.
 			local now = DotaTime()
-			if bot._runePickTry == nil or bot._runePickTry.id ~= runeInfo.location or now - bot._runePickTry.first > 8 then
+			if
+				bot._runePickTry == nil
+				or bot._runePickTry.id ~= runeInfo.location
+				or now - bot._runePickTry.first > 8
+			then
 				bot._runePickTry = { id = runeInfo.location, first = now, n = 0 }
 			end
 			bot._runePickTry.n = bot._runePickTry.n + 1
@@ -1193,15 +1409,18 @@ function Think()
 				return
 			end
 			if bot._runePickTry.n >= 3 and now - bot._runePickTry.first >= 3 then
-				pcall(print, string.format(
-					"[OHA-RUNE] %s t=%.1f pickup-failed rune=%s tries=%d dist=%.0f type=%s",
-					HeroTag(),
-					now,
-					tostring(runeInfo.location),
-					bot._runePickTry.n,
-					liveDist,
-					tostring(GetRuneType and GetRuneType(runeInfo.location) or "?")
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] %s t=%.1f pickup-failed rune=%s tries=%d dist=%.0f type=%s",
+						HeroTag(),
+						now,
+						tostring(runeInfo.location),
+						bot._runePickTry.n,
+						liveDist,
+						tostring(GetRuneType and GetRuneType(runeInfo.location) or "?")
+					)
+				)
 				bot._runePickTry = nil
 				-- River gold (a bounty on a power spot) that will not pick up stays that way: skip
 				-- it until the next power rune spawn (every 2 min), not just 30s, so the water or
@@ -1252,8 +1471,10 @@ function Think()
 end
 function RuneMode.InitRune()
 	if bot.rune == nil then
-		bot.rune =
-			{ normal = { time = 0, type = nil, location = nil, distance = 0, status = RUNE_STATUS_MISSING }, location = nil }
+		bot.rune = {
+			normal = { time = 0, type = nil, location = nil, distance = 0, status = RUNE_STATUS_MISSING },
+			location = nil,
+		}
 	end
 end
 -- Bounty runes never despawn. A new one spawns beside the old one, but the bot API
@@ -1420,7 +1641,12 @@ function RuneMode.RuneReachFailed(id, dist)
 	local mine = GetUnitToLocationDistance(bot, loc)
 	for playerIndex = 1, 5 do
 		local member = GetTeamMember(playerIndex)
-		if Fu.IsValidHero(member) and member ~= bot and member:IsAlive() and GetUnitToLocationDistance(member, loc) + 80 < mine then
+		if
+			Fu.IsValidHero(member)
+			and member ~= bot
+			and member:IsAlive()
+			and GetUnitToLocationDistance(member, loc) + 80 < mine
+		then
 			limit = 2
 			break
 		end
@@ -1470,8 +1696,12 @@ function RuneMode.ClosestAvailableRune(maxDist)
 	local now = DotaTime()
 	for _, rune in pairs(runeIds) do
 		-- Jungle bounties spawn every 4 minutes and report missing until the bot has vision.
-		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2) and now >= BOUNTY_CYCLE - 10 and now % BOUNTY_CYCLE <= 50
-		if GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE or (bountyDue and GetRuneStatus(rune) ~= RUNE_STATUS_MISSING) then
+		local bountyDue = (rune == RUNE_BOUNTY_1 or rune == RUNE_BOUNTY_2)
+			and now >= BOUNTY_CYCLE - 10
+			and now % BOUNTY_CYCLE <= 50
+		if
+			GetRuneStatus(rune) == RUNE_STATUS_AVAILABLE or (bountyDue and GetRuneStatus(rune) ~= RUNE_STATUS_MISSING)
+		then
 			if RuneMode.RuneSkipped(rune) then
 				goto continue_rune
 			end
@@ -1560,7 +1790,12 @@ function RuneMode.GetBestRune()
 			local dist = GetUnitToLocationDistance(bot, runeLocation)
 			if RuneMode.SidelaneSkipsRiver(runeId, dist) or RuneMode.SkipSecondLaningRune(runeId) then
 				-- River gold at 0:00 and water at 2:00 share this spot. One mid trip.
-			elseif runeId == RUNE_BOUNTY_1 or runeId == RUNE_BOUNTY_2 or hornGold or (Fu.IsCore(bot) or not Fu.IsThereCoreNearby(1200)) then
+			elseif
+				runeId == RUNE_BOUNTY_1
+				or runeId == RUNE_BOUNTY_2
+				or hornGold
+				or (Fu.IsCore(bot) or not Fu.IsThereCoreNearby(1200))
+			then
 				local distance = dist
 				if distance < bestDistance then
 					bestRune = runeId
@@ -1659,7 +1894,11 @@ function RuneMode.IsPingedByHumanPlayer(location, radius)
 		if Fu.IsValidHero(member) and not member:IsBot() and GetUnitToLocationDistance(member, location) <= radius then
 			local ping = member:GetMostRecentPing()
 			if ping then
-				if not ping.normal_ping and Fu.GetDistance(ping.location, location) <= 800 and GameTime() - ping.time < pingMemorySeconds then
+				if
+					not ping.normal_ping
+					and Fu.GetDistance(ping.location, location) <= 800
+					and GameTime() - ping.time < pingMemorySeconds
+				then
 					return true
 				end
 			end
@@ -1698,7 +1937,8 @@ function RuneMode.IsEnemyPickRune(runeId)
 			Fu.IsValidHero(enemyHero)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and (enemyHero:IsFacingLocation(runeLocation, 30) or GetUnitToLocationDistance(enemyHero, runeLocation) < 600)
-			and GetUnitToLocationDistance(enemyHero, runeLocation) < GetUnitToLocationDistance(bot, runeLocation) + 300
+			and GetUnitToLocationDistance(enemyHero, runeLocation)
+				< GetUnitToLocationDistance(bot, runeLocation) + 300
 		then
 			return true
 		end
@@ -1711,7 +1951,11 @@ function RuneMode.IsUnitAroundLocation(location, radius)
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 			if lastSeenInfo ~= nil then
 				local lastSeen = lastSeenInfo[1]
-				if lastSeen ~= nil and Fu.GetDistance(location, lastSeen.location) <= radius and lastSeen.time_since_seen < 1.0 then
+				if
+					lastSeen ~= nil
+					and Fu.GetDistance(location, lastSeen.location) <= radius
+					and lastSeen.time_since_seen < 1.0
+				then
 					return true
 				end
 			end
@@ -1794,18 +2038,22 @@ function RuneMode.GetGoOutLocation()
 	end
 	if GetTeam() == TEAM_RADIANT then
 		if botPosition == 1 or botPosition == 5 then
-			local candidates = { Vector(526.370239, -3893.405762, 256.000000), Vector(1999.415894, -4838.790039, 256.000000) }
+			local candidates =
+				{ Vector(526.370239, -3893.405762, 256.000000), Vector(1999.415894, -4838.790039, 256.000000) }
 			cachedGoOutLocation = candidates[RandomInt(1, #candidates)]
 		elseif botPosition == 2 or botPosition == 3 or botPosition == 4 then
-			local candidates = { Vector(-3456.702637, 649.725403, 256.000000), Vector(-1945.830322, 60.404663, 128.000000) }
+			local candidates =
+				{ Vector(-3456.702637, 649.725403, 256.000000), Vector(-1945.830322, 60.404663, 128.000000) }
 			cachedGoOutLocation = candidates[RandomInt(1, #candidates)]
 		end
 	elseif GetTeam() == TEAM_DIRE then
 		if botPosition == 1 or botPosition == 5 then
-			local candidates = { Vector(-1051.021973, 3384.059082, 256.000000), Vector(-2415.422119, 4641.448242, 256.000000) }
+			local candidates =
+				{ Vector(-1051.021973, 3384.059082, 256.000000), Vector(-2415.422119, 4641.448242, 256.000000) }
 			cachedGoOutLocation = candidates[RandomInt(1, #candidates)]
 		elseif botPosition == 2 or botPosition == 3 or botPosition == 4 then
-			local candidates = { Vector(2734.819580, -1155.105225, 256.000000), Vector(1142.979614, -337.891663, 128.000000) }
+			local candidates =
+				{ Vector(2734.819580, -1155.105225, 256.000000), Vector(1142.979614, -337.891663, 128.000000) }
 			cachedGoOutLocation = candidates[RandomInt(1, #candidates)]
 		end
 	end
@@ -1859,7 +2107,12 @@ function RuneMode.IsHumanDangerPingedRune(runeId)
 		local member = GetTeamMember(playerIndex)
 		if member ~= nil and member:IsAlive() and not member:IsBot() then
 			local ping = member:GetMostRecentPing()
-			if ping ~= nil and not ping.normal_ping and Fu.GetDistance(ping.location, runeLocation) <= 400 and GameTime() - ping.time < 30 then
+			if
+				ping ~= nil
+				and not ping.normal_ping
+				and Fu.GetDistance(ping.location, runeLocation) <= 400
+				and GameTime() - ping.time < 30
+			then
 				return true
 			end
 		end
@@ -1890,7 +2143,8 @@ end
 function RuneMode.GetLaningRuneDesire(laningRuneRange)
 	local minute = math.floor(DotaTime() / 60)
 	local second = DotaTime() % 60
-	local isPowerRuneWindow = DotaTime() < 6 * 60 and (minute % 2 == 1 and second >= 55 or minute % 2 == 0 and second <= 5)
+	local isPowerRuneWindow = DotaTime() < 6 * 60
+		and (minute % 2 == 1 and second >= 55 or minute % 2 == 0 and second <= 5)
 	if isPowerRuneWindow then
 		local powerRunes = { RUNE_POWERUP_1, RUNE_POWERUP_2 }
 		local bestPowerRune = nil
@@ -1922,7 +2176,11 @@ function RuneMode.GetLaningRuneDesire(laningRuneRange)
 				bot.rune.normal.status = GetRuneStatus(bestPowerRune)
 				bot.rune.normal.type = GetRuneType(bestPowerRune)
 			end
-			return RuneMode.DesireForNearbyRune(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, bestPowerDistance, 3200), bestPowerDistance, bestPowerStatus)
+			return RuneMode.DesireForNearbyRune(
+				RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, bestPowerDistance, 3200),
+				bestPowerDistance,
+				bestPowerStatus
+			)
 		end
 	end
 	if botPosition >= 4 then
@@ -1933,7 +2191,12 @@ function RuneMode.GetLaningRuneDesire(laningRuneRange)
 		elseif team == TEAM_RADIANT and botPosition == 5 or team == TEAM_DIRE and botPosition == 4 then
 			bountyRune = RUNE_BOUNTY_2
 		end
-		if bountyRune ~= nil and RuneMode.ShouldCheckRuneStatus(bountyRune) and not RuneMode.IsHumanDangerPingedRune(bountyRune) and not RuneMode.SkipSecondLaningRune(bountyRune) then
+		if
+			bountyRune ~= nil
+			and RuneMode.ShouldCheckRuneStatus(bountyRune)
+			and not RuneMode.IsHumanDangerPingedRune(bountyRune)
+			and not RuneMode.SkipSecondLaningRune(bountyRune)
+		then
 			local distance = GetUnitToLocationDistance(bot, GetRuneSpawnLocation(bountyRune))
 			if distance < laningRuneRange then
 				if bot.rune and bot.rune.normal then
@@ -1954,9 +2217,17 @@ function RuneMode.GetLaningRuneDesire(laningRuneRange)
 	local bestDistance = laningRuneRange
 	local allRunes = { RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }
 	for _, runeId in pairs(allRunes) do
-		if RuneMode.ShouldCheckRuneStatus(runeId) and not RuneMode.IsHumanDangerPingedRune(runeId) and not RuneMode.IsAllyWithBottleCloser(runeId) then
+		if
+			RuneMode.ShouldCheckRuneStatus(runeId)
+			and not RuneMode.IsHumanDangerPingedRune(runeId)
+			and not RuneMode.IsAllyWithBottleCloser(runeId)
+		then
 			local distance = GetUnitToLocationDistance(bot, GetRuneSpawnLocation(runeId))
-			if not RuneMode.SidelaneSkipsRiver(runeId, distance) and not RuneMode.SkipSecondLaningRune(runeId) and distance < bestDistance then
+			if
+				not RuneMode.SidelaneSkipsRiver(runeId, distance)
+				and not RuneMode.SkipSecondLaningRune(runeId)
+				and distance < bestDistance
+			then
 				bestRune = runeId
 				bestDistance = distance
 			end
@@ -1969,7 +2240,11 @@ function RuneMode.GetLaningRuneDesire(laningRuneRange)
 			bot.rune.normal.status = GetRuneStatus(bestRune)
 			bot.rune.normal.type = GetRuneType(bestRune)
 		end
-		return RuneMode.DesireForNearbyRune(RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, bestDistance, laningRuneRange), bestDistance, GetRuneStatus(bestRune))
+		return RuneMode.DesireForNearbyRune(
+			RuneMode.GetScaledDesire(BOT_MODE_DESIRE_HIGH, bestDistance, laningRuneRange),
+			bestDistance,
+			GetRuneStatus(bestRune)
+		)
 	end
 	return 0
 end

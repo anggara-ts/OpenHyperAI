@@ -46,7 +46,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_TA" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -58,7 +59,11 @@ function X.MinionThink(minion)
 		else
 			-- Safe proxy: the datafeed does not list templar_assassin_self_trap (a trap-unit ability), so if
 			-- it is gone a nil here would error on p:IsFullyCastable() every MinionThink.
-			local selfTrapAbility = SafeAbility(minion:GetAbilityByName("templar_assassin_self_trap"), "templar_assassin_self_trap", "templar_assassin")
+			local selfTrapAbility = SafeAbility(
+				minion:GetAbilityByName("templar_assassin_self_trap"),
+				"templar_assassin_self_trap",
+				"templar_assassin"
+			)
 			local trapAbility =
 				SafeAbility(bot:GetAbilityByName("templar_assassin_trap"), "templar_assassin_trap", "templar_assassin")
 			local trapRadius = 400
@@ -72,13 +77,18 @@ function X.MinionThink(minion)
 				distanceToBot = 9999
 			end
 			if selfTrapAbility:IsFullyCastable() then
-				if #nearbyEnemies >= 1 and (distanceToBot < 1200 or #nearbyAllies >= 1 or X.IsEnemyRegenning(nearbyEnemies)) then
+				if
+					#nearbyEnemies >= 1
+					and (distanceToBot < 1200 or #nearbyAllies >= 1 or X.IsEnemyRegenning(nearbyEnemies))
+				then
 					minion:Action_UseAbility(selfTrapAbility)
 					return
 				end
 				if
 					minion:GetHealth() / minion:GetMaxHealth() < 0.6
-					or farEnemies[1] ~= nil and farEnemies[1]:IsAlive() and farEnemies[1]:GetAttackTarget() == minion
+					or farEnemies[1] ~= nil
+						and farEnemies[1]:IsAlive()
+						and farEnemies[1]:GetAttackTarget() == minion
 				then
 					minion:Action_UseAbility(selfTrapAbility)
 					return
@@ -196,7 +206,11 @@ function X.ConsiderQ()
 	if
 		hpRatio < 0.11
 		and not bot:IsInvisible()
-		and (bot:WasRecentlyDamagedByAnyHero(4.0) or bot:WasRecentlyDamagedByCreep(2.0) or bot:WasRecentlyDamagedByTower(2.0))
+		and (
+			bot:WasRecentlyDamagedByAnyHero(4.0)
+			or bot:WasRecentlyDamagedByCreep(2.0)
+			or bot:WasRecentlyDamagedByTower(2.0)
+		)
 	then
 		return BOT_ACTION_DESIRE_MODERATE
 	end
@@ -225,7 +239,11 @@ function X.ConsiderQ()
 	if Fu.IsNotAttackProjectileIncoming(bot, 1600) or Fu.GetAttackProjectileDamageByRange(bot, 1600) >= 110 then
 		return BOT_ACTION_DESIRE_MODERATE
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and abilityLevel >= 3 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost)
+		and abilityLevel >= 3
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
 		if #laneCreeps >= 2 then
 			local healthiestCreep = Fu.GetMostHpUnit(laneCreeps)
@@ -238,11 +256,20 @@ function X.ConsiderQ()
 			end
 		end
 	end
-	if Fu.IsFarming(bot) and abilityLevel >= 2 and (bot:GetAttackDamage() < 200 or mpRatio > 0.49) and mpRatio > 0.3 then
+	if
+		Fu.IsFarming(bot)
+		and abilityLevel >= 2
+		and (bot:GetAttackDamage() < 200 or mpRatio > 0.49)
+		and mpRatio > 0.3
+	then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(800)
 		if #neutralCreeps >= 2 then
 			local healthiestCreep = Fu.GetMostHpUnit(neutralCreeps)
-			if Fu.IsValid(healthiestCreep) and (healthiestCreep:GetHealth() >= 400 or #neutralCreeps >= 3) and Fu.IsInRange(healthiestCreep, bot, attackRange + 50) then
+			if
+				Fu.IsValid(healthiestCreep)
+				and (healthiestCreep:GetHealth() >= 400 or #neutralCreeps >= 3)
+				and Fu.IsInRange(healthiestCreep, bot, attackRange + 50)
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -254,7 +281,11 @@ function X.ConsiderQ()
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsRoshan(attackTarget) and Fu.GetHP(attackTarget) > 0.3 and Fu.IsInRange(attackTarget, bot, attackRange) then
+		if
+			Fu.IsRoshan(attackTarget)
+			and Fu.GetHP(attackTarget) > 0.3
+			and Fu.IsInRange(attackTarget, bot, attackRange)
+		then
 			return BOT_ACTION_DESIRE_LOW
 		end
 	end
@@ -264,7 +295,8 @@ function X.ConsiderQ()
 		end
 	end
 	if
-		bot:HasModifier("modifier_rune_regen") or abilityLevel >= 3 and mpRatio > 0.96 and bot:HasModifier("modifier_fountain_aura_buff")
+		bot:HasModifier("modifier_rune_regen")
+		or abilityLevel >= 3 and mpRatio > 0.96 and bot:HasModifier("modifier_fountain_aura_buff")
 	then
 		return BOT_ACTION_DESIRE_LOW
 	end
@@ -318,11 +350,19 @@ function X.ConsiderW()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsValidHero(attackTarget) and Fu.CanBeAttacked(attackTarget) and Fu.IsInRange(attackTarget, bot, attackRange + 64) then
+		if
+			Fu.IsValidHero(attackTarget)
+			and Fu.CanBeAttacked(attackTarget)
+			and Fu.IsInRange(attackTarget, bot, attackRange + 64)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 		attackTarget = bot:GetTarget()
-		if Fu.IsValidHero(attackTarget) and Fu.CanBeAttacked(attackTarget) and Fu.IsInRange(attackTarget, bot, attackRange + 24) then
+		if
+			Fu.IsValidHero(attackTarget)
+			and Fu.CanBeAttacked(attackTarget)
+			and Fu.IsInRange(attackTarget, bot, attackRange + 24)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -338,7 +378,12 @@ function X.ConsiderW()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and abilityLevel >= 3 and #enemyHeroes == 0 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost)
+		and abilityLevel >= 3
+		and #enemyHeroes == 0
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(1200, true)
 		local allyCreeps = bot:GetNearbyLaneCreeps(800, false)
 		if #laneCreeps >= 3 then
@@ -368,7 +413,11 @@ function X.ConsiderW()
 	end
 	if botLevel > 11 and bot:GetMana() > 280 then
 		local attackTarget = bot:GetAttackTarget()
-		if Fu.IsValid(attackTarget) and Fu.IsInRange(attackTarget, bot, attackRange + 50) and not Fu.CanKillTarget(attackTarget, attackDamage * 3.28, damageType) then
+		if
+			Fu.IsValid(attackTarget)
+			and Fu.IsInRange(attackTarget, bot, attackRange + 50)
+			and not Fu.CanKillTarget(attackTarget, attackDamage * 3.28, damageType)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -400,7 +449,11 @@ function X.ConsiderR()
 	if Fu.IsRetreating(bot) then
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(enemyHeroes) do
-			if Fu.IsMoving(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 2.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsMoving(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_MODERATE, enemyHero:GetExtrapolatedLocation(1.0)
 			end
 		end
@@ -455,25 +508,37 @@ function X.ConsiderR()
 			end
 		end
 		for _, camp in pairs(neutralCamps) do
-			if GetUnitToLocationDistance(bot, camp.location) < castRange and abilityLevel >= 2 and (camp.type ~= "ancient" or botLevel >= 15) then
+			if
+				GetUnitToLocationDistance(bot, camp.location) < castRange
+				and abilityLevel >= 2
+				and (camp.type ~= "ancient" or botLevel >= 15)
+			then
 				if not IsLocationVisible(camp.location) then
 					return BOT_ACTION_DESIRE_HIGH, camp.location
 				end
 			end
 		end
 		if midTrapLocation ~= nil and abilityLevel >= 2 then
-			if GetUnitToLocationDistance(bot, midTrapLocation) < castRange and not IsLocationVisible(midTrapLocation) then
+			if
+				GetUnitToLocationDistance(bot, midTrapLocation) < castRange and not IsLocationVisible(midTrapLocation)
+			then
 				return BOT_ACTION_DESIRE_HIGH, midTrapLocation
 			end
 		end
 		if abilityLevel >= 3 then
 			if topTowerLocation ~= nil then
-				if GetUnitToLocationDistance(bot, topTowerLocation) < castRange and not IsLocationVisible(topTowerLocation) then
+				if
+					GetUnitToLocationDistance(bot, topTowerLocation) < castRange
+					and not IsLocationVisible(topTowerLocation)
+				then
 					return BOT_ACTION_DESIRE_HIGH, topTowerLocation
 				end
 			end
 			if bottomTowerLocation ~= nil then
-				if GetUnitToLocationDistance(bot, bottomTowerLocation) < castRange and not IsLocationVisible(bottomTowerLocation) then
+				if
+					GetUnitToLocationDistance(bot, bottomTowerLocation) < castRange
+					and not IsLocationVisible(bottomTowerLocation)
+				then
 					return BOT_ACTION_DESIRE_HIGH, bottomTowerLocation
 				end
 			end
@@ -514,7 +579,15 @@ function X.TAConsiderTarget()
 	then
 		if DotaTime() - (X.lastRetargetLog or -99) > 10 then
 			X.lastRetargetLog = DotaTime()
-			pcall(print, string.format("[OHA-TA] t=%.0f retarget from=%s to=%s", DotaTime(), attackTarget:GetUnitName(), newTarget:GetUnitName()))
+			pcall(
+				print,
+				string.format(
+					"[OHA-TA] t=%.0f retarget from=%s to=%s",
+					DotaTime(),
+					attackTarget:GetUnitName(),
+					newTarget:GetUnitName()
+				)
+			)
 		end
 		bot:SetTarget(newTarget)
 		return

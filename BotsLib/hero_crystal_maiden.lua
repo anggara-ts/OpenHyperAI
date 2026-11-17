@@ -62,7 +62,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand", "item_shivas_guar
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = true
@@ -76,11 +77,8 @@ local frostbiteAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAb
 local freezingFieldAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "crystal_maiden")
 -- datafeed: Crystal Clone is granted by the Shard; fetch it by name, since entry 4 of the ability list is
 -- not guaranteed to be it (the hero also has the innate Glacial Guard).
-local crystalCloneAbility = SafeAbility(
-	bot:GetAbilityByName("crystal_maiden_crystal_clone"),
-	"crystal_maiden_crystal_clone",
-	"crystal_maiden"
-)
+local crystalCloneAbility =
+	SafeAbility(bot:GetAbilityByName("crystal_maiden_crystal_clone"), "crystal_maiden_crystal_clone", "crystal_maiden")
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "crystal_maiden")
 local brillianceAuraAbility = SafeAbility(
 	bot:GetAbilityByName("crystal_maiden_brilliance_aura"),
@@ -207,7 +205,11 @@ function X.ConsiderQ()
 	local heroAoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0.8, 0)
 	local killCreepAoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange + radius, radius, 0.5, damage)
 	local creepAoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange + radius, radius, 0.5, 0)
-	if creepAoe == nil or creepAoe.targetloc == nil or Fu.GetInLocLaneCreepCount(bot, 1600, radius, creepAoe.targetloc) <= 2 then
+	if
+		creepAoe == nil
+		or creepAoe.targetloc == nil
+		or Fu.GetInLocLaneCreepCount(bot, 1600, radius, creepAoe.targetloc) <= 2
+	then
 		creepAoe.count = 0
 	end
 	if killHeroAoe.count ~= nil and killHeroAoe.count >= 1 then
@@ -230,7 +232,11 @@ function X.ConsiderQ()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValid(weakestExtendedEnemy) and heroAoe.count >= 2 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange then
+		if
+			Fu.IsValid(weakestExtendedEnemy)
+			and heroAoe.count >= 2
+			and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange
+		then
 			return BOT_ACTION_DESIRE_HIGH, heroAoe.targetloc
 		end
 		local target = Fu.GetProperTarget(bot)
@@ -241,7 +247,10 @@ function X.ConsiderQ()
 					return BOT_ACTION_DESIRE_HIGH, castLocation
 				end
 			end
-			if target:GetHealth() / target:GetMaxHealth() < 0.4 and GetUnitToUnitDistance(target, bot) <= radius + castRange then
+			if
+				target:GetHealth() / target:GetMaxHealth() < 0.4
+				and GetUnitToUnitDistance(target, bot) <= radius + castRange
+			then
 				local castLocation = Fu.GetCastLocation(bot, target, castRange, radius)
 				if castLocation ~= nil then
 					return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -260,7 +269,13 @@ function X.ConsiderQ()
 				return BOT_ACTION_DESIRE_HIGH, castLocation
 			end
 		end
-		if Fu.IsValid(weakestExtendedCreep) and creepAoe.count >= 5 and #enemiesInExtendedRange <= 0 and bot:GetActiveMode() ~= BOT_MODE_ATTACK and abilityLevel >= 3 then
+		if
+			Fu.IsValid(weakestExtendedCreep)
+			and creepAoe.count >= 5
+			and #enemiesInExtendedRange <= 0
+			and bot:GetActiveMode() ~= BOT_MODE_ATTACK
+			and abilityLevel >= 3
+		then
 			return BOT_ACTION_DESIRE_HIGH, creepAoe.targetloc
 		end
 		if
@@ -278,7 +293,11 @@ function X.ConsiderQ()
 			if heroAoe.count >= 3 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange then
 				return BOT_ACTION_DESIRE_VERYHIGH, heroAoe.targetloc
 			end
-			if heroAoe.count >= 2 and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange and bot:GetMana() > retainMana then
+			if
+				heroAoe.count >= 2
+				and GetUnitToLocationDistance(bot, heroAoe.targetloc) <= castRange
+				and bot:GetMana() > retainMana
+			then
 				return BOT_ACTION_DESIRE_HIGH, heroAoe.targetloc
 			end
 			if Fu.IsValid(weakestExtendedEnemy) then
@@ -288,7 +307,10 @@ function X.ConsiderQ()
 						return BOT_ACTION_DESIRE_HIGH, castLocation
 					end
 				end
-				if weakestExtendedEnemy:GetHealth() / weakestExtendedEnemy:GetMaxHealth() < 0.4 and GetUnitToUnitDistance(weakestExtendedEnemy, bot) <= radius + castRange then
+				if
+					weakestExtendedEnemy:GetHealth() / weakestExtendedEnemy:GetMaxHealth() < 0.4
+					and GetUnitToUnitDistance(weakestExtendedEnemy, bot) <= radius + castRange
+				then
 					local castLocation = Fu.GetCastLocation(bot, weakestExtendedEnemy, castRange, radius)
 					if castLocation ~= nil then
 						return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -503,7 +525,10 @@ function X.ConsiderW()
 					and strongestNearbyCreep:GetUnitName() ~= "npc_dota_creep_goodguys_ranged"
 			)
 		then
-			if (strongestNearbyCreepHealth > 460 or strongestCreepHealth > 390 and mpRatio > 0.45) and strongestNearbyCreepHealth <= 1200 then
+			if
+				(strongestNearbyCreepHealth > 460 or strongestCreepHealth > 390 and mpRatio > 0.45)
+				and strongestNearbyCreepHealth <= 1200
+			then
 				return BOT_ACTION_DESIRE_LOW, strongestNearbyCreep
 			end
 		end
@@ -517,7 +542,10 @@ function X.ConsiderW()
 					and strongestCreep:GetUnitName() ~= "npc_dota_creep_goodguys_ranged"
 			)
 		then
-			if (strongestCreepHealth > 410 or strongestCreepHealth > 360 and mpRatio > 0.45) and strongestCreepHealth <= 1200 then
+			if
+				(strongestCreepHealth > 410 or strongestCreepHealth > 360 and mpRatio > 0.45)
+				and strongestCreepHealth <= 1200
+			then
 				return BOT_ACTION_DESIRE_LOW, strongestCreep
 			end
 		end
@@ -550,7 +578,12 @@ function X.ConsiderW()
 		end
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and bot:GetMana() >= 400 then
-		if Fu.IsRoshan(botTarget) and not Fu.IsDisabled(botTarget) and not botTarget:IsDisarmed() and Fu.IsInRange(botTarget, bot, castRange) then
+		if
+			Fu.IsRoshan(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and not botTarget:IsDisarmed()
+			and Fu.IsInRange(botTarget, bot, castRange)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -569,7 +602,10 @@ function X.ConsiderR()
 		if
 			Fu.IsValid(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
-			and (Fu.IsDisabled(enemyHero) or Fu.IsInRange(bot, enemyHero, radius * 0.82 - enemyHero:GetCurrentMovementSpeed()))
+			and (
+				Fu.IsDisabled(enemyHero)
+				or Fu.IsInRange(bot, enemyHero, radius * 0.82 - enemyHero:GetCurrentMovementSpeed())
+			)
 		then
 			trappedEnemyCount = trappedEnemyCount + 1
 		end
@@ -628,7 +664,8 @@ function X.ConsiderCrystalClone()
 			local alliesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, true, BOT_MODE_NONE)
 			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 1200, false, BOT_MODE_NONE)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), cloneDistance)
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), cloneDistance)
 			end
 		end
 	end
@@ -643,8 +680,13 @@ function X.ConsiderCrystalClone()
 		then
 			local alliesNearEnemy = Fu.GetNearbyHeroes(enemiesNearby[1], 1200, true, BOT_MODE_NONE)
 			local enemiesNearEnemy = Fu.GetNearbyHeroes(enemiesNearby[1], 1200, false, BOT_MODE_NONE)
-			if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1)) then
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), cloneDistance)
+			if
+				alliesNearEnemy ~= nil
+				and enemiesNearEnemy ~= nil
+				and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1))
+			then
+				return BOT_ACTION_DESIRE_HIGH,
+					Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), cloneDistance)
 			end
 		end
 	end
@@ -680,7 +722,10 @@ function X.cm_GetStrongestUnit(units)
 			and string.find(unit:GetUnitName(), "siege") == nil
 			and (botLevel < 25 or unit:GetTeam() == TEAM_NEUTRAL)
 		then
-			if string.find(unit:GetUnitName(), "ranged") ~= nil and unit:GetHealth() > GetBot():GetAttackDamage() * 2 then
+			if
+				string.find(unit:GetUnitName(), "ranged") ~= nil
+				and unit:GetHealth() > GetBot():GetAttackDamage() * 2
+			then
 				return unit, 500
 			end
 			if unit:GetHealth() > highestHealth then

@@ -1,6 +1,12 @@
 -- Gather the team before a push or fight.
 local bot = GetBot()
-if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(bot:GetUnitName(), "hero") or bot:IsIllusion() then
+if
+	bot == nil
+	or bot:IsInvulnerable()
+	or not bot:IsHero()
+	or not string.find(bot:GetUnitName(), "hero")
+	or bot:IsIllusion()
+then
 	return
 end
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -57,7 +63,13 @@ function GetDesire()
 		return BOT_MODE_DESIRE_NONE
 	end
 	local pingingHuman, ping = Fu.GetHumanPing()
-	if pingingHuman ~= nil and ping ~= nil and ping.normal_ping and ping.time ~= 0 and GameTime() - ping.time < PING_MAX_AGE then
+	if
+		pingingHuman ~= nil
+		and ping ~= nil
+		and ping.normal_ping
+		and ping.time ~= 0
+		and GameTime() - ping.time < PING_MAX_AGE
+	then
 		local distanceToPing = GetUnitToLocationDistance(bot, ping.location)
 		if distanceToPing > ARRIVE_DISTANCE and distanceToPing < MAX_PING_DISTANCE then
 			assembleLocation = ping.location

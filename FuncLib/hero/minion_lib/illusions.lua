@@ -49,7 +49,9 @@ function X.ConfuseEnemyWithIllusions(bot, minion)
 		local botFacing = bot:GetFacing()
 		local awayAngle = (botFacing + 180) % 360
 		local moveDistance = 800
-		local moveLocation = minion:GetLocation() + Vector(moveDistance * math.cos(math.rad(awayAngle)), moveDistance * math.sin(math.rad(awayAngle))) + RandomVector(50)
+		local moveLocation = minion:GetLocation()
+			+ Vector(moveDistance * math.cos(math.rad(awayAngle)), moveDistance * math.sin(math.rad(awayAngle)))
+			+ RandomVector(50)
 		minion:Action_MoveToLocation(moveLocation)
 		return 1
 	end
@@ -61,7 +63,9 @@ function X.ConsiderRetreat(minion, hTarget)
 	end
 	if
 		(
-			MinionUtils.IsValidUnit(hTarget) and Fu.GetHP(hTarget) > 0.5 and hTarget:IsFacingLocation(minion:GetLocation(), 20)
+			MinionUtils.IsValidUnit(hTarget)
+				and Fu.GetHP(hTarget) > 0.5
+				and hTarget:IsFacingLocation(minion:GetLocation(), 20)
 			or Fu.GetHP(minion) < 0.25
 		)
 		and Fu.GetHP(minion) < 0.3
@@ -77,7 +81,8 @@ function X.IsTargetInShouldAimToAttackRange(minion, target, maxDistance)
 		return false
 	end
 	return GetUnitToUnitDistance(minion, target) <= minion:GetAttackRange()
-		or not MinionUtils.CantMove(minion) and GetUnitToUnitDistance(minion, target) < math.min(minion:GetAttackRange() * 3, maxDistance)
+		or not MinionUtils.CantMove(minion)
+			and GetUnitToUnitDistance(minion, target) < math.min(minion:GetAttackRange() * 3, maxDistance)
 end
 function X.ConsiderAttack(minion)
 	if MinionUtils.CantAttack(minion) then
@@ -92,7 +97,11 @@ end
 function X.GetAttackTarget(minion)
 	local target = nil
 	local minionName = minion:GetUnitName()
-	if bot:HasModifier("modifier_bane_nightmare") and not bot:IsInvulnerable() and GetUnitToUnitDistance(bot, minion) < 2000 then
+	if
+		bot:HasModifier("modifier_bane_nightmare")
+		and not bot:IsInvulnerable()
+		and GetUnitToUnitDistance(bot, minion) < 2000
+	then
 		target = bot
 	end
 	if Fu.IsInLaningPhase() then
@@ -145,7 +154,10 @@ function X.GetAttackTarget(minion)
 		then
 			if string.find(minionName, "warlock_golem") then
 				local attackDamage = minion:GetAttackDamage()
-				if Fu.IsChasingTarget(minion, target) and not Fu.WillKillTarget(target, attackDamage, DAMAGE_TYPE_PHYSICAL, 6.0) then
+				if
+					Fu.IsChasingTarget(minion, target)
+					and not Fu.WillKillTarget(target, attackDamage, DAMAGE_TYPE_PHYSICAL, 6.0)
+				then
 					return bot:GetAttackTarget()
 				end
 			end
@@ -186,7 +198,11 @@ end
 function X.IsTargetUnderEnemyTower(minion, target)
 	local enemyTowers = minion:GetNearbyTowers(1600, true)
 	if enemyTowers then
-		if Fu.IsValidBuilding(enemyTowers[1]) and MinionUtils.IsValidUnit(target) and Fu.IsInRange(target, enemyTowers[1], 880) then
+		if
+			Fu.IsValidBuilding(enemyTowers[1])
+			and MinionUtils.IsValidUnit(target)
+			and Fu.IsInRange(target, enemyTowers[1], 880)
+		then
 			return true
 		end
 	end
@@ -194,8 +210,16 @@ function X.IsTargetUnderEnemyTower(minion, target)
 end
 function X.IsMinionInLane(minion, lane)
 	for _, allyUnit in pairs(GetUnitList(UNIT_LIST_ALLIES)) do
-		if Fu.IsValid(allyUnit) and minion ~= allyUnit and allyUnit:IsIllusion() and string.find(bot:GetUnitName(), allyUnit:GetUnitName()) then
-			if allyUnit.to_farm_lane == lane or GetUnitToLocationDistance(allyUnit, GetLaneFrontLocation(GetTeam(), lane, 0)) < 1600 then
+		if
+			Fu.IsValid(allyUnit)
+			and minion ~= allyUnit
+			and allyUnit:IsIllusion()
+			and string.find(bot:GetUnitName(), allyUnit:GetUnitName())
+		then
+			if
+				allyUnit.to_farm_lane == lane
+				or GetUnitToLocationDistance(allyUnit, GetLaneFrontLocation(GetTeam(), lane, 0)) < 1600
+			then
 				return true
 			end
 		end

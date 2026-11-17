@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+local tAllAbilityBuildList =
+	{ { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[2]
 if sRole == "pos_1" then
 	nAbilityBuildList = tAllAbilityBuildList[1]
@@ -108,7 +109,8 @@ X["sSellList"] = { "item_power_treads", "item_quelling_blade", "item_abyssal_bla
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_melee_carry" }, { "item_power_treads", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -222,7 +224,11 @@ function X.ConsiderW()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PURE) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PURE)
+		then
 			if enemyHero:GetMovementDirectionStability() >= 0.75 then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
 			else
@@ -237,7 +243,12 @@ function X.ConsiderW()
 		end
 	end
 	-- Parenthesised: without them "or" let this fire with no push/defend at all whenever no enemy hero was near.
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost) and (nearbyEnemies == nil or #nearbyEnemies == 0) and #nearbyAllies <= 2 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost)
+		and (nearbyEnemies == nil or #nearbyEnemies == 0)
+		and #nearbyAllies <= 2
+	then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(1000, true)
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 1000, radius / 2, castPoint, damage)
 		if aoeLocation.count >= 4 and #nearbyLaneCreeps >= 4 then
@@ -246,13 +257,18 @@ function X.ConsiderW()
 	end
 	if Fu.IsRetreating(bot) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 1.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 1.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 			end
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
-		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 200, radius / 2, castPoint, 0)
+		local aoeLocation =
+			bot:FindAoELocation(true, true, bot:GetLocation(), castRange - 200, radius / 2, castPoint, 0)
 		if aoeLocation.count >= 2 then
 			local castableEnemyCount = Fu.GetInvUnitInLocCount(bot, castRange, radius / 2, aoeLocation.targetloc, false)
 			if castableEnemyCount >= aoeLocation.count then
@@ -261,7 +277,11 @@ function X.ConsiderW()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, castRange + radius) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(botTarget, bot, castRange + radius)
+		then
 			local castLocation = Fu.GetDelayCastLocation(bot, botTarget, castRange, radius, 2.0)
 			if castLocation ~= nil then
 				return BOT_ACTION_DESIRE_HIGH, castLocation
@@ -336,12 +356,15 @@ function X.ConsiderR()
 			if Fu.GetHP(botTarget) < 0.5 and not Fu.IsSuspiciousIllusion(botTarget) then
 				if DotaTime() >= (bot._bsRuptureLogAt or -999) then
 					bot._bsRuptureLogAt = DotaTime() + 10
-					pcall(print, string.format(
-						"[OHA-BLOODSEEKER] t=%.0f rupture solo %s hp=%.2f",
-						DotaTime(),
-						(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-						Fu.GetHP(botTarget)
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-BLOODSEEKER] t=%.0f rupture solo %s hp=%.2f",
+							DotaTime(),
+							(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+							Fu.GetHP(botTarget)
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end

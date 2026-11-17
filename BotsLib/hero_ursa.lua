@@ -44,7 +44,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -109,7 +110,11 @@ function X.ConsiderEarthshock()
 		then
 			if bot:IsFacingLocation(enemyHero:GetExtrapolatedLocation(hopDuration), 15) then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, radius + 100, true, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and #alliesNearEnemy <= 1 and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL) then
+				if
+					alliesNearEnemy ~= nil
+					and #alliesNearEnemy <= 1
+					and Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end
@@ -117,7 +122,11 @@ function X.ConsiderEarthshock()
 	end
 	if enemiesInRadius ~= nil and #enemiesInRadius >= 2 then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, radius + 300, false, BOT_MODE_NONE)
-		if nearbyAllies ~= nil and #nearbyAllies >= #enemiesInRadius and not bot:HasModifier("modifier_ursa_earthshock_move") then
+		if
+			nearbyAllies ~= nil
+			and #nearbyAllies >= #enemiesInRadius
+			and not bot:HasModifier("modifier_ursa_earthshock_move")
+		then
 			local enemyCenter = Fu.GetCenterOfUnits(enemiesInRadius)
 			if enemyCenter ~= nil and bot:IsFacingLocation(enemyCenter, 25) then
 				return BOT_ACTION_DESIRE_HIGH
@@ -147,12 +156,15 @@ function X.ConsiderEarthshock()
 				-- [OHA-URSA] the new long-reach hop only, at most once per 5s.
 				if not Fu.IsInRange(bot, botTarget, radius) and DotaTime() >= (bot._ursaReachLogAt or -999) then
 					bot._ursaReachLogAt = DotaTime() + 5
-					pcall(print, string.format(
-						"[OHA-URSA] t=%.0f earthshock-reach target=%s dist=%d",
-						DotaTime(),
-						(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
-						math.floor(GetUnitToUnitDistance(bot, botTarget))
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-URSA] t=%.0f earthshock-reach target=%s dist=%d",
+							DotaTime(),
+							(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+							math.floor(GetUnitToUnitDistance(bot, botTarget))
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH
 			end
@@ -184,7 +196,13 @@ function X.ConsiderEarthshock()
 			end
 		end
 	end
-	if Fu.IsLaning(bot) and enemiesInRadius ~= nil and nearbyTowers ~= nil and #enemiesInRadius == 0 and #nearbyTowers == 0 then
+	if
+		Fu.IsLaning(bot)
+		and enemiesInRadius ~= nil
+		and nearbyTowers ~= nil
+		and #enemiesInRadius == 0
+		and #nearbyTowers == 0
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
 		for _, creep in pairs(laneCreeps) do
 			if
@@ -233,7 +251,9 @@ function X.ConsiderOverpower()
 			local nearbyAllies = Fu.GetNearbyHeroes(bot, attackRange * 3, false, BOT_MODE_NONE)
 			local nearbyEnemies = Fu.GetNearbyHeroes(bot, attackRange * 2, true, BOT_MODE_NONE)
 			if nearbyAllies ~= nil and nearbyEnemies ~= nil and #nearbyAllies >= #nearbyEnemies then
-				if Fu.IsInRange(bot, botTarget, attackRange * 4) and bot:IsFacingLocation(botTarget:GetLocation(), 30) then
+				if
+					Fu.IsInRange(bot, botTarget, attackRange * 4) and bot:IsFacingLocation(botTarget:GetLocation(), 30)
+				then
 					return BOT_ACTION_DESIRE_HIGH
 				end
 			end

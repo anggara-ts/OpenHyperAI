@@ -106,7 +106,8 @@ X["sSellList"] = { "item_black_king_bar", "item_null_talisman" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -289,7 +290,10 @@ function X.ConsiderW()
 		debugText = "W-被卡住"
 		return BOT_ACTION_DESIRE_ABSOLUTE, castLocation, debugText
 	end
-	if Fu.IsRetreating(bot) or bot:GetActiveMode() == BOT_MODE_RETREAT and hpRatio < 0.2 and bot:DistanceFromFountain() > 1100 then
+	if
+		Fu.IsRetreating(bot)
+		or bot:GetActiveMode() == BOT_MODE_RETREAT and hpRatio < 0.2 and bot:DistanceFromFountain() > 1100
+	then
 		if Fu.ShouldEscape(bot) or bot:DistanceFromFountain() > 600 and bot:DistanceFromFountain() < 3800 then
 			castLocation = Fu.GetEscapeLoc()
 			debugText = "W-逃跑"
@@ -320,7 +324,12 @@ function X.ConsiderW()
 		end
 	end
 	local enemyTowers = bot:GetNearbyTowers(1600, true)
-	if (bot:GetActiveMode() == BOT_MODE_LANING or botLevel <= 7) and #nearbyEnemies == 0 and #enemyTowers == 0 and DotaTime() < 12 * 60 then
+	if
+		(bot:GetActiveMode() == BOT_MODE_LANING or botLevel <= 7)
+		and #nearbyEnemies == 0
+		and #enemyTowers == 0
+		and DotaTime() < 12 * 60
+	then
 		if
 			mpRatio > 0.96
 			and bot:DistanceFromFountain() > 60
@@ -337,7 +346,10 @@ function X.ConsiderW()
 					castLocation = blinkTargetLocation
 					debugText = "W-对线赶路"
 					if Fu.IsValidHero(bot:GetTarget()) then
-						if Fu.CanKillTarget(bot:GetTarget(), screamDamage, DAMAGE_TYPE_MAGICAL) and screamOfPainAbility:IsFullyCastable() then
+						if
+							Fu.CanKillTarget(bot:GetTarget(), screamDamage, DAMAGE_TYPE_MAGICAL)
+							and screamOfPainAbility:IsFullyCastable()
+						then
 							-- Return the blink location too: the caller casts Blink on blinkLocation, and nil there broke the cast.
 							return BOT_ACTION_DESIRE_VERYHIGH, castLocation, debugText
 						end
@@ -405,7 +417,11 @@ function X.ConsiderE()
 	local castTarget = nil
 	local debugText = nil
 	for _, enemyHero in pairs(enemiesInRange) do
-		if Fu.IsValid(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and Fu.CanKillTarget(enemyHero, damage, damageType) then
+		if
+			Fu.IsValid(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and Fu.CanKillTarget(enemyHero, damage, damageType)
+		then
 			castTarget = enemyHero
 			debugText = "E-击杀" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
@@ -413,7 +429,11 @@ function X.ConsiderE()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		-- Scream of Pain is SPELL_IMMUNITY_ENEMIES_NO (game files): a magic-immune target takes nothing.
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, radius - 20) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius - 20)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			castTarget = botTarget
 			debugText = "E-攻击" .. Fu.Chat.GetNormName(castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
@@ -434,7 +454,11 @@ function X.ConsiderE()
 	end
 	if Fu.IsRetreating(bot) then
 		for _, enemyHero in pairs(enemiesInRange) do
-			if Fu.IsValid(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 5.0) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if
+				Fu.IsValid(enemyHero)
+				and bot:WasRecentlyDamagedByHero(enemyHero, 5.0)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+			then
 				castTarget = enemyHero
 				debugText = "E-撤退" .. Fu.Chat.GetNormName(castTarget)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
@@ -469,13 +493,25 @@ function X.ConsiderE()
 		if killableRangedCount >= 1 and killableMeleeCount >= 1 then
 			return BOT_ACTION_DESIRE_HIGH, bot, "E对线2"
 		end
-		if #laneCreeps == 0 and Fu.IsValidHero(enemiesInRange[1]) and Fu.CanCastOnNonMagicImmune(enemiesInRange[1]) and mpRatio > 0.5 then
+		if
+			#laneCreeps == 0
+			and Fu.IsValidHero(enemiesInRange[1])
+			and Fu.CanCastOnNonMagicImmune(enemiesInRange[1])
+			and mpRatio > 0.5
+		then
 			return BOT_ACTION_DESIRE_HIGH, bot, "E消耗"
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and Fu.IsAllowedToSpam(bot, manaCost * 0.32) and #nearbyAllies <= 3 then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and Fu.IsAllowedToSpam(bot, manaCost * 0.32)
+		and #nearbyAllies <= 3
+	then
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
-		if (#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82) and not laneCreeps[1]:HasModifier("modifier_fountain_glyph") then
+		if
+			(#laneCreeps >= 4 or #laneCreeps >= 3 and mpRatio > 0.82)
+			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+		then
 			castTarget = laneCreeps[1] -- was the undefined global creep (nil); Scream is no-target
 			debugText = "E-带线AOE" .. #laneCreeps
 			return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
@@ -490,7 +526,12 @@ function X.ConsiderE()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.IsInRange(botTarget, bot, radius) and Fu.CanBeAttacked(botTarget) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius)
+			and Fu.CanBeAttacked(botTarget)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

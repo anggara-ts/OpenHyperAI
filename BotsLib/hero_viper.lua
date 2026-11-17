@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
-local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 2, 3, 6 }, { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 } }
+local tAllAbilityBuildList =
+	{ { 1, 3, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 2, 3, 6 }, { 1, 3, 1, 3, 1, 6, 1, 2, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -82,7 +83,8 @@ X["sSellList"] = { "item_black_king_bar", "item_quelling_blade", "item_mage_slay
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = true
 X["bDeafaultItem"] = false
@@ -217,7 +219,8 @@ function X.ConsiderPoisonAttack()
 				alliesNearTarget ~= nil
 				and enemiesNearTarget ~= nil
 				and #alliesNearTarget >= #enemiesNearTarget
-				and Fu.GetManaAfter(poisonAttackAbility:GetManaCost()) * bot:GetMana() > viperStrikeAbility:GetManaCost()
+				and Fu.GetManaAfter(poisonAttackAbility:GetManaCost()) * bot:GetMana()
+					> viperStrikeAbility:GetManaCost()
 			then
 				if Fu.IsInRange(bot, botTarget, attackRange) and not botTarget:IsAttackImmune() then
 					if not poisonAttackAbility:GetAutoCastState() then
@@ -277,7 +280,12 @@ function X.ConsiderPoisonAttack()
 	for _, allyHero in pairs(nearbyAllies) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(allyNearbyEnemies) do
-			if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2) and not allyHero:IsIllusion() then
+			if
+				Fu.IsValidHero(allyHero)
+				and Fu.IsRetreating(allyHero)
+				and allyHero:WasRecentlyDamagedByAnyHero(2)
+				and not allyHero:IsIllusion()
+			then
 				if
 					Fu.IsValidHero(enemyHero)
 					and Fu.CanCastOnNonMagicImmune(enemyHero)
@@ -321,7 +329,8 @@ function X.ConsiderNetherToxin()
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
 				if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				end
 			end
 		end
@@ -337,7 +346,11 @@ function X.ConsiderNetherToxin()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(0.5)
 				end
 			end
@@ -349,11 +362,21 @@ function X.ConsiderNetherToxin()
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 		end
 	end
-	if Fu.IsFarming(bot) and Fu.GetManaAfter(nethertoxinAbility:GetManaCost()) * bot:GetMana() > viperStrikeAbility:GetManaCost() and abilityLevel >= 2 then
+	if
+		Fu.IsFarming(bot)
+		and Fu.GetManaAfter(nethertoxinAbility:GetManaCost()) * bot:GetMana() > viperStrikeAbility:GetManaCost()
+		and abilityLevel >= 2
+	then
 		if isAttacking then
 			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(bot:GetAttackRange() + 200)
-			local unitsAroundCenter = Fu.GetNearbyAroundLocationUnitCount(true, false, radius, Fu.GetCenterOfUnits(nearbyNeutrals))
-			if nearbyNeutrals ~= nil and #nearbyNeutrals >= 1 and Fu.GetManaAfter(nethertoxinAbility:GetManaCost()) * bot:GetMana() > viperStrikeAbility:GetManaCost() then
+			local unitsAroundCenter =
+				Fu.GetNearbyAroundLocationUnitCount(true, false, radius, Fu.GetCenterOfUnits(nearbyNeutrals))
+			if
+				nearbyNeutrals ~= nil
+				and #nearbyNeutrals >= 1
+				and Fu.GetManaAfter(nethertoxinAbility:GetManaCost()) * bot:GetMana()
+					> viperStrikeAbility:GetManaCost()
+			then
 				if Fu.IsBigCamp(nearbyNeutrals) or nearbyNeutrals[1]:IsAncientCreep() then
 					if #nearbyNeutrals >= 2 and unitsAroundCenter >= 2 then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyNeutrals)
@@ -365,7 +388,8 @@ function X.ConsiderNetherToxin()
 				end
 			end
 			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(bot:GetAttackRange() + 200, true)
-			unitsAroundCenter = Fu.GetNearbyAroundLocationUnitCount(true, false, radius, Fu.GetCenterOfUnits(nearbyLaneCreeps))
+			unitsAroundCenter =
+				Fu.GetNearbyAroundLocationUnitCount(true, false, radius, Fu.GetCenterOfUnits(nearbyLaneCreeps))
 			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 and unitsAroundCenter >= 2 then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 			end
@@ -383,7 +407,12 @@ function X.ConsiderNetherToxin()
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
-		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not botTarget:HasModifier("modifier_viper_nethertoxin") then
+		if
+			Fu.IsTormentor(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and not botTarget:HasModifier("modifier_viper_nethertoxin")
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -426,13 +455,16 @@ local function StrikeOk(enemyHero)
 		and not enemyHero:HasModifier("modifier_item_sphere_target")
 end
 local function LogStrike(why, enemyHero)
-	pcall(print, string.format(
-		"[OHA-VIPER] t=%.0f strike why=%s target=%s hp=%.2f",
-		DotaTime(),
-		why,
-		(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-		Fu.GetHP(enemyHero)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-VIPER] t=%.0f strike why=%s target=%s hp=%.2f",
+			DotaTime(),
+			why,
+			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(enemyHero)
+		)
+	)
 end
 function X.ConsiderViperStrike()
 	if not viperStrikeAbility:IsFullyCastable() then
@@ -447,7 +479,13 @@ function X.ConsiderViperStrike()
 		end
 	end
 	if #inRange == 0 then
-		if Fu.IsDoingRoshan(bot) and Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking and not botTarget:HasModifier("modifier_roshan_spell_block") then
+		if
+			Fu.IsDoingRoshan(bot)
+			and Fu.IsRoshan(botTarget)
+			and Fu.IsInRange(bot, botTarget, 500)
+			and isAttacking
+			and not botTarget:HasModifier("modifier_roshan_spell_block")
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 		return BOT_ACTION_DESIRE_NONE, nil
@@ -519,15 +557,19 @@ function X.ConsiderNosedive()
 					if Fu.IsInRange(bot, botTarget, castRange) then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 					end
-					if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
-						return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
+					if
+						Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange)
+					then
+						return BOT_ACTION_DESIRE_HIGH,
+							Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetCenterOfUnits(enemiesNearTarget), castRange)
 					end
 				end
 				if Fu.IsInRange(bot, botTarget, castRange) then
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 				end
 				if Fu.IsInRange(bot, botTarget, castRange + radius) and not Fu.IsInRange(bot, botTarget, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, botTarget:GetLocation(), castRange)
 				end
 			end
 		end
@@ -547,8 +589,13 @@ function X.ConsiderNosedive()
 			then
 				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2)) then
-					return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange)
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(2))
+				then
+					return BOT_ACTION_DESIRE_HIGH,
+						Fu.Site.GetXUnitsTowardsLocation(bot, Fu.GetTeamFountain(), castRange)
 				end
 			end
 		end

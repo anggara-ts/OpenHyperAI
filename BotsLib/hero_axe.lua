@@ -50,7 +50,8 @@ X["sSellList"] = { "item_travel_boots", "item_quelling_blade", "item_abyssal_bla
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_tank" }, { "item_heavens_halberd", "item_quelling_blade" }
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 -- Cast when cornered (retreating into 3+ enemies with no way out), before running further.
@@ -156,7 +157,12 @@ function X.ConsiderQ()
 	if Fu.IsInTeamFight(bot, 1200) or Fu.IsGoingOnSomeone(bot) then
 		local heroesInCall = 0
 		for _, enemyHero in pairs(enemiesInRadius) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and not Fu.IsDisabled(enemyHero) then
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+			then
 				heroesInCall = heroesInCall + 1
 			end
 		end
@@ -203,7 +209,12 @@ function X.ConsiderQ()
 		end
 	end
 	if bot:GetActiveMode() == BOT_MODE_ROSHAN and Fu.GetManaAfter(manaCost) > 0.3 and hpRatio > 0.3 then
-		if Fu.IsRoshan(botTarget) and not Fu.IsDisabled(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and not Fu.IsDisabled(botTarget)
+			and Fu.IsInRange(bot, botTarget, radius)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
@@ -392,7 +403,11 @@ function X.LogAxe(why)
 end
 -- Blink (item, range 1200) into 2+ enemy heroes, or onto the engage target, then Call at once.
 function X.ConsiderBlinkCall()
-	if not berserkersCallAbility:IsFullyCastable() or bot:GetMana() < berserkersCallAbility:GetManaCost() or bot:IsRooted() then
+	if
+		not berserkersCallAbility:IsFullyCastable()
+		or bot:GetMana() < berserkersCallAbility:GetManaCost()
+		or bot:IsRooted()
+	then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if not (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot, 1200)) or Fu.GetHP(bot) < 0.4 then

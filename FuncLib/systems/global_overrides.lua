@@ -60,7 +60,8 @@ local function getStackTrace(level)
 			if not info then
 				break
 			end
-			frames[#frames + 1] = string.format("  %s:%d", tostring(info.short_src or info.source), info.currentline or -1)
+			frames[#frames + 1] =
+				string.format("  %s:%d", tostring(info.short_src or info.source), info.currentline or -1)
 		end
 		if #frames == 0 then
 			return "<no frames>"
@@ -198,7 +199,11 @@ setmetatable(_G.NIL_ABILITY, {
 function SafeAbility(ability, abilityName, heroName)
 	if ability == nil then
 		if abilityName then
-			log('[WARN] %s ability "%s" is nil (removed/renamed/innate?) — using safe proxy', heroName or "unknown", abilityName)
+			log(
+				'[WARN] %s ability "%s" is nil (removed/renamed/innate?) — using safe proxy',
+				heroName or "unknown",
+				abilityName
+			)
 		end
 		return _G.NIL_ABILITY
 	end
@@ -568,7 +573,11 @@ function CDOTABaseAbility_BotScript:GetCastRange()
 						local hasAetherLens = false
 						for slot = 0, 5 do
 							local otherItem = bot:GetItemInSlot(slot)
-							if otherItem and otherItem ~= item and string.find(otherItem:GetName(), "item_aether_lens") then
+							if
+								otherItem
+								and otherItem ~= item
+								and string.find(otherItem:GetName(), "item_aether_lens")
+							then
 								hasAetherLens = true
 								break
 							end
@@ -718,7 +727,11 @@ end
 local originalActionAttackUnit = CDOTA_Bot_Script.Action_AttackUnit
 function CDOTA_Bot_Script:Action_AttackUnit(target, isOnce)
 	if target == nil then
-		log("[OVERRIDE] Action_AttackUnit nil target for %s\n%s", tostring(self and self:GetUnitName()), getStackTrace(2))
+		log(
+			"[OVERRIDE] Action_AttackUnit nil target for %s\n%s",
+			tostring(self and self:GetUnitName()),
+			getStackTrace(2)
+		)
 		return
 	end
 	return originalActionAttackUnit(self, target, isOnce)
@@ -820,16 +833,19 @@ local function LogGrenadeSwap(self, slotA, slotB, result)
 		self._grenadeSwapLogKey = key
 		self._grenadeSwapLogAt = DotaTime() + 5
 	end
-	pcall(print, string.format(
-		"[OHA-ITEM] t=%.0f %s swap %d(%s)<->%d(%s) %s",
-		DotaTime(),
-		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
-		slotA,
-		nameA,
-		slotB,
-		nameB,
-		result
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s swap %d(%s)<->%d(%s) %s",
+			DotaTime(),
+			(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+			slotA,
+			nameA,
+			slotB,
+			nameB,
+			result
+		)
+	)
 end
 -- Checks the last swap half a second later: did the two items actually trade places?
 -- Logged for every swap that touched the grenade, and for the first 6 other swaps per bot,
@@ -855,19 +871,22 @@ function VerifyLastSwap(self)
 		end
 		self._swapChecksLogged = self._swapChecksLogged + 1
 	end
-	pcall(print, string.format(
-		"[OHA-ITEM] t=%.0f %s %s %d(%s)<->%d(%s)%s now=%s,%s",
-		DotaTime(),
-		(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
-		done and "swap-done" or "swap-noop",
-		check.a,
-		check.nameA,
-		check.b,
-		check.nameB,
-		check.reversed and " reversed" or "",
-		SlotName(self, check.a),
-		SlotName(self, check.b)
-	))
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s %s %d(%s)<->%d(%s)%s now=%s,%s",
+			DotaTime(),
+			(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+			done and "swap-done" or "swap-noop",
+			check.a,
+			check.nameA,
+			check.b,
+			check.nameB,
+			check.reversed and " reversed" or "",
+			SlotName(self, check.a),
+			SlotName(self, check.b)
+		)
+	)
 end
 function CDOTA_Bot_Script:ActionImmediate_SwapItems(slotA, slotB)
 	local forced = self._swapDespiteEnemies
@@ -899,7 +918,8 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(slotA, slotB)
 			and (mode == BOT_MODE_ATTACK or mode == BOT_MODE_RETREAT or mode == BOT_MODE_TEAM_ROAM or mode == BOT_MODE_DEFEND_ALLY)
 	-- Items that are worth bringing in mid-fight: used once and soon, and never moved back out
 	-- (they are all in sCanNotSwitchItems, so no other routine picks them to make room).
-	local incoming = (slotA >= 6 and slotA <= 8 and slotB <= 5) and nameA or ((slotB >= 6 and slotB <= 8 and slotA <= 5) and nameB or nil)
+	local incoming = (slotA >= 6 and slotA <= 8 and slotB <= 5) and nameA
+		or ((slotB >= 6 and slotB <= 8 and slotA <= 5) and nameB or nil)
 	local fightOk = fighting and incoming ~= nil and SWAP_IN_DURING_FIGHT[incoming] == true
 	local cooldown = swapPairGap - (DotaTime() - (self._swapPairTime[pairKey] or -1000))
 	if (forced or not fighting or fightOk) and (cooldown < 0 or urgent) then
@@ -907,7 +927,12 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(slotA, slotB)
 		-- After a swap the engine ignored, try the slots the other way round once.
 		local reversed = self._swapTryReverse == true
 		self._swapTryReverse = nil
-		LogGrenadeSwap(self, slotA, slotB, (forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or ""))
+		LogGrenadeSwap(
+			self,
+			slotA,
+			slotB,
+			(forced and "ok-forced" or (fighting and "ok-fight" or "ok")) .. (reversed and "-reversed" or "")
+		)
 		self._swapCheck = { a = slotA, b = slotB, nameA = nameA, nameB = nameB, at = DotaTime(), reversed = reversed }
 		if reversed then
 			return originalSwapItems(self, slotB, slotA)

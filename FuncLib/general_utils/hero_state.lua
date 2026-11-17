@@ -500,7 +500,9 @@ local function installHeroState(Fu)
 			or unit:HasModifier("modifier_bounty_hunter_wind_walk")
 			or unit:HasModifier("modifier_clinkz_wind_walk")
 			or unit:HasModifier("modifier_weaver_shukuchi")
-			or unit:HasModifier("modifier_oracle_false_promise") and unit:HasModifier("modifier_oracle_false_promise_invis")
+			or unit:HasModifier("modifier_oracle_false_promise") and unit:HasModifier(
+				"modifier_oracle_false_promise_invis"
+			)
 			or unit:HasModifier("modifier_windrunner_windrun") and unit:HasModifier("modifier_windrunner_windrun_invis")
 			or unit:HasModifier("modifier_item_invisibility_edge")
 			or unit:HasModifier("modifier_item_invisibility_edge_windwalk")

@@ -10,7 +10,11 @@ function X.ConsiderMagicMissile(unit, magicMissileAbility)
 	local damage = magicMissileAbility:GetSpecialValueInt("magic_missile_damage")
 	local nearbyEnemies = unit:GetNearbyHeroes(castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
-		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
 			if enemyHero:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
@@ -29,7 +33,12 @@ function X.ConsiderMagicMissile(unit, magicMissileAbility)
 	local nearbyAllies = unit:GetNearbyHeroes(castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				allyNearbyEnemies ~= nil
 				and #allyNearbyEnemies >= 1
@@ -66,7 +75,12 @@ function X.ConsiderMagicMissile(unit, magicMissileAbility)
 			local targetEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 			local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 			local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, unit, 5, DAMAGE_TYPE_ALL)
-			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies and maxDamage < estimatedDamage then
+			if
+				targetEnemies ~= nil
+				and targetAllies ~= nil
+				and #targetEnemies >= #targetAllies
+				and maxDamage < estimatedDamage
+			then
 				maxDamage = estimatedDamage
 				strongestTarget = enemyHero
 			end
@@ -119,7 +133,12 @@ function X.ConsiderWaveOfTerror(unit, waveOfTerrorAbility)
 			local targetEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 			local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 			local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, unit, 5, DAMAGE_TYPE_ALL)
-			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies and maxDamage < estimatedDamage then
+			if
+				targetEnemies ~= nil
+				and targetAllies ~= nil
+				and #targetEnemies >= #targetAllies
+				and maxDamage < estimatedDamage
+			then
 				maxDamage = estimatedDamage
 				strongestTarget = enemyHero
 			end
@@ -134,7 +153,12 @@ function X.ConsiderWaveOfTerror(unit, waveOfTerrorAbility)
 	end
 	local aoeLocation = unit:FindAoELocation(true, false, unit:GetLocation(), castRange, waveWidth, 0, 0)
 	local nearbyLaneCreeps = unit:GetNearbyLaneCreeps(castRange, true)
-	if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 and aoeLocation.count >= 3 and not Fu.IsThereNonSelfCoreNearby(1000) then
+	if
+		nearbyLaneCreeps ~= nil
+		and #nearbyLaneCreeps >= 3
+		and aoeLocation.count >= 3
+		and not Fu.IsThereNonSelfCoreNearby(1000)
+	then
 		return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(nearbyLaneCreeps)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -177,7 +201,14 @@ function X.ConsiderNetherSwap(unit, netherSwapAbility)
 			local targetEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
 			local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
 			local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 5, DAMAGE_TYPE_ALL)
-			if targetEnemies ~= nil and targetAllies ~= nil and #targetEnemies >= #targetAllies and #targetEnemies >= 1 and #targetEnemies <= #targetAllies + 2 and maxDamage < estimatedDamage then
+			if
+				targetEnemies ~= nil
+				and targetAllies ~= nil
+				and #targetEnemies >= #targetAllies
+				and #targetEnemies >= 1
+				and #targetEnemies <= #targetAllies + 2
+				and maxDamage < estimatedDamage
+			then
 				maxDamage = estimatedDamage
 				strongestTarget = enemyHero
 			end

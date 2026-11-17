@@ -49,7 +49,11 @@ if DOTA_UNIT_TARGET_TEAM_BOTH == nil then
 	DOTA_UNIT_TARGET_TEAM_BOTH = 3
 end
 function X.ConsiderStolenSpell(ability)
-	if ability:GetName() == "rubick_empty1" or ability:GetName() == "rubick_empty2" or not ability:IsFullyCastable() then
+	if
+		ability:GetName() == "rubick_empty1"
+		or ability:GetName() == "rubick_empty2"
+		or not ability:IsFullyCastable()
+	then
 		return
 	end
 	botTarget = Fu.GetProperTarget(bot)
@@ -123,7 +127,12 @@ function X.SmartCast(ability, abilityInfo)
 	end
 	if abilityInfo.targetsEnemy or not abilityInfo.targetsAlly and not abilityInfo.isNoTarget then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and enemyHero:IsChanneling() and Fu.IsInRange(bot, enemyHero, castRange) and not enemyHero:IsMagicImmune() then
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero:IsChanneling()
+				and Fu.IsInRange(bot, enemyHero, castRange)
+				and not enemyHero:IsMagicImmune()
+			then
 				if abilityInfo.isUnitTarget then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero
 				elseif abilityInfo.isPointTarget or abilityInfo.isAOE then
@@ -168,7 +177,13 @@ function X.SmartCast(ability, abilityInfo)
 				return BOT_ACTION_DESIRE_HIGH, nil
 			end
 		end
-		if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and Fu.CanBeAttacked(botTarget) and not botTarget:IsMagicImmune() then
+		if
+			isGoingOnSomeone
+			and Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and Fu.CanBeAttacked(botTarget)
+			and not botTarget:IsMagicImmune()
+		then
 			if abilityInfo.isUnitTarget then
 				return BOT_ACTION_DESIRE_MODERATE, botTarget
 			elseif abilityInfo.isPointTarget then

@@ -1,8 +1,10 @@
 -- Draft logic: which heroes bots pick or ban, lane slots, and chat commands such as !pos and !pick.
 require(GetScriptDirectory() .. "/FuncLib/systems/global_overrides")
 local HeroSelection = {}
-local pickState =
-	{ initialized = false, NextPickAt = { [1] = math.huge, [2] = math.huge, [3] = math.huge, [4] = math.huge, [5] = math.huge } }
+local pickState = {
+	initialized = false,
+	NextPickAt = { [1] = math.huge, [2] = math.huge, [3] = math.huge, [4] = math.huge, [5] = math.huge },
+}
 local banList = {}
 local slotHeroes = {}
 local positionHeroPools = {}
@@ -64,13 +66,16 @@ local function getKeys(source)
 	return keys
 end
 local function fitsCorePool(heroName, pos, durableQuota)
-	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName) or (Role.IsDisabler(heroName) or Role.IsNuker(heroName))
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsDisabler(heroName) or Role.IsNuker(heroName))
 end
 local function fitsOfflanePool(heroName, pos, durableQuota)
-	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName) or (Role.IsInitiator(heroName) or Role.IsDisabler(heroName) and Role.IsDurable(heroName))
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsInitiator(heroName) or Role.IsDisabler(heroName) and Role.IsDurable(heroName))
 end
 local function fitsSoftSupportPool(heroName, pos, durableQuota)
-	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName) or (Role.IsDisabler(heroName) or Role.IsHealer(heroName) or Role.IsInitiator(heroName))
+	return poolCountByPos[pos] <= durableQuota and Role.IsDurable(heroName)
+		or (Role.IsDisabler(heroName) or Role.IsHealer(heroName) or Role.IsInitiator(heroName))
 end
 local function buildPositionPool(weightsByHero, pos)
 	local candidates = {}
@@ -114,7 +119,13 @@ local function buildPositionPool(weightsByHero, pos)
 	return pool
 end
 allHeroNames = getKeys(heroPosWeights)
-positionHeroPools = { [1] = buildPositionPool(heroPosWeights, 1), [2] = buildPositionPool(heroPosWeights, 2), [3] = buildPositionPool(heroPosWeights, 3), [4] = buildPositionPool(heroPosWeights, 4), [5] = buildPositionPool(heroPosWeights, 5) }
+positionHeroPools = {
+	[1] = buildPositionPool(heroPosWeights, 1),
+	[2] = buildPositionPool(heroPosWeights, 2),
+	[3] = buildPositionPool(heroPosWeights, 3),
+	[4] = buildPositionPool(heroPosWeights, 4),
+	[5] = buildPositionPool(heroPosWeights, 5),
+}
 slotHeroes = {
 	[1] = positionHeroPools[1][RandomInt(1, #positionHeroPools[1])],
 	[2] = positionHeroPools[2][RandomInt(1, #positionHeroPools[2])],
@@ -196,9 +207,7 @@ local hasDebugForcedPicks = false
 if CustomLoader then
 	forcedPickList = getForcedPickList(GetTeam())
 	hasDebugForcedPicks = applyForcedPicks(forcedPickList)
-		and (
-			hasForcedHeroNames(CustomLoader.Debug_Ally_Heros) or hasForcedHeroNames(CustomLoader.Debug_Enemy_Heros)
-		)
+		and (hasForcedHeroNames(CustomLoader.Debug_Ally_Heros) or hasForcedHeroNames(CustomLoader.Debug_Enemy_Heros))
 end
 function HeroSelection.IsInCustomizedPicks(heroName)
 	if not CustomLoader then
@@ -225,12 +234,20 @@ function HeroSelection.ShufflePickOrder(teamPlayers)
 	local order = HeroSelection.ShuffleArray({ 1, 2, 3, 4, 5 })
 	for slot = 1, #order do
 		local otherSlot = order[slot]
-		if teamPlayers[slot] and teamPlayers[slot] >= 0 and IsPlayerBot(teamPlayers[slot]) and IsPlayerBot(teamPlayers[otherSlot]) then
+		if
+			teamPlayers[slot]
+			and teamPlayers[slot] >= 0
+			and IsPlayerBot(teamPlayers[slot])
+			and IsPlayerBot(teamPlayers[otherSlot])
+		then
 			slotHeroes[slot], slotHeroes[otherSlot] = slotHeroes[otherSlot], slotHeroes[slot]
 			forcedSlot[slot], forcedSlot[otherSlot] = forcedSlot[otherSlot], forcedSlot[slot]
-			positionHeroPools[slot], positionHeroPools[otherSlot] = positionHeroPools[otherSlot], positionHeroPools[slot]
-			laneAssignments["TEAM_RADIANT"][slot], laneAssignments["TEAM_RADIANT"][otherSlot] = laneAssignments["TEAM_RADIANT"][otherSlot], laneAssignments["TEAM_RADIANT"][slot]
-			laneAssignments["TEAM_DIRE"][slot], laneAssignments["TEAM_DIRE"][otherSlot] = laneAssignments["TEAM_DIRE"][otherSlot], laneAssignments["TEAM_DIRE"][slot]
+			positionHeroPools[slot], positionHeroPools[otherSlot] =
+				positionHeroPools[otherSlot], positionHeroPools[slot]
+			laneAssignments["TEAM_RADIANT"][slot], laneAssignments["TEAM_RADIANT"][otherSlot] =
+				laneAssignments["TEAM_RADIANT"][otherSlot], laneAssignments["TEAM_RADIANT"][slot]
+			laneAssignments["TEAM_DIRE"][slot], laneAssignments["TEAM_DIRE"][otherSlot] =
+				laneAssignments["TEAM_DIRE"][otherSlot], laneAssignments["TEAM_DIRE"][slot]
 			Role.RoleAssignment["TEAM_RADIANT"][slot], Role.RoleAssignment["TEAM_RADIANT"][otherSlot] =
 				Role.RoleAssignment["TEAM_RADIANT"][otherSlot], Role.RoleAssignment["TEAM_RADIANT"][slot]
 			Role.RoleAssignment["TEAM_DIRE"][slot], Role.RoleAssignment["TEAM_DIRE"][otherSlot] =
@@ -603,14 +620,7 @@ local function SwapRoleWithHolder(teamKey, players, idx, newPos)
 	end
 	ApplyLanesFromRoles(teamKey)
 	Role.HeroPositions = {}
-	log(
-		"Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s",
-		teamKey,
-		idx,
-		oldPos,
-		tostring(holder),
-		newPos
-	)
+	log("Swap role ok. Team: %s idx %s pos %s <-> idx %s pos %s", teamKey, idx, oldPos, tostring(holder), newPos)
 	return "ok"
 end
 local function countWeakHeroes(team)
@@ -836,7 +846,11 @@ local function handleChatCommand(text, senderId, teamOnly)
 				local pickForAlly = teamOnly == true or teamOnly == false and GetTeamForPlayer(senderId) ~= GetTeam()
 				if pickForAlly then
 					for _, playerId in pairs(teamPlayers) do
-						if IsPlayerBot(playerId) and IsPlayerInHeroSelectionControl(playerId) and GetSelectedHeroName(playerId) == "" then
+						if
+							IsPlayerBot(playerId)
+							and IsPlayerInHeroSelectionControl(playerId)
+							and GetSelectedHeroName(playerId) == ""
+						then
 							SelectHero(playerId, heroName)
 							if Utils.HasValue(weakHeroes, heroName) then
 								weakHeroPickCount[GetTeam()] = weakHeroPickCount[GetTeam()] + 1
@@ -934,12 +948,7 @@ local function handleChatCommand(text, senderId, teamOnly)
 				local targetHero = targetPid and GetSelectedHeroName(targetPid) or ""
 				-- Don't force a core hero onto 4/5. Leave the roster as it is.
 				if position >= 4 and IsCorePreferredHero(targetHero) then
-					log(
-						"Refuse !%spos %s: %s is a core hero",
-						botIndexText,
-						positionText,
-						targetHero
-					)
+					log("Refuse !%spos %s: %s is a core hero", botIndexText, positionText, targetHero)
 				else
 					local swapped = SwapRoleWithHolder(teamKey, teamPlayers, botIndex, position)
 					if swapped == "human" then
@@ -968,7 +977,11 @@ local function initPickTimes()
 	if pickState.initialized then
 		return
 	end
-	if GameTime() < 3.0 and not skipHumanWait or HeroSelection.IsHumanNotReady(GetTeam()) or HeroSelection.IsHumanNotReady(GetOpposingTeam()) then
+	if
+		GameTime() < 3.0 and not skipHumanWait
+		or HeroSelection.IsHumanNotReady(GetTeam())
+		or HeroSelection.IsHumanNotReady(GetOpposingTeam())
+	then
 		return
 	end
 	local startTime = GameTime() + 3
@@ -989,7 +1002,11 @@ function Think()
 	elseif GetGameMode() == GAMEMODE_1V1MID then
 		OneVsOneLogic()
 	else
-		if GameTime() < 3.0 and not skipHumanWait or HeroSelection.IsHumanNotReady(GetTeam()) or HeroSelection.IsHumanNotReady(GetOpposingTeam()) then
+		if
+			GameTime() < 3.0 and not skipHumanWait
+			or HeroSelection.IsHumanNotReady(GetTeam())
+			or HeroSelection.IsHumanNotReady(GetOpposingTeam())
+		then
 			if GetGameMode() ~= GAMEMODE_TURBO then
 				return
 			end
@@ -1104,7 +1121,12 @@ function OneVsOneLogic()
 		oneVsOnePicked = true
 	end
 	for _, playerId in pairs(GetTeamPlayers(GetTeam())) do
-		if not oneVsOnePicked and IsPlayerBot(playerId) and IsPlayerInHeroSelectionControl(playerId) and GetSelectedHeroName(playerId) == "" then
+		if
+			not oneVsOnePicked
+			and IsPlayerBot(playerId)
+			and IsPlayerInHeroSelectionControl(playerId)
+			and GetSelectedHeroName(playerId) == ""
+		then
 			if Utils.IsHumanPlayerInAnyTeam() then
 				heroName = GetSelectedHumanHero(GetOpposingTeam())
 			else
@@ -1118,7 +1140,12 @@ function OneVsOneLogic()
 				end
 			end
 			return
-		elseif oneVsOnePicked and IsPlayerBot(playerId) and IsPlayerInHeroSelectionControl(playerId) and GetSelectedHeroName(playerId) == "" then
+		elseif
+			oneVsOnePicked
+			and IsPlayerBot(playerId)
+			and IsPlayerInHeroSelectionControl(playerId)
+			and GetSelectedHeroName(playerId) == ""
+		then
 			local fallbackHero = "npc_dota_hero_techies"
 			if HeroSelection.CanPickHero(GetTeam(), fallbackHero) then
 				SelectHero(playerId, fallbackHero)

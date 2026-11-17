@@ -74,7 +74,11 @@ function X.ConsiderShurikenToss()
 		if npcEnemy:IsChanneling() and not npcEnemy:IsMagicImmune() then
 			if npcEnemy:HasModifier("modifier_bounty_hunter_track") then
 				for _, enemyUnit in pairs(nearbyEnemyUnits) do
-					if Fu.IsValid(enemyUnit) and Fu.CanCastOnTargetAdvanced(enemyUnit) and not enemyUnit:IsMagicImmune() then
+					if
+						Fu.IsValid(enemyUnit)
+						and Fu.CanCastOnTargetAdvanced(enemyUnit)
+						and not enemyUnit:IsMagicImmune()
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyUnit
 					end
 				end
@@ -89,7 +93,11 @@ function X.ConsiderShurikenToss()
 		then
 			if npcEnemy:HasModifier("modifier_bounty_hunter_track") then
 				for _, enemyUnit in pairs(nearbyEnemyUnits) do
-					if Fu.IsValid(enemyUnit) and Fu.CanCastOnTargetAdvanced(enemyUnit) and not enemyUnit:IsMagicImmune() then
+					if
+						Fu.IsValid(enemyUnit)
+						and Fu.CanCastOnTargetAdvanced(enemyUnit)
+						and not enemyUnit:IsMagicImmune()
+					then
 						return BOT_ACTION_DESIRE_HIGH, enemyUnit
 					end
 				end
@@ -128,7 +136,11 @@ function X.ConsiderShurikenToss()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange + bounceRadius + 100) and Fu.CanCastOnNonMagicImmune(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + bounceRadius + 100)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+		then
 			if botTarget:HasModifier("modifier_bounty_hunter_track") then
 				for _, enemyUnit in pairs(nearbyEnemyUnits) do
 					if
@@ -271,7 +283,12 @@ function X.ConsiderFriendlyShadow()
 	local castRange = Fu.GetProperCastRange(false, bot, friendlyShadowAbility:GetCastRange())
 	local alliesInRange = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(alliesInRange) do
-		if Fu.IsGoingOnSomeone(allyHero) and Fu.IsInRange(bot, allyHero, castRange) and Fu.IsNotSelf(bot, allyHero) and not Fu.IsRealInvisible(allyHero) then
+		if
+			Fu.IsGoingOnSomeone(allyHero)
+			and Fu.IsInRange(bot, allyHero, castRange)
+			and Fu.IsNotSelf(bot, allyHero)
+			and not Fu.IsRealInvisible(allyHero)
+		then
 			return BOT_ACTION_DESIRE_HIGH, allyHero
 		end
 		if

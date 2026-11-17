@@ -334,7 +334,8 @@ Item["tEarlyConsumableItem"] = {
 	"item_magic_stick",
 	"item_smoke_of_deceit",
 }
-Item["tEarlyBoots"] = { "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
+Item["tEarlyBoots"] =
+	{ "item_boots", "item_phase_boots", "item_power_treads", "item_tranquil_boots", "item_arcane_boots" }
 Item["sCanNotSwitchItems"] = {
 	"item_aegis",
 	-- Swapped in from the backpack for a push; other swaps must not send it back.
@@ -1774,13 +1775,16 @@ function Item.TryPickupRoshanDrop(bot)
 		if cheap ~= nil and cheap >= 0 and bestDist <= 600 then
 			local item = bot:GetItemInSlot(cheap)
 			if item ~= nil then
-				pcall(print, string.format(
-					"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
-					DotaTime(),
-					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-					Item.RoshanClaimKind(best.item:GetName()) or "drop",
-					(string.gsub(item:GetName(), "^item_", ""))
-				))
+				pcall(
+					print,
+					string.format(
+						"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						Item.RoshanClaimKind(best.item:GetName()) or "drop",
+						(string.gsub(item:GetName(), "^item_", ""))
+					)
+				)
 				bot._roshReturn = { name = item:GetName(), at = DotaTime() }
 				bot:Action_DropItem(item, bot:GetLocation())
 				return true

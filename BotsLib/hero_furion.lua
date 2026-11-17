@@ -13,23 +13,27 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 -- tAllAbilityBuildList[1] (pos 1/2): Nature's Call first, then Teleportation, Sprout last (Dotabuff most picked order).
-local tAllAbilityBuildList = { { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, { 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 }, {
-	2,
-	1,
-	1,
-	2,
-	1,
-	6,
-	1,
-	2,
-	2,
-	3,
-	6,
-	3,
-	3,
-	3,
-	6,
-} }
+local tAllAbilityBuildList = {
+	{ 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 },
+	{ 3, 1, 3, 2, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 },
+	{
+		2,
+		1,
+		1,
+		2,
+		1,
+		6,
+		1,
+		2,
+		2,
+		3,
+		6,
+		3,
+		3,
+		3,
+		6,
+	},
+}
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" or sRole == "pos_2" then
@@ -158,7 +162,8 @@ X["sSellList"] = {
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -170,8 +175,10 @@ local function refreshAbilities()
 	sproutAbility = SafeAbility(bot:GetAbilityByName("furion_sprout"), "furion_sprout", "furion")
 	teleportationAbility = SafeAbility(bot:GetAbilityByName("furion_teleportation"), "furion_teleportation", "furion")
 	naturesCallAbility = SafeAbility(bot:GetAbilityByName("furion_force_of_nature"), "furion_force_of_nature", "furion")
-	curseOfTheOldGrowthAbility = SafeAbility(bot:GetAbilityByName("furion_curse_of_the_forest"), "furion_curse_of_the_forest", "furion")
-	wrathOfNatureAbility = SafeAbility(bot:GetAbilityByName("furion_wrath_of_nature"), "furion_wrath_of_nature", "furion")
+	curseOfTheOldGrowthAbility =
+		SafeAbility(bot:GetAbilityByName("furion_curse_of_the_forest"), "furion_curse_of_the_forest", "furion")
+	wrathOfNatureAbility =
+		SafeAbility(bot:GetAbilityByName("furion_wrath_of_nature"), "furion_wrath_of_nature", "furion")
 end
 local botTarget, nearbyAllies, nearbyEnemies, isAttacking
 local isGoingOnSomeone
@@ -194,7 +201,14 @@ function X.SkillsComplement()
 	end
 	local sproutCallDesire, sproutCallTarget, sproutCallLocation = X.ConsiderSproutCall()
 	if sproutCallDesire > 0 and sproutCallTarget ~= nil then
-		pcall(print, string.format("[OHA-FURION] t=%.0f sprout-call dist=%.0f", DotaTime(), GetUnitToLocationDistance(bot, sproutCallLocation)))
+		pcall(
+			print,
+			string.format(
+				"[OHA-FURION] t=%.0f sprout-call dist=%.0f",
+				DotaTime(),
+				GetUnitToLocationDistance(bot, sproutCallLocation)
+			)
+		)
 		bot:Action_ClearActions(true)
 		bot:ActionQueue_UseAbilityOnEntity(sproutAbility, sproutCallTarget)
 		bot:ActionQueue_Delay(0.35 + 0.44)
@@ -203,16 +217,19 @@ function X.SkillsComplement()
 	end
 	local teleportationDesire, teleportationLocation = X.ConsiderTeleportation()
 	if teleportationDesire > 0 then
-		pcall(print, string.format(
-			"[OHA-FURION] t=%.0f teleport to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
-			DotaTime(),
-			teleportationLocation.x,
-			teleportationLocation.y,
-			GetUnitToLocationDistance(bot, teleportationLocation),
-			Fu.GetHP(bot),
-			bot:GetActiveMode(),
-			#(Fu.GetEnemiesNearLoc(teleportationLocation, 1200) or {})
-		))
+		pcall(
+			print,
+			string.format(
+				"[OHA-FURION] t=%.0f teleport to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
+				DotaTime(),
+				teleportationLocation.x,
+				teleportationLocation.y,
+				GetUnitToLocationDistance(bot, teleportationLocation),
+				Fu.GetHP(bot),
+				bot:GetActiveMode(),
+				#(Fu.GetEnemiesNearLoc(teleportationLocation, 1200) or {})
+			)
+		)
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(teleportationAbility, teleportationLocation)
 		bot.useProphetTP = false
@@ -262,7 +279,11 @@ function X.ConsiderSprout()
 	if isInTeamFight then
 		local bestTarget, highestDamage = nil, 0
 		for _, enemyHero in pairs(nearbyEnemies) do
-			if isGoodSproutTarget(enemyHero) and not Fu.IsDisabled(enemyHero) and Fu.IsInRange(bot, enemyHero, castRange) then
+			if
+				isGoodSproutTarget(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange)
+			then
 				local estimatedDamage = enemyHero:GetEstimatedDamageToTarget(true, bot, 5, DAMAGE_TYPE_ALL)
 				if estimatedDamage > highestDamage then
 					bestTarget = enemyHero
@@ -275,7 +296,12 @@ function X.ConsiderSprout()
 		end
 	end
 	if isGoingOnSomeone then
-		if isGoodSproutTarget(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and not Fu.IsDisabled(botTarget) then
+		if
+			isGoodSproutTarget(botTarget)
+			and Fu.CanCastOnMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -302,7 +328,12 @@ function X.ConsiderSprout()
 			and (not Fu.IsCore(bot) or Fu.GetMP(bot) > 0.5)
 		then
 			local enemiesNearAlly = allyHero:GetNearbyHeroes(castRange, true, BOT_MODE_NONE)
-			if Fu.IsValidHero(enemiesNearAlly[1]) and isGoodSproutTarget(enemiesNearAlly[1]) and Fu.IsInRange(bot, enemiesNearAlly[1], castRange) and Fu.IsChasingTarget(enemiesNearAlly[1], allyHero) then
+			if
+				Fu.IsValidHero(enemiesNearAlly[1])
+				and isGoodSproutTarget(enemiesNearAlly[1])
+				and Fu.IsInRange(bot, enemiesNearAlly[1], castRange)
+				and Fu.IsChasingTarget(enemiesNearAlly[1], allyHero)
+			then
 				return BOT_ACTION_DESIRE_HIGH, enemiesNearAlly[1]
 			end
 		end
@@ -325,12 +356,20 @@ function X.ConsiderTeleportation()
 	-- push, a defense, Roshan or a Tormentor needs half HP; below it only the fountain is a target.
 	local fitToJoin = Fu.GetHP(bot) >= 0.5
 	local teamFightLocation = Fu.GetTeamFightLocation(bot)
-	if fitToJoin and teamFightLocation ~= nil and (not Fu.IsCore(bot) or not Fu.IsInLaningPhase() or bot:GetNetWorth() > 3500) then
+	if
+		fitToJoin
+		and teamFightLocation ~= nil
+		and (not Fu.IsCore(bot) or not Fu.IsInLaningPhase() or bot:GetNetWorth() > 3500)
+	then
 		local distance = GetUnitToLocationDistance(bot, teamFightLocation)
 		local travelTime = distance / moveSpeed
 		if travelTime > castPoint + 2 then
 			local alliesNearFight = Fu.GetAlliesNearLoc(teamFightLocation, 1200)
-			if alliesNearFight ~= nil and #alliesNearFight >= 1 and Fu.IsValidHero(alliesNearFight[#alliesNearFight]) then
+			if
+				alliesNearFight ~= nil
+				and #alliesNearFight >= 1
+				and Fu.IsValidHero(alliesNearFight[#alliesNearFight])
+			then
 				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(alliesNearFight[#alliesNearFight], castPoint)
 			end
 		end
@@ -356,7 +395,12 @@ function X.ConsiderTeleportation()
 				then
 					local enemiesNearTarget = allyAttackTarget:GetNearbyHeroes(800, false, BOT_MODE_NONE)
 					local alliesNearTeammate = teamMember:GetNearbyHeroes(800, false, BOT_MODE_NONE)
-					if alliesNearTeammate and enemiesNearTarget and #alliesNearTeammate + 1 >= #enemiesNearTarget and not Fu.IsLocationInChrono(Fu.GetCorrectLoc(teamMember, castPoint)) then
+					if
+						alliesNearTeammate
+						and enemiesNearTarget
+						and #alliesNearTeammate + 1 >= #enemiesNearTarget
+						and not Fu.IsLocationInChrono(Fu.GetCorrectLoc(teamMember, castPoint))
+					then
 						return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(teamMember, castPoint)
 					end
 				end
@@ -452,7 +496,11 @@ function X.ConsiderNaturesCall()
 	end
 	if Fu.IsFarming(bot) and Fu.GetManaAfter(naturesCallAbility:GetManaCost()) > 0.35 and isAttacking then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if neutralCreeps and Fu.IsValid(neutralCreeps[1]) and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			neutralCreeps
+			and Fu.IsValid(neutralCreeps[1])
+			and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+		then
 			return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 		end
 		if laneCreeps and #laneCreeps >= 3 and Fu.CanBeAttacked(laneCreeps[1]) then
@@ -473,7 +521,12 @@ function X.ConsiderNaturesCall()
 	then
 		return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 	end
-	if Fu.IsDoingTormentor(bot) and Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, bot:GetAttackRange()) and isAttacking then
+	if
+		Fu.IsDoingTormentor(bot)
+		and Fu.IsTormentor(botTarget)
+		and Fu.IsInRange(bot, botTarget, bot:GetAttackRange())
+		and isAttacking
+	then
 		return BOT_ACTION_DESIRE_HIGH, nearbyTrees[1]
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -556,12 +609,21 @@ function X.ConsiderSproutCall()
 	-- Sprout is cast on Furion, so its trees ring him; Nature's Call only converts trees within its
 	-- area (150-375) of the point. Calling at the creep centre (up to 850 away) found none of the
 	-- sprouted trees. Call on Furion, as the farming case already does.
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and laneCreeps and #laneCreeps >= 4 and Fu.CanBeAttacked(laneCreeps[1]) then
+	if
+		(Fu.IsPushing(bot) or Fu.IsDefending(bot))
+		and laneCreeps
+		and #laneCreeps >= 4
+		and Fu.CanBeAttacked(laneCreeps[1])
+	then
 		return BOT_ACTION_DESIRE_HIGH, bot, bot:GetLocation()
 	end
 	if Fu.IsFarming(bot) and isAttacking then
 		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if neutralCreeps and Fu.IsValid(neutralCreeps[1]) and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep()) then
+		if
+			neutralCreeps
+			and Fu.IsValid(neutralCreeps[1])
+			and (#neutralCreeps >= 3 or #neutralCreeps >= 2 and neutralCreeps[1]:IsAncientCreep())
+		then
 			return BOT_ACTION_DESIRE_HIGH, bot, bot:GetLocation()
 		end
 		-- Same as the push case: call where the sprouted trees are (around Furion).

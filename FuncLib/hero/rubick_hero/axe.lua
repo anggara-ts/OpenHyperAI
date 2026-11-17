@@ -55,7 +55,12 @@ function X.ConsiderBerserkersCall()
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, radius - 90) and Fu.CanCastOnNonMagicImmune(botTarget) and not Fu.IsDisabled(botTarget) then
+		if
+			Fu.IsValidHero(botTarget)
+			and Fu.IsInRange(botTarget, bot, radius - 90)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and not Fu.IsDisabled(botTarget)
+		then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

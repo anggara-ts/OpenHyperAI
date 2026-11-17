@@ -65,7 +65,8 @@ X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end
-nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] = Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
+nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
+	Fu.SetUserHeroInit(nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"])
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
@@ -153,7 +154,10 @@ function X.SkillsComplement()
 		-- fix: Cold Feet is DOTA_ABILITY_BEHAVIOR_UNIT_TARGET (game data and datafeed, the AoE talent only
 		-- adds area_of_effect), so the location order given with the talent was refused and Cold Feet
 		-- was not cast exactly when 2+ enemies stood together. Only order a location if it really is a point spell.
-		if coldFeetAoeTalent:IsTrained() and Fu.CheckBitfieldFlag(coldFeetAbility:GetBehavior(), ABILITY_BEHAVIOR_POINT) then
+		if
+			coldFeetAoeTalent:IsTrained()
+			and Fu.CheckBitfieldFlag(coldFeetAbility:GetBehavior(), ABILITY_BEHAVIOR_POINT)
+		then
 			local radius = 450
 			local castRange = Fu.GetProperCastRange(false, bot, coldFeetAbility:GetCastRange())
 			local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
@@ -182,7 +186,12 @@ function X.ConsiderColdFeet()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 150, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -278,7 +287,11 @@ function X.ConsiderIceVortex()
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, 0, 0)
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 		-- fix: `#enemiesInRadius` alone is always true; require an enemy hero in the vortex
-		if enemiesInRadius ~= nil and #enemiesInRadius >= 1 and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange then
+		if
+			enemiesInRadius ~= nil
+			and #enemiesInRadius >= 1
+			and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange
+		then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
@@ -320,7 +333,12 @@ function X.ConsiderIceVortex()
 	if (Fu.IsDefending(bot) or Fu.IsPushing(bot)) and not Fu.IsThereNonSelfCoreNearby(1000) then
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, castPoint, 0)
-		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and aoeLocation.count >= 4 and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange then
+		if
+			nearbyLaneCreeps ~= nil
+			and #nearbyLaneCreeps >= 4
+			and aoeLocation.count >= 4
+			and GetUnitToLocationDistance(bot, aoeLocation.targetloc) <= castRange
+		then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 		aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius, castPoint, 0)
@@ -329,7 +347,12 @@ function X.ConsiderIceVortex()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
 		end
 	end
@@ -344,7 +367,8 @@ function X.ConsiderChillingTouch()
 	if not chillingTouchAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local castRange = Fu.GetProperCastRange(false, bot, chillingTouchAbility:GetCastRange()) + chillingTouchAbility:GetSpecialValueInt("attack_range_bonus")
+	local castRange = Fu.GetProperCastRange(false, bot, chillingTouchAbility:GetCastRange())
+		+ chillingTouchAbility:GetSpecialValueInt("attack_range_bonus")
 	local damage = chillingTouchAbility:GetSpecialValueInt("damage")
 	botTarget = Fu.GetProperTarget(bot)
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
@@ -366,7 +390,12 @@ function X.ConsiderChillingTouch()
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 50, false, BOT_MODE_NONE)
 	for _, allyHero in pairs(nearbyAllies) do
 		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-		if Fu.IsValidHero(allyHero) and Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(1.5) and not allyHero:IsIllusion() then
+		if
+			Fu.IsValidHero(allyHero)
+			and Fu.IsRetreating(allyHero)
+			and allyHero:WasRecentlyDamagedByAnyHero(1.5)
+			and not allyHero:IsIllusion()
+		then
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -424,7 +453,12 @@ function X.ConsiderChillingTouch()
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
-		if Fu.IsRoshan(botTarget) and Fu.CanCastOnNonMagicImmune(botTarget) and Fu.IsInRange(bot, botTarget, castRange) and isAttacking then
+		if
+			Fu.IsRoshan(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
+			and isAttacking
+		then
 			return BOT_ACTION_DESIRE_HIGH, botTarget
 		end
 	end
@@ -471,8 +505,15 @@ function X.ConsiderIceBlastRelease()
 	end
 	local linearProjectiles = GetLinearProjectiles()
 	for _, projectile in pairs(linearProjectiles) do
-		if projectile ~= nil and projectile.ability ~= nil and projectile.ability:GetName() == "ancient_apparition_ice_blast" then
-			if iceBlastCastLocation ~= nil and Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location) < 100 then
+		if
+			projectile ~= nil
+			and projectile.ability ~= nil
+			and projectile.ability:GetName() == "ancient_apparition_ice_blast"
+		then
+			if
+				iceBlastCastLocation ~= nil
+				and Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location) < 100
+			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
 			-- fix: at 1500 speed the tracer moves ~50-150 units between thinks and could skip the
@@ -486,11 +527,14 @@ function X.ConsiderIceBlastRelease()
 			then
 				if DotaTime() >= (bot._aaReleaseLogAt or -999) then
 					bot._aaReleaseLogAt = DotaTime() + 10
-					pcall(print, string.format(
-						"[OHA-AA] t=%.0f ice blast release (overshoot check) miss=%d",
-						DotaTime(),
-						math.floor(Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location))
-					))
+					pcall(
+						print,
+						string.format(
+							"[OHA-AA] t=%.0f ice blast release (overshoot check) miss=%d",
+							DotaTime(),
+							math.floor(Fu.GetLocationToLocationDistance(iceBlastCastLocation, projectile.location))
+						)
+					)
 				end
 				return BOT_ACTION_DESIRE_HIGH
 			end

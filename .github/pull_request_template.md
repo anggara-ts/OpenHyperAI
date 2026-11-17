@@ -27,12 +27,13 @@ or object still gets its own sub-bullet with its own Before/Now.
 -
 
 ## How to verify in game
-<!-- The [OHA-*] log lines to look for in the next game's console, and what a good result looks like. -->
+<!-- The [OHA-*] log lines to look for in the next game, and what a good result looks like. When a machine can
+check a bullet, end it with an HTML comment holding "expect: seen>=1; key<=X" and/or "heroes: a,b" (Util/verify.js). -->
 -
 
 ## Checks
-- [ ] CI green: LuaJIT syntax, luacheck, StyLua
-- [ ] `Customize/version.lua` bumped
+- [ ] CI green: LuaJIT syntax, luacheck, StyLua, Tests
+- [ ] Build checked: `[OHA-BUILD]` in the test game names this branch
 - [ ] No `Customize/general.lua` test lineup, no match logs committed
 - [ ] Dota mechanics checked against game data / datafeed (not memory)
 - [ ] Tested in a local game (game NNN) / not yet tested

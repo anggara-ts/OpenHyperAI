@@ -11,3 +11,5 @@ Buff/
 Customize/fretbots.lua
 # In-game verification tracker (Util/verify.js): local test state, quotes match-log lines
 Util/verify/
+# Build info for the game's version line (Util/build-info.js, run by the git hooks)
+Customize/build_info.lua

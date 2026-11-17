@@ -3,11 +3,13 @@
 //
 //   node Util/issue-prs.js [--dry-run]
 //
-// For each open issue without a PR (matched by "Closes #N" in a PR body or "issue-N" in the branch name):
+// For each open issue without a PR (matched by "Refs #N" / "Closes #N" in a PR body or "issue-N" in the branch):
 //   - branch  <prefix>/issue-<N>-<slug>  from origin/main  (prefix: feat for "enhancement", docs for
 //     "documentation", chore for "chore", otherwise fix)
 //   - one signed empty commit (git commit-tree -S, so no checkout and no working-tree change),
-//   - a draft PR titled "<prefix>: <issue title> (#N)" with the PR template and "Closes #N".
+//   - a draft PR titled "<prefix>: <issue title> (#N)" with the PR template and "Refs #N".
+//     Never "Closes #N": merging a PR must not close the issue. The issue is closed by hand when every
+//     task item in it is ticked (an issue card can need several PRs or games).
 // Issues labelled "no-pr" are skipped. Runs locally (not as a GitHub Action) because the branch rules require
 // commits signed with the maintainer's key.
 "use strict";
@@ -41,7 +43,7 @@ const issues = JSON.parse(gh(["issue", "list", "--state", "open", "--limit", "20
 const prs = JSON.parse(gh(["pr", "list", "--state", "all", "--limit", "300", "--json", "number,headRefName,body"]));
 const covered = new Set();
 for (const pr of prs) {
-	for (const m of (pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi)) covered.add(Number(m[1]));
+	for (const m of (pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|related to|part of)\s+#(\d+)/gi)) covered.add(Number(m[1]));
 	const b = pr.headRefName.match(/issue-(\d+)/);
 	if (b) covered.add(Number(b[1]));
 }
@@ -62,7 +64,7 @@ for (const issue of issues) {
 	if (DRY) continue;
 	const sha = git(["commit-tree", "-S", baseTree, "-p", baseSha, "-m", `chore: start work on #${issue.number}\n\n${issue.title}`]);
 	git(["push", "-q", "origin", `${sha}:refs/heads/${branch}`]);
-	const body = `Closes #${issue.number}\n\n` + template;
+	const body = `Refs #${issue.number}\n\n` + template;
 	const out = gh(["pr", "create", "--draft", "--base", "main", "--head", branch, "--title", title, "--body", body]);
 	console.log("   " + out.trim());
 	made++;

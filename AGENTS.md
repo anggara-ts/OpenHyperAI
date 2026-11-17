@@ -1,6 +1,7 @@
 # AGENTS.md
 
 Working rules for anyone (people or AI coding agents) changing this repo. Read this before the first change.
+Setting up a machine (hooks, signing, linking Dota to the clone) is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 OpenHyperAI is a set of Lua bot scripts for Dota 2. The game runs them with LuaJIT. There is no build step and
 no unit-test harness: the checks below plus a real bot game are the test.
@@ -74,26 +75,38 @@ Prefix a file with `--` only for a short local test, never as a long-term "disab
 
 - Conventional messages: `fix(scope): ...`, `feat(scope): ...`, `refactor: ...`, `style: ...`, `ci: ...`,
   `docs: ...`, `chore: ...`. The body says what was wrong, what changed, and which `[OHA-*]` log shows it.
-- Bump `Customize/version.lua` on every commit that changes Lua: `number = "YYYY.MM.DD-NNN"`, `NNN` +1 per
-  change, reset to `001` on a new date. Bump `FuncLib/systems/version.lua` (`"0.7.41 - YYYY/MM/DD"`) when the
-  date changes.
+- **No manual version bump.** The git hooks (see pre-commit hooks) run `Util/build-info.js` after every checkout,
+  commit, merge and rebase; it writes the git-ignored `Customize/build_info.lua`, and the game prints
+  `[OHA-BUILD] version=<commit date>-<sha>[+dirty] commit= branch= dirty=` at the start of every game, so each
+  log names the exact build. `Customize/version.lua`'s `number` is only the fallback for Workshop installs
+  (no git): bump it, and `FuncLib/systems/version.lua` (`"0.7.41 - YYYY/MM/DD"`), only for a Workshop release.
 - **Never commit test lineups** in `Customize/general.lua` (forced picks, unbans, `Weak_Hero_Cap` debug values).
   Only commit real setting changes there, staged on their own.
 
-## Checks (CI blocks on all three)
+## Checks (CI blocks on all of them)
 
-`.github/workflows/lua-check.yml` runs on pushes to `main`, `release-*`, `fix/**` and on every PR:
+`.github/workflows/lua-check.yml` runs on pushes to `main`, `release-*`, `fix/**`, `feat/**`, `chore/**`,
+`docs/**` and on every PR:
 
 1. **Syntax** - every tracked `.lua` compiled with LuaJIT (the game's Lua, so `goto` is fine).
 2. **Lint** - `luacheck` with `.luacheckrc`. No unused locals or values, no new globals,
    write `x < y` not `not (x >= y)`, never `not a == b` (it means `(not a) == b`).
 3. **Format** - `stylua --check .` (StyLua 2.6.0, `stylua.toml`: LuaJIT, tabs, 120 columns, double quotes).
    Run `stylua <files>` before committing; some files need a second pass, so re-run `--check`.
+4. **Tests** - `luajit Tests/run.lua`: a stub bot API loads every hero file, checks every `require` path,
+   team-slot helpers (stub player IDs are deliberately not 1-5) and pure helpers. Add a test when you fix a bug
+   a test could have caught. Tests live in `Tests/test_*.lua` and get the runner as `local T = ...`
+   (`T.test`, `T.xfail`, `T.eq`, `T.near`, `T.ok`, `T.stub`, `T.files`, `T.read`); `luajit Tests/run.lua <word>`
+   runs matching files. An API call the stub doesn't cover fails with `stub missing: <name>`: add it to
+   `Tests/stub_api.lua`. A real bug that isn't fixed in the same PR stays as `T.xfail(name, reason, fn)` plus an
+   issue; an XPASS means it got fixed, so remove the xfail.
 
 Run them locally before pushing, then confirm the CI run for your commit is green.
 
-**pre-commit hooks.** Once per clone: `pip install pre-commit` then `pre-commit install`
-(`.pre-commit-config.yaml`). On every commit:
+**pre-commit hooks.** Once per clone: `pip install pre-commit` then `pre-commit install --install-hooks`
+(`.pre-commit-config.yaml`; installs the commit hooks and the post-checkout/commit/merge/rewrite hooks that
+write `Customize/build_info.lua`). Keep `.pre-commit-config.yaml` staged when you edit it (an unstaged config
+makes the post-* hooks fail). On every commit:
 - `no-commit-to-branch`: commits directly on `main` are refused. Work on a branch and open a PR.
 - `check-added-large-files`: a new file over 500 KB is refused (match logs, dumps, binaries).
 - `stylua-github`: StyLua 2.6.0 formats the staged `.lua` files. If it changed anything the commit stops:
@@ -128,69 +141,112 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
 ## Testing in a game
 
 1. The local dev setup links `dota 2 beta/game/dota/scripts/vscripts/bots` to this repo, so the game runs the
-   checked-out branch. Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script**.
+   checked-out branch. Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script** (Valve
+   only offers bot scripts in lobbies, and third-party scripts only load on a Local Host server).
 2. Launch Dota with `-condebug` so the console is written to `game/dota/console*.log`.
-3. After the game: `node Util/split-console.js "<...>/dota 2 beta/game/dota" --out Util/match-logs`.
-   This writes `game-NNN_<result>.log` and a `.summary.txt` (scoreboard, deaths with mode/HP/allies/enemies,
-   buildings, pushes, Roshan, lotus, script errors). `Util/match-logs/` is git-ignored: the logs contain the
-   host's Steam account ID and server IPs, never commit or publish them.
+3. The game prints `[OHA-BUILD]` (exact commit) at the start. After the game, `node Util/after-game.js` splits
+   the console (`Util/split-console.js`) and writes the review skeleton (see Reviewing a game).
+   `Util/match-logs/` is git-ignored: the logs contain the host's Steam account ID and server IPs, never commit
+   or publish them.
 
 ## Issue -> PR -> game test -> merge (the regular workflow)
 
-Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`.
+Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Util/test-build.js`,
+`Util/after-game.js`, `Util/build-info.js`. Claude Code skills in `.claude/skills/` run each step
+(see Skills below).
 
 1. **Issues.** Every bug, finding or request is a GitHub issue. Group findings that share a cause or an area into
    one card (e.g. "Meepo: Poof and retreat", "Rubick stolen spells: leftover globals"), so a card is one focused
-   fix. Labels: `bug`, `enhancement`, `needs-confirmation` (seen once, verify next game), `design` (needs a
-   decision), `game-review` (came from watching a game). `no-pr` skips step 2.
+   fix. Each problem in a card is a **task item** `- [ ] (game NNN, m:ss) ...`; a new finding for an existing card
+   is a new task item there, not a new card. Labels: `bug`, `enhancement`, `needs-confirmation` (seen once,
+   verify next game), `design` (needs a decision), `game-review` (came from watching a game), `chore`; `no-pr`
+   skips step 2.
 2. **Draft PR per issue, automatically.** `node Util/issue-prs.js` opens a draft PR for every open issue without
    one: branch `<fix|feat|docs|chore>/issue-<N>-<slug>` from `origin/main`, one signed empty commit, the PR
-   template and `Closes #N`. Run it after creating issues (agents run it right after they file issues). It runs
-   locally, not as a GitHub Action, because commits must be signed with the maintainer's key.
+   template and **`Refs #N`** (never `Closes #N`: merging a PR must not close the issue). Run it right after
+   filing issues. It runs locally, not as a GitHub Action, because commits must be signed with the maintainer's
+   key.
 3. **Work on the PR branch.** Before the first real commit, merge `origin/main` into it if `main` moved. Commit
    (signed, pre-commit hooks), push, keep CI green, and fill the PR description in the change-log format
    (see Branches and pull requests). Mark the PR ready for review when the code is done.
 4. **Track what is not tested in a game yet.** `node Util/verify.js add <pr>` imports the PR's
    "How to verify in game" list into `Util/verify/tracker.json` (git-ignored). Every PR with game-visible
-   changes goes there until a game proves it.
-5. **Set the test lineup** (local only, `Customize/general.lua`, never committed). When a tracked item needs a
-   specific hero on the field (a hero fix, or a mechanic only some heroes trigger), put that hero in a **free**
-   slot: one that is `"Random"`, unset, or whose `TEST` tag `node Util/verify.js lineup` reports as "can free".
-   Use the hero's main role from `Util/role-weights/rows.json` (slot order = position 1-5). Tag the line:
-   `"npc_dota_hero_x", -- pos N -- TEST #<pr> [#<issue>]: <log tag to watch>`. If no slot is free, **wait for
-   the next game**; never replace a slot that is still testing another PR. When a PR's items pass, set its slots
-   back to `"Random"`. Check the "weak hero" cap (`Customize.Weak_Hero_Cap`) when stacking test heroes.
-6. **Play a game** on a branch that contains the PRs under test (or `main` once merged). Note which build ran.
-7. **Review the game** (below). Then for the tracked PRs:
-   - `node Util/verify.js check Util/match-logs/game-NNN_*.log --game NNN` counts each item's log tags and shows
-     sample lines; read them and set each item: `node Util/verify.js set <pr> <item> pass|fail|skip [note]`.
-   - Read the maintainer's PR comments (`gh pr view <pr> --comments`): game-review PRs get comments written while
-     watching the game, e.g. "20:30 radiant team went yolo behind bottom t1". Each observation is either fixed
-     in that PR (if it is about that PR's change) or filed as an issue (grouped as in step 1).
-   - An item that failed or did not fire: fix it in the same PR and keep it in the tracker; an item that never
-     triggered (the situation didn't happen) stays pending for the next game.
-8. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
-   tick the PR's checks (including "Tested in a local game (game NNN)"), squash-merge with `gh pr merge <pr>
-   --squash`, delete the branch, and `node Util/verify.js done <pr>`. Stacked PRs merge in order (base first);
-   after each squash-merge, merge `origin/main` into the next branch so its PR shows only its own changes.
+   changes goes there until a game proves it. Make items machine-checkable where possible: end the bullet with
+   `<!-- expect: seen>=1; allyDist<=500 -->` (rules: `seen>=N`, `absent`, `key<=X` / `>=` / `==` / `!=` / `<`
+   / `>` on `key=value` fields; give such an item one tagged pattern) and/or `<!-- heroes: lion,mirana -->`, or
+   set them later with `node Util/verify.js expect <pr> <item> "<rules>"` / `heroes <pr> <item> a,b`.
+5. **Set the test lineup** (local only, `Customize/general.lua`, never committed). `node Util/verify.js lineup`
+   shows each slot as keep (still testing a PR) or can free; `lineup --suggest [--write]` puts the heroes that
+   pending items need into **free** slots (`"Random"`, unset, or can free) at the hero's best free position by
+   pick rate (`Util/role-weights/rows.json`), tagged `"npc_dota_hero_x", -- pos N -- TEST #<pr>: <what>`
+   (set `LUAPARSE` to a luaparse install to parse-check the written file). It never replaces a slot still
+   testing another PR: if nothing is free, the hero **waits for the next game**. Check
+   `Customize.Weak_Hero_Cap` when stacking test heroes. Set a PR's slots back to `"Random"` when it merges.
+6. **Build and play.** `node Util/test-build.js [--with <branch>]` makes the local branch `test/next` =
+   `origin/main` + every tracked PR (+ any `--with` branch, e.g. a tooling PR whose scripts you need), skips and
+   lists PRs that conflict (fix the conflict in that PR, not in test/next), writes `Util/verify/test-build.json`
+   and switches the working tree to it, carrying `Customize/general.lua` (other modified files make it refuse;
+   `--dry-run` only reports, `--no-switch` builds without switching). Never push `test/next`. Then run
+   `node Util/build-info.js` (a reset fires no hook) so `[OHA-BUILD]` names the build, and play. PRs no longer
+   need to be stacked to be tested together: branch each one from `main`.
+7. **During the game** the maintainer may post observations with game times ("2:50 kez and tusk won't hit
+   dawnbreaker trapped in ice shards"). Check each against the running log (newest `console*.log`, grep a
+   window around the time for the heroes involved), explain the cause, and record it: a task item on the
+   matching issue card, a comment on the PR under test, or a note for the review. Don't change code while the
+   game runs.
+8. **Review the game** (below), then for the tracked PRs:
+   - `node Util/verify.js check <log> --game NNN` (run by `after-game.js`) auto-passes or auto-fails items with
+     `expect` rules, keeps items pending when none of their `heroes` played, and shows sample lines for the rest;
+     set those with `node Util/verify.js set <pr> <item> pass|fail|skip [note]`. Only check a log from a build
+     whose `test-build.json` lists the PR (an `absent` rule passes trivially otherwise).
+   - Read the maintainer's PR comments (`after-game.js` lists those since the last review). Each observation is
+     either fixed in the PR it is about or added to a grouped issue card (step 1).
+   - An item that failed: fix it in the same PR and keep it tracked; an item whose situation didn't happen stays
+     pending for the next game.
+9. **Merge.** When `node Util/verify.js show <pr>` says READY TO MERGE (every item pass or skip) and CI is green:
+   - `node Util/verify.js mute-suggest <pr>` prints `OHA_MUTED` entries for the proven log lines
+     (`FuncLib/systems/global_overrides.lua`); add the noisy ones in the PR (avoid whole-tag mutes; keep error and
+     rare-decision logs).
+   - Tick the PR's checks (including "Tested in a local game (game NNN)"), `gh pr merge <pr> --squash
+     --delete-branch`, `node Util/verify.js done <pr>`, free its lineup slots.
+   - For each issue the PR refers to: tick the task items it fixed and verified, and comment the PR link and the
+     game. **Close an issue only when every task item in it is ticked**; a PR never closes an issue by itself.
+   - If a later PR was built on this one, merge `origin/main` into it so its PR shows only its own changes.
 
 ## Reviewing a game (regular task)
 
-- Split the console (`Util/split-console.js`), note the build the game ran (`version` in the summary) and map
-  log line numbers to that commit (`git show <sha>:<file>`).
-- Check: script errors (`attempt to`, `stack traceback`), every tracked `[OHA-*]` item (`Util/verify.js check`)
-  and every other line added since the last game (did the feature fire, with sane values?), log spam (lines per
-  second per tag), death patterns, objectives (towers, barracks, Roshan, Tormentor, buybacks), mode flip-flops
-  (`[OHA-FLIP]`, `[OHA-STUCK]`), and the maintainer's comments on the PRs under test.
+- `node Util/after-game.js` splits the console, picks the newest game, maps its build (`[OHA-BUILD]`, or an old
+  `version` to its commit range) and the PRs in it (`test-build.json`), runs `verify.js check`, groups script
+  errors, ranks log spam by peak lines per second, lists deaths and the scoreboard, collects the maintainer's PR
+  comments since the last review, and writes `Util/match-logs/game-NNN_review.md`. Fill in its Findings and
+  Issues to file sections.
+- Then go deeper where the skeleton points: every tracked `[OHA-*]` item and every line added since the last
+  game (did the feature fire, with sane values?), death patterns, objectives (towers, barracks, Roshan,
+  Tormentor, buybacks), mode flip-flops (`[OHA-FLIP]`, `[OHA-STUCK]`). Map log line numbers to the build's
+  commit (`git show <sha>:<file>`).
 - Write findings as: what happened (time + log line) / why it matters / code location / suggested fix /
-  confidence. File them as grouped issues (step 1) and let `Util/issue-prs.js` open their PRs; a single
-  `fix/game-NNN` PR is fine for many small fixes from one review.
+  confidence. File them as task items on grouped issue cards (step 1) and let `Util/issue-prs.js` open PRs for
+  new cards; a single `fix/game-NNN` PR is fine for many small fixes from one review.
+
+## Skills (Claude Code)
+
+`.claude/skills/` holds step-by-step playbooks for the steps above; `AGENTS.md` stays the source of the rules.
+
+| Skill | When |
+|---|---|
+| `/start-issue` | file findings or requests as grouped issue cards with task items, open draft PRs |
+| `/create-pr` | code done: checks, signed commit, CI, change-log description, tracker entry |
+| `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, what the game tests |
+| `/check-live-event` | the maintainer reports an event during a live game |
+| `/review-game` | the game ended: `after-game.js`, tracker, PR comments, findings, issues, next lineup |
+| `/merge-pr` | a PR is READY TO MERGE: mute proven logs, tick checks, squash-merge, tick issue items |
 
 ## Things not to do
 
 - Do not commit `Customize/general.lua` test lineups, match logs, or anything with the Steam ID.
 - Do not force-push, rewrite published history, or skip signing.
 - Do not change a mechanic from memory; check the game data.
-- Do not stack branches on unmerged branches unless the work depends on them; then say so in the PR and merge
-  in order.
+- Do not stack branches on unmerged branches; use `test-build.js` to test several PRs together.
 - Do not merge a PR with game-visible changes before its tracker items pass in a game.
+- Do not close an issue while any of its task items is open; do not write `Closes #N` in a PR.
+- Do not push `test/next`, and do not change code while a test game is running.

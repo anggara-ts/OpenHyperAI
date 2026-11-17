@@ -1,10 +1,16 @@
-# pre-commit hooks (https://pre-commit.com). Install once per clone:
-#   pip install pre-commit && pre-commit install
+# pre-commit hooks (https://pre-commit.com). Install once per clone (installs every hook type listed below):
+#   pip install pre-commit && pre-commit install --install-hooks
 # On every commit:
 #   - no commits directly on main (work on a branch and open a PR; PRs are squash-merged),
 #   - no new file over 500 KB (match logs, dumps, binaries; the largest Lua file is ~330 KB),
 #   - StyLua formats the staged .lua files with stylua.toml (same version as CI). If it changed a file,
 #     the commit stops: review, `git add` the formatted files, and commit again.
+# After every checkout, commit, merge and rebase:
+#   - Util/build-info.js writes Customize/build_info.lua (git-ignored), so the game prints the commit it runs
+#     ([OHA-BUILD], and version=<commit date>-<sha> in [OHA-MATCH]). Run it by hand after editing files
+#     without a commit, so "+dirty" is current before a test game.
+default_install_hook_types: [pre-commit, post-checkout, post-commit, post-merge, post-rewrite]
+default_stages: [pre-commit]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -17,3 +23,12 @@ repos:
     rev: v2.6.0
     hooks:
       - id: stylua-github
+  - repo: local
+    hooks:
+      - id: build-info
+        name: build info (Customize/build_info.lua)
+        language: system
+        entry: node Util/build-info.js
+        always_run: true
+        pass_filenames: false
+        stages: [post-checkout, post-commit, post-merge, post-rewrite]

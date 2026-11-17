@@ -106,9 +106,42 @@ local dbgAt = -100
 local dbgWhy = ""
 local dbgLoc = nil
 local dbgStuckLogAt = -100
+-- Diagnostic (#32, maintainer: bots walk right past a power rune without taking it). When a power rune is up
+-- within 600 and this decision is something else, say which rule won. At most every 20s per bot.
+local function IsPickupWhy(why)
+	return why == "underfoot" or string.sub(why, 1, 6) == "power-" or string.sub(why, 1, 7) == "status-"
+end
+local function LogPowerRuneSkip(why)
+	if IsPickupWhy(tostring(why)) or DotaTime() < 0 or DotaTime() < (bot._powerSkipLogAt or -999) then
+		return
+	end
+	for _, id in ipairs({ RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
+		if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
+			local runeType = GetRuneType(id)
+			local dist = GetUnitToLocationDistance(bot, GetRuneSpawnLocation(id))
+			if dist <= 600 and runeType ~= RUNE_BOUNTY and not (RUNE_WATER ~= nil and runeType == RUNE_WATER) then
+				bot._powerSkipLogAt = DotaTime() + 20
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] t=%.0f %s powerrune-near-skip spot=%d type=%s dist=%d why=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						id,
+						tostring(runeType),
+						dist,
+						tostring(why)
+					)
+				)
+				return
+			end
+		end
+	end
+end
 local function give(desire, why)
 	if why ~= nil then
 		runeWhy = why
+		pcall(LogPowerRuneSkip, why)
 	end
 	return desire
 end
@@ -674,6 +707,26 @@ function GetDesireRaw()
 		if okW and waterState ~= nil and bot._waterWalk ~= nil then
 			if DotaTime() < bot._waterWalk.t0 then
 				return give(BOT_MODE_DESIRE_HIGH, "water-" .. waterState)
+			end
+			-- Bots can't pick a water rune up themselves (see UnpickableRiverRune: every pickup order failed);
+			-- Valve's item mode does it while the bot stands there. Game 040, 4:00: the item mode took over for 1s,
+			-- then laning (0.56) beat the 0.35 hold and Meepo walked off with the rune still there. For the first
+			-- 5s after the spawn, standing on it holds at 0.6 (above laning, below fights and retreat).
+			local sinceSpawn = DotaTime() - bot._waterWalk.t0
+			if sinceSpawn <= 5 and GetUnitToLocationDistance(bot, bot._waterWalk.loc) <= 300 then
+				if bot._waterStayLogged ~= bot._waterWalk.t0 then
+					bot._waterStayLogged = bot._waterWalk.t0
+					pcall(
+						print,
+						string.format(
+							"[OHA-RUNE] t=%.0f %s water-stay spot=%d for=5s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							bot._waterWalk.id
+						)
+					)
+				end
+				return give(0.6, "river-item-stay")
 			end
 			return give(RIVER_HOLD_DESIRE, "river-item-" .. waterState)
 		end

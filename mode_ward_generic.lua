@@ -251,6 +251,28 @@ function GetDesire()
 	if Fu.GetPosition(bot) <= 3 then
 		return false
 	end
+	-- Finish a lotus trip first (#32). Game 038, 44:30: Rubick walked to the pool to take the lotus, the ward
+	-- mode took over at the pool, he planted and walked off with the lotus still there. The rune mode keeps
+	-- bot._mapObjKind / _mapObjLoc set while the trip lasts.
+	if
+		bot._mapObjKind == "lotus"
+		and bot._mapObjLoc ~= nil
+		and GetUnitToLocationDistance(bot, bot._mapObjLoc) <= 600
+	then
+		if DotaTime() >= (bot._wardLotusLogAt or -999) then
+			bot._wardLotusLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-WARD] t=%.0f %s wait why=lotus-trip dist=%d",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToLocationDistance(bot, bot._mapObjLoc)
+				)
+			)
+		end
+		return BOT_MODE_DESIRE_NONE
+	end
 	local desire = GetDesireHelper()
 	return RemapValClamped(Fu.GetHP(bot) * desire, 0, 1, BOT_MODE_DESIRE_NONE, desire)
 end

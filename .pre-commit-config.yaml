@@ -1,0 +1,9 @@
+# pre-commit hooks (https://pre-commit.com). Install once per clone:
+#   pip install pre-commit && pre-commit install
+# On every commit, StyLua formats the staged .lua files with stylua.toml (same version as CI).
+# If it changed a file, the commit stops: review, `git add` the formatted files, and commit again.
+repos:
+  - repo: https://github.com/JohnnyMorganz/StyLua
+    rev: v2.6.0
+    hooks:
+      - id: stylua-github

@@ -841,9 +841,33 @@ function r.GetDefendDesireHelper(af, aF)
 		return DefNone(af, "push-group")
 	end
 	local cb = am and am:IsAlive() and az.ancientHP < 0.4
-	local cc = not cb and az.aliveEnemyCount >= 3 and az.aliveEnemyCount > az.aliveAllyCount + 1
+	-- Last stand: enemy heroes at our Ancient while it is hurt or both T4s are gone. Game 036,
+	-- 55:00-55:28: defend read 0.30-0.46 ("ancient-heroes", capped at L) and 0.06-0.12 for Ogre
+	-- ("hg-outnumbered"), and the Ancient fell from 0.77 to 0.13 with all five Radiant alive.
+	-- Then: no outnumbered cut, no half desire, and the desire may reach 0.9 (above farm, push and
+	-- most retreat rules; attack at 0.95 still fights). Not for a bot under 30% HP.
+	local lastStand = am
+		and am:IsAlive()
+		and ca >= 1
+		and (az.ancientHP < 0.95 or baseThreat.t4 == 0)
+		and Z.GetHP(af) >= 0.3
+	local lastStandDesire = 0.9
+	if lastStand and DotaTime() >= (af._ancLastStandLogAt or -999) then
+		af._ancLastStandLogAt = DotaTime() + 5
+		pcall(print, string.format(
+			"[OHA-DEFEND] t=%.0f %s ancient-last-stand lane=%s anc=%.2f heroesAtAnc=%d t4=%d hp=%.2f",
+			DotaTime(),
+			(string.gsub(af:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(laneNames[aF]),
+			az.ancientHP or -1,
+			ca,
+			baseThreat.t4,
+			Z.GetHP(af)
+		))
+	end
+	local cc = not cb and not lastStand and az.aliveEnemyCount >= 3 and az.aliveEnemyCount > az.aliveAllyCount + 1
 	local cd = L * 0.5
-	if c9 >= 1 then
+	if c9 >= 1 and not lastStand then
 		local ce = Z.GetLastSeenEnemiesNearLoc(af:GetLocation(), 2000)
 		if #ce >= 2 then
 			local cf = 0
@@ -907,6 +931,13 @@ function r.GetDefendDesireHelper(af, aF)
 			end
 		end
 	end
+	if lastStand then
+		if not ch.active then
+			ch = { active = true, floor = 0, forceLoc = Z.AdjustLocationWithOffsetTowardsFountain(am:GetLocation(), 300) }
+		end
+		ch.floor = math.max(ch.floor, lastStandDesire)
+		S = DotaTime() + N
+	end
 	if c9 >= 2 and not c7 then
 		S = DotaTime() + N
 		local cn = cc and cd or (aF == c8 and L or L * 0.7)
@@ -968,7 +999,7 @@ function r.GetDefendDesireHelper(af, aF)
 		bX.defendLoc = Z.AdjustLocationWithOffsetTowardsFountain(am:GetLocation(), 300)
 	end
 	if cp then
-		if aF ~= c8 then
+		if aF ~= c8 and not lastStand then
 			af._defendDesireHalved = true
 		end
 	else
@@ -1014,6 +1045,10 @@ function r.GetDefendDesireHelper(af, aF)
 	end
 	if cC >= 4 and am and am:IsAlive() and ca >= 2 then
 		af._defendWhy = "ancient-heroes"
+		if lastStand then
+			af._defendWhy = "ancient-last-stand"
+			return lastStandDesire
+		end
 		if cc then
 			return cd
 		end
@@ -1255,7 +1290,7 @@ function r.GetDefendDesireHelper(af, aF)
 			d8 = math.max(0.05, d8)
 		end
 	end
-	return math.min(math.max(d8, 0), L)
+	return math.min(math.max(d8, 0), lastStand and lastStandDesire or L)
 end
 I, J = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
 if not I then

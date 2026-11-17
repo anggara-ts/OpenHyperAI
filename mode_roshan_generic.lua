@@ -81,8 +81,19 @@ local function LogDesireChange(final)
 	end
 	a._roshOn = on
 	local M = c.GetCurrentRoshanLocation()
+	-- Game 036, 19:56-21:06: four bots stood ~65s at the pit and dropped as even(5v5); the log had
+	-- no Roshan HP. roshHp=-1 means no valid handle; hitting = allies whose attack target is Roshan.
+	local roshHp, hitting = -1, 0
+	if c.Utils.IsValidUnit(k) then
+		roshHp = k:GetHealth() / math.max(k:GetMaxHealth(), 1)
+		for _, al in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+			if al ~= nil and al:IsAlive() and al:GetAttackTarget() == k then
+				hitting = hitting + 1
+			end
+		end
+	end
 	RoshLog(
-		"%s desire=%.2f why=%s mode=%s dist=%d allies=%d enemies=%d held=%d fit=%s",
+		"%s desire=%.2f why=%s mode=%s dist=%d allies=%d enemies=%d held=%d fit=%s roshHp=%.2f hitting=%d",
 		on and "call" or "drop",
 		final,
 		tostring(a._roshWhy),
@@ -91,7 +102,9 @@ local function LogDesireChange(final)
 		c.GetNumOfAliveHeroes(false),
 		c.GetNumOfAliveHeroes(true),
 		a._roshHeld or 0,
-		tostring(a._roshFitWhy)
+		tostring(a._roshFitWhy),
+		roshHp,
+		hitting
 	)
 end
 function GetDesire()
@@ -491,6 +504,25 @@ function GetDesireHelper()
 	-- not the fresh-take numbers: at 56:59 a committed 5-man take on full-HP Roshan was dropped
 	-- by everyone at once as enemies4(missing=1).
 	local committedNow = a._roshCommitUntil ~= nil and DotaTime() < a._roshCommitUntil
+	-- The commit lasted 25s; after that a group already hitting Roshan in the pit fell back to the
+	-- fresh-take numbers and left (game 036, 21:06, drop why=even(5v5) dist=69-299). Extend it
+	-- while 3+ allies are in the pit, 2+ are hitting Roshan and no enemy hero is seen near it.
+	if committedNow and alliesInPit >= 3 and c.Utils.IsValidUnit(k) then
+		local hitting = 0
+		for _, al in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+			if al ~= nil and al:IsAlive() and al:GetAttackTarget() == k then
+				hitting = hitting + 1
+			end
+		end
+		if hitting >= 2 and #(c.GetEnemiesNearLoc(M, 1600) or {}) == 0 and a._roshCommitUntil - DotaTime() < 8 then
+			a._roshCommitUntil = DotaTime() + 10
+			if DotaTime() >= (a._roshExtendLogAt or -999) then
+				a._roshExtendLogAt = DotaTime() + 10
+				RoshLog("commit-extend hitting=%d inPit=%d roshHp=%.2f", hitting, alliesInPit,
+					k:GetHealth() / math.max(k:GetMaxHealth(), 1))
+			end
+		end
+	end
 	local safeTake, takeWhy = IsRoshanEngageSafe(M, committedNow and alliesInPit >= 3)
 	if not safeTake then
 		return Ret(BOT_MODE_DESIRE_NONE, takeWhy)

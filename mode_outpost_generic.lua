@@ -1774,6 +1774,17 @@ r["npc_dota_hero_primal_beast"] = function()
 	e = c:GetAbilityByName("primal_beast_trample")
 	if e:IsTrained() then
 		if e:IsInAbilityPhase() or c:HasModifier("modifier_primal_beast_trample") and S > 0.3 then
+			-- Game 036: outpost/1.50 in 32 of Primal Beast's base-defence samples. Name the source
+			-- (Trample lasts 5.5s, game data) and whether a fight or a lane defence was on.
+			if DotaTime() >= (c._pbOverrideLogAt or -999) then
+				c._pbOverrideLogAt = DotaTime() + 10
+				local defend = 0
+				for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+					defend = math.max(defend, GetDefendLaneDesire(lane) or 0)
+				end
+				pcall(print, string.format("[OHA-FLIPSRC] t=%.0f primal_beast override=1.50 why=trample enemies=%d maxDefend=%.2f",
+					DotaTime(), #a.GetEnemiesNearLoc(c:GetLocation(), 1200), defend))
+			end
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end

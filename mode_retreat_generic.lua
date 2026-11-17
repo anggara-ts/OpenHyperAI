@@ -98,6 +98,100 @@ local function RetreatTag(line, v)
 	retreatLine = line
 	return v
 end
+-- Our Ancient is being fought over: enemy heroes seen within 1600 of it while it is hurt
+-- (under 95%) or both T4s are gone. Game 036, 55:00-55:28: Slark and Ogre left at full HP on
+-- low mana (tag 350) and the Ancient went from 0.77 to 0.13 with all five Radiant alive.
+local function AncientLastStand()
+	local anc = GetAncient(GetTeam())
+	if anc == nil or not anc:IsAlive() then
+		return false
+	end
+	if anc:GetHealth() >= 0.95 * anc:GetMaxHealth() then
+		for _, id in ipairs({ TOWER_BASE_1, TOWER_BASE_2 }) do
+			local tw = GetTower(GetTeam(), id)
+			if tw ~= nil and tw:IsAlive() then
+				return false
+			end
+		end
+	end
+	return #(b.GetEnemiesNearLoc(anc:GetLocation(), 1600) or {}) >= 1
+end
+local function LastStandLog(skipped)
+	if DotaTime() >= (c._lastStandLogAt or -999) then
+		c._lastStandLogAt = DotaTime() + 5
+		pcall(print, string.format(
+			"[OHA-DEFEND] t=%.0f %s ancient-last-stand retreat-skip=%s hp=%.2f mp=%.2f",
+			DotaTime(),
+			(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+			skipped,
+			b.GetHP(c),
+			b.GetMP(c)
+		))
+	end
+end
+-- Valve's built-in evasive mode switches this retreat logic off (tag 142). Game 036: 30 of 50
+-- Radiant deaths ended in it, 0 of 47 Dire. Log what is around the bot when it starts, to find
+-- the trigger. No behaviour change.
+local function LogEvasiveEntry()
+	local now = DotaTime()
+	local was = c._evasiveSince
+	c._evasiveSince = now
+	if was ~= nil and now - was < 1.0 then
+		return
+	end
+	if now < (c._evasiveLogAt or -999) then
+		return
+	end
+	c._evasiveLogAt = now + 3
+	local foes, casting = {}, {}
+	for _, h in pairs(c:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}) do
+		if b.IsValidHero(h) then
+			local nm = (string.gsub(h:GetUnitName(), "npc_dota_hero_", ""))
+			foes[#foes + 1] = nm
+			local okA, ab = pcall(function()
+				return h:GetCurrentActiveAbility()
+			end)
+			if okA and ab ~= nil then
+				casting[#casting + 1] = nm .. ":" .. tostring(ab:GetName())
+			end
+		end
+	end
+	local tracking = {}
+	local okT, projs = pcall(function()
+		return c:GetIncomingTrackingProjectiles()
+	end)
+	for _, p in pairs(okT and projs or {}) do
+		if p ~= nil and not p.is_attack then
+			local who = p.caster ~= nil and (string.gsub(p.caster:GetUnitName(), "npc_dota_hero_", "")) or "?"
+			tracking[#tracking + 1] = who .. ":" .. (p.ability ~= nil and p.ability:GetName() or "?")
+		end
+	end
+	local linear = {}
+	local okL, lins = pcall(GetLinearProjectiles)
+	for _, p in pairs(okL and lins or {}) do
+		if p ~= nil and p.location ~= nil and GetUnitToLocationDistance(c, p.location) <= 1500 then
+			linear[#linear + 1] = (p.ability ~= nil and p.ability:GetName() or "?")
+		end
+	end
+	local zones = {}
+	local okZ, zs = pcall(GetAvoidanceZones)
+	for _, z in pairs(okZ and zs or {}) do
+		if z ~= nil and z.location ~= nil and GetUnitToLocationDistance(c, z.location) <= (z.radius or 0) + 300 then
+			zones[#zones + 1] = (z.ability ~= nil and z.ability:GetName() or "?") .. "/" .. tostring(z.radius)
+		end
+	end
+	pcall(print, string.format(
+		"[OHA-EVASIVE] t=%.0f %s enter hp=%.2f foes=%s casting=%s tracking=%s linear=%s zones=%s",
+		now,
+		(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+		b.GetHP(c),
+		table.concat(foes, ","),
+		table.concat(casting, ","),
+		table.concat(tracking, ","),
+		table.concat(linear, ","),
+		table.concat(zones, ",")
+	))
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
@@ -126,6 +220,9 @@ function GetDesire()
 end
 function GetDesireHelper()
 	m = c:GetActiveMode()
+	if m == BOT_MODE_EVASIVE_MANEUVERS and c:IsAlive() then
+		pcall(LogEvasiveEntry)
+	end
 	if
 		not c:IsAlive()
 		or c:HasModifier("modifier_dazzle_nothl_projection_soul_clone")
@@ -193,8 +290,12 @@ function GetDesireHelper()
 		end
 		return RetreatTag(184, unitRun)
 	end
+	local lastStand = d >= 0.4 and AncientLastStand()
 	-- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
-	do
+	-- It returned 0.7 (BOT_MODE_DESIRE_ABSOLUTE) while attack sits at 0.95, so it never won a
+	-- fight (game 036: 28 deaths straight out of attack mode). Below 60% HP it now returns 0.98,
+	-- like the disarmed rule; above that it stays 0.7. Not while defending our Ancient.
+	if not lastStand then
 		local alliesNearby = b.GetAllyCount(c, 1400)
 		local enemiesNearby = b.GetEnemyCount(c, 1400)
 		local lastSeen = b.GetLastSeenEnemiesNearLoc and b.GetLastSeenEnemiesNearLoc(c:GetLocation(), 2000) or {}
@@ -208,6 +309,21 @@ function GetDesireHelper()
 			)
 			and (m == BOT_MODE_ATTACK or m == BOT_MODE_TEAM_ROAM or m == BOT_MODE_ROAM or b.IsGoingOnSomeone(c))
 		then
+			if d < 0.6 then
+				if DotaTime() >= (c._hardRetreatLogAt or -999) then
+					c._hardRetreatLogAt = DotaTime() + 3
+					pcall(print, string.format(
+						"[OHA-RETREAT] t=%.0f %s hard-retreat over-attack hp=%.2f allies=%d pressure=%d mode=%d",
+						DotaTime(),
+						(string.gsub(c:GetUnitName(), "npc_dota_hero_", "")),
+						d,
+						alliesNearby,
+						pressure,
+						m or -1
+					))
+				end
+				return RetreatTag(201, 0.98)
+			end
 			return RetreatTag(201, BOT_MODE_DESIRE_ABSOLUTE)
 		end
 	end
@@ -357,7 +473,11 @@ function GetDesireHelper()
 	end
 	if c:DistanceFromFountain() <= 4000 and not J then
 		if d <= 0.6 or e < 0.4 then
-			return RetreatTag(350, BOT_MODE_DESIRE_VERYHIGH)
+			if lastStand then
+				LastStandLog("350")
+			else
+				return RetreatTag(350, BOT_MODE_DESIRE_VERYHIGH)
+			end
 		end
 	end
 	if c:HasModifier("modifier_fountain_aura_buff") then
@@ -367,7 +487,12 @@ function GetDesireHelper()
 				return RetreatTag(357, BOT_MODE_DESIRE_ABSOLUTE)
 			end
 		elseif d <= 0.9 or e <= 0.8 and f ~= "npc_dota_hero_huskar" then
-			return RetreatTag(360, BOT_MODE_DESIRE_ABSOLUTE)
+			-- Topping up in the fountain while the Ancient is being killed: leave above 60% HP.
+			if lastStand and d > 0.6 then
+				LastStandLog("360")
+			else
+				return RetreatTag(360, BOT_MODE_DESIRE_ABSOLUTE)
+			end
 		end
 		if #o > #n and not I and not b.CanBeAttacked(t) then
 			return RetreatTag(363, BOT_MODE_DESIRE_HIGH)

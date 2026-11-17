@@ -416,7 +416,52 @@ function l.GetPushDesireHelper(ao, ap)
 		end
 		if C ~= nil and DotaTime() < D then
 			if ap == C then
-				return math.max(0.55, RemapValClamped(GetPushLaneDesire(ap), 0, 1, 0, B))
+				-- Game 036 (23:25, 30:01, 35:11): this lock returned before every later safety cap, so
+				-- four bots stayed on the Dire high ground with all 5 Dire alive and got wiped. The
+				-- caps now apply inside the lock: B already holds the HG / own-HP / 5-alive caps.
+				local lockD = math.max(0.55, RemapValClamped(GetPushLaneDesire(ap), 0, 1, 0, B))
+				local capWhy = nil
+				if B < lockD then
+					lockD, capWhy = B, "cap"
+				end
+				if #aA <= 1 and #aB >= 2 and lockD > 0.2 then
+					lockD, capWhy = 0.2, "alone-vs-2"
+				end
+				if t and l.GetLaneBuildingTier(ap) >= 2 and GetUnitToUnitDistance(ao, t) < 6000 and #aA < ad.aliveEnemyCount and lockD > 0.4 then
+					lockD, capWhy = 0.4, "fewer-than-alive"
+				end
+				if aE and #aA >= 2 then
+					local hurt, sum = 0, 0
+					for _, ay in ipairs(aA) do
+						if O.IsValidHero(ay) then
+							local hpA = O.GetHP(ay)
+							sum = sum + hpA
+							if hpA < 0.4 then
+								hurt = hurt + 1
+							end
+						end
+					end
+					if hurt >= 2 and sum / #aA < 0.6 and ad.aliveEnemyCount >= #aA - 2 and lockD > 0.15 then
+						lockD, capWhy = 0.15, "group-hurt"
+					end
+				end
+				if capWhy ~= nil and DotaTime() >= (ao._pushLockCapLogAt or -999) then
+					ao._pushLockCapLogAt = DotaTime() + 5
+					pcall(print, string.format(
+						"[OHA-PUSH] t=%.0f %s lock-capped lane=%s why=%s desire=%.2f allies=%d enemies=%d alive=%d/%d hg=%s",
+						DotaTime(),
+						(string.gsub(ao:GetUnitName(), "npc_dota_hero_", "")),
+						tostring(ap),
+						capWhy,
+						lockD,
+						#aA,
+						#aB,
+						ad.aliveAllyCount,
+						ad.aliveEnemyCount,
+						tostring(aE)
+					))
+				end
+				return lockD
 			else
 				return S.None
 			end

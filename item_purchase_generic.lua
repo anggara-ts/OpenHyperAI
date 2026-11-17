@@ -932,7 +932,36 @@ local function a3()
 		end
 		p = DotaTime()
 	elseif o == true and a:GetBuybackCooldown() <= 10 then
-		a5 = m + a:GetBuybackCost() + a:GetNetWorth() / 40 - 300
+		-- Buyback reserve. Game 036: Primal Beast bought nothing 38:26-52:43 and Lion nothing after
+		-- 40:00. Supports (pos 4-5) keep no reserve, and a core holds one item at most 3 min; then
+		-- it buys and the next item can be held again. [OHA-BUY] hold-for-buyback logs the wait.
+		local reserveTo = m + a:GetBuybackCost() + a:GetNetWorth() / 40 - 300
+		if e.GetPosition(a) <= 3 and a:GetGold() < reserveTo then
+			if a:GetGold() >= m then
+				if a._bbHoldItem ~= a.currBuyingBasicItem then
+					a._bbHoldItem = a.currBuyingBasicItem
+					a._bbHoldSince = DotaTime()
+				end
+				local held = DotaTime() - (a._bbHoldSince or DotaTime())
+				if held < 180 then
+					a5 = reserveTo
+					if DotaTime() >= (a._bbHoldLogAt or -999) then
+						a._bbHoldLogAt = DotaTime() + 30
+						BuyLog("hold-for-buyback item=%s gold=%d need=%d buyback=%d held=%.0fs",
+							ShortItem(a.currBuyingBasicItem), a:GetGold(), math.floor(reserveTo), a:GetBuybackCost(), held)
+					end
+				elseif not a._bbHoldReleased then
+					a._bbHoldReleased = true
+					BuyLog("hold-for-buyback released item=%s gold=%d after=%.0fs",
+						ShortItem(a.currBuyingBasicItem), a:GetGold(), held)
+				end
+			else
+				a5 = reserveTo
+			end
+		end
+	end
+	if a._bbHoldItem ~= nil and a._bbHoldItem ~= a.currBuyingBasicItem then
+		a._bbHoldItem, a._bbHoldSince, a._bbHoldReleased = nil, nil, nil
 	end
 	if #a.currBuyingBasicItemList == 1 or d.IsPvNMode() then
 		a5 = m

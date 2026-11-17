@@ -165,6 +165,19 @@ function GetDesireHelper()
 	then
 		return BOT_MODE_DESIRE_NONE, "base_threatened"
 	end
+	-- Not only the Ancient and T3s: a lane we should defend or enemy heroes at any of our towers
+	-- or barracks keeps us home (game 036, bottom T2 lost at 31:18 during a Tormentor call).
+	do
+		local why = d.OurLaneThreatened()
+		if why ~= nil then
+			if b.tormentor_state == true and DotaTime() >= (b._tormentorStayLogAt or -999) then
+				b._tormentorStayLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-TORMENTOR] t=%.0f %s stay why=%s", DotaTime(),
+					(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")), why))
+			end
+			return BOT_MODE_DESIRE_NONE, "lane_threatened"
+		end
+	end
 	E = E / 3
 	F = F / 2
 	if F < 11 then

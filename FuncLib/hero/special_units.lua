@@ -661,12 +661,41 @@ function a.GetDewardDesire(bot, attackRange, nearbyEnemies)
 		return 0, nil
 	end
 
+	-- Game 036, 35:11-35:22: three of four Radiant deaths were hitting a ward at 1.10 with 5-33% HP
+	-- and 5 enemies around (1.10-1.25 beats retreat and attack). Below 50% HP with 2+ enemy heroes
+	-- near, or hit by a hero in the last 2s: leave the ward. Any enemy hero within 1200: at most
+	-- 0.9, under attack (0.95) and the hard retreat (0.98).
+	local hp = c.GetHP(bot)
+	local foes = c.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
+	local function DewardLog(what, v)
+		if DotaTime() >= (bot._dewardLogAt or -999) then
+			bot._dewardLogAt = DotaTime() + 5
+			pcall(print, string.format(
+				"[OHA-DEWARD] t=%.0f %s %s desire=%.2f hp=%.2f foes=%d dist=%d",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				what,
+				v,
+				hp,
+				#foes,
+				bestDist
+			))
+		end
+	end
+	if hp < 0.5 and (#foes >= 2 or bot:WasRecentlyDamagedByAnyHero(2.0)) then
+		DewardLog("skip-low-hp", 0)
+		return 0, nil
+	end
+	local d = 0.95
 	if bestDist <= attackRange + 50 then
-		return 1.25, best
+		d = 1.25
+	elseif bestDist <= attackRange + 350 then
+		d = 1.1
 	end
-	if bestDist <= attackRange + 350 then
-		return 1.1, best
+	if #foes >= 1 and d > 0.9 then
+		d = 0.9
+		DewardLog("capped-enemies-near", d)
 	end
-	return 0.95, best
+	return d, best
 end
 return a

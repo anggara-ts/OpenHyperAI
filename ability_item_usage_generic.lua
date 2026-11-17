@@ -4994,9 +4994,35 @@ a.ConsiderItemDesire["item_tpscroll"] = function(bm)
 		(b:GetActiveMode() == BOT_MODE_SIDE_SHOP or b:GetActiveMode() == BOT_MODE_WATCHER)
 		and DotaTime() >= (f.IsModeTurbo() and 10 or 20) * 60
 		and ax == 0
-		and (not f.IsInTeamFight(b, 1200) or not f.IsGoingOnSomeone(b) or not f.IsDefending(b))
+		-- Was "not A or not B or not C", true almost always (game 036: 7 Tormentor TPs, 0 kills).
+		and not f.IsInTeamFight(b, 1200)
+		and not f.IsGoingOnSomeone(b)
+		and not f.IsDefending(b)
 	then
 		local e2 = f.GetTormentorLocation(d)
+		-- Only TP when 2+ other allies are coming (in Tormentor mode or at the spot) and our lanes
+		-- are not under attack; every game-036 gather showed here=0/1 with the rest declined.
+		local coming = 0
+		for G = 1, 5 do
+			local H = GetTeamMember(G)
+			if
+				H ~= nil
+				and H ~= b
+				and H:IsAlive()
+				and (f.IsDoingTormentor(H) or GetUnitToLocationDistance(H, e2) <= 1600)
+			then
+				coming = coming + 1
+			end
+		end
+		local threat = f.OurLaneThreatened()
+		if (coming < 2 or threat ~= nil) and GetUnitToLocationDistance(b, e2) > 8000 then
+			if DotaTime() >= (b._tormentorTpSkipLogAt or -999) then
+				b._tormentorTpSkipLogAt = DotaTime() + 10
+				pcall(print, string.format("[OHA-TORMENTOR] t=%.0f %s tp-skip why=%s coming=%d", DotaTime(),
+					(string.gsub(b:GetUnitName(), "npc_dota_hero_", "")), threat or "few-allies", coming))
+			end
+			e2 = b:GetLocation()
+		end
 		if GetUnitToLocationDistance(b, e2) > 8000 then
 			hEffectTarget = f.GetNearbyLocationToTp(e2)
 			bw = "tormentor"

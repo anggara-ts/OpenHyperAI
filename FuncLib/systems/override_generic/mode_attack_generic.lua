@@ -312,6 +312,18 @@ function r.GetDesire()
 				if a.IsValidHero(a3) and not a.IsSuspiciousIllusion(a3) then
 					d.unit = a3
 					c:SetTarget(d.unit)
+					-- This is the 0.65 (VERYHIGH 0.6 + 0.05) attack with no enemy near: following an ally
+					-- up to 11s of walking away. Think used to drop a target beyond 1200 (n = true), so
+					-- the next desire read 0 and the bot flipped attack/assemble (game 036, Primal Beast,
+					-- 20 changes at 41:41). Think now walks to it; logged here.
+					local far = GetUnitToUnitDistance(c, a3)
+					if far > 1200 and DotaTime() >= (c._flipSrcLogAt or -999) then
+						c._flipSrcLogAt = DotaTime() + 5
+						pcall(print, string.format("[OHA-FLIPSRC] t=%.0f %s attack=0.65 follow ally=%s target=%s dist=%d",
+							DotaTime(), (string.gsub(m, "npc_dota_hero_", "")),
+							(string.gsub(S:GetUnitName(), "npc_dota_hero_", "")),
+							(string.gsub(a3:GetUnitName(), "npc_dota_hero_", "")), far))
+					end
 					return BOT_MODE_DESIRE_VERYHIGH + 0.05
 				end
 				if a.IsInRange(c, S, 1000) and #x == 0 then
@@ -327,6 +339,9 @@ function r.GetDesire()
 							local a7 = a.GetEnemiesNearLoc(a6.location, 300)
 							if a.IsValidHero(a7[1]) then
 								d.location = a6.location
+								-- Think only walks to d.location with hidden1 set; without it this
+								-- desire did nothing and dropped to 0 next think.
+								d.hidden1 = true
 								return BOT_MODE_DESIRE_VERYHIGH + 0.05
 							end
 						end
@@ -485,6 +500,12 @@ function r.Think()
 			c:Action_MoveToLocation(d.locationFuture)
 			return
 		end
+	end
+	-- An ally's fight target beyond 1200 (the ally-follow desire): walk there instead of
+	-- dropping the mode, which made the next desire 0 and the bot flip attack/assemble.
+	if a.IsValidHero(d.unit) and not a.IsSuspiciousIllusion(d.unit) then
+		c:Action_MoveToLocation(d.unit:GetLocation())
+		return
 	end
 	n = true
 end

@@ -32,7 +32,6 @@ local OHA_MUTED = {
 	"^%[OHA%-FARM%] t=%S+ %S+ base%-siege%-hold", -- 116-134 per game
 	"^%[OHA%-FARM%] t=%S+ %S+ enemy%-half%-withdraw why=finish", -- the repeat while walking back
 	"^%[OHA%-ATTACK%] t=%S+ %S+ follow%-skip",
-	"^%[OHA%-KITE%]",
 	"^%[OHA%-MONKEY_KING%] t=%S+ spring%-skip", -- 127 per game
 	"^%[OHA%-NS%] t=%S+ feast result",
 	"^%[OHA%-MEEPO%] t=%S+ %S+ rune%-skip",

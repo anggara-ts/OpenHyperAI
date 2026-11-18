@@ -194,6 +194,18 @@ function X.DangerJaunt()
 end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
+	-- Hold every other cast while Phase Shift starts and lasts (#15, game 046: 15 orders, never channelling 0.3s later;
+	-- 5 of 8 probes found Puck already casting Waning Rift or the orb: our own next think broke the channel).
+	if bot._phaseOrderAt ~= nil and DotaTime() - bot._phaseOrderAt < 0.4 then
+		return
+	end
+	local activeNow = bot:IsChanneling() and bot:GetCurrentActiveAbility() or nil
+	if
+		bot:HasModifier("modifier_puck_phase_shift")
+		or activeNow ~= nil and not activeNow:IsNull() and activeNow:GetName() == "puck_phase_shift"
+	then
+		return
+	end
 	local okReady, orbOut = pcall(X.OrbInFlight)
 	bot._puckEscapeReady = phaseShiftAbility:IsFullyCastable()
 		or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
@@ -221,6 +233,7 @@ function X.SkillsComplement()
 			)
 		)
 		bot._phaseProbeAt = DotaTime() + 0.3
+		bot._phaseOrderAt = DotaTime()
 		bot:Action_UseAbility(phaseShiftAbility)
 		return
 	end

@@ -632,6 +632,24 @@ do
 						)
 					end
 					local why, harasser = LastHitRisk(lastHitCreep, spot, creepDistance > attackRange)
+					-- Not from inside an enemy tower's range (#71, game 044 4:20: Puck walked under Radiant's bottom
+					-- T1 for a last hit). Supports never; cores only above 50% HP with 2+ of our lane creeps in that
+					-- range to hold the tower.
+					local tower = enemyTowers[1]
+					if why == nil and Fu.IsValidBuilding(tower) and tower:IsAlive() then
+						local towerReach = (tower:GetAttackRange() or 700) + 150
+						if GetUnitToLocationDistance(tower, spot) <= towerReach then
+							local holders = 0
+							for _, creep in pairs(allyLaneCreeps or {}) do
+								if Fu.IsValid(creep) and GetUnitToUnitDistance(creep, tower) <= towerReach then
+									holders = holders + 1
+								end
+							end
+							if bSupport or Fu.GetHP(bot) <= 0.5 or holders < 2 then
+								why, harasser = "tower", tower
+							end
+						end
+					end
 					if why ~= nil then
 						LaneLog(
 							"[OHA-LANE] t=%.0f %s lasthit-skip why=%s creep=%s by=%s hp=%.2f walk=%d",
@@ -711,6 +729,20 @@ do
 			end
 			return true
 		end
+		do
+			local reset = bot._harassReset
+			if reset ~= nil then
+				if DotaTime() > reset.untilTime or not Fu.IsValidHero(reset.target) then
+					bot._harassReset = nil
+				elseif bot:GetLastAttackTime() >= reset.at or GameTime() - reset.at > 1 then
+					bot:Action_MoveToLocation(Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 350))
+					return
+				else
+					bot:Action_AttackUnit(reset.target, true)
+					return
+				end
+			end
+		end
 		-- Harass a hero in attack range: supports above 50% HP, cores above 45%, no fresh creep aggro, not by
 		-- the enemy T1 (unchanged rules; now one pass with a log of the gate that stops it).
 		do
@@ -743,6 +775,24 @@ do
 					if target == nil then
 						why = "tower"
 					end
+				end
+				-- Harass and reset (#71): game 044 skipped 19 of 26 harass chances for creep aggro. A ranged bot over
+				-- 60% HP with at most 2 fresh creeps near still takes one hit, then steps back toward its fountain
+				-- for 1.2s so the creeps that turned on it lose it (the usual "hit and step back").
+				if
+					target == nil
+					and why == "creep-aggro"
+					and attackRange >= 400
+					and Fu.GetHP(bot) > 0.6
+					and fresh <= 2
+					and hitting == 0
+					and SafeToHarassHero(inRange)
+					and DotaTime() >= (bot._harassResetNextAt or -999)
+				then
+					target = inRange
+					why = "reset"
+					bot._harassReset = { target = inRange, at = GameTime(), untilTime = DotaTime() + 2.5 }
+					bot._harassResetNextAt = DotaTime() + 6
 				end
 				LogHarass(inRange, target, why, fresh, hitting)
 				if target ~= nil then

@@ -1108,14 +1108,57 @@ function Retreat.ShouldRun()
 		local isDivingTower = Fu.IsValidBuilding(nearbyEnemyTowers[1])
 			and GetUnitToUnitDistance(bot, nearbyEnemyTowers[1])
 				< (nearbyEnemyTowers[1]:GetAttackRange() or 700) + 200
+		-- Game 044, 6:00: this ran Kez (87% HP, 2 allies to 1) off a Puck at 16% HP next to Dire's T1: "deep in the
+		-- lane" alone triggered it, and "two right-clicks" ignored his spells and his allies. Now only inside the
+		-- enemy tower's reach, and not when the target dies to what we and the allies near can do in ~3s, or is
+		-- under 25% HP while the tower is busy with someone else.
 		if
-			(isDeepInEnemyLane or isDivingTower)
+			isDivingTower
 			and Fu.IsValidHero(botTarget)
 			and Fu.CanBeAttacked(botTarget)
 			and not Fu.IsSuspiciousIllusion(botTarget)
-			and not Fu.CanKillTarget(botTarget, bot:GetAttackDamage() * 2.0, DAMAGE_TYPE_PHYSICAL)
 		then
-			return 2.88
+			local teamDamage = bot:GetEstimatedDamageToTarget(true, botTarget, 3.0, DAMAGE_TYPE_ALL) or 0
+			for _, ally in pairs(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) do
+				if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+					teamDamage = teamDamage
+						+ (ally:GetEstimatedDamageToTarget(true, botTarget, 3.0, DAMAGE_TYPE_ALL) or 0)
+				end
+			end
+			local tower = nearbyEnemyTowers[1]
+			local towerOnUs = tower:GetAttackTarget() == bot
+			local killable = teamDamage >= botTarget:GetHealth()
+			local lowTarget = Fu.GetHP(botTarget) < 0.25 and not towerOnUs
+			if not killable and not lowTarget then
+				if DotaTime() >= (bot._antiDiveLogAt or -999) then
+					bot._antiDiveLogAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-RETREAT] t=%.0f %s anti-dive why=tower target=%s hp=%.2f dmg3s=%d targetHp=%d towerOnUs=%s",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+							Fu.GetHP(botTarget),
+							math.floor(teamDamage),
+							botTarget:GetHealth(),
+							tostring(towerOnUs)
+						)
+					)
+				end
+				return 2.88
+			end
+		elseif isDeepInEnemyLane and Fu.IsValidHero(botTarget) and DotaTime() >= (bot._deepLaneLogAt or -999) then
+			bot._deepLaneLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s anti-dive skipped why=deep-lane-only target=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
 		end
 	end
 	local nearbyEnemyTowers = bot:GetNearbyTowers(900, true)

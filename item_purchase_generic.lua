@@ -2725,4 +2725,9 @@ local function OHA_Guard(name, fn)
 end
 ItemPurchaseThink = OHA_Guard("ItemPurchaseThink", ItemPurchaseThink)
 ItemPurchase.ItemPurchaseThink = ItemPurchaseThink
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	ItemPurchaseThink = Perf.Wrap("ItemPurchaseThink", ItemPurchaseThink)
+end
 return ItemPurchase

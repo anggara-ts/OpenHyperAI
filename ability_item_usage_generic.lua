@@ -9393,4 +9393,13 @@ CourierUsageThink = OHA_Guard("CourierUsageThink", CourierUsageThink)
 AbilityLevelUpThink = OHA_Guard("AbilityLevelUpThink", AbilityLevelUpThink)
 Usage.AbilityUsageThink = AbilityUsageThink
 Usage.ItemUsageThink = ItemUsageThink
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	ItemUsageThink = Perf.Wrap("ItemUsageThink", ItemUsageThink)
+	AbilityUsageThink = Perf.Wrap("AbilityUsageThink", AbilityUsageThink)
+	BuybackUsageThink = Perf.Wrap("BuybackUsageThink", BuybackUsageThink)
+	CourierUsageThink = Perf.Wrap("CourierUsageThink", CourierUsageThink)
+	AbilityLevelUpThink = Perf.Wrap("AbilityLevelUpThink", AbilityLevelUpThink)
+end
 return Usage

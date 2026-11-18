@@ -26,3 +26,9 @@ if SafeCall then
 		Think = SafeCall(originalThink, nil, "PUSH_TOWER_BOT_Think")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("push_tower_bot.GetDesire", GetDesire)
+	Think = Perf.Wrap("push_tower_bot.Think", Think)
+end

@@ -555,7 +555,8 @@ function Usage.SetTalkMessage()
 		if bot:IsAlive() and gold > lastGold + 300 * turboGoldScale and kills > lastKills then
 			local chatLine = "?"
 			if Fu.Customize.Trash_Talk_Level and Fu.Customize.Trash_Talk_Level >= 2 then
-				if RandomInt(1, 9) > 7 then
+				-- A normal kill: one of our lines 3 times in 4, "?" once in 4 (#90; it was 2 in 9).
+				if RandomInt(1, 4) > 1 then
 					chatLine = Localization.Get("got_a_kill")[RandomInt(1, #Localization.Get("got_a_kill"))]
 				end
 				if gold > lastGold + 800 * turboGoldScale and RandomInt(1, 9) > 4 then

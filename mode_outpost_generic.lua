@@ -288,6 +288,10 @@ function GetDesireHelper()
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
+	-- A hero hold (Puck's Phase Shift): no order at all, or the channel ends.
+	if bot._outpostHoldUntil ~= nil and DotaTime() < bot._outpostHoldUntil then
+		return
+	end
 	if Fu.CanNotUseAction(bot) then
 		return
 	end
@@ -2027,7 +2031,17 @@ heroSpecificDesire["npc_dota_hero_puck"] = function()
 		highPriorityAbility = bot:GetAbilityByName("puck_phase_shift")
 	end
 	if highPriorityAbility:IsTrained() then
-		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_puck_phase_shift") then
+		-- From the order on (#15, games 046-047: every Phase Shift ended at once; Valve's retreat Think moves the bot
+		-- every think and a move ends the channel). The shift's modifier was only seen after it had ended, so the hold
+		-- starts at hero_puck.lua's order time and lasts the shift's duration (game data) + 0.1s; Think gives no order.
+		local orderAt = bot._phaseOrderAt
+		local holdFor = highPriorityAbility:GetSpecialValueFloat("duration") + 0.1
+		if
+			orderAt ~= nil and DotaTime() - orderAt < holdFor
+			or highPriorityAbility:IsInAbilityPhase()
+			or bot:HasModifier("modifier_puck_phase_shift")
+		then
+			bot._outpostHoldUntil = DotaTime() + 0.15
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end

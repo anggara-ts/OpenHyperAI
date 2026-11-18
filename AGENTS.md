@@ -143,6 +143,10 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   is a bug (it floods the console and costs FPS).
 - Add a log to every new or uncertain behaviour so the next game proves it works. Remove or mute logs for
   features that are proven to work (`OHA_MUTED` in `FuncLib/systems/global_overrides.lua`).
+- "Proven to work" means the game showed the **effect** (the right target, the HP saved, the rune taken), not only
+  that the line prints. A line that only proves a rule fires stays until its effect is measured. Mute for noise
+  (hundreds of lines per game), not as a reward for passing. Game 043: the kiting log had been muted because it
+  fired, and nobody could tell whether kiting helped (#72).
 
 ## Testing in a game
 

@@ -4989,8 +4989,11 @@ function Usage.GetLaningTPLocation(hero, tpDistance, botLocation)
 	end
 	return GetLaneFrontLocation(team, lane, 100), farFromLane
 end
+-- Game 045, 43:55: this was our own creeps' front (GetLaneFrontLocation(team, lane, -950)), pushed deep to the
+-- enemy side, so a defend TP landed at the far end of the lane while the enemy sieged our base. TP toward the
+-- enemy wave instead: the TP lands at our building nearest it.
 function Usage.GetDefendTPLocation(lane)
-	return GetLaneFrontLocation(team, lane, -950)
+	return GetLaneFrontLocation(GetOpposingTeam(), lane, 0)
 end
 function Usage.GetPushTPLocation(lane)
 	local laneFront = GetLaneFrontLocation(team, lane, 0)
@@ -5513,6 +5516,19 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 			end
 			return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
 		end
+		-- Heal trip (#12, game 045 36:06: Meepo walked ~9500 home at 36% HP with TPs in the bag). Retreating with no
+		-- enemy hero within 1600, far from the fountain, and low on HP (or mana for a caster): TP home.
+		if
+			activeMode == BOT_MODE_RETREAT
+			and nearbyEnemyCount == 0
+			and not bot:WasRecentlyDamagedByAnyHero(3.0)
+			and bot:DistanceFromFountain() > 6000
+			and (hpRatio < 0.5 or bot:GetMaxMana() > 600 and mpRatio < 0.25)
+		then
+			tpLocation = Fu.GetTeamFountain()
+			castReason = "heal-trip"
+			return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
+		end
 		local attackingAllies = Fu.GetNearbyHeroes(bot, 1500, false, BOT_MODE_ATTACK)
 		-- Retreat TP home: HP under 15% + 24% per enemy hero within 1600 (two enemies: 63%). In
 		-- the laning phase that sent Doom home at 3:57 (game 018) and cost the lane; there it
@@ -5943,7 +5959,7 @@ local function TpHoldReason(target)
 	local siege = states ~= nil and states.baseSiege or nil
 	if
 		siege ~= nil
-		and now - siege.at <= 10
+		and now - siege.at <= 25
 		and ancient ~= nil
 		and Fu.GetLocationToLocationDistance(target, ancient:GetLocation()) > 5000
 	then
@@ -5986,6 +6002,33 @@ do
 		end
 		local why, enemies, allies = TpHoldReason(target)
 		if why == nil then
+			-- Only when it saves time (#12, maintainer): a TP lands at our building nearest the target. Escapes and
+			-- heal trips keep their own rules.
+			local reason = tostring(castReason)
+			local escape = string.find(reason, "撤退", 1, true) ~= nil or reason == "heal-trip"
+			local okL, landing = pcall(Fu.GetNearbyLocationToTp, target)
+			if not escape and okL and landing ~= nil then
+				local speed = math.max(250, bot:GetCurrentMovementSpeed())
+				local walk = GetUnitToLocationDistance(bot, target) / speed
+				local tp = 3.0 + Fu.GetLocationToLocationDistance(landing, target) / speed
+				if tp + 8 > walk then
+					if DotaTime() >= (bot._tpWorthLogAt or -999) then
+						bot._tpWorthLogAt = DotaTime() + 10
+						pcall(
+							print,
+							string.format(
+								"[OHA-TP] t=%.0f %s tp-skip why=not-worth walk=%.0fs tp=%.0fs reason=%s",
+								DotaTime(),
+								(string.gsub(botName, "npc_dota_hero_", "")),
+								walk,
+								tp,
+								reason
+							)
+						)
+					end
+					return BOT_ACTION_DESIRE_NONE
+				end
+			end
 			return desire, target, castType, castReason
 		end
 		if DotaTime() >= (bot._tpHoldLogAt or -999) then

@@ -315,7 +315,12 @@ function Push.GetPushDesireHelper(bot, lane)
 		return BotModeDesire.None
 	end
 	local isNearEnemyFountain = getLocationToLocationDistance(laneFrontLocation, enemyFountainTpPoint) < 5000
-	if isNearEnemyFountain and (#alliesNearBot < 3 or gameState.aliveAllyCount < gameState.aliveEnemyCount) then
+	-- Not when every enemy hero is dead (game 045, 28:18: 3 alive vs 0, push capped at 0.15, Dire left for Roshan).
+	if
+		isNearEnemyFountain
+		and gameState.aliveEnemyCount > 0
+		and (#alliesNearBot < 3 or gameState.aliveAllyCount < gameState.aliveEnemyCount)
+	then
 		maxPushDesire = math.min(maxPushDesire, 0.15)
 	end
 	if Fu.GetHP(bot) < 0.5 then
@@ -605,6 +610,29 @@ function Push.GetPushDesireHelper(bot, lane)
 	end
 	if #alliesNearBot <= 1 and #enemiesNearBot >= 2 then
 		pushDesire = math.min(pushDesire, 0.2)
+	end
+	-- Wipe push (#12): with no enemy hero alive, a bot above 30% HP near this lane's front pushes it above Roshan
+	-- and the walk home.
+	if
+		aliveEnemyCount == 0
+		and Fu.GetHP(bot) >= 0.3
+		and getLocationToLocationDistance(GetLaneFrontLocation(team, lane, 0), bot:GetLocation()) < 4000
+	then
+		pushDesire = math.max(pushDesire, 0.9)
+		if DotaTime() >= (bot._wipePushLogAt or -999) then
+			bot._wipePushLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-PUSH] t=%.0f %s wipe-push lane=%s alive=%d/0 hp=%.2f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(lane),
+					gameState.aliveAllyCount,
+					Fu.GetHP(bot)
+				)
+			)
+		end
 	end
 	local groupHurt = false
 	if isNearEnemyFountain and #alliesNearBot >= 2 then

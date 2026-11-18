@@ -85,14 +85,6 @@ local ability4Desire, ability4Target
 local spectralSlugDesire, spectralSlugTarget
 local minManaForCalling = 280
 local botTarget = nil
-function X.Think()
-	if X.TeamRoam == nil then
-		X.TeamRoam = require(GetScriptDirectory() .. "/FuncLib/mode_team_roam_generic_shared")
-	end
-	if X.TeamRoam.GetDesire() > 0 then
-		X.TeamRoam.Think()
-	end
-end
 function X.SkillsComplement()
 	X.ConsiderTarget()
 	Fu.ConsiderForMkbDisassembleMask(bot)

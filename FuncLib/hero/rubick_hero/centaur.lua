@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Centaur.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local HitchARideDesire, HitchARideTarget, WorkHorseDesire, StampedeDesire, HoofStompDesire, DoubleEdgeDesire, DoubleEdgeTarget
 local bot
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

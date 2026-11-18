@@ -1,4 +1,6 @@
 -- [OHA-MIRANA] logs off: the behaviour they traced works (game 029).
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local botTarget
 local print = function() end
 -- Mirana: skill build, item build, and ability use for this hero.
 local X = {}

@@ -1,4 +1,7 @@
 -- Thinking for summoned units: primal split.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local DispelMagic, WindWalk, DispelMagicTarget, CycloneTarget, HurlBoulder, HurlBoulderTarget, AstralPull
+local AstralPullDesire, AttackUnits, UseDispelMagic, UseCyclone, UseWindWalk, UseHurlBoulder, UseAstralPull
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
 local X = {}
@@ -26,7 +29,7 @@ function X.MinionThink(ownerBot, minion)
 				minion:Action_UseAbilityOnEntity(Cyclone, CycloneTarget)
 				return
 			end
-			windWalkDesire, WindWalkTarget = UseWindWalk(minion)
+			windWalkDesire = UseWindWalk(minion)
 			if windWalkDesire > 0 then
 				minion:Action_UseAbility(WindWalk)
 				return
@@ -77,7 +80,7 @@ function X.MinionThink(ownerBot, minion)
 				return
 			end
 			AstralPull = minion:GetAbilityByName("brewmaster_void_astral_pull")
-			AstralPullDesire, AstralPullTarget = UseAstralPull(minion)
+			AstralPullDesire = UseAstralPull(minion)
 			if AstralPullDesire > 0 then
 				minion:Action_UseAbility(AstralPull)
 				return

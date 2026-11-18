@@ -1671,7 +1671,29 @@ function Defend.GetDefendDesire(bot, lane)
 			end
 		end
 	end
+	-- Don't call a defence the team is already holding. Game 038, 17:50: "They're pushing bot!" while four of
+	-- ours were at the bottom T2 winning 4v1.
+	local defenceHeld = false
 	if desire >= 0.5 and (bot._lastDefendChatDesire or 0) < 0.5 then
+		local front = GetLaneFrontLocation(ourTeam, lane, 0)
+		local alliesAtFront = Fu.GetAlliesNearLoc(front, 1600) or {}
+		local enemiesAtFront = Fu.GetLastSeenEnemiesNearLoc(front, 1600) or {}
+		if #alliesAtFront >= 2 and #alliesAtFront > #enemiesAtFront then
+			defenceHeld = true
+			pcall(
+				print,
+				string.format(
+					"[OHA-DEFEND] t=%.0f %s chat-skip why=already-held lane=%s allies=%d enemies=%d",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(lane),
+					#alliesAtFront,
+					#enemiesAtFront
+				)
+			)
+		end
+	end
+	if desire >= 0.5 and (bot._lastDefendChatDesire or 0) < 0.5 and not defenceHeld then
 		if FarmDefend.ClaimDecisionChat("defend_commit") then
 			local chatKey = lane == Lane.Top and "say_defend_top"
 				or (lane == Lane.Mid and "say_defend_mid" or "say_defend_bot")
@@ -1973,6 +1995,34 @@ function Defend.DefendThink(bot, lane)
 			if waveCreep ~= nil then
 				bot:Action_AttackUnit(waveCreep, true)
 				return
+			end
+			-- Diagnostic (#12, game 038 49:36: defenders stood at the Ancient while a wave fought our creeps
+			-- further out). Nothing within reach: where is the nearest enemy creep and what is it hitting?
+			if DotaTime() >= (bot._hgIdleLogAt or -999) then
+				bot._hgIdleLogAt = DotaTime() + 5
+				local nearestCreep, nearestDistance = nil, math.huge
+				for _, creep in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+					if Fu.IsValid(creep) then
+						local distance = GetUnitToUnitDistance(bot, creep)
+						if distance < nearestDistance then
+							nearestCreep, nearestDistance = creep, distance
+						end
+					end
+				end
+				local creepTarget = nearestCreep ~= nil and nearestCreep:GetAttackTarget() or nil
+				pcall(
+					print,
+					string.format(
+						"[OHA-DEFEND] t=%.0f %s hg-idle nearestCreep=%d creepHits=%s toHgSpot=%d hgRadius=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						nearestCreep ~= nil and math.floor(nearestDistance) or -1,
+						creepTarget ~= nil and tostring(creepTarget:GetUnitName()) or "none",
+						nearestCreep ~= nil and math.floor(GetUnitToLocationDistance(nearestCreep, highGroundSpot))
+							or -1,
+						hgRadius
+					)
+				)
 			end
 		end
 		if enemiesOnHG == 0 and #enemiesAtHighGround > 0 and #alliesAtHighGround >= #enemiesAtHighGround + 1 then

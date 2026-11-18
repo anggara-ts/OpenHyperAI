@@ -18,6 +18,7 @@ local BotBuild = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botNa
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
@@ -6939,7 +6940,7 @@ local function SmokeNextEnemyTower(lane)
 	end
 	return nil
 end
-Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
+local function SmokeDesireRaw(item)
 	local radius = 1200
 	local castType = "none"
 	local hEffectTarget = nil
@@ -6999,7 +7000,9 @@ Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
 			or activeMode == BOT_MODE_PUSH_TOWER_MID and LANE_MID
 			or activeMode == BOT_MODE_PUSH_TOWER_BOT and LANE_BOT
 			or nil
-		if pushLane ~= nil and #allyHeroes >= 3 then
+		-- Not with an enemy wave ahead (game 043, 13:49: Radiant smoked, hit the wave on the way and showed itself).
+		local waveAhead = #(bot:GetNearbyLaneCreeps(1600, true) or {}) >= 1
+		if pushLane ~= nil and #allyHeroes >= 3 and not waveAhead then
 			local tower = SmokeNextEnemyTower(pushLane)
 			local dist = tower ~= nil and GetUnitToUnitDistance(bot, tower) or 0
 			if dist > 2500 then
@@ -7032,6 +7035,47 @@ Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Game 043, 13:49-13:56: Rubick smoked a mid push, the group hit a creep wave (Smoke broke), and Grimstroke smoked
+-- again 7s later; Dire's Puck did the same (13:29 and 14:12). One Smoke per team per 60s, and none while this bot or
+-- an ally within 1200 is still smoked. Log: [OHA-ITEM] smoke-skip why=recent|smoked.
+local SMOKE_TEAM_GAP = 60
+Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
+	local why = nil
+	local lastSmoke = TeamMemory.Get(GetTeam(), "smokeAt")
+	if lastSmoke ~= nil and DotaTime() - lastSmoke < SMOKE_TEAM_GAP then
+		why = "recent"
+	elseif bot:HasModifier("modifier_smoke_of_deceit") then
+		why = "smoked"
+	else
+		for _, ally in pairs(Fu.GetAllyList(bot, 1200) or {}) do
+			if Fu.IsValidHero(ally) and ally:HasModifier("modifier_smoke_of_deceit") then
+				why = "smoked"
+				break
+			end
+		end
+	end
+	if why ~= nil then
+		if DotaTime() >= (bot._smokeSkipLogAt or -999) then
+			bot._smokeSkipLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s smoke-skip why=%s since=%.0f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					why,
+					lastSmoke ~= nil and DotaTime() - lastSmoke or -1
+				)
+			)
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local desire, target, castType, reason = SmokeDesireRaw(item)
+	if desire ~= nil and desire > 0 then
+		TeamMemory.Set(GetTeam(), "smokeAt", DotaTime())
+	end
+	return desire, target, castType, reason
 end
 local enemyPlayerIds = nil
 -- Dust only from a main slot (game 036: 308 "item can't be used from stash" refusals, bursts with the

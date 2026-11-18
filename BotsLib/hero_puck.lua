@@ -98,7 +98,35 @@ local mpRatio
 function X.OrbStraightPoint(aim)
 	return StraightCast.Point(bot, aim, StraightCast.Range(illusoryOrbAbility, "max_distance", 1950))
 end
+-- Diagnostic (#15): Phase Shift is channelled (game files: DOTA_ABILITY_BEHAVIOR_CHANNELLED), so any new order ends
+-- it. Does Puck stay shifted for the full duration, or does the next mode order cut it short? One line per shift.
+function X.TrackPhaseShift()
+	local shifted = bot:HasModifier("modifier_puck_phase_shift")
+	local track = bot._phaseTrack
+	if shifted and track == nil then
+		bot._phaseTrack = {
+			at = DotaTime(),
+			full = phaseShiftAbility:GetSpecialValueFloat("duration"),
+			mode = bot:GetActiveMode(),
+		}
+	elseif not shifted and track ~= nil then
+		bot._phaseTrack = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f phase held=%.2f of=%.2f mode=%d->%d hp=%.2f",
+				DotaTime(),
+				DotaTime() - track.at,
+				track.full or -1,
+				track.mode or -1,
+				bot:GetActiveMode(),
+				Fu.GetHP(bot)
+			)
+		)
+	end
+end
 function X.SkillsComplement()
+	pcall(X.TrackPhaseShift)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end

@@ -132,7 +132,7 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   of [discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50). When a game, test or source
   confirms a new limitation, disproves one, or a workaround is found, **edit the main post** (not only a reply):
   move the item between "Confirmed" and "Not confirmed yet", with the evidence (log line, test, Valve source) and
-  the related issue. `gh api graphql` with `updateDiscussion` edits it. Record API facts in
+  the related issue. `gh api graphql` with `updateDiscussion` edits it. The post is public: write it for readers outside the project, with no internal test-game numbers ("game 043") or match-log names; describe the evidence itself (the log line, the test, the game file). Record API facts in
   `Docs/BOT_API_RUNTIME.md` too.
 
 ## Logging

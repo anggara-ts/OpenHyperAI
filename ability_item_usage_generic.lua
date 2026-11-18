@@ -534,7 +534,13 @@ function Usage.SetTalkMessage()
 			humanChatTime = nil
 		end
 	end
-	if Fu.Customize.Allow_Trash_Talk then
+	-- One chat per player: every Meepo body (and Arc Warden's Tempest Double) runs this with its own kill count, and
+	-- each rolled its own line (game 043: Meepo said "mostly vici" and "?" for one kill, #8).
+	if
+		Fu.Customize.Allow_Trash_Talk
+		and not Fu.IsMeepoClone(bot)
+		and not bot:HasModifier("modifier_arc_warden_tempest_double")
+	then
 		if
 			DotaTime() < 600
 			and bot:IsAlive()
@@ -6998,7 +7004,58 @@ local function SmokeDesireRaw(item)
 		local activeMode = bot:GetActiveMode()
 		local timeOfDay = Fu.CheckTimeOfDay()
 		hEffectTarget = bot
-		if activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM then
+		-- Game 044, 15:08: Puck smoked a team roam right in front of Radiant's bottom T1 while flipping between team
+		-- roam and pushing that tower (16 mode changes); walking on to the tower breaks the Smoke. Like push-group:
+		-- not within 2500 of an enemy tower, and not while an ally near is in a push mode.
+		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM
+		local roamSkip = nil
+		if roamMode then
+			for _, towerId in ipairs({
+				TOWER_TOP_1,
+				TOWER_TOP_2,
+				TOWER_TOP_3,
+				TOWER_MID_1,
+				TOWER_MID_2,
+				TOWER_MID_3,
+				TOWER_BOT_1,
+				TOWER_BOT_2,
+				TOWER_BOT_3,
+				TOWER_BASE_1,
+				TOWER_BASE_2,
+			}) do
+				local tower = GetTower(GetOpposingTeam(), towerId)
+				if tower ~= nil and tower:IsAlive() and GetUnitToUnitDistance(bot, tower) < 2500 then
+					roamSkip = "tower-near"
+					break
+				end
+			end
+			if roamSkip == nil then
+				for _, ally in pairs(allyHeroes) do
+					local allyMode = Fu.IsValidHero(ally) and ally:GetActiveMode() or nil
+					if
+						allyMode == BOT_MODE_PUSH_TOWER_TOP
+						or allyMode == BOT_MODE_PUSH_TOWER_MID
+						or allyMode == BOT_MODE_PUSH_TOWER_BOT
+					then
+						roamSkip = "ally-pushing"
+						break
+					end
+				end
+			end
+			if roamSkip ~= nil and DotaTime() >= (bot._smokeRoamSkipLogAt or -999) then
+				bot._smokeRoamSkipLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-ITEM] t=%.0f %s smoke-skip why=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						roamSkip
+					)
+				)
+			end
+		end
+		if roamMode and roamSkip == nil then
 			SmokeLog("team-roam", #allyHeroes)
 			MatchTrace.Item(bot, "item_smoke_of_deceit", "team_roam", string.format("allies=%d", #allyHeroes))
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason

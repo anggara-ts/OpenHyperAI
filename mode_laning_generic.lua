@@ -196,6 +196,10 @@ end
 -- damage prediction counts tower projectiles already flying, not the next shot: when our tower is attacking this
 -- creep and its next shot lands before our hit, count it. Returns the damage the creep takes from it, or 0.
 local function OurTowerShotBefore(creep, hitDelay)
+	-- An unreachable hit (delay inf, game 046: a melee bot far from the creep) has no timing to plan.
+	if hitDelay == nil or hitDelay ~= hitDelay or hitDelay > 3 then
+		return 0
+	end
 	for _, tower in pairs(bot:GetNearbyTowers(1000, false) or {}) do
 		if Fu.IsValidBuilding(tower) and tower:GetAttackTarget() == creep then
 			local nextShot = tower:GetLastAttackTime() + tower:GetSecondsPerAttack()

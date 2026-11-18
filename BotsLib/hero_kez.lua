@@ -173,8 +173,33 @@ function X.CheckCastResult()
 		)
 	)
 end
+-- Where did the Echo Slash actually go? 0.6s after the cast, the direction Kez moved against the target's direction.
+function X.CheckEchoResult()
+	local probe = bot._echoProbe
+	if probe == nil or DotaTime() < probe.at + 0.6 then
+		return
+	end
+	bot._echoProbe = nil
+	local d = bot:GetLocation() - probe.loc
+	if d:Length2D() < 50 then
+		X.LogKez("echo-result moved=0")
+		return
+	end
+	local movedDir = math.deg(math.atan2(d.y, d.x)) % 360
+	local off = probe.aimDir >= 0 and math.abs(((movedDir - probe.aimDir) + 180) % 360 - 180) or -1
+	X.LogKez(
+		string.format(
+			"echo-result moved=%d moved-dir=%.0f target-dir=%.0f off=%.0f",
+			d:Length2D(),
+			movedDir,
+			probe.aimDir,
+			off
+		)
+	)
+end
 function X.SkillsComplement()
 	X.CheckCastResult()
+	pcall(X.CheckEchoResult)
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
@@ -252,8 +277,12 @@ function X.SkillsComplement()
 				grapplingClawTarget ~= nil
 				and (type(grapplingClawTarget) == "number" or grapplingClawTargetType == "tree")
 			then
+				bot._kezClawAt = DotaTime()
+				X.LogKez("claw target=tree")
 				bot:Action_UseAbilityOnTree(grapplingClawAbility, grapplingClawTarget)
 			elseif grapplingClawTarget ~= nil then
+				bot._kezClawAt = DotaTime()
+				X.LogKez("claw target=" .. tostring(grapplingClawTarget:GetUnitName()))
 				bot:Action_UseAbilityOnEntity(grapplingClawAbility, grapplingClawTarget)
 			end
 			return
@@ -263,9 +292,27 @@ function X.SkillsComplement()
 		if echoSlashDesire > 0 then
 			-- Echo Slash has no target (game files: NO_TARGET, cast point 0.2): it goes where Kez faces. Cast at once:
 			-- the queued Power Treads switch in front gave him time to turn away (game 044, 1:30).
-			X.LogKez("echo-slash why=" .. tostring(echoWhy))
-			bot:Action_UseAbility(echoSlashAbility)
-			return
+			local sinceClaw = DotaTime() - (bot._kezClawAt or -99)
+			if sinceClaw >= 1 then
+				local aim = Fu.IsValidHero(botTarget) and botTarget or nearbyEnemies[1]
+				local aimDir = -1
+				if Fu.IsValidHero(aim) then
+					local d = aim:GetLocation() - bot:GetLocation()
+					aimDir = math.deg(math.atan2(d.y, d.x)) % 360
+				end
+				X.LogKez(
+					string.format(
+						"echo-slash why=%s facing=%.0f target-dir=%.0f since-claw=%.1f",
+						tostring(echoWhy),
+						(bot:GetFacing() or 0) % 360,
+						aimDir,
+						math.min(sinceClaw, 99)
+					)
+				)
+				bot._echoProbe = { at = DotaTime(), loc = bot:GetLocation(), aimDir = aimDir }
+				bot:Action_UseAbility(echoSlashAbility)
+				return
+			end
 		end
 		KazuraiKatanaDesire, KazuraiKatanaTarget = X.ConsiderKazuraiKatana()
 		if KazuraiKatanaDesire > 0 then
@@ -385,14 +432,6 @@ function X.ConsiderEchoSlash()
 		end
 	end
 	if Fu.IsLaning(bot) and not Fu.IsThereNonSelfCoreNearby(1200) then
-		if
-			nearbyEnemies[1] ~= nil
-			and Fu.IsInRange(bot, nearbyEnemies[1], katanaDistance - 100)
-			and bot:IsFacingLocation(nearbyEnemies[1]:GetLocation(), 8)
-			and manaAfter > 0.5
-		then
-			return BOT_ACTION_DESIRE_HIGH, "lane-hero"
-		end
 		local creeps = bot:GetNearbyCreeps(katanaDistance, true)
 		if Fu.IsValid(creeps[1]) and Fu.CanBeAttacked(creeps[1]) and not Fu.IsRunning(creeps[1]) then
 			local aoe = bot:FindAoELocation(true, false, creeps[1]:GetLocation(), 0, katanaRadius, 0, 0)
@@ -1032,6 +1071,24 @@ function X.ConsiderSwitchDiscipline()
 		local katanaReady = ready(echoSlashAbility) and "echo_slash"
 			or (ready(grapplingClawAbility) and "grappling_claw")
 		local saiReady = ready(falconRushAbility) and "falcon_rush" or (ready(talonTossAbility) and "talon_toss")
+		if DotaTime() >= (bot._weaveCheckLogAt or -999) then
+			bot._weaveCheckLogAt = DotaTime() + 20
+			local function state(ability)
+				return string.format("%d/%.0f", ability:GetLevel(), ability:GetCooldownTimeRemaining())
+			end
+			X.LogKez(
+				string.format(
+					"weave-check mode=%s katana=%s sai=%s echo=%s claw=%s rush=%s toss=%s",
+					tostring(bot.kez_mode),
+					tostring(katanaReady),
+					tostring(saiReady),
+					state(echoSlashAbility),
+					state(grapplingClawAbility),
+					state(falconRushAbility),
+					state(talonTossAbility)
+				)
+			)
+		end
 		if bot.kez_mode == "katana" and not katanaReady and saiReady then
 			X.LogKez("stance-switch to=sai why=weave next=" .. saiReady)
 			return BOT_ACTION_DESIRE_HIGH

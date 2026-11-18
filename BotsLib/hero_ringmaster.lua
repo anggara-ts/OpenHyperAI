@@ -137,7 +137,40 @@ local isEngaging
 local isRetreating
 local isAttacking
 local hpRatio
+-- Diagnostic (#49): which souvenir Ringmaster holds and whether it can be cast. Game 043: he got Strongman Tonic
+-- (~26:26) and Whoopee Cushion (~34:40), the engine warned "trying to unhide in a slot > 5", and no line said
+-- whether either was used. Every 30s: each souvenir that is not hidden, with castable / cooldown / level.
+function X.LogSouvenirState()
+	if DotaTime() < (bot._souvenirStateAt or -999) then
+		return
+	end
+	bot._souvenirStateAt = DotaTime() + 30
+	local parts = {}
+	for _, pair in ipairs({
+		{ "tonic", strongmanTonicAbility },
+		{ "cushion", whoopeeCushionAbility },
+		{ "mirror", funhouseMirrorAbility },
+		{ "unicycle", unicycleAbility },
+		{ "pie", weightedPieAbility },
+		{ "ball", crystalBallAbility },
+	}) do
+		local ability = pair[2]
+		if ability ~= nil and not ability:IsNull() and not ability:IsHidden() and ability:GetLevel() > 0 then
+			parts[#parts + 1] = string.format(
+				"%s(castable=%s cd=%.0f lvl=%d)",
+				pair[1],
+				tostring(ability:IsFullyCastable()),
+				ability:GetCooldownTimeRemaining(),
+				ability:GetLevel()
+			)
+		end
+	end
+	if #parts > 0 then
+		pcall(print, string.format("[OHA-RINGMASTER] t=%.0f souvenirs %s", DotaTime(), table.concat(parts, " ")))
+	end
+end
 function X.SkillsComplement()
+	pcall(X.LogSouvenirState)
 	if Fu.CanNotUseAbility(bot) or bot:IsCastingAbility() or bot:IsChanneling() then
 		return
 	end
@@ -150,6 +183,7 @@ function X.SkillsComplement()
 	botLevel = bot:GetLevel()
 	whoopeeCushionDesire = X.ConsiderWhoopeeCushion()
 	if whoopeeCushionDesire > 0 then
+		X.LogSouvenir("whoopee_cushion", "cast")
 		bot:Action_UseAbility(whoopeeCushionAbility)
 		return
 	end
@@ -197,6 +231,7 @@ function X.SkillsComplement()
 	end
 	strongmanTonicDesire, strongmanTonicTarget = X.ConsiderStrongmanTonic()
 	if strongmanTonicDesire > 0 then
+		X.LogSouvenir("strongman_tonic", "cast")
 		bot:Action_UseAbilityOnEntity(strongmanTonicAbility, strongmanTonicTarget)
 		return
 	end
@@ -208,11 +243,13 @@ function X.SkillsComplement()
 	end
 	funhouseMirrorDesire = X.ConsiderFunhouseMirror()
 	if funhouseMirrorDesire > 0 then
+		X.LogSouvenir("funhouse_mirror", "cast")
 		bot:Action_UseAbility(funhouseMirrorAbility)
 		return
 	end
 	unicycleDesire = X.ConsiderUnicycle()
 	if unicycleDesire > 0 then
+		X.LogSouvenir("unicycle", "cast")
 		bot:Action_UseAbility(unicycleAbility)
 		return
 	end

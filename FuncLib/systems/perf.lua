@@ -41,17 +41,29 @@ local function Record(name, seconds)
 		for i = 1, math.min(3, #names) do
 			top[#top + 1] = string.format("%s=%.0fms", names[i][1], names[i][2] * 1000)
 		end
+		local partList = {}
+		for key, value in pairs(perf.parts or {}) do
+			partList[#partList + 1] = { key, value }
+		end
+		table.sort(partList, function(a, b)
+			return a[2] > b[2]
+		end)
+		local parts = {}
+		for i = 1, math.min(4, #partList) do
+			parts[#parts + 1] = string.format("%s=%.0fms", partList[i][1], partList[i][2] * 1000)
+		end
 		pcall(
 			print,
 			string.format(
-				"[OHA-PERF] t=%.0f %s why=%s ms/s=%.1f calls=%d window=%.0fs top=%s",
+				"[OHA-PERF] t=%.0f %s why=%s ms/s=%.1f calls=%d window=%.0fs top=%s parts=%s",
 				now,
 				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 				baseline and "baseline" or "over-budget",
 				perf.total / span * 1000,
 				perf.calls,
 				span,
-				table.concat(top, ",")
+				table.concat(top, ","),
+				#parts > 0 and table.concat(parts, ",") or "-"
 			)
 		)
 	end
@@ -61,6 +73,18 @@ end
 local function Finish(name, startedAt, ...)
 	Record(name, RealTime() - startedAt)
 	return ...
+end
+
+-- Time spent in one part of a wrapped function (e.g. ItemUsageThink's item checks vs the hero's ability code).
+-- Kept apart from the totals, which already include it; the report lists the top 4 parts (#52, game 043: every
+-- over-budget line had ItemUsageThink on top, and it runs both the items and the hero's SkillsComplement).
+function Perf.Part(name, seconds)
+	local bot = GetBot()
+	if bot == nil or bot._perf == nil or seconds == nil then
+		return
+	end
+	bot._perf.parts = bot._perf.parts or {}
+	bot._perf.parts[name] = (bot._perf.parts[name] or 0) + seconds
 end
 
 -- Returns fn wrapped with timing (fn unchanged when nil or when RealTime is missing).

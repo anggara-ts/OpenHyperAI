@@ -1,5 +1,15 @@
 -- Casts abilities and uses items while the bot is already in some other mode.
 local Usage = {}
+local PerfParts = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+-- Perf.Part helpers for ItemUsageThink (#52).
+local function PartStart()
+	return RealTime ~= nil and RealTime() or nil
+end
+local function PartEnd(name, startedAt)
+	if startedAt ~= nil then
+		PerfParts.Part(name, RealTime() - startedAt)
+	end
+end
 local bot = GetBot()
 local botName = bot:GetUnitName()
 if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(botName, "hero") or bot:IsIllusion() then
@@ -9222,11 +9232,13 @@ function ItemUsageThink()
 	pcall(TrackCyclone)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, bot)
+	local tWatch = PartStart()
 	pcall(Usage.TrackTeleportJump)
 	pcall(Usage.WatchStillUnderHit)
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.LogHomeWalk)
+	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)
 	if okQ and cleared then
 		return
@@ -9319,7 +9331,9 @@ function ItemUsageThink()
 	end
 	if not Fu.IsNoItemIllution(bot) then
 		local tItem = _perfT0 and RealTime() or nil
+		local tItems = PartStart()
 		ConsiderItems()
+		PartEnd("items", tItems)
 		if tItem then
 			MatchTrace.PerfSample("ItemUsage.bg", RealTime() - tItem)
 		end
@@ -9368,7 +9382,9 @@ function ItemUsageThink()
 	end
 	if BotBuild ~= nil and not Fu.IsNoAbilityIllution(bot) then
 		local tSkill = _perfT0 and RealTime() or nil
+		local tHero = PartStart()
 		local ok, err = pcall(BotBuild.SkillsComplement)
+		PartEnd("hero-abilities", tHero)
 		if tSkill then
 			MatchTrace.PerfSample("SkillsComplement", RealTime() - tSkill)
 		end

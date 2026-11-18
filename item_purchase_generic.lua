@@ -2099,7 +2099,11 @@ function ItemPurchaseThink()
 			local it = bot:GetItemInSlot(slot)
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
-				if name == "item_foragers_health" or name == "item_foragers_stats" or name == "item_foragers_mana" then
+				local backedOff = bot._forageSwapBackoff ~= nil and now < (bot._forageSwapBackoff[name] or -999)
+				if
+					(name == "item_foragers_health" or name == "item_foragers_stats" or name == "item_foragers_mana")
+					and not backedOff
+				then
 					return name, slot, it
 				end
 			end
@@ -2120,6 +2124,31 @@ function ItemPurchaseThink()
 				if cheap ~= nil and cheap >= 0 then
 					dest = cheap
 				end
+			end
+			-- A mushroom that can't be used here (another hero's Forager's Kit) went back and forth every 4s for the
+			-- rest of the game (game 045: Weaver, 34 swap lines). After 2 swaps of the same forage within 60s, leave it
+			-- for 120s.
+			bot._forageSwaps = bot._forageSwaps or {}
+			local swaps = bot._forageSwaps[forageName]
+			if swaps == nil or now - swaps.since > 60 then
+				swaps = { n = 0, since = now }
+			end
+			swaps.n = swaps.n + 1
+			bot._forageSwaps[forageName] = swaps
+			if swaps.n > 2 then
+				bot._forageSwapBackoff = bot._forageSwapBackoff or {}
+				bot._forageSwapBackoff[forageName] = now + 120
+				bot._forageSwaps[forageName] = nil
+				pcall(
+					print,
+					string.format(
+						"[OHA-FORAGE] t=%.0f %s swap-giveup %s why=not-used backoff=120s",
+						now,
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						forageName
+					)
+				)
+				dest = nil
 			end
 			if dest ~= nil then
 				ForceSwap(forageSlot, dest)

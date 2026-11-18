@@ -54,3 +54,29 @@ T.test("straight cast: range from the special value, else the cast range, else t
 	T.eq(S.Range(ability(0, 0), "max_distance", 1000), 1000, "fallback")
 	T.eq(S.Range(nil, "max_distance", 1000), 1000, "no ability")
 end)
+
+T.test("straight cast: FaceFirst casts when facing the point, else steps toward it", function()
+	local S = load()
+	local moved = nil
+	local unit = {
+		GetLocation = function()
+			return Vector(0, 0, 0)
+		end,
+		GetFacing = function()
+			return 90 -- facing +y
+		end,
+		Action_MoveToLocation = function(_, loc)
+			moved = loc
+		end,
+	}
+	local angle, ok = S.FaceFirst(unit, Vector(0, 1000, 0), 12)
+	T.ok(ok, "facing +y, point on +y")
+	T.near(angle, 0, 0.01, "no angle")
+	T.eq(moved, nil, "no step")
+	angle, ok = S.FaceFirst(unit, Vector(1000, 0, 0), 12)
+	T.ok(not ok, "point on +x needs a turn")
+	T.near(angle, 90, 0.01, "90 degrees")
+	T.near(moved.x, 60, 0.5, "steps 60 toward the point")
+	angle = S.FaceFirst(unit, Vector(10, -1000, 0), 12)
+	T.ok(angle > 170 and angle <= 180, "behind: about 180")
+end)

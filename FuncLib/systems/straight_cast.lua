@@ -38,4 +38,25 @@ function StraightCast.Range(ability, valueName, fallback)
 	return fallback
 end
 
+-- Game 044, 2:26: the orb still curved at full range (`orb cast point=max ... cast=1948`). Both abilities' files have
+-- facing settings (grimstroke_dark_artistry vector_min_cos_facing_angle; illusory orb curve_strength), so the path
+-- likely starts where the caster faces and bends toward the point. Facing the point first should make it straight.
+-- Returns the angle (degrees) between the facing and the point; when it's over maxAngle a short step toward the
+-- point is issued (the hero turns as it starts moving) and the caller casts on a later think.
+function StraightCast.FaceFirst(unit, point, maxAngle)
+	local from = unit:GetLocation()
+	local dir = point - from
+	if dir:Length2D() < 1 then
+		return 0, true
+	end
+	local facing = unit:GetFacing() or 0
+	local want = math.deg(math.atan2(dir.y, dir.x))
+	local angle = math.abs(((want - facing) + 180) % 360 - 180)
+	if angle <= maxAngle then
+		return angle, true
+	end
+	unit:Action_MoveToLocation(Fu.VectorTowards(from, point, 60))
+	return angle, false
+end
+
 return StraightCast

@@ -2224,7 +2224,14 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 	end
-	if Fu.CanCastOnNonMagicImmune(bot) and #nearbyEnemies > 0 then
+	-- Puck's own escapes first (Phase Shift, or Jaunt to an orb in flight): game 044, 38:47, she Eul'd herself
+	-- with the orb out, landed among 8 enemies and died (#15). hero_puck.lua sets bot._puckEscapeReady.
+	if bot._puckEscapeReady and #nearbyEnemies > 0 and not Usage.IsDoomed(bot) and not bot:IsRooted() then
+		if DotaTime() >= (bot._puckEulSkipLogAt or -999) then
+			bot._puckEulSkipLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-PUCK] t=%.0f escape-order eul-skip why=own-escape-ready", DotaTime()))
+		end
+	elseif Fu.CanCastOnNonMagicImmune(bot) and #nearbyEnemies > 0 then
 		if Fu.GetHP(bot) < 0.2 and bot:WasRecentlyDamagedByAnyHero(3.0) then
 			hEffectTarget = bot
 			castReason = "撤退:" .. Fu.Chat.GetNormName(hEffectTarget)

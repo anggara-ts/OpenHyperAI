@@ -101,32 +101,89 @@ end
 -- Diagnostic (#15): Phase Shift is channelled (game files: DOTA_ABILITY_BEHAVIOR_CHANNELLED), so any new order ends
 -- it. Does Puck stay shifted for the full duration, or does the next mode order cut it short? One line per shift.
 function X.TrackPhaseShift()
-	local shifted = bot:HasModifier("modifier_puck_phase_shift")
+	local active = bot:IsChanneling() and bot:GetCurrentActiveAbility() or nil
+	local channelling = active ~= nil and not active:IsNull() and active:GetName() == "puck_phase_shift"
+	local shifted = bot:HasModifier("modifier_puck_phase_shift") or channelling
 	local track = bot._phaseTrack
 	if shifted and track == nil then
 		bot._phaseTrack = {
 			at = DotaTime(),
 			full = phaseShiftAbility:GetSpecialValueFloat("duration"),
 			mode = bot:GetActiveMode(),
+			by = channelling and "channel" or "modifier",
 		}
 	elseif not shifted and track ~= nil then
 		bot._phaseTrack = nil
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase held=%.2f of=%.2f mode=%d->%d hp=%.2f",
+				"[OHA-PUCK] t=%.0f phase held=%.2f of=%.2f mode=%d->%d hp=%.2f by=%s",
 				DotaTime(),
 				DotaTime() - track.at,
 				track.full or -1,
 				track.mode or -1,
 				bot:GetActiveMode(),
-				Fu.GetHP(bot)
+				Fu.GetHP(bot),
+				track.by or "?"
 			)
 		)
 	end
 end
+-- Escape order (#15, game 044, 38:47): Puck Eul'd herself against Pudge's hook while her orb flew away unused,
+-- landed among 8 enemies, was rooted and died. Her own escapes come first: tell the generic self-Eul rule
+-- (bot._puckEscapeReady) and Jaunt to an orb in flight when in danger. Jaunt is ROOT_DISABLES (game files), so it
+-- has to come before a root.
+function X.OrbInFlight()
+	for _, projectile in pairs(GetLinearProjectiles() or {}) do
+		if
+			projectile ~= nil
+			and projectile.ability ~= nil
+			and projectile.ability:GetName() == "puck_illusory_orb"
+			and not Fu.IsLocationInChrono(projectile.location)
+		then
+			return projectile.location
+		end
+	end
+	return nil
+end
+function X.DangerJaunt()
+	if not etherealJauntAbility:IsFullyCastable() or bot:IsRooted() then
+		return false
+	end
+	local orbAt = X.OrbInFlight()
+	if orbAt == nil or GetUnitToLocationDistance(bot, orbAt) < 500 then
+		return false
+	end
+	local enemiesHere = #Fu.GetEnemiesNearLoc(bot:GetLocation(), 900)
+	local enemiesThere = #Fu.GetEnemiesNearLoc(orbAt, 700)
+	local alliesHere = #Fu.GetAlliesNearLoc(bot:GetLocation(), 900)
+	local danger = bot:WasRecentlyDamagedByAnyHero(1.5) and (enemiesHere > alliesHere or Fu.GetHP(bot) < 0.5)
+		or Fu.IsStunProjectileIncoming(bot, 800)
+	if danger and enemiesThere < enemiesHere then
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f escape-order used=jaunt enemies=%d->%d hp=%.2f",
+				DotaTime(),
+				enemiesHere,
+				enemiesThere,
+				Fu.GetHP(bot)
+			)
+		)
+		bot:Action_UseAbility(etherealJauntAbility)
+		return true
+	end
+	return false
+end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
+	local okReady, orbOut = pcall(X.OrbInFlight)
+	bot._puckEscapeReady = phaseShiftAbility:IsFullyCastable()
+		or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
+	local okJ, jaunted = pcall(X.DangerJaunt)
+	if okJ and jaunted then
+		return
+	end
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -148,16 +205,27 @@ function X.SkillsComplement()
 	illusoryOrbDesire, illusoryOrbLocation = X.ConsiderIllusoryOrb()
 	if illusoryOrbDesire > 0 then
 		local castPoint = X.OrbStraightPoint(illusoryOrbLocation)
+		-- Turn first (at most 0.5s per orb, then cast anyway): the curve likely starts from Puck's facing.
+		if bot._orbTurnSince ~= nil and DotaTime() - bot._orbTurnSince > 2 then
+			bot._orbTurnSince = nil
+		end
+		local angle, facingIt = StraightCast.FaceFirst(bot, castPoint, 12)
+		if not facingIt and DotaTime() < (bot._orbTurnSince or DotaTime()) + 0.5 then
+			bot._orbTurnSince = bot._orbTurnSince or DotaTime()
+			return
+		end
+		bot._orbTurnSince = nil
 		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, castPoint)
 		if DotaTime() >= (bot._orbCastLogAt or -999) then
 			bot._orbCastLogAt = DotaTime() + 5
 			pcall(
 				print,
 				string.format(
-					"[OHA-PUCK] t=%.0f orb cast point=max aim=%d cast=%d",
+					"[OHA-PUCK] t=%.0f orb cast point=max aim=%d cast=%d facing=%.0f",
 					DotaTime(),
 					GetUnitToLocationDistance(bot, illusoryOrbLocation),
-					GetUnitToLocationDistance(bot, castPoint)
+					GetUnitToLocationDistance(bot, castPoint),
+					angle
 				)
 			)
 		end
@@ -314,9 +382,15 @@ function X.ConsiderWaningRift()
 	end
 	local castPoint = waningRiftAbility:GetCastPoint()
 	local radius = waningRiftAbility:GetSpecialValueInt("radius")
+	-- Game files: Puck moves up to max_distance (350, +350 talent) and hits radius (400) around where she lands.
+	local moveDistance = waningRiftAbility:GetSpecialValueInt("max_distance")
+	if moveDistance == nil or moveDistance <= 0 then
+		moveDistance = 350
+	end
+	local reach = moveDistance + radius
 	local damage = waningRiftAbility:GetSpecialValueInt("damage")
 	botTarget = Fu.GetProperTarget(bot)
-	local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius + 200, true, BOT_MODE_NONE)
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, reach, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemyHero)
@@ -333,7 +407,7 @@ function X.ConsiderWaningRift()
 	end
 	if Fu.IsStuck(bot) then
 		local escapeLocation = Fu.GetEscapeLoc()
-		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, radius)
+		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, moveDistance)
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
@@ -346,7 +420,7 @@ function X.ConsiderWaningRift()
 		if
 			Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
-			and Fu.IsInRange(bot, botTarget, radius)
+			and Fu.IsInRange(bot, botTarget, reach)
 			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
@@ -373,7 +447,7 @@ function X.ConsiderWaningRift()
 				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.65 and bot:WasRecentlyDamagedByAnyHero(2))
 			then
 				local escapeLocation = Fu.GetEscapeLoc()
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, radius)
+				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, moveDistance)
 			end
 		end
 	end

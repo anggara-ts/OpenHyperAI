@@ -466,6 +466,46 @@ function Push.GetPushDesireHelper(bot, lane)
 		isBotOnlyGame = not Fu.Utils.IsHumanPlayerInTeam(GetTeam())
 			and not Fu.Utils.IsHumanPlayerInTeam(GetOpposingTeam())
 	end
+	-- Finish a tower the group can kill (#12, game 047 ~18:00: Radiant went back and forth under Dire's bottom T2 while
+	-- it was nearly dead, the backdoor and low-HP caps holding push at 0.25). Under 25% HP, or the damage of the allies
+	-- near it over 5s beats its HP, with 2+ allies there: push at 0.9 whatever the caps.
+	local function FinishTower()
+		local tower = (bot:GetNearbyTowers(1200, true) or {})[1]
+		if
+			Fu.IsValidBuilding(tower)
+			and tower:IsAlive()
+			and getLocationToLocationDistance(GetLaneFrontLocation(team, lane, 0), tower:GetLocation()) < 2500
+		then
+			local towerAllies = 0
+			local damage5s = 0
+			for _, ally in pairs(tower:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) do
+				if Fu.IsValidHero(ally) and not ally:IsIllusion() then
+					towerAllies = towerAllies + 1
+					damage5s = damage5s + (ally:GetEstimatedDamageToTarget(true, tower, 5.0, DAMAGE_TYPE_ALL) or 0)
+				end
+			end
+			local towerHp = tower:GetHealth()
+			if towerAllies >= 2 and (towerHp / math.max(1, tower:GetMaxHealth()) < 0.25 or damage5s >= towerHp) then
+				if DotaTime() >= (bot._finishTowerLogAt or -999) then
+					bot._finishTowerLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-PUSH] t=%.0f %s finish-tower hp=%d dmg5s=%d allies=%d lane=%s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							towerHp,
+							math.floor(damage5s),
+							towerAllies,
+							tostring(lane)
+						)
+					)
+				end
+				return true
+			end
+		end
+		return false
+	end
 	if isBotOnlyGame and not gameState.isLaningPhase and not gameState.isEarlyGame then
 		if pushingTeammates >= 2 and lane == teamPushLane then
 			local laneFront = GetLaneFrontLocation(team, lane, 0)
@@ -537,6 +577,9 @@ function Push.GetPushDesireHelper(bot, lane)
 							tostring(isNearEnemyFountain)
 						)
 					)
+				end
+				if FinishTower() then
+					return math.max(lockDesire, 0.9)
 				end
 				return lockDesire
 			else
@@ -633,6 +676,9 @@ function Push.GetPushDesireHelper(bot, lane)
 				)
 			)
 		end
+	end
+	if FinishTower() then
+		pushDesire = math.max(pushDesire, 0.9)
 	end
 	local groupHurt = false
 	if isNearEnemyFountain and #alliesNearBot >= 2 then

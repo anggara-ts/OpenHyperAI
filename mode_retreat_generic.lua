@@ -471,6 +471,46 @@ function GetDesire()
 	bot._retreatDesireAt = now
 	retreatLine = 0
 	local desire = GetDesireHelper()
+	-- Rooted: retreat can only order a move, and a rooted hero can't move. Game 040, 5:40: Outworld Destroyer,
+	-- rooted by Earthbind at 26% HP, stood still in retreat mode while Meepo hit him. With an enemy hero in reach,
+	-- step aside (low desire) so attack mode fights back; spells and items run in their own think anyway. Retreat
+	-- comes back as soon as the root ends.
+	if
+		type(desire) == "number"
+		and desire > BOT_MODE_DESIRE_LOW
+		and bot:IsAlive()
+		and bot:IsRooted()
+		and not bot:IsStunned()
+		and not bot:IsHexed()
+		and not bot:IsDisarmed()
+	then
+		local reach = bot:GetAttackRange() + 200
+		local fightBackTarget = nil
+		for _, enemyHero in pairs(bot:GetNearbyHeroes(math.min(1600, reach), true, BOT_MODE_NONE) or {}) do
+			if Fu.IsValidHero(enemyHero) and Fu.CanBeAttacked(enemyHero) then
+				if fightBackTarget == nil or enemyHero:GetHealth() < fightBackTarget:GetHealth() then
+					fightBackTarget = enemyHero
+				end
+			end
+		end
+		if fightBackTarget ~= nil then
+			if now >= (bot._rootedLogAt or -999) then
+				bot._rootedLogAt = now + 3
+				pcall(
+					print,
+					string.format(
+						"[OHA-RETREAT] t=%.0f %s rooted act=fight-back target=%s hp=%.2f desire=%.2f",
+						now,
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(fightBackTarget:GetUnitName(), "npc_dota_hero_", "")),
+						bot:GetHealth() / bot:GetMaxHealth(),
+						desire
+					)
+				)
+			end
+			return BOT_MODE_DESIRE_LOW
+		end
+	end
 	-- A healthy bot wanting to retreat: say which rule (game 014, 35:30: Medusa at full HP and
 	-- mana backed off from a 1v1 with OD, and nothing in the log said why). At most every 5s.
 	if type(desire) == "number" and desire >= 0.5 and bot:IsAlive() and bot:GetHealth() >= 0.8 * bot:GetMaxHealth() then
@@ -595,7 +635,8 @@ function GetDesireHelper()
 	if
 		activeMode == BOT_MODE_ROSHAN
 		and not Fu.IsRoshanAlive()
-		and GetUnitToLocationDistance(bot, Fu.GetCurrentRoshanLocation())
+		-- Was a bare distance (always true): any bot in Roshan mode anywhere retreated once Roshan was dead.
+		and GetUnitToLocationDistance(bot, Fu.GetCurrentRoshanLocation()) < 1600
 		and IsLocationVisible(Fu.GetCurrentRoshanLocation())
 	then
 		if not nearby.aegisNearby1200 then
@@ -679,7 +720,8 @@ function GetDesireHelper()
 	if
 		botName == "npc_dota_hero_lone_druid"
 		and activeMode == BOT_MODE_ITEM
-		and GetUnitToLocationDistance(bot, roshanLocation)
+		-- Was a bare distance (always true); the Aegis check below looks within 1200 of the bot.
+		and GetUnitToLocationDistance(bot, roshanLocation) < 1200
 		and IsLocationVisible(roshanLocation)
 	then
 		if nearby.aegisNearby1200 then
@@ -1257,7 +1299,8 @@ GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(
 	"retreat",
 	BOT_MODE_RETREAT,
 	function(bot)
-		return bot:GetHealth() < 0.6 * bot:GetMaxHealth()
+		-- Not while rooted: the rooted fight-back in GetDesire drops retreat on purpose.
+		return bot:GetHealth() < 0.6 * bot:GetMaxHealth() and not bot:IsRooted()
 	end
 )
 if SafeCall then
@@ -1265,5 +1308,11 @@ if SafeCall then
 	if originalGetDesire then
 		GetDesire = SafeCall(originalGetDesire, 0, "RETREAT_GetDesire")
 	end
+end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("retreat.GetDesire", GetDesire)
+	Think = Perf.Wrap("retreat.Think", Think)
 end
 return Retreat

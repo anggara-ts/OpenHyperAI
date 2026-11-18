@@ -1541,3 +1541,9 @@ local function OHA_Trap(name, fn, fallback)
 end
 GetDesire = OHA_Trap("FARM_GetDesire", GetDesire, 0)
 Think = OHA_Trap("FARM_Run", Think, nil)
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("farm.GetDesire", GetDesire)
+	Think = Perf.Wrap("farm.Think", Think)
+end

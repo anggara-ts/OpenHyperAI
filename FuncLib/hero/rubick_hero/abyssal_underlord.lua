@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Abyssal Underlord.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local PitOfMaliceDesire, PitOfMaliceLocation, FirestormDesire, FirestormLocation, FiendsGateDesire, FiendsGateLocation
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

@@ -1,4 +1,7 @@
 -- How Rubick plays after stealing a spell from Ancient Apparition.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local IceBlastReleaseDesire, IceBlastDesire, IceBlastLocation, IceVortexDesire, IceVortextLocation, ColdFeetDesire, ColdFeetTarget, ChillingTouchDesire
+local ChillingTouchTarget
 local bot
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

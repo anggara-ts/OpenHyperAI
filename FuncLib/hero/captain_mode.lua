@@ -1,4 +1,7 @@
 -- Hero-specific helper: captain mode.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local banHero, pickHero, isHumanPicked, isExcludedHero, randomAvailableHero, allHumansSelected, selectHeroes, collectPickedHeroes
+local removeFromPicked
 local function countArgs(...)
 	return select("#", ...)
 end

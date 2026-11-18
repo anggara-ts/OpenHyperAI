@@ -1,4 +1,6 @@
 -- Zuus: skill build, item build, and ability use for this hero.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local nManaPercentage, nHealthPercentage
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -144,7 +146,6 @@ local nimbusDesire, nimbusLocation
 local wrathDesire
 local heavenlyJumpDesire, heavenlyJumpTarget
 local keepMana, mpRatio
-local bonusDamage = 0
 local staticFieldPct = 0
 local unusedTarget
 function X.SkillsComplement()
@@ -153,7 +154,6 @@ function X.SkillsComplement()
 	end
 	local context = AbilityContext.Build(bot)
 	keepMana = 400
-	bonusDamage = 0
 	staticFieldPct = 0
 	mpRatio = context.mp
 	nManaPercentage = context.mp
@@ -163,9 +163,6 @@ function X.SkillsComplement()
 	local staticFieldAbility = bot:GetAbilityByName("zuus_static_field")
 	if staticFieldAbility ~= nil then
 		staticFieldPct = staticFieldAbility:GetSpecialValueFloat("damage_health_pct") / 100
-	end
-	if talent8:IsTrained() then
-		bonusDamage = bonusDamage + talent8:GetSpecialValueInt("value")
 	end
 	wrathDesire = X.ConsiderR()
 	if wrathDesire > 0 then

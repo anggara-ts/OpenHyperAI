@@ -1,4 +1,7 @@
 -- How Rubick plays after stealing a spell from Antimage.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local CounterSpellDesire, BlinkFragmentDesire, BlinkFragmentLocation, BlinkDesire, BlinkLocation, ManaVoidDesire, ManaVoidTarget, CounterSpellAllyDesire
+local CounterSpellAllyTarget
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

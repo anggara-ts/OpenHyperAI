@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Crystal Maiden.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local CrystalCloneDesire, CrystalNovaDesire, CrystalNovaLocation, FrostbiteDesire, FrostbiteTarget, FreezingFieldDesire
 local bot
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

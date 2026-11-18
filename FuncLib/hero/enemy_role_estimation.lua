@@ -1,4 +1,6 @@
 -- Hero-specific helper: enemy role estimation.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local calculateNetWorth, calculateOffensivePower, normalizeScores
 local function objectValues(object)
 	local result = {}
 	local count = 0

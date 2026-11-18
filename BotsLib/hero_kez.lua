@@ -140,22 +140,36 @@ function X.LogKez(what)
 	pcall(print, string.format("[OHA-KEZ] t=%.0f %s", DotaTime(), what))
 end
 -- Did the last Shodo Sai / Katana order go off (#27)? Game 038 logged 15 parry decisions but nothing proved a cast.
--- 0.6s after the order, a started cooldown means it did (the two share a cooldown, datafeed).
+-- A started cooldown means it did (the two share a cooldown, datafeed). The Katana impale is an attack ability
+-- (game files: DOTA_ABILITY_BEHAVIOR_ATTACK, cast range 200): its cooldown starts when the attack goes off, after
+-- the walk and the attack wind-up. Game 043 read 9 of 20 impales as failed 0.6s after the order. Now: ok as soon
+-- as the cooldown starts, failed after 2s, with the mode and the target distance at the order and at the end.
 function X.CheckCastResult()
 	local check = bot._kezCastCheck
-	if check == nil or DotaTime() < check.at + 0.6 then
+	if check == nil then
+		return
+	end
+	local ok = check.ability ~= nil and not check.ability:IsNull() and check.ability:GetCooldownTimeRemaining() > 0
+	if not ok and DotaTime() < check.at + 2 then
 		return
 	end
 	bot._kezCastCheck = nil
-	local ok = check.ability ~= nil and not check.ability:IsNull() and check.ability:GetCooldownTimeRemaining() > 0
+	local target = check.target
+	local distNow = Fu.IsValidHero(target) and GetUnitToUnitDistance(bot, target) or -1
 	pcall(
 		print,
 		string.format(
-			"[OHA-KEZ] t=%.0f cast-result ability=%s ok=%s stance=%s",
+			"[OHA-KEZ] t=%.0f cast-result ability=%s ok=%s after=%.1f stance=%s mode=%d->%d dist=%d->%d target-alive=%s",
 			DotaTime(),
 			check.name,
 			tostring(ok),
-			tostring(bot.kez_mode)
+			DotaTime() - check.at,
+			tostring(bot.kez_mode),
+			check.mode or -1,
+			bot:GetActiveMode(),
+			check.dist or -1,
+			distNow,
+			tostring(target ~= nil and not target:IsNull() and target:IsAlive())
 		)
 	)
 end
@@ -253,7 +267,16 @@ function X.SkillsComplement()
 		KazuraiKatanaDesire, KazuraiKatanaTarget = X.ConsiderKazuraiKatana()
 		if KazuraiKatanaDesire > 0 then
 			bot:Action_UseAbilityOnEntity(kazuraiKatanaAbility, KazuraiKatanaTarget)
-			bot._kezCastCheck = { name = "katana_impale", ability = kazuraiKatanaAbility, at = DotaTime() }
+			if bot._kezCastCheck == nil or bot._kezCastCheck.target ~= KazuraiKatanaTarget then
+				bot._kezCastCheck = {
+					name = "katana_impale",
+					ability = kazuraiKatanaAbility,
+					at = DotaTime(),
+					target = KazuraiKatanaTarget,
+					mode = bot:GetActiveMode(),
+					dist = GetUnitToUnitDistance(bot, KazuraiKatanaTarget),
+				}
+			end
 			return
 		end
 		raptorDanceDesire = X.ConsiderRaptorDance()

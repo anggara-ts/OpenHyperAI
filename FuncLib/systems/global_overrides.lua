@@ -44,6 +44,8 @@ local OHA_MUTED = {
 	-- Proven in game 040 (PR #20); muted 2026-11-18.
 	"^%[OHA%-RETREAT%] t=%S+ %S+ healthy%-fight%-kept", -- 234 per game
 	"^%[OHA%-FARM%] t=%S+ %S+ enemy%-camp%-uncovered", -- 622 per game
+	-- Proven in game 043 (PR #57); muted 2026-11-18.
+	"^%[OHA%-DEFEND%] t=%S+ %S+ chat%-skip why=already%-held", -- 1047 per game
 }
 if _G.OHA_RAW_PRINT == nil then
 	_G.OHA_RAW_PRINT = print

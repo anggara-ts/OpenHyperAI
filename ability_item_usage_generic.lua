@@ -534,7 +534,13 @@ function Usage.SetTalkMessage()
 			humanChatTime = nil
 		end
 	end
-	if Fu.Customize.Allow_Trash_Talk then
+	-- One chat per player: every Meepo body (and Arc Warden's Tempest Double) runs this with its own kill count, and
+	-- each rolled its own line (game 043: Meepo said "mostly vici" and "?" for one kill, #8).
+	if
+		Fu.Customize.Allow_Trash_Talk
+		and not Fu.IsMeepoClone(bot)
+		and not bot:HasModifier("modifier_arc_warden_tempest_double")
+	then
 		if
 			DotaTime() < 600
 			and bot:IsAlive()

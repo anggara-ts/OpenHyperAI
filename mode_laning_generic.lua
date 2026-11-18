@@ -192,6 +192,21 @@ local function GetCreepValue(creep)
 	end
 	return 1
 end
+-- Our tower's next shot on a creep (#71, game 045: enemy creeps under our T1 were missed or ignored). The incoming-
+-- damage prediction counts tower projectiles already flying, not the next shot: when our tower is attacking this
+-- creep and its next shot lands before our hit, count it. Returns the damage the creep takes from it, or 0.
+local function OurTowerShotBefore(creep, hitDelay)
+	for _, tower in pairs(bot:GetNearbyTowers(1000, false) or {}) do
+		if Fu.IsValidBuilding(tower) and tower:GetAttackTarget() == creep then
+			local nextShot = tower:GetLastAttackTime() + tower:GetSecondsPerAttack()
+			local travel = GetUnitToUnitDistance(tower, creep) / math.max(1, tower:GetAttackProjectileSpeed())
+			if nextShot + travel < GameTime() + hitDelay then
+				return creep:GetActualIncomingDamage(tower:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+			end
+		end
+	end
+	return 0
+end
 function GetBestLastHitCreep(creeps)
 	local damage = attackDamage - 3
 	local bestCreep = nil
@@ -200,7 +215,27 @@ function GetBestLastHitCreep(creeps)
 		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
 			local value = GetCreepValue(creep)
-			if Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_PHYSICAL, attackDelay) then
+			local okT, towerShot = pcall(OurTowerShotBefore, creep, attackDelay)
+			towerShot = okT and towerShot or 0
+			-- The tower shot lands first; our hit then needs to finish what's left, and the tower alone must not
+			-- kill it (that gold is lost either way).
+			local towerKills = towerShot > 0 and towerShot >= creep:GetHealth()
+			if towerShot > 0 and not towerKills and DotaTime() >= (bot._lhTowerLogAt or -999) then
+				bot._lhTowerLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-LANE] t=%.0f %s lh-tower creep-hp=%d tower=%d hit=%d delay=%.2f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						creep:GetHealth(),
+						math.floor(towerShot),
+						damage,
+						attackDelay
+					)
+				)
+			end
+			if not towerKills and Fu.WillKillTarget(creep, damage + towerShot, DAMAGE_TYPE_PHYSICAL, attackDelay) then
 				if value > bestValue then
 					bestValue = value
 					bestCreep = creep

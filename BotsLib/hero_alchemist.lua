@@ -446,15 +446,57 @@ function X.ConsiderUnstableConcoctionThrow()
 	if explodeAt <= 0 or explodeAt > 5.5 then
 		explodeAt = 5.5
 	end
+	-- The throw can hit an illusion (and the explosion is AoE, so a real hero next to it is hit too). Game 039,
+	-- 30:42: the old filter (Fu.CanCastOnNonMagicImmune) rejects suspicious illusions, so with only Phantom
+	-- Lancer's illusions in range it logged "no-target" and the brew blew up on him.
+	local canHitWithThrow = function(unit)
+		return Fu.IsValidHero(unit) and unit:CanBeSeen() and not unit:IsMagicImmune() and not unit:IsInvulnerable()
+	end
+	-- Early throw: from 2s brewed, a target near the edge of range that is not facing him is walking away;
+	-- throw now instead of holding to 4.25s and losing it (game 038: 13 self-explosions, "no-target" at 5.0s).
+	if brewed >= retreatThrowDelay and brewed < explodeAt - 0.5 then
+		for _, enemyHero in pairs(nearbyEnemies or {}) do
+			if
+				canHitWithThrow(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and GetUnitToUnitDistance(bot, enemyHero) > castRange * 0.8
+				and not enemyHero:IsFacingLocation(bot:GetLocation(), 90)
+			then
+				if DotaTime() >= (bot._alchEarlyLogAt or -999) then
+					bot._alchEarlyLogAt = DotaTime() + 3
+					pcall(
+						print,
+						string.format(
+							"[OHA-ALCHEMIST] t=%.0f concoction throw why=leaving target=%s dist=%d brewed=%.1fs",
+							DotaTime(),
+							enemyHero:GetUnitName(),
+							GetUnitToUnitDistance(bot, enemyHero),
+							brewed
+						)
+					)
+				end
+				return BOT_ACTION_DESIRE_HIGH, enemyHero
+			end
+		end
+	end
 	if brewed >= explodeAt - 0.5 and brewed < explodeAt + 1 then
+		-- Prefer a real hero; otherwise the nearest illusion.
 		local nearest, nearestDist = nil, castRange + 100
+		local nearestIllusion, illusionDist = nil, castRange + 100
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, castRange + 100, true, BOT_MODE_NONE) or {}) do
-			if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) then
+			if canHitWithThrow(enemyHero) then
 				local distance = GetUnitToUnitDistance(bot, enemyHero)
-				if distance <= nearestDist then
+				if Fu.IsSuspiciousIllusion(enemyHero) then
+					if distance <= illusionDist then
+						nearestIllusion, illusionDist = enemyHero, distance
+					end
+				elseif distance <= nearestDist then
 					nearest, nearestDist = enemyHero, distance
 				end
 			end
+		end
+		if nearest == nil and nearestIllusion ~= nil then
+			nearest, nearestDist = nearestIllusion, illusionDist
 		end
 		local logNow = DotaTime() >= (bot._alchForceLogAt or -999)
 		if logNow then

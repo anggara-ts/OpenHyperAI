@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Bristleback.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local HairBallDesire, HairBallLocation, BristlebackDesire, BristlebackLocation, ViscousNasalGooDesire, ViscousNasalGooTarget, QuillSprayDesire
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

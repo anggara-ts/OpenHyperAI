@@ -34,6 +34,7 @@ local MUTED = {
 	"[OHA-TUSK] t=3240 buddies-retreat chaser=keeper_of_the_light ally=shredder enemies=1",
 	"[OHA-RETREAT] t=7 meepo healthy-fight-kept hp=1.00 allies=1 visible=1 recent=2 hit=false",
 	"[OHA-FARM] t=541 obsidian_destroyer enemy-camp-uncovered lane=3 campToAncient=9903 waveToAncient=12591 at=3978,-5027",
+	"[OHA-DEFEND] t=642 rubick chat-skip why=already-held lane=3 allies=3 enemies=2",
 }
 local KEPT = {
 	"[OHA-FARM] t=631 alchemist enemy-half-withdraw why=outnumbered mode=16 at=-870,-657 to=822,918 alive=5/5",

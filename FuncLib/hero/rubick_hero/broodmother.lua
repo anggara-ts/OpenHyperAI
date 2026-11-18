@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Broodmother.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local SpawnSpiderlingsDesire, SpirderlingsTarget, SpinWebDesire, SpinWebLocation, SilkenBolaDesire, SilkenBolaTarget, InsatiableHungerDesire
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

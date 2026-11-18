@@ -2100,4 +2100,10 @@ if SafeCall then
 end
 TeamRoam.GetDesire = GetDesire
 TeamRoam.Think = Think
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("team_roam.GetDesire", GetDesire)
+	Think = Perf.Wrap("team_roam.Think", Think)
+end
 return TeamRoam

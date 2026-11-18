@@ -2732,3 +2732,9 @@ if SafeCall then
 		Think = SafeCall(originalThink, nil, "OUTPOST_Think")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("outpost.GetDesire", GetDesire)
+	Think = Perf.Wrap("outpost.Think", Think)
+end

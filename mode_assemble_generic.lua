@@ -355,3 +355,9 @@ if SafeCall then
 		Think = SafeCall(originalThink, nil, "ASSEMBLE_Think")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("assemble.GetDesire", GetDesire)
+	Think = Perf.Wrap("assemble.Think", Think)
+end

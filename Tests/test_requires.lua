@@ -20,8 +20,7 @@ local OPTIONAL = {
 
 -- Known bugs: "<file> -> <module>" = reason. Reported as expected failures until fixed (then XPASS).
 local KNOWN_MISSING = {
-	["BotsLib/hero_muerta.lua -> FuncLib/mode_team_roam_generic_shared"] = "Muerta's X.Think requires a module "
-		.. "that is not in the repo; nothing calls X.Think today, so it never fails in game",
+	-- (empty: Muerta's dead X.Think and its missing require were removed in #13)
 }
 
 local known = {}

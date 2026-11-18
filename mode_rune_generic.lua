@@ -756,6 +756,24 @@ function GetDesireRaw()
 			-- then laning (0.56) beat the 0.35 hold and Meepo walked off with the rune still there. For the first
 			-- 5s after the spawn, standing on it holds at 0.6 (above laning, below fights and retreat).
 			local sinceSpawn = DotaTime() - bot._waterWalk.t0
+			-- Not on an empty spot (game 045, 0:08: Viper stood idle on the bottom spot reading missing until the stay
+			-- ran out). After 1s on it, a spot that reads missing ends the stay.
+			local spotEmpty = sinceSpawn >= 1 and RawGetRuneStatus(bot._waterWalk.id) == RUNE_STATUS_MISSING
+			if spotEmpty and bot._waterEmptyLogged ~= bot._waterWalk.t0 then
+				bot._waterEmptyLogged = bot._waterWalk.t0
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] t=%.0f %s water-stay-end why=empty spot=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						bot._waterWalk.id
+					)
+				)
+			end
+			if spotEmpty then
+				return give(BOT_MODE_DESIRE_NONE, "water-empty")
+			end
 			if sinceSpawn <= 5 and GetUnitToLocationDistance(bot, bot._waterWalk.loc) <= 300 then
 				if bot._waterStayLogged ~= bot._waterWalk.t0 then
 					bot._waterStayLogged = bot._waterWalk.t0

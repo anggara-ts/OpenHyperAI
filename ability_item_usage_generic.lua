@@ -6998,7 +6998,46 @@ local function SmokeDesireRaw(item)
 		local activeMode = bot:GetActiveMode()
 		local timeOfDay = Fu.CheckTimeOfDay()
 		hEffectTarget = bot
-		if activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM then
+		-- Game 044, 15:08: Puck smoked a team roam right in front of Radiant's bottom T1 while flipping between team
+		-- roam and pushing that tower (16 mode changes); walking on to the tower breaks the Smoke. Like push-group:
+		-- not within 2500 of an enemy tower, and not while an ally near is in a push mode.
+		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM
+		local roamSkip = nil
+		if roamMode then
+			for towerId = 0, 10 do
+				local tower = GetTower(GetOpposingTeam(), towerId)
+				if tower ~= nil and tower:IsAlive() and GetUnitToUnitDistance(bot, tower) < 2500 then
+					roamSkip = "tower-near"
+					break
+				end
+			end
+			if roamSkip == nil then
+				for _, ally in pairs(allyHeroes) do
+					local allyMode = Fu.IsValidHero(ally) and ally:GetActiveMode() or nil
+					if
+						allyMode == BOT_MODE_PUSH_TOWER_TOP
+						or allyMode == BOT_MODE_PUSH_TOWER_MID
+						or allyMode == BOT_MODE_PUSH_TOWER_BOT
+					then
+						roamSkip = "ally-pushing"
+						break
+					end
+				end
+			end
+			if roamSkip ~= nil and DotaTime() >= (bot._smokeRoamSkipLogAt or -999) then
+				bot._smokeRoamSkipLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-ITEM] t=%.0f %s smoke-skip why=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						roamSkip
+					)
+				)
+			end
+		end
+		if roamMode and roamSkip == nil then
 			SmokeLog("team-roam", #allyHeroes)
 			MatchTrace.Item(bot, "item_smoke_of_deceit", "team_roam", string.format("allies=%d", #allyHeroes))
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason

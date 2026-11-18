@@ -280,11 +280,33 @@ function X.ConsiderOnslaught()
 		end
 	end
 	local earlyEscape = hpRatio < 0.45 and chasers >= 1 and bot:GetActiveModeDesire() >= 0.5
+	-- Game 045: 4 of 9 escape charges were followed by death within 3s: he stands charging (1.3s+) while hit. With an
+	-- enemy hero within 600 the charge-up costs more than it gains; he just runs (logged once per 5s).
+	local nearestEnemy = math.huge
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if Fu.IsValidHero(enemyHero) then
+			nearestEnemy = math.min(nearestEnemy, GetUnitToUnitDistance(bot, enemyHero))
+		end
+	end
+	local tooClose = nearestEnemy <= 600
+	if tooClose and isRetreating and DotaTime() >= (bot._onslaughtSkipLogAt or -999) then
+		bot._onslaughtSkipLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-PRIMAL_BEAST] t=%.0f onslaught escape-skip why=too-close dist=%d hp=%.2f",
+				DotaTime(),
+				math.floor(nearestEnemy),
+				hpRatio
+			)
+		)
+	end
 	if
 		isRetreating
 		and not Fu.IsRealInvisible(bot)
 		and bot:WasRecentlyDamagedByAnyHero(4)
 		and (bot:GetActiveModeDesire() > 0.7 or earlyEscape)
+		and not tooClose
 	then
 		if
 			Fu.IsValidHero(nearbyEnemies[1])
@@ -299,9 +321,6 @@ function X.ConsiderOnslaught()
 				chargeupTime * 0.6,
 				chargeupTime
 			)
-			if GetUnitToUnitDistance(bot, nearbyEnemies[1]) <= 300 then
-				chargeTime = chargeupTime * 0.25
-			end
 			onslaughtChargeTime = chargeTime
 			X.LogOnslaughtRetreat(onslaughtChargeTime, chasers)
 			bot.onslaught_status = { "retreat", Fu.GetTeamFountain() }

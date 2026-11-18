@@ -1,4 +1,7 @@
 -- How Rubick plays after stealing a spell from Beastmaster.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local BlinkRoarDesire, BlinkRoarTarget, PrimalRoarDesire, PrimalRoarTarget, CallOfTheWildBoarDesire, CallOfTheWildHawkDesire, WildAxesDesire, WildAxesLocation
+local BlinkLocation
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

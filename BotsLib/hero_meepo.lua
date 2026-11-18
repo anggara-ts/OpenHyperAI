@@ -407,6 +407,57 @@ function X.ConsiderPoofRaw()
 			end
 		end
 	end
+	-- Fight Poofs (#8). Poof damages at the departure AND the arrival spot (datafeed: "damaging the enemy in
+	-- both the departure and arrival locations"), so an enemy near both, or a self-Poof in place, takes it twice.
+	-- Game 038, 18:30: Earthbind rooted the Dire team and no Meepo Poofed. Two cases:
+	--   * onto a Meepo next to a disabled (rooted / stunned) enemy hero: the team Poof nuke;
+	--   * a kill: this Poof (counted at both ends) plus the other Meepos' Poofs that are ready.
+	if not isRetreating and hpRatio > 0.25 then
+		local readyOthers = 0
+		for _, meepo in pairs(meepos) do
+			if meepo ~= bot and Fu.IsValidHero(meepo) then
+				local otherPoof = meepo:GetAbilityByName("meepo_poof")
+				if otherPoof ~= nil and otherPoof:IsFullyCastable() then
+					readyOthers = readyOthers + 1
+				end
+			end
+		end
+		local bestMeepo, bestScore, bestWhy = nil, 0, nil
+		for _, meepo in pairs(meepos) do
+			if Fu.IsValidHero(meepo) then
+				for _, enemyHero in pairs(Fu.GetNearbyHeroes(meepo, radius, true, BOT_MODE_NONE) or {}) do
+					if
+						Fu.IsValidHero(enemyHero)
+						and Fu.CanCastOnNonMagicImmune(enemyHero)
+						and not Fu.IsSuspiciousIllusion(enemyHero)
+					then
+						local hits = 1 + (GetUnitToUnitDistance(bot, enemyHero) <= radius and 1 or 0)
+						local damage = poofDamage * hits + poofDamage * readyOthers
+						local disabled = Fu.IsDisabled(enemyHero) or enemyHero:IsRooted()
+						local kill = Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
+						local score = (kill and 3 or 0) + (disabled and 2 or 0) + hits - 1
+						if (kill or disabled) and score > bestScore then
+							bestMeepo, bestScore = meepo, score
+							bestWhy = (kill and "kill" or "disabled")
+								.. " target="
+								.. (string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", ""))
+								.. " hits="
+								.. hits
+								.. " readyOthers="
+								.. readyOthers
+						end
+					end
+				end
+			end
+		end
+		if bestMeepo ~= nil and mpRatio > 0.15 then
+			if DotaTime() >= (bot._poofFightLogAt or -999) then
+				bot._poofFightLogAt = DotaTime() + 3
+				pcall(print, string.format("[OHA-MEEPO] t=%.0f poof-fight why=%s", DotaTime(), bestWhy))
+			end
+			return BOT_ACTION_DESIRE_HIGH, bestMeepo
+		end
+	end
 	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not isRetreating then
 		local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
 		for _, meepo in pairs(meepos) do
@@ -656,7 +707,27 @@ function X.ConsiderDig()
 			return BOT_ACTION_DESIRE_NONE
 		end
 	end
-	if hpRatio < 0.49 then
+	-- Dig (Shard, datafeed): 3s invulnerable and untargetable, basic dispel, 25% max HP back, 40s cooldown. It was
+	-- cast whenever HP < 49% in any fight (#8, game 038). Now only when this body is being focused (hit by a hero
+	-- in the last 1.5s under 40% with an enemy near), or to dispel a root / silence while being hit.
+	local enemiesNear = #(Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {})
+	local beingHit = bot:WasRecentlyDamagedByAnyHero(1.5)
+	local focused = hpRatio < 0.4 and beingHit and enemiesNear >= 1
+	local dispel = (bot:IsRooted() or bot:IsSilenced()) and beingHit and hpRatio < 0.7
+	if focused or dispel then
+		if DotaTime() >= (bot._digLogAt or -999) then
+			bot._digLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-MEEPO] t=%.0f dig why=%s hp=%.2f enemies=%d",
+					DotaTime(),
+					focused and "focused" or "dispel",
+					hpRatio,
+					enemiesNear
+				)
+			)
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	return BOT_ACTION_DESIRE_NONE

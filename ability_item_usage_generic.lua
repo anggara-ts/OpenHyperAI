@@ -5468,6 +5468,39 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		if Fu.IsInLaningPhase() then
 			tpHpLine = math.min(tpHpLine, nearbyEnemyCount >= 3 and 0.4 or 0.35)
 		end
+		-- Game 038, 8:10: Kez TP'd home at 54% HP / 83% mana against two (line 63%) and lost the lane. Cap the
+		-- line at 45%, and with one of our towers within 2500 walk to it instead unless under 35%.
+		tpHpLine = math.min(tpHpLine, 0.45)
+		local ownTowerNear = false
+		for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+			if
+				building ~= nil
+				and not building:IsNull()
+				and building:IsAlive()
+				and building:IsTower()
+				and GetUnitToUnitDistance(bot, building) < 2500
+			then
+				ownTowerNear = true
+				break
+			end
+		end
+		if ownTowerNear and hpRatio >= 0.35 and hpRatio < tpHpLine then
+			if DotaTime() >= (bot._tpWalkLogAt or -999) then
+				bot._tpWalkLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-TP] t=%.0f %s tp-home-skip why=tower-near hp=%.2f enemies=%d line=%.2f",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						hpRatio,
+						nearbyEnemyCount,
+						tpHpLine
+					)
+				)
+			end
+			tpHpLine = 0.35
+		end
 		if
 			hpRatio < tpHpLine
 			and #attackingAllies == 0
@@ -9393,4 +9426,13 @@ CourierUsageThink = OHA_Guard("CourierUsageThink", CourierUsageThink)
 AbilityLevelUpThink = OHA_Guard("AbilityLevelUpThink", AbilityLevelUpThink)
 Usage.AbilityUsageThink = AbilityUsageThink
 Usage.ItemUsageThink = ItemUsageThink
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	ItemUsageThink = Perf.Wrap("ItemUsageThink", ItemUsageThink)
+	AbilityUsageThink = Perf.Wrap("AbilityUsageThink", AbilityUsageThink)
+	BuybackUsageThink = Perf.Wrap("BuybackUsageThink", BuybackUsageThink)
+	CourierUsageThink = Perf.Wrap("CourierUsageThink", CourierUsageThink)
+	AbilityLevelUpThink = Perf.Wrap("AbilityLevelUpThink", AbilityLevelUpThink)
+end
 return Usage

@@ -2359,3 +2359,9 @@ if SafeCall then
 		Think = SafeCall(rawThink, nil, "RUNE_Think")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("rune.GetDesire", GetDesire)
+	Think = Perf.Wrap("rune.Think", Think)
+end

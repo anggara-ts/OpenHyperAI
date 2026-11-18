@@ -58,7 +58,6 @@ FuncLib/
     ├── captain_mode.lua        Captain's mode pick/ban logic
     ├── enemy_role_estimation.lua  Enemy role detection
     ├── hero_skill.lua          Per-hero skill usage
-    ├── hero_sub_units.lua      Hero sub-unit management
     ├── minion.lua              Minion/summon control entry point
     ├── morphling.lua           Morphling-specific logic
     ├── rubick.lua              Rubick spell steal logic

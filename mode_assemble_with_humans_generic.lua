@@ -285,6 +285,18 @@ function GetDesireHelper()
 			bot.tormentor_team_healthy = false
 			tormentorStartTime = 0
 			canDoTormentor = false
+			-- Nothing set this cooldown, so the check above never fired and a failed attempt could restart at
+			-- once. Wait 90s before the next try.
+			tormentorCooldownUntil = DotaTime() + 90
+			pcall(
+				print,
+				string.format(
+					"[OHA-TORMENTOR] t=%.0f %s give-up why=timeout tormentorHp=%.2f retry-after=90s",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					tormentor ~= nil and Fu.GetHP(tormentor) or -1
+				)
+			)
 			return BOT_MODE_DESIRE_NONE, "tormentor_timeout"
 		end
 	end
@@ -622,4 +634,10 @@ if SafeCall then
 	if think then
 		Think = SafeCall(think, nil, "WATCHER_Think")
 	end
+end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("assemble_with_humans.GetDesire", GetDesire)
+	Think = Perf.Wrap("assemble_with_humans.Think", Think)
 end

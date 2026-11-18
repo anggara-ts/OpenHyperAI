@@ -179,7 +179,7 @@ function X.ConsiderTimeWalk()
 		end
 	end
 	if isRetreating then
-		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
 		for _, enemyHero in pairs(nearbyEnemyHeroes) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -281,7 +281,7 @@ function X.ConsiderTimeDilation()
 		end
 	end
 	if isRetreating then
-		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE) or {}
 		for _, enemyHero in pairs(nearbyEnemyHeroes) do
 			if
 				Fu.IsValidHero(enemyHero)
@@ -360,7 +360,7 @@ function X.ConsiderChronosphere()
 			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
-			local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+			local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
 			if
 				nearbyAllies ~= nil
 				and nearbyEnemyHeroes ~= nil
@@ -383,7 +383,7 @@ function X.ConsiderChronosphere()
 	end
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
-		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
 		for _, enemyHero in pairs(nearbyEnemyHeroes) do
 			if
 				nearbyAllies ~= nil

@@ -825,6 +825,25 @@ function X.ConsiderFalconRush()
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
+	-- Escape (#27, maintainer: fleeing in Sai stance used no dash). Falcon Rush is Sai's twin of Echo Slash (same
+	-- cooldown; game files: NO_TARGET, rush_range 525, rush_speed 850). Same conditions as the Echo Slash escape.
+	if
+		isRetreating
+		and not Fu.IsRealInvisible(bot)
+		and bot:WasRecentlyDamagedByAnyHero(3.0)
+		and (Fu.GetHP(bot) < 0.5 or #nearbyEnemies > #(nearbyAllies or {}))
+		and bot:GetActiveModeDesire() >= 0.6
+	then
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 1200) then
+				local awayLocation = Fu.VectorAway(bot:GetLocation(), enemyHero:GetLocation(), 800)
+				if bot:IsFacingLocation(Fu.GetTeamFountain(), 45) or bot:IsFacingLocation(awayLocation, 45) then
+					X.LogKez("falcon-rush why=escape hp=" .. string.format("%.2f", Fu.GetHP(bot)))
+					return BOT_ACTION_DESIRE_HIGH
+				end
+			end
+		end
+	end
 	if Fu.IsFarming(bot) and not Fu.IsThereNonSelfCoreNearby(1200) and manaAfter > 0.4 then
 		local creeps = bot:GetNearbyCreeps(attackRange, true)
 		if #creeps >= 2 then
@@ -1057,47 +1076,8 @@ function X.ConsiderSwitchDiscipline()
 			end
 		end
 	end
-	-- Weave (#27): Switch Discipline is cheap to use often (game files: cooldown 8s, -0.25 per hero level, and a 2s
-	-- swap bonus). In a fight, when every damaging spell of this stance is on cooldown and one of the other is
-	-- ready, switch to cast it. Katana: Echo Slash, Grappling Claw. Sai: Falcon Rush, Talon Toss.
-	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 700) then
-		local function ready(ability)
-			return ability ~= nil
-				and not ability:IsNull()
-				and ability:GetLevel() > 0
-				and ability:GetCooldownTimeRemaining() <= 0
-				and ability:GetManaCost() <= bot:GetMana()
-		end
-		local katanaReady = ready(echoSlashAbility) and "echo_slash"
-			or (ready(grapplingClawAbility) and "grappling_claw")
-		local saiReady = ready(falconRushAbility) and "falcon_rush" or (ready(talonTossAbility) and "talon_toss")
-		if DotaTime() >= (bot._weaveCheckLogAt or -999) then
-			bot._weaveCheckLogAt = DotaTime() + 20
-			local function state(ability)
-				return string.format("%d/%.0f", ability:GetLevel(), ability:GetCooldownTimeRemaining())
-			end
-			X.LogKez(
-				string.format(
-					"weave-check mode=%s katana=%s sai=%s echo=%s claw=%s rush=%s toss=%s",
-					tostring(bot.kez_mode),
-					tostring(katanaReady),
-					tostring(saiReady),
-					state(echoSlashAbility),
-					state(grapplingClawAbility),
-					state(falconRushAbility),
-					state(talonTossAbility)
-				)
-			)
-		end
-		if bot.kez_mode == "katana" and not katanaReady and saiReady then
-			X.LogKez("stance-switch to=sai why=weave next=" .. saiReady)
-			return BOT_ACTION_DESIRE_HIGH
-		end
-		if bot.kez_mode == "sai" and not saiReady and katanaReady then
-			X.LogKez("stance-switch to=katana why=weave next=" .. katanaReady)
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
+	-- No stance weaving: the two stances share cooldowns per slot (game 046: Echo Slash = Falcon Rush, Grappling
+	-- Claw = Talon Toss, as Kazurai Katana = Shodo Sai), so switching never gives a ready spell the other lacks.
 	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1200) then
 		local attackers = 0
 		for _, enemyHero in pairs(bot:GetNearbyHeroes(400, true, BOT_MODE_NONE) or {}) do

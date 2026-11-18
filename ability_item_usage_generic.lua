@@ -1,5 +1,15 @@
 -- Casts abilities and uses items while the bot is already in some other mode.
 local Usage = {}
+local PerfParts = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+-- Perf.Part helpers for ItemUsageThink (#52).
+local function PartStart()
+	return RealTime ~= nil and RealTime() or nil
+end
+local function PartEnd(name, startedAt)
+	if startedAt ~= nil then
+		PerfParts.Part(name, RealTime() - startedAt)
+	end
+end
 local bot = GetBot()
 local botName = bot:GetUnitName()
 if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(botName, "hero") or bot:IsIllusion() then
@@ -18,6 +28,7 @@ local BotBuild = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botNa
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
@@ -2109,6 +2120,45 @@ Usage.ConsiderItemDesire["item_crimson_guard"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- A silence only matters when it blocks a spell the hero could use now: a learned, non-passive ability that is
+-- off cooldown and affordable. The self-dispel rules (Eul's, Stormcrafter) used to require an intelligence hero,
+-- so universal, strength and agility heroes never dispelled a silence (#15). Eul's self-cast is a basic dispel
+-- (datafeed, item 100).
+function Usage.SilenceBlocksASpell(unit)
+	-- Only when a spell is needed now: retreating (escape) or engaging (disable / nuke). A silenced right-clicker
+	-- in a calm moment should not Eul himself out of a fight. The silence's remaining time is not checked: it
+	-- needs the silence modifier names (many), left for later (#15).
+	if not unit:IsSilenced() or not (Fu.IsRetreating(unit) or Fu.IsGoingOnSomeone(unit)) then
+		return false
+	end
+	for slot = 0, 5 do
+		local ability = unit:GetAbilityInSlot(slot)
+		if
+			ability ~= nil
+			and not ability:IsNull()
+			and ability:GetLevel() > 0
+			and not ability:IsPassive()
+			and not ability:IsHidden()
+			and ability:GetCooldownTimeRemaining() <= 0
+			and ability:GetManaCost() <= unit:GetMana()
+		then
+			if DotaTime() >= (unit._silenceDispelLogAt or -999) then
+				unit._silenceDispelLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-ITEM] t=%.0f %s silence-dispel-wanted spell=%s",
+						DotaTime(),
+						(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+						ability:GetName()
+					)
+				)
+			end
+			return true
+		end
+	end
+	return false
+end
 Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 	local castRange = 650 + castRangeBonus
 	local castType = "unit"
@@ -2180,10 +2230,7 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			castReason = "撤退:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
-		if
-			bot:IsRooted()
-			or bot:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and bot:IsSilenced() and not Usage.IsDoomed(bot)
-		then
+		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
 			hEffectTarget = bot
 			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -6397,10 +6444,7 @@ Usage.ConsiderItemDesire["item_stormcrafter"] = function(item)
 	local castReason = nil
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	if Fu.CanCastOnNonMagicImmune(bot) and #enemyHeroes > 0 then
-		if
-			bot:IsRooted()
-			or bot:GetPrimaryAttribute() == ATTRIBUTE_INTELLECT and bot:IsSilenced() and not Usage.IsDoomed(bot)
-		then
+		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
 			hEffectTarget = bot
 			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -6906,7 +6950,7 @@ local function SmokeNextEnemyTower(lane)
 	end
 	return nil
 end
-Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
+local function SmokeDesireRaw(item)
 	local radius = 1200
 	local castType = "none"
 	local hEffectTarget = nil
@@ -6966,7 +7010,9 @@ Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
 			or activeMode == BOT_MODE_PUSH_TOWER_MID and LANE_MID
 			or activeMode == BOT_MODE_PUSH_TOWER_BOT and LANE_BOT
 			or nil
-		if pushLane ~= nil and #allyHeroes >= 3 then
+		-- Not with an enemy wave ahead (game 043, 13:49: Radiant smoked, hit the wave on the way and showed itself).
+		local waveAhead = #(bot:GetNearbyLaneCreeps(1600, true) or {}) >= 1
+		if pushLane ~= nil and #allyHeroes >= 3 and not waveAhead then
 			local tower = SmokeNextEnemyTower(pushLane)
 			local dist = tower ~= nil and GetUnitToUnitDistance(bot, tower) or 0
 			if dist > 2500 then
@@ -6999,6 +7045,47 @@ Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Game 043, 13:49-13:56: Rubick smoked a mid push, the group hit a creep wave (Smoke broke), and Grimstroke smoked
+-- again 7s later; Dire's Puck did the same (13:29 and 14:12). One Smoke per team per 60s, and none while this bot or
+-- an ally within 1200 is still smoked. Log: [OHA-ITEM] smoke-skip why=recent|smoked.
+local SMOKE_TEAM_GAP = 60
+Usage.ConsiderItemDesire["item_smoke_of_deceit"] = function(item)
+	local why = nil
+	local lastSmoke = TeamMemory.Get(GetTeam(), "smokeAt")
+	if lastSmoke ~= nil and DotaTime() - lastSmoke < SMOKE_TEAM_GAP then
+		why = "recent"
+	elseif bot:HasModifier("modifier_smoke_of_deceit") then
+		why = "smoked"
+	else
+		for _, ally in pairs(Fu.GetAllyList(bot, 1200) or {}) do
+			if Fu.IsValidHero(ally) and ally:HasModifier("modifier_smoke_of_deceit") then
+				why = "smoked"
+				break
+			end
+		end
+	end
+	if why ~= nil then
+		if DotaTime() >= (bot._smokeSkipLogAt or -999) then
+			bot._smokeSkipLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s smoke-skip why=%s since=%.0f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					why,
+					lastSmoke ~= nil and DotaTime() - lastSmoke or -1
+				)
+			)
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local desire, target, castType, reason = SmokeDesireRaw(item)
+	if desire ~= nil and desire > 0 then
+		TeamMemory.Set(GetTeam(), "smokeAt", DotaTime())
+	end
+	return desire, target, castType, reason
 end
 local enemyPlayerIds = nil
 -- Dust only from a main slot (game 036: 308 "item can't be used from stash" refusals, bursts with the
@@ -8717,22 +8804,66 @@ function Usage.EatForage()
 	if okM and muted then
 		return false
 	end
+	-- Did the last eat order consume anything? Game 039: Keeper ordered 306 eats of a Forager mushroom that was
+	-- never used up (most likely another hero's: items owned by another player can't be used). After two
+	-- orders that changed nothing, leave that item alone for 60s.
+	bot._forageFail = bot._forageFail or {}
+	local pending = bot._foragePending
+	if pending ~= nil and DotaTime() >= pending.at + 1.0 then
+		bot._foragePending = nil
+		local item = bot:GetItemInSlot(pending.slot)
+		local stillThere = item ~= nil
+			and not item:IsNull()
+			and item:GetName() == pending.name
+			and (item:GetCurrentCharges() or 0) >= pending.charges
+		if stillThere then
+			local fail = bot._forageFail[pending.name] or { n = 0, untilAt = 0 }
+			fail.n = fail.n + 1
+			if fail.n >= 2 then
+				fail.untilAt = DotaTime() + 60
+				fail.n = 0
+				pcall(
+					print,
+					string.format(
+						"[OHA-FORAGE] t=%.0f %s cannot-eat %s why=not-consumed backoff=60s",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						pending.name
+					)
+				)
+			end
+			bot._forageFail[pending.name] = fail
+		else
+			bot._forageFail[pending.name] = nil
+		end
+	end
 	for slot = 0, 5 do
 		local item = bot:GetItemInSlot(slot)
 		if item ~= nil and not item:IsNull() then
 			local name = item:GetName()
-			if (FORAGE_NO_TARGET[name] or name == "item_foragers_health") and Fu.CanCastAbility(item) then
+			local backedOff = bot._forageFail[name] ~= nil and DotaTime() < bot._forageFail[name].untilAt
+			if
+				(FORAGE_NO_TARGET[name] or name == "item_foragers_health")
+				and Fu.CanCastAbility(item)
+				and not backedOff
+				and bot._foragePending == nil
+			then
+				bot._foragePending =
+					{ name = name, slot = slot, charges = item:GetCurrentCharges() or 0, at = DotaTime() }
 				bot._forageEatAt = DotaTime() + 0.5
-				pcall(
-					print,
-					string.format(
-						"[OHA-FORAGE] t=%.0f %s eat %s slot%d",
-						DotaTime(),
-						(string.gsub(botName, "npc_dota_hero_", "")),
-						name,
-						slot
+				if DotaTime() >= (bot._forageLogAt or -999) then
+					bot._forageLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-FORAGE] t=%.0f %s eat %s slot%d",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							name,
+							slot
+						)
 					)
-				)
+				end
 				if FORAGE_NO_TARGET[name] then
 					bot:Action_UseAbility(item)
 				else
@@ -9054,6 +9185,39 @@ end
 function Usage.RunePickupLock()
 	return bot:IsAlive() and bot:GetActiveMode() == BOT_MODE_RUNE and DotaTime() - (bot._runePickupAt or -999) < 0.5
 end
+-- Diagnostic (#15): does a bot in a cyclone (Wind Waker or Eul's, ours or an enemy's) drift? Other modes keep giving
+-- move orders while it lasts, and Wind Waker's cyclone can be moved. One line when it ends: held time, distance moved
+-- and how much closer to the fountain it got.
+local CYCLONE_MODIFIERS = { "modifier_wind_waker", "modifier_item_wind_waker", "modifier_eul_cyclone" }
+local function TrackCyclone()
+	local found = nil
+	for _, name in ipairs(CYCLONE_MODIFIERS) do
+		if bot:HasModifier(name) then
+			found = name
+			break
+		end
+	end
+	local cyclone = bot._cycloneTrack
+	if found ~= nil and cyclone == nil then
+		bot._cycloneTrack =
+			{ name = found, at = DotaTime(), loc = bot:GetLocation(), fountain = bot:DistanceFromFountain() }
+	elseif found == nil and cyclone ~= nil then
+		bot._cycloneTrack = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s cyclone-end mod=%s held=%.1f moved=%d toFountain=%d mode=%d",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				cyclone.name,
+				DotaTime() - cyclone.at,
+				GetUnitToLocationDistance(bot, cyclone.loc),
+				cyclone.fountain - bot:DistanceFromFountain(),
+				bot:GetActiveMode()
+			)
+		)
+	end
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -9065,13 +9229,16 @@ function ItemUsageThink()
 		end
 	end
 	MatchTrace.Tick(bot)
+	pcall(TrackCyclone)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, bot)
+	local tWatch = PartStart()
 	pcall(Usage.TrackTeleportJump)
 	pcall(Usage.WatchStillUnderHit)
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.LogHomeWalk)
+	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)
 	if okQ and cleared then
 		return
@@ -9164,7 +9331,9 @@ function ItemUsageThink()
 	end
 	if not Fu.IsNoItemIllution(bot) then
 		local tItem = _perfT0 and RealTime() or nil
+		local tItems = PartStart()
 		ConsiderItems()
+		PartEnd("items", tItems)
 		if tItem then
 			MatchTrace.PerfSample("ItemUsage.bg", RealTime() - tItem)
 		end
@@ -9213,7 +9382,9 @@ function ItemUsageThink()
 	end
 	if BotBuild ~= nil and not Fu.IsNoAbilityIllution(bot) then
 		local tSkill = _perfT0 and RealTime() or nil
+		local tHero = PartStart()
 		local ok, err = pcall(BotBuild.SkillsComplement)
+		PartEnd("hero-abilities", tHero)
 		if tSkill then
 			MatchTrace.PerfSample("SkillsComplement", RealTime() - tSkill)
 		end

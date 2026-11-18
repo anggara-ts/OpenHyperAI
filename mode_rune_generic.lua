@@ -74,23 +74,15 @@ end
 local RawGetRuneStatus = GetRuneStatus
 local function GetRuneStatus(id)
 	local status = RawGetRuneStatus(id)
-	-- Not in the first 10s of a spawn: a new rune can read as not there for a moment.
-	-- River runes only. Game 031, 20:09-20:49: the bottom jungle bounty read available with type -1
-	-- in our vision (Doom 160 away, Mirana 257), this turned it into missing, and nobody took it.
+	-- A river rune a bot found empty on arrival (type -1, the pick-up failed) reads missing until the next spawn.
+	-- Game 043, 25:10: the old rule here (available + type -1 + spot in vision = missing) hid a real power rune
+	-- (`spot rune=1 type=-1 status=1`, Pudge 425 away) and the team walked past it. Type -1 alone is no proof.
 	if
-		IsRiverRune(id)
-		and status == RUNE_STATUS_AVAILABLE
-		and DotaTime() >= 60
-		and DotaTime() % RuneCycle(id) >= 10
-		and GetRuneType ~= nil
+		status == RUNE_STATUS_AVAILABLE
+		and bot._staleCycle ~= nil
+		and bot._staleCycle[id] == math.floor(DotaTime() / RuneCycle(id))
 	then
-		local okT, rType = pcall(GetRuneType, id)
-		if okT and (rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)) then
-			local okV, seen = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
-			if okV and seen then
-				return RUNE_STATUS_MISSING
-			end
-		end
+		return RUNE_STATUS_MISSING
 	end
 	return status
 end
@@ -106,9 +98,42 @@ local dbgAt = -100
 local dbgWhy = ""
 local dbgLoc = nil
 local dbgStuckLogAt = -100
+-- Diagnostic (#32, maintainer: bots walk right past a power rune without taking it). When a power rune is up
+-- within 600 and this decision is something else, say which rule won. At most every 20s per bot.
+local function IsPickupWhy(why)
+	return why == "underfoot" or string.sub(why, 1, 6) == "power-" or string.sub(why, 1, 7) == "status-"
+end
+local function LogPowerRuneSkip(why)
+	if IsPickupWhy(tostring(why)) or DotaTime() < 0 or DotaTime() < (bot._powerSkipLogAt or -999) then
+		return
+	end
+	for _, id in ipairs({ RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
+		if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
+			local runeType = GetRuneType(id)
+			local dist = GetUnitToLocationDistance(bot, GetRuneSpawnLocation(id))
+			if dist <= 600 and runeType ~= RUNE_BOUNTY and not (RUNE_WATER ~= nil and runeType == RUNE_WATER) then
+				bot._powerSkipLogAt = DotaTime() + 20
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] t=%.0f %s powerrune-near-skip spot=%d type=%s dist=%d why=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						id,
+						tostring(runeType),
+						dist,
+						tostring(why)
+					)
+				)
+				return
+			end
+		end
+	end
+end
 local function give(desire, why)
 	if why ~= nil then
 		runeWhy = why
+		pcall(LogPowerRuneSkip, why)
 	end
 	return desire
 end
@@ -672,8 +697,56 @@ function GetDesireRaw()
 	do
 		local okW, waterState = pcall(RuneMode.WaterWalk)
 		if okW and waterState ~= nil and bot._waterWalk ~= nil then
+			-- Game 043, 0:00: Ringmaster walked onto the top spot where Pudge, Meepo and Rubick stood (n=3/1), lost
+			-- HP before the horn, and the 5s stay held him there (0.69 -> 0.40). Not into more enemy heroes than
+			-- ours at the spot, and not while heroes hit us.
+			local spot = bot._waterWalk.loc
+			local enemiesAtSpot = #(Fu.GetEnemiesNearLoc(spot, 900) or {})
+			local alliesAtSpot = #(Fu.GetAlliesNearLoc(spot, 900) or {})
+			if GetUnitToLocationDistance(bot, spot) > 900 then
+				alliesAtSpot = alliesAtSpot + 1
+			end
+			local hitByHero = bot:WasRecentlyDamagedByAnyHero(1.5)
+			if enemiesAtSpot > alliesAtSpot or hitByHero and enemiesAtSpot >= 1 then
+				if DotaTime() >= (bot._waterContestLogAt or -999) then
+					bot._waterContestLogAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-RUNE] t=%.0f %s water-skip why=contested enemies=%d allies=%d hit=%s hp=%.2f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							enemiesAtSpot,
+							alliesAtSpot,
+							tostring(hitByHero),
+							Fu.GetHP(bot)
+						)
+					)
+				end
+				return give(BOT_MODE_DESIRE_NONE, "water-contested")
+			end
 			if DotaTime() < bot._waterWalk.t0 then
 				return give(BOT_MODE_DESIRE_HIGH, "water-" .. waterState)
+			end
+			-- Bots can't pick a water rune up themselves (see UnpickableRiverRune: every pickup order failed);
+			-- Valve's item mode does it while the bot stands there. Game 040, 4:00: the item mode took over for 1s,
+			-- then laning (0.56) beat the 0.35 hold and Meepo walked off with the rune still there. For the first
+			-- 5s after the spawn, standing on it holds at 0.6 (above laning, below fights and retreat).
+			local sinceSpawn = DotaTime() - bot._waterWalk.t0
+			if sinceSpawn <= 5 and GetUnitToLocationDistance(bot, bot._waterWalk.loc) <= 300 then
+				if bot._waterStayLogged ~= bot._waterWalk.t0 then
+					bot._waterStayLogged = bot._waterWalk.t0
+					pcall(
+						print,
+						string.format(
+							"[OHA-RUNE] t=%.0f %s water-stay spot=%d for=5s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							bot._waterWalk.id
+						)
+					)
+				end
+				return give(0.6, "river-item-stay")
 			end
 			return give(RIVER_HOLD_DESIRE, "river-item-" .. waterState)
 		end
@@ -1405,7 +1478,24 @@ function Think()
 				StartSweep("no-rune")
 				return
 			end
-			if rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID) then
+			local typeUnknown = rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)
+			local blindTry = typeUnknown
+				and IsRiverRune(runeInfo.location)
+				and RawGetRuneStatus(runeInfo.location) == RUNE_STATUS_AVAILABLE
+			if blindTry and bot._blindTryLogged ~= runeInfo.location .. ":" .. math.floor(now0 / 120) then
+				bot._blindTryLogged = runeInfo.location .. ":" .. math.floor(now0 / 120)
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] %s t=%.1f blind-pickup rune=%s dist=%.0f",
+						HeroTag(),
+						now0,
+						tostring(runeInfo.location),
+						liveDist
+					)
+				)
+			end
+			if typeUnknown and not blindTry then
 				pcall(
 					print,
 					string.format(
@@ -1478,6 +1568,23 @@ function Think()
 					skipFor = math.max(30, 120 - (now % 120) + 1)
 				end
 				RuneMode.SkipRune(runeInfo.location, skipFor)
+				local failedType = GetRuneType and GetRuneType(runeInfo.location)
+				if
+					IsRiverRune(runeInfo.location)
+					and (failedType == -1 or (RUNE_INVALID ~= nil and failedType == RUNE_INVALID))
+				then
+					bot._staleCycle = bot._staleCycle or {}
+					bot._staleCycle[runeInfo.location] = math.floor(now / RuneCycle(runeInfo.location))
+					pcall(
+						print,
+						string.format(
+							"[OHA-RUNE] %s t=%.1f stale-status rune=%s (available, type -1, nothing to pick up)",
+							HeroTag(),
+							now,
+							tostring(runeInfo.location)
+						)
+					)
+				end
 				bot:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(), assignedLane or bot:GetAssignedLane(), -600))
 				doing("pickup-failed")
 				return

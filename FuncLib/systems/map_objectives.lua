@@ -888,6 +888,42 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		local maxWalk = MapObjectives.MaxWalk(bot, true)
 		local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 		local inWisdom, etaW = MapObjectives.InMarkWindow(wInterval, arrive, 8)
+		-- Only go when the walk fits the window (it closes 8s after the mark). Game 039, 21:00: Tusk said
+		-- "Grabbing the XP shrine" from far away at 20:59, then gave up at 21:08 and went farming (#32).
+		if inWisdom and loc ~= nil and type(etaW) == "number" then
+			local travel = dist / math.max(250, bot:GetCurrentMovementSpeed())
+			local markKey = math.floor(DotaTime() / wInterval + (etaW > 0 and 1 or 0))
+			if travel > etaW + 8 then
+				inWisdom = false
+				if bot._wisdomSkipLogged ~= markKey then
+					bot._wisdomSkipLogged = markKey
+					pcall(
+						print,
+						string.format(
+							"[OHA-WISDOM] t=%.0f %s skip why=cant-arrive dist=%d travel=%.0f eta=%.0f",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							dist,
+							travel,
+							etaW
+						)
+					)
+				end
+			elseif bot._wisdomGoLogged ~= markKey then
+				bot._wisdomGoLogged = markKey
+				pcall(
+					print,
+					string.format(
+						"[OHA-WISDOM] t=%.0f %s go dist=%d travel=%.0f eta=%.0f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						dist,
+						travel,
+						etaW
+					)
+				)
+			end
+		end
 		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 		if
 			inWisdom

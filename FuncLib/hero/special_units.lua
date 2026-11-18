@@ -748,6 +748,42 @@ end
 -- Shared: the override attack mode calls it, and X.TryKiteInAttack is the hook for heroes on
 -- Valve's attack mode (game 037: it lived only in the override, so only Hoodwink ever kited).
 local KITE_BUF = 0.1
+-- Result of the kiting (#72): it fires, but does it help? After each step, once the melee hero's next attack could
+-- have landed (his seconds per attack, or ours if longer, + 0.1s), check whether he hit us and whether our own
+-- attack came after the step. One line per bot per 60s when it kited.
+local function KiteStats(unit)
+	unit._kiteStats = unit._kiteStats or { steps = 0, hitAfter = 0, late = 0, since = DotaTime() }
+	return unit._kiteStats
+end
+function X.KiteResultTick(unit)
+	local pending = unit._kitePending
+	if pending ~= nil and GameTime() >= pending.checkAt then
+		unit._kitePending = nil
+		local stats = KiteStats(unit)
+		if Fu.IsValidHero(pending.enemy) and unit:WasRecentlyDamagedByHero(pending.enemy, pending.window) then
+			stats.hitAfter = stats.hitAfter + 1
+		end
+		if unit:GetLastAttackTime() < pending.at then
+			stats.late = stats.late + 1
+		end
+	end
+	local stats = unit._kiteStats
+	if stats ~= nil and stats.steps > 0 and DotaTime() - stats.since >= 60 then
+		pcall(
+			print,
+			string.format(
+				"[OHA-KITE] t=%.0f %s result steps=%d hit-after=%d late-attack=%d window=%.0fs",
+				DotaTime(),
+				(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+				stats.steps,
+				stats.hitAfter,
+				stats.late,
+				DotaTime() - stats.since
+			)
+		)
+		unit._kiteStats = nil
+	end
+end
 function X.TryKite(unit, meleeEnemy)
 	local range = unit:GetAttackRange()
 	if range <= 320 or not Fu.IsValidHero(meleeEnemy) or meleeEnemy:GetAttackRange() > 320 then
@@ -786,6 +822,12 @@ function X.TryKite(unit, meleeEnemy)
 		return false
 	end
 	unit:Action_MoveToLocation(away)
+	if unit._kitePending == nil then
+		local enemySpa = meleeEnemy:GetSecondsPerAttack() or spa
+		local window = math.max(enemySpa, spa) + 0.1
+		KiteStats(unit).steps = KiteStats(unit).steps + 1
+		unit._kitePending = { enemy = meleeEnemy, at = GameTime(), checkAt = GameTime() + window, window = window }
+	end
 	if DotaTime() >= (unit._kiteLogAt or -99) + 2 then
 		unit._kiteLogAt = DotaTime()
 		pcall(
@@ -810,6 +852,9 @@ end
 -- hero. Heroes on the override attack mode (unit._ohaAttackOverride, set by
 -- mode_attack_generic.lua) already kite from its Think. Returns true when it issued the step.
 function X.TryKiteInAttack(unit)
+	if unit ~= nil and unit:IsAlive() then
+		pcall(X.KiteResultTick, unit)
+	end
 	if
 		unit == nil
 		or unit._ohaAttackOverride

@@ -2,7 +2,6 @@
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local StraightCast = require(GetScriptDirectory() .. "/FuncLib/systems/straight_cast")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
@@ -93,14 +92,27 @@ local isGoingOnSomeone
 local isRetreating
 local isAttacking
 local mpRatio
--- Illusory Orb curves when aimed short of its maximum distance (game files: curve_orb, max_distance 1950). Aim at
--- the full distance in the same direction so it flies straight (#36, StraightCast).
-function X.OrbStraightPoint(aim)
-	return StraightCast.Point(bot, aim, StraightCast.Range(illusoryOrbAbility, "max_distance", 1950))
-end
 -- Diagnostic (#15): Phase Shift is channelled (game files: DOTA_ABILITY_BEHAVIOR_CHANNELLED), so any new order ends
 -- it. Does Puck stay shifted for the full duration, or does the next mode order cut it short? One line per shift.
 function X.TrackPhaseShift()
+	if bot._phaseProbeAt ~= nil and DotaTime() >= bot._phaseProbeAt then
+		bot._phaseProbeAt = nil
+		local mods = {}
+		for i = 0, bot:NumModifiers() - 1 do
+			mods[#mods + 1] = tostring(bot:GetModifierName(i))
+		end
+		local activeNow = bot:GetCurrentActiveAbility()
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f phase-probe channelling=%s active=%s mods=%s",
+				DotaTime(),
+				tostring(bot:IsChanneling()),
+				activeNow ~= nil and not activeNow:IsNull() and activeNow:GetName() or "-",
+				table.concat(mods, ",")
+			)
+		)
+	end
 	local active = bot:IsChanneling() and bot:GetCurrentActiveAbility() or nil
 	local channelling = active ~= nil and not active:IsNull() and active:GetName() == "puck_phase_shift"
 	local shifted = bot:HasModifier("modifier_puck_phase_shift") or channelling
@@ -147,7 +159,11 @@ function X.OrbInFlight()
 	return nil
 end
 function X.DangerJaunt()
-	if not etherealJauntAbility:IsFullyCastable() or bot:IsRooted() then
+	if
+		not etherealJauntAbility:IsFullyCastable()
+		or bot:IsRooted()
+		or DotaTime() < (bot._dangerJauntAt or -999) + 3
+	then
 		return false
 	end
 	local orbAt = X.OrbInFlight()
@@ -170,6 +186,7 @@ function X.DangerJaunt()
 				Fu.GetHP(bot)
 			)
 		)
+		bot._dangerJauntAt = DotaTime()
 		bot:Action_UseAbility(etherealJauntAbility)
 		return true
 	end
@@ -180,22 +197,38 @@ function X.SkillsComplement()
 	local okReady, orbOut = pcall(X.OrbInFlight)
 	bot._puckEscapeReady = phaseShiftAbility:IsFullyCastable()
 		or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
-	local okJ, jaunted = pcall(X.DangerJaunt)
-	if okJ and jaunted then
+	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	if Fu.CanNotUseAbility(bot) then
+	local okJ, jaunted = pcall(X.DangerJaunt)
+	if okJ and jaunted then
 		return
 	end
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = Fu.GetMP(bot)
+	phaseShiftDesire = X.ConsiderPhaseShift()
+	if phaseShiftDesire > 0 then
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s",
+				DotaTime(),
+				Fu.GetHP(bot),
+				#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000),
+				tostring(isRetreating)
+			)
+		)
+		bot._phaseProbeAt = DotaTime() + 0.3
+		bot:Action_UseAbility(phaseShiftAbility)
+		return
+	end
 	local phaseDuration
 	phaseOrbDesire, phaseOrbLocation, phaseDuration = X.ConsiderPhaseOrb()
 	if phaseOrbDesire > 0 then
 		bot:Action_ClearActions(false)
-		bot:ActionQueue_UseAbilityOnLocation(illusoryOrbAbility, X.OrbStraightPoint(phaseOrbLocation))
+		bot:ActionQueue_UseAbilityOnLocation(illusoryOrbAbility, phaseOrbLocation)
 		bot:ActionQueue_Delay(0.1)
 		bot:ActionQueue_UseAbility(phaseShiftAbility)
 		bot:ActionQueue_Delay(phaseDuration - 0.3)
@@ -204,36 +237,9 @@ function X.SkillsComplement()
 	end
 	illusoryOrbDesire, illusoryOrbLocation = X.ConsiderIllusoryOrb()
 	if illusoryOrbDesire > 0 then
-		local castPoint = X.OrbStraightPoint(illusoryOrbLocation)
-		-- Turn first (at most 0.5s per orb, then cast anyway): the curve likely starts from Puck's facing.
-		if bot._orbTurnSince ~= nil and DotaTime() - bot._orbTurnSince > 2 then
-			bot._orbTurnSince = nil
-		end
-		local angle, facingIt = StraightCast.FaceFirst(bot, castPoint, 12)
-		if not facingIt and DotaTime() < (bot._orbTurnSince or DotaTime()) + 0.5 then
-			bot._orbTurnSince = bot._orbTurnSince or DotaTime()
-			return
-		end
-		bot._orbTurnSince = nil
-		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, castPoint)
-		if DotaTime() >= (bot._orbCastLogAt or -999) then
-			bot._orbCastLogAt = DotaTime() + 5
-			pcall(
-				print,
-				string.format(
-					"[OHA-PUCK] t=%.0f orb cast point=max aim=%d cast=%d facing=%.0f",
-					DotaTime(),
-					GetUnitToLocationDistance(bot, illusoryOrbLocation),
-					GetUnitToLocationDistance(bot, castPoint),
-					angle
-				)
-			)
-		end
-		return
-	end
-	phaseShiftDesire = X.ConsiderPhaseShift()
-	if phaseShiftDesire > 0 then
-		bot:Action_UseAbility(phaseShiftAbility)
+		-- Bots can't make the orb fly straight: no alt-cast, and neither a full-range aim nor facing the point first
+		-- changed the curve (games 044-045, discussion #50). Aim at the target point.
+		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, illusoryOrbLocation)
 		return
 	end
 	etherealJauntDesire = X.ConsiderEtherealJaunt()

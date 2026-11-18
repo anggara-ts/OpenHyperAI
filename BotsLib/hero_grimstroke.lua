@@ -1,5 +1,4 @@
--- [OHA-GRIM] logs off: the behaviour they traced works (game 029). The straight-cast line (#36) still prints.
-local logLine = print
+-- [OHA-GRIM] logs off: the behaviour they traced works (game 029).
 local print = function() end
 -- Grimstroke: skill build, item build, and ability use for this hero.
 local X = {}
@@ -7,7 +6,6 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local StraightCast = require(GetScriptDirectory() .. "/FuncLib/systems/straight_cast")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -180,35 +178,8 @@ function X.SkillsComplement()
 	end
 	strokeOfFateDesire, strokeOfFateLocation = X.ConsiderStrokeOfFate()
 	if strokeOfFateDesire > 0 then
-		-- Stroke of Fate curves when aimed short of its range (game files: vector_strength 0.6, AbilityCastRange
-		-- 1400); bots can't alt-cast (#36). Aim at the full range in the same direction so it goes straight.
-		local castPoint =
-			StraightCast.Point(bot, strokeOfFateLocation, StraightCast.Range(strokeOfFateAbility, nil, 1400))
-		-- Turn first (at most 0.5s per stroke): the curve likely starts from Grimstroke's facing (game files:
-		-- vector_min_cos_facing_angle), see StraightCast.FaceFirst.
-		if bot._strokeTurnSince ~= nil and DotaTime() - bot._strokeTurnSince > 2 then
-			bot._strokeTurnSince = nil
-		end
-		local angle, facingIt = StraightCast.FaceFirst(bot, castPoint, 12)
-		if not facingIt and DotaTime() < (bot._strokeTurnSince or DotaTime()) + 0.5 then
-			bot._strokeTurnSince = bot._strokeTurnSince or DotaTime()
-			return
-		end
-		bot._strokeTurnSince = nil
-		if DotaTime() >= (bot._strokeCastLogAt or -999) then
-			bot._strokeCastLogAt = DotaTime() + 5
-			pcall(
-				logLine,
-				string.format(
-					"[OHA-GRIM] t=%.0f stroke cast point=max aim=%d cast=%d facing=%.0f",
-					DotaTime(),
-					GetUnitToLocationDistance(bot, strokeOfFateLocation),
-					GetUnitToLocationDistance(bot, castPoint),
-					angle
-				)
-			)
-		end
-		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, castPoint)
+		-- Bots can't make Stroke of Fate straight (no alt-cast; full range and facing both tried, discussion #50).
+		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, strokeOfFateLocation)
 		return
 	end
 	darkPortraitDesire, darkPortraitTarget = X.ConsiderDarkPortrait()

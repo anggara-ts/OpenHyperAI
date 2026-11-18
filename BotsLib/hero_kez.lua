@@ -258,10 +258,13 @@ function X.SkillsComplement()
 			end
 			return
 		end
-		echoSlashDesire = X.ConsiderEchoSlash()
+		local echoWhy
+		echoSlashDesire, echoWhy = X.ConsiderEchoSlash()
 		if echoSlashDesire > 0 then
-			Fu.SetQueuePtToINT(bot, false)
-			bot:ActionQueue_UseAbility(echoSlashAbility)
+			-- Echo Slash has no target (game files: NO_TARGET, cast point 0.2): it goes where Kez faces. Cast at once:
+			-- the queued Power Treads switch in front gave him time to turn away (game 044, 1:30).
+			X.LogKez("echo-slash why=" .. tostring(echoWhy))
+			bot:Action_UseAbility(echoSlashAbility)
 			return
 		end
 		KazuraiKatanaDesire, KazuraiKatanaTarget = X.ConsiderKazuraiKatana()
@@ -313,7 +316,7 @@ function X.ConsiderEchoSlash()
 			and not enemyHero:HasModifier("modifier_troll_warlord_battle_trance")
 			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "kill"
 		end
 	end
 	if isGoingOnSomeone then
@@ -333,7 +336,7 @@ function X.ConsiderEchoSlash()
 				or Fu.IsDisabled(botTarget)
 				or botTarget:GetCurrentMovementSpeed() <= 200
 			then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, "engage"
 			end
 		end
 	end
@@ -342,6 +345,10 @@ function X.ConsiderEchoSlash()
 		and not Fu.IsRealInvisible(bot)
 		and bot:WasRecentlyDamagedByAnyHero(3.0)
 		and Fu.CanBeAttacked(bot)
+		-- Game 044, 1:30: Kez flipped modes 6 times in 10s and a one-moment retreat at full HP slashed him toward
+		-- the fountain, away from the fight. Escape slashes need real danger and a settled retreat.
+		and (hpRatio < 0.5 or #nearbyEnemies > #(nearbyAllies or {}))
+		and bot:GetActiveModeDesire() >= 0.6
 	then
 		for _, enemyHero in pairs(nearbyEnemies) do
 			if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, 1200) then
@@ -350,7 +357,7 @@ function X.ConsiderEchoSlash()
 							and Fu.VectorAway(bot:GetLocation(), enemyHero:GetLocation(), 800)
 						or Fu.GetTeamFountain()
 					if bot:IsFacingLocation(Fu.GetTeamFountain(), 45) or bot:IsFacingLocation(awayLocation, 45) then
-						return BOT_ACTION_DESIRE_HIGH
+						return BOT_ACTION_DESIRE_HIGH, "escape"
 					end
 				end
 			end
@@ -361,7 +368,7 @@ function X.ConsiderEchoSlash()
 		if Fu.IsValid(laneCreeps[1]) and Fu.CanBeAttacked(laneCreeps[1]) and not Fu.IsRunning(laneCreeps[1]) then
 			local aoe = bot:FindAoELocation(true, false, laneCreeps[1]:GetLocation(), 0, katanaRadius, 0, 0)
 			if aoe.count >= 4 and bot:IsFacingLocation(aoe.targetloc, 20) then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, "push"
 			end
 		end
 	end
@@ -373,7 +380,7 @@ function X.ConsiderEchoSlash()
 				(aoe.count >= 2 or aoe.count >= 2 and creeps[1]:IsAncientCreep())
 				and bot:IsFacingLocation(aoe.targetloc, 20)
 			then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, "farm"
 			end
 		end
 	end
@@ -384,13 +391,13 @@ function X.ConsiderEchoSlash()
 			and bot:IsFacingLocation(nearbyEnemies[1]:GetLocation(), 8)
 			and manaAfter > 0.5
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "lane-hero"
 		end
 		local creeps = bot:GetNearbyCreeps(katanaDistance, true)
 		if Fu.IsValid(creeps[1]) and Fu.CanBeAttacked(creeps[1]) and not Fu.IsRunning(creeps[1]) then
 			local aoe = bot:FindAoELocation(true, false, creeps[1]:GetLocation(), 0, katanaRadius, 0, 0)
 			if aoe.count >= 5 and bot:IsFacingLocation(aoe.targetloc, 15) then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, "lane-creeps"
 			end
 		end
 	end
@@ -403,7 +410,7 @@ function X.ConsiderEchoSlash()
 			and isAttacking
 			and manaAfter > 0.25
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "roshan"
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
@@ -415,7 +422,7 @@ function X.ConsiderEchoSlash()
 			and isAttacking
 			and manaAfter > 0.25
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "tormentor"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -698,6 +705,7 @@ function X.ConsiderKazuraiKatana()
 			and Fu.CanCastOnTargetAdvanced(enemyHero)
 		then
 			if enemyHero:IsChanneling() then
+				X.LogKez("interrupt how=impale target=" .. enemyHero:GetUnitName())
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			-- The Katana bleed is a debuff on the enemy (datafeed: "applies stacking damage over time to
@@ -847,6 +855,7 @@ function X.ConsiderTalonToss()
 			and Fu.CanCastOnTargetAdvanced(enemyHero)
 			and Fu.IsInRange(bot, enemyHero, castRange)
 			and enemyHero:IsChanneling()
+			and not enemyHero:HasModifier("modifier_teleporting")
 		then
 			X.LogKez("toss-channel target=" .. enemyHero:GetUnitName())
 			return BOT_ACTION_DESIRE_HIGH, enemyHero
@@ -994,6 +1003,44 @@ function X.ConsiderSwitchDiscipline()
 	-- Fights (#27): it always switched to Sai, so Katana was never held in a fight and its bleed and impale were
 	-- never used (game 038: no impale decision all game). Sai when someone is right-clicking Kez (parry) or the
 	-- target is running away out of reach (Sai's gap closers); Katana for the trade in melee range (bleed stacks).
+	-- Interrupt (#27): in Sai, an enemy within the Katana's reach is channelling a TP (a silence doesn't stop an item
+	-- channel) or a spell while Talon Toss is down: switch to Katana, and the impale's channel rule cuts it.
+	if bot.kez_mode == "sai" and kazuraiKatanaAbility:GetCooldownTimeRemaining() <= 0 then
+		local reach = switchDisciplineAbility:GetSpecialValueInt("katana_attack_range") + 100
+		for _, enemyHero in pairs(bot:GetNearbyHeroes(reach, true, BOT_MODE_NONE) or {}) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero:IsChanneling()
+				and (enemyHero:HasModifier("modifier_teleporting") or not Fu.CanCastAbility(talonTossAbility))
+			then
+				X.LogKez("interrupt how=switch-impale target=" .. enemyHero:GetUnitName())
+				return BOT_ACTION_DESIRE_HIGH
+			end
+		end
+	end
+	-- Weave (#27): Switch Discipline is cheap to use often (game files: cooldown 8s, -0.25 per hero level, and a 2s
+	-- swap bonus). In a fight, when every damaging spell of this stance is on cooldown and one of the other is
+	-- ready, switch to cast it. Katana: Echo Slash, Grappling Claw. Sai: Falcon Rush, Talon Toss.
+	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 700) then
+		local function ready(ability)
+			return ability ~= nil
+				and not ability:IsNull()
+				and ability:GetLevel() > 0
+				and ability:GetCooldownTimeRemaining() <= 0
+				and ability:GetManaCost() <= bot:GetMana()
+		end
+		local katanaReady = ready(echoSlashAbility) and "echo_slash"
+			or (ready(grapplingClawAbility) and "grappling_claw")
+		local saiReady = ready(falconRushAbility) and "falcon_rush" or (ready(talonTossAbility) and "talon_toss")
+		if bot.kez_mode == "katana" and not katanaReady and saiReady then
+			X.LogKez("stance-switch to=sai why=weave next=" .. saiReady)
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		if bot.kez_mode == "sai" and not saiReady and katanaReady then
+			X.LogKez("stance-switch to=katana why=weave next=" .. katanaReady)
+			return BOT_ACTION_DESIRE_HIGH
+		end
+	end
 	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1200) then
 		local attackers = 0
 		for _, enemyHero in pairs(bot:GetNearbyHeroes(400, true, BOT_MODE_NONE) or {}) do

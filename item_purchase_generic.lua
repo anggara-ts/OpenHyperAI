@@ -1836,6 +1836,10 @@ function ItemPurchaseThink()
 		-- Only the clones are skipped now: the main Meepo buys it like every hero.
 		and not Fu.IsMeepoClone(bot)
 		and botName ~= "npc_dota_hero_lone_druid_bear"
+		-- A bought TP is not counted while the courier carries it (charges read the hero and the stash; a 100-gold
+		-- TP on the courier still passes courierValue <= 100). Game 044: Meepo bought 2-3 in a row (t=371/372,
+		-- 1568/1575/1576). Wait 30s after a buy.
+		and now >= (bot._tpBuyHoldUntil or -999)
 	then
 		local tpCharges = Item.GetItemCharges(bot, "item_tpscroll")
 		if bot:HasModifier("modifier_teleporting") then
@@ -1846,6 +1850,7 @@ function ItemPurchaseThink()
 				bot:ActionImmediate_PurchaseItem("item_tpscroll")
 			end
 			bot:ActionImmediate_PurchaseItem("item_tpscroll")
+			bot._tpBuyHoldUntil = now + 30
 			if botName == "npc_dota_hero_meepo" then
 				pcall(print, string.format("[OHA-MEEPO] t=%.0f tp-buy charges=%d gold=%d", now, tpCharges, gold))
 			end

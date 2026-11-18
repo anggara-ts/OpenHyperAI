@@ -151,6 +151,45 @@ function X.SkillsComplement()
 	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
 	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
 	-- once inside that radius (the hit has landed).
+	-- Chase Shukuchi (#48, maintainer): stopping at attack range left the target at the edge, and the first hit (which
+	-- ends the invisibility) let him walk out again. While it lasts, go through him to a point 150 past (Shukuchi's
+	-- damage lands on the way), then attack. Attack at once when the right-clicks in the time left kill him.
+	do
+		local chase = bot._shukuchiChase
+		if chase ~= nil then
+			local target = chase.target
+			if
+				DotaTime() > chase.untilTime
+				or isRetreating
+				or not bot:HasModifier("modifier_weaver_shukuchi") and DotaTime() > chase.untilTime - 3.5
+				or not Fu.IsValidHero(target)
+				or not target:IsAlive()
+			then
+				bot._shukuchiChase = nil
+			else
+				local timeLeft = math.max(0.5, chase.untilTime - DotaTime())
+				local hitKill = (bot:GetEstimatedDamageToTarget(true, target, timeLeft, DAMAGE_TYPE_PHYSICAL) or 0)
+					>= target:GetHealth()
+				local dist = GetUnitToUnitDistance(bot, target)
+				if hitKill or dist <= 120 then
+					bot._shukuchiChase = nil
+					X.LogWeaver(
+						"shukuchi-chase",
+						"target=%s through=%s dist=%d",
+						target:GetUnitName(),
+						hitKill and "attack-kill" or "yes",
+						dist
+					)
+					bot:Action_AttackUnit(target, true)
+					return
+				end
+				bot:Action_MoveToLocation(
+					Fu.VectorTowards(bot:GetLocation(), target:GetExtrapolatedLocation(0.3), dist + 150)
+				)
+				return
+			end
+		end
+	end
 	if bot.tryShukuchiKill and not isRetreating then
 		local killTarget = bot.ShukuchiKillTarget
 		if
@@ -317,6 +356,7 @@ function X.ConsiderShukuchi()
 			and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
+			bot._shukuchiChase = { target = botTarget, untilTime = DotaTime() + shukuchiDuration }
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

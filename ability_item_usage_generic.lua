@@ -555,7 +555,8 @@ function Usage.SetTalkMessage()
 		if bot:IsAlive() and gold > lastGold + 300 * turboGoldScale and kills > lastKills then
 			local chatLine = "?"
 			if Fu.Customize.Trash_Talk_Level and Fu.Customize.Trash_Talk_Level >= 2 then
-				if RandomInt(1, 9) > 7 then
+				-- A normal kill: one of our lines 3 times in 4, "?" once in 4 (#90; it was 2 in 9).
+				if RandomInt(1, 4) > 1 then
 					chatLine = Localization.Get("got_a_kill")[RandomInt(1, #Localization.Get("got_a_kill"))]
 				end
 				if gold > lastGold + 800 * turboGoldScale and RandomInt(1, 9) > 4 then
@@ -9318,6 +9319,29 @@ local function TrackCyclone()
 		)
 	end
 end
+-- One voice per player (#8, game 046: Meepo still said "Going for Puck" / "going to mid" twice). Chat comes from many
+-- files and every Meepo body runs them; on a clone (or Arc Warden's Tempest Double) the chat order becomes a no-op.
+local function MuteCloneChat()
+	if bot._chatGateDone then
+		return
+	end
+	bot._chatGateDone = true
+	if not (Fu.IsMeepoClone(bot) or bot:HasModifier("modifier_arc_warden_tempest_double")) then
+		return
+	end
+	local ok = pcall(function()
+		bot.ActionImmediate_Chat = function() end
+	end)
+	pcall(
+		print,
+		string.format(
+			"[OHA-MEEPO] t=%.0f %s clone-chat-muted ok=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(ok)
+		)
+	)
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -9329,6 +9353,7 @@ function ItemUsageThink()
 		end
 	end
 	MatchTrace.Tick(bot)
+	pcall(MuteCloneChat)
 	pcall(TrackCyclone)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, bot)

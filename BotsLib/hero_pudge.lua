@@ -192,7 +192,106 @@ function X.ToggleRot(rot)
 	bot:Action_UseAbility(rot)
 	return true
 end
+-- Hook follow-up (#73, game 043): the maintainer saw Pudge turn away after a landed hook. The hook goes out from any
+-- mode (laning, farm, roam), and that mode walked him off on the next think. Landed = within 3s of the hook, an
+-- enemy hero who was 600+ away at the cast is now within 350 of Pudge (or has the hook debuff; the modifier name
+-- is not in the game files, so the distance test is the one that counts). Then for 3s: Rot on, Dismember if it can
+-- be cast, else attack him. Not under 30% HP or with two more enemy heroes than allies around.
+-- Logs: [OHA-PUDGE] hook-result landed|missed, follow=dismember|attack|none.
+local function PudgeLine(fmt, ...)
+	pcall(print, string.format("[OHA-PUDGE] t=%.0f " .. fmt, DotaTime(), ...))
+end
+local function ShortName(unit)
+	return (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
+end
+function X.NoteHookCast()
+	if bot._hookTrack ~= nil and DotaTime() - bot._hookTrack.at < 1 then
+		return
+	end
+	local far = {}
+	for _, enemyHero in pairs(bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and GetUnitToUnitDistance(bot, enemyHero) > 600 then
+			far[enemyHero:GetUnitName()] = true
+		end
+	end
+	bot._hookTrack = { at = DotaTime(), far = far }
+end
+function X.TrackHook()
+	local track = bot._hookTrack
+	if track == nil then
+		return
+	end
+	if DotaTime() - track.at > 3 then
+		bot._hookTrack = nil
+		PudgeLine("hook-result missed mode=%d", bot:GetActiveMode())
+		return
+	end
+	for _, enemyHero in pairs(bot:GetNearbyHeroes(350, true, BOT_MODE_NONE) or {}) do
+		local debuff = Fu.IsValidHero(enemyHero) and enemyHero:HasModifier("modifier_pudge_meat_hook")
+		if Fu.IsValidHero(enemyHero) and (track.far[enemyHero:GetUnitName()] or debuff) then
+			bot._hookTrack = nil
+			bot._hookFollow = { target = enemyHero, untilTime = DotaTime() + 3, logged = false }
+			PudgeLine(
+				"hook-result landed target=%s after=%.1f mode=%d hp=%.2f foes=%d allies=%d debuff=%s",
+				ShortName(enemyHero),
+				DotaTime() - track.at,
+				bot:GetActiveMode(),
+				Fu.GetHP(bot),
+				#(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}),
+				#(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) - 1,
+				tostring(debuff)
+			)
+			return
+		end
+	end
+end
+-- Returns true when it gave an order.
+function X.FollowHook(rotAbility, dismemberAbility, hpRatio)
+	local follow = bot._hookFollow
+	if follow == nil then
+		return false
+	end
+	local target = follow.target
+	if DotaTime() > follow.untilTime or not Fu.IsValidHero(target) or not target:IsAlive() then
+		bot._hookFollow = nil
+		return false
+	end
+	local foes = #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+	local friends = #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
+	if hpRatio < 0.3 or foes >= friends + 2 then
+		bot._hookFollow = nil
+		PudgeLine(
+			"follow=none why=unsafe target=%s hp=%.2f foes=%d allies=%d",
+			ShortName(target),
+			hpRatio,
+			foes,
+			friends - 1
+		)
+		return false
+	end
+	local castRange = dismemberAbility:GetCastRange() + 100
+	if Fu.CanCastAbility(dismemberAbility) and GetUnitToUnitDistance(bot, target) <= castRange then
+		bot._hookFollow = nil
+		PudgeLine("follow=dismember target=%s", ShortName(target))
+		bot:Action_ClearActions(false)
+		if hpRatio > 0.3 and Fu.CanCastAbility(rotAbility) and not RotOn(rotAbility) then
+			bot:ActionQueue_UseAbility(rotAbility)
+		end
+		bot:ActionQueue_UseAbilityOnEntity(dismemberAbility, target)
+		return true
+	end
+	if hpRatio > 0.3 and not RotOn(rotAbility) and X.ToggleRot(rotAbility) then
+		return true
+	end
+	if not follow.logged then
+		follow.logged = true
+		PudgeLine("follow=attack target=%s dist=%d", ShortName(target), GetUnitToUnitDistance(bot, target))
+	end
+	bot:Action_AttackUnit(target, true)
+	return true
+end
 function X.SkillsComplement()
+	pcall(X.TrackHook)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -208,6 +307,9 @@ function X.SkillsComplement()
 	local rotRadius = rotAbility:GetSpecialValueInt("rot_radius")
 	local enemiesInRotRange = Fu.GetNearbyHeroes(bot, rotRadius + 50, true, BOT_MODE_NONE)
 	if X.BlinkComboStep(rotAbility, meatShieldAbility, dismemberAbility) then
+		return
+	end
+	if X.FollowHook(rotAbility, dismemberAbility, hpRatio) then
 		return
 	end
 	if X.BlinkHookStep(meatHookAbility) then
@@ -234,6 +336,7 @@ function X.SkillsComplement()
 		X.ConsiderMeatHook(meatHookAbility, rotAbility, dismemberAbility, botTarget, hpRatio, enemiesInRotRange)
 	if meatHookDesire > 0 then
 		X.LogPudge("hook", hpRatio)
+		X.NoteHookCast()
 		bot:Action_UseAbilityOnLocation(meatHookAbility, meatHookLocation)
 		return
 	end
@@ -502,6 +605,7 @@ function X.BlinkHookStep(hook)
 	end
 	local speed = math.max(1, hook:GetSpecialValueInt("hook_speed"))
 	local distance = GetUnitToUnitDistance(bot, target)
+	X.NoteHookCast()
 	bot:Action_UseAbilityOnLocation(hook, target:GetExtrapolatedLocation(hook:GetCastPoint() + distance / speed))
 	pcall(
 		print,

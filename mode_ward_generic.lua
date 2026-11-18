@@ -794,3 +794,9 @@ if SafeCall then
 		Think = SafeCall(originalThink, nil, "WARD_Think")
 	end
 end
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	GetDesire = Perf.Wrap("ward.GetDesire", GetDesire)
+	Think = Perf.Wrap("ward.Think", Think)
+end

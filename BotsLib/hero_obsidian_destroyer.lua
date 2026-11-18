@@ -427,6 +427,29 @@ function X.ConsiderAstralImprisonment()
 		end
 		return BOT_ACTION_DESIRE_HIGH, bot
 	end
+	-- Rooted, low and being hit: prison himself (invulnerable for the prison, datafeed) to wait out the root.
+	-- Game 040, 5:40: rooted by Earthbind at 26% HP, nothing fired (no lethal projectile, no stun projectile).
+	if
+		bot:IsRooted()
+		and hpRatio < 0.4
+		and bot:WasRecentlyDamagedByAnyHero(1.0)
+		and #nearbyEnemies >= 1
+		and not bot:IsMagicImmune()
+	then
+		if DotaTime() >= (bot._odRootLogAt or -999) then
+			bot._odRootLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-OD] t=%.0f self-prison rooted hp=%.2f enemies=%d",
+					DotaTime(),
+					hpRatio,
+					#nearbyEnemies
+				)
+			)
+		end
+		return BOT_ACTION_DESIRE_HIGH, bot
+	end
 	if #nearbyAllies >= #nearbyEnemies then
 		if not bot:IsMagicImmune() then
 			if Fu.IsStunProjectileIncoming(bot, 600) and hpRatio < 0.2 then

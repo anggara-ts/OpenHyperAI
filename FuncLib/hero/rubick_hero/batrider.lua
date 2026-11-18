@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Batrider.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local BlinkLassoTarget, FireflyDesire, FlamingLassoDesire, FlamingLassoTarget, FlamebreakDesire, FlamebreakLocation, StickyNapalmDesire, StickyNapalmLocation
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -409,7 +411,6 @@ function X.ConsiderBlinkLasso()
 				local targetAllies = Fu.GetNearbyHeroes(lassoTarget, 1199, false, BOT_MODE_NONE)
 				if nearbyAllies ~= nil and targetAllies ~= nil and #nearbyAllies >= #targetAllies then
 					bot.shouldBlink = true
-					BlinkLocation = lassoTarget:GetLocation()
 					return BOT_ACTION_DESIRE_HIGH, lassoTarget
 				end
 			end

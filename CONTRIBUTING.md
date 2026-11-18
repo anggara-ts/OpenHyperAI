@@ -92,9 +92,9 @@ then fill in the values. Each one is explained in `.env.example`. Today there is
 
 | Variable | Used by | How to get it |
 |---|---|---|
-| `STRATZ_TOKEN` | item-build second opinion (`Util/item-builds/`, issue #38): per-position item data | log in to [stratz.com](https://stratz.com) with Steam, open your account's API section, copy the token |
+| `STRATZ_TOKEN` | item-build second opinion (`Util/item-builds/`, issues #9, #38): its only data source, per position and week | log in to [stratz.com](https://stratz.com) with Steam, open your account's API section, copy the token |
 
-Without a token, the tools that need it fall back to sources that need none (OpenDota) or skip that source.
+Without a token, the tools that need it stop with a message saying so.
 Never commit `.env`, paste a token into an issue or PR, or print it in a log. If a token leaks, revoke it on
 the site and make a new one.
 

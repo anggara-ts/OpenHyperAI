@@ -51,3 +51,8 @@ local function OHA_Trap(name, fn, fallback)
 	end
 end
 MinionThink = OHA_Trap("MinionThink", MinionThink, nil)
+-- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
+do
+	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
+	MinionThink = Perf.Wrap("MinionThink", MinionThink)
+end

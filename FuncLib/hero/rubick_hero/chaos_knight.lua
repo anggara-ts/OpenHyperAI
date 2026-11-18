@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Chaos Knight.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local PhantasmDesire, RealityRiftDesire, RealityRiftTarget, ChaosBoltDesire, ChaosBoltTarget
 local bot
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

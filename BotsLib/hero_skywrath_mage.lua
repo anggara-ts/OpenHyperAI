@@ -1,4 +1,6 @@
 -- Skywrath Mage: skill build, item build, and ability use for this hero.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local botTarget, nInRangeEnemyHeroList
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -126,7 +128,6 @@ function X.SkillsComplement()
 	hpRatio = context.hp
 	botTarget = context.target
 	nearbyEnemies = context.enemies
-	hAllyList = context.allies
 	nInRangeEnemyHeroList = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 	ancientSealDesire, ancientSealTarget = X.ConsiderE()
 	if ancientSealDesire > 0 then

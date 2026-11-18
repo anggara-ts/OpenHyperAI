@@ -1,4 +1,6 @@
 -- How Rubick plays after stealing a spell from Bane.
+-- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
+local EnfeebleDesire, EnfeebleTarget, BrainSapDesire, BrainSapTarget, FiendsGripDesire, FiendsGripTarget, NightmareDesire, NightmareTarget
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")

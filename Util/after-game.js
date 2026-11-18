@@ -154,7 +154,7 @@ function buildSection(lines, summary) {
 		const name = (n) => `#${n}${tracker.prs && tracker.prs[n] ? " " + tracker.prs[n].title : ""}`;
 		const match = commit && tb.head ? (commit.startsWith(tb.head) || tb.head.startsWith(commit) ? "yes" : "NO") : "?";
 		out.push("", `Test build (Util/verify/test-build.json, built ${tb.builtAt || "?"}): head \`${String(tb.head || "?").slice(0, 10)}\` on base \`${String(tb.base || "?").slice(0, 10)}\`; game ran this head: **${match}**`);
-		for (const [key, label] of [["included", "merged"], ["upToDate", "already in base"], ["conflicts", "CONFLICT, not in build"], ["missing", "branch missing"]]) {
+		for (const [key, label] of [["included", "in this build"], ["upToDate", "already in base"], ["conflicts", "CONFLICT, not in build"], ["missing", "branch missing"]]) {
 			for (const n of tb[key] || []) out.push(`- ${name(n)} (${label})`);
 		}
 	} else {

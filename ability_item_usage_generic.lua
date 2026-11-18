@@ -7004,7 +7004,19 @@ local function SmokeDesireRaw(item)
 		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM
 		local roamSkip = nil
 		if roamMode then
-			for towerId = 0, 10 do
+			for _, towerId in ipairs({
+				TOWER_TOP_1,
+				TOWER_TOP_2,
+				TOWER_TOP_3,
+				TOWER_MID_1,
+				TOWER_MID_2,
+				TOWER_MID_3,
+				TOWER_BOT_1,
+				TOWER_BOT_2,
+				TOWER_BOT_3,
+				TOWER_BASE_1,
+				TOWER_BASE_2,
+			}) do
 				local tower = GetTower(GetOpposingTeam(), towerId)
 				if tower ~= nil and tower:IsAlive() and GetUnitToUnitDistance(bot, tower) < 2500 then
 					roamSkip = "tower-near"

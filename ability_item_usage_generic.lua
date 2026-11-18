@@ -9175,6 +9175,39 @@ end
 function Usage.RunePickupLock()
 	return bot:IsAlive() and bot:GetActiveMode() == BOT_MODE_RUNE and DotaTime() - (bot._runePickupAt or -999) < 0.5
 end
+-- Diagnostic (#15): does a bot in a cyclone (Wind Waker or Eul's, ours or an enemy's) drift? Other modes keep giving
+-- move orders while it lasts, and Wind Waker's cyclone can be moved. One line when it ends: held time, distance moved
+-- and how much closer to the fountain it got.
+local CYCLONE_MODIFIERS = { "modifier_wind_waker", "modifier_item_wind_waker", "modifier_eul_cyclone" }
+local function TrackCyclone()
+	local found = nil
+	for _, name in ipairs(CYCLONE_MODIFIERS) do
+		if bot:HasModifier(name) then
+			found = name
+			break
+		end
+	end
+	local cyclone = bot._cycloneTrack
+	if found ~= nil and cyclone == nil then
+		bot._cycloneTrack =
+			{ name = found, at = DotaTime(), loc = bot:GetLocation(), fountain = bot:DistanceFromFountain() }
+	elseif found == nil and cyclone ~= nil then
+		bot._cycloneTrack = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s cyclone-end mod=%s held=%.1f moved=%d toFountain=%d mode=%d",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				cyclone.name,
+				DotaTime() - cyclone.at,
+				GetUnitToLocationDistance(bot, cyclone.loc),
+				cyclone.fountain - bot:DistanceFromFountain(),
+				bot:GetActiveMode()
+			)
+		)
+	end
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -9186,6 +9219,7 @@ function ItemUsageThink()
 		end
 	end
 	MatchTrace.Tick(bot)
+	pcall(TrackCyclone)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, bot)
 	pcall(Usage.TrackTeleportJump)

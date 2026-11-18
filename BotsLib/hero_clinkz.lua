@@ -362,6 +362,38 @@ function X.ConsiderSearingArrows()
 		{ strafeAbility, deathPactAbility, burningBarrageAbility, burningArmyAbility, skeletonWalkAbility }
 	)
 	local isAutoCastOn = searingArrowsAbility:GetAutoCastState()
+	-- Last hits with Searing Arrows (#48, maintainer): in lane, offer the arrow's bonus to the last-hit prediction while
+	-- mana stays 20% above the reserve for his spells (game files: damage_bonus 20/35/50/65, mana 10). When a last
+	-- hit needs it and Clinkz is on that creep, turn autocast on for the hit.
+	bot._lastHitBonus = 0
+	if Fu.IsLaning(bot) and manaAfter > manaThreshold + 0.2 then
+		bot._lastHitBonus = searingArrowsAbility:GetSpecialValueInt("damage_bonus")
+		local need = bot._lastHitNeedsBonus
+		if
+			need ~= nil
+			and DotaTime() - need.at < 1.5
+			and Fu.IsValid(need.creep)
+			and botTarget == need.creep
+			and Fu.IsInRange(bot, need.creep, attackRange + 100)
+		then
+			if not isAutoCastOn then
+				searingArrowsAbility:ToggleAutoCast()
+			end
+			if DotaTime() >= (bot._searingLhLogAt or -999) then
+				bot._searingLhLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-CLINKZ] t=%.0f searing-lasthit creep-hp=%d bonus=%d",
+						DotaTime(),
+						need.creep:GetHealth(),
+						bot._lastHitBonus
+					)
+				)
+			end
+			return BOT_ACTION_DESIRE_NONE
+		end
+	end
 	if isGoingOnSomeone then
 		if
 			Fu.IsValidHero(botTarget)

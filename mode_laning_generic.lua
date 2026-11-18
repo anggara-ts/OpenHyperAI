@@ -239,7 +239,17 @@ function GetBestLastHitCreep(creeps)
 					)
 				)
 			end
-			if not towerKills and Fu.WillKillTarget(creep, damage + towerShot, DAMAGE_TYPE_PHYSICAL, attackDelay) then
+			local bonus = bot._lastHitBonus or 0
+			local plainKill = not towerKills
+				and Fu.WillKillTarget(creep, damage + towerShot, DAMAGE_TYPE_PHYSICAL, attackDelay)
+			local bonusKill = not plainKill
+				and not towerKills
+				and bonus > 0
+				and Fu.WillKillTarget(creep, damage + towerShot + bonus, DAMAGE_TYPE_PHYSICAL, attackDelay)
+			if bonusKill then
+				bot._lastHitNeedsBonus = { creep = creep, at = DotaTime() }
+			end
+			if plainKill or bonusKill then
 				if value > bestValue then
 					bestValue = value
 					bestCreep = creep

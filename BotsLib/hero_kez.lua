@@ -139,7 +139,42 @@ function X.LogKez(what)
 	bot._kezLogAt[kind] = DotaTime() + 3
 	pcall(print, string.format("[OHA-KEZ] t=%.0f %s", DotaTime(), what))
 end
+-- Did the last Shodo Sai / Katana order go off (#27)? Game 038 logged 15 parry decisions but nothing proved a cast.
+-- A started cooldown means it did (the two share a cooldown, datafeed). The Katana impale is an attack ability
+-- (game files: DOTA_ABILITY_BEHAVIOR_ATTACK, cast range 200): its cooldown starts when the attack goes off, after
+-- the walk and the attack wind-up. Game 043 read 9 of 20 impales as failed 0.6s after the order. Now: ok as soon
+-- as the cooldown starts, failed after 2s, with the mode and the target distance at the order and at the end.
+function X.CheckCastResult()
+	local check = bot._kezCastCheck
+	if check == nil then
+		return
+	end
+	local ok = check.ability ~= nil and not check.ability:IsNull() and check.ability:GetCooldownTimeRemaining() > 0
+	if not ok and DotaTime() < check.at + 2 then
+		return
+	end
+	bot._kezCastCheck = nil
+	local target = check.target
+	local distNow = Fu.IsValidHero(target) and GetUnitToUnitDistance(bot, target) or -1
+	pcall(
+		print,
+		string.format(
+			"[OHA-KEZ] t=%.0f cast-result ability=%s ok=%s after=%.1f stance=%s mode=%d->%d dist=%d->%d target-alive=%s",
+			DotaTime(),
+			check.name,
+			tostring(ok),
+			DotaTime() - check.at,
+			tostring(bot.kez_mode),
+			check.mode or -1,
+			bot:GetActiveMode(),
+			check.dist or -1,
+			distNow,
+			tostring(target ~= nil and not target:IsNull() and target:IsAlive())
+		)
+	)
+end
 function X.SkillsComplement()
+	X.CheckCastResult()
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
@@ -206,6 +241,7 @@ function X.SkillsComplement()
 		shodoSaiDesire, shodoSaiLocation = X.ConsiderShodoSai()
 		if shodoSaiDesire > 0 then
 			bot:Action_UseAbilityOnLocation(shodoSaiAbility, shodoSaiLocation)
+			bot._kezCastCheck = { name = "shodo_sai", ability = shodoSaiAbility, at = DotaTime() }
 			return
 		end
 	else
@@ -231,6 +267,16 @@ function X.SkillsComplement()
 		KazuraiKatanaDesire, KazuraiKatanaTarget = X.ConsiderKazuraiKatana()
 		if KazuraiKatanaDesire > 0 then
 			bot:Action_UseAbilityOnEntity(kazuraiKatanaAbility, KazuraiKatanaTarget)
+			if bot._kezCastCheck == nil or bot._kezCastCheck.target ~= KazuraiKatanaTarget then
+				bot._kezCastCheck = {
+					name = "katana_impale",
+					ability = kazuraiKatanaAbility,
+					at = DotaTime(),
+					target = KazuraiKatanaTarget,
+					mode = bot:GetActiveMode(),
+					dist = GetUnitToUnitDistance(bot, KazuraiKatanaTarget),
+				}
+			end
 			return
 		end
 		raptorDanceDesire = X.ConsiderRaptorDance()
@@ -683,13 +729,22 @@ function X.ConsiderKazuraiKatana()
 			-- Stacks are on the target and the burst is measured against the target's HP (it used Kez's
 			-- own stacks and Kez's own HP).
 			local burstDamage = Fu.GetModifierCount(botTarget, "modifier_kez_katana_bleed") * burstPct
+			-- Thresholds lowered (#27): 10-25% of the target's HP / 75-300 was never reached in game 038 even with
+			-- 120-406 stacks (60-203 burst). 6-15% / 50-200 now.
 			if
-				burstDamage / botTarget:GetHealth() > RemapValClamped(kazuraiKatanaAbility:GetLevel(), 2, 4, 0.1, 0.25)
+				burstDamage / botTarget:GetHealth() > RemapValClamped(kazuraiKatanaAbility:GetLevel(), 2, 4, 0.06, 0.15)
 			then
 				X.LogKez("impale-burst target=" .. botTarget:GetUnitName() .. " burst=" .. math.floor(burstDamage))
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
-			if burstDamage > RemapValClamped(kazuraiKatanaAbility:GetLevel(), 2, 4, 75, 300) then
+			if burstDamage > RemapValClamped(kazuraiKatanaAbility:GetLevel(), 2, 4, 50, 200) then
+				X.LogKez("impale-burst target=" .. botTarget:GetUnitName() .. " burst=" .. math.floor(burstDamage))
+				return BOT_ACTION_DESIRE_HIGH, botTarget
+			end
+			-- The impale also roots and stops turning for 0.5s (datafeed): use it to stop a target that is
+			-- walking out of reach.
+			if Fu.IsRunning(botTarget) and not botTarget:IsFacingLocation(bot:GetLocation(), 90) then
+				X.LogKez("impale-escape target=" .. botTarget:GetUnitName() .. " burst=" .. math.floor(burstDamage))
 				return BOT_ACTION_DESIRE_HIGH, botTarget
 			end
 		end
@@ -936,15 +991,31 @@ function X.ConsiderSwitchDiscipline()
 	if bot:GetAbilityPoints() > 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	if isGoingOnSomeone then
-		if
-			Fu.IsValidHero(botTarget)
-			and Fu.IsInRange(bot, botTarget, 1200)
-			and Fu.GetMP(bot) > 0.25
-			and bot.kez_mode == "katana"
-		then
+	-- Fights (#27): it always switched to Sai, so Katana was never held in a fight and its bleed and impale were
+	-- never used (game 038: no impale decision all game). Sai when someone is right-clicking Kez (parry) or the
+	-- target is running away out of reach (Sai's gap closers); Katana for the trade in melee range (bleed stacks).
+	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 1200) then
+		local attackers = 0
+		for _, enemyHero in pairs(bot:GetNearbyHeroes(400, true, BOT_MODE_NONE) or {}) do
+			if Fu.IsValidHero(enemyHero) and enemyHero:GetAttackTarget() == bot then
+				attackers = attackers + 1
+			end
+		end
+		local distance = GetUnitToUnitDistance(bot, botTarget)
+		local chasing = distance > 600 and Fu.IsRunning(botTarget)
+		-- Parry only when Shodo Sai is ready: it shares its cooldown with the Katana (datafeed), so the Katana's
+		-- cooldown says. Otherwise the target hitting back would pull Kez out of every Katana trade.
+		local parryReady = kazuraiKatanaAbility:GetCooldownTimeRemaining() <= 0
+		local wantSai = attackers >= 1 and parryReady or chasing
+		if bot.kez_mode == "katana" and wantSai and Fu.GetMP(bot) > 0.25 then
+			X.LogKez("stance-switch to=sai why=" .. (attackers >= 1 and "parry" or "chase"))
 			return BOT_ACTION_DESIRE_HIGH
 		end
+		if bot.kez_mode == "sai" and not wantSai and distance <= 400 then
+			X.LogKez("stance-switch to=katana why=trade")
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		return BOT_ACTION_DESIRE_NONE
 	end
 	if isRetreating and not Fu.IsRealInvisible(bot) then
 		if bot.kez_mode == "sai" then

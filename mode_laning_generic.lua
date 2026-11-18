@@ -294,7 +294,7 @@ local function AnnounceOffsideHarass(target)
 	bot:ActionImmediate_Chat("Harassing " .. PrettyHeroName(target), false)
 end
 -- Right-clicking a hero pulls every enemy lane creep within 500 that is not already on us.
-local function CreepAggroUnsafe(hero)
+local function CreepAggroCounts(hero)
 	local creeps = hero:GetNearbyLaneCreeps(500, true) or {}
 	local fresh, hitting = 0, 0
 	for _, creep in pairs(creeps) do
@@ -306,7 +306,36 @@ local function CreepAggroUnsafe(hero)
 			end
 		end
 	end
+	return fresh, hitting
+end
+local function CreepAggroUnsafe(hero)
+	local fresh, hitting = CreepAggroCounts(hero)
 	return fresh > 0 or hitting >= 2
+end
+-- Diagnostic (#71): with an enemy hero in attack range and no last hit to take, did the bot harass, and if not,
+-- which gate stopped it (hp / creep-aggro / tower)? The maintainer sees bots stand idle between last hits.
+-- At most every 5s per bot.
+local function LogHarass(enemyHero, target, why, fresh, hitting)
+	if DotaTime() < (bot._harassLogAt or -999) then
+		return
+	end
+	bot._harassLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-HARASS] t=%.0f %s %s target=%s why=%s hp=%.2f fresh=%d hitting=%d range=%d dist=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			target ~= nil and "hit" or "skip",
+			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+			why or "-",
+			Fu.GetHP(bot),
+			fresh,
+			hitting,
+			attackRange,
+			GetUnitToUnitDistance(bot, enemyHero)
+		)
+	)
 end
 -- Aggressive lane poke on our half. LH/deny still come first in Think.
 local function ConsiderOffsideHarass(enemyHeroes)
@@ -682,18 +711,42 @@ do
 			end
 			return true
 		end
-		if not Fu.IsCore(bot) and Fu.GetHP(bot) > 0.5 and not CreepAggroUnsafe(bot) then
+		-- Harass a hero in attack range: supports above 50% HP, cores above 45%, no fresh creep aggro, not by
+		-- the enemy T1 (unchanged rules; now one pass with a log of the gate that stops it).
+		do
+			local inRange = nil
 			for _, enemyHero in pairs(nearbyEnemies) do
-				if SafeToHarassHero(enemyHero) and Fu.IsInRange(bot, enemyHero, attackRange) then
-					bot:Action_AttackUnit(enemyHero, true)
-					return
+				if
+					Fu.IsValidHero(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+					and Fu.IsInRange(bot, enemyHero, attackRange)
+				then
+					inRange = enemyHero
+					break
 				end
 			end
-		end
-		if Fu.IsCore(bot) and Fu.GetHP(bot) > 0.45 and not CreepAggroUnsafe(bot) then
-			for _, enemyHero in pairs(nearbyEnemies) do
-				if SafeToHarassHero(enemyHero) and Fu.IsInRange(bot, enemyHero, attackRange) then
-					bot:Action_AttackUnit(enemyHero, true)
+			if inRange ~= nil then
+				local fresh, hitting = CreepAggroCounts(bot)
+				local hpNeed = Fu.IsCore(bot) and 0.45 or 0.5
+				local target, why = nil, nil
+				if Fu.GetHP(bot) <= hpNeed then
+					why = "hp"
+				elseif fresh > 0 or hitting >= 2 then
+					why = "creep-aggro"
+				else
+					for _, enemyHero in pairs(nearbyEnemies) do
+						if SafeToHarassHero(enemyHero) and Fu.IsInRange(bot, enemyHero, attackRange) then
+							target = enemyHero
+							break
+						end
+					end
+					if target == nil then
+						why = "tower"
+					end
+				end
+				LogHarass(inRange, target, why, fresh, hitting)
+				if target ~= nil then
+					bot:Action_AttackUnit(target, true)
 					return
 				end
 			end

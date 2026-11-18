@@ -18,6 +18,7 @@ local BotBuild = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botNa
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local PerfParts = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
@@ -9054,6 +9055,15 @@ end
 function Usage.RunePickupLock()
 	return bot:IsAlive() and bot:GetActiveMode() == BOT_MODE_RUNE and DotaTime() - (bot._runePickupAt or -999) < 0.5
 end
+-- Perf.Part helpers for ItemUsageThink (#52).
+local function PartStart()
+	return RealTime ~= nil and RealTime() or nil
+end
+local function PartEnd(name, startedAt)
+	if startedAt ~= nil then
+		PerfParts.Part(name, RealTime() - startedAt)
+	end
+end
 function ItemUsageThink()
 	local _perfT0 = nil
 	if MatchTrace.PerfEnabled and MatchTrace.PerfEnabled() and RealTime then
@@ -9064,6 +9074,7 @@ function ItemUsageThink()
 			MatchTrace.PerfSample("ItemUsageThink", RealTime() - _perfT0)
 		end
 	end
+	local tWatch = PartStart()
 	MatchTrace.Tick(bot)
 	-- Ability charges for every bot (the API has no ability-charge read); before any gate below.
 	pcall(ChargeTracker.Tick, bot)
@@ -9072,6 +9083,7 @@ function ItemUsageThink()
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.LogHomeWalk)
+	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)
 	if okQ and cleared then
 		return
@@ -9164,7 +9176,9 @@ function ItemUsageThink()
 	end
 	if not Fu.IsNoItemIllution(bot) then
 		local tItem = _perfT0 and RealTime() or nil
+		local tItems = PartStart()
 		ConsiderItems()
+		PartEnd("items", tItems)
 		if tItem then
 			MatchTrace.PerfSample("ItemUsage.bg", RealTime() - tItem)
 		end
@@ -9213,7 +9227,9 @@ function ItemUsageThink()
 	end
 	if BotBuild ~= nil and not Fu.IsNoAbilityIllution(bot) then
 		local tSkill = _perfT0 and RealTime() or nil
+		local tHero = PartStart()
 		local ok, err = pcall(BotBuild.SkillsComplement)
+		PartEnd("hero-abilities", tHero)
 		if tSkill then
 			MatchTrace.PerfSample("SkillsComplement", RealTime() - tSkill)
 		end

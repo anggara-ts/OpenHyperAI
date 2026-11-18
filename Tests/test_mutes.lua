@@ -23,7 +23,6 @@ local MUTED = {
 	"[OHA-FARM] t=1322 tusk base-siege-hold siege=5 at=-4640,-4144 dist=1280 farm=0.05",
 	"[OHA-FARM] t=636 alchemist enemy-half-withdraw why=finish mode=17 at=-201,61 to=822,918 alive=5/5",
 	"[OHA-ATTACK] t=172 kez follow-skip no-fight ally=tusk allyMode=3 dist=227",
-	"[OHA-KITE] t=134 rubick from monkey_king dist=238 step=250 since=0.43 window=0.42-0.94 spa=1.36",
 	"[OHA-MONKEY_KING] t=111 spring-skip why=cannot-use-ability(using) active=none mods= hidden=false cd=0.0",
 	"[OHA-NS] t=349 feast result started=true goldDelta=39 cdAt=0.1 reissues=0 dist=135 creepAlive=false",
 	"[OHA-MEEPO] t=161 clone rune-skip body-in-fight dist=47",
@@ -37,6 +36,8 @@ local MUTED = {
 	"[OHA-DEFEND] t=642 rubick chat-skip why=already-held lane=3 allies=3 enemies=2",
 }
 local KEPT = {
+	"[OHA-KITE] t=134 rubick from monkey_king dist=238 step=250 since=0.43 window=0.42-0.94 spa=1.36",
+	"[OHA-KITE] t=600 mirana result steps=12 hit-after=5 late-attack=1 window=61s",
 	"[OHA-FARM] t=631 alchemist enemy-half-withdraw why=outnumbered mode=16 at=-870,-657 to=822,918 alive=5/5",
 	"[OHA-RETREAT] t=913 meepo hard-retreat hold hp=0.17 allies=2 pressure=3 mode=4",
 	"[OHA-RETREAT] t=1115 meepo desire=0.70 line=201 hp=1.00 mp=0.97 enemies1200=2 allies1200=3",

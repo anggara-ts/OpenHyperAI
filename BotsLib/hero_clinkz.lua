@@ -116,8 +116,20 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = context.mp
 	botTarget = context.target
+	local okH, hunted = pcall(X.HuntStep)
+	if okH and hunted then
+		return
+	end
 	skeletonWalkDesire = X.ConsiderSkeletonWalk()
 	if skeletonWalkDesire > 0 then
+		-- Soul Ring first when he has it (maintainer's hunt), so the walk and the reveal have mana.
+		local ring = X.ReadyItem("item_soul_ring")
+		if ring ~= nil and Fu.GetHP(bot) > 0.4 then
+			X.LogHunt("soul-ring", nil)
+			bot:Action_UseAbility(ring)
+			bot:ActionQueue_UseAbility(skeletonWalkAbility)
+			return
+		end
 		bot:Action_UseAbility(skeletonWalkAbility)
 		return
 	end
@@ -146,6 +158,76 @@ function X.SkillsComplement()
 		bot:Action_UseAbilityOnLocation(burningArmyAbility, burningArmyLocation)
 		return
 	end
+end
+-- The maintainer's Clinkz hunt (#94): Soul Ring, Skeleton Walk, eat the biggest creep in range while invisible
+-- (Death Pact doesn't break Skeleton Walk, datafeed), walk point blank to the target, then reveal with Orchid /
+-- Bloodthorn and Strafe and shoot. Burning Barrage is for groups.
+function X.ReadyItem(name)
+	local slot = bot:FindItemSlot(name)
+	if slot < 0 or slot > 5 then
+		return nil
+	end
+	local item = bot:GetItemInSlot(slot)
+	if item ~= nil and not item:IsNull() and item:IsFullyCastable() then
+		return item
+	end
+	return nil
+end
+function X.LogHunt(step, target)
+	if DotaTime() < (bot._huntLogAt or -999) and step == bot._huntLogStep then
+		return
+	end
+	bot._huntLogAt = DotaTime() + 3
+	bot._huntLogStep = step
+	pcall(
+		print,
+		string.format(
+			"[OHA-CLINKZ] t=%.0f hunt step=%s target=%s hp=%.2f",
+			DotaTime(),
+			step,
+			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			Fu.GetHP(bot)
+		)
+	)
+end
+-- Returns true when it gave an order.
+function X.HuntStep()
+	if not bot:HasModifier("modifier_clinkz_wind_walk") then
+		return false
+	end
+	-- Invisible: a pact on the biggest creep in range first (heal + max HP, keeps him invisible).
+	if Fu.CanCastAbility(deathPactAbility) and not bot:HasModifier("modifier_clinkz_death_pact") then
+		local creep = GetMostHPCreepLevel(
+			bot:GetNearbyCreeps(deathPactAbility:GetCastRange(), true),
+			deathPactAbility:GetSpecialValueInt("creep_level")
+		)
+		if creep ~= nil and not creep:IsAncientCreep() then
+			X.LogHunt("pact", nil)
+			bot:Action_UseAbilityOnEntity(deathPactAbility, creep)
+			return true
+		end
+	end
+	if not isGoingOnSomeone or not Fu.IsValidHero(botTarget) or Fu.IsSuspiciousIllusion(botTarget) then
+		return false
+	end
+	-- Point blank before the first hit (the first attack or cast ends the invisibility).
+	if GetUnitToUnitDistance(bot, botTarget) > 175 then
+		X.LogHunt("approach", botTarget)
+		bot:Action_MoveToUnit(botTarget)
+		return true
+	end
+	local hex = X.ReadyItem("item_bloodthorn") or X.ReadyItem("item_orchid")
+	if hex ~= nil and Fu.CanCastOnNonMagicImmune(botTarget) then
+		X.LogHunt("reveal-" .. hex:GetName(), botTarget)
+		bot:Action_UseAbilityOnEntity(hex, botTarget)
+		return true
+	end
+	if strafeAbility:IsFullyCastable() then
+		X.LogHunt("reveal-strafe", botTarget)
+		bot:Action_UseAbility(strafeAbility)
+		return true
+	end
+	return false
 end
 function X.ConsiderStrafe()
 	if not strafeAbility:IsFullyCastable() then
@@ -234,6 +316,30 @@ function X.ConsiderDeathPact()
 	local castRange = deathPactAbility:GetCastRange()
 	local maxCreepLevel = deathPactAbility:GetSpecialValueInt("creep_level")
 	local nearbyCreeps = bot:GetNearbyCreeps(castRange, true)
+	-- Heal (#48, game 047 10:08: Clinkz walked home at half HP). Datafeed: Death Pact heals and adds max HP
+	-- (175/250/325/400 for 45s; the current HP stays when it ends), charges 1/1/2/2. Missing 80% of the gain or under
+	-- 60% HP, no enemy hero within 900: eat the biggest creep in range, in any mode, even with a pact up.
+	do
+		local gain = deathPactAbility:GetSpecialValueInt("health_gain")
+		local missing = bot:GetMaxHealth() - bot:GetHealth()
+		local enemiesNear = #(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {})
+		if (missing >= gain * 0.8 or Fu.GetHP(bot) < 0.6) and enemiesNear == 0 then
+			local creep = GetMostHPCreepLevel(nearbyCreeps, maxCreepLevel)
+			if creep ~= nil and not creep:IsAncientCreep() then
+				pcall(
+					print,
+					string.format(
+						"[OHA-CLINKZ] t=%.0f death-pact why=heal hp=%.2f gain=%d creep=%s",
+						DotaTime(),
+						Fu.GetHP(bot),
+						gain,
+						creep:GetUnitName()
+					)
+				)
+				return BOT_ACTION_DESIRE_HIGH, creep
+			end
+		end
+	end
 	if Fu.IsInLaningPhase() then
 		if Fu.IsLaning(bot) then
 			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -241,10 +347,8 @@ function X.ConsiderDeathPact()
 				if
 					Fu.IsValid(creep)
 					and Fu.CanBeAttacked(creep)
-					and (
-						Fu.IsKeyWordUnit("ranged", creep)
-						or Fu.IsKeyWordUnit("siege", creep) and creep:GetLevel() <= maxCreepLevel
-					)
+					and (Fu.IsKeyWordUnit("ranged", creep) or Fu.IsKeyWordUnit("siege", creep))
+					and creep:GetLevel() <= maxCreepLevel
 				then
 					local nearbyAllies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE)
 					if
@@ -455,7 +559,8 @@ function X.ConsiderBurningBarrage()
 			local enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), 1200)
 			if alliesNearTarget ~= nil and enemiesNearTarget ~= nil and #alliesNearTarget >= #enemiesNearTarget then
 				enemiesNearTarget = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), projectileWidth - 75)
-				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 1 then
+				-- Groups only (maintainer): a single target gets Strafe.
+				if enemiesNearTarget ~= nil and #enemiesNearTarget >= 2 then
 					return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(enemiesNearTarget)
 				else
 					return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(0.5)

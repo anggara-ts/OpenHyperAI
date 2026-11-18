@@ -996,6 +996,10 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 			local inLotus, etaL = MapObjectives.InMarkWindow(lInterval, arrive, 6)
 			local foes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
+			-- Game 044, 2:50: on a lotus contest Leshrac traded with Pudge from inside this mode (0.71, above
+			-- retreat) and died at Radiant's top tower: the danger exit only came at 37% HP. Hit by a hero with an
+			-- enemy hero near: the trip ends, and attack / retreat (kiting included) take the fight.
+			local fightNow = #foes >= 1 and bot:WasRecentlyDamagedByAnyHero(1.5)
 			local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
 			local lostBeside = false
@@ -1161,6 +1165,8 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				failWhy = "low-hp"
 			elseif danger and dist > 700 then
 				failWhy = "danger"
+			elseif fightNow then
+				failWhy = "fight"
 			elseif not beside then
 				failWhy = "not-best"
 			end
@@ -1171,6 +1177,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and dist <= maxWalk
 				and hp >= 0.28
 				and not (danger and dist > 700)
+				and not fightNow
 				and (
 					beside
 					or contester
@@ -1314,8 +1321,13 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		return true
 	end
 
+	-- Outnumbered on the way: walk back instead of standing still (it returned with no order, game 044 review).
 	if #enemies > 0 and #enemies > #allies and dist > gather then
 		MarkLotusDo(bot, "outnumbered")
+		local fountain = GetShopLocation(GetTeam(), SHOP_HOME)
+		if fountain ~= nil then
+			bot:Action_MoveToLocation(fountain)
+		end
 		return true
 	end
 	if #enemies > 0 and #enemies <= #allies and dist > gather then

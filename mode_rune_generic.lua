@@ -224,7 +224,29 @@ end
 local function HeroTag()
 	local name = string.gsub(bot:GetUnitName() or "?", "npc_dota_hero_", "")
 	local team = GetTeam() == TEAM_RADIANT and "r" or "d"
-	return name .. "/" .. team
+	-- Meepo clones get their own tag: can a clone pick up a rune? (discussion #50, "not confirmed yet")
+	return name .. "/" .. team .. (Fu.IsMeepoClone(bot) and "/clone" or "")
+end
+-- Did the pick-up order take the rune? 1.5s after the order the spot's status says (#50: Meepo clones and runes).
+-- One line per order: [OHA-RUNE] <hero>/<team>[/clone] pickup-result rune= taken=yes|no.
+local function CheckPickupResult()
+	local check = bot._pickupResult
+	if check == nil or DotaTime() < check.at + 1.5 then
+		return
+	end
+	bot._pickupResult = nil
+	local status = GetRuneStatus(check.id)
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] %s t=%.1f pickup-result rune=%s taken=%s status=%s",
+			HeroTag(),
+			DotaTime(),
+			tostring(check.id),
+			status == RUNE_STATUS_AVAILABLE and "no" or "yes",
+			tostring(status)
+		)
+	)
 end
 local function NearRune()
 	local bestId, bestDist = nil, math.huge
@@ -659,6 +681,7 @@ function RuneMode.MeepoBodyInFight()
 	return nil
 end
 function GetDesireRaw()
+	pcall(CheckPickupResult)
 	RuneMode.InitRune()
 	bot._mapObjKind = nil
 	bot._mapObjLoc = nil
@@ -1593,6 +1616,9 @@ function Think()
 			RuneMode.NoteBountyGrab(runeInfo.location)
 			RuneMode.NoteLaneRuneTake(runeInfo.location)
 			bot:Action_PickUpRune(runeInfo.location)
+			if bot._pickupResult == nil then
+				bot._pickupResult = { id = runeInfo.location, at = DotaTime() }
+			end
 			doing("pickup")
 			return
 		else

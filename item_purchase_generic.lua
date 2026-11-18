@@ -1812,7 +1812,9 @@ function ItemPurchaseThink()
 		and courierValue <= 100
 		and gold >= tpCost
 		and not HasEnoughTpScrolls()
-		and botName ~= "npc_dota_hero_meepo"
+		-- Meepo was skipped by name (inherited, no reason given), so he never rebought a TP (game 043, ~8:00, #8).
+		-- Only the clones are skipped now: the main Meepo buys it like every hero.
+		and not Fu.IsMeepoClone(bot)
 		and botName ~= "npc_dota_hero_lone_druid_bear"
 	then
 		local tpCharges = Item.GetItemCharges(bot, "item_tpscroll")
@@ -1824,6 +1826,9 @@ function ItemPurchaseThink()
 				bot:ActionImmediate_PurchaseItem("item_tpscroll")
 			end
 			bot:ActionImmediate_PurchaseItem("item_tpscroll")
+			if botName == "npc_dota_hero_meepo" then
+				pcall(print, string.format("[OHA-MEEPO] t=%.0f tp-buy charges=%d gold=%d", now, tpCharges, gold))
+			end
 		end
 	end
 	if now > 180 and now < 1800 and bot.switchTime < now - 5.6 then

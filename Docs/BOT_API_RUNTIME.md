@@ -11,6 +11,7 @@ confirmed or disproved.
 ## Key findings
 
 - **No vector-target order.** Abilities can only be cast with no target, on a unit, on a location or on a tree (plus the Push/Queue variants). A vector-targeted spell such as Muerta's Dead Shot cannot have its direction chosen.
+- **No alt-cast.** Cast orders have no alt flag. `ToggleAutoCast()` on an alt-castable ability flips the button's state (`GetAutoCastState()` reads it back), but bot casts ignore it: Puck's Illusory Orb and Grimstroke's Stroke of Fate still curved with it on (game 043). It works for real autocast abilities (Quill Spray, Frost Arrows). For those two, aiming at the full range keeps the path straight (`FuncLib/systems/straight_cast.lua`, #36). Discussion #50 item 2.
 - `GetCurrentCharges`, `GetInitialCharges` and `GetSecondaryCharges` exist on abilities as well as items. On the Ward Dispenser the first is observers and the second sentries (game 032). Whether they return charges for charge-based abilities (Mirana's Leap, Techies' mines, ...) has not been tested; `FuncLib/systems/charge_tracker.lua` still tracks those itself.
 - `GetToggleState`, `IsInAbilityPhase`, `GetDamageType`, `GetTargetType/Team/Flags` are available on abilities.
 - Item management beyond buy/sell: `ActionImmediate_DisassembleItem`, `ActionImmediate_SetItemCombineLock`, `ActionImmediate_SwapItems`.

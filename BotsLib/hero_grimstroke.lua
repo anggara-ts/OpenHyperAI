@@ -1,4 +1,5 @@
--- [OHA-GRIM] logs off: the behaviour they traced works (game 029).
+-- [OHA-GRIM] logs off: the behaviour they traced works (game 029). The straight-cast line (#36) still prints.
+local logLine = print
 local print = function() end
 -- Grimstroke: skill build, item build, and ability use for this hero.
 local X = {}
@@ -6,6 +7,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local StraightCast = require(GetScriptDirectory() .. "/FuncLib/systems/straight_cast")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -119,48 +121,6 @@ local botTarget
 local isEngaging
 local isRetreating
 local isAttacking
--- Stroke of Fate on alt-cast goes straight (7.41), easier to aim than the curve. The bot API
--- has no alt-cast call; the autocast switch is the closest, so it is turned on once Stroke is
--- learned and the state is logged before and after, to confirm in game that the path is straight.
--- Checked every 5s: if the switch is found off again (e.g. reset by a death), it is logged with
--- the gap since the last check (a long gap means he was dead) and turned back on.
-local function StrokeStraight()
-	if not strokeOfFateAbility:IsTrained() then
-		return
-	end
-	local now = DotaTime()
-	if bot._strokeAltCheckAt ~= nil and now - bot._strokeAltCheckAt < 5 then
-		return
-	end
-	local gap = bot._strokeAltCheckAt ~= nil and now - bot._strokeAltCheckAt or 0
-	local first = bot._strokeAltCheckAt == nil
-	bot._strokeAltCheckAt = now
-	local okB, before = pcall(function()
-		return strokeOfFateAbility:GetAutoCastState()
-	end)
-	if not okB or before ~= false then
-		if first then
-			pcall(print, string.format("[OHA-GRIM] t=%.0f stroke-altcast already=%s", now, tostring(okB and before)))
-		end
-		return
-	end
-	pcall(function()
-		strokeOfFateAbility:ToggleAutoCast()
-	end)
-	local okA, after = pcall(function()
-		return strokeOfFateAbility:GetAutoCastState()
-	end)
-	pcall(
-		print,
-		string.format(
-			"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
-			now,
-			first and "set" or "reset-found",
-			gap,
-			tostring(okA and after)
-		)
-	)
-end
 -- Stroke of Fate on creeps keeps mana for Ink Swell + Phantom's Embrace (+ Soulbind when it is
 -- up within 20s), and at least 25% of the pool. It was spammed on waves down to low mana.
 function X.StrokeOnCreepsOk()
@@ -178,7 +138,6 @@ function X.StrokeOnCreepsOk()
 	return left >= reserve and Fu.GetManaAfter(strokeOfFateAbility:GetManaCost()) >= 0.25
 end
 function X.SkillsComplement()
-	pcall(StrokeStraight)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -221,44 +180,23 @@ function X.SkillsComplement()
 	end
 	strokeOfFateDesire, strokeOfFateLocation = X.ConsiderStrokeOfFate()
 	if strokeOfFateDesire > 0 then
-		-- EXPERIMENT: Stroke of Fate is ALT_CASTABLE (game files): the plain cast curves from where
-		-- Grimstroke faces, the alt-cast goes straight. The bot API has no alt-cast order; try
-		-- whether the alt state is the autocast toggle. Toggled once; every cast logs the state.
-		if not bot._grimAltTried then
-			bot._grimAltTried = true
-			local okB, before = pcall(function()
-				return strokeOfFateAbility:GetAutoCastState()
-			end)
-			local okT = pcall(function()
-				strokeOfFateAbility:ToggleAutoCast()
-			end)
-			local okA, after = pcall(function()
-				return strokeOfFateAbility:GetAutoCastState()
-			end)
+		-- Stroke of Fate curves when aimed short of its range (game files: vector_strength 0.6, AbilityCastRange
+		-- 1400); bots can't alt-cast (#36). Aim at the full range in the same direction so it goes straight.
+		local castPoint =
+			StraightCast.Point(bot, strokeOfFateLocation, StraightCast.Range(strokeOfFateAbility, nil, 1400))
+		if DotaTime() >= (bot._strokeCastLogAt or -999) then
+			bot._strokeCastLogAt = DotaTime() + 5
 			pcall(
-				print,
+				logLine,
 				string.format(
-					"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
+					"[OHA-GRIM] t=%.0f stroke cast point=max aim=%d cast=%d",
 					DotaTime(),
-					tostring(okT),
-					okB and tostring(before) or "error",
-					okA and tostring(after) or "error"
+					GetUnitToLocationDistance(bot, strokeOfFateLocation),
+					GetUnitToLocationDistance(bot, castPoint)
 				)
 			)
 		end
-		local okS, state = pcall(function()
-			return strokeOfFateAbility:GetAutoCastState()
-		end)
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
-				DotaTime(),
-				okS and tostring(state) or "error",
-				math.floor(GetUnitToLocationDistance(bot, strokeOfFateLocation))
-			)
-		)
-		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, strokeOfFateLocation)
+		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, castPoint)
 		return
 	end
 	darkPortraitDesire, darkPortraitTarget = X.ConsiderDarkPortrait()

@@ -2,7 +2,7 @@
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
-local AltCast = require(GetScriptDirectory() .. "/FuncLib/systems/alt_cast")
+local StraightCast = require(GetScriptDirectory() .. "/FuncLib/systems/straight_cast")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
@@ -93,10 +93,12 @@ local isGoingOnSomeone
 local isRetreating
 local isAttacking
 local mpRatio
+-- Illusory Orb curves when aimed short of its maximum distance (game files: curve_orb, max_distance 1950). Aim at
+-- the full distance in the same direction so it flies straight (#36, StraightCast).
+function X.OrbStraightPoint(aim)
+	return StraightCast.Point(bot, aim, StraightCast.Range(illusoryOrbAbility, "max_distance", 1950))
+end
 function X.SkillsComplement()
-	-- Illusory Orb curves on a normal cast and flies straight on alt-cast (#36). Try the autocast switch as the alt
-	-- state (as Grimstroke does) and log it at each cast, to confirm in a game that the orb then flies straight.
-	AltCast.Ensure(bot, illusoryOrbAbility, true)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -108,7 +110,7 @@ function X.SkillsComplement()
 	phaseOrbDesire, phaseOrbLocation, phaseDuration = X.ConsiderPhaseOrb()
 	if phaseOrbDesire > 0 then
 		bot:Action_ClearActions(false)
-		bot:ActionQueue_UseAbilityOnLocation(illusoryOrbAbility, phaseOrbLocation)
+		bot:ActionQueue_UseAbilityOnLocation(illusoryOrbAbility, X.OrbStraightPoint(phaseOrbLocation))
 		bot:ActionQueue_Delay(0.1)
 		bot:ActionQueue_UseAbility(phaseShiftAbility)
 		bot:ActionQueue_Delay(phaseDuration - 0.3)
@@ -117,16 +119,17 @@ function X.SkillsComplement()
 	end
 	illusoryOrbDesire, illusoryOrbLocation = X.ConsiderIllusoryOrb()
 	if illusoryOrbDesire > 0 then
-		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, illusoryOrbLocation)
+		local castPoint = X.OrbStraightPoint(illusoryOrbLocation)
+		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, castPoint)
 		if DotaTime() >= (bot._orbCastLogAt or -999) then
 			bot._orbCastLogAt = DotaTime() + 5
 			pcall(
 				print,
 				string.format(
-					"[OHA-PUCK] t=%.0f orb cast alt=%s dist=%d",
+					"[OHA-PUCK] t=%.0f orb cast point=max aim=%d cast=%d",
 					DotaTime(),
-					tostring(AltCast.State(illusoryOrbAbility)),
-					GetUnitToLocationDistance(bot, illusoryOrbLocation)
+					GetUnitToLocationDistance(bot, illusoryOrbLocation),
+					GetUnitToLocationDistance(bot, castPoint)
 				)
 			)
 		end

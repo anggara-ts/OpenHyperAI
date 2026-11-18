@@ -187,6 +187,10 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(whoopeeCushionAbility)
 		return
 	end
+	local okC, comboActed = pcall(X.WheelTameCombo)
+	if okC and comboActed then
+		return
+	end
 	wheelOfWonderDesire, wheelOfWonderLocation = X.ConsiderWheelOfWonder()
 	if wheelOfWonderDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
@@ -335,6 +339,64 @@ function X.ConsiderCrystalBall()
 		end
 	end
 	return nil
+end
+-- Wheel then Tame (#49, maintainer's idea). Datafeed: Tame the Beasts makes whipped enemies "flee in fear from
+-- Ringmaster" (up to 1.2s with a full 1s channel, cast range 700); the Wheel of Wonder rolls to a point (cast range
+-- 1400, min range 700, speed 1200) and mesmerizes heroes who face it for 0.5s. The fear is shorter than the roll, so
+-- the Wheel goes first, beyond the group on the line from Ringmaster, then the whip drives them into it.
+function X.WheelTameCombo()
+	local now = DotaTime()
+	local combo = bot._wheelTame
+	-- Step 2: the Wheel is out; whip the group (full channel) within 1.5s.
+	if combo ~= nil then
+		if now - combo.at > 1.5 then
+			bot._wheelTame = nil
+		elseif Fu.CanCastAbility(tameTheBeastsAbility) then
+			local enemies = Fu.GetEnemiesNearLoc(combo.center, 650)
+			if #enemies >= 1 and GetUnitToLocationDistance(bot, combo.center) <= 750 then
+				bot._wheelTame = nil
+				pcall(print, string.format("[OHA-RINGMASTER] t=%.0f wheel-tame step=tame enemies=%d", now, #enemies))
+				bot:Action_UseAbilityOnLocation(tameTheBeastsAbility, Fu.GetCenterOfUnits(enemies))
+				whipCastTime = now
+				return true
+			end
+		end
+		return false
+	end
+	-- Step 1: a group of 2+ enemy heroes close together, both spells ready, mana for both.
+	if not isEngaging or not Fu.CanCastAbility(wheelOfWonderAbility) or not Fu.CanCastAbility(tameTheBeastsAbility) then
+		return false
+	end
+	if bot:GetMana() < wheelOfWonderAbility:GetManaCost() + tameTheBeastsAbility:GetManaCost() then
+		return false
+	end
+	local enemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
+	if #enemies < 2 then
+		return false
+	end
+	local center = Fu.GetCenterOfUnits(enemies)
+	if #Fu.GetEnemiesNearLoc(center, 600) < 2 then
+		return false
+	end
+	local dist = GetUnitToLocationDistance(bot, center)
+	if dist > 700 then
+		return false
+	end
+	local wheelDist = math.max(700, math.min(1400, dist + 400))
+	local wheelPoint = Fu.VectorTowards(bot:GetLocation(), center, wheelDist)
+	bot._wheelTame = { at = now, center = center }
+	pcall(
+		print,
+		string.format(
+			"[OHA-RINGMASTER] t=%.0f wheel-tame step=wheel enemies=%d wheel-dist=%d group-dist=%d",
+			now,
+			#enemies,
+			wheelDist,
+			dist
+		)
+	)
+	bot:Action_UseAbilityOnLocation(wheelOfWonderAbility, wheelPoint)
+	return true
 end
 function X.ConsiderTameTheBeasts()
 	if not Fu.CanCastAbility(tameTheBeastsAbility) then

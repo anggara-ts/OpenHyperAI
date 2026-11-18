@@ -42,10 +42,38 @@ end
 local function IsHumanSupportOnTeam()
 	return Fu.IsPosxHuman(4) or Fu.IsPosxHuman(5)
 end
+-- Diagnostic (#71, game 047: enemy heroes kept walking behind our tower in the laning phase): when this bot is inside
+-- an enemy tower's range in the laning phase, say which mode took it there. At most every 10s.
+local function LogInEnemyTower()
+	if not Fu.IsInLaningPhase() or DotaTime() < (bot._inEnemyTowerLogAt or -999) or not bot:IsAlive() then
+		return
+	end
+	for _, tower in pairs(bot:GetNearbyTowers(1000, true) or {}) do
+		if Fu.IsValidBuilding(tower) and GetUnitToUnitDistance(bot, tower) <= (tower:GetAttackRange() or 700) + 100 then
+			bot._inEnemyTowerLogAt = DotaTime() + 10
+			local target = bot:GetAttackTarget()
+			pcall(
+				print,
+				string.format(
+					"[OHA-LANE] t=%.0f %s in-enemy-tower mode=%d desire=%.2f towerOnMe=%s target=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					bot:GetActiveMode(),
+					bot:GetActiveModeDesire(),
+					tostring(tower:GetAttackTarget() == bot),
+					target ~= nil and not target:IsNull() and target:GetUnitName() or "-",
+					Fu.GetHP(bot)
+				)
+			)
+			return
+		end
+	end
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
+	pcall(LogInEnemyTower)
 	return GetDesireRaw()
 end
 function GetDesireRaw()
@@ -789,6 +817,46 @@ do
 				else
 					bot:Action_AttackUnit(reset.target, true)
 					return
+				end
+			end
+		end
+		-- Tower punish (#71, maintainer game 047: enemy heroes walked behind our tower and nobody hit them). An enemy hero
+		-- inside our tower's range is a free target above 40% HP: the tower hits him and takes the creep aggro.
+		do
+			local ourTower = GetLaneT1(GetTeam(), botLane)
+			for _, tower in pairs(bot:GetNearbyTowers(1200, false) or {}) do
+				if Fu.IsValidBuilding(tower) then
+					ourTower = tower
+					break
+				end
+			end
+			if Fu.IsValidBuilding(ourTower) and ourTower:IsAlive() and Fu.GetHP(bot) > 0.4 then
+				local reach = (ourTower:GetAttackRange() or 700) - 50
+				for _, enemyHero in pairs(nearbyEnemies) do
+					if
+						Fu.IsValidHero(enemyHero)
+						and not Fu.IsSuspiciousIllusion(enemyHero)
+						and Fu.CanBeAttacked(enemyHero)
+						and GetUnitToUnitDistance(enemyHero, ourTower) <= reach
+						and GetUnitToUnitDistance(bot, enemyHero) <= attackRange + 400
+					then
+						if DotaTime() >= (bot._towerPunishLogAt or -999) then
+							bot._towerPunishLogAt = DotaTime() + 5
+							pcall(
+								print,
+								string.format(
+									"[OHA-LANE] t=%.0f %s tower-punish target=%s towerOn=%s hp=%.2f",
+									DotaTime(),
+									(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+									(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+									tostring(ourTower:GetAttackTarget() == enemyHero),
+									Fu.GetHP(bot)
+								)
+							)
+						end
+						bot:Action_AttackUnit(enemyHero, true)
+						return
+					end
 				end
 			end
 		end

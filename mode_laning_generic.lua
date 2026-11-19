@@ -69,11 +69,71 @@ local function LogInEnemyTower()
 		end
 	end
 end
+-- Creep score (#71, maintainer game 050: "check all heroes' creep stats"). Last hits and denies every minute
+-- until 15:00, then every 5 minutes. (Finished games also have the engine's end-of-match numbers.)
+local function LogCreepScore()
+	local now = DotaTime()
+	if now < 0 or now < (bot._csLogAt or -999) or bot:IsIllusion() then
+		return
+	end
+	bot._csLogAt = now + (now < 900 and 60 or 300)
+	pcall(
+		print,
+		string.format(
+			"[OHA-CS] t=%.0f %s lh=%d dn=%d lvl=%d nw=%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			bot:GetLastHits(),
+			bot:GetDenies(),
+			bot:GetLevel(),
+			bot:GetNetWorth()
+		)
+	)
+end
+-- Last-hit attempts in the laning phase (#71, maintainer game 050 6:30: Weaver's hits look late; she missed 42
+-- last hits, Kez 11). GetBestLastHitCreep notes the creep it picked, its HP and when it expects the hit to land;
+-- when that creep dies, say whether the bot's last-hit count went up and how long it really took.
+local function TrackLastHitAttempt()
+	local attempt = bot._lhAttempt
+	if attempt == nil then
+		return
+	end
+	local now = DotaTime()
+	local creep = attempt.creep
+	local dead = creep == nil or creep:IsNull() or not creep:IsAlive()
+	if not dead then
+		if now - attempt.at > 4 then
+			bot._lhAttempt = nil
+		end
+		return
+	end
+	-- The counter can update a moment after the death.
+	attempt.deadAt = attempt.deadAt or now
+	if now - attempt.deadAt < 0.3 then
+		return
+	end
+	bot._lhAttempt = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-LH] t=%.0f %s %s creep-hp=%d dmg=%d expect=%.2f took=%.2f",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			bot:GetLastHits() > attempt.lastHits and "got" or "missed",
+			attempt.hp,
+			attempt.damage,
+			attempt.delay,
+			attempt.deadAt - attempt.at
+		)
+	)
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
 	pcall(LogInEnemyTower)
+	pcall(LogCreepScore)
+	pcall(TrackLastHitAttempt)
 	return GetDesireRaw()
 end
 function GetDesireRaw()
@@ -243,6 +303,7 @@ function GetBestLastHitCreep(creeps)
 	local damage = attackDamage - 3
 	local bestCreep = nil
 	local bestValue = 0
+	local bestDelay = 0
 	for _, creep in pairs(creeps) do
 		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
@@ -281,9 +342,20 @@ function GetBestLastHitCreep(creeps)
 				if value > bestValue then
 					bestValue = value
 					bestCreep = creep
+					bestDelay = attackDelay
 				end
 			end
 		end
+	end
+	if bestCreep ~= nil and Fu.IsInLaningPhase() and (bot._lhAttempt == nil or bot._lhAttempt.creep ~= bestCreep) then
+		bot._lhAttempt = {
+			creep = bestCreep,
+			at = DotaTime(),
+			hp = bestCreep:GetHealth(),
+			damage = damage,
+			delay = bestDelay,
+			lastHits = bot:GetLastHits(),
+		}
 	end
 	return bestCreep
 end

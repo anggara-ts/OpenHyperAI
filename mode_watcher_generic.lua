@@ -48,7 +48,8 @@ local function Key(lantern)
 end
 
 local function Lanterns()
-	if DotaTime() - lanterns.at < 5 and #lanterns.units > 0 then
+	-- Rescan every 5s; every 15s while the unit list holds no watcher at all.
+	if DotaTime() - lanterns.at < (#lanterns.units > 0 and 5 or 15) then
 		return lanterns.units
 	end
 	local found = {}
@@ -77,8 +78,13 @@ local lampSlot = nil
 local function LampAbility()
 	local lamp = bot:GetAbilityByName("ability_lamp_use")
 	local how = "name"
+	if (lamp == nil or lamp:IsNull()) and lampSlot == nil and DotaTime() < (bot._lampScanAt or -999) then
+		return nil
+	end
 	if lamp == nil or lamp:IsNull() then
 		lamp = nil
+		-- A full slot scan at most every 10s while nothing is found (64 slots, every bot).
+		bot._lampScanAt = DotaTime() + 10
 		for slot = lampSlot or 0, lampSlot or 63 do
 			local ability = bot:GetAbilityInSlot(slot)
 			if ability ~= nil and not ability:IsNull() and ability:GetName() == "ability_lamp_use" then

@@ -106,9 +106,13 @@ function X.TrackPhaseShift()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase-probe after=%.1f cd=%.1f invuln=%s damaged=%s channelling=%s active=%s mods=%s",
+				"[OHA-PUCK] t=%.0f phase-probe after=%.1f moved=%d action=%s cd=%.1f invuln=%s damaged=%s channelling=%s active=%s mods=%s",
 				DotaTime(),
 				since,
+				-- Distance from where she ordered the shift and what she is doing now: a move or another order
+				-- inside the shift means something broke the channel.
+				bot._phaseOrderLoc ~= nil and GetUnitToLocationDistance(bot, bot._phaseOrderLoc) or -1,
+				tostring(bot:GetCurrentActionType()),
 				phaseShiftAbility:GetCooldownTimeRemaining(),
 				tostring(bot:IsInvulnerable()),
 				tostring(X.HurtSincePhaseOrder()),
@@ -302,6 +306,7 @@ function X.SkillsComplement()
 		)
 		bot._phaseProbeAt = DotaTime() + 0.3
 		bot._phaseOrderAt = DotaTime()
+		bot._phaseOrderLoc = bot:GetLocation()
 		-- Item orders and every wrapped mode Think wait too (OhaCastGuard, ItemUsageThink).
 		bot._castHoldUntil = DotaTime() + phaseShiftAbility:GetSpecialValueFloat("duration") + 0.05
 		bot:Action_UseAbility(phaseShiftAbility)

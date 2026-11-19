@@ -173,7 +173,7 @@ local function RememberWard(kind)
 	end
 end
 local function DumpWards()
-	if dumped or GetGameState() ~= DOTA_GAMERULES_STATE_POST_GAME then
+	if dumped or GetGameState() ~= GAME_STATE_POST_GAME then
 		return
 	end
 	dumped = true

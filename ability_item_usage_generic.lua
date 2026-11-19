@@ -3920,7 +3920,7 @@ Usage.ConsiderItemDesire["item_phase_boots"] = function(item)
 	if
 		actionType == BOT_ACTION_TYPE_MOVE_TO
 		or actionType == BOT_ACTION_TYPE_MOVE_TO_DIRECTLY
-		or actionType == BOT_ACTION_TYPE_ATTACK_MOVE
+		or actionType == BOT_ACTION_TYPE_ATTACKMOVE
 		or Fu.IsRunning(bot)
 	then
 		return BOT_ACTION_DESIRE_HIGH, bot, castType, "phase: moving"
@@ -6208,7 +6208,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and not Fu.IsSuspiciousIllusion(botTarget)
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
@@ -6219,7 +6219,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and #nEnemyHeroes == 0
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
@@ -6229,7 +6229,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and #nEnemyHeroes == 0
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -6237,7 +6237,7 @@ end
 Usage.ConsiderItemDesire["item_idol_of_screeauk"] = function(item)
 	if Fu.IsGoingOnSomeone(bot) then
 		if bot:WasRecentlyDamagedByAnyHero(2.0) and Fu.IsRunning(bot) then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -6262,7 +6262,7 @@ Usage.ConsiderItemDesire["item_jidi_pollen_bag"] = function(item)
 				end
 			end
 			if validEnemyCount >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+				return BOT_ACTION_DESIRE_HIGH, nil, "none"
 			end
 		end
 	end
@@ -6277,7 +6277,7 @@ Usage.ConsiderItemDesire["item_jidi_pollen_bag"] = function(item)
 			and not botTarget:HasModifier("modifier_ice_blast")
 			and not botTarget:HasModifier("modifier_item_spirit_vessel_damage")
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -7008,7 +7008,7 @@ local function SmokeDesireRaw(item)
 		-- Game 044, 15:08: Puck smoked a team roam right in front of Radiant's bottom T1 while flipping between team
 		-- roam and pushing that tower (16 mode changes); walking on to the tower breaks the Smoke. Like push-group:
 		-- not within 2500 of an enemy tower, and not while an ally near is in a push mode.
-		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM
+		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_TEAM_ROAM
 		local roamSkip = nil
 		if roamMode then
 			for _, towerId in ipairs({

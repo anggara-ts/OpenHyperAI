@@ -292,7 +292,9 @@ function X.HuntStep()
 	local step = nil
 	if hex ~= nil and Fu.CanCastOnNonMagicImmune(target) then
 		step = "reveal-" .. hex:GetName()
+		-- The item ends the invisibility, so HuntStep stops next think: queue the first hit now.
 		bot:Action_UseAbilityOnEntity(hex, target)
+		bot:ActionQueue_AttackUnit(target, true)
 	elseif strafeAbility:IsFullyCastable() then
 		step = "reveal-strafe"
 		bot._strafeAt = DotaTime()

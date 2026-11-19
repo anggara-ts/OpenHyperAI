@@ -4908,7 +4908,8 @@ Usage.ConsiderItemDesire["item_tango_single"] = function(item)
 				castReason = "近处的树"
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
-			if missingHealth > tangoHealAmount * 0.38 and bot:WasRecentlyDamagedByAnyHero(2.0) then
+			-- 0.7 of the real heal (112): about the 76 HP this rule used with the old, wrong 200.
+			if missingHealth > tangoHealAmount * 0.7 and bot:WasRecentlyDamagedByAnyHero(2.0) then
 				hEffectTarget = closeTrees[1]
 				castReason = "提前吃树"
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason

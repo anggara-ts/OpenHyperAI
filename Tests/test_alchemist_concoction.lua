@@ -132,7 +132,7 @@ T.test("alchemist: a kill throw goes out as soon as the brew's damage kills, and
 	state.brewing = false
 	Stub.time = 104.9
 	X.SkillsComplement()
-	T.ok(printedLine("concoction end outcome=thrown brewed=4.9s seen=4.7s start=kill"), "end line: thrown")
+	T.ok(printedLine("concoction brew%-end outcome=thrown brewed=4.9s seen=4.7s rule=kill"), "end line: thrown")
 	T.ok(printedLine("lastThrow=kill@4.7"), "end line names the last throw order")
 end)
 
@@ -149,7 +149,10 @@ T.test("alchemist: a brew held to the deadline with nobody in range reads self-e
 	state.brewing = false
 	Stub.time = 205.53
 	X.SkillsComplement()
-	T.ok(printedLine("concoction end outcome=self%-explode brewed=5.5s seen=5.5s start=kill"), "end line: self-explode")
+	T.ok(
+		printedLine("concoction brew%-end outcome=self%-explode brewed=5.5s seen=5.5s rule=kill"),
+		"end line: self-explode"
+	)
 end)
 
 T.test("alchemist: the last target leaving the range gets the throw early", function()

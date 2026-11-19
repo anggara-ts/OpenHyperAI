@@ -211,7 +211,7 @@ local function AbilityGateReason()
 end
 -- Runs every think, above the ability gate: the explosion on himself stuns him, so code below the gate never
 -- sees a brew end. Returns whether he is brewing and the seconds brewed. When a brew ends it prints one line:
---   [OHA-ALCHEMIST] concoction end outcome=thrown|self-explode|died|unknown ...
+--   [OHA-ALCHEMIST] concoction brew-end outcome=thrown|self-explode|died|unknown ...
 -- self-explode: still brewing at the deadline. thrown: it ended earlier, between two thinks. unknown: this
 -- function was not run around the end (the usage file returned before the hero script), so it cannot tell.
 function X.TrackConcoctionBrew()
@@ -244,7 +244,7 @@ function X.TrackConcoctionBrew()
 			local nearest, nearestDist = NearestThrowTargets(1600)
 			print(
 				string.format(
-					"[OHA-ALCHEMIST] t=%.0f concoction end outcome=%s brewed=%.1fs seen=%.1fs start=%s target=%s"
+					"[OHA-ALCHEMIST] t=%.0f concoction brew-end outcome=%s brewed=%.1fs seen=%.1fs rule=%s target=%s"
 						.. " lastThrow=%s@%.1f gate=%s@%.1f nearest=%s nearestDist=%.0f mode=%s stunned=%s",
 					DotaTime(),
 					outcome,
@@ -637,7 +637,7 @@ function X.ConsiderUnstableConcoction()
 					pcall(function()
 						print(
 							string.format(
-								"[OHA-ALCHEMIST] t=%.0f concoction start-skip why=retreat chaser=%s dist=%.0f onHim=%s gapAt2s=%.0f",
+								"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=retreat chaser=%s dist=%.0f onHim=%s gapAt2s=%.0f",
 								DotaTime(),
 								UnitNameOrNone(chaser),
 								chaserDist,

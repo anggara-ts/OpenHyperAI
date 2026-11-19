@@ -2599,7 +2599,24 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 		end
 		-- At full HP and mana only when an item waits in the stash or on the courier (game 048 42:00: Puck ate
 		-- the lotus she had just taken at full HP and mana).
-		if hp >= 0.9 and mp >= 0.85 and (bot:GetStashValue() > 0 or bot:GetCourierValue() > 0) then
+		local waiting = bot:GetStashValue() > 0 or bot:GetCourierValue() > 0
+		local freeNow = hp >= 0.9 and mp >= 0.85 and waiting or hp < 0.8 or mp < 0.7
+		if freeNow and DotaTime() >= (bot._lotusFreeLogAt or -999) then
+			bot._lotusFreeLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-LOTUS] t=%.0f %s use why=free-slot item=%s hp=%.2f mp=%.2f waiting=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					label,
+					hp,
+					mp,
+					tostring(waiting)
+				)
+			)
+		end
+		if hp >= 0.9 and mp >= 0.85 and waiting then
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, "Free slot (" .. label .. ", full)"
 		end
 		-- Still packed and missing some HP or mana: use it, then the slot opens.

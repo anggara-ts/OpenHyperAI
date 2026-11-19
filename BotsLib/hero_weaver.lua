@@ -73,23 +73,97 @@ function X.LogWeaver(reason, format, ...)
 	bot._weaverLogAt[reason] = DotaTime() + 5
 	pcall(print, string.format("[OHA-WEAVER] t=%.0f " .. reason .. " " .. format, DotaTime(), ...))
 end
--- HP fraction about 5s ago (what Time Lapse gives back), sampled every 0.5s.
-function X.HpFiveSecondsAgo()
+-- HP fractions over the last 6s, sampled every 0.5s, for Weaver and every allied hero within 1200 (Time Lapse
+-- gives back the HP of 5s ago; the ally version needs the ally's history).
+function X.TrackHp()
 	local now = DotaTime()
-	bot._weaverHp = bot._weaverHp or {}
-	local history = bot._weaverHp
-	if #history == 0 or now - history[#history][1] >= 0.5 then
-		table.insert(history, { now, Fu.GetHP(bot) })
+	bot._lapseHp = bot._lapseHp or {}
+	if now - (bot._lapseHpAt or -99) < 0.5 then
+		return
+	end
+	bot._lapseHpAt = now
+	local units = { bot }
+	for _, allyHero in pairs(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(allyHero) and allyHero ~= bot and not allyHero:IsIllusion() then
+			units[#units + 1] = allyHero
+		end
+	end
+	for _, unit in ipairs(units) do
+		local playerId = unit:GetPlayerID()
+		local history = bot._lapseHp[playerId] or {}
+		bot._lapseHp[playerId] = history
+		history[#history + 1] = { now, Fu.GetHP(unit) }
 		while #history > 0 and now - history[1][1] > 6 do
 			table.remove(history, 1)
 		end
 	end
-	for _, sample in ipairs(history) do
+end
+-- HP fraction about 5s ago; the current HP when there is no history yet.
+function X.HpFiveSecondsAgo(unit)
+	unit = unit or bot
+	local history = bot._lapseHp and bot._lapseHp[unit:GetPlayerID()] or nil
+	local now = DotaTime()
+	for _, sample in ipairs(history or {}) do
 		if now - sample[1] <= 5.2 then
 			return sample[2]
 		end
 	end
-	return Fu.GetHP(bot)
+	return Fu.GetHP(unit)
+end
+-- Time Lapse on burst (#103, maintainer's rule, game 050 38:50: Ringmaster went 61% -> 9% in 3.5s beside her and the
+-- ally rule, which wanted a retreating core and Weaver above 75%, could not pick him). Burst = 30%+ of max HP lost
+-- in the last 5s, now under 40%, hit by a hero in the last 1.5s (or under 20% after losing 15%+). Any mode, any
+-- role; never a channelling hero (the rewind would cut the channel). Self and allies are judged alike; with
+-- several, cores first by position (1, 2, 3, then 4, 5), then the bigger loss. Game files: the ally version
+-- (weaver_time_lapse_ally) comes with Aghanim's Scepter, 500 cast range, and shares the cooldown.
+function X.LapseCandidate(unit)
+	if not Fu.IsValidHero(unit) or unit:IsIllusion() or unit:IsChanneling() then
+		return nil
+	end
+	local hpNow = Fu.GetHP(unit)
+	local lost = X.HpFiveSecondsAgo(unit) - hpNow
+	if
+		unit:WasRecentlyDamagedByAnyHero(1.5)
+		and (hpNow < 0.4 and lost >= 0.3 or hpNow < 0.2 and lost >= 0.15)
+		and not unit:HasModifier("modifier_necrolyte_reapers_scythe")
+	then
+		return { unit = unit, hp = hpNow, lost = lost, pos = Fu.GetPosition(unit) or 5 }
+	end
+	return nil
+end
+function X.ConsiderTimeLapse()
+	local candidates = {}
+	if timeLapseAbility:IsFullyCastable() then
+		candidates[#candidates + 1] = X.LapseCandidate(bot)
+	end
+	if bot:HasScepter() and timeLapseAllyAbility:IsFullyCastable() then
+		local castRange = timeLapseAllyAbility:GetCastRange()
+		for _, allyHero in pairs(bot:GetNearbyHeroes(math.max(castRange, 500), false, BOT_MODE_NONE) or {}) do
+			if allyHero ~= bot then
+				candidates[#candidates + 1] = X.LapseCandidate(allyHero)
+			end
+		end
+	end
+	if #candidates == 0 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	table.sort(candidates, function(lhs, rhs)
+		if lhs.pos ~= rhs.pos then
+			return lhs.pos < rhs.pos
+		end
+		return lhs.lost > rhs.lost
+	end)
+	local pick = candidates[1]
+	X.LogWeaver(
+		"lapse",
+		"target=%s pos=%d hp=%.2f hp5=%.2f candidates=%d",
+		pick.unit == bot and "self" or (string.gsub(pick.unit:GetUnitName(), "npc_dota_hero_", "")),
+		pick.pos,
+		pick.hp,
+		pick.hp + pick.lost,
+		#candidates
+	)
+	return BOT_ACTION_DESIRE_HIGH, pick.unit == bot and "self" or pick.unit
 end
 local theSwarmDesire, theSwarmLocation
 local shukuchiDesire
@@ -107,7 +181,7 @@ local hpRatio
 local mpRatio
 function X.SkillsComplement()
 	-- Sample HP before the early return so the 5s history has no gaps while stunned.
-	local hpFiveSecondsAgo = X.HpFiveSecondsAgo()
+	pcall(X.TrackHp)
 	if
 		geminateAttackAbility ~= nil
 		and not geminateAttackAbility:IsNull()
@@ -128,19 +202,6 @@ function X.SkillsComplement()
 	-- Grace of 0.5s after the cast so the flag is not cleared before the buff shows up.
 	if not bot:HasModifier("modifier_weaver_shukuchi") and DotaTime() - (bot.ShukuchiKillAt or -99) > 0.5 then
 		bot.tryShukuchiKill = false
-	end
-	-- Time Lapse in a fight: it was only considered in retreat mode, so a Weaver burst down while
-	-- attacking (mode not yet retreat) died with it ready. Cast when HP fell hard in the last 5s.
-	if
-		timeLapseAbility:IsFullyCastable()
-		and not isRetreating
-		and hpRatio < 0.3
-		and hpFiveSecondsAgo - hpRatio >= 0.25
-		and bot:WasRecentlyDamagedByAnyHero(1.5)
-	then
-		X.LogWeaver("lapse-fight", "hp=%.2f hp5=%.2f", hpRatio, hpFiveSecondsAgo)
-		bot:Action_UseAbility(timeLapseAbility)
-		return
 	end
 	local timeLapseTarget
 	timeLapseDesire, timeLapseTarget = X.ConsiderTimeLapse()
@@ -321,10 +382,14 @@ function X.ConsiderShukuchi()
 	local shukuchiSpeed = 550
 	local roshanLocation = Fu.GetCurrentRoshanLocation()
 	local tormentorLocation = Fu.GetTormentorLocation(GetTeam())
+	-- A kill or chase Shukuchi keeps the mana for one more, the escape (game 050, 17:11-17:15: two chase casts
+	-- from 21% mana left none when three heroes turned on her). Game files: 65 mana, cooldown 15/12/9/6s.
+	local keepsEscape = bot:GetMana() >= 2 * shukuchiAbility:GetManaCost()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
-			Fu.IsValidHero(enemyHero)
+			keepsEscape
+			and Fu.IsValidHero(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
 			and Fu.CanKillTarget(enemyHero, shukuchiDamage, DAMAGE_TYPE_MAGICAL)
 			and enemyHero:DistanceFromFountain() > 600
@@ -356,7 +421,8 @@ function X.ConsiderShukuchi()
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		if
-			Fu.IsValidTarget(botTarget)
+			keepsEscape
+			and Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnMagicImmune(botTarget)
 			and not Fu.IsInRange(bot, botTarget, attackRange + 300)
 			and not botTarget:HasModifier("modifier_enigma_black_hole_pull")
@@ -423,66 +489,5 @@ function X.ConsiderShukuchi()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-function X.ConsiderTimeLapse()
-	if not timeLapseAbility:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	if isRetreating then
-		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-		for _, enemyHero in pairs(nearbyEnemies) do
-			if
-				Fu.IsValidHero(enemyHero)
-				and not Fu.IsSuspiciousIllusion(enemyHero)
-				and not Fu.IsDisabled(enemyHero)
-			then
-				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
-				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if alliesNearEnemy ~= nil and enemiesNearEnemy ~= nil and #enemiesNearEnemy > #alliesNearEnemy then
-					if
-						hpRatio < 0.42
-						and shukuchiAbility:IsTrained()
-						and shukuchiAbility:GetCooldownTimeRemaining() < 2.5
-						and Fu.IsChasingTarget(enemyHero, bot)
-					then
-						return BOT_ACTION_DESIRE_HIGH, "self"
-					end
-				end
-				if hpRatio < 0.33 and bot:WasRecentlyDamagedByHero(enemyHero, 1) then
-					return BOT_ACTION_DESIRE_HIGH, "self"
-				end
-			end
-		end
-	end
-	if bot:HasScepter() and timeLapseAllyAbility:IsFullyCastable() then
-		local castRange = timeLapseAllyAbility:GetCastRange()
-		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
-		for _, allyHero in pairs(nearbyAllies) do
-			if
-				Fu.IsValidHero(allyHero)
-				and Fu.IsRetreating(allyHero)
-				and Fu.GetHP(allyHero) < 0.33
-				and Fu.IsCore(allyHero)
-				and hpRatio > 0.75
-				and allyHero:WasRecentlyDamagedByAnyHero(2)
-				and not Fu.IsSuspiciousIllusion(allyHero)
-				and not allyHero:HasModifier("modifier_legion_commander_duel")
-				and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
-				for _, enemyHero in pairs(enemiesNearAlly) do
-					if
-						Fu.IsValidHero(enemyHero)
-						and Fu.IsChasingTarget(enemyHero, allyHero)
-						and not Fu.IsSuspiciousIllusion(enemyHero)
-						and not Fu.IsDisabled(enemyHero)
-					then
-						return BOT_ACTION_DESIRE_HIGH, allyHero
-					end
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
 end
 return X

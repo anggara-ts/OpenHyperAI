@@ -130,6 +130,10 @@ function X.SkillsComplement()
 	if zealotDesire > 0 then
 		-- 7.42 (Valve patch notes + datafeed): Zealot is a no-target resurrect now. The teleport of all
 		-- controlled creeps moved to Holy Persuasion: cast it on Chen himself (teleport_delay 6/5/4/3s).
+		if DotaTime() >= (bot._chenGatherLogAt or -999) then
+			bot._chenGatherLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-CHEN] t=%.0f gather creeps=%d", DotaTime(), #(controlledCreeps or {})))
+		end
 		bot:Action_UseAbilityOnEntity(holyPersuasionAbility, bot)
 		return
 	end

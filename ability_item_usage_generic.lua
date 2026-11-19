@@ -9007,6 +9007,31 @@ local function ApiPrint(label, names)
 		)
 	end
 end
+-- Each bot once (#109, 7.42): the engine's own ability names in every slot (abilities, innates, talents), to
+-- compare with the names the hero files use. (h) hidden, (t) talent.
+function Usage.DumpHeroAbilities()
+	if bot._abilitiesDumped or bot:IsIllusion() then
+		return
+	end
+	bot._abilitiesDumped = true
+	local names = {}
+	for slot = 0, 35 do
+		local ability = bot:GetAbilityInSlot(slot)
+		if ability ~= nil and not ability:IsNull() then
+			local abilityName = ability:GetName()
+			if abilityName ~= nil and abilityName ~= "" and abilityName ~= "generic_hidden" then
+				local tag = ""
+				if ability:IsTalent() then
+					tag = "(t)"
+				elseif ability:IsHidden() then
+					tag = "(h)"
+				end
+				names[#names + 1] = slot .. ":" .. abilityName .. tag
+			end
+		end
+	end
+	ApiPrint("abilities " .. string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""), names)
+end
 function Usage.DumpBotApi()
 	if _G.OHA_API_DUMPED or GetTeam() ~= TEAM_RADIANT then
 		return
@@ -9049,6 +9074,25 @@ function Usage.DumpBotApi()
 	end
 	table.sort(consts)
 	ApiPrint("constants", consts)
+	-- Every item name in our dictionary (FuncLib/data/item_names.lua) against the engine (#109): a name the
+	-- engine has no cost for is unknown to it (or free: neutrals, Roshan drops). Our own placeholders are skipped.
+	local okN, itemNames = pcall(require, GetScriptDirectory() .. "/FuncLib/data/item_names")
+	if okN and type(itemNames) == "table" then
+		local unknown, known = {}, 0
+		for _, entry in ipairs(itemNames) do
+			local itemName = type(entry) == "table" and entry.sRawName or nil
+			if type(itemName) == "string" and not string.find(itemName, "^item_new_") then
+				local okC, cost = pcall(GetItemCost, itemName)
+				if okC and type(cost) == "number" and cost > 0 then
+					known = known + 1
+				else
+					unknown[#unknown + 1] = itemName .. "=" .. (okC and tostring(cost) or "error")
+				end
+			end
+		end
+		pcall(print, string.format("[OHA-API] item-names known=%d no-cost=%d", known, #unknown))
+		ApiPrint("item-names no-cost", unknown)
+	end
 	-- 7.42 items (#109): does the engine know the new items and the changed recipes? Cost and components as the
 	-- buy code sees them (it buys by GetItemComponents). Names from the installed 7.42 items.txt.
 	for _, itemName in ipairs({
@@ -9358,6 +9402,7 @@ function ItemUsageThink()
 	pcall(Usage.WatchStillUnderHit)
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
+	pcall(Usage.DumpHeroAbilities)
 	pcall(Usage.LogHomeWalk)
 	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)

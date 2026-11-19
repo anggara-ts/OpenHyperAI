@@ -125,6 +125,7 @@ local wheelOfWonderDesire, wheelOfWonderLocation
 local funhouseMirrorDesire
 local strongmanTonicDesire, strongmanTonicTarget
 local whoopeeCushionDesire
+local whoopeeCushionWhy = "fight"
 local unicycleDesire
 -- Weighted Pie and Crystal Ball souvenirs (#49): never cast before.
 local weightedPieAbility =
@@ -183,7 +184,7 @@ function X.SkillsComplement()
 	botLevel = bot:GetLevel()
 	whoopeeCushionDesire = X.ConsiderWhoopeeCushion()
 	if whoopeeCushionDesire > 0 then
-		X.LogSouvenir("whoopee_cushion", "cast")
+		X.LogSouvenir("whoopee_cushion", "cast-" .. whoopeeCushionWhy)
 		bot:Action_UseAbility(whoopeeCushionAbility)
 		return
 	end
@@ -1028,6 +1029,7 @@ function X.ConsiderWhoopeeCushion()
 	if not Fu.CanCastAbility(whoopeeCushionAbility) then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	whoopeeCushionWhy = "fight"
 	local leapDistance = whoopeeCushionAbility:GetSpecialValueInt("leap_distance")
 	local fartCloudRadius = whoopeeCushionAbility:GetSpecialValueInt("fart_cloud_radius")
 	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
@@ -1057,6 +1059,26 @@ function X.ConsiderWhoopeeCushion()
 			then
 				return BOT_ACTION_DESIRE_HIGH
 			end
+		end
+	end
+	-- Free movement (#49, game 048: a held cushion blocked the next souvenirs for minutes). Game files: 0 mana, 3s
+	-- cooldown, a 400 leap where he faces. Walking straight and fast with no enemy hero or enemy tower near the
+	-- landing point, outside laning and attack: leap, which also frees the souvenir slot.
+	local mode = bot:GetActiveMode()
+	if
+		#nearbyEnemies == 0
+		and mode ~= BOT_MODE_LANING
+		and mode ~= BOT_MODE_ATTACK
+		and mode ~= BOT_MODE_EVASIVE_MANEUVERS
+		and not bot:IsChanneling()
+		and bot:GetMovementDirectionStability() >= 0.95
+		and bot:GetCurrentMovementSpeed() > 0
+		and #(bot:GetNearbyTowers(1300, true) or {}) == 0
+	then
+		local velocity = bot:GetVelocity()
+		if velocity ~= nil and velocity.x * velocity.x + velocity.y * velocity.y >= 250 * 250 then
+			whoopeeCushionWhy = "travel"
+			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE

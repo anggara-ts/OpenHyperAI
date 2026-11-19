@@ -12,8 +12,9 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
+-- Replicate at entries 6/11/15 (hero levels 6/12/18, the first levels the game allows).
 local tAllAbilityBuildList =
-	{ { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 } }
+	{ { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 6, 2, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 6, 2, 4, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then

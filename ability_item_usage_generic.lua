@@ -139,12 +139,13 @@ local function ReloadBotBuild(reason)
 		useDefaultItem = BotBuild["bDeafaultItem"]
 		if build["sSkillList"] ~= nil and #build["sSkillList"] > 0 then
 			local fullSkillList = build["sSkillList"]
-			local level = bot:GetLevel()
-			local pointsSpent = level - bot:GetAbilityPoints()
-			local remainingSkills = {}
-			for i = pointsSpent + 1, #fullSkillList do
-				table.insert(remainingSkills, fullSkillList[i])
-			end
+			-- Drop what is already learned, by each ability's own level (#45). "Hero level minus unspent
+			-- points" skipped entries the hero never learned once a level had passed without a point.
+			local remainingSkills = Fu.Skill.GetRemainingSkillList(fullSkillList, function(name)
+				local listed = bot:GetAbilityByName(name)
+				return listed ~= nil and listed:GetLevel() or 0
+			end)
+			local pointsSpent = #fullSkillList - #remainingSkills
 			if #remainingSkills > 0 then
 				abilityLevelUpList = remainingSkills
 			else
@@ -291,6 +292,52 @@ local function LevelUpAbilities()
 			)
 		end
 	end
+	-- Talents (#45): an order sent below is checked here on a later think. The entry leaves the list, and
+	-- [OHA-TALENT] learned= prints, only once the talent really has its level. required= / canUpgrade= are
+	-- what the engine answered when the order went out, points= the unspent points then, attr= the level of
+	-- special_bonus_attributes; late= is how many hero levels after its tier's level a first pick came.
+	local talentOrder = bot.ohaTalentOrder
+	if talentOrder ~= nil then
+		local orderedTalent = bot:GetAbilityByName(talentOrder.name)
+		if orderedTalent == nil or orderedTalent:IsNull() then
+			bot.ohaTalentOrder = nil
+		elseif orderedTalent:GetLevel() >= 1 then
+			bot.ohaTalentOrder = nil
+			if abilityLevelUpList[1] == talentOrder.name then
+				table.remove(abilityLevelUpList, 1)
+			end
+			print(
+				string.format(
+					"[OHA-TALENT] t=%.0f %s learned=%s level=%d%s required=%s canUpgrade=%s points=%d attr=%d",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					talentOrder.name,
+					talentOrder.level,
+					talentOrder.firstPick and string.format(" late=%d", talentOrder.level - talentOrder.talentLevel)
+						or "",
+					tostring(talentOrder.required),
+					tostring(talentOrder.canUpgrade),
+					talentOrder.points,
+					talentOrder.attributes
+				)
+			)
+		elseif not talentOrder.rejected and DotaTime() > talentOrder.time + 3 then
+			talentOrder.rejected = true
+			print(
+				string.format(
+					"[OHA-TALENT] t=%.0f %s rejected=%s level=%d required=%s canUpgrade=%s points=%d attr=%d",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					talentOrder.name,
+					talentOrder.level,
+					tostring(talentOrder.required),
+					tostring(talentOrder.canUpgrade),
+					talentOrder.points,
+					talentOrder.attributes
+				)
+			)
+		end
+	end
 	if #abilityLevelUpList >= 1 and bot:GetAbilityPoints() > 0 then
 		if Fu.IsTryingtoUseAbility(bot) then
 			return
@@ -346,6 +393,66 @@ local function LevelUpAbilities()
 			log("[WARN] Ability %s not found on %s, skipping", abilityName, botName)
 			table.remove(abilityLevelUpList, 1)
 			return
+		end
+		-- An entry that holds the list back for 20s (it needs a higher hero level, or the engine refuses it)
+		-- used to show in debug runs only. Once per entry (#45).
+		local skillWait = bot.ohaSkillWait
+		if skillWait == nil or skillWait.name ~= abilityName then
+			bot.ohaSkillWait = { name = abilityName, since = DotaTime() }
+		elseif not skillWait.logged and DotaTime() > skillWait.since + 20 then
+			skillWait.logged = true
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s waiting=%s level=%d points=%d rank=%d required=%s canUpgrade=%s hidden=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					abilityName,
+					level,
+					bot:GetAbilityPoints(),
+					ability:GetLevel(),
+					tostring(ability:GetHeroLevelRequiredToUpgrade()),
+					tostring(ability:CanAbilityBeUpgraded()),
+					tostring(ability:IsHidden())
+				)
+			)
+		end
+		-- Talents (#45). Game 050: every bot learned its level 15 talent at hero level 18 and the level 20 / 25
+		-- ones at 25 / 26, though the list has them as the 15th, 18th and 19th point. The list waited on CanLearn
+		-- below, whose hero-level check asks GetHeroLevelRequiredToUpgrade. For a talent the level now comes
+		-- from its tier (Skill.GetTalentHeroLevel): one order per hero level, confirmed by the check above, with
+		-- the engine's own answers in the log line. An order the engine refuses keeps the entry (as before).
+		-- Not in ARDM, whose list is every talent first: that one keeps the old path.
+		if ability:IsTalent() and abilityName ~= "special_bonus_attributes" and GetGameMode() ~= GAMEMODE_ARDM then
+			local talentLevel = Fu.Skill.GetTalentHeroLevel(Fu.Skill.GetTalentList(bot), abilityName, function(name)
+				local otherTalent = bot:GetAbilityByName(name)
+				return otherTalent ~= nil and otherTalent:GetLevel() >= 1
+			end)
+			if talentLevel ~= nil then
+				local lastOrder = bot.ohaTalentOrder
+				if ability:GetLevel() >= 1 then
+					table.remove(abilityLevelUpList, 1)
+				elseif level < talentLevel then
+					return
+				elseif lastOrder == nil or lastOrder.name ~= abilityName or lastOrder.level ~= level then
+					local attributes = bot:GetAbilityByName("special_bonus_attributes")
+					bot.ohaTalentOrder = {
+						name = abilityName,
+						level = level,
+						time = DotaTime(),
+						talentLevel = talentLevel,
+						firstPick = talentLevel < 27,
+						required = ability:GetHeroLevelRequiredToUpgrade(),
+						canUpgrade = ability:CanAbilityBeUpgraded(),
+						points = bot:GetAbilityPoints(),
+						attributes = attributes ~= nil and attributes:GetLevel() or -1,
+					}
+					bot:ActionImmediate_LevelAbility(abilityName)
+				elseif lastOrder.rejected and level > 25 then
+					-- Refused at this level, and past 25 nothing later changes that: free the list.
+					table.remove(abilityLevelUpList, 1)
+				end
+				return
+			end
 		end
 		-- The server rejects a train order for anything the hero cannot learn right now
 		-- ("Ability is not owned by specified unit"). Only send one that will land.

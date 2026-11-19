@@ -54,6 +54,10 @@ end
 local theSwarmAbility = SafeAbility(bot:GetAbilityByName("weaver_the_swarm"), "weaver_the_swarm", "weaver")
 local shukuchiAbility = SafeAbility(bot:GetAbilityByName("weaver_shukuchi"), "weaver_shukuchi", "weaver")
 local timeLapseAbility = SafeAbility(bot:GetAbilityByName("weaver_time_lapse"), "weaver_time_lapse", "weaver")
+-- 7.42: the Aghanim's Scepter ally cast is its own ability (cast range 500, cooldown shared with Time
+-- Lapse); weaver_time_lapse is self-only (Valve datafeed, patch notes).
+local timeLapseAllyAbility =
+	SafeAbility(bot:GetAbilityByName("weaver_time_lapse_ally"), "weaver_time_lapse_ally", "weaver")
 -- Geminate Attack is an autocast attack ability in the current game files (AUTOCAST | ATTACK);
 -- nothing in this script turned it on, so the second attack depended on the default state.
 local geminateAttackAbility = bot:GetAbilityByName("weaver_geminate_attack")
@@ -142,7 +146,7 @@ function X.SkillsComplement()
 			bot:Action_UseAbility(timeLapseAbility)
 		else
 			if bot:HasScepter() then
-				bot:Action_UseAbilityOnEntity(timeLapseAbility, timeLapseTarget)
+				bot:Action_UseAbilityOnEntity(timeLapseAllyAbility, timeLapseTarget)
 			end
 		end
 		return
@@ -447,8 +451,8 @@ function X.ConsiderTimeLapse()
 			end
 		end
 	end
-	if bot:HasScepter() then
-		local castRange = timeLapseAbility:GetCastRange()
+	if bot:HasScepter() and timeLapseAllyAbility:IsFullyCastable() then
+		local castRange = timeLapseAllyAbility:GetCastRange()
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
 		for _, allyHero in pairs(nearbyAllies) do
 			if

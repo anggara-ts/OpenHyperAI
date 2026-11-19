@@ -170,13 +170,12 @@ X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local sproutAbility, teleportationAbility, naturesCallAbility, curseOfTheOldGrowthAbility, wrathOfNatureAbility
+local sproutAbility, teleportationAbility, naturesCallAbility, wrathOfNatureAbility
 local function refreshAbilities()
 	sproutAbility = SafeAbility(bot:GetAbilityByName("furion_sprout"), "furion_sprout", "furion")
 	teleportationAbility = SafeAbility(bot:GetAbilityByName("furion_teleportation"), "furion_teleportation", "furion")
 	naturesCallAbility = SafeAbility(bot:GetAbilityByName("furion_force_of_nature"), "furion_force_of_nature", "furion")
-	curseOfTheOldGrowthAbility =
-		SafeAbility(bot:GetAbilityByName("furion_curse_of_the_forest"), "furion_curse_of_the_forest", "furion")
+	-- Curse of the Oldgrowth is a passive, breakable debuff since 7.42 (Valve patch notes): nothing to cast.
 	wrathOfNatureAbility =
 		SafeAbility(bot:GetAbilityByName("furion_wrath_of_nature"), "furion_wrath_of_nature", "furion")
 end
@@ -245,12 +244,6 @@ function X.SkillsComplement()
 	if naturesCallDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(naturesCallAbility, GetTreeLocation(naturesCallTree))
-		return
-	end
-	local curseDesire = X.ConsiderCurseOfTheOldGrowth()
-	if curseDesire > 0 then
-		Fu.SetQueuePtToINT(bot, false)
-		bot:ActionQueue_UseAbility(curseOfTheOldGrowthAbility)
 		return
 	end
 	local wrathOfNatureDesire, wrathOfNatureTarget = X.ConsiderWrathOfNature()
@@ -585,17 +578,6 @@ function X.ConsiderWrathOfNature()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
-end
-function X.ConsiderCurseOfTheOldGrowth()
-	if not Fu.CanCastAbility(curseOfTheOldGrowthAbility) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local curseRange = curseOfTheOldGrowthAbility:GetSpecialValueInt("range")
-	local enemiesInRange = Fu.GetEnemiesNearLoc(bot:GetLocation(), curseRange)
-	if (isInTeamFight or isGoingOnSomeone) and #enemiesInRange >= 2 then
-		return BOT_ACTION_DESIRE_HIGH
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function X.CanDoSproutCall()
 	return Fu.CanCastAbility(sproutAbility) and Fu.CanCastAbility(naturesCallAbility) and Fu.GetMP(bot) > 0.5

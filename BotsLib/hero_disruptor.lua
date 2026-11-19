@@ -633,14 +633,16 @@ function X.ConsiderKineticFence()
 	if not Fu.CanCastAbility(kineticFenceAbility) then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local duration = kineticFenceAbility:GetSpecialValueInt("duration")
+	-- Float reads: Kinetic Fence duration is 4.4s and its formation time 0.5s since 7.42 (Valve datafeed);
+	-- an Int read gave 4 and 0.
+	local duration = kineticFenceAbility:GetSpecialValueFloat("duration")
 	if not Fu.CanCastAbility(kineticFenceAbility) or DotaTime() < kineticFenceCastTime + duration then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, kineticFenceAbility:GetCastRange())
 	local castPoint = kineticFenceAbility:GetCastPoint()
 	local radius = kineticFenceAbility:GetSpecialValueInt("radius")
-	local formationTime = kineticFenceAbility:GetSpecialValueInt("formation_time")
+	local formationTime = kineticFenceAbility:GetSpecialValueFloat("formation_time")
 	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	if isInTeamFight then
 		local aoeLocation =

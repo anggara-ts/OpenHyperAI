@@ -298,8 +298,9 @@ function X.ConsiderQ()
 	local castPoint = poisonTouchAbility:GetCastPoint()
 	local manaCost = poisonTouchAbility:GetManaCost()
 	local damagePerSecond = poisonTouchAbility:GetSpecialValueInt("damage")
-	if talent6:IsTrained() then
-		damagePerSecond = damagePerSecond + talent6:GetSpecialValueInt("value")
+	-- Level 15 talent T3 "+50 Poison Touch DPS" (7.42; the old DPS talent was T6, now -15s Nothl Projection cooldown).
+	if talent3:IsTrained() then
+		damagePerSecond = damagePerSecond + talent3:GetSpecialValueInt("value")
 	end
 	local duration = poisonTouchAbility:GetSpecialValueInt("duration")
 	local nDamage = damagePerSecond * duration

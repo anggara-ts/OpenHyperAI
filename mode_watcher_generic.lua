@@ -70,12 +70,39 @@ local function Skip(lantern, seconds, why)
 	bot._watcherSecondOrder = false
 end
 
+-- Game 050: GetAbilityByName("ability_lamp_use") was nil for all 10 bots at t=-90 and the ability dump (slots
+-- 0-35) had no system ability. Look by name, then through the slots up to 63 (remembering the slot), and say
+-- once how it was found.
+local lampSlot = nil
 local function LampAbility()
 	local lamp = bot:GetAbilityByName("ability_lamp_use")
-	if lamp ~= nil and not lamp:IsNull() then
-		return lamp
+	local how = "name"
+	if lamp == nil or lamp:IsNull() then
+		lamp = nil
+		for slot = lampSlot or 0, lampSlot or 63 do
+			local ability = bot:GetAbilityInSlot(slot)
+			if ability ~= nil and not ability:IsNull() and ability:GetName() == "ability_lamp_use" then
+				lamp, lampSlot, how = ability, slot, "slot" .. slot
+				break
+			end
+		end
 	end
-	return nil
+	if lamp ~= nil and not bot._watcherLampLogged then
+		bot._watcherLampLogged = true
+		pcall(
+			print,
+			string.format(
+				"[OHA-WATCHER] t=%.0f %s lamp-ability found by=%s hidden=%s level=%d castable=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				how,
+				tostring(lamp:IsHidden()),
+				lamp:GetLevel(),
+				tostring(lamp:IsFullyCastable())
+			)
+		)
+	end
+	return lamp
 end
 
 local function Usable(lantern)
@@ -104,11 +131,28 @@ local function Raw()
 		return 0
 	end
 	local lamp = LampAbility()
-	if lamp == nil then
-		if not bot._watcherNoLampLogged then
-			bot._watcherNoLampLogged = true
-			Log("no-lamp-ability", nil)
+	-- State every 5 minutes: is the ability there, how many watchers does the unit list hold, how far is the
+	-- nearest (game 050 could not tell "no ability" from "no watcher in reach").
+	if DotaTime() >= (bot._watcherStateLogAt or -999) then
+		bot._watcherStateLogAt = DotaTime() + 300
+		local all = Lanterns()
+		local nearest = math.huge
+		for _, lantern in ipairs(all) do
+			nearest = math.min(nearest, GetUnitToUnitDistance(bot, lantern))
 		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-WATCHER] t=%.0f %s state lamp=%s lanterns=%d nearest=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				lamp ~= nil and "ok" or "nil",
+				#all,
+				nearest < math.huge and tostring(math.floor(nearest)) or "-"
+			)
+		)
+	end
+	if lamp == nil then
 		return 0
 	end
 	-- Keep the current try until it ends or times out.

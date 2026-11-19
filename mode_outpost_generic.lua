@@ -333,13 +333,26 @@ function Think()
 				pcall(
 					print,
 					string.format(
-						"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d",
+						"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d capture=%s",
 						DotaTime(),
 						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 						targetOutpost:GetUnitName(),
 						outpostLocation.x,
 						outpostLocation.y,
-						math.floor(dist)
+						math.floor(dist),
+						-- What the bot has of ability_capture (game 050: 6 give-ups at ~140, none in games 047-049).
+						(function()
+							local found = bot:GetAbilityByName("ability_capture")
+							if found == nil or found:IsNull() then
+								return "nil"
+							end
+							return string.format(
+								"castable:%s/hidden:%s/level:%d",
+								tostring(found:IsFullyCastable()),
+								tostring(found:IsHidden()),
+								found:GetLevel()
+							)
+						end)()
 					)
 				)
 				bot:Action_ClearActions(true)

@@ -21,6 +21,9 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_magic_wand",
+	-- TEMPORARY, for testing #103/#104: Aghanim's Scepter early so the ally Time Lapse (weaver_time_lapse_ally,
+	-- game files: IsGrantedByScepter) shows up in test games. Move it to its proper slot once tested.
+	"item_ultimate_scepter",
 	"item_desolator",
 	"item_dragon_lance",
 	"item_sphere",

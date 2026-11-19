@@ -8,7 +8,8 @@
 --        point back until that level);
 --      * the ultimate is taken with the first point the game allows (hero level 6 / 12 / 18), unless the
 --        hero is listed in ULTIMATE_LATE with the reason;
---      * the first talent is the 10th point and the second the 15th, each from its own tier.
+--      * the four tiers' first talents are the 10th, 15th, 18th and 19th point (the 18th and 19th point
+--        come with hero levels 20 and 25), each from its own tier.
 --    Hero level needed for a rank: basic abilities 1 / 3 / 5 / 7, ultimates 6 / 12 / 18 (the engine's
 --    defaults, what GetHeroLevelRequiredToUpgrade reports for them); the game files override it for a few.
 -- 2. The helpers in FuncLib/systems/skill.lua that the level-up code uses.
@@ -117,7 +118,7 @@ local function problems(skillList, byName, ultimateLate)
 			found[#found + 1] = "point " .. point .. ": " .. tostring(name) .. " is not an ability of this hero"
 		elseif ability.talent then
 			talentsSeen = talentsSeen + 1
-			local wanted = ({ 10, 15 })[talentsSeen]
+			local wanted = ({ 10, 15, 18, 19 })[talentsSeen]
 			if wanted ~= nil and point ~= wanted then
 				found[#found + 1] = string.format("talent %d is point %d, not %d", talentsSeen, point, wanted)
 			end
@@ -317,9 +318,10 @@ end)
 -- Levels Lich from 1 to 30 through AbilityLevelUpThink with a small model of the game: one ability point
 -- per hero level except 17, 19, 21-24 and 26, ranks at their hero levels, a tier's first talent at
 -- 10 / 15 / 20 / 25 and the second from 27. `api` is what the two ability calls the old code trusted answer
--- for a talent; `refuseBefore` makes the game itself refuse a tier's first talent before that hero level.
+-- for a talent; `refuseBefore` makes the game itself refuse a tier's first talent before that hero level;
+-- `dropFirstOrderAt` loses the first talent order sent at that hero level. A hero level lasts 24s here.
 local NO_POINT = { [17] = true, [19] = true, [21] = true, [22] = true, [23] = true, [24] = true, [26] = true }
-local function levelLich(api, refuseBefore)
+local function levelLich(api, refuseBefore, dropFirstOrderAt)
 	local unit = Stub.reset({ hero = "npc_dota_hero_lich", slot = 5 })
 	local abilityList, byName = heroAbilities("lich")
 	Stub.setSlots(unit, abilityList)
@@ -374,6 +376,10 @@ local function levelLich(api, refuseBefore)
 	end
 	unit.ActionImmediate_LevelAbility = function(self, name)
 		local ability = self:GetAbilityByName(name)
+		if byName[name].talent and heroLevel == dropFirstOrderAt then
+			dropFirstOrderAt = nil
+			return
+		end
 		if points > 0 and allowed(ability, byName[name]) then
 			ability._learned = (ability._learned or 0) + 1
 			points = points - 1
@@ -388,7 +394,7 @@ local function levelLich(api, refuseBefore)
 		if level > 1 and not NO_POINT[level] then
 			points = points + 1
 		end
-		for _ = 1, 8 do
+		for _ = 1, 12 do
 			Stub.time = Stub.time + 2
 			think()
 		end
@@ -421,6 +427,7 @@ T.test("level-up: talents at 10 / 15 / 20 / 25 and 27-30 when the engine API ans
 	T.eq(points, 0, "unspent points at level 30")
 	T.ok(not string.find(printed, "rejected=", 1, true), "no rejected talent order:\n" .. printed)
 	T.ok(not string.find(printed, "late=[1-9]"), "no late talent:\n" .. printed)
+	T.ok(not string.find(printed, "[OHA-SKILL]", 1, true), "no entry held the list back:\n" .. printed)
 	local _, learnedLines = string.gsub(printed, "%[OHA%-TALENT%] t=%d+ lich learned=", "")
 	T.eq(learnedLines, 8, "[OHA-TALENT] learned= lines")
 end)
@@ -442,6 +449,12 @@ T.test("level-up: a talent does not wait for GetHeroLevelRequiredToUpgrade / Can
 		string.find(printed, "level=15 late=0 required=18 canUpgrade=false", 1, true),
 		"the log names what the engine said:\n" .. printed
 	)
+end)
+
+T.test("level-up: a talent order that gets lost is sent again", function()
+	local learnedAt, printed = levelLich({}, nil, 15)
+	T.eq(shortened(learnedAt), LICH_LEVELS, "what Lich learned at which hero level")
+	T.ok(string.find(printed, "level=15 late=0", 1, true), "learned at 15:\n" .. printed)
 end)
 
 T.test("level-up: a talent the game refuses stays in the list and is retried each hero level", function()

@@ -395,10 +395,11 @@ local function LevelUpAbilities()
 			return
 		end
 		-- An entry that holds the list back for 20s (it needs a higher hero level, or the engine refuses it)
-		-- used to show in debug runs only. Once per entry (#45).
+		-- used to show in debug runs only. Once per entry (#45); the list's length tells two entries of the
+		-- same ability apart.
 		local skillWait = bot.ohaSkillWait
-		if skillWait == nil or skillWait.name ~= abilityName then
-			bot.ohaSkillWait = { name = abilityName, since = DotaTime() }
+		if skillWait == nil or skillWait.name ~= abilityName or skillWait.entriesLeft ~= #abilityLevelUpList then
+			bot.ohaSkillWait = { name = abilityName, entriesLeft = #abilityLevelUpList, since = DotaTime() }
 		elseif not skillWait.logged and DotaTime() > skillWait.since + 20 then
 			skillWait.logged = true
 			print(
@@ -440,7 +441,9 @@ local function LevelUpAbilities()
 						level = level,
 						time = DotaTime(),
 						talentLevel = talentLevel,
-						firstPick = talentLevel < 27,
+						-- late= is not printed for Meepo: his hand-made list (skill.lua) takes the first
+						-- talent with the 11th point, behind a Divided We Stand rank.
+						firstPick = talentLevel < 27 and botName ~= "npc_dota_hero_meepo",
 						required = ability:GetHeroLevelRequiredToUpgrade(),
 						canUpgrade = ability:CanAbilityBeUpgraded(),
 						points = bot:GetAbilityPoints(),
@@ -450,6 +453,16 @@ local function LevelUpAbilities()
 				elseif lastOrder.rejected and level > 25 then
 					-- Refused at this level, and past 25 nothing later changes that: free the list.
 					table.remove(abilityLevelUpList, 1)
+				elseif
+					lastOrder.canUpgrade == true
+					and type(lastOrder.required) == "number"
+					and level >= lastOrder.required
+					and DotaTime() > lastOrder.time + 5
+				then
+					-- The engine said yes and the talent is still not learned: the order was dropped, send it
+					-- again. (An order the engine said no to is sent once per hero level.)
+					lastOrder.time = DotaTime()
+					bot:ActionImmediate_LevelAbility(abilityName)
 				end
 				return
 			end

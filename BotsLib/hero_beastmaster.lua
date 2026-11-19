@@ -54,7 +54,6 @@ sRoleItemsBuyList["pos_2"] = {
 sRoleItemsBuyList["pos_3"] = {
 	"item_tank_outfit",
 	"item_helm_of_the_dominator",
-	"item_helm_of_the_overlord",
 	"item_ultimate_scepter",
 	"item_blink",
 	"item_black_king_bar",

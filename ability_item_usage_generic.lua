@@ -5134,6 +5134,11 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	if bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") or bot.healInBase then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- Meepo (#8): a body at the fountain with another body out on the map Poofs to it once healed instead of
+	-- spending the scroll ([OHA-MEEPO] poof-out). BotsLib/hero_meepo.lua sets the hold, 2s at a time.
+	if bot._meepoPoofOutHold ~= nil and DotaTime() < bot._meepoPoofOutHold and bot:DistanceFromFountain() < 1500 then
+		return BOT_ACTION_DESIRE_NONE
+	end
 	local enemyTowers = bot:GetNearbyTowers(888, true)
 	if #enemyTowers > 0 then
 		return BOT_ACTION_DESIRE_NONE

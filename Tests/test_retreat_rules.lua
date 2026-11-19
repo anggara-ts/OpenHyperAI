@@ -29,3 +29,35 @@ T.test("hard retreat: still breaks off when it should", function()
 	-- Hurt but our side is stronger (Fu.WeAreStronger): keep fighting unless alone.
 	T.eq(R.HardRetreatOutnumbered(2, 3, 3, 0.50, false, true), false, "2 vs 3 at 50%, stronger")
 end)
+
+-- RetreatRules.MeepoWeakBody(hp, hit by a hero, enemy heroes within 1200, Meepo bodies alive, rule already on).
+T.test("meepo weak body: the cases from games 044-047 leave the fight", function()
+	local R = rules()
+	-- Game 046, 9:14: 14% HP in attack mode beside a full-HP body, Undying and Clinkz on him.
+	T.eq(R.MeepoWeakBody(0.14, true, 2, 2, false), true, "game 046 t=554")
+	-- Game 047, 31:28: 8% HP in attack mode, only Puck near, three bodies.
+	T.eq(R.MeepoWeakBody(0.08, true, 1, 3, false), true, "game 047 t=1888")
+	-- Game 047, 37:37: 34% HP in attack mode against five.
+	T.eq(R.MeepoWeakBody(0.34, true, 5, 3, false), true, "game 047 t=2257")
+	-- Under 25% with an enemy hero near, not hit in the last 2s: still leaves.
+	T.eq(R.MeepoWeakBody(0.20, false, 1, 2, false), true, "20%, enemy near, not hit")
+end)
+
+T.test("meepo weak body: healthy, alone or safe bodies keep their mode", function()
+	local R = rules()
+	T.eq(R.MeepoWeakBody(0.55, true, 3, 3, false), false, "55% and hit: fight on")
+	T.eq(R.MeepoWeakBody(0.35, false, 2, 3, false), false, "35%, nobody hitting it: not yet")
+	T.eq(R.MeepoWeakBody(0.10, true, 0, 3, false), false, "no enemy hero within 1200")
+	-- One body (before Divided We Stand): a normal hero, the usual retreat rules decide.
+	T.eq(R.MeepoWeakBody(0.14, true, 2, 1, false), false, "lone body")
+end)
+
+T.test("meepo weak body: once on, it holds until 45% or no enemy near", function()
+	local R = rules()
+	-- Stepped out of range (no hit), 38%: without the hold it would go back to attack.
+	T.eq(R.MeepoWeakBody(0.38, false, 1, 2, false), false, "38% not hit, rule off: does not start")
+	T.eq(R.MeepoWeakBody(0.38, false, 1, 2, true), true, "38% not hit, rule on: holds")
+	T.eq(R.MeepoWeakBody(0.44, false, 2, 3, true), true, "44%: holds")
+	T.eq(R.MeepoWeakBody(0.46, true, 2, 3, true), false, "46%: released")
+	T.eq(R.MeepoWeakBody(0.30, false, 0, 3, true), false, "enemies gone: released")
+end)

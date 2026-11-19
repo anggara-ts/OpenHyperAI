@@ -18,4 +18,23 @@ function RetreatRules.HardRetreatOutnumbered(allies, visible, recent, hp, hit, s
 	return hit and visible >= allies + 2 and not stronger
 end
 
+-- Meepo's weakest body (#8, mode_retreat_generic.lua): a body that dies takes every body with it, so a weak body
+-- leaves the fight while the others keep fighting.
+--   hp       this body's HP ratio; hit: damaged by a hero in the last ~2s
+--   enemies  enemy heroes near it (the caller counts within 1200, and within 1600 while the rule is on)
+--   bodies   Meepo bodies alive, this one included (a lone body is a normal hero: no rule)
+--   holding  the rule is already on for this body
+-- Starts under 40% while a hero is hitting it, or under 25% with an enemy hero near. Once on, it stays until the
+-- body is back at 45% or no enemy hero is near: "being hit" stops the moment it steps out of range, and the rule
+-- would hand the body back to attack mode (0.95) on the next think.
+function RetreatRules.MeepoWeakBody(hp, hit, enemies, bodies, holding)
+	if bodies < 2 or enemies < 1 then
+		return false
+	end
+	if holding then
+		return hp < 0.45
+	end
+	return hp < 0.25 or hp < 0.4 and hit
+end
+
 return RetreatRules

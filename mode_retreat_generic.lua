@@ -694,7 +694,13 @@ function GetDesireHelper()
 				end
 			end
 		end
-		if roshanHandle ~= nil and activeMode ~= BOT_MODE_ROSHAN and roshanHandle:GetAttackTarget() == bot then
+		-- Under 60% HP only: a healthy bot fighting heroes at the pit is not pulled out by one swat.
+		if
+			roshanHandle ~= nil
+			and hpRatio < 0.6
+			and activeMode ~= BOT_MODE_ROSHAN
+			and roshanHandle:GetAttackTarget() == bot
+		then
 			if DotaTime() >= (bot._roshAggroLogAt or -999) then
 				bot._roshAggroLogAt = DotaTime() + 5
 				pcall(

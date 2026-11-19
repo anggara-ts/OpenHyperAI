@@ -471,11 +471,31 @@ function Push.GetPushDesireHelper(bot, lane)
 	-- near it over 5s beats its HP, with 2+ allies there: push at 0.9 whatever the caps.
 	local function FinishTower()
 		local tower = (bot:GetNearbyTowers(1200, true) or {})[1]
-		if
-			Fu.IsValidBuilding(tower)
-			and tower:IsAlive()
-			and getLocationToLocationDistance(GetLaneFrontLocation(team, lane, 0), tower:GetLocation()) < 2500
-		then
+		if not Fu.IsValidBuilding(tower) or not tower:IsAlive() then
+			return false
+		end
+		local frontDist = getLocationToLocationDistance(GetLaneFrontLocation(team, lane, 0), tower:GetLocation())
+		if frontDist >= 2500 then
+			if
+				tower:GetHealth() / math.max(1, tower:GetMaxHealth()) < 0.5
+				and DotaTime() >= (bot._finishTowerCheckAt or -999)
+			then
+				bot._finishTowerCheckAt = DotaTime() + 15
+				pcall(
+					print,
+					string.format(
+						"[OHA-PUSH] t=%.0f %s finish-tower-check hp=%d why=lane-front front=%d lane=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						tower:GetHealth(),
+						math.floor(frontDist),
+						tostring(lane)
+					)
+				)
+			end
+			return false
+		end
+		do
 			local towerAllies = 0
 			local damage5s = 0
 			for _, ally in pairs(Fu.GetAlliesNearLoc(tower:GetLocation(), 1200) or {}) do

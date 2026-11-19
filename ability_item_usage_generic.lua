@@ -1042,7 +1042,7 @@ function Usage.IsEnemyHeroAroundSecretShop()
 	return false
 end
 -- HP each charge of a healing item restores (game files: tango 7/s x 16s, salve 30/s x 13s, faerie fire 85,
--- stick/wand 15 per charge, healing lotus 125 / great 400). Used by the heal-trip TP (#12).
+-- stick/wand 15 per charge, healing lotus 125 / great 400 / greater 900). Used by the heal-trip TP (#12).
 local bagHealPerCharge = {
 	item_tango = 112,
 	item_tango_single = 112,
@@ -1052,6 +1052,7 @@ local bagHealPerCharge = {
 	item_magic_wand = 15,
 	item_famango = 125,
 	item_great_famango = 400,
+	item_greater_famango = 900,
 }
 local function BagHeal(unit)
 	local total = 0

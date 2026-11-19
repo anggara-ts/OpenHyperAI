@@ -9007,6 +9007,31 @@ local function ApiPrint(label, names)
 		)
 	end
 end
+-- Each bot once (#109, 7.42): the engine's own ability names in every slot (abilities, innates, talents), to
+-- compare with the names the hero files use. (h) hidden, (t) talent.
+function Usage.DumpHeroAbilities()
+	if bot._abilitiesDumped or bot:IsIllusion() then
+		return
+	end
+	bot._abilitiesDumped = true
+	local names = {}
+	for slot = 0, 35 do
+		local ability = bot:GetAbilityInSlot(slot)
+		if ability ~= nil and not ability:IsNull() then
+			local abilityName = ability:GetName()
+			if abilityName ~= nil and abilityName ~= "" and abilityName ~= "generic_hidden" then
+				local tag = ""
+				if ability:IsTalent() then
+					tag = "(t)"
+				elseif ability:IsHidden() then
+					tag = "(h)"
+				end
+				names[#names + 1] = slot .. ":" .. abilityName .. tag
+			end
+		end
+	end
+	ApiPrint("abilities " .. string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""), names)
+end
 function Usage.DumpBotApi()
 	if _G.OHA_API_DUMPED or GetTeam() ~= TEAM_RADIANT then
 		return
@@ -9037,21 +9062,79 @@ function Usage.DumpBotApi()
 	end
 	-- The bot's own handle, in case its class table is not a global.
 	ApiPrint("bot-handle", ApiNames(bot))
-	-- Numeric constants for shrines and ability behaviors (is ABILITY_BEHAVIOR_VECTOR_TARGETING
-	-- defined for bots?), and what the old healing-shrine API returns now that 7.33 replaced those
-	-- shrines with lotus pools and watchers: GetShrine for every SHRINE_* id on both teams.
+	-- Every numeric engine constant (#109, 7.42): BOT_MODE_*, ITEM_SLOT_*, RUNE_*, DAMAGE_TYPE_*, UNIT_LIST_*,
+	-- SHRINE_*, ABILITY_BEHAVIOR_*, ... to compare with FuncLib/dota/enums.lua and the numbers our logs print.
+	-- Then what the old healing-shrine API returns now that 7.33 replaced those shrines with lotus pools and
+	-- watchers: GetShrine for every SHRINE_* id on both teams.
 	local consts = {}
 	for k, v in pairs(_G) do
-		if
-			type(k) == "string"
-			and type(v) == "number"
-			and (string.find(k, "^SHRINE_") or string.find(k, "^ABILITY_BEHAVIOR_"))
-		then
+		if type(k) == "string" and type(v) == "number" and string.find(k, "^[A-Z][A-Z0-9_]+$") then
 			consts[#consts + 1] = k .. "=" .. tostring(v)
 		end
 	end
 	table.sort(consts)
 	ApiPrint("constants", consts)
+	-- Every item name in our dictionary (FuncLib/data/item_names.lua) against the engine (#109): a name the
+	-- engine has no cost for is unknown to it (or free: neutrals, Roshan drops). Our own placeholders are skipped.
+	local okN, itemNames = pcall(require, GetScriptDirectory() .. "/FuncLib/data/item_names")
+	if okN and type(itemNames) == "table" then
+		local unknown, known = {}, 0
+		for _, entry in ipairs(itemNames) do
+			local itemName = type(entry) == "table" and entry.sRawName or nil
+			if type(itemName) == "string" and not string.find(itemName, "^item_new_") then
+				local okC, cost = pcall(GetItemCost, itemName)
+				if okC and type(cost) == "number" and cost > 0 then
+					known = known + 1
+				else
+					unknown[#unknown + 1] = itemName .. "=" .. (okC and tostring(cost) or "error")
+				end
+			end
+		end
+		pcall(print, string.format("[OHA-API] item-names known=%d no-cost=%d", known, #unknown))
+		ApiPrint("item-names no-cost", unknown)
+	end
+	-- 7.42 items (#109): does the engine know the new items and the changed recipes? Cost and components as the
+	-- buy code sees them (it buys by GetItemComponents). Names from the installed 7.42 items.txt.
+	for _, itemName in ipairs({
+		"item_bloodslinger",
+		"item_caduceus",
+		"item_ristuls_devotion",
+		"item_berserkers_sabatons",
+		"item_skypiercer",
+		"item_starforge",
+		"item_horn_of_battle_greater",
+		"item_skadi",
+		"item_bloodthorn",
+		"item_abyssal_blade",
+		"item_mjollnir",
+		"item_butterfly",
+		"item_basher",
+		"item_crimson_guard",
+		"item_harpoon",
+		"item_heavens_halberd",
+		"item_angels_demise",
+		"item_helm_of_the_overlord",
+	}) do
+		local okC, cost = pcall(GetItemCost, itemName)
+		local okP, parts = pcall(GetItemComponents, itemName)
+		local recipes = {}
+		if okP and type(parts) == "table" then
+			for _, recipe in ipairs(parts) do
+				if type(recipe) == "table" then
+					recipes[#recipes + 1] = table.concat(recipe, "+")
+				end
+			end
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-API] item %s cost=%s parts=%s",
+				itemName,
+				okC and tostring(cost) or "error",
+				okP and (#recipes > 0 and table.concat(recipes, " | ") or "-") or "error"
+			)
+		)
+	end
 	local shrineIds = {}
 	for k, v in pairs(_G) do
 		if type(k) == "string" and type(v) == "number" and string.find(k, "^SHRINE_") then
@@ -9319,6 +9402,7 @@ function ItemUsageThink()
 	pcall(Usage.WatchStillUnderHit)
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
+	pcall(Usage.DumpHeroAbilities)
 	pcall(Usage.LogHomeWalk)
 	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)

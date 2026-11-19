@@ -1497,7 +1497,8 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_hoodwink = function()
 	if not HasItem(bot, "item_maelstrom") and netWorth < 12000 then
 		return true
 	end
-	if not HasItem(bot, "item_gleipnir") and netWorth < 18000 then
+	-- Gleipnir's item name is item_gungir (game files); item_gleipnir never matched, so she farmed to 18000 (#109).
+	if not HasItem(bot, "item_gungir") and netWorth < 18000 then
 		return true
 	end
 	return false

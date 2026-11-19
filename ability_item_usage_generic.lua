@@ -7156,8 +7156,47 @@ Usage.ConsiderItemDesire["item_dust"] = function(item)
 	end
 	return DustDesire(item)
 end
+-- Every Dust use says why (#15, game 048 22:27: Radiant dusted the bottom lane with no Dire hero near; the
+-- fog-vanish, Radiance and unseen-damage uses printed nothing).
+local function DustUse(why, name)
+	if DotaTime() >= (bot._dustUseLogAt or -999) then
+		bot._dustUseLogAt = DotaTime() + 2
+		pcall(
+			print,
+			string.format(
+				"[OHA-DUST] t=%.0f %s use why=%s on=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				why,
+				name ~= nil and (string.gsub(name, "npc_dota_hero_", "")) or "-"
+			)
+		)
+	end
+	return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+end
+-- Enemy players who can go invisible: seen with an invisibility ability or item, or an invisibility hero.
+local function CanGoInvisible(playerId)
+	bot._invisCapable = bot._invisCapable or {}
+	if bot._invisCapable[playerId] == nil then
+		local name = GetSelectedHeroName(playerId)
+		local okR, roles = pcall(require, GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
+		if name ~= nil and okR and type(roles) == "table" and roles.InvisHeroes ~= nil then
+			bot._invisCapable[playerId] = roles.InvisHeroes[name] == 1 or nil
+		end
+	end
+	return bot._invisCapable[playerId] == true
+end
 DustDesire = function(item)
 	local radius = 1050
+	bot._invisCapable = bot._invisCapable or {}
+	for _, enemy in pairs(Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600) or {}) do
+		if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) then
+			local playerId = enemy:GetPlayerID()
+			if bot._invisCapable[playerId] ~= true and Fu.HasInvisibilityOrItem(enemy) then
+				bot._invisCapable[playerId] = true
+			end
+		end
+	end
 	-- Game 031, 28:40: Dazzle used Glimmer Cape (datafeed: 0.5s fade, 5s invisible) and no Dust
 	-- came; the rules below only catch the half-second fade, or 0.2-0.5s after he vanished within
 	-- 600. An enemy hero seen fading is remembered for 4s; while he is out of sight within 900 of
@@ -7255,7 +7294,7 @@ DustDesire = function(item)
 							)
 						)
 					end
-					return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+					return DustUse("faded", fader.name)
 				end
 			end
 		end
@@ -7267,7 +7306,7 @@ DustDesire = function(item)
 	if #nearbyTrees < 5 then
 		for _, playerId in pairs(enemyPlayerIds) do
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
-			if IsHeroAlive(playerId) and lastSeenInfo ~= nil then
+			if IsHeroAlive(playerId) and lastSeenInfo ~= nil and CanGoInvisible(playerId) then
 				local lastSeen = lastSeenInfo[1]
 				if
 					lastSeen ~= nil
@@ -7281,7 +7320,7 @@ DustDesire = function(item)
 						behindLoc = Fu.GetXUnitsTowardsLocation2(lastSeen.location, radiantFountain, 200)
 					end
 					if IsLocationVisible(behindLoc) and IsLocationPassable(behindLoc) then
-						return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+						return DustUse("fog-vanish", GetSelectedHeroName(playerId))
 					end
 				end
 			end
@@ -7291,20 +7330,22 @@ DustDesire = function(item)
 		bot:HasModifier("modifier_sandking_sand_storm_slow")
 		or bot:HasModifier("modifier_sandking_sand_storm_slow_aura_thinker")
 	then
-		return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+		return DustUse("sand-storm", nil)
 	end
 	local nInRangeEnemy = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 	if nInRangeEnemy ~= nil and #nInRangeEnemy == 0 then
 		if bot:HasModifier("modifier_item_radiance_debuff") then
-			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+			return DustUse("radiance", nil)
 		end
 		for _, playerId in pairs(enemyPlayerIds) do
-			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) then
+			-- Only an enemy who can go invisible (game 049: 4 unseen-damage Dusts on Puck, Tinker and Weaver; Puck and
+			-- Tinker have no invisibility, they were in fog).
+			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) and CanGoInvisible(playerId) then
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil then
 					local lastSeen = lastSeenInfo[1]
 					if lastSeen ~= nil and GetUnitToLocationDistance(bot, lastSeen.location) < radius then
-						return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+						return DustUse("unseen-damage", GetSelectedHeroName(playerId))
 					end
 				end
 			end
@@ -7320,7 +7361,7 @@ DustDesire = function(item)
 			then
 				local towersNearEnemy = enemy:GetNearbyTowers(700, true)
 				if towersNearEnemy == nil or #towersNearEnemy == 0 then
-					return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+					return DustUse("about-to-fade", enemy:GetUnitName())
 				end
 			end
 		end

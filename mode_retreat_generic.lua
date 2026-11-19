@@ -354,6 +354,60 @@ end
 -- attack won back (game 037, Kez t=2319-2332: attack 0.65 / retreat 0.98, 29 changes in 13s).
 -- Now held for 3s while retreat is active, renewed while still outnumbered under 70% HP.
 -- Returns desire, tag (201 start, 202 held).
+-- Time to die, shadow mode (#12): LOG ONLY, no behaviour. Games 048-050: 86 of 208 deaths came straight out of
+-- attack mode, median HP 71% 3.5s before, losing ~20% of max HP per second; the head-count rule above never saw
+-- them (game 050, 17:35: Weaver stayed in attack from 40% to 4%, 3 against 2-3). For a bot in a fight that the
+-- head count calls even: the enemy heroes whose attack target is this bot, their attack damage over the next 3.5s
+-- (minus the time to get in range), through this bot's armour; time to die = HP / that rate. Printed when under
+-- 5s and the bot was hit in the last second, so a game can show which window would have saved whom
+-- ([OHA-DEATH] within 5s of a line, or a death from attack mode with no line).
+local function TimeToDieShadow(attacking, outnumbered, alliesNearby, enemiesNearby)
+	local now = DotaTime()
+	local hp = bot:GetHealth()
+	local hist = bot._ttdHp
+	if hist == nil or now - hist.at >= 1 then
+		bot._ttdHp = { hp = hp, at = now, prev = hist ~= nil and hist.hp or hp }
+		hist = bot._ttdHp
+	end
+	if not attacking or outnumbered or now < (bot._ttdLogAt or -999) or not bot:WasRecentlyDamagedByAnyHero(1.0) then
+		return
+	end
+	local window = 3.5
+	local raw, attackers = 0, 0
+	for _, enemy in pairs(bot:GetNearbyHeroes(1400, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) and enemy:GetAttackTarget() == bot then
+			local reach = math.max(0, GetUnitToUnitDistance(enemy, bot) - enemy:GetAttackRange())
+				/ math.max(1, enemy:GetCurrentMovementSpeed())
+			raw = raw
+				+ enemy:GetAttackDamage() * math.max(0, window - reach) / math.max(0.1, enemy:GetSecondsPerAttack())
+			attackers = attackers + 1
+		end
+	end
+	if attackers == 0 then
+		return
+	end
+	local real = bot:GetActualIncomingDamage(raw, DAMAGE_TYPE_PHYSICAL)
+	local timeToDie = real > 0 and hp / (real / window) or 99
+	if timeToDie < 5 then
+		bot._ttdLogAt = now + 2
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s burst-would ttd=%.1f attackers=%d dmg=%d hp=%.2f lost1s=%.2f allies=%d enemies=%d mode=%d",
+				now,
+				HeroName(),
+				timeToDie,
+				attackers,
+				math.floor(real),
+				hpRatio,
+				(math.max(hist.hp, hist.prev) - hp) / math.max(1, bot:GetMaxHealth()),
+				alliesNearby,
+				enemiesNearby,
+				activeMode
+			)
+		)
+	end
+end
 local function HardRetreatDesire(lastStand)
 	if lastStand then
 		bot._hardRetreatUntil = nil
@@ -382,6 +436,7 @@ local function HardRetreatDesire(lastStand)
 		or activeMode == BOT_MODE_ROAM
 		or Fu.IsGoingOnSomeone(bot)
 	local holding = bot._hardRetreatUntil ~= nil and now < bot._hardRetreatUntil and activeMode == BOT_MODE_RETREAT
+	pcall(TimeToDieShadow, attacking, outnumbered, alliesNearby, enemiesNearby)
 	if freeKill or not outnumbered or not attacking and not holding then
 		-- Game 038: the old rule (Meepo clones not counted, stale sightings at any HP) fired 156 times on healthy
 		-- bots. Say when it would have, to show the new rule holding the fight. At most every 5s.
@@ -626,6 +681,35 @@ function GetDesireHelper()
 			)
 		end
 		return RetreatTag(184, unitRun)
+	end
+	-- Roshan on a bot that is not doing Roshan (game 050, 29:49: the few-hitters drop left Puck 303 from Roshan in
+	-- push mode with Roshan hitting her, and she died in the pit). Walk out, above push (0.95).
+	do
+		local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+		if roshanHandle == nil or roshanHandle:IsNull() or not roshanHandle:IsAlive() then
+			roshanHandle = nil
+			for _, creep in pairs(bot:GetNearbyNeutralCreeps(900) or {}) do
+				if creep ~= nil and not creep:IsNull() and creep:GetUnitName() == "npc_dota_roshan" then
+					roshanHandle = creep
+				end
+			end
+		end
+		if roshanHandle ~= nil and activeMode ~= BOT_MODE_ROSHAN and roshanHandle:GetAttackTarget() == bot then
+			if DotaTime() >= (bot._roshAggroLogAt or -999) then
+				bot._roshAggroLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-RETREAT] t=%.0f %s roshan-aggro hp=%.2f mode=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						hpRatio,
+						activeMode
+					)
+				)
+			end
+			return RetreatTag(185, 0.96)
+		end
 	end
 	local lastStand = hpRatio >= 0.4 and AncientLastStand()
 	local hardRetreat, hardRetreatTag = HardRetreatDesire(lastStand)

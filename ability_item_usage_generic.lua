@@ -1041,11 +1041,11 @@ function Usage.IsEnemyHeroAroundSecretShop()
 	end
 	return false
 end
--- HP each charge of a healing item restores (game files: tango 7/s x 16s, salve 30/s x 13s, faerie fire 85,
+-- HP each charge of a healing item restores (game files: tango 7/s x 16s, shared tango 3.5/s x 16s, salve 30/s x 13s, faerie fire 85,
 -- stick/wand 15 per charge, healing lotus 125 / great 400 / greater 900). Used by the heal-trip TP (#12).
 local bagHealPerCharge = {
 	item_tango = 112,
-	item_tango_single = 112,
+	item_tango_single = 56,
 	item_flask = 390,
 	item_faerie_fire = 85,
 	item_magic_stick = 15,
@@ -1054,6 +1054,26 @@ local bagHealPerCharge = {
 	item_great_famango = 400,
 	item_greater_famango = 900,
 }
+-- Is something that is not a hero still hurting this bot? Roshan, a tower, creeps, or any HP lost over the last
+-- ~2s (damage over time). Used to hold a TP channel that would be cut or end in a death.
+function Usage.StillTakingDamage()
+	local now = DotaTime()
+	local hp = bot:GetHealth()
+	local sample = bot._tpHpSample
+	if sample == nil or now - sample.at > 2 then
+		bot._tpHpSample = { hp = hp, at = now, prev = sample ~= nil and sample.hp or hp }
+		sample = bot._tpHpSample
+	end
+	if bot:WasRecentlyDamagedByCreep(3.0) or bot:WasRecentlyDamagedByTower(3.0) then
+		return true
+	end
+	for _, creep in pairs(bot:GetNearbyNeutralCreeps(900) or {}) do
+		if creep ~= nil and not creep:IsNull() and creep:GetAttackTarget() == bot then
+			return true
+		end
+	end
+	return hp < math.min(sample.hp, sample.prev) - 25
+end
 local function BagHeal(unit)
 	local total = 0
 	for slot = 0, 5 do
@@ -5552,6 +5572,9 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 			and not bot:WasRecentlyDamagedByAnyHero(3.0)
 			and bot:DistanceFromFountain() > 6000
 			and not bot:IsInvisible()
+			-- Not while anything still hits him (game 050, 29:51: Puck channelled this TP with Roshan on her
+			-- and died mid-channel; only hero damage was checked).
+			and not Usage.StillTakingDamage()
 		then
 			local hp = bot:GetHealth()
 			local bagHeal = BagHeal(bot)

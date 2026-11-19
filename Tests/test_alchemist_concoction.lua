@@ -188,3 +188,33 @@ T.test("alchemist: while brewing with the target out of the start distance he wa
 	X.SkillsComplement()
 	T.eq(state.movedTo, nil, "in range: no move order")
 end)
+
+T.test("alchemist: a brew that ends around the deadline with no throw order reads self-explode", function()
+	local X = load()
+	local state = startBrew(X, 500)
+	state.enemy._loc = state.bot._loc + Vector(9000, 0, 0)
+	-- The hero script stops being run at 5.3s brewed (the usage file returned before it); the end is seen later.
+	for step = 1, 53 do
+		Stub.time = 500 + step * 0.1
+		X.SkillsComplement()
+	end
+	T.eq(#state.orders, 0, "no throw order in this brew")
+	state.brewing = false
+	Stub.time = 505.52
+	X.SkillsComplement()
+	T.ok(printedLine("concoction brew%-end outcome=self%-explode brewed=5.5s seen=5.3s rule=kill"), "self-explode")
+	T.ok(printedLine("lastThrow=none@0.0"), "no throw order named")
+end)
+
+T.test("alchemist: a brew that ends early without a throw order reads unknown, not thrown", function()
+	local X = load()
+	local state = startBrew(X, 600)
+	state.enemy._hp = 1000
+	Stub.time = 602
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "no throw order yet")
+	state.brewing = false
+	Stub.time = 602.1
+	X.SkillsComplement()
+	T.ok(printedLine("concoction brew%-end outcome=unknown brewed=2.1s"), "unknown")
+end)

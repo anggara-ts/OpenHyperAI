@@ -212,8 +212,10 @@ end
 -- Runs every think, above the ability gate: the explosion on himself stuns him, so code below the gate never
 -- sees a brew end. Returns whether he is brewing and the seconds brewed. When a brew ends it prints one line:
 --   [OHA-ALCHEMIST] concoction brew-end outcome=thrown|self-explode|died|unknown ...
--- self-explode: still brewing at the deadline. thrown: it ended earlier, between two thinks. unknown: this
--- function was not run around the end (the usage file returned before the hero script), so it cannot tell.
+-- self-explode: still brewing at the deadline, or it ended around the deadline with no throw order in this
+-- brew (only this file orders the throw), or he is stunned when the end is seen. thrown: a throw was ordered
+-- and the brew ended before the deadline. unknown: anything else (this function did not run around the end
+-- because the usage file returned before the hero script, and an order was pending).
 function X.TrackConcoctionBrew()
 	local brewed = DotaTime() - concoctionStartTime
 	local explodeAt = ConcoctionExplodeAt()
@@ -233,12 +235,19 @@ function X.TrackConcoctionBrew()
 	if brewSeen then
 		brewSeen = false
 		local outcome = "unknown"
+		local throwOrdered = lastThrowWhy ~= "none"
 		if not bot:IsAlive() then
 			outcome = "died"
 		elseif brewSeenAt >= explodeAt - 0.07 then
 			outcome = "self-explode"
-		elseif brewed - brewSeenAt < 0.3 then
-			outcome = "thrown"
+		elseif brewed < explodeAt - 0.07 then
+			if throwOrdered then
+				outcome = "thrown"
+			end
+		elseif not throwOrdered and brewed <= explodeAt + 5 then
+			outcome = "self-explode"
+		elseif bot:IsStunned() then
+			outcome = "self-explode"
 		end
 		pcall(function()
 			local nearest, nearestDist = NearestThrowTargets(1600)
@@ -306,7 +315,8 @@ function X.ConcoctionKeepRange(brewed)
 			chaseTarget, chaseDist = brewTarget, brewTargetDist
 		end
 	end
-	-- Not under an enemy tower (attack range 700, plus a margin) unless the attack mode already took him there.
+	-- Not under an enemy tower (7.42 npc_units.txt: tower AttackRange 700; 850 leaves a margin) unless the
+	-- attack mode already took him there.
 	local underTower = not isEngaging and Fu.IsLocHaveTower(850, true, chaseTarget:GetLocation())
 	local secondsLeft = ConcoctionExplodeAt() - brewed
 	local reachable = chaseDist - castRange <= bot:GetCurrentMovementSpeed() * secondsLeft
@@ -410,7 +420,8 @@ function X.SkillsComplement()
 		bot:Action_UseAbilityOnEntity(berserkPotionAbility, berserkPotionTarget)
 		return
 	end
-	if brewing and not brewRetreating then
+	-- Not hidden and castable is the pair the throw itself has always been gated on.
+	if brewing and not brewRetreating and unstableConcoctionThrowAbility:IsFullyCastable() then
 		X.ConcoctionKeepRange(brewed)
 	end
 end
@@ -672,7 +683,8 @@ function X.ConsiderUnstableConcoctionThrow()
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
 			-- #34: a channel is interrupted now. Any brew stuns (game data: min_stun 0.25), and waiting for
-			-- 4.25s let a 3s Town Portal finish (game 043, 41:23: Kez teleported out, the brew blew up on him).
+			-- 4.25s let a Town Portal finish (7.42 items.txt: item_tpscroll AbilityChannelTime 3.0; game 043,
+			-- 41:23: Kez teleported out, the brew blew up on him).
 			if enemyHero:IsChanneling() then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "channel"
 			end

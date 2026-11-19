@@ -181,8 +181,10 @@ function X.InitiateAbility(unit)
 		unit.abilities = {}
 		for i = 0, 23 do
 			local ability = unit:GetAbilityInSlot(i)
+			-- Packed with no gaps (game 049, 20:29: a Chen creep with a hidden or passive slot left a hole, and the
+			-- `#unit.abilities` loop in minion_with_skill.lua indexed nil).
 			if ability and not ability:IsHidden() and not ability:IsPassive() then
-				unit.abilities[i + 1] = ability
+				unit.abilities[#unit.abilities + 1] = ability
 			end
 		end
 	end

@@ -90,9 +90,9 @@ sRoleItemsBuyList["pos_3"] = {
 }
 sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
-	"item_orb_of_frost",
+	"item_double_branches",
+	"item_wind_lace",
 	"item_magic_wand",
 	"item_boots",
 	"item_tranquil_boots",
@@ -109,9 +109,9 @@ sRoleItemsBuyList["pos_4"] = {
 }
 sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
-	"item_orb_of_frost",
+	"item_double_branches",
+	"item_wind_lace",
 	"item_magic_wand",
 	"item_boots",
 	"item_tranquil_boots",

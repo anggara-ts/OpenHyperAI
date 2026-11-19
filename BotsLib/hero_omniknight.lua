@@ -86,10 +86,15 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter_2",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_blood_grenade",
 	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves and a Blink Dagger instead of Tranquil ->
 	-- Boots of Bearing (Drum): Arcane 47%, Greaves 46%, Blink 55% of his matches (Dotabuff, last patch).
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_blink",
 	"item_consecrated_wraps",

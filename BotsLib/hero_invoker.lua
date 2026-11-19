@@ -28,7 +28,15 @@ local sRoleItemsBuyList = {}
 -- items with no buff; cast by the bot, nothing changes (same abilities, still inert). The bot API
 -- cannot make the pick, so he does not buy them.
 sRoleItemsBuyList["pos_2"] = {
-	"item_ranged_carry_outfit",
+	"item_tango",
+	"item_circlet",
+	"item_double_branches",
+	"item_mantle",
+	"item_faerie_fire",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
+	"item_infused_raindrop",
 	"item_urn_of_shadows",
 	"item_spirit_vessel",
 	"item_orchid",
@@ -49,7 +57,6 @@ sRoleItemsBuyList["pos_2_qe"] = {
 	"item_magic_wand",
 	"item_boots",
 	"item_hand_of_midas",
-	"item_power_treads",
 	"item_meteor_hammer",
 	"item_sphere",
 	"item_black_king_bar",

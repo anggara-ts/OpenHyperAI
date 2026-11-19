@@ -54,7 +54,14 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_mage_outfit",
+	"item_tango",
+	"item_branches",
+	"item_circlet",
+	"item_enchanted_mango",
+	"item_mantle",
+	"item_magic_wand",
+	"item_null_talisman",
+	"item_arcane_boots",
 	"item_soul_ring",
 	"item_glimmer_cape",
 	"item_aghanims_shard",

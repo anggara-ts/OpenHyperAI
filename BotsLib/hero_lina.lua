@@ -48,8 +48,15 @@ else
 end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
 	"item_cyclone",
+	"item_travel_boots",
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_orchid",
@@ -119,11 +126,16 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_sheepstick",
 }
 sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_branches",
+	"item_magic_stick",
+	"item_circlet",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_ultimate_scepter",
 	"item_cyclone",

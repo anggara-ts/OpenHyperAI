@@ -35,9 +35,10 @@ end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_quelling_blade",
-	"item_orb_of_frost",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
 	"item_boots",
 	"item_orb_of_corrosion",
 	"item_power_treads",
@@ -60,7 +61,8 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_orb_of_frost",
+	"item_circlet",
+	"item_faerie_fire",
 	"item_power_treads",
 	"item_orb_of_corrosion",
 	"item_magic_wand",

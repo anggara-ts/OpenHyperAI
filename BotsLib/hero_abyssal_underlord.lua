@@ -29,7 +29,13 @@ sRoleItemsBuyList["pos_1"] = {
 }
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_gauntlets",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_soul_ring",
 	"item_ultimate_scepter",
 	"item_lotus_orb",
@@ -65,10 +71,15 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_mage_outfit",
+	"item_tango",
+	"item_magic_stick",
+	"item_branches",
+	"item_gauntlets",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_aghanims_shard",
 	"item_cyclone",

@@ -26,7 +26,14 @@ else
 end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_gauntlets",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_hand_of_midas",
 	"item_crimson_guard",
 	"item_aghanims_shard",
@@ -96,7 +103,13 @@ sRoleItemsBuyList["pos_4"] = {
 sRoleItemsBuyList["pos_5"] = {
 	-- Arcane Boots (crystal_maiden_outfit) instead of Tranquil Boots, and Blink Dagger instead of
 	-- Spirit Vessel: Arcane 71% (#2), Blink 64% (#3) of his matches (Dotabuff, last patch).
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_branches",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_hand_of_midas",
 	"item_glimmer_cape",
 	"item_blink",

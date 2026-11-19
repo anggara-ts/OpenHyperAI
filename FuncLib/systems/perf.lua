@@ -4,10 +4,11 @@
 -- invisible. Perf.Wrap times a function with RealTime(); every 10s, a bot whose total is over the budget prints
 -- its total and top 3 functions. Quiet in normal play.
 --
--- Games 048-050 (#52): the cost follows game time, not fights (per minute, over-budget time against the minute:
--- r=0.73-0.77; against deaths: about -0.1); ItemUsageThink is on top of every line, about a quarter of it in no
--- part; and the over-budget count swings 7x between two games with the same ten heroes (1971 and 283), because it
--- only counts windows above the budget. So the lines also carry:
+-- Games 048-050 (#52): the cost does not follow fights (per minute, over-budget time against deaths: r=-0.10,
+-- -0.34, -0.06). In 048 and 050 it grows with game time (r=0.77 and 0.73); 049 was high from the start (47 ms/s at
+-- t=400) and flat. ItemUsageThink is on top of every line, about a quarter of it in no part, and the over-budget
+-- count swings 7x between two games with the same ten heroes (1971 in 049, 283 in 050), because it only counts
+-- windows above the budget. So the lines also carry:
 --   top=<fn>=<ms>/<calls>  the call count, to tell many cheap calls from a few dear ones;
 --   parts=...,unsplit=<ms> ItemUsageThink's time outside its timed parts;
 --   detail=<name>=<ms>     time inside named helpers (each item's use rule, the gates before the item loop);

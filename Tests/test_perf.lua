@@ -62,7 +62,7 @@ T.test("Perf.Format: call counts, unsplit rest, detail and slow calls", function
 	local window = {
 		total = 0.3,
 		calls = 420,
-		sum = { ItemUsageThink = 0.2, ["retreat.GetDesire"] = 0.06, ["farm.GetDesire"] = 0.04 },
+		sum = { ItemUsageThink = 0.21, ["retreat.GetDesire"] = 0.06, ["farm.GetDesire"] = 0.03 },
 		count = { ItemUsageThink = 300, ["retreat.GetDesire"] = 60, ["farm.GetDesire"] = 60 },
 		parts = { items = 0.09, ["hero-abilities"] = 0.05, watchers = 0.01 },
 		detail = { item_tpscroll = 0.04, EatForage = 0.002 },
@@ -79,8 +79,8 @@ T.test("Perf.Format: call counts, unsplit rest, detail and slow calls", function
 	T.eq(
 		line,
 		"[OHA-PERF] t=1230 lich why=over-budget ms/s=30.0 calls=420 window=10s"
-			.. " top=ItemUsageThink=200ms/300,retreat.GetDesire=60ms/60"
-			.. " parts=items=90ms,hero-abilities=50ms,unsplit=50ms,watchers=10ms"
+			.. " top=ItemUsageThink=210ms/300,retreat.GetDesire=60ms/60"
+			.. " parts=items=90ms,unsplit=60ms,hero-abilities=50ms,watchers=10ms"
 			.. " detail=item_tpscroll=40ms,EatForage=2ms"
 			.. " slow=7 slowGc=3 slowTop=ItemUsageThink=5,retreat.GetDesire=2"
 			.. " peak=retreat.GetDesire=9.1ms kb/s=150 gc=4",
@@ -195,4 +195,19 @@ T.test("Perf: quiet under budget, but [OHA-PERFSUM] prints every 5 minutes", fun
 	T.ok(string.find(sums[1], "why=total ms/s=0.5 ", 1, true), "whole-window average: " .. sums[1])
 	T.ok(string.find(sums[1], "top=test.cheap=", 1, true), "top function: " .. sums[1])
 	T.ok(string.find(sums[1], " slow=0 ", 1, true), "no slow call: " .. sums[1])
+end)
+
+T.test("the item think still runs end to end with its item rules and gates timed", function()
+	T.stub.reset({ hero = "npc_dota_hero_lich" })
+	local Usage = dofile("ability_item_usage_generic.lua")
+	local bot = GetBot()
+	T.ok(type(Usage.ConsiderItemDesire.item_tpscroll) == "function", "the TP rule is still a function")
+	-- The first think opens the timing window; the second one's helpers are recorded in it.
+	ItemUsageThink()
+	ItemUsageThink()
+	T.eq(bot._perf.count.ItemUsageThink, 2, "both thinks counted")
+	local detail = bot._perf.detail or {}
+	for _, name in ipairs({ "EatForage", "DeflectTowerAggro", "BannerFromBackpack", "Dispel.Self", "MatchTrace.Tick" }) do
+		T.ok(detail[name] ~= nil, name .. " timed")
+	end
 end)

@@ -425,9 +425,13 @@ T.test("level-up: talents at 10 / 15 / 20 / 25 and 27-30 when the engine API ans
 	local learnedAt, printed, points = levelLich({})
 	T.eq(shortened(learnedAt), LICH_LEVELS, "what Lich learned at which hero level")
 	T.eq(points, 0, "unspent points at level 30")
-	T.ok(not string.find(printed, "rejected=", 1, true), "no rejected talent order:\n" .. printed)
+	T.ok(not string.find(printed, " rejected ", 1, true), "no rejected talent order:\n" .. printed)
 	T.ok(not string.find(printed, "late=[1-9]"), "no late talent:\n" .. printed)
-	T.ok(not string.find(printed, "[OHA-SKILL]", 1, true), "no entry held the list back:\n" .. printed)
+	T.ok(not string.find(printed, "%[OHA%-SKILL%] t=%d+ lich waiting"), "no entry held the list back:\n" .. printed)
+	local ranksAt7 =
+		"ranks at=7 level=7 points=0 lich_frost_nova=4 lich_frost_shield=1 lich_sinister_gaze=1 lich_chain_frost=1"
+	T.ok(string.find(printed, ranksAt7, 1, true), "the ranks line at level 7:\n" .. printed)
+	T.ok(string.find(printed, "ranks at=18 level=18 points=0", 1, true), "the ranks line at level 18:\n" .. printed)
 	local _, learnedLines = string.gsub(printed, "%[OHA%-TALENT%] t=%d+ lich learned=", "")
 	T.eq(learnedLines, 8, "[OHA-TALENT] learned= lines")
 end)
@@ -466,13 +470,13 @@ T.test("level-up: a talent the game refuses stays in the list and is retried eac
 	T.eq(points, 0, "unspent points at level 30")
 	for _, level in ipairs({ 15, 16, 17 }) do
 		T.ok(
-			string.find(printed, "rejected=special_bonus_unique_lich_%w+ level=" .. level),
+			string.find(printed, "rejected talent=special_bonus_unique_lich_%w+ level=" .. level),
 			"rejected at " .. level .. ":\n" .. printed
 		)
 	end
 	T.ok(string.find(printed, "level=18 late=3", 1, true), "late= on the learned line:\n" .. printed)
 	T.ok(
-		string.find(printed, "%[OHA%-SKILL%] t=%d+ lich waiting=special_bonus"),
+		string.find(printed, "%[OHA%-SKILL%] t=%d+ lich waiting ability=special_bonus"),
 		"the waiting entry is named:\n" .. printed
 	)
 end)

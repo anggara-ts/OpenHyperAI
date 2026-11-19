@@ -292,6 +292,42 @@ local function LevelUpAbilities()
 			)
 		end
 	end
+	-- The ranks a hero has at hero level 7, 12 and 18, once its points are spent (#45): one line shows which
+	-- ability was maxed first, the early value points and the ultimate's rank, so a game can check a build.
+	local ranksLogged = bot.ohaRanksLogged
+	if ranksLogged == nil then
+		ranksLogged = {}
+		bot.ohaRanksLogged = ranksLogged
+	end
+	for _, rankLevel in ipairs({ 7, 12, 18 }) do
+		if not ranksLogged[rankLevel] and (level > rankLevel or level == rankLevel and bot:GetAbilityPoints() == 0) then
+			ranksLogged[rankLevel] = true
+			local ranks = {}
+			for slot = 0, 10 do
+				local slotAbility = bot:GetAbilityInSlot(slot)
+				if
+					slotAbility ~= nil
+					and not slotAbility:IsNull()
+					and not slotAbility:IsTalent()
+					and not slotAbility:IsHidden()
+					and slotAbility:GetMaxLevel() > 1
+				then
+					ranks[#ranks + 1] = slotAbility:GetName() .. "=" .. slotAbility:GetLevel()
+				end
+			end
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s ranks at=%d level=%d points=%d %s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					rankLevel,
+					level,
+					bot:GetAbilityPoints(),
+					table.concat(ranks, " ")
+				)
+			)
+		end
+	end
 	-- Talents (#45): an order sent below is checked here on a later think. The entry leaves the list, and
 	-- [OHA-TALENT] learned= prints, only once the talent really has its level. required= / canUpgrade= are
 	-- what the engine answered when the order went out, points= the unspent points then, attr= the level of
@@ -325,7 +361,7 @@ local function LevelUpAbilities()
 			talentOrder.rejected = true
 			print(
 				string.format(
-					"[OHA-TALENT] t=%.0f %s rejected=%s level=%d required=%s canUpgrade=%s points=%d attr=%d",
+					"[OHA-TALENT] t=%.0f %s rejected talent=%s level=%d required=%s canUpgrade=%s points=%d attr=%d",
 					DotaTime(),
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					talentOrder.name,
@@ -404,7 +440,7 @@ local function LevelUpAbilities()
 			skillWait.logged = true
 			print(
 				string.format(
-					"[OHA-SKILL] t=%.0f %s waiting=%s level=%d points=%d rank=%d required=%s canUpgrade=%s hidden=%s",
+					"[OHA-SKILL] t=%.0f %s waiting ability=%s level=%d points=%d rank=%d required=%s canUpgrade=%s hidden=%s",
 					DotaTime(),
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					abilityName,

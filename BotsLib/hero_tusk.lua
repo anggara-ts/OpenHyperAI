@@ -257,7 +257,7 @@ function X.CheckSnowballAdds()
 	end
 	print(
 		string.format(
-			"[OHA-TUSK] t=%.0f tusk snowball launch allies=%d tried=%d held=%.2fs",
+			"[OHA-TUSK] t=%.0f tusk snowball launch allies=%d tried=%d held=%.2f",
 			DotaTime(),
 			carriedCount,
 			#adds.tries,

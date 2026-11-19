@@ -429,9 +429,9 @@ T.test("level-up: talents at 10 / 15 / 20 / 25 and 27-30 when the engine API ans
 	T.ok(not string.find(printed, "late=[1-9]"), "no late talent:\n" .. printed)
 	T.ok(not string.find(printed, "%[OHA%-SKILL%] t=%d+ lich waiting"), "no entry held the list back:\n" .. printed)
 	local ranksAt7 =
-		"ranks at=7 level=7 points=0 lich_frost_nova=4 lich_frost_shield=1 lich_sinister_gaze=1 lich_chain_frost=1"
+		"ranks-7 level=7 points=0 lich_frost_nova=4 lich_frost_shield=1 lich_sinister_gaze=1 lich_chain_frost=1"
 	T.ok(string.find(printed, ranksAt7, 1, true), "the ranks line at level 7:\n" .. printed)
-	T.ok(string.find(printed, "ranks at=18 level=18 points=0", 1, true), "the ranks line at level 18:\n" .. printed)
+	T.ok(string.find(printed, "ranks-18 level=18 points=0", 1, true), "the ranks line at level 18:\n" .. printed)
 	local _, learnedLines = string.gsub(printed, "%[OHA%-TALENT%] t=%d+ lich learned=", "")
 	T.eq(learnedLines, 8, "[OHA-TALENT] learned= lines")
 end)

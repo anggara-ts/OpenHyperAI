@@ -317,7 +317,7 @@ local function LevelUpAbilities()
 			end
 			print(
 				string.format(
-					"[OHA-SKILL] t=%.0f %s ranks at=%d level=%d points=%d %s",
+					"[OHA-SKILL] t=%.0f %s ranks-%d level=%d points=%d %s",
 					DotaTime(),
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					rankLevel,

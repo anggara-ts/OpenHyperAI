@@ -96,7 +96,8 @@ local mpRatio
 -- it. Does Puck stay shifted for the full duration, or does the next mode order cut it short? One line per shift.
 function X.TrackPhaseShift()
 	if bot._phaseProbeAt ~= nil and DotaTime() >= bot._phaseProbeAt then
-		bot._phaseProbeAt = nil
+		local since = DotaTime() - (bot._phaseOrderAt or DotaTime())
+		bot._phaseProbeAt = since < 0.9 and bot._phaseOrderAt + 1.0 or nil
 		local mods = {}
 		for i = 0, bot:NumModifiers() - 1 do
 			mods[#mods + 1] = tostring(bot:GetModifierName(i))
@@ -105,8 +106,11 @@ function X.TrackPhaseShift()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase-probe channelling=%s active=%s mods=%s",
+				"[OHA-PUCK] t=%.0f phase-probe after=%.1f cd=%.1f invuln=%s channelling=%s active=%s mods=%s",
 				DotaTime(),
+				since,
+				phaseShiftAbility:GetCooldownTimeRemaining(),
+				tostring(bot:IsInvulnerable()),
 				tostring(bot:IsChanneling()),
 				activeNow ~= nil and not activeNow:IsNull() and activeNow:GetName() or "-",
 				table.concat(mods, ",")
@@ -192,11 +196,54 @@ function X.DangerJaunt()
 	end
 	return false
 end
+-- Diagnostic (#15, game 048 64:10: Puck used Eul, not Phase Shift or Blink). In danger, what escapes she has.
+-- Blink: damage puts it on a 3s cooldown (game files: blink_damage_cooldown 3.0). Every 3s at most.
+function X.LogEscapeCheck(orbOut, canCast)
+	if
+		DotaTime() < (bot._escapeCheckLogAt or -999)
+		or not bot:WasRecentlyDamagedByAnyHero(1.5)
+		or Fu.GetHP(bot) > 0.5
+	then
+		return
+	end
+	bot._escapeCheckLogAt = DotaTime() + 3
+	local blinkCd = -1
+	for _, name in ipairs({ "item_blink", "item_overwhelming_blink" }) do
+		local slot = bot:FindItemSlot(name)
+		if slot >= 0 and slot <= 5 then
+			blinkCd = bot:GetItemInSlot(slot):GetCooldownTimeRemaining()
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f escape-check hp=%.2f silenced=%s canCast=%s phaseCd=%.1f orbOut=%s jauntOk=%s rooted=%s blinkCd=%.1f ready=%s enemies=%d",
+			DotaTime(),
+			Fu.GetHP(bot),
+			tostring(bot:IsSilenced()),
+			tostring(canCast),
+			phaseShiftAbility:GetCooldownTimeRemaining(),
+			tostring(orbOut),
+			tostring(etherealJauntAbility:IsFullyCastable()),
+			tostring(bot:IsRooted()),
+			blinkCd,
+			tostring(bot._puckEscapeReady),
+			#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
+		)
+	)
+end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
 	-- Hold every other cast while Phase Shift starts and lasts (#15, game 046: 15 orders, never channelling 0.3s later;
 	-- 5 of 8 probes found Puck already casting Waning Rift or the orb: our own next think broke the channel).
 	if bot._phaseOrderAt ~= nil and DotaTime() - bot._phaseOrderAt < 0.4 then
+		return
+	end
+	if
+		bot._phaseOrderAt ~= nil
+		and DotaTime() - bot._phaseOrderAt < phaseShiftAbility:GetSpecialValueFloat("duration") + 0.05
+		and phaseShiftAbility:GetCooldownTimeRemaining() > 0
+	then
 		return
 	end
 	local activeNow = bot:IsChanneling() and bot:GetCurrentActiveAbility() or nil
@@ -207,9 +254,14 @@ function X.SkillsComplement()
 		return
 	end
 	local okReady, orbOut = pcall(X.OrbInFlight)
-	bot._puckEscapeReady = phaseShiftAbility:IsFullyCastable()
-		or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
-	if Fu.CanNotUseAbility(bot) then
+	local canCast = not Fu.CanNotUseAbility(bot)
+	bot._puckEscapeReady = canCast
+		and (
+			phaseShiftAbility:IsFullyCastable()
+			or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
+		)
+	pcall(X.LogEscapeCheck, okReady and orbOut ~= nil, canCast)
+	if not canCast then
 		return
 	end
 	local okJ, jaunted = pcall(X.DangerJaunt)
@@ -267,6 +319,16 @@ function X.SkillsComplement()
 	end
 	waningRiftDesire, waningRiftLocation = X.ConsiderWaningRift()
 	if waningRiftDesire > 0 then
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f rift why=%s heroes=%d dist=%d",
+				DotaTime(),
+				X.riftWhy or "other",
+				#Fu.GetEnemiesNearLoc(waningRiftLocation, waningRiftAbility:GetSpecialValueInt("radius")),
+				GetUnitToLocationDistance(bot, waningRiftLocation)
+			)
+		)
 		bot:Action_UseAbilityOnLocation(waningRiftAbility, waningRiftLocation)
 		return
 	end
@@ -409,6 +471,7 @@ function X.ConsiderWaningRift()
 	local reach = moveDistance + radius
 	local damage = waningRiftAbility:GetSpecialValueInt("damage")
 	botTarget = Fu.GetProperTarget(bot)
+	X.riftWhy = "kill"
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, reach, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
@@ -424,16 +487,32 @@ function X.ConsiderWaningRift()
 			return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 		end
 	end
+	X.riftWhy = "stuck"
 	if Fu.IsStuck(bot) then
 		local escapeLocation = Fu.GetEscapeLoc()
 		return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, moveDistance)
 	end
-	if Fu.IsInTeamFight(bot, 1200) then
-		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
-		if enemiesInRadius ~= nil and #enemiesInRadius >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
+	-- Silence a group, or a channelling hero, from where she lands (game files: radius 400 around the landing
+	-- point, max_distance 350): the best point for 2+ heroes within max_distance of Puck.
+	if not isRetreating or Fu.IsInTeamFight(bot, 1200) then
+		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), moveDistance, radius - 50, castPoint, 0)
+		if aoe ~= nil and aoe.count >= 2 and #Fu.GetEnemiesNearLoc(aoe.targetloc, radius - 50) >= 2 then
+			X.riftWhy = "group"
+			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+		end
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and enemyHero:IsChanneling()
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+			then
+				X.riftWhy = "channel"
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
+			end
 		end
 	end
+	X.riftWhy = "other"
 	if isGoingOnSomeone then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
 		if

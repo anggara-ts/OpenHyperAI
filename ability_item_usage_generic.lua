@@ -1072,7 +1072,8 @@ function Usage.StillTakingDamage()
 			return true
 		end
 	end
-	return hp < math.min(sample.hp, sample.prev) - 25
+	-- Lower than either of the last two samples (2-4s back): still falling.
+	return hp < math.max(sample.hp, sample.prev) - 25
 end
 local function BagHeal(unit)
 	local total = 0

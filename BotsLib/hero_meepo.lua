@@ -405,8 +405,8 @@ end
 -- The body to go to: 3500+ from our fountain, above half HP, not retreating, not in a fight that is clearly lost.
 -- Not while the base needs this body: it is in a defend mode, an enemy hero is within 1600, or enemy heroes were
 -- seen within 3500 of our Ancient (the same check that keeps the fountain TP at home).
-function X.PoofOutBody()
-	if bot:DistanceFromFountain() > 1500 or not poofAbility:IsTrained() or Fu.IsDefending(bot) then
+function X.PoofOutBody(fountainRange)
+	if bot:DistanceFromFountain() > fountainRange or not poofAbility:IsTrained() or Fu.IsDefending(bot) then
 		return nil
 	end
 	if #(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}) > 0 then
@@ -436,10 +436,11 @@ end
 -- Items think before spells, so the scroll would go first. While this body is at the fountain and such a body
 -- exists, hold its TP: the tpscroll rule in ability_item_usage_generic.lua reads bot._meepoPoofOutHold. The hold
 -- lapses 2s after the last think that set it, and after 30s in a row it pauses for 20s, so a Poof that never
--- comes (silenced, mana burned) cannot keep him in the base.
+-- comes (silenced, mana burned) cannot keep him in the base. It is set from 2500 out, because that rule fires
+-- within 1500 on the same think: a body walking in above 75% HP would teleport before this ran once.
 function X.HoldFountainTp()
 	local now = DotaTime()
-	if now < (bot._meepoPoofOutPause or -999) or X.PoofOutBody() == nil then
+	if now < (bot._meepoPoofOutPause or -999) or X.PoofOutBody(2500) == nil then
 		return
 	end
 	if bot._meepoPoofOutSince == nil or now > (bot._meepoPoofOutHold or -999) then
@@ -502,7 +503,7 @@ function X.ConsiderPoofRaw()
 	-- Healed at the fountain (the HP and mana at which retreat lets go of it: mode_retreat_generic.lua, tag 360)
 	-- with another body out on the map: Poof to it (X.PoofOutBody above).
 	if hpRatio > 0.9 and mpRatio > 0.8 and not bot._sellPending then
-		local outBody = X.PoofOutBody()
+		local outBody = X.PoofOutBody(1500)
 		if outBody ~= nil then
 			if DotaTime() >= (bot._poofOutLogAt or -999) then
 				bot._poofOutLogAt = DotaTime() + 5

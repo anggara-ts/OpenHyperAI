@@ -351,8 +351,8 @@ function X.AssassinateKills(enemyHero, bonusDamage, hitDelay)
 	local healthAtHit = enemyHero:GetHealth() + enemyHero:GetHealthRegen() * hitDelay
 	return bonusTaken + attackTaken * 0.9 >= healthAtHit
 end
--- [OHA-SNIPER] assassinate-kill: a shot fired because it should kill, at most once per 3s. attack= is the part of
--- the kill that needs his attack damage (the bonus damage alone covers bonus=).
+-- [OHA-SNIPER] assassinate-kill: a shot fired because it should kill, at most once per 3s. bonus= and attack= are
+-- the two parts of the shot after the target's resistances; hp above bonus means the kill counts on the attack.
 function X.LogAssassinateKill(enemyHero, bonusDamage)
 	if DotaTime() < (bot._assassinateLogAt or -999) then
 		return

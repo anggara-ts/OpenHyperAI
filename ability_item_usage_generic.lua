@@ -9037,21 +9037,60 @@ function Usage.DumpBotApi()
 	end
 	-- The bot's own handle, in case its class table is not a global.
 	ApiPrint("bot-handle", ApiNames(bot))
-	-- Numeric constants for shrines and ability behaviors (is ABILITY_BEHAVIOR_VECTOR_TARGETING
-	-- defined for bots?), and what the old healing-shrine API returns now that 7.33 replaced those
-	-- shrines with lotus pools and watchers: GetShrine for every SHRINE_* id on both teams.
+	-- Every numeric engine constant (#109, 7.42): BOT_MODE_*, ITEM_SLOT_*, RUNE_*, DAMAGE_TYPE_*, UNIT_LIST_*,
+	-- SHRINE_*, ABILITY_BEHAVIOR_*, ... to compare with FuncLib/dota/enums.lua and the numbers our logs print.
+	-- Then what the old healing-shrine API returns now that 7.33 replaced those shrines with lotus pools and
+	-- watchers: GetShrine for every SHRINE_* id on both teams.
 	local consts = {}
 	for k, v in pairs(_G) do
-		if
-			type(k) == "string"
-			and type(v) == "number"
-			and (string.find(k, "^SHRINE_") or string.find(k, "^ABILITY_BEHAVIOR_"))
-		then
+		if type(k) == "string" and type(v) == "number" and string.find(k, "^[A-Z][A-Z0-9_]+$") then
 			consts[#consts + 1] = k .. "=" .. tostring(v)
 		end
 	end
 	table.sort(consts)
 	ApiPrint("constants", consts)
+	-- 7.42 items (#109): does the engine know the new items and the changed recipes? Cost and components as the
+	-- buy code sees them (it buys by GetItemComponents). Names from the installed 7.42 items.txt.
+	for _, itemName in ipairs({
+		"item_bloodslinger",
+		"item_caduceus",
+		"item_ristuls_devotion",
+		"item_berserkers_sabatons",
+		"item_skypiercer",
+		"item_starforge",
+		"item_horn_of_battle_greater",
+		"item_skadi",
+		"item_bloodthorn",
+		"item_abyssal_blade",
+		"item_mjollnir",
+		"item_butterfly",
+		"item_basher",
+		"item_crimson_guard",
+		"item_harpoon",
+		"item_heavens_halberd",
+		"item_angels_demise",
+		"item_helm_of_the_overlord",
+	}) do
+		local okC, cost = pcall(GetItemCost, itemName)
+		local okP, parts = pcall(GetItemComponents, itemName)
+		local recipes = {}
+		if okP and type(parts) == "table" then
+			for _, recipe in ipairs(parts) do
+				if type(recipe) == "table" then
+					recipes[#recipes + 1] = table.concat(recipe, "+")
+				end
+			end
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-API] item %s cost=%s parts=%s",
+				itemName,
+				okC and tostring(cost) or "error",
+				okP and (#recipes > 0 and table.concat(recipes, " | ") or "-") or "error"
+			)
+		)
+	end
 	local shrineIds = {}
 	for k, v in pairs(_G) do
 		if type(k) == "string" and type(v) == "number" and string.find(k, "^SHRINE_") then

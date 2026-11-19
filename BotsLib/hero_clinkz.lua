@@ -120,6 +120,13 @@ function X.SkillsComplement()
 	if okH and hunted then
 		return
 	end
+	if not okH then
+		bot._clinkzHuntUntil = nil
+		if DotaTime() >= (bot._huntErrAt or -999) then
+			bot._huntErrAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-CLINKZ] t=%.0f hunt error %s", DotaTime(), tostring(hunted)))
+		end
+	end
 	skeletonWalkDesire = X.ConsiderSkeletonWalk()
 	if skeletonWalkDesire > 0 then
 		-- Soul Ring first when he has it (maintainer's hunt), so the walk and the reveal have mana.
@@ -145,6 +152,7 @@ function X.SkillsComplement()
 	end
 	strafeDesire = X.ConsiderStrafe()
 	if strafeDesire > 0 then
+		bot._strafeAt = DotaTime()
 		bot:Action_UseAbility(strafeAbility)
 		return
 	end
@@ -204,7 +212,7 @@ function X.HuntTarget()
 		return locked
 	end
 	bot._huntTarget = nil
-	if Fu.GetHP(bot) < 0.5 then
+	if Fu.GetHP(bot) < 0.5 or Fu.IsRetreating(bot) then
 		return nil
 	end
 	local best, bestHp = nil, 2
@@ -253,13 +261,29 @@ function X.HuntStep()
 	end
 	local target = X.HuntTarget()
 	if target == nil then
+		bot._clinkzHuntUntil = nil
 		return false
 	end
-	bot._clinkzHuntUntil = DotaTime() + 0.3
+	-- Outnumbered around Clinkz (the ally list includes him): no hunt.
+	if #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200) then
+		bot._huntTarget = nil
+		bot._clinkzHuntUntil = nil
+		return false
+	end
 	local distance = GetUnitToUnitDistance(bot, target)
 	if distance > 200 then
 		local toFountain = Fu.GetEnemyFountain() - target:GetLocation()
 		local ambush = target:GetLocation() + toFountain:Normalized() * 150
+		-- Not into an enemy tower's range (700, plus a margin).
+		for _, tower in pairs(bot:GetNearbyTowers(1600, true) or {}) do
+			if Fu.IsValidBuilding(tower) and GetUnitToLocationDistance(tower, ambush) < 850 then
+				X.LogHunt("skip-tower", target)
+				bot._huntTarget = nil
+				bot._clinkzHuntUntil = nil
+				return false
+			end
+		end
+		bot._clinkzHuntUntil = DotaTime() + 0.3
 		X.LogHunt("approach", target)
 		bot:Action_MoveToLocation(ambush)
 		return true
@@ -271,23 +295,28 @@ function X.HuntStep()
 		bot:Action_UseAbilityOnEntity(hex, target)
 	elseif strafeAbility:IsFullyCastable() then
 		step = "reveal-strafe"
+		bot._strafeAt = DotaTime()
 		bot:Action_UseAbility(strafeAbility)
 	else
 		step = "reveal-attack"
 		bot:Action_AttackUnit(target, true)
 	end
 	X.LogHunt(step, target)
-	pcall(
-		print,
-		string.format(
-			"[OHA-CLINKZ] t=%.0f hunt reveal dist=%d target=%s by=%s",
-			DotaTime(),
-			distance,
-			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
-			step
+	if DotaTime() >= (bot._huntRevealLogAt or -999) then
+		bot._huntRevealLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f hunt reveal dist=%d target=%s by=%s",
+				DotaTime(),
+				distance,
+				(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+				step
+			)
 		)
-	)
-	bot._clinkzHuntUntil = nil
+	end
+	-- Keep the other modes out until the first hit lands.
+	bot._clinkzHuntUntil = DotaTime() + 0.5
 	return true
 end
 function X.ConsiderStrafe()
@@ -602,8 +631,13 @@ function X.ConsiderBurningBarrage()
 	if not burningBarrageAbility:IsTrained() or not burningBarrageAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	-- Not during Strafe (maintainer, game 048 44:30): the 2s channel wastes the Strafe attack speed.
-	if bot:HasModifier("modifier_clinkz_strafe") then
+	-- Not during Strafe (maintainer, game 048 44:30): the 2s channel wastes the Strafe attack speed. The cast time
+	-- covers the case where the API doesn't show the modifier (game files: Strafe lasts "duration").
+	local strafeFor = strafeAbility:GetSpecialValueFloat("duration")
+	if
+		bot:HasModifier("modifier_clinkz_strafe")
+		or DotaTime() - (bot._strafeAt or -999) < (strafeFor > 0 and strafeFor or 3.5)
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	-- datafeed: Burning Barrage has no cast range and no "radius"; its arrows fly "range" (850), "projectile_width" (200) wide

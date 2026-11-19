@@ -116,6 +116,7 @@ local ACORN_TREE_DURATION = 20
 local ACORN_COMBO_WINDOW = 3
 local sharpshooterWindup = nil -- { startedAt, target, startFacing, reaims, released }
 local acornTree = nil -- { location, plantedAt, target }
+local acornTreeProbe = nil -- { location, orderedAt, castAt }
 local lastAcornLogAt = -100
 local acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy
 local bushwhackDesire, bushwhackLocation
@@ -134,6 +135,7 @@ function X.SkillsComplement()
 	hpRatio = context.hp
 	-- Charging Sharpshooter: aim and release come before the busy check (it may count the windup as a cast),
 	-- and nothing else is cast meanwhile.
+	pcall(X.ProbeAcornTree)
 	if X.ThinkSharpshooterWindup() then
 		return
 	end
@@ -275,12 +277,17 @@ function X.ConsiderAcornShot()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 -- Acorn Shot, by the goal. "tree": the acorn goes on the ground by the target and plants a tree for Bushwhack.
--- "bounce": it goes on the unit and bounces between the enemies around it.
+-- "bounce": it goes on the unit and bounces between the enemies around it. "ground": on the ground, no combo.
 function X.AcornShotMode(why, bushwhackReady, manaForBoth, targetCanBeTrapped, treeNearTarget)
 	if why == "wave" then
 		return "tree"
 	end
-	if why ~= "kill" and bushwhackReady and manaForBoth and targetCanBeTrapped and not treeNearTarget then
+	-- A unit cast is not allowed on a spell-immune enemy (game files: SPELL_IMMUNITY_ENEMIES_NO), and an order the
+	-- engine refuses would repeat every think: the ground by it, as before this rule, and no Bushwhack follow-up.
+	if not targetCanBeTrapped then
+		return "ground"
+	end
+	if why ~= "kill" and bushwhackReady and manaForBoth and not treeNearTarget then
 		return "tree"
 	end
 	return "bounce"
@@ -335,21 +342,65 @@ function X.CastAcornShot(location, target, why)
 		bot:Action_UseAbilityOnEntity(acornShotAbility, target)
 		return
 	end
-	if target ~= nil then
+	if mode == "tree" and target ~= nil then
 		acornTree = { location = location, plantedAt = DotaTime(), target = target }
+		acornTreeProbe = { location = location, orderedAt = DotaTime() }
 	end
 	bot:Action_UseAbilityOnLocation(acornShotAbility, location)
 end
--- Bushwhack on the tree her own acorn planted. GetNearbyTrees may not list a planted tree (apiTrees in the log
+-- Does the API list a planted tree? One second after the acorn left (its cooldown runs; it flies for at most
+-- 0.35s), the distance from the planted spot to the nearest tree GetNearbyTrees returns. Tree mode is only used
+-- with no tree within 250 of the target, so a tree within 60 of the spot is the planted one.
+function X.ProbeAcornTree()
+	local probe = acornTreeProbe
+	if probe == nil then
+		return
+	end
+	if acornShotAbility:IsCooldownReady() then
+		if DotaTime() > probe.orderedAt + 1 then
+			acornTreeProbe = nil
+		end
+		return
+	end
+	probe.castAt = probe.castAt or DotaTime()
+	if DotaTime() < probe.castAt + 1 then
+		return
+	end
+	acornTreeProbe = nil
+	local nearest = -1
+	for _, tree in pairs(bot:GetNearbyTrees(1300) or {}) do
+		local distance = Fu.GetLocationToLocationDistance(GetTreeLocation(tree), probe.location)
+		if nearest < 0 or distance < nearest then
+			nearest = distance
+		end
+	end
+	print(
+		string.format(
+			"[OHA-HOODWINK] t=%.0f hoodwink planted-tree listed=%s nearest=%d fromBot=%d",
+			DotaTime(),
+			tostring(nearest >= 0 and nearest <= 60),
+			math.floor(nearest),
+			math.floor(GetUnitToLocationDistance(bot, probe.location))
+		)
+	)
+end
+-- Bushwhack on the tree her own acorn planted. GetNearbyTrees may not list a planted tree (the planted-tree log
 -- tells), so the spot is remembered: the acorn's target for ACORN_COMBO_WINDOW seconds, then the attack target.
 function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectileSpeed)
 	if acornTree == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local age = DotaTime() - acornTree.plantedAt
-	-- The acorn never left (order replaced, stun): it would be on cooldown by now.
-	if age > ACORN_TREE_DURATION or age > 0.6 and acornShotAbility:IsCooldownReady() then
+	if age > ACORN_TREE_DURATION then
 		acornTree = nil
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- No net before the acorn has left (its cooldown runs then). Still ready after 0.6s: it never left (order
+	-- replaced, stun), forget the spot.
+	if acornShotAbility:IsCooldownReady() then
+		if age > 0.6 then
+			acornTree = nil
+		end
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local enemyHero = acornTree.target
@@ -370,15 +421,13 @@ function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectile
 	if center == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local apiTrees = enemyHero:GetNearbyTrees(radius)
 	print(
 		string.format(
-			"[OHA-HOODWINK] t=%.0f hoodwink bushwhack why=acorn-tree target=%s treeDist=%d treeAge=%.1f apiTrees=%d",
+			"[OHA-HOODWINK] t=%.0f hoodwink bushwhack why=acorn-tree target=%s treeDist=%d treeAge=%.1f",
 			DotaTime(),
 			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
 			math.floor(GetUnitToLocationDistance(enemyHero, acornTree.location)),
-			age,
-			apiTrees and #apiTrees or 0
+			age
 		)
 	)
 	-- One net per tree: a miss is not thrown again.
@@ -584,12 +633,17 @@ function X.ConsiderSharpshooter()
 end
 -- Why to fire a charging Sharpshooter now, or nil to keep charging.
 --   full: charged for max_charge_time and the bolt line is on the target (or there is no target to aim at);
+--   full-noturn: charged, off the line, and the move orders are not turning her: waiting would only reach the
+--     automatic fire;
 --   harassed: a hero is hitting her and she is hurt or it stands next to her, after half a second of charge;
 --   leaving: the bolt would still reach the target now, but not once the charge is full.
--- Off the line at full charge she keeps turning; the bolt fires by itself at misfire_time.
-function X.SharpshooterReleaseReason(charge, maxChargeTime, hasTarget, onLine, harassed, leaving)
+-- Off the line at full charge she keeps turning while that works; the bolt fires by itself at misfire_time.
+function X.SharpshooterReleaseReason(charge, maxChargeTime, hasTarget, onLine, harassed, leaving, canTurn)
 	if charge >= maxChargeTime and (onLine or not hasTarget) then
 		return "full"
+	end
+	if charge >= maxChargeTime and not canTurn then
+		return "full-noturn"
 	end
 	if harassed and charge >= 0.5 then
 		return "harassed"
@@ -676,7 +730,9 @@ function X.ThinkSharpshooterWindup()
 		hasTarget,
 		onLine,
 		harassed,
-		leaving
+		leaving,
+		-- Turning works until five move orders have moved her facing by less than 3 degrees.
+		windup.reaims < 5 or FacingChange(windup.startFacing, bot:GetFacing()) >= 3
 	)
 	if reason ~= nil and not sharpshooterReleaseAbility:IsHidden() and sharpshooterReleaseAbility:IsFullyCastable() then
 		if not windup.released then

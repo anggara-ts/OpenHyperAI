@@ -2036,8 +2036,12 @@ heroSpecificDesire["npc_dota_hero_puck"] = function()
 		-- starts at hero_puck.lua's order time and lasts the shift's duration (game data) + 0.1s; Think gives no order.
 		local orderAt = bot._phaseOrderAt
 		local holdFor = highPriorityAbility:GetSpecialValueFloat("duration") + 0.1
+		-- Hit by a hero after the order (0.1s for the cast): the shift is not on, no hold (game 048, t=752).
+		local hurt = orderAt ~= nil
+			and DotaTime() - orderAt > 0.15
+			and bot:WasRecentlyDamagedByAnyHero(DotaTime() - orderAt - 0.1)
 		if
-			orderAt ~= nil and DotaTime() - orderAt < holdFor
+			not hurt and orderAt ~= nil and DotaTime() - orderAt < holdFor
 			or highPriorityAbility:IsInAbilityPhase()
 			or bot:HasModifier("modifier_puck_phase_shift")
 		then

@@ -106,11 +106,12 @@ function X.TrackPhaseShift()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase-probe after=%.1f cd=%.1f invuln=%s channelling=%s active=%s mods=%s",
+				"[OHA-PUCK] t=%.0f phase-probe after=%.1f cd=%.1f invuln=%s damaged=%s channelling=%s active=%s mods=%s",
 				DotaTime(),
 				since,
 				phaseShiftAbility:GetCooldownTimeRemaining(),
 				tostring(bot:IsInvulnerable()),
+				tostring(X.HurtSincePhaseOrder()),
 				tostring(bot:IsChanneling()),
 				activeNow ~= nil and not activeNow:IsNull() and activeNow:GetName() or "-",
 				table.concat(mods, ",")
@@ -232,6 +233,15 @@ function X.LogEscapeCheck(orbOut, canCast)
 		)
 	)
 end
+-- Hit by a hero after the Phase Shift order (0.1s for the cast): the shift is not on, so stop holding
+-- (game 048, t=752: Puck died at 31% HP within a second of the order, under the hold).
+function X.HurtSincePhaseOrder()
+	if bot._phaseOrderAt == nil then
+		return false
+	end
+	local since = DotaTime() - bot._phaseOrderAt - 0.1
+	return since > 0.05 and bot:WasRecentlyDamagedByAnyHero(since)
+end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
 	-- Hold every other cast while Phase Shift starts and lasts (#15, game 046: 15 orders, never channelling 0.3s later;
@@ -243,6 +253,7 @@ function X.SkillsComplement()
 		bot._phaseOrderAt ~= nil
 		and DotaTime() - bot._phaseOrderAt < phaseShiftAbility:GetSpecialValueFloat("duration") + 0.05
 		and phaseShiftAbility:GetCooldownTimeRemaining() > 0
+		and not X.HurtSincePhaseOrder()
 	then
 		return
 	end
@@ -494,7 +505,7 @@ function X.ConsiderWaningRift()
 	end
 	-- Silence a group, or a channelling hero, from where she lands (game files: radius 400 around the landing
 	-- point, max_distance 350): the best point for 2+ heroes within max_distance of Puck.
-	if not isRetreating or Fu.IsInTeamFight(bot, 1200) then
+	if (isGoingOnSomeone or Fu.IsInTeamFight(bot, 1200)) and mpRatio > 0.25 then
 		local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), moveDistance, radius - 50, castPoint, 0)
 		if aoe ~= nil and aoe.count >= 2 and #Fu.GetEnemiesNearLoc(aoe.targetloc, radius - 50) >= 2 then
 			X.riftWhy = "group"

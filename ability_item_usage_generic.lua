@@ -7338,7 +7338,9 @@ DustDesire = function(item)
 			return DustUse("radiance", nil)
 		end
 		for _, playerId in pairs(enemyPlayerIds) do
-			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) then
+			-- Only an enemy who can go invisible (game 049: 4 unseen-damage Dusts on Puck, Tinker and Weaver; Puck and
+			-- Tinker have no invisibility, they were in fog).
+			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) and CanGoInvisible(playerId) then
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil then
 					local lastSeen = lastSeenInfo[1]

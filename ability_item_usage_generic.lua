@@ -2597,11 +2597,13 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 				return BOT_ACTION_DESIRE_NONE
 			end
 		end
-		if hp >= 0.9 and mp >= 0.85 then
+		-- At full HP and mana only when an item waits in the stash or on the courier (game 048 42:00: Puck ate
+		-- the lotus she had just taken at full HP and mana).
+		if hp >= 0.9 and mp >= 0.85 and (bot:GetStashValue() > 0 or bot:GetCourierValue() > 0) then
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, "Free slot (" .. label .. ", full)"
 		end
-		-- Still packed but not full resources — use it, then the slot opens.
-		if hp < 0.95 or mp < 0.9 then
+		-- Still packed and missing some HP or mana: use it, then the slot opens.
+		if hp < 0.8 or mp < 0.7 then
 			return BOT_ACTION_DESIRE_MODERATE, bot, castType, "Free slot (" .. label .. ")"
 		end
 	end

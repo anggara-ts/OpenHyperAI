@@ -1000,13 +1000,20 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			-- retreat) and died at Radiant's top tower: the danger exit only came at 37% HP. Hit by a hero with an
 			-- enemy hero near: the trip ends, and attack / retreat (kiting included) take the fight.
 			local fightNow = #foes >= 1 and bot:WasRecentlyDamagedByAnyHero(1.5)
+			-- A fight ends the trip for 10s (game 048 38:58: Puck fought Phoenix on the way, the trip came back
+			-- at 44% HP a few seconds later).
+			if fightNow then
+				bot._lotusFightUntil = DotaTime() + 10
+			end
+			fightNow = fightNow or DotaTime() < (bot._lotusFightUntil or -999)
+			-- The ally list includes the bot itself.
 			local friends = bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}
 			local beside = dist <= 800 and spawnOpen and sinceLast >= 0 and sinceLast <= 45
 			local lostBeside = false
 			if beside then
 				local hpNow = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
 				-- The forced desire beats retreat. Do not hold a losing fight on the pool.
-				if hpNow < 0.5 and #foes > #friends + 1 then
+				if hpNow < 0.5 and #foes >= #friends then
 					beside = false
 					lostBeside = true
 				end
@@ -1042,7 +1049,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 				and sinceLast >= 0
 				and sinceLast <= 45
 				and foesAtPool == 0
-				and #foes <= #friends
+				and #foes < #friends
 				and bot._lotusSkipMark ~= mark
 			then
 				inLotus = true
@@ -1249,10 +1256,13 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	if bot == nil or loc == nil then
 		return false
 	end
-	AnnounceObjective(bot, kind)
 	-- Lotus grants only from the middle of the pool. 340 stops them on the bank.
 	local gather = kind == "wisdom" and 280 or 140
 	local dist = GetUnitToLocationDistance(bot, loc)
+	-- Say it near the objective only (game 048 38:58: Puck said "Taking lotus" by the Dire bottom T2, far away).
+	if dist <= 1500 then
+		AnnounceObjective(bot, kind)
+	end
 	local enemies = bot:GetNearbyHeroes(1000, true, BOT_MODE_NONE) or {}
 	local allies = bot:GetNearbyHeroes(1000, false, BOT_MODE_NONE) or {}
 
@@ -1322,7 +1332,8 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 	end
 
 	-- Outnumbered on the way: walk back instead of standing still (it returned with no order, game 044 review).
-	if #enemies > 0 and #enemies > #allies and dist > gather then
+	-- The ally list includes the bot: one enemy against a lone bot is outnumbered (game 048 38:58).
+	if #enemies > 0 and #enemies > #allies - 1 and dist > gather then
 		MarkLotusDo(bot, "outnumbered")
 		local fountain = GetShopLocation(GetTeam(), SHOP_HOME)
 		if fountain ~= nil then
@@ -1330,14 +1341,8 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		end
 		return true
 	end
-	if #enemies > 0 and #enemies <= #allies and dist > gather then
-		local target = enemies[1]
-		if target ~= nil and target:IsAlive() then
-			bot:Action_AttackUnit(target, true)
-			MarkLotusDo(bot, "attack")
-			return true
-		end
-	end
+	-- No hero fights from this mode (game 048 38:58: it attacked Phoenix 1v1 on the way). A hit ends the trip
+	-- (fightNow) and the attack / retreat modes take the fight.
 	if dist > gather then
 		bot._lotusHaveAt = nil
 		bot:Action_MoveToLocation(loc)

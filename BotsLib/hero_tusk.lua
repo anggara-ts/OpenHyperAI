@@ -65,6 +65,7 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_blink",
 	"item_desolator",
 	"item_black_king_bar",
+	"item_echo_sabre",
 	"item_heavens_halberd",
 	"item_assault",
 	"item_travel_boots",

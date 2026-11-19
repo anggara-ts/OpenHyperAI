@@ -9339,6 +9339,12 @@ function ItemUsageThink()
 	if Usage.RunePickupLock() then
 		return
 	end
+	-- A hero file's own hold (Puck's Phase Shift, #36): an item order would end the channel. Game 050: a hero hit
+	-- her within 1s of the cast in 12 of 24 probes, and item orders were the one thing not held.
+	if bot._castHoldUntil ~= nil and DotaTime() < bot._castHoldUntil then
+		_perfDone()
+		return
+	end
 	do
 		local okF, ate = pcall(Usage.EatForage)
 		if okF and ate then

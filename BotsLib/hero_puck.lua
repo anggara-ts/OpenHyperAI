@@ -244,6 +244,10 @@ function X.HurtSincePhaseOrder()
 end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
+	-- Hit after the order: the shift is not on, so nothing is held any more.
+	if bot._castHoldUntil ~= nil and X.HurtSincePhaseOrder() then
+		bot._castHoldUntil = nil
+	end
 	-- Hold every other cast while Phase Shift starts and lasts (#15, game 046: 15 orders, never channelling 0.3s later;
 	-- 5 of 8 probes found Puck already casting Waning Rift or the orb: our own next think broke the channel).
 	if bot._phaseOrderAt ~= nil and DotaTime() - bot._phaseOrderAt < 0.4 then
@@ -288,15 +292,18 @@ function X.SkillsComplement()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s",
+				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s why=%s",
 				DotaTime(),
 				Fu.GetHP(bot),
 				#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000),
-				tostring(isRetreating)
+				tostring(isRetreating),
+				tostring(X.phaseWhy)
 			)
 		)
 		bot._phaseProbeAt = DotaTime() + 0.3
 		bot._phaseOrderAt = DotaTime()
+		-- Item orders and every wrapped mode Think wait too (OhaCastGuard, ItemUsageThink).
+		bot._castHoldUntil = DotaTime() + phaseShiftAbility:GetSpecialValueFloat("duration") + 0.05
 		bot:Action_UseAbility(phaseShiftAbility)
 		return
 	end
@@ -523,7 +530,7 @@ function X.ConsiderWaningRift()
 			end
 		end
 	end
-	X.riftWhy = "other"
+	X.riftWhy = "target"
 	if isGoingOnSomeone then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
 		if
@@ -540,38 +547,46 @@ function X.ConsiderWaningRift()
 			end
 		end
 	end
+	X.riftWhy = "escape"
 	if isRetreating then
-		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
-		local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-		if
-			nearbyAllies ~= nil
-			and nearbyEnemyHeroes ~= nil
-			and Fu.IsValidHero(nearbyEnemyHeroes[1])
-			and not Fu.IsSuspiciousIllusion(nearbyEnemyHeroes[1])
-			and not Fu.IsDisabled(nearbyEnemyHeroes[1])
-		then
-			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1200, false, BOT_MODE_NONE)
+		-- An escape jump needs someone to escape from (game 050, 14:06: she jumped 349 with no enemy in sight,
+		-- still in retreat mode from a fight 30s before): an enemy hero chasing her within 600, and she was hit in
+		-- the last 2s or a stun is flying at her.
+		local hitNow = bot:WasRecentlyDamagedByAnyHero(2) or Fu.IsStunProjectileIncoming(bot, 600)
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE) or {}) do
 			if
-				enemyAllies ~= nil
-				and (#enemyAllies > #nearbyAllies or Fu.GetHP(bot) < 0.65 and bot:WasRecentlyDamagedByAnyHero(2))
+				hitNow
+				and Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+				and Fu.IsChasingTarget(enemyHero, bot)
 			then
 				local escapeLocation = Fu.GetEscapeLoc()
 				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, moveDistance)
 			end
 		end
 	end
+	-- Rift moves Puck to the point (game 050, 46:19: a creep-clear Rift put her back on a wave she was walking
+	-- away from). Creep clears only on a point she is facing.
+	X.riftWhy = "push"
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
 		local aoeLocation =
 			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
 		local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
-		if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
+		if
+			laneCreeps ~= nil
+			and #laneCreeps >= 4
+			and aoeLocation.count >= 4
+			and bot:IsFacingLocation(aoeLocation.targetloc, 60)
+		then
 			return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
 		end
 	end
+	X.riftWhy = "farm"
 	if Fu.IsFarming(bot) then
 		local aoeLocation =
 			bot:FindAoELocation(true, false, bot:GetLocation(), bot:GetAttackRange() + 150, radius, 0, 0)
-		if isAttacking then
+		if isAttacking and bot:IsFacingLocation(aoeLocation.targetloc, 60) then
 			local neutralCreeps = bot:GetNearbyNeutralCreeps(radius)
 			if
 				neutralCreeps ~= nil
@@ -588,6 +603,7 @@ function X.ConsiderWaningRift()
 			end
 		end
 	end
+	X.riftWhy = "lane"
 	if Fu.IsLaning(bot) then
 		local killableCreepCount = 0
 		local killableCreeps = {}
@@ -603,6 +619,7 @@ function X.ConsiderWaningRift()
 			return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
 		end
 	end
+	X.riftWhy = "roshan"
 	if Fu.IsDoingRoshan(bot) then
 		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
@@ -616,6 +633,7 @@ function X.ConsiderWaningRift()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 function X.ConsiderPhaseShift()
+	X.phaseWhy = "hero"
 	if not phaseShiftAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
@@ -631,6 +649,19 @@ function X.ConsiderPhaseShift()
 		if Fu.IsWillBeCastUnitTargetSpell(bot, 400) then
 			return BOT_ACTION_DESIRE_HIGH
 		end
+	end
+	-- Roshan on her under 40% HP (game 050, 29:49-29:53: she died to Roshan from 58% with Phase Shift unused; every
+	-- rule above reacts to heroes). The shift drops his attack; she walks out after it.
+	local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+	if
+		Fu.GetHP(bot) < 0.4
+		and roshanHandle ~= nil
+		and not roshanHandle:IsNull()
+		and roshanHandle:IsAlive()
+		and roshanHandle:GetAttackTarget() == bot
+	then
+		X.phaseWhy = "roshan"
+		return BOT_ACTION_DESIRE_HIGH
 	end
 	if isRetreating then
 		-- Phase only to wait out a short blink lockout (damage puts Blink on a 3s cooldown) with an enemy

@@ -731,8 +731,9 @@ function X.ConsiderNihilism()
 		end
 	end
 	-- Fights: Nihilism disarms the enemies within the radius for 4s (7.42; it was an ethereal escape
-	-- before). It was only an escape. Now (1) in a fight while heroes hit him below 60% HP, and (2)
-	-- going on a target with no allied hero within 1200 (kept from the ethereal version: not re-tuned).
+	-- before, which is why it once waited for "no ally nearby": ethereal enemies could not be hit by
+	-- allies either). A disarm does not block allies, so now (1) in a fight while heroes hit him below
+	-- 60% HP, and (2) going on a target within the radius, with or without allies near.
 	if isGoingOnSomeone or isInTeamFight then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		local enemiesHit = 0
@@ -746,12 +747,6 @@ function X.ConsiderNihilism()
 			end
 		end
 		if enemiesHit >= 1 then
-			local nearbyAllyCount = 0
-			for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}) do
-				if allyHero ~= bot and not Fu.IsSuspiciousIllusion(allyHero) then
-					nearbyAllyCount = nearbyAllyCount + 1
-				end
-			end
 			local castReason = nil
 			if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.6 then
 				castReason = "defend"
@@ -760,9 +755,8 @@ function X.ConsiderNihilism()
 				and Fu.IsValidHero(botTarget)
 				and Fu.IsInRange(bot, botTarget, radius)
 				and not botTarget:IsMagicImmune()
-				and nearbyAllyCount == 0
 			then
-				castReason = "solo"
+				castReason = "engage"
 			end
 			if castReason ~= nil then
 				if DotaTime() >= (bot._nihilLogAt or -999) then

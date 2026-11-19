@@ -243,7 +243,8 @@ function X.HuntTarget()
 		return locked
 	end
 	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
-	if Fu.GetHP(bot) < 0.5 or Fu.IsRetreating(bot) then
+	-- No new target for 15s after a cancelled hunt (else the same hero is picked again next think).
+	if Fu.GetHP(bot) < 0.5 or Fu.IsRetreating(bot) or DotaTime() < (bot._huntOffUntil or -999) then
 		return nil
 	end
 	local best, bestHp = nil, 2
@@ -549,8 +550,8 @@ function X.ConsiderSkeletonWalk()
 	local tormentorLocation = Fu.GetTormentorLocation(GetTeam())
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
 	-- Hunt (#94, maintainer's play; game 050 30:40: he saw Lich alone and hit him from the edge of his range).
-	local prey = X.FindPrey()
-	if prey ~= nil then
+	local okPrey, prey = pcall(X.FindPrey)
+	if okPrey and prey ~= nil then
 		bot._huntTarget = prey
 		bot._huntPrey = prey
 		bot._huntLockAt = DotaTime()

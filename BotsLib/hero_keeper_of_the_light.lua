@@ -67,9 +67,11 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_boots",
 	"item_urn_of_shadows",
 	"item_tranquil_boots",
-	"item_glimmer_cape",
+	"item_magic_wand",
 	"item_spirit_vessel",
-	"item_kaya_and_sange",
+	"item_force_staff",
+	"item_glimmer_cape",
+	"item_ultimate_scepter",
 	"item_boots_of_bearing",
 	"item_octarine_core",
 	"item_sheepstick",
@@ -77,14 +79,22 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
+-- Pos 5 (#9, game 039): no Solar Crest rush. Stratz 7.41f (week of 5-11 Nov 2026, all ranks), pos 5, 8,183
+-- matches: Solar Crest 4.3%, Mekansm 3.1% (its Guardian Greaves 1.5%); Aghanim's Scepter 79%, Magic Wand 52%,
+-- Urn of Shadows 47%, Force Staff 40%, Spirit Vessel 37%, Glimmer Cape 35%. Order by when they are bought:
+-- Wand and Urn by minute 10, Vessel ~17, Force Staff and Glimmer ~24, Scepter ~29. Pos 4 (12,985 matches)
+-- reads the same: Scepter 81%, Urn 55%, Wand 54%, Vessel 41%, Force Staff 41%; Kaya and Sange 0.5%.
 sRoleItemsBuyList["pos_5"] = {
 	"item_double_tango",
 	"item_faerie_fire",
 	"item_blood_grenade",
 	"item_tranquil_boots",
-	"item_solar_crest",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_force_staff",
 	"item_glimmer_cape",
-	"item_mekansm",
+	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_boots_of_bearing",
 	"item_lotus_orb",

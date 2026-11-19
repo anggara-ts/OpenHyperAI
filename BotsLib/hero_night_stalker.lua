@@ -38,40 +38,36 @@ sRoleItemsBuyList["pos_3"] = {
 }
 sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
+-- Pos 4/5 (#9): players build him as a Blink initiator in every position, not as a caster support.
+-- Stratz 7.41f (week of 5-11 Nov 2026, all ranks), pos 4, 1,309 matches: Blink, Bracer and Magic Wand in over
+-- 95% of matches, Echo Sabre 68%, Black King Bar 67%, first boots Phase 57% (plain Boots 33%, Arcane/Tranquil
+-- under 3%). The old support list's items: Mekansm 0.3%, Glimmer Cape 0.9%, Mjollnir 1.4%, Scythe of Vyse 0.5%,
+-- Guardian Greaves never. Blink comes before Echo Sabre here: by minute 16, 26% have Blink and 19% Echo Sabre,
+-- by minute 20, 64% and 44% (at pos 3 Echo Sabre is the earlier one: 68% against 50% by minute 16). Pos 5 has
+-- only 289 matches, so it follows pos 4; its own numbers agree (Blink and Bracer over 95%, Pavise 0.7%,
+-- Solar Crest 0.7%, Glimmer Cape 2.4%).
 sRoleItemsBuyList["pos_4"] = {
-	"item_priest_outfit",
-	"item_hand_of_midas",
-	"item_mekansm",
-	"item_glimmer_cape",
+	"item_tango",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_blink",
+	"item_echo_sabre",
+	"item_black_king_bar",
+	"item_harpoon",
+	"item_basher",
 	"item_aghanims_shard",
-	"item_guardian_greaves",
-	"item_spirit_vessel",
-	"item_lotus_orb",
-	"item_mjollnir",
-	"item_ultimate_scepter",
-	"item_sheepstick",
-	"item_mystic_staff",
-	"item_ultimate_scepter_2",
-	"item_shivas_guard",
+	"item_assault",
+	"item_abyssal_blade",
+	"item_overwhelming_blink",
 	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_5"] = {
-	"item_mage_outfit",
-	"item_hand_of_midas",
-	"item_glimmer_cape",
-	"item_pavise",
-	"item_pipe",
-	"item_solar_crest",
-	"item_lotus_orb",
-	"item_aghanims_shard",
-	"item_spirit_vessel",
-	"item_ultimate_scepter",
-	"item_shivas_guard",
-	"item_mystic_staff",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
-	"item_sheepstick",
 }
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

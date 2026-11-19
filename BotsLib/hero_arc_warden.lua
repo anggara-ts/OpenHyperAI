@@ -59,6 +59,10 @@ if sRole == "pos_2" then
 		nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[3])
 	end
 end
+-- Item check for #9, Stratz 7.41f (week of 5-11 Nov 2026, all ranks). Dropped: Diffusal Blade and Disperser from
+-- the pos 1 list (pos 1, 3,870 matches: 2.4% and 1.8%, no Diffusal before minute 25; it was the first item
+-- after Midas) and Spirit Vessel from both mid lists (32 of 60,560 pos 2 matches). Hydra's Breath is not added:
+-- 32% of pos 1 and 26% of pos 2 matches, at ~33 min, under the ~35% bar used for adding an item.
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
@@ -70,7 +74,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_wraith_band",
 	"item_boots",
 	"item_hand_of_midas",
-	"item_diffusal_blade",
 	"item_maelstrom",
 	"item_mjollnir",
 	"item_travel_boots",
@@ -80,7 +83,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_bloodthorn",
 	"item_moon_shard",
 	"item_sheepstick",
-	"item_disperser",
 	"item_travel_boots_2",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
@@ -93,7 +95,6 @@ if sMidBuildType == "Magical" then
 		"item_faerie_fire",
 		"item_bottle",
 		"item_magic_wand",
-		"item_spirit_vessel",
 		"item_boots",
 		"item_hand_of_midas",
 		"item_mjollnir",
@@ -116,7 +117,6 @@ else
 		"item_double_branches",
 		"item_faerie_fire",
 		"item_bottle",
-		"item_spirit_vessel",
 		"item_magic_wand",
 		"item_boots",
 		"item_hand_of_midas",

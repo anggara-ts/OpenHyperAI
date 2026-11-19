@@ -6,14 +6,19 @@ local bot
 local stoneFormAbility
 local isAttackingCreepsOrTowers = false
 function X.Think(ownerBot, minion)
+	X.LogStoneFormResult(minion)
 	if Fu.CanNotUseAbility(minion) then
 		return
 	end
 	bot = ownerBot
 	stoneFormAbility = minion:GetAbilityByName("visage_summon_familiars_stone_form")
-	minion.cast_desire = X.ConsiderStoneForm(minion, stoneFormAbility)
+	local stoneFormReason
+	minion.cast_desire, stoneFormReason = X.ConsiderStoneForm(minion, stoneFormAbility)
 	if minion.cast_desire > 0 then
-		minion:Action_UseAbilityOnLocation(stoneFormAbility, minion:GetLocation())
+		-- Stone Form is a no-target spell (game files 7.42: DOTA_ABILITY_BEHAVIOR_NO_TARGET | IMMEDIATE). It was
+		-- ordered as a location cast, which is the wrong order type for it.
+		minion:Action_UseAbility(stoneFormAbility)
+		X.LogStoneForm(minion, stoneFormReason)
 		return
 	end
 	minion.retreat_desire, minion.retreat_location = X.ConsiderFamiliarRetreat(minion)
@@ -32,6 +37,38 @@ function X.Think(ownerBot, minion)
 		return
 	end
 end
+-- [OHA-VISAGE] familiar-stone why=retreat|low-hp|channel|attack: the order, at most once per 3s per familiar.
+function X.LogStoneForm(minion, why)
+	if DotaTime() < (minion._stoneFormLogAt or -999) then
+		return
+	end
+	minion._stoneFormLogAt = DotaTime() + 3
+	minion._stoneFormOrderAt = DotaTime()
+	pcall(
+		print,
+		string.format(
+			"[OHA-VISAGE] t=%.0f familiar-stone why=%s hp=%.2f owner-dist=%.0f",
+			DotaTime(),
+			tostring(why),
+			Fu.GetHP(minion),
+			GetUnitToUnitDistance(minion, bot)
+		)
+	)
+end
+-- [OHA-VISAGE] familiar-stone-result stone=yes|no: 1s after a logged order, is the familiar in Stone Form
+-- (6s, game files)? "no" means the order did not go through.
+function X.LogStoneFormResult(minion)
+	local orderAt = minion._stoneFormOrderAt
+	if orderAt == nil or DotaTime() < orderAt + 1 then
+		return
+	end
+	minion._stoneFormOrderAt = nil
+	local inStone = minion:HasModifier("modifier_visage_summon_familiars_stone_form_buff")
+	pcall(
+		print,
+		string.format("[OHA-VISAGE] t=%.0f familiar-stone-result stone=%s", DotaTime(), inStone and "yes" or "no")
+	)
+end
 function X.ConsiderStoneForm(minion, ability)
 	if not Fu.CanCastAbility(ability) or minion:HasModifier("modifier_visage_summon_familiars_stone_form_buff") then
 		return BOT_ACTION_DESIRE_NONE
@@ -48,16 +85,16 @@ function X.ConsiderStoneForm(minion, ability)
 				and not MinionUtils.CantMove(enemyHero)
 				and bot:WasRecentlyDamagedByHero(enemyHero, 3.0)
 			then
-				return BOT_ACTION_DESIRE_HIGH
+				return BOT_ACTION_DESIRE_HIGH, "retreat"
 			end
 		end
 	end
 	if Fu.GetHP(minion) < 0.35 then
-		return BOT_ACTION_DESIRE_HIGH
+		return BOT_ACTION_DESIRE_HIGH, "low-hp"
 	end
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if Fu.IsValidHero(enemyHero) and Fu.CanCastOnNonMagicImmune(enemyHero) and enemyHero:IsChanneling() then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "channel"
 		end
 	end
 	local attackTarget = minion:GetAttackTarget()
@@ -66,7 +103,7 @@ function X.ConsiderStoneForm(minion, ability)
 		and not Fu.IsSuspiciousIllusion(attackTarget)
 		and not Fu.IsDisabled(attackTarget)
 	then
-		return BOT_ACTION_DESIRE_HIGH
+		return BOT_ACTION_DESIRE_HIGH, "attack"
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

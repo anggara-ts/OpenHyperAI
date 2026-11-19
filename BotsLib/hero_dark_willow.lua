@@ -331,7 +331,10 @@ function X.ConsiderBedlam()
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	if terrorizeAbility:IsTrained() then
-		local fearDuration = bedlamAbility:GetSpecialValueInt("destination_status_duration")
+		-- "Bedlam cannot be used while Terrorize is active" (datafeed). The fear time is Terrorize's value
+		-- (game files 7.42: destination_status_duration 2.8/3.0/3.2); it was read from Bedlam, which has no
+		-- such key, so it was 0 and this wait never applied.
+		local fearDuration = terrorizeAbility:GetSpecialValueFloat("destination_status_duration")
 		if DotaTime() - lastTerrorizeTime <= fearDuration then
 			return BOT_ACTION_DESIRE_NONE, nil
 		end
@@ -348,15 +351,39 @@ function X.ConsiderBedlam()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	if isInTeamFight then
 		if #nearbyEnemies >= 1 then
+			X.LogBedlam("fight", #nearbyEnemies)
 			return BOT_ACTION_DESIRE_HIGH, bot
 		end
 	end
 	if isGoingOnSomeone then
 		if Fu.IsInRange(bot, botTarget, castRange) and Fu.IsValidTarget(botTarget) then
+			X.LogBedlam("engage", #nearbyEnemies)
 			return BOT_ACTION_DESIRE_HIGH, bot -- was the undefined global allyTarget; Bedlam is no-target
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- [OHA-DARK_WILLOW] bedlam why=fight|engage, at most once per 5s. since-terrorize is the time since the last
+-- Terrorize order (-1 before the first one): it must be longer than the fear (about 3s).
+function X.LogBedlam(why, enemyCount)
+	if DotaTime() < (bot._bedlamLogAt or -999) then
+		return
+	end
+	bot._bedlamLogAt = DotaTime() + 5
+	local sinceTerrorize = -1
+	if lastTerrorizeTime > 0 then
+		sinceTerrorize = DotaTime() - lastTerrorizeTime
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-DARK_WILLOW] t=%.0f bedlam why=%s enemies=%d since-terrorize=%.1f",
+			DotaTime(),
+			why,
+			enemyCount,
+			sinceTerrorize
+		)
+	)
 end
 function X.ConsiderTerrorize()
 	if not terrorizeAbility:IsFullyCastable() or DotaTime() - lastBedlamTime <= 5 then

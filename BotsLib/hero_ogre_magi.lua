@@ -101,7 +101,7 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_5"] = {
-	-- Arcane Boots (crystal_maiden_outfit) instead of Tranquil Boots, and Blink Dagger instead of
+	-- Arcane Boots instead of Tranquil Boots, and Blink Dagger instead of
 	-- Spirit Vessel: Arcane 71% (#2), Blink 64% (#3) of his matches (Dotabuff, last patch).
 	"item_tango",
 	"item_blood_grenade",

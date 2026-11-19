@@ -35,10 +35,11 @@ if sRole == "pos_5" then
 end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_2"] = {
-	"item_tango",
-	"item_double_branches",
-	"item_circlet",
 	"item_faerie_fire",
+	"item_mantle",
+	"item_circlet",
+	"item_double_branches",
+	"item_tango",
 	"item_null_talisman",
 	"item_boots",
 	"item_magic_wand",

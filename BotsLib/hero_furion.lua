@@ -49,9 +49,10 @@ end
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_faerie_fire",
+	"item_double_branches",
 	"item_circlet",
+	"item_mantle",
 	"item_null_talisman",
 	"item_magic_wand",
 	"item_power_treads",

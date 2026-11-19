@@ -74,7 +74,6 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_magic_stick",
 	"item_branches",
-	"item_gauntlets",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_ancient_janggo",

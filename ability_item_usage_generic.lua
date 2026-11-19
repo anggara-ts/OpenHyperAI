@@ -8421,10 +8421,11 @@ do
 	-- Kobold Cup (tier 1), "One for the Road": movespeed_pct (10%) movement speed for all allied units within
 	-- buff_radius (1000) for buff_duration (8 s); cooldown 40 s, 40 mana. Used to get away, to catch a target
 	-- that is out of attack range, or to help an ally beside the bot get away. Only the bot's own escape may
-	-- take the last mana.
+	-- take the last mana. No "already buffed" check: the buff is modifier_item_kobold_cup, and whether the
+	-- holder carries a modifier of that name all the time is not known.
 	local KOBOLD_CUP_MANA_FLOOR = 0.2
 	Usage.ConsiderItemDesire["item_kobold_cup"] = function(item)
-		if AttemptedLately("item_kobold_cup") or bot:IsRooted() or bot:HasModifier("modifier_item_kobold_cup") then
+		if AttemptedLately("item_kobold_cup") or bot:IsRooted() then
 			return BOT_ACTION_DESIRE_NONE
 		end
 		local buffRadius = item:GetSpecialValueInt("buff_radius")
@@ -8454,7 +8455,7 @@ do
 			return BOT_ACTION_DESIRE_NONE
 		end
 		if
-			Fu.IsGoingOnSomeone(bot)
+			(Fu.IsGoingOnSomeone(bot) or botMode == BOT_MODE_ATTACK)
 			and Fu.IsValidHero(botTarget)
 			and Fu.CanBeAttacked(botTarget)
 			and Fu.IsRunning(bot)
@@ -8479,7 +8480,6 @@ do
 				and ally:WasRecentlyDamagedByAnyHero(3.0)
 				and not ally:IsRooted()
 				and not ally:IsStunned()
-				and not ally:HasModifier("modifier_item_kobold_cup")
 			then
 				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
 				if enemiesNearAlly ~= nil and #enemiesNearAlly >= 1 then
@@ -8499,7 +8499,9 @@ do
 	-- Brick (tier 2): thrown at an enemy within AbilityCastRange (600): `damage` (150) physical damage, and it
 	-- removes `barrier_damage` (200) from any barrier on the target; cooldown 30 s, no mana, projectile speed
 	-- 1400. The item has no SpellImmunityType, so debuff-immune targets are skipped; the damage is physical, so
-	-- attack-immune (ethereal) targets are skipped too (Fu.CanBeAttacked).
+	-- attack-immune (ethereal) targets are skipped too (Fu.CanBeAttacked). Only targets inside the real cast
+	-- range: an order that needs a walk first can be replaced before the throw, and the log line would lie.
+	-- botMode is the mode ConsiderItems promotes to attack when the bot fights during a push or a defence.
 	-- Barrier modifiers: the ones whose tooltip in abilities_english.txt (7.42) says they absorb a set amount of
 	-- damage. Percentage reductions, block chances and Refraction's instances are left out.
 	local BRICK_BARRIER_MODIFIERS = {
@@ -8539,7 +8541,6 @@ do
 		if castRange == nil or castRange <= 0 then
 			castRange = 600
 		end
-		castRange = Fu.GetProperCastRange(false, bot, castRange)
 		local damage = item:GetSpecialValueInt("damage")
 		local function CanBrick(enemy)
 			return Fu.IsValidHero(enemy)
@@ -8566,7 +8567,7 @@ do
 				return BOT_ACTION_DESIRE_HIGH, enemy, "unit", "kill"
 			end
 		end
-		if Fu.IsGoingOnSomeone(bot) and CanBrick(botTarget) then
+		if (Fu.IsGoingOnSomeone(bot) or botMode == BOT_MODE_ATTACK) and CanBrick(botTarget) then
 			local barrierName = BarrierOn(botTarget)
 			local why = barrierName ~= nil and "barrier" or "fight"
 			LogNeutralUse(

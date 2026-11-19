@@ -1076,15 +1076,24 @@ end
 Utils.HG_WAVE_RADIUS = 2600
 -- Enemy creeps within `radius` of loc, counting only those closer to loc than to another of
 -- our T3 towers (mid and top T3 are close enough that one wave would count for both).
+-- Where each lane's T3 stands, remembered after it falls (#12, game 048 52:40: with the bottom T3 down, a
+-- 16-creep bottom wave counted for mid too, and the team called "defend mid").
+local highGroundTowerLocations = {}
 function Utils.CountHighGroundWave(team, location, radius)
 	local others = {}
+	highGroundTowerLocations[team] = highGroundTowerLocations[team] or {}
 	for _, id in ipairs(highGroundTowers) do
 		local tower = GetTower(team, id)
 		if Utils.IsValidBuilding(tower) then
-			local towerLocation = tower:GetLocation()
-			if (towerLocation.x - location.x) ^ 2 + (towerLocation.y - location.y) ^ 2 > 300 * 300 then
-				others[#others + 1] = towerLocation
-			end
+			highGroundTowerLocations[team][id] = tower:GetLocation()
+		end
+		local towerLocation = highGroundTowerLocations[team][id]
+		-- Another lane: its T3 (alive or not) is not this building or the barracks behind it.
+		if
+			towerLocation ~= nil
+			and (towerLocation.x - location.x) ^ 2 + (towerLocation.y - location.y) ^ 2 > 1200 * 1200
+		then
+			others[#others + 1] = towerLocation
 		end
 	end
 	local count = 0

@@ -1041,6 +1041,29 @@ function Usage.IsEnemyHeroAroundSecretShop()
 	end
 	return false
 end
+-- HP each charge of a healing item restores (game files: tango 7/s x 16s, salve 30/s x 13s, faerie fire 85,
+-- stick/wand 15 per charge, healing lotus 125 / great 400). Used by the heal-trip TP (#12).
+local bagHealPerCharge = {
+	item_tango = 112,
+	item_tango_single = 112,
+	item_flask = 390,
+	item_faerie_fire = 85,
+	item_magic_stick = 15,
+	item_magic_wand = 15,
+	item_famango = 125,
+	item_great_famango = 400,
+}
+local function BagHeal(unit)
+	local total = 0
+	for slot = 0, 5 do
+		local item = unit:GetItemInSlot(slot)
+		local perCharge = item ~= nil and bagHealPerCharge[item:GetName()] or nil
+		if perCharge ~= nil then
+			total = total + perCharge * math.max(1, item:GetCurrentCharges() or 1)
+		end
+	end
+	return total
+end
 local stashItemSeenTime = {}
 local castRangeBonus = 0
 local unusedCounter = 0
@@ -5519,16 +5542,49 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		end
 		-- Heal trip (#12, game 045 36:06: Meepo walked ~9500 home at 36% HP with TPs in the bag). Retreating with no
 		-- enemy hero within 1600, far from the fountain, and low on HP (or mana for a caster): TP home.
+		-- Game 048: Puck went home at ~50% HP with 2 tangos, and heroes TP'd out of a Roshan fight. HP counts the
+		-- heal in the bag, and has to be low in value too (a level-based floor), not only in percent. No trip
+		-- while invisible (the walk is safe) or while an ally near is doing Roshan.
 		if
 			activeMode == BOT_MODE_RETREAT
 			and nearbyEnemyCount == 0
 			and not bot:WasRecentlyDamagedByAnyHero(3.0)
 			and bot:DistanceFromFountain() > 6000
-			and (hpRatio < 0.5 or bot:GetMaxMana() > 600 and mpRatio < 0.25)
+			and not bot:IsInvisible()
 		then
-			tpLocation = Fu.GetTeamFountain()
-			castReason = "heal-trip"
-			return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
+			local hp = bot:GetHealth()
+			local bagHeal = BagHeal(bot)
+			local hpFloor = 250 + 60 * bot:GetLevel()
+			local lowHp = hpRatio < 0.5 and hp + bagHeal < 0.6 * bot:GetMaxHealth() and hp < hpFloor
+			local lowMana = bot:GetMaxMana() > 600 and mpRatio < 0.25
+			local roshanNear = false
+			for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_ROSHAN) or {}) do
+				if Fu.IsValidHero(ally) and ally ~= bot then
+					roshanNear = true
+				end
+			end
+			if (lowHp or lowMana) and not roshanNear then
+				if DotaTime() >= (bot._healTripLogAt or -999) then
+					bot._healTripLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-TP] t=%.0f %s heal-trip hp=%d (%.2f) bag=%d floor=%d mana=%.2f lvl=%d",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							hp,
+							hpRatio,
+							bagHeal,
+							hpFloor,
+							mpRatio,
+							bot:GetLevel()
+						)
+					)
+				end
+				tpLocation = Fu.GetTeamFountain()
+				castReason = "heal-trip"
+				return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
+			end
 		end
 		local attackingAllies = Fu.GetNearbyHeroes(bot, 1500, false, BOT_MODE_ATTACK)
 		-- Retreat TP home: HP under 15% + 24% per enemy hero within 1600 (two enemies: 63%). In

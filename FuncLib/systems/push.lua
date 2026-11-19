@@ -478,14 +478,34 @@ function Push.GetPushDesireHelper(bot, lane)
 		then
 			local towerAllies = 0
 			local damage5s = 0
-			for _, ally in pairs(tower:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) do
+			for _, ally in pairs(Fu.GetAlliesNearLoc(tower:GetLocation(), 1200) or {}) do
 				if Fu.IsValidHero(ally) and not ally:IsIllusion() then
 					towerAllies = towerAllies + 1
 					damage5s = damage5s + (ally:GetEstimatedDamageToTarget(true, tower, 5.0, DAMAGE_TYPE_ALL) or 0)
 				end
 			end
 			local towerHp = tower:GetHealth()
-			if towerAllies >= 2 and (towerHp / math.max(1, tower:GetMaxHealth()) < 0.25 or damage5s >= towerHp) then
+			local finish = towerAllies >= 2
+				and (towerHp / math.max(1, tower:GetMaxHealth()) < 0.25 or damage5s >= towerHp)
+			-- Diagnostic: a hurt tower near the group, whether the rule fires (game 048: it never did).
+			if not finish and towerHp / math.max(1, tower:GetMaxHealth()) < 0.5 then
+				if DotaTime() >= (bot._finishTowerCheckAt or -999) then
+					bot._finishTowerCheckAt = DotaTime() + 15
+					pcall(
+						print,
+						string.format(
+							"[OHA-PUSH] t=%.0f %s finish-tower-check hp=%d dmg5s=%d allies=%d lane=%s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							towerHp,
+							math.floor(damage5s),
+							towerAllies,
+							tostring(lane)
+						)
+					)
+				end
+			end
+			if finish then
 				if DotaTime() >= (bot._finishTowerLogAt or -999) then
 					bot._finishTowerLogAt = DotaTime() + 10
 					pcall(

@@ -37,6 +37,30 @@ local function AdjustDesireForHealth(desire)
 		bot._roshDipActive = false
 		return 0
 	end
+	-- Tank steps out (#12, game 048 29:07: Sniper stayed at 18% HP with Roshan on him and died to Roshan; under
+	-- 50% Roshan HP nobody leaves). Roshan's next 3s would kill him, and Roshan isn't about to die: 3s out, so
+	-- Roshan turns to someone else.
+	if DotaTime() < (bot._roshStepOutUntil or -999) then
+		return 0
+	end
+	if desire > 0 and Fu.Utils.IsValidUnit(roshan) and roshan:GetAttackTarget() == bot then
+		local roshDmg = roshan:GetEstimatedDamageToTarget(true, bot, 3.0, DAMAGE_TYPE_PHYSICAL) or 0
+		if bot:GetHealth() <= roshDmg and Fu.GetHP(roshan) > 0.08 then
+			bot._roshStepOutUntil = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-ROSH] t=%.0f %s step-out hp=%d roshDmg3s=%d roshHp=%.2f",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					bot:GetHealth(),
+					math.floor(roshDmg),
+					Fu.GetHP(roshan)
+				)
+			)
+			return 0
+		end
+	end
 	if desire <= 0 then
 		return desire
 	end
@@ -519,6 +543,13 @@ function GetDesireHelper()
 				and bot:GetAttackDamage() / secondsPerAttack * 0.5
 			or 0
 		local soloFinish = Fu.Utils.IsValidUnit(roshan) and roshan:GetHealth() <= myDps * 5
+		-- Two hitters at least (#12, game 048 29:10: two allies TP'd out and Sniper and Ringmaster were left to
+		-- finish it): allies next to Roshan, not only somewhere in the pit.
+		local alliesAtRoshan = Fu.Utils.IsValidUnit(roshan) and #(Fu.GetAlliesNearLoc(roshan:GetLocation(), 900) or {})
+			or alliesInPit
+		if safeFinish and alliesAtRoshan < 2 and alliesInPit >= 2 and not soloFinish then
+			return Ret(BOT_MODE_DESIRE_NONE, "few-hitters")
+		end
 		if safeFinish and (alliesInPit >= 2 or soloFinish) then
 			local roshanHpRatio = roshan:GetHealth() / roshan:GetMaxHealth()
 			return Ret(RemapValClamped(roshanHpRatio, 0.8, 0.0, 0.9, 1.0), "finishing")

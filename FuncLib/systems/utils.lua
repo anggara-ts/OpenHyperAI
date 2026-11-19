@@ -1082,40 +1082,57 @@ local highGroundTowerLocations = {}
 local function Dist2(a, b)
 	return (a.x - b.x) ^ 2 + (a.y - b.y) ^ 2
 end
--- Does a creep at creepLoc count for the high-ground building at `location`? spots: the lanes' T3 locations
--- (alive or remembered). The building's lane is the T3 spot within 1200 of it (the T3 or a barracks behind
--- it); the creep belongs to the lane whose T3 spot is nearest. A building with no T3 spot that close (a T4,
--- the Ancient) takes every creep.
+-- Does a creep at creepLoc count for the high-ground building at `location`? spots: one entry per lane,
+-- { loc = its T3 location (alive or remembered), open = T3 and both barracks gone }. The building's lane is the
+-- T3 spot within 1200 of it (the T3 or a barracks behind it); the creep belongs to the lane whose T3 spot is
+-- nearest. A building with no T3 spot that close (a T4, the Ancient) takes only creeps of an open lane: the
+-- others are that lane's T3 or barracks' to call.
 function Utils.HighGroundCreepOwned(creepLoc, location, spots)
 	local own, ownDist = nil, 1200 * 1200
 	for _, spot in pairs(spots) do
-		local d = Dist2(spot, location)
+		local d = Dist2(spot.loc, location)
 		if d <= ownDist then
 			own, ownDist = spot, d
 		end
 	end
-	if own == nil then
-		return true
-	end
 	local nearest, best = nil, math.huge
 	for _, spot in pairs(spots) do
-		local d = Dist2(spot, creepLoc)
+		local d = Dist2(spot.loc, creepLoc)
 		if d < best then
 			nearest, best = spot, d
 		end
 	end
+	if nearest == nil then
+		return true
+	end
+	if own == nil then
+		return nearest.open == true
+	end
 	return nearest == own
 end
+-- Lane of each high-ground tower, and its barracks.
+local laneBarracks = {
+	{ Barracks.TopMelee, Barracks.TopRanged },
+	{ Barracks.MidMelee, Barracks.MidRanged },
+	{ Barracks.BotMelee, Barracks.BotRanged },
+}
 function Utils.CountHighGroundWave(team, location, radius)
 	highGroundTowerLocations[team] = highGroundTowerLocations[team] or {}
 	local spots = {}
-	for _, id in ipairs(highGroundTowers) do
+	for i, id in ipairs(highGroundTowers) do
 		local tower = GetTower(team, id)
-		if Utils.IsValidBuilding(tower) then
+		local towerUp = Utils.IsValidBuilding(tower)
+		if towerUp then
 			highGroundTowerLocations[team][id] = tower:GetLocation()
 		end
 		if highGroundTowerLocations[team][id] ~= nil then
-			spots[#spots + 1] = highGroundTowerLocations[team][id]
+			local raxUp = false
+			for _, raxId in ipairs(laneBarracks[i]) do
+				if Utils.IsValidBuilding(GetBarracks(team, raxId)) then
+					raxUp = true
+				end
+			end
+			spots[#spots + 1] = { loc = highGroundTowerLocations[team][id], open = not towerUp and not raxUp }
 		end
 	end
 	local count = 0

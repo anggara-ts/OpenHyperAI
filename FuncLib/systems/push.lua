@@ -478,9 +478,10 @@ function Push.GetPushDesireHelper(bot, lane)
 		if frontDist >= 2500 then
 			if
 				tower:GetHealth() / math.max(1, tower:GetMaxHealth()) < 0.5
-				and DotaTime() >= (bot._finishTowerCheckAt or -999)
+				and DotaTime() >= ((bot._finishTowerCheckAt or {})[lane] or -999)
 			then
-				bot._finishTowerCheckAt = DotaTime() + 15
+				bot._finishTowerCheckAt = bot._finishTowerCheckAt or {}
+				bot._finishTowerCheckAt[lane] = DotaTime() + 15
 				pcall(
 					print,
 					string.format(
@@ -509,8 +510,9 @@ function Push.GetPushDesireHelper(bot, lane)
 				and (towerHp / math.max(1, tower:GetMaxHealth()) < 0.25 or damage5s >= towerHp)
 			-- Diagnostic: a hurt tower near the group, whether the rule fires (game 048: it never did).
 			if not finish and towerHp / math.max(1, tower:GetMaxHealth()) < 0.5 then
-				if DotaTime() >= (bot._finishTowerCheckAt or -999) then
-					bot._finishTowerCheckAt = DotaTime() + 15
+				if DotaTime() >= ((bot._finishTowerCheckAt or {})[lane] or -999) then
+					bot._finishTowerCheckAt = bot._finishTowerCheckAt or {}
+					bot._finishTowerCheckAt[lane] = DotaTime() + 15
 					pcall(
 						print,
 						string.format(

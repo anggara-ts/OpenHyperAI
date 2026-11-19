@@ -44,7 +44,15 @@ local function AdjustDesireForHealth(desire)
 		return 0
 	end
 	if desire > 0 and Fu.Utils.IsValidUnit(roshan) and roshan:GetAttackTarget() == bot then
-		local roshDmg = roshan:GetEstimatedDamageToTarget(true, bot, 3.0, DAMAGE_TYPE_PHYSICAL) or 0
+		-- Untested on Roshan: fall back to his attack damage over 3s if the estimate fails or reads 0.
+		local okD, estimate = pcall(function()
+			return roshan:GetEstimatedDamageToTarget(true, bot, 3.0, DAMAGE_TYPE_PHYSICAL)
+		end)
+		local roshDmg = okD and type(estimate) == "number" and estimate or 0
+		if roshDmg <= 0 then
+			local secondsPerAttack = roshan:GetSecondsPerAttack() or 1
+			roshDmg = (roshan:GetAttackDamage() or 0) * 3 / math.max(0.5, secondsPerAttack)
+		end
 		if bot:GetHealth() <= roshDmg and Fu.GetHP(roshan) > 0.08 then
 			bot._roshStepOutUntil = DotaTime() + 3
 			pcall(

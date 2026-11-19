@@ -109,7 +109,164 @@ end
 local isEngaging
 local isRetreating
 local isAttacking
+-- Allies in the snowball (#28). Valve datafeed (hero_id=100): "Allies within a 325 radius can also be added to
+-- the snowball by right-clicking on them, even while the snowball is moving ... Each allied Hero in the snowball
+-- will add to its damage and stun duration" (7.42 game files: snowball_grab_radius 325, snowball_damage_bonus
+-- 40-115, stun_duration_bonus 0.2); it doesn't carry illusions. A right-click on an ally is a move-to-unit
+-- order, which the bot API has (Action_MoveToUnit). Whether the engine adds the ally on a bot's order is not
+-- known: the "snowball add-result" line tells.
+local SNOWBALL_ADD_HOLD = 0.5 -- the launch waits at most this long for the pick-up orders
+local SNOWBALL_ADD_ORDER_TIME = 0.1 -- each ally is ordered for this long
+local SNOWBALL_MAX_ADDS = 2
+local snowballAdds = nil -- { castAt, firstAt, tries = { { ally, at, dist, invulnAtLaunch, modsAtLaunch } }, launchAt, launchLocation }
+-- Worth picking up: a real allied hero inside the grab radius, healthy, not channelling and not on its way out.
+function X.SnowballAllyOk(isRealHero, healthRatio, isChannelling, allyIsRetreating, distance, grabRadius)
+	return isRealHero
+		and healthRatio > 0.5
+		and not isChannelling
+		and not allyIsRetreating
+		and distance <= grabRadius - 25
+end
+-- Carried: in the snowball at the launch (invulnerable, or under one of Tusk's modifiers), or still on top of
+-- Tusk after the snowball has rolled a good way.
+function X.SnowballCarried(invulnAtLaunch, tuskModsAtLaunch, distanceNow, rolledDistance)
+	return invulnAtLaunch or tuskModsAtLaunch > 0 or rolledDistance > 200 and distanceNow < 120
+end
+local function TuskModifiersOn(unit)
+	local names = {}
+	for i = 0, unit:NumModifiers() - 1 do
+		local name = tostring(unit:GetModifierName(i))
+		if string.find(name, "tusk") or string.find(name, "snowball") then
+			names[#names + 1] = name
+		end
+	end
+	return names
+end
+local function CanJoinSnowball(allyHero, grabRadius)
+	return Fu.IsValidHero(allyHero)
+		and allyHero ~= bot
+		and allyHero:IsBot()
+		and not allyHero:IsInvulnerable()
+		and X.SnowballAllyOk(
+			not allyHero:IsIllusion(),
+			Fu.GetHP(allyHero),
+			allyHero:IsChanneling(),
+			Fu.IsRetreating(allyHero),
+			GetUnitToUnitDistance(bot, allyHero),
+			grabRadius
+		)
+end
+-- The ally to right-click before the launch, or nil to launch. Only for a snowball thrown at a hero.
+function X.NextSnowballAlly()
+	if not bot._snowballOnHero then
+		return nil
+	end
+	local castAt = bot._snowballCastAt or 0
+	if snowballAdds == nil or snowballAdds.castAt ~= castAt then
+		snowballAdds = { castAt = castAt, tries = {} }
+	end
+	local adds = snowballAdds
+	if adds.launchAt ~= nil then
+		return nil
+	end
+	local now = DotaTime()
+	local grabRadius = snowballAbility:GetSpecialValueInt("snowball_grab_radius")
+	local lastTry = adds.tries[#adds.tries]
+	if lastTry ~= nil and now < lastTry.at + SNOWBALL_ADD_ORDER_TIME and CanJoinSnowball(lastTry.ally, grabRadius) then
+		return lastTry.ally
+	end
+	if #adds.tries >= SNOWBALL_MAX_ADDS or adds.firstAt ~= nil and now >= adds.firstAt + SNOWBALL_ADD_HOLD then
+		return nil
+	end
+	local bestAlly, bestDistance = nil, math.huge
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, grabRadius, false, BOT_MODE_NONE) or {}) do
+		local alreadyTried = false
+		for _, try in ipairs(adds.tries) do
+			if try.ally == allyHero then
+				alreadyTried = true
+			end
+		end
+		if not alreadyTried and CanJoinSnowball(allyHero, grabRadius) then
+			local distance = GetUnitToUnitDistance(bot, allyHero)
+			if distance < bestDistance then
+				bestAlly, bestDistance = allyHero, distance
+			end
+		end
+	end
+	if bestAlly == nil then
+		return nil
+	end
+	adds.firstAt = adds.firstAt or now
+	adds.tries[#adds.tries + 1] = { ally = bestAlly, at = now, dist = bestDistance }
+	print(
+		string.format(
+			"[OHA-TUSK] t=%.0f tusk snowball add ally=%s dist=%d hp=%.2f",
+			now,
+			(string.gsub(bestAlly:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(bestDistance),
+			Fu.GetHP(bestAlly)
+		)
+	)
+	return bestAlly
+end
+function X.NoteSnowballLaunch()
+	local adds = snowballAdds
+	if adds == nil or adds.launchAt ~= nil or adds.castAt ~= (bot._snowballCastAt or 0) or #adds.tries == 0 then
+		return
+	end
+	adds.launchAt = DotaTime()
+	adds.launchLocation = bot:GetLocation()
+	for _, try in ipairs(adds.tries) do
+		if Fu.IsValidHero(try.ally) then
+			try.invulnAtLaunch = try.ally:IsInvulnerable()
+			try.modsAtLaunch = TuskModifiersOn(try.ally)
+		end
+	end
+end
+-- 0.4s after the launch: was each right-clicked ally carried?
+function X.CheckSnowballAdds()
+	local adds = snowballAdds
+	if adds == nil or adds.launchAt == nil or DotaTime() < adds.launchAt + 0.4 then
+		return
+	end
+	snowballAdds = nil
+	local rolledDistance = GetUnitToLocationDistance(bot, adds.launchLocation)
+	local carriedCount = 0
+	for _, try in ipairs(adds.tries) do
+		if Fu.IsValidHero(try.ally) then
+			local mods = try.modsAtLaunch or {}
+			local distanceNow = GetUnitToUnitDistance(bot, try.ally)
+			local carried = X.SnowballCarried(try.invulnAtLaunch == true, #mods, distanceNow, rolledDistance)
+			if carried then
+				carriedCount = carriedCount + 1
+			end
+			print(
+				string.format(
+					"[OHA-TUSK] t=%.0f tusk snowball add-result ally=%s carried=%s invuln=%s mods=%s dist=%d->%d rolled=%d",
+					DotaTime(),
+					(string.gsub(try.ally:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(carried),
+					tostring(try.invulnAtLaunch == true),
+					#mods > 0 and table.concat(mods, ",") or "-",
+					math.floor(try.dist),
+					math.floor(distanceNow),
+					math.floor(rolledDistance)
+				)
+			)
+		end
+	end
+	print(
+		string.format(
+			"[OHA-TUSK] t=%.0f tusk snowball launch allies=%d tried=%d held=%.2fs",
+			DotaTime(),
+			carriedCount,
+			#adds.tries,
+			adds.launchAt - (adds.firstAt or adds.launchAt)
+		)
+	)
+end
 function X.SkillsComplement()
+	pcall(X.CheckSnowballAdds)
 	-- The hold flag only belongs to the escape snowball that set it. Clear it once Tusk is
 	-- out of the snowball, or every later snowball would also wait out the full duration.
 	if
@@ -135,6 +292,13 @@ function X.SkillsComplement()
 	-- spell. Checked after them, it could wait out the whole 3s windup while engaging. Only an
 	-- escape snowball (snowballHeroRetreat) keeps rolling, to stay out of reach.
 	if X.ConsiderLaunchSnowball() > 0 and not bot:IsStunned() and not bot:IsHexed() and not bot:IsSilenced() then
+		-- Healthy allies next to him first (#28): a right-click each, for at most SNOWBALL_ADD_HOLD seconds.
+		local allyToAdd = X.NextSnowballAlly()
+		if allyToAdd ~= nil then
+			bot:Action_MoveToUnit(allyToAdd)
+			return
+		end
+		X.NoteSnowballLaunch()
 		-- The order repeats each think until the snowball leaves; log the first one only.
 		if (bot._snowballLaunchLoggedFor or -1) ~= (bot._snowballCastAt or 0) then
 			bot._snowballLaunchLoggedFor = bot._snowballCastAt or 0
@@ -177,6 +341,7 @@ function X.SkillsComplement()
 	if snowballDesire > 0 then
 		bot:Action_UseAbilityOnEntity(snowballAbility, snowballTarget)
 		bot._snowballCastAt = DotaTime()
+		bot._snowballOnHero = snowballTarget:IsHero()
 		return
 	end
 	walrusKickDesire, walrusKickTarget = X.ConsiderWalrusKick()

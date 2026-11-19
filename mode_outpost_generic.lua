@@ -288,6 +288,10 @@ function GetDesireHelper()
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
+	-- A hero hold (Puck's Phase Shift): no order at all, or the channel ends.
+	if bot._outpostHoldUntil ~= nil and DotaTime() < bot._outpostHoldUntil then
+		return
+	end
 	if Fu.CanNotUseAction(bot) then
 		return
 	end
@@ -1873,6 +1877,9 @@ heroSpecificDesire["npc_dota_hero_hoodwink"] = function()
 	end
 	if highPriorityAbility:IsTrained() then
 		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_hoodwink_sharpshooter_windup") then
+			-- hero_hoodwink.lua turns the bolt and releases it; a move order from this mode's Think (it walks
+			-- toward the fountain when idle) would turn her off the target.
+			bot._outpostHoldUntil = DotaTime() + 0.15
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end

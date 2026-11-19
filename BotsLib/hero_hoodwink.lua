@@ -103,12 +103,26 @@ local huntersBoomerangAbility =
 local decoyAbility = SafeAbility(bot:GetAbilityByName("hoodwink_decoy"), "hoodwink_decoy", "hoodwink")
 local sharpshooterAbility =
 	SafeAbility(bot:GetAbilityByName("hoodwink_sharpshooter"), "hoodwink_sharpshooter", "hoodwink")
-local acornShotDesire, acornShotLocation
+local sharpshooterReleaseAbility =
+	SafeAbility(bot:GetAbilityByName("hoodwink_sharpshooter_release"), "hoodwink_sharpshooter_release", "hoodwink")
+-- Game data, 7.42 (scripts/npc/heroes/npc_dota_hero_hoodwink.txt) and the Valve datafeed (hero_id=123):
+--   Sharpshooter: damage and slow are full after max_charge_time (3s), the bolt fires by itself at misfire_time
+--   (5s); she turns turn_rate (60) degrees a second while charging; arrow_range 3000, arrow_width 125.
+--   Acorn Shot: on a unit the acorn bounces between enemies within bounce_range (525); on the ground it plants a
+--   tree first ("The planted tree lasts for 20 seconds").
+local ACORN_TREE_DURATION = 20
+-- A tree planted for the combo is thrown at with Bushwhack on that target for this long; after it, only on the
+-- attack target.
+local ACORN_COMBO_WINDOW = 3
+local sharpshooterWindup = nil -- { startedAt, target, startFacing, reaims, released }
+local acornTree = nil -- { location, plantedAt, target }
+local lastAcornLogAt = -100
+local acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy
 local bushwhackDesire, bushwhackLocation
 local scurryDesire
 local huntersBoomerangDesire, huntersBoomerangTarget
 local decoyDesire
-local sharpshooterDesire, sharpshooterLocation
+local sharpshooterDesire, sharpshooterLocation, sharpshooterTarget
 local botTarget
 local isGoingOnSomeone
 local isRetreating
@@ -118,12 +132,17 @@ function X.SkillsComplement()
 	isGoingOnSomeone = context.isEngaging
 	isRetreating = context.isRetreating
 	hpRatio = context.hp
+	-- Charging Sharpshooter: aim and release come before the busy check (it may count the windup as a cast),
+	-- and nothing else is cast meanwhile.
+	if X.ThinkSharpshooterWindup() then
+		return
+	end
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
-	acornShotDesire, acornShotLocation = X.ConsiderAcornShot()
+	acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy = X.ConsiderAcornShot()
 	if acornShotDesire > 0 then
-		bot:Action_UseAbilityOnLocation(acornShotAbility, acornShotLocation)
+		X.CastAcornShot(acornShotLocation, acornShotTarget, acornShotWhy)
 		return
 	end
 	bushwhackDesire, bushwhackLocation = X.ConsiderBushwhack()
@@ -146,8 +165,9 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(decoyAbility)
 		return
 	end
-	sharpshooterDesire, sharpshooterLocation = X.ConsiderSharpshooter()
+	sharpshooterDesire, sharpshooterLocation, sharpshooterTarget = X.ConsiderSharpshooter()
 	if sharpshooterDesire > 0 then
+		bot._sharpshooterTarget = sharpshooterTarget
 		bot:Action_UseAbilityOnLocation(sharpshooterAbility, sharpshooterLocation)
 		return
 	end
@@ -179,7 +199,7 @@ function X.ConsiderAcornShot()
 			and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
 			local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
-			return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
+			return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay), enemyHero, "kill"
 		end
 	end
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
@@ -199,7 +219,10 @@ function X.ConsiderAcornShot()
 				and not Fu.IsDisabled(allyNearbyEnemies[1])
 			then
 				local delay = GetUnitToUnitDistance(bot, allyNearbyEnemies[1]) / projectileSpeed + castPoint
-				return BOT_ACTION_DESIRE_HIGH, allyNearbyEnemies[1]:GetExtrapolatedLocation(delay)
+				return BOT_ACTION_DESIRE_HIGH,
+					allyNearbyEnemies[1]:GetExtrapolatedLocation(delay),
+					allyNearbyEnemies[1],
+					"save-ally"
 			end
 		end
 	end
@@ -215,7 +238,7 @@ function X.ConsiderAcornShot()
 			and #nearbyAllies >= #nearbyEnemies
 		then
 			local delay = GetUnitToUnitDistance(bot, botTarget) / projectileSpeed + castPoint
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(delay)
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(delay), botTarget, "engage"
 		end
 	end
 	if isRetreating then
@@ -229,7 +252,7 @@ function X.ConsiderAcornShot()
 			and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 			and not Fu.IsDisabled(nearbyEnemies[1])
 		then
-			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation(), nearbyEnemies[1], "retreat"
 		end
 	end
 	if
@@ -241,13 +264,126 @@ function X.ConsiderAcornShot()
 		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		local aoe = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, bounceRange, castPoint, 0)
 		if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 and aoe.count >= 4 then
-			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+			return BOT_ACTION_DESIRE_HIGH, aoe.targetloc, nil, "wave"
 		end
 	end
-	if not acornShotAbility:GetAutoCastState() then
+	-- Alt-cast off (it was switched on here): alt-cast forces the tree, and CastAcornShot picks tree or bounce
+	-- by the order it gives.
+	if acornShotAbility:GetAutoCastState() then
 		acornShotAbility:ToggleAutoCast()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Acorn Shot, by the goal. "tree": the acorn goes on the ground by the target and plants a tree for Bushwhack.
+-- "bounce": it goes on the unit and bounces between the enemies around it.
+function X.AcornShotMode(why, bushwhackReady, manaForBoth, targetCanBeTrapped, treeNearTarget)
+	if why == "wave" then
+		return "tree"
+	end
+	if why ~= "kill" and bushwhackReady and manaForBoth and targetCanBeTrapped and not treeNearTarget then
+		return "tree"
+	end
+	return "bounce"
+end
+-- Where Bushwhack lands so that the enemy and the tree are both inside the net: halfway between them, or nil
+-- when they are too far apart for one net (25 less than the radius on each side).
+function X.BushwhackCenterForTree(enemyLocation, treeLocation, radius)
+	local gap = Fu.GetLocationToLocationDistance(enemyLocation, treeLocation)
+	if gap > 2 * (radius - 25) then
+		return nil
+	end
+	return (enemyLocation + treeLocation) / 2
+end
+function X.CastAcornShot(location, target, why)
+	local mode
+	local nearCount = 0
+	if target == nil then
+		mode = "tree"
+	else
+		local trapRadius = bushwhackAbility:GetSpecialValueInt("trap_radius")
+		local trees = target:GetNearbyTrees(trapRadius - 25)
+		mode = X.AcornShotMode(
+			why,
+			bushwhackAbility:IsTrained() and bushwhackAbility:GetCooldownTimeRemaining() <= 0.5,
+			bot:GetMana() >= acornShotAbility:GetManaCost() + bushwhackAbility:GetManaCost(),
+			Fu.CanCastOnNonMagicImmune(target),
+			trees ~= nil and #trees > 0
+		)
+		local bounceRange = acornShotAbility:GetSpecialValueInt("bounce_range")
+		local heroesNear = Fu.GetEnemiesNearLoc(target:GetLocation(), bounceRange)
+		nearCount = math.max(0, (heroesNear and #heroesNear or 0) - 1)
+		for _, creep in pairs(bot:GetNearbyCreeps(1600, true) or {}) do
+			if Fu.IsValid(creep) and GetUnitToUnitDistance(creep, target) <= bounceRange then
+				nearCount = nearCount + 1
+			end
+		end
+	end
+	if DotaTime() - lastAcornLogAt >= 3 then
+		lastAcornLogAt = DotaTime()
+		print(
+			string.format(
+				"[OHA-HOODWINK] t=%.0f hoodwink acorn mode=%s why=%s target=%s near=%d",
+				DotaTime(),
+				mode,
+				tostring(why),
+				target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "ground",
+				nearCount
+			)
+		)
+	end
+	if mode == "bounce" then
+		bot:Action_UseAbilityOnEntity(acornShotAbility, target)
+		return
+	end
+	if target ~= nil then
+		acornTree = { location = location, plantedAt = DotaTime(), target = target }
+	end
+	bot:Action_UseAbilityOnLocation(acornShotAbility, location)
+end
+-- Bushwhack on the tree her own acorn planted. GetNearbyTrees may not list a planted tree (apiTrees in the log
+-- tells), so the spot is remembered: the acorn's target for ACORN_COMBO_WINDOW seconds, then the attack target.
+function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectileSpeed)
+	if acornTree == nil then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local age = DotaTime() - acornTree.plantedAt
+	-- The acorn never left (order replaced, stun): it would be on cooldown by now.
+	if age > ACORN_TREE_DURATION or age > 0.6 and acornShotAbility:IsCooldownReady() then
+		acornTree = nil
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local enemyHero = acornTree.target
+	if age > ACORN_COMBO_WINDOW then
+		enemyHero = isGoingOnSomeone and botTarget or nil
+	end
+	if
+		not Fu.IsValidHero(enemyHero)
+		or not Fu.CanCastOnNonMagicImmune(enemyHero)
+		or not Fu.IsInRange(bot, enemyHero, castRange)
+		or Fu.IsSuspiciousIllusion(enemyHero)
+		or Fu.IsDisabled(enemyHero)
+	then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
+	local center = X.BushwhackCenterForTree(enemyHero:GetExtrapolatedLocation(delay), acornTree.location, radius)
+	if center == nil then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local apiTrees = enemyHero:GetNearbyTrees(radius)
+	print(
+		string.format(
+			"[OHA-HOODWINK] t=%.0f hoodwink bushwhack why=acorn-tree target=%s treeDist=%d treeAge=%.1f apiTrees=%d",
+			DotaTime(),
+			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(GetUnitToLocationDistance(enemyHero, acornTree.location)),
+			age,
+			apiTrees and #apiTrees or 0
+		)
+	)
+	-- One net per tree: a miss is not thrown again.
+	acornTree = nil
+	return BOT_ACTION_DESIRE_HIGH, center
 end
 function X.ConsiderBushwhack()
 	if not bushwhackAbility:IsFullyCastable() then
@@ -259,6 +395,11 @@ function X.ConsiderBushwhack()
 	local radius = bushwhackAbility:GetSpecialValueInt("trap_radius")
 	local projectileSpeed = bushwhackAbility:GetSpecialValueInt("projectile_speed")
 	botTarget = Fu.GetProperTarget(bot)
+	local acornTreeDesire, acornTreeLocation =
+		X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectileSpeed)
+	if acornTreeDesire > 0 then
+		return acornTreeDesire, acornTreeLocation
+	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
@@ -419,7 +560,7 @@ function X.ConsiderSharpshooter()
 			if directionStability < 0.95 then
 				aimLocation = botTarget:GetLocation()
 			end
-			return BOT_ACTION_DESIRE_HIGH, aimLocation
+			return BOT_ACTION_DESIRE_HIGH, aimLocation, botTarget
 		end
 	end
 	if Fu.IsDefending(bot) then
@@ -435,11 +576,139 @@ function X.ConsiderSharpshooter()
 				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
 				and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 			then
-				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), enemyHero
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Why to fire a charging Sharpshooter now, or nil to keep charging.
+--   full: charged for max_charge_time and the bolt line is on the target (or there is no target to aim at);
+--   harassed: a hero is hitting her and she is hurt or it stands next to her, after half a second of charge;
+--   leaving: the bolt would still reach the target now, but not once the charge is full.
+-- Off the line at full charge she keeps turning; the bolt fires by itself at misfire_time.
+function X.SharpshooterReleaseReason(charge, maxChargeTime, hasTarget, onLine, harassed, leaving)
+	if charge >= maxChargeTime and (onLine or not hasTarget) then
+		return "full"
+	end
+	if harassed and charge >= 0.5 then
+		return "harassed"
+	end
+	if hasTarget and onLine and leaving and charge >= 0.5 then
+		return "leaving"
+	end
+	return nil
+end
+local function FacingChange(fromDegrees, toDegrees)
+	local change = math.abs(toDegrees - fromDegrees) % 360
+	if change > 180 then
+		change = 360 - change
+	end
+	return change
+end
+-- While Sharpshooter charges: turn the bolt line onto the target and release it (see the game data note at the
+-- top). Returns true while the windup is on, so nothing else is ordered.
+function X.ThinkSharpshooterWindup()
+	local charging = bot:HasModifier("modifier_hoodwink_sharpshooter_windup")
+	if not charging then
+		if sharpshooterWindup ~= nil then
+			-- Ended without our release: the bolt fired by itself (misfire_time) or she was interrupted.
+			if not sharpshooterWindup.released then
+				print(
+					string.format(
+						"[OHA-HOODWINK] t=%.0f hoodwink sharpshooter-end released=false charge=%.1f reaims=%d turned=%d",
+						DotaTime(),
+						DotaTime() - sharpshooterWindup.startedAt,
+						sharpshooterWindup.reaims,
+						math.floor(FacingChange(sharpshooterWindup.startFacing, bot:GetFacing()))
+					)
+				)
+			end
+			sharpshooterWindup = nil
+		end
+		return false
+	end
+	if sharpshooterWindup == nil then
+		sharpshooterWindup = {
+			startedAt = DotaTime(),
+			target = bot._sharpshooterTarget,
+			startFacing = bot:GetFacing(),
+			reaims = 0,
+			released = false,
+		}
+	end
+	local windup = sharpshooterWindup
+	local charge = DotaTime() - windup.startedAt
+	local target = windup.target
+	local hasTarget = Fu.IsValidHero(target) and target:CanBeSeen()
+	if not hasTarget then
+		-- The target died or went out of sight: the nearest enemy hero the bolt can still be turned onto.
+		local visibleEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		if visibleEnemies ~= nil and Fu.IsValidHero(visibleEnemies[1]) then
+			target = visibleEnemies[1]
+			windup.target = target
+			hasTarget = true
+		end
+	end
+	local onLine, leaving, targetDistance = false, false, 0
+	local hitLocation = nil
+	if hasTarget then
+		local arrowSpeed = math.max(1, sharpshooterAbility:GetSpecialValueInt("arrow_speed"))
+		local arrowRange = sharpshooterAbility:GetSpecialValueInt("arrow_range")
+		local arrowWidth = sharpshooterAbility:GetSpecialValueInt("arrow_width")
+		local maxChargeTime = sharpshooterAbility:GetSpecialValueFloat("max_charge_time")
+		targetDistance = GetUnitToUnitDistance(bot, target)
+		local flightTime = targetDistance / arrowSpeed
+		hitLocation = target:GetExtrapolatedLocation(flightTime)
+		-- On the line: the bolt (arrow_width wide) passes over where the target will be.
+		local tolerance = math.max(3, math.deg(math.atan(arrowWidth / math.max(1, targetDistance))))
+		onLine = bot:IsFacingLocation(hitLocation, tolerance)
+		local locationAtFullCharge = target:GetExtrapolatedLocation(flightTime + math.max(0, maxChargeTime - charge))
+		leaving = targetDistance < arrowRange - 200
+			and GetUnitToLocationDistance(bot, locationAtFullCharge) > arrowRange - 200
+	end
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 400, true, BOT_MODE_NONE)
+	local harassed = bot:WasRecentlyDamagedByAnyHero(1.0)
+		and (hpRatio < 0.6 or nearbyEnemies ~= nil and #nearbyEnemies > 0)
+	local reason = X.SharpshooterReleaseReason(
+		charge,
+		sharpshooterAbility:GetSpecialValueFloat("max_charge_time"),
+		hasTarget,
+		onLine,
+		harassed,
+		leaving
+	)
+	if reason ~= nil and not sharpshooterReleaseAbility:IsHidden() and sharpshooterReleaseAbility:IsFullyCastable() then
+		if not windup.released then
+			windup.released = true
+			print(
+				string.format(
+					"[OHA-HOODWINK] t=%.0f hoodwink sharpshooter-release reason=%s charge=%.1f target=%s dist=%d onLine=%s reaims=%d turned=%d",
+					DotaTime(),
+					reason,
+					charge,
+					hasTarget and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "none",
+					math.floor(targetDistance),
+					tostring(onLine),
+					windup.reaims,
+					math.floor(FacingChange(windup.startFacing, bot:GetFacing()))
+				)
+			)
+		end
+		bot:Action_UseAbility(sharpshooterReleaseAbility)
+		return true
+	end
+	-- Re-aim: a move order turns her while she charges (a plain move, not a vector order). Whether a bot's move
+	-- order does it is what "reaims" and "turned" in the two log lines show.
+	if hasTarget and not onLine and not windup.released then
+		local botLocation = bot:GetLocation()
+		local direction = Vector(hitLocation.x - botLocation.x, hitLocation.y - botLocation.y, 0)
+		if direction:Length2D() > 1 then
+			windup.reaims = windup.reaims + 1
+			bot:Action_MoveDirectly(botLocation + direction:Normalized() * 300)
+		end
+	end
+	return true
 end
 function X.ConsiderHuntersBoomerang()
 	if not huntersBoomerangAbility:IsTrained() or not huntersBoomerangAbility:IsFullyCastable() then

@@ -8339,6 +8339,252 @@ Usage.ConsiderItemDesire["item_crippling_crossbow"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- 7.42 neutral items whose active had no use rule (#116): Red Ledger, Kobold Cup, Brick. Behaviour and numbers
+-- are from the 7.42 game files: scripts/npc/items.txt (AbilityBehavior, AbilityValues, cooldown, cast range) and
+-- resource/localization/abilities_english.txt (tooltips and notes).
+do
+	-- One attempt per item every few seconds. The neutral slot is ordered last in ConsiderItems, so a rule whose
+	-- order the engine refuses would otherwise replace every other item order on every think. In the log, two
+	-- "use" lines for one item closer together than its cooldown mean the order did not take.
+	local NEUTRAL_RETRY_GAP = 4
+	local lastAttemptAt = {}
+	local function AttemptedLately(itemName)
+		return DotaTime() < (lastAttemptAt[itemName] or -999) + NEUTRAL_RETRY_GAP
+	end
+	local function LogNeutralUse(itemName, why, target, detail)
+		lastAttemptAt[itemName] = DotaTime()
+		local targetName = "-"
+		if target ~= nil and target ~= bot and not target:IsNull() then
+			targetName = (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
+		end
+		print(
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s use item=%s why=%s target=%s %s",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				itemName,
+				why,
+				targetName,
+				detail or ""
+			)
+		)
+	end
+
+	-- Red Ledger (tier 1), "Most Wanted": a list of hero bounties, each worth base_gold (50) plus
+	-- gold_per_level_difference (12) per level the target is above the holder; assists pay assist_gold_pct (75%).
+	-- The game makes a new list by itself once every bounty is collected (tooltip Note0); the active only
+	-- replaces the current list (Note1), cooldown 120 s. So it is pressed only on a list that pays nothing: no
+	-- change in the open bounties or in the gold counter for RED_LEDGER_STALE seconds, and no enemy hero near
+	-- (a listed hero may be about to die).
+	-- Game 050: the holder (Weaver) carried two modifier_item_red_ledger_bounty while no enemy held the item
+	-- (min_hit_list_size is 2), so the open bounties are read from the bot's own modifiers. If that reading is
+	-- wrong the count stays 0 and the list is simply replaced every RED_LEDGER_STALE seconds.
+	local RED_LEDGER_STALE = 240
+	local ledgerState = nil
+	local ledgerStateSince = 0
+	Usage.ConsiderItemDesire["item_red_ledger"] = function(item)
+		local openBounties = 0
+		local goldEarned = 0
+		for index = 0, bot:NumModifiers() - 1 do
+			local modifierName = bot:GetModifierName(index)
+			if modifierName == "modifier_item_red_ledger_bounty" then
+				openBounties = openBounties + 1
+			elseif modifierName == "modifier_item_red_ledger_gold" then
+				goldEarned = bot:GetModifierStackCount(index) or 0
+			end
+		end
+		local state = openBounties .. "/" .. goldEarned
+		if state ~= ledgerState then
+			ledgerState = state
+			ledgerStateSince = DotaTime()
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local idleTime = DotaTime() - ledgerStateSince
+		if
+			idleTime < RED_LEDGER_STALE
+			or #nearbyEnemies > 0
+			or Fu.IsRetreating(bot)
+			or AttemptedLately("item_red_ledger")
+		then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		ledgerStateSince = DotaTime()
+		LogNeutralUse(
+			"item_red_ledger",
+			"stale-list",
+			nil,
+			string.format("bounties=%d gold=%d idle=%.0f", openBounties, goldEarned, idleTime)
+		)
+		return BOT_ACTION_DESIRE_HIGH, bot, "none", "stale-list"
+	end
+
+	-- Kobold Cup (tier 1), "One for the Road": movespeed_pct (10%) movement speed for all allied units within
+	-- buff_radius (1000) for buff_duration (8 s); cooldown 40 s, 40 mana. Used to get away, to catch a target
+	-- that is out of attack range, or to help an ally beside the bot get away. Only the bot's own escape may
+	-- take the last mana.
+	local KOBOLD_CUP_MANA_FLOOR = 0.2
+	Usage.ConsiderItemDesire["item_kobold_cup"] = function(item)
+		if AttemptedLately("item_kobold_cup") or bot:IsRooted() or bot:HasModifier("modifier_item_kobold_cup") then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local buffRadius = item:GetSpecialValueInt("buff_radius")
+		if buffRadius <= 0 then
+			buffRadius = 1000
+		end
+		local hpRatio = Fu.GetHP(bot)
+		if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) and bot:DistanceFromFountain() > 600 then
+			for _, enemy in pairs(nearbyEnemies) do
+				if
+					Fu.IsValidHero(enemy)
+					and not Fu.IsSuspiciousIllusion(enemy)
+					and Fu.IsInRange(bot, enemy, 1200)
+					and (bot:WasRecentlyDamagedByHero(enemy, 3.0) or Fu.IsChasingTarget(enemy, bot))
+				then
+					LogNeutralUse(
+						"item_kobold_cup",
+						"retreat",
+						enemy,
+						string.format("hp=%.2f dist=%.0f", hpRatio, GetUnitToUnitDistance(bot, enemy))
+					)
+					return BOT_ACTION_DESIRE_HIGH, bot, "none", "retreat"
+				end
+			end
+		end
+		if bot:GetMana() - item:GetManaCost() < bot:GetMaxMana() * KOBOLD_CUP_MANA_FLOOR then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		if
+			Fu.IsGoingOnSomeone(bot)
+			and Fu.IsValidHero(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsRunning(bot)
+			and Fu.IsInRange(bot, botTarget, 1600)
+			and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100)
+			and bot:IsFacingLocation(botTarget:GetLocation(), 30)
+		then
+			LogNeutralUse(
+				"item_kobold_cup",
+				"chase",
+				botTarget,
+				string.format("hp=%.2f dist=%.0f", hpRatio, GetUnitToUnitDistance(bot, botTarget))
+			)
+			return BOT_ACTION_DESIRE_HIGH, bot, "none", "chase"
+		end
+		for _, ally in pairs(Fu.GetNearbyHeroes(bot, buffRadius, false, BOT_MODE_NONE) or {}) do
+			if
+				ally ~= bot
+				and Fu.IsValidHero(ally)
+				and not ally:IsIllusion()
+				and Fu.IsRetreating(ally)
+				and ally:WasRecentlyDamagedByAnyHero(3.0)
+				and not ally:IsRooted()
+				and not ally:IsStunned()
+				and not ally:HasModifier("modifier_item_kobold_cup")
+			then
+				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
+				if enemiesNearAlly ~= nil and #enemiesNearAlly >= 1 then
+					LogNeutralUse(
+						"item_kobold_cup",
+						"ally-escape",
+						ally,
+						string.format("allyHp=%.2f allyDist=%.0f", Fu.GetHP(ally), GetUnitToUnitDistance(bot, ally))
+					)
+					return BOT_ACTION_DESIRE_HIGH, bot, "none", "ally-escape"
+				end
+			end
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+
+	-- Brick (tier 2): thrown at an enemy within AbilityCastRange (600): `damage` (150) physical damage, and it
+	-- removes `barrier_damage` (200) from any barrier on the target; cooldown 30 s, no mana, projectile speed
+	-- 1400. The item has no SpellImmunityType, so debuff-immune targets are skipped; the damage is physical, so
+	-- attack-immune (ethereal) targets are skipped too (Fu.CanBeAttacked).
+	-- Barrier modifiers: the ones whose tooltip in abilities_english.txt (7.42) says they absorb a set amount of
+	-- damage. Percentage reductions, block chances and Refraction's instances are left out.
+	local BRICK_BARRIER_MODIFIERS = {
+		"modifier_abaddon_aphotic_shield",
+		"modifier_bloodseeker_blood_mist_barrier",
+		"modifier_crystal_maiden_crystal_nova_barrier",
+		"modifier_dazzle_nothl_boon_shield",
+		"modifier_furion_teleport_shield",
+		"modifier_legion_commander_overwhelming_odds_shield",
+		"modifier_lina_laguna_blade_barrier",
+		"modifier_marci_bodyguarded",
+		"modifier_obsidian_destroyer_equilibrium_barrier",
+		"modifier_oracle_diviners_deck_the_tower",
+		"modifier_pangolier_shield_crash_buff",
+		"modifier_skywrath_mage_shield_barrier",
+		"modifier_tinker_defense_matrix",
+		"modifier_void_spirit_resonant_pulse_physical_buff",
+		"modifier_item_ash_legion_shield",
+		"modifier_item_consecrated_wraps_auto_barrier",
+		"modifier_item_pavise_shield",
+		"modifier_item_pipe_barrier",
+		"modifier_rune_shield",
+	}
+	local function BarrierOn(unit)
+		for _, modifierName in ipairs(BRICK_BARRIER_MODIFIERS) do
+			if unit:HasModifier(modifierName) then
+				return modifierName
+			end
+		end
+		return nil
+	end
+	Usage.ConsiderItemDesire["item_brick"] = function(item)
+		if AttemptedLately("item_brick") then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local castRange = item:GetCastRange()
+		if castRange == nil or castRange <= 0 then
+			castRange = 600
+		end
+		castRange = Fu.GetProperCastRange(false, bot, castRange)
+		local damage = item:GetSpecialValueInt("damage")
+		local function CanBrick(enemy)
+			return Fu.IsValidHero(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanBeAttacked(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+		end
+		for _, enemy in pairs(nearbyEnemies) do
+			if
+				CanBrick(enemy)
+				and BarrierOn(enemy) == nil
+				and Fu.CanKillTarget(enemy, damage, DAMAGE_TYPE_PHYSICAL)
+				and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			then
+				LogNeutralUse(
+					"item_brick",
+					"kill",
+					enemy,
+					string.format("hp=%d dist=%.0f", enemy:GetHealth(), GetUnitToUnitDistance(bot, enemy))
+				)
+				return BOT_ACTION_DESIRE_HIGH, enemy, "unit", "kill"
+			end
+		end
+		if Fu.IsGoingOnSomeone(bot) and CanBrick(botTarget) then
+			local barrierName = BarrierOn(botTarget)
+			local why = barrierName ~= nil and "barrier" or "fight"
+			LogNeutralUse(
+				"item_brick",
+				why,
+				botTarget,
+				string.format(
+					"hp=%d dist=%.0f barrier=%s",
+					botTarget:GetHealth(),
+					GetUnitToUnitDistance(bot, botTarget),
+					barrierName ~= nil and (string.gsub(barrierName, "^modifier_", "")) or "-"
+				)
+			)
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "unit", why
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+end
 Usage.ConsiderItemDesire["item_pyrrhic_cloak"] = function(item)
 	local castRange = Fu.GetProperCastRange(false, bot, item:GetCastRange())
 	local nEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)

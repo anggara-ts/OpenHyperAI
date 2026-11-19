@@ -120,16 +120,12 @@ end
 local shadowrazeNearAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "nevermore")
 local shadowrazeMediumAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "nevermore")
 local shadowrazeFarAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "nevermore")
--- sAbilityList[4] is Feast of Souls or Presence of the Dark Lord (slot order not in the datafeed;
--- Necromastery is innate), so the handle keeps a neutral name.
-local slot4Ability = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "nevermore")
 local feastOfSoulsAbility = SafeAbility(bot:GetAbilityByName("nevermore_frenzy"), "nevermore_frenzy", "nevermore")
 local requiemAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "nevermore")
 local talent4 = SafeAbility(bot:GetAbilityByName(sTalentList[4]), "sTalentList[4]", "nevermore")
 local razeNearDesire
 local razeMediumDesire
 local razeFarDesire
-local slot4Desire, slot4Target
 local feastOfSoulsDesire
 local requiemDesire
 local razeManaReserve, mpRatio, hpRatio, botLevel, nearbyEnemies, botTarget
@@ -180,32 +176,12 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbility(shadowrazeNearAbility)
 		return
 	end
-	slot4Desire, slot4Target = X.ConsiderN()
-	if slot4Desire > 0 then
-		bot:ActionQueue_UseAbilityOnEntity(slot4Ability, slot4Target)
-		return
-	end
 	feastOfSoulsDesire = X.ConsiderFeastOfSouls()
 	if feastOfSoulsDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbility(feastOfSoulsAbility)
 		return
 	end
-end
-function X.ConsiderN()
-	if
-		not slot4Ability:IsTrained()
-		or slot4Ability:IsPassive()
-		or not slot4Ability:IsFullyCastable()
-		or bot:IsDisarmed()
-		or slot4Ability:GetAutoCastState()
-	then
-		return 0
-	end
-	if not slot4Ability:GetAutoCastState() then
-		slot4Ability:ToggleAutoCast()
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function X.ConsiderR()
 	if not requiemAbility:IsFullyCastable() then

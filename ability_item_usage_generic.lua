@@ -6465,6 +6465,7 @@ Usage.ConsiderItemDesire["item_stormcrafter"] = function(item)
 	return BOT_ACTION_DESIRE_NONE
 end
 Usage.ConsiderItemDesire["item_gungir"] = function(item)
+	local hEffectTarget = nil
 	local nInRangeEnemy = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
 	for _, enemy in pairs(nInRangeEnemy) do
 		if

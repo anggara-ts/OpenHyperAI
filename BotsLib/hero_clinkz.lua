@@ -190,9 +190,53 @@ function X.LogHunt(step, target)
 		)
 	)
 end
--- Returns true when it gave an order.
+-- The hero to hunt while invisible: the engage target, else the weakest hero within 1400 that isn't covered
+-- by more enemies than we have near. Kept for 6s (game 048: the target changed while he walked).
+function X.HuntTarget()
+	local locked = bot._huntTarget
+	if
+		Fu.IsValidHero(locked)
+		and locked:CanBeSeen()
+		and DotaTime() - (bot._huntLockAt or -999) < 6
+		and GetUnitToUnitDistance(bot, locked) < 1600
+		and Fu.GetHP(bot) >= 0.35
+	then
+		return locked
+	end
+	bot._huntTarget = nil
+	if Fu.GetHP(bot) < 0.5 then
+		return nil
+	end
+	local best, bestHp = nil, 2
+	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+		best = botTarget
+	else
+		local alliesNear = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1400, true, BOT_MODE_NONE) or {}) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.CanBeAttacked(enemyHero)
+				and Fu.GetHP(enemyHero) < bestHp
+				and #Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 900) <= alliesNear
+			then
+				best, bestHp = enemyHero, Fu.GetHP(enemyHero)
+			end
+		end
+	end
+	if best ~= nil then
+		bot._huntTarget = best
+		bot._huntLockAt = DotaTime()
+	end
+	return best
+end
+-- Returns true when it gave an order. In any mode while invisible (#94, game 048: 61 approaches, 2 reveals;
+-- at 44:30 he showed himself at the edge of his range and the target walked out of the skeletons' attacks).
+-- He walks to a point 150 past the target on its way home (its escape path), then hex, Strafe and shoot from
+-- point blank. bot._clinkzHuntUntil keeps the outpost mode holding the other modes' orders meanwhile.
 function X.HuntStep()
 	if not bot:HasModifier("modifier_clinkz_wind_walk") then
+		bot._huntTarget = nil
 		return false
 	end
 	-- Invisible: a pact on the biggest creep in range first (heal + max HP, keeps him invisible).
@@ -207,27 +251,44 @@ function X.HuntStep()
 			return true
 		end
 	end
-	if not isGoingOnSomeone or not Fu.IsValidHero(botTarget) or Fu.IsSuspiciousIllusion(botTarget) then
+	local target = X.HuntTarget()
+	if target == nil then
 		return false
 	end
-	-- Point blank before the first hit (the first attack or cast ends the invisibility).
-	if GetUnitToUnitDistance(bot, botTarget) > 175 then
-		X.LogHunt("approach", botTarget)
-		bot:Action_MoveToUnit(botTarget)
+	bot._clinkzHuntUntil = DotaTime() + 0.3
+	local distance = GetUnitToUnitDistance(bot, target)
+	if distance > 200 then
+		local toFountain = Fu.GetEnemyFountain() - target:GetLocation()
+		local ambush = target:GetLocation() + toFountain:Normalized() * 150
+		X.LogHunt("approach", target)
+		bot:Action_MoveToLocation(ambush)
 		return true
 	end
 	local hex = X.ReadyItem("item_bloodthorn") or X.ReadyItem("item_orchid")
-	if hex ~= nil and Fu.CanCastOnNonMagicImmune(botTarget) then
-		X.LogHunt("reveal-" .. hex:GetName(), botTarget)
-		bot:Action_UseAbilityOnEntity(hex, botTarget)
-		return true
-	end
-	if strafeAbility:IsFullyCastable() then
-		X.LogHunt("reveal-strafe", botTarget)
+	local step = nil
+	if hex ~= nil and Fu.CanCastOnNonMagicImmune(target) then
+		step = "reveal-" .. hex:GetName()
+		bot:Action_UseAbilityOnEntity(hex, target)
+	elseif strafeAbility:IsFullyCastable() then
+		step = "reveal-strafe"
 		bot:Action_UseAbility(strafeAbility)
-		return true
+	else
+		step = "reveal-attack"
+		bot:Action_AttackUnit(target, true)
 	end
-	return false
+	X.LogHunt(step, target)
+	pcall(
+		print,
+		string.format(
+			"[OHA-CLINKZ] t=%.0f hunt reveal dist=%d target=%s by=%s",
+			DotaTime(),
+			distance,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			step
+		)
+	)
+	bot._clinkzHuntUntil = nil
+	return true
 end
 function X.ConsiderStrafe()
 	if not strafeAbility:IsFullyCastable() then
@@ -539,6 +600,10 @@ function X.ConsiderSearingArrows()
 end
 function X.ConsiderBurningBarrage()
 	if not burningBarrageAbility:IsTrained() or not burningBarrageAbility:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- Not during Strafe (maintainer, game 048 44:30): the 2s channel wastes the Strafe attack speed.
+	if bot:HasModifier("modifier_clinkz_strafe") then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	-- datafeed: Burning Barrage has no cast range and no "radius"; its arrows fly "range" (850), "projectile_width" (200) wide

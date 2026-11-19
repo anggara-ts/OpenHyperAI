@@ -288,6 +288,10 @@ function GetDesireHelper()
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
+	-- A hero hold (Puck's Phase Shift): no order at all, or the channel ends.
+	if bot._outpostHoldUntil ~= nil and DotaTime() < bot._outpostHoldUntil then
+		return
+	end
 	if Fu.CanNotUseAction(bot) then
 		return
 	end
@@ -1862,6 +1866,12 @@ heroSpecificDesire["npc_dota_hero_shadow_shaman"] = function()
 	return CheckHighPriorityChannelAbility("shadow_shaman_shackles")
 end
 heroSpecificDesire["npc_dota_hero_clinkz"] = function()
+	-- Invisible hunt (#94): hero_clinkz.lua walks him to the target's escape path; no other mode's orders meanwhile
+	-- (game 048: the attack mode shot from max range and ended the invisibility).
+	if bot._clinkzHuntUntil ~= nil and DotaTime() < bot._clinkzHuntUntil then
+		bot._outpostHoldUntil = DotaTime() + 0.15
+		return BOT_DESIRE_OVERRIDE * 1.5
+	end
 	return CheckHighPriorityChannelAbility("clinkz_burning_barrage")
 end
 heroSpecificDesire["npc_dota_hero_tiny"] = function()

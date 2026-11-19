@@ -172,8 +172,28 @@ local function RememberWard(kind)
 		table.remove(planted, 1)
 	end
 end
+-- Each bot's ward list, once, near the end of the game. Bot scripts stop when the game enters POST_GAME (game 050:
+-- the last script line came 1s before it), so a post-game dump never ran: dump when an Ancient is under 15% HP
+-- (or post-game, should scripts ever run there). Bots that placed no ward print nothing.
 local function DumpWards()
-	if dumped or GetGameState() ~= GAME_STATE_POST_GAME then
+	if dumped or #planted == 0 then
+		return
+	end
+	local nearEnd = GetGameState() == GAME_STATE_POST_GAME
+	if not nearEnd then
+		for _, ancientTeam in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+			local ancient = GetAncient(ancientTeam)
+			if
+				ancient ~= nil
+				and not ancient:IsNull()
+				and ancient:GetHealth() > 0
+				and ancient:GetHealth() / math.max(1, ancient:GetMaxHealth()) < 0.15
+			then
+				nearEnd = true
+			end
+		end
+	end
+	if not nearEnd then
 		return
 	end
 	dumped = true

@@ -198,6 +198,37 @@ function X.LogHunt(step, target)
 		)
 	)
 end
+-- A lone enemy hero worth a hunt (#94, maintainer): visible, within 2500, no other enemy hero within 1200 of it
+-- and none of its towers within 900. Clinkz above 60% HP, not retreating, with mana for the walk, a pact and the
+-- silence (game files: Skeleton Walk 80/105/130 mana, 35/40/45s, +25/35/45% speed; Death Pact 50), and Strafe or
+-- a silence item ready. The weakest such hero. Not for 15s after a cancelled hunt.
+function X.FindPrey()
+	if
+		Fu.GetHP(bot) < 0.6
+		or Fu.IsRetreating(bot)
+		or DotaTime() < (bot._huntOffUntil or -999)
+		or bot:GetMana() < skeletonWalkAbility:GetManaCost() + 150
+		or not (strafeAbility:IsFullyCastable() or X.ReadyItem("item_bloodthorn") or X.ReadyItem("item_orchid"))
+	then
+		return nil
+	end
+	local best, bestHp = nil, 2
+	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and enemyHero:CanBeSeen()
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and Fu.CanBeAttacked(enemyHero)
+			and GetUnitToUnitDistance(bot, enemyHero) <= 2500
+			and Fu.GetHP(enemyHero) < bestHp
+			and #Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 1200) <= 1
+			and #(enemyHero:GetNearbyTowers(900, false) or {}) == 0
+		then
+			best, bestHp = enemyHero, Fu.GetHP(enemyHero)
+		end
+	end
+	return best
+end
 -- The hero to hunt while invisible: the engage target, else the weakest hero within 1400 that isn't covered
 -- by more enemies than we have near. Kept for 6s (game 048: the target changed while he walked).
 function X.HuntTarget()
@@ -205,13 +236,13 @@ function X.HuntTarget()
 	if
 		Fu.IsValidHero(locked)
 		and locked:CanBeSeen()
-		and DotaTime() - (bot._huntLockAt or -999) < 6
-		and GetUnitToUnitDistance(bot, locked) < 1600
+		and DotaTime() - (bot._huntLockAt or -999) < (bot._huntLockFor or 6)
+		and GetUnitToUnitDistance(bot, locked) < (bot._huntRange or 1600)
 		and Fu.GetHP(bot) >= 0.35
 	then
 		return locked
 	end
-	bot._huntTarget = nil
+	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
 	if Fu.GetHP(bot) < 0.5 or Fu.IsRetreating(bot) then
 		return nil
 	end
@@ -264,6 +295,23 @@ function X.HuntStep()
 		bot._clinkzHuntUntil = nil
 		return false
 	end
+	-- A hunt on a lone hero ends when it gets backup (maintainer): another enemy hero within 1200 of the target
+	-- before the reveal. He stays invisible and the modes take over; no new hunt for 15s.
+	if bot._huntPrey == target and #Fu.GetEnemiesNearLoc(target:GetLocation(), 1200) >= 2 then
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f hunt cancel why=backup target=%s dist=%d",
+				DotaTime(),
+				(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+				GetUnitToUnitDistance(bot, target)
+			)
+		)
+		bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
+		bot._huntOffUntil = DotaTime() + 15
+		bot._clinkzHuntUntil = nil
+		return false
+	end
 	-- Outnumbered around Clinkz (the ally list includes him): no hunt.
 	if #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200) then
 		bot._huntTarget = nil
@@ -287,6 +335,10 @@ function X.HuntStep()
 		X.LogHunt("approach", target)
 		bot:Action_MoveToLocation(ambush)
 		return true
+	end
+	-- Searing Arrows on for the hunt's hits (maintainer): the first attack comes before the arrow rules run.
+	if searingArrowsAbility:IsTrained() and not searingArrowsAbility:GetAutoCastState() then
+		searingArrowsAbility:ToggleAutoCast()
 	end
 	local hex = X.ReadyItem("item_bloodthorn") or X.ReadyItem("item_orchid")
 	local step = nil
@@ -432,6 +484,28 @@ function X.ConsiderDeathPact()
 			end
 		end
 	end
+	-- Escape (#94, game 050 10:47-10:53: he ran with Skeleton Walk from Lich and Tinker and died with no pact). Game
+	-- files (7.42): charges 1/1/2/2, no cooldown, 700 range, +175-400 HP; it doesn't end Skeleton Walk. Hurt under
+	-- 60% with an enemy hero within 900 while retreating or just hit: eat the biggest creep in range, pact up or not.
+	if
+		Fu.GetHP(bot) < 0.6
+		and (Fu.IsRetreating(bot) or bot:WasRecentlyDamagedByAnyHero(2.0))
+		and #(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}) >= 1
+	then
+		local creep = GetMostHPCreepLevel(nearbyCreeps, maxCreepLevel)
+		if creep ~= nil and not creep:IsAncientCreep() then
+			pcall(
+				print,
+				string.format(
+					"[OHA-CLINKZ] t=%.0f death-pact why=escape hp=%.2f creep=%s",
+					DotaTime(),
+					Fu.GetHP(bot),
+					creep:GetUnitName()
+				)
+			)
+			return BOT_ACTION_DESIRE_HIGH, creep
+		end
+	end
 	if Fu.IsInLaningPhase() then
 		if Fu.IsLaning(bot) then
 			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
@@ -474,6 +548,27 @@ function X.ConsiderSkeletonWalk()
 	local roshanLocation = Fu.GetCurrentRoshanLocation()
 	local tormentorLocation = Fu.GetTormentorLocation(GetTeam())
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+	-- Hunt (#94, maintainer's play; game 050 30:40: he saw Lich alone and hit him from the edge of his range).
+	local prey = X.FindPrey()
+	if prey ~= nil then
+		bot._huntTarget = prey
+		bot._huntPrey = prey
+		bot._huntLockAt = DotaTime()
+		bot._huntLockFor = 30
+		bot._huntRange = 3200
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f hunt start target=%s dist=%d hp=%.2f target-hp=%.2f",
+				DotaTime(),
+				(string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")),
+				GetUnitToUnitDistance(bot, prey),
+				Fu.GetHP(bot),
+				Fu.GetHP(prey)
+			)
+		)
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	if isGoingOnSomeone and bot:GetActiveModeDesire() > 0.65 then
 		if
 			Fu.IsValidTarget(botTarget)

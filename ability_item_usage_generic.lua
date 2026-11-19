@@ -4778,8 +4778,42 @@ Usage.ConsiderItemDesire["item_tango_single"] = function(item)
 	local castType = "tree"
 	local hEffectTarget = nil
 	local castReason = nil
-	local tangoHealAmount = item:GetName() == "item_tango" and 200 or 160
+	-- Game files (7.42): Tango 7 HP/s for 16s = 112; a shared Tango (item_tango_single) 3.5 HP/s = 56 (the code
+	-- counted 200 / 160, so a Tango was only eaten far too late).
+	local tangoHealAmount = item:GetName() == "item_tango" and 112 or 56
 	local missingHealth = bot:OriginalGetMaxHealth() - bot:OriginalGetHealth()
+	-- A shared Tango is a gift that expires (game files: duration_to_use 40, it is gone 40s after it is given;
+	-- maintainer, game 050 6:30: Weaver held one at ~80% HP). Eat it as soon as a tree is in reach, whatever the
+	-- HP missing: no enemy hero right on the bot, the tree outside enemy tower range.
+	if item:GetName() == "item_tango_single" and missingHealth >= 1 then
+		local giftTrees = bot:GetNearbyTrees(800)
+		local closeEnemies = Fu.GetNearbyHeroes(bot, 400, true, BOT_MODE_NONE) or {}
+		local giftTowers = bot:GetNearbyTowers(1400, true)
+		if giftTrees[1] ~= nil and #closeEnemies == 0 then
+			local treeLocation = GetTreeLocation(giftTrees[1])
+			if
+				IsLocationVisible(treeLocation)
+				and IsLocationPassable(treeLocation)
+				and (#giftTowers == 0 or GetUnitToLocationDistance(giftTowers[1], treeLocation) > 920)
+			then
+				if DotaTime() >= (bot._sharedTangoLogAt or -999) then
+					bot._sharedTangoLogAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-ITEM] t=%.0f %s shared-tango hp=%.2f missing=%d tree-dist=%d",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							Fu.GetHP(bot),
+							missingHealth,
+							GetUnitToLocationDistance(bot, treeLocation)
+						)
+					)
+				end
+				return BOT_ACTION_DESIRE_HIGH, giftTrees[1], castType, "shared tango (expires)"
+			end
+		end
+	end
 	if bot:HasModifier("modifier_furion_sprout_damage") then
 		local closeTrees = bot:GetNearbyTrees(280)
 		if

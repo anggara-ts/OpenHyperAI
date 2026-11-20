@@ -97,7 +97,11 @@ local mpRatio
 function X.TrackPhaseShift()
 	if bot._phaseProbeAt ~= nil and DotaTime() >= bot._phaseProbeAt then
 		local since = DotaTime() - (bot._phaseOrderAt or DotaTime())
-		bot._phaseProbeAt = since < 0.9 and bot._phaseOrderAt + 1.0 or nil
+		-- Two probes inside the shift: 0.3s after the order and 0.15s before its end (duration 1 / 1.75 / 2.5 /
+		-- 3.25s). Game 051: the one probe at 1.0s came after a rank 1 shift was over, so it said nothing.
+		bot._phaseProbeAt = since < 0.5
+				and bot._phaseOrderAt + math.max(0.6, phaseShiftAbility:GetSpecialValueFloat("duration") - 0.15)
+			or nil
 		local mods = {}
 		for i = 0, bot:NumModifiers() - 1 do
 			mods[#mods + 1] = tostring(bot:GetModifierName(i))
@@ -245,6 +249,15 @@ function X.HurtSincePhaseOrder()
 	end
 	local since = DotaTime() - bot._phaseOrderAt - 0.1
 	return since > 0.05 and bot:WasRecentlyDamagedByAnyHero(since)
+end
+-- The cast hold (bot._castHoldUntil) pauses the item think, and with it SkillsComplement. The item think calls
+-- this instead, so the Phase Shift probe and the "hit: release the hold" check keep running inside the shift
+-- (game 051: every probe printed only after the hold, 1.1s to 3.3s after the order).
+function X.CastHoldTick()
+	pcall(X.TrackPhaseShift)
+	if bot._castHoldUntil ~= nil and X.HurtSincePhaseOrder() then
+		bot._castHoldUntil = nil
+	end
 end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)

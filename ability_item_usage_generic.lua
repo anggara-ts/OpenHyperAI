@@ -9485,6 +9485,10 @@ function ItemUsageThink()
 	-- A hero file's own hold (Puck's Phase Shift, #36): an item order would end the channel. Game 050: a hero hit
 	-- her within 1s of the cast in 12 of 24 probes, and item orders were the one thing not held.
 	if bot._castHoldUntil ~= nil and DotaTime() < bot._castHoldUntil then
+		-- The hero script does not run during the hold either: its own tick keeps its log and release check going.
+		if BotBuild.CastHoldTick ~= nil then
+			pcall(BotBuild.CastHoldTick)
+		end
 		_perfDone()
 		return
 	end

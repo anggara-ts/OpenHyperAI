@@ -99,6 +99,7 @@ local Tower = Dota.Tower
 local Rune = Dota.Rune
 local Shop = Dota.Shop
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local FarmRules = require(GetScriptDirectory() .. "/FuncLib/systems/farm_rules")
 local HasItem = Utils.HasItem
 local GetLocationToLocationDistance = Utils.GetLocationToLocationDistance
 local GetOffsetLocationTowardsTargetLocation = Utils.GetOffsetLocationTowardsTargetLocation
@@ -393,8 +394,138 @@ Site.IsCampDangerous = function(bot, camp)
 	end
 	return false
 end
+-- Farm keeps camps as { idx =, cattr = <spawner> } (RefreshCamp); other callers pass the spawner itself.
+local function CampData(camp)
+	return camp.cattr or camp
+end
+-- Camp side by position (FarmRules.CampSide: the nearest lane tower's team). Tower positions are read once,
+-- the first time a side is needed (the farm desire asks before the horn, with every tower standing), and
+-- each camp's side is cached by position.
+local towerSpots = nil
+local campSideCache = {}
+local function TowerSpots()
+	if towerSpots ~= nil then
+		return towerSpots
+	end
+	local spots = { radiant = {}, dire = {}, n = 0 }
+	for _, towerId in ipairs({
+		Tower.Top1,
+		Tower.Top2,
+		Tower.Top3,
+		Tower.Mid1,
+		Tower.Mid2,
+		Tower.Mid3,
+		Tower.Bot1,
+		Tower.Bot2,
+		Tower.Bot3,
+	}) do
+		for teamKey, team in pairs({ radiant = Team.Radiant, dire = Team.Dire }) do
+			local tower = GetTower(team, towerId)
+			if tower ~= nil then
+				local loc = tower:GetLocation()
+				spots[teamKey][#spots[teamKey] + 1] = { x = loc.x, y = loc.y }
+				spots.n = spots.n + 1
+			end
+		end
+	end
+	if spots.n > 0 then
+		towerSpots = spots
+	end
+	return spots
+end
+-- "radiant", "dire" or nil, and the margin (FarmRules.CampSide).
+Site.CampSide = function(camp)
+	local loc = CampData(camp).location
+	if loc == nil then
+		return nil, 0
+	end
+	local key = math.floor(loc.x) .. "," .. math.floor(loc.y)
+	local cached = campSideCache[key]
+	if cached == nil then
+		local spots = TowerSpots()
+		local side, margin = FarmRules.CampSide(loc.x, loc.y, spots.radiant, spots.dire)
+		if side == nil then
+			-- No tower found (should not happen): the closer Ancient, not cached.
+			local radiantDist = GetLocationToLocationDistance(loc, Site.radiant_ancient)
+			local direDist = GetLocationToLocationDistance(loc, Site.dire_ancient)
+			return radiantDist <= direDist and "radiant" or "dire", math.abs(radiantDist - direDist)
+		end
+		cached = { side = side, margin = margin }
+		campSideCache[key] = cached
+	end
+	return cached.side, cached.margin
+end
+-- Game 062: every camp read as an enemy camp. Farm passes { idx, cattr } wrappers and this read
+-- `camp.team` off the wrapper, which is nil, so nil ~= GetTeam() held for all of them (Radiant dropped
+-- -1454,-3356 in its own jungle, Dire dropped 8430,1263 in its own corner). The side now comes from the
+-- camp's position (Site.CampSide); the engine's spawner team is only printed in the [OHA-CAMP] survey.
 Site.IsEnemyCamp = function(camp)
-	return camp.team ~= GetTeam()
+	local side = Site.CampSide(camp)
+	if side == nil then
+		return CampData(camp).team ~= GetTeam()
+	end
+	return (side == "radiant" and Team.Radiant or Team.Dire) ~= GetTeam()
+end
+-- [OHA-CAMP] once per team per game: every camp's index, type, the engine's team, position, and the side
+-- the position rule gives, so a game shows whether the two agree.
+local campSurveyDone = {}
+Site.SurveyCamps = function(bot)
+	local team = GetTeam()
+	if campSurveyDone[team] then
+		return
+	end
+	local spawners = objectValues(GetNeutralSpawners() or {})
+	if #spawners == 0 then
+		return
+	end
+	campSurveyDone[team] = true
+	local hero = bot ~= nil and string.gsub(bot:GetUnitName(), "npc_dota_hero_", "") or "?"
+	local spots = TowerSpots()
+	local agree, disagree, total = 0, 0, 0
+	for i, spawner in ipairs(spawners) do
+		if spawner ~= nil and spawner.location ~= nil then
+			total = total + 1
+			local side, margin = Site.CampSide(spawner)
+			local engineTeam = spawner.team == Team.Radiant and "radiant"
+				or spawner.team == Team.Dire and "dire"
+				or tostring(spawner.team)
+			local same = engineTeam == side
+			if same then
+				agree = agree + 1
+			else
+				disagree = disagree + 1
+			end
+			pcall(
+				print,
+				string.format(
+					"[OHA-CAMP] t=%.0f %s survey idx=%s type=%s engineTeam=%s side=%s margin=%d agree=%d at=%.0f,%.0f",
+					DotaTime(),
+					hero,
+					tostring(spawner.idx or i),
+					tostring(spawner.type),
+					engineTeam,
+					tostring(side),
+					math.floor(margin or 0),
+					same and 1 or 0,
+					spawner.location.x,
+					spawner.location.y
+				)
+			)
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-CAMP] t=%.0f %s survey-sum team=%s camps=%d towers=%d agree=%d disagree=%d",
+			DotaTime(),
+			hero,
+			team == Team.Radiant and "radiant" or "dire",
+			total,
+			spots.n,
+			agree,
+			disagree
+		)
+	)
 end
 local campBehindGatesCache = {}
 Site.IsCampBehindEnemyGates = function(camp)
@@ -434,17 +565,19 @@ Site.IsCampBehindEnemyGates = function(camp)
 	end
 	return isBehindGates
 end
+-- Read through the farm wrapper too (game 062: IsAncientCamp(wrapper) was always false, so
+-- GetClosestNeutralSpwan never applied its level 10 / 6 armor rule to ancient camps).
 Site.IsAncientCamp = function(camp)
-	return camp.type == "ancient"
+	return CampData(camp).type == "ancient"
 end
 Site.IsSmallCamp = function(camp)
-	return camp.type == "small"
+	return CampData(camp).type == "small"
 end
 Site.IsMediumCamp = function(camp)
-	return camp.type == "medium"
+	return CampData(camp).type == "medium"
 end
 Site.IsLargeCamp = function(camp)
-	return camp.type == "large"
+	return CampData(camp).type == "large"
 end
 Site.RefreshCamp = function(bot)
 	local neutralSpawners = GetNeutralSpawners()

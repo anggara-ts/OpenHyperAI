@@ -254,11 +254,24 @@ function GetDesireHelper()
 		lastHitCreep = TeamRoam.GetLastHitCreep()
 		if Fu.IsValid(lastHitCreep) and Fu.CanBeAttacked(lastHitCreep) then
 			local why = TeamRoam.LastHitWithdrawWhy(lastHitCreep)
+			-- Game 062, 30:35: Dazzle at our bottom T1 went team_roam 1.50 (this snipe) <-> farm 0.15-0.17
+			-- every 1-4s (8 changes in 14s). Farm was already hitting that wave (its Think attacks the
+			-- lowest-HP lane creep in range); the 1.50 override took each killable creep and handed back.
+			-- While farm works a wave, farm takes the last hit itself.
+			if
+				why == nil
+				and bot:GetActiveMode() == BOT_MODE_FARM
+				and bot._farmCommitKind == "lane"
+				and GameTime() - (bot._farmCommitAt or -99) < 1.5
+			then
+				why = "farm-wave"
+			end
 			if why == nil then
 				return BOT_DESIRE_OVERRIDE * 1.5
 			end
 			if DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
-				bot._roamLastHitSkipLogAt = DotaTime() + 5
+				-- farm-wave fires on every killable creep of a wave farm is clearing: once per 30s.
+				bot._roamLastHitSkipLogAt = DotaTime() + (why == "farm-wave" and 30 or 5)
 				pcall(
 					print,
 					string.format(

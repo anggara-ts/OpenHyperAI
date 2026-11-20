@@ -12,6 +12,7 @@ local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localizat
 local CustomizeGeneral = require(GetScriptDirectory() .. "/Customize/general")
 local FarmDefend = require(GetScriptDirectory() .. "/FuncLib/systems/farm_defend")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
+local FarmRules = require(GetScriptDirectory() .. "/FuncLib/systems/farm_rules")
 local bot = GetBot()
 local FarmMode = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -90,6 +91,196 @@ end
 local function ShortName(unit)
 	return (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
 end
+local function CampLoc(camp)
+	return camp ~= nil and camp.cattr ~= nil and camp.cattr.location or nil
+end
+local function CampKey(camp)
+	local loc = CampLoc(camp)
+	if loc == nil then
+		return "none"
+	end
+	return string.format("%.0f,%.0f", loc.x, loc.y)
+end
+-- Every preferredCamp change goes through here. Game 062, 13:46-13:56: Dazzle walked back and forth by
+-- our bottom T1 in farm mode with no mode flip; the target camp kept changing and nothing said so.
+-- [OHA-FARM] camp-switch names a change to a different camp, including a drop and a new pick within 30s
+-- (A -> none -> B), with the reason; n= counts the switches since the last printed line (5s throttle).
+local campChosenAt = nil
+local lastCampKey, lastCampAt, lastDropWhy = nil, -999, nil
+local campSwitchLogAt, campSwitchCount = -999, 0
+local function SetPreferredCamp(camp, why)
+	local now = DotaTime()
+	local fromKey = preferredCamp ~= nil and CampKey(preferredCamp) or nil
+	local toKey = camp ~= nil and CampKey(camp) or nil
+	preferredCamp = camp
+	if toKey == fromKey then
+		return
+	end
+	if toKey == nil then
+		lastCampKey, lastCampAt, lastDropWhy = fromKey, now, why
+		campChosenAt = nil
+		return
+	end
+	campChosenAt = now
+	local prevKey = fromKey
+	local switchWhy = why
+	if prevKey == nil and lastCampKey ~= nil and now - lastCampAt <= 30 then
+		prevKey = lastCampKey
+		switchWhy = tostring(lastDropWhy) .. ">" .. why
+	end
+	lastCampKey, lastCampAt = toKey, now
+	if prevKey == nil or prevKey == toKey then
+		return
+	end
+	campSwitchCount = campSwitchCount + 1
+	if now >= campSwitchLogAt then
+		campSwitchLogAt = now + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-FARM] t=%.0f %s camp-switch from=%s to=%s why=%s n=%d",
+				now,
+				ShortName(bot),
+				prevKey,
+				toKey,
+				switchWhy,
+				campSwitchCount
+			)
+		)
+		campSwitchCount = 0
+	end
+end
+local function PickCamp(camps, why)
+	SetPreferredCamp(Fu.Site.GetClosestNeutralSpwan(bot, camps or {}), why)
+	return preferredCamp
+end
+-- Where our wave on a camp's lane is compared with the camp, toward their Ancient: the camp's nearest lane,
+-- our lane front's distance to their Ancient and the camp's. Cached 2s per camp: farm's desire runs every
+-- think, and the lane lookups add up over ~13 enemy camps.
+local function CampDepths(camp)
+	local campLoc = CampLoc(camp)
+	local enemyAncient = GetAncient(GetOpposingTeam())
+	if campLoc == nil or enemyAncient == nil then
+		return nil
+	end
+	bot._campCover = bot._campCover or {}
+	local key = CampKey(camp)
+	local cached = bot._campCover[key]
+	if cached ~= nil and DotaTime() < cached.until_ then
+		return cached
+	end
+	local lane, laneDist = nil, math.huge
+	for _, candidate in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local along = GetAmountAlongLane(candidate, campLoc)
+		if along ~= nil and along.distance < laneDist then
+			lane, laneDist = candidate, along.distance
+		end
+	end
+	if lane == nil then
+		return nil
+	end
+	local ancientLoc = enemyAncient:GetLocation()
+	cached = {
+		lane = lane,
+		wave = Fu.GetLocationToLocationDistance(GetLaneFrontLocation(GetTeam(), lane, 0), ancientLoc),
+		camp = Fu.GetLocationToLocationDistance(campLoc, ancientLoc),
+		until_ = DotaTime() + 2,
+	}
+	bot._campCover[key] = cached
+	return cached
+end
+local function LaneBehind(lane)
+	local states = Fu.Utils.GameStates
+	local untilAt = states ~= nil and states.enemyHalfOff ~= nil and states.enemyHalfOff[lane] or nil
+	return untilAt ~= nil and untilAt > DotaTime()
+end
+-- While behind or with fewer heroes alive (keepOwnSide): an enemy camp stays open where our wave on its lane
+-- is deeper than the camp, that lane is not the one marked behind, and no enemy hero was seen within 2500 of
+-- it in the last 5s (FarmRules.EnemyCampOpenWhileBehind). Logs a camp when it opens, and when an open camp
+-- closes again (blocked is the default and not printed); at most one line per 5s per bot, a change held
+-- back by the throttle prints later.
+local campOpenLogged = {}
+local campOpenLogAt = -999
+local function CampOpenWhileBehind(camp)
+	local depths = CampDepths(camp)
+	if depths == nil then
+		return false, "no-lane"
+	end
+	local campLoc = CampLoc(camp)
+	local enemiesNear = #Fu.GetLastSeenEnemiesNearLoc(campLoc, 2500)
+	local open, why = FarmRules.EnemyCampOpenWhileBehind(depths.wave, depths.camp, LaneBehind(depths.lane), enemiesNear)
+	local key = CampKey(camp)
+	if (campOpenLogged[key] or false) ~= open and DotaTime() >= campOpenLogAt then
+		campOpenLogAt = DotaTime() + 5
+		campOpenLogged[key] = open
+		pcall(
+			print,
+			string.format(
+				"[OHA-FARM] t=%.0f %s behind-camp %s why=%s lane=%d campToAncient=%d waveToAncient=%d enemies=%d alive=%d/%d at=%s",
+				DotaTime(),
+				ShortName(bot),
+				open and "allow" or "block",
+				why,
+				depths.lane,
+				depths.camp,
+				depths.wave,
+				enemiesNear,
+				Fu.GetNumOfAliveHeroes(false),
+				Fu.GetNumOfAliveHeroes(true),
+				key
+			)
+		)
+	end
+	return open, why
+end
+-- Otherwise an enemy camp is fine only when our wave on its lane is at least as deep toward their Ancient as
+-- the camp: the wave gives vision and draws them. Game 039, 27:00: Phantom Lancer farmed Dire camps with our
+-- bottom wave pushed back toward us.
+local function EnemyCampCovered(camp)
+	local depths = CampDepths(camp)
+	if depths == nil then
+		return true
+	end
+	local covered = FarmRules.EnemyCampCovered(depths.wave, depths.camp)
+	if not covered and DotaTime() >= (bot._farmSideLogAt or -999) then
+		bot._farmSideLogAt = DotaTime() + 10
+		pcall(
+			print,
+			string.format(
+				"[OHA-FARM] t=%.0f %s enemy-camp-uncovered lane=%d campToAncient=%d waveToAncient=%d at=%s",
+				DotaTime(),
+				ShortName(bot),
+				depths.lane,
+				depths.camp,
+				depths.wave,
+				CampKey(camp)
+			)
+		)
+	end
+	return covered
+end
+-- The camp rules of this think (set by the desire, read again by Think when it re-picks a camp, so Think
+-- no longer picks from the unfiltered team table a camp the desire drops a moment later).
+local keepOwnSideNow, aliveEnemyCountNow = false, 5
+local function CampAllowed(camp)
+	if not Fu.Site.IsEnemyCamp(camp) or Fu.IsInLaningPhase() then
+		return true
+	end
+	if keepOwnSideNow then
+		return (CampOpenWhileBehind(camp))
+	end
+	-- With at most 2 enemies alive the enemy jungle is open anyway.
+	return aliveEnemyCountNow <= 2 or EnemyCampCovered(camp)
+end
+local function FilterCamps(camps)
+	local allowed = {}
+	for _, camp in ipairs(camps or {}) do
+		if CampAllowed(camp) then
+			allowed[#allowed + 1] = camp
+		end
+	end
+	return allowed
+end
 -- Base siege (FuncLib/systems/defend.lua Defend.GetBaseSiege: 3+ enemy heroes at a T3, barracks,
 -- T4 or the Ancient, kept 10s after the last sighting).
 local function BaseSiege()
@@ -131,11 +322,33 @@ local function EnemyHalfWithdrawWhy()
 	if Fu.DoesTeamHaveAegis() and aliveAllies >= 4 then
 		return nil
 	end
+	local why = nil
 	if BehindLaneNear(2500) ~= nil then
-		return "behind"
+		why = "behind"
+	elseif aliveEnemies > aliveAllies then
+		why = "fewer-alive"
 	end
-	if aliveEnemies > aliveAllies then
-		return "fewer-alive"
+	if why ~= nil then
+		-- Not while on the way to (within 3000) a camp the farm rules allow in this state: one of ours, or an
+		-- enemy camp behind our deeper wave (CampOpenWhileBehind). Otherwise the withdraw walks the bot home
+		-- and the farm picks the same camp again.
+		local campLoc = CampLoc(preferredCamp)
+		if
+			campLoc ~= nil
+			and GetUnitToLocationDistance(bot, campLoc) <= 3000
+			and (not Fu.Site.IsEnemyCamp(preferredCamp) or CampOpenWhileBehind(preferredCamp))
+		then
+			FarmLog(
+				"[OHA-FARM] t=%.0f %s withdraw-skip why=%s camp=%s own=%s",
+				DotaTime(),
+				ShortName(bot),
+				why,
+				CampKey(preferredCamp),
+				tostring(not Fu.Site.IsEnemyCamp(preferredCamp))
+			)
+			return nil
+		end
+		return why
 	end
 	local enemiesNear = #Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2500)
 	local alliesNear = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1600)
@@ -206,6 +419,186 @@ local function MeepoBodyInFight()
 		end
 	end
 	return nil
+end
+-- Idle fallback. Game 062, 30:30-31:50: after a wipe, Medusa, Leshrac and Nature's Prophet stood still
+-- ~80s at the top lane with farm 0.06 (end_fallback) and Valve's assemble 0.10-0.11 as the best modes.
+-- When the active (best) mode's desire stays under 0.15 for 10s while the bot does nothing
+-- (FarmRules.IdleStep), farm takes over at IDLE_FALLBACK_DESIRE and walks to the nearest of: a wave on
+-- our half with no enemy seen near it, a camp on our side; else to the team. It holds until the bot is
+-- there, another mode wants more, or 25s passed (FarmRules.IdleHoldEnds).
+local IDLE_FALLBACK_DESIRE = 0.3
+local idleState = {}
+local idleHold = nil
+local idleModeNames = nil
+local function ModeName(mode)
+	if idleModeNames == nil then
+		idleModeNames = {}
+		for name, id in pairs({
+			none = BOT_MODE_NONE,
+			laning = BOT_MODE_LANING,
+			attack = BOT_MODE_ATTACK,
+			roam = BOT_MODE_ROAM,
+			retreat = BOT_MODE_RETREAT,
+			secret_shop = BOT_MODE_SECRET_SHOP,
+			side_shop = BOT_MODE_SIDE_SHOP,
+			push_top = BOT_MODE_PUSH_TOWER_TOP,
+			push_mid = BOT_MODE_PUSH_TOWER_MID,
+			push_bot = BOT_MODE_PUSH_TOWER_BOT,
+			defend_top = BOT_MODE_DEFEND_TOWER_TOP,
+			defend_mid = BOT_MODE_DEFEND_TOWER_MID,
+			defend_bot = BOT_MODE_DEFEND_TOWER_BOT,
+			assemble = BOT_MODE_ASSEMBLE,
+			team_roam = BOT_MODE_TEAM_ROAM,
+			farm = BOT_MODE_FARM,
+			defend_ally = BOT_MODE_DEFEND_ALLY,
+			evasive = BOT_MODE_EVASIVE_MANEUVERS,
+			roshan = BOT_MODE_ROSHAN,
+			item = BOT_MODE_ITEM,
+			ward = BOT_MODE_WARD,
+			rune = BOT_MODE_RUNE,
+		}) do
+			idleModeNames[id] = name
+		end
+	end
+	return idleModeNames[mode] or tostring(mode)
+end
+-- Modes that wait on purpose at a low desire (rune: holding the river spot for the bounty; ward, shops, item).
+local idleWaitModes = {}
+for _, mode in ipairs({ BOT_MODE_RUNE, BOT_MODE_WARD, BOT_MODE_SECRET_SHOP, BOT_MODE_SIDE_SHOP, BOT_MODE_ITEM }) do
+	idleWaitModes[mode] = true
+end
+local function IdleBusy()
+	return not bot:IsAlive()
+		or not IsPlayerBot(bot:GetPlayerID())
+		or bot.isBear
+		or bot:HasModifier("modifier_arc_warden_tempest_double")
+		or Fu.IsInLaningPhase()
+		or idleWaitModes[bot:GetActiveMode()] == true
+		or bot:HasModifier("modifier_fountain_aura_buff") and (Fu.GetHP(bot) < 0.95 or Fu.GetMP(bot) < 0.95)
+		or bot:IsChanneling()
+		or bot:IsCastingAbility()
+		or bot:IsUsingAbility()
+		or bot:GetAttackTarget() ~= nil
+		or Fu.IsAttacking(bot)
+		or #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600) > 0
+end
+-- Where an idle bot goes: the nearest wave on our half or own camp (more than 800 away, so not where it
+-- already stands), else the middle of the alive allies.
+local function IdleTarget()
+	local best, bestDist, bestKind, bestCamp = nil, math.huge, nil, nil
+	local ourFountain, enemyFountain = Fu.GetTeamFountain(), Fu.GetEnemyFountain()
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		local front = GetLaneFrontLocation(GetTeam(), lane, 0)
+		local dist = GetUnitToLocationDistance(bot, front)
+		if
+			dist > 800
+			and dist < bestDist
+			and Fu.GetDistance(front, ourFountain) < Fu.GetDistance(front, enemyFountain)
+			and not LaneBehind(lane)
+			and #Fu.GetLastSeenEnemiesNearLoc(front, 1600) == 0
+			and IsLocationPassable(front)
+		then
+			best, bestDist, bestKind = front, dist, "wave-" .. lane
+		end
+	end
+	for _, camp in ipairs(Fu.Role["availableCampTable"] or {}) do
+		local loc = CampLoc(camp)
+		if loc ~= nil and not Fu.Site.IsEnemyCamp(camp) and not Fu.Site.IsCampDangerous(bot, camp) then
+			local dist = GetUnitToLocationDistance(bot, loc)
+			if dist > 800 and dist < bestDist then
+				best, bestDist, bestKind, bestCamp = loc, dist, "camp", camp
+			end
+		end
+	end
+	if best ~= nil then
+		return best, bestKind, bestCamp
+	end
+	local sumX, sumY, n = 0, 0, 0
+	for i = 1, #GetTeamPlayers(GetTeam()) do
+		local member = GetTeamMember(i)
+		if member ~= nil and member ~= bot and member:IsAlive() then
+			local loc = member:GetLocation()
+			sumX, sumY, n = sumX + loc.x, sumY + loc.y, n + 1
+		end
+	end
+	if n > 0 then
+		local center = Vector(sumX / n, sumY / n, 0)
+		if GetUnitToLocationDistance(bot, center) > 1500 then
+			return center, "team", nil
+		end
+	end
+	return nil
+end
+-- Returns farm's desire while the idle fallback runs, or nil. rawDesire: farm's own desire this think.
+local function IdleFallback(rawDesire)
+	local now = DotaTime()
+	if idleHold ~= nil then
+		local activeMode = bot:GetActiveMode()
+		local other = activeMode ~= BOT_MODE_FARM and bot:GetActiveModeDesire() or nil
+		local ends = FarmRules.IdleHoldEnds(
+			now,
+			idleHold.at,
+			GetUnitToLocationDistance(bot, idleHold.to),
+			other,
+			IDLE_FALLBACK_DESIRE
+		)
+		if ends == nil and (not bot:IsAlive() or #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600) > 0) then
+			ends = "enemy-or-dead"
+		end
+		if ends == nil then
+			bot.farmLocation = idleHold.to
+			return IDLE_FALLBACK_DESIRE
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-IDLE] t=%.0f %s end why=%s then=%s took=%.0f moved=%d",
+				now,
+				ShortName(bot),
+				ends,
+				idleHold.kind,
+				now - idleHold.at,
+				math.floor(GetUnitToLocationDistance(bot, idleHold.from))
+			)
+		)
+		idleHold = nil
+		idleState.since = nil
+		return nil
+	end
+	local activeMode = bot:GetActiveMode()
+	local activeDesire = bot:GetActiveModeDesire()
+	local fire, idleFor = FarmRules.IdleStep(idleState, now, activeDesire, IdleBusy())
+	if not fire then
+		return nil
+	end
+	local to, kind, camp = IdleTarget()
+	if to == nil then
+		-- Nowhere better to go: start the 10s over.
+		idleState.since = now
+		return nil
+	end
+	if camp ~= nil then
+		SetPreferredCamp(camp, "idle")
+	end
+	idleHold = { to = to, kind = kind, at = now, from = bot:GetLocation() }
+	bot.farmLocation = to
+	pcall(
+		print,
+		string.format(
+			"[OHA-IDLE] t=%.0f %s best=%s:%.2f second=%s for=%.0f then=%s to=%.0f,%.0f dist=%d",
+			now,
+			ShortName(bot),
+			ModeName(activeMode),
+			activeDesire,
+			activeMode ~= BOT_MODE_FARM and string.format("farm:%.2f", rawDesire) or "-",
+			idleFor,
+			kind,
+			to.x,
+			to.y,
+			math.floor(GetUnitToLocationDistance(bot, to))
+		)
+	)
+	return IDLE_FALLBACK_DESIRE
 end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
@@ -400,6 +793,14 @@ function GetDesire()
 		bot._farmCommitFloor = nil
 		return BOT_MODE_DESIRE_NONE
 	end
+	-- Idle fallback (IdleFallback): past the push-frequency scaling above, like the withdraw.
+	local idleDesire = IdleFallback(desire)
+	if idleDesire ~= nil and idleDesire > desire then
+		bot._farmCommitUntil = nil
+		bot._farmCommitFloor = nil
+		bot._farmExitReason = "idle_fallback"
+		return idleDesire
+	end
 	-- Evasive maneuvers is the engine's momentary dodge mode. Replying from it read as
 	-- "I'm busy" for a bot that was really about to farm.
 	if desire > 0.5 and bot:GetActiveMode() ~= BOT_MODE_EVASIVE_MANEUVERS and FarmDefend.ClaimAnnounce() then
@@ -414,8 +815,10 @@ function GetDesire()
 end
 function GetDesireHelper()
 	bot._farmExitReason = nil
+	-- [OHA-CAMP] survey, once per team (site.lua keeps the flag).
+	Fu.Site.SurveyCamps(bot)
 	if preferredCamp == nil then
-		preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+		PickCamp(availableCamps, "pick")
 	end
 	if DotaTime() - lastCacheCleanupTime > Utils.CachedVarsCleanTime then
 		Utils.CleanupCachedVars()
@@ -473,7 +876,7 @@ function GetDesireHelper()
 		withdrawWhy = "finish"
 	end
 	if withdrawWhy ~= nil and bot:IsAlive() then
-		preferredCamp = nil
+		SetPreferredCamp(nil, "withdraw")
 		if bot._farmWithdrawTo == nil or DotaTime() - (bot._farmWithdrawStart or -99) > 25 then
 			bot._farmWithdrawTo = NearestOwnTower()
 			bot._farmWithdrawStart = DotaTime()
@@ -615,91 +1018,27 @@ function GetDesireHelper()
 		Fu.Role["hasRefreshDone"] = false
 	end
 	availableCamps = Fu.Role["availableCampTable"]
-	-- While behind (push.lua flag) or with fewer heroes alive: own-side camps and lane creeps only, so
-	-- farm does not walk the bot straight back into the enemy half after a withdraw.
+	-- While behind (push.lua flag) or with fewer heroes alive: own-side camps, lane creeps, and enemy camps
+	-- behind our deeper wave on a lane that is not the behind one (CampOpenWhileBehind). Game 062: any lane
+	-- marked behind anywhere shut every enemy camp, and the wrapper bug in Site.IsEnemyCamp shut ours too.
+	-- Otherwise enemy camps need our wave about as deep as the camp (EnemyCampCovered), see CampAllowed.
 	local keepOwnSide = not Fu.IsInLaningPhase() and (BehindLaneNear(nil) ~= nil or aliveEnemyCount > aliveAllyCount)
-	-- Otherwise an enemy camp is fine only when our wave on its lane is at least as deep toward their Ancient as
-	-- the camp: the wave gives vision and draws them. Game 039, 27:00: Phantom Lancer farmed Dire camps with
-	-- our bottom wave pushed back toward us. With at most 2 enemies alive the enemy jungle is open anyway.
-	local campCovered = function(camp)
-		if not Fu.Site.IsEnemyCamp(camp) or Fu.IsInLaningPhase() or aliveEnemyCount <= 2 then
-			return true
-		end
-		local enemyAncient = GetAncient(GetOpposingTeam())
-		local campLoc = camp.cattr and camp.cattr.location
-		if enemyAncient == nil or campLoc == nil then
-			return true
-		end
-		-- Cached 2s per camp: farm's desire runs every think, and the lane lookups add up over ~9 camps.
-		bot._campCover = bot._campCover or {}
-		local key = math.floor(campLoc.x) .. "," .. math.floor(campLoc.y)
-		local cachedCover = bot._campCover[key]
-		if cachedCover ~= nil and DotaTime() < cachedCover.until_ then
-			return cachedCover.covered
-		end
-		local lane, laneDist = nil, math.huge
-		for _, candidate in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
-			local along = GetAmountAlongLane(candidate, campLoc)
-			if along ~= nil and along.distance < laneDist then
-				lane, laneDist = candidate, along.distance
-			end
-		end
-		if lane == nil then
-			return true
-		end
-		local front = GetLaneFrontLocation(GetTeam(), lane, 0)
-		local ancientLoc = enemyAncient:GetLocation()
-		local waveDepth = Fu.GetLocationToLocationDistance(front, ancientLoc)
-		local campDepth = Fu.GetLocationToLocationDistance(campLoc, ancientLoc)
-		local covered = waveDepth <= campDepth + 500
-		bot._campCover[key] = { covered = covered, until_ = DotaTime() + 2 }
-		if not covered and DotaTime() >= (bot._farmSideLogAt or -999) then
-			bot._farmSideLogAt = DotaTime() + 10
-			pcall(
-				print,
-				string.format(
-					"[OHA-FARM] t=%.0f %s enemy-camp-uncovered lane=%d campToAncient=%d waveToAncient=%d at=%.0f,%.0f",
+	keepOwnSideNow, aliveEnemyCountNow = keepOwnSide, aliveEnemyCount
+	availableCamps = FilterCamps(availableCamps)
+	if preferredCamp ~= nil and not CampAllowed(preferredCamp) then
+		-- Behind, or enemies seen at the camp: drop it now. Only uncovered: keep it the few seconds of the
+		-- camp keep window (the wave front moves; a camp at the edge flipped back and forth).
+		local hard = keepOwnSide or Fu.Site.IsCampDangerous(bot, preferredCamp)
+		if FarmRules.CanSwitchCamp(DotaTime(), campChosenAt, hard) then
+			if keepOwnSide then
+				FarmLog(
+					"[OHA-FARM] t=%.0f %s enemy-camp-drop at=%s",
 					DotaTime(),
 					ShortName(bot),
-					lane,
-					campDepth,
-					waveDepth,
-					campLoc.x,
-					campLoc.y
+					CampKey(preferredCamp)
 				)
-			)
-		end
-		return covered
-	end
-	if not keepOwnSide then
-		local coveredCamps = {}
-		for _, camp in ipairs(availableCamps or {}) do
-			if campCovered(camp) then
-				coveredCamps[#coveredCamps + 1] = camp
 			end
-		end
-		availableCamps = coveredCamps
-		if preferredCamp ~= nil and not campCovered(preferredCamp) then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
-		end
-	end
-	if keepOwnSide then
-		local ownCamps = {}
-		for _, camp in ipairs(availableCamps or {}) do
-			if not Fu.Site.IsEnemyCamp(camp) then
-				ownCamps[#ownCamps + 1] = camp
-			end
-		end
-		availableCamps = ownCamps
-		if preferredCamp ~= nil and Fu.Site.IsEnemyCamp(preferredCamp) then
-			FarmLog(
-				"[OHA-FARM] t=%.0f %s enemy-camp-drop at=%.0f,%.0f",
-				DotaTime(),
-				ShortName(bot),
-				preferredCamp.cattr.location.x,
-				preferredCamp.cattr.location.y
-			)
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, keepOwnSide and "enemy-camp-drop" or "uncovered")
 		end
 	end
 	if isAlive and bot:HasModifier("modifier_arc_warden_tempest_double") then
@@ -714,7 +1053,7 @@ function GetDesireHelper()
 					local allyTarget = allyHero:GetAttackTarget()
 					if Fu.IsRoshan(allyTarget) and Fu.GetHP(allyTarget) < 0.4 or botMode == BOT_MODE_ITEM then
 						if preferredCamp == nil then
-							preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+							PickCamp(availableCamps, "pick")
 						end
 						return RemapValClamped(
 							Fu.GetHP(bot),
@@ -741,7 +1080,7 @@ function GetDesireHelper()
 					local allyTarget = allyHero:GetAttackTarget()
 					if Fu.IsRoshan(allyTarget) and Fu.GetHP(allyTarget) < 0.25 or botMode == BOT_MODE_ITEM then
 						if preferredCamp == nil then
-							preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+							PickCamp(availableCamps, "pick")
 						end
 						return RemapValClamped(
 							Fu.GetHP(bot),
@@ -790,7 +1129,7 @@ function GetDesireHelper()
 	local handOfMidas = Fu.IsItemAvailable("item_hand_of_midas")
 	if Fu.IsInAllyArea(bot) and Fu.CanCastAbility(handOfMidas) then
 		if preferredCamp == nil then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, "pick")
 		end
 		return RemapValClamped(Fu.GetHP(bot), 0.2, 0.7, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_VERYHIGH)
 	end
@@ -866,7 +1205,7 @@ function GetDesireHelper()
 	end
 	if canFarm then
 		if preferredCamp == nil then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, "pick")
 		end
 		if Fu.GetDistanceFromEnemyFountain(bot) > 4000 then
 			laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
@@ -930,7 +1269,7 @@ function GetDesireHelper()
 		end
 		if #laneCreeps == 0 then
 			if preferredCamp == nil then
-				preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+				PickCamp(availableCamps, "pick")
 			end
 			if IsDebug then
 				log(
@@ -943,11 +1282,11 @@ function GetDesireHelper()
 			end
 			if preferredCamp ~= nil then
 				if not Fu.Site.IsModeSuitableToFarm(bot) then
-					preferredCamp = nil
+					SetPreferredCamp(nil, "mode-not-suitable")
 					bot._farmExitReason = "mode_not_suitable_" .. tostring(botMode)
 					return BOT_MODE_DESIRE_VERYLOW
 				elseif bot:GetHealth() <= 200 then
-					preferredCamp = nil
+					SetPreferredCamp(nil, "low-hp")
 					lastTeamActivityTime = DotaTime()
 					bot._farmExitReason = "low_hp"
 					return BOT_MODE_DESIRE_VERYLOW
@@ -963,14 +1302,14 @@ function GetDesireHelper()
 		end
 	end
 	if preferredCamp == nil then
-		preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+		PickCamp(availableCamps, "pick")
 		if preferredCamp ~= nil then
 			bot.farmLocation = preferredCamp.cattr.location
 		end
 	end
 	if not Fu.IsInLaningPhase() and Fu.IsCore(bot) and DotaTime() > 5 * 60 then
 		if preferredCamp == nil then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, "pick")
 		end
 		if preferredCamp ~= nil then
 			local maxPushDesire =
@@ -1019,7 +1358,7 @@ function GetDesireHelper()
 	end
 	if not Fu.IsInLaningPhase() and (Fu.IsLateGame() or bot:GetLevel() >= 18) then
 		if preferredCamp == nil then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, "pick")
 		end
 		if preferredCamp ~= nil then
 			return BOT_MODE_DESIRE_LOW
@@ -1039,7 +1378,7 @@ function GetDesireHelper()
 end
 function OnStart() end
 function OnEnd()
-	preferredCamp = nil
+	SetPreferredCamp(nil, "mode-end")
 	farmState = farmStateNone
 	laneCreeps = {}
 	bot._farmCommitKind = nil
@@ -1115,6 +1454,11 @@ function Think()
 	if Fu.GetHP(bot) < 0.35 and bot:WasRecentlyDamagedByAnyHero(3.0) then
 		local fountain = Fu.GetTeamFountain()
 		bot:Action_MoveToLocation(fountain)
+		return
+	end
+	-- Idle fallback walk (IdleFallback) to a wave or the team; a camp target runs through the camp code below.
+	if idleHold ~= nil and idleHold.kind ~= "camp" and #bot:GetNearbyLaneCreeps(900, true) == 0 then
+		bot:Action_MoveToLocation(idleHold.to)
 		return
 	end
 	local pushingAllies = {}
@@ -1235,22 +1579,25 @@ function Think()
 	if GameTime() >= (bot._farm_repick_at or 0) then
 		bot._farm_repick_at = GameTime() + 3.0
 		if preferredCamp == nil then
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			PickCamp(availableCamps, "pick")
 		else
 			local campDistance = GetUnitToLocationDistance(bot, preferredCamp.cattr.location)
-			if campDistance > 1500 then
-				local closerCamp = Fu.Site.GetClosestNeutralSpwan(bot, Fu.Role["availableCampTable"])
-				if closerCamp and closerCamp ~= preferredCamp then
+			-- From the camps the desire allows (was the unfiltered team table: Think picked a camp the
+			-- desire dropped again a moment later), and not within the keep window.
+			if campDistance > 1500 and FarmRules.CanSwitchCamp(DotaTime(), campChosenAt, false) then
+				availableCamps = FilterCamps(Fu.Role["availableCampTable"])
+				local closerCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+				if closerCamp and CampKey(closerCamp) ~= CampKey(preferredCamp) then
 					local closerCampDistance = GetUnitToLocationDistance(bot, closerCamp.cattr.location)
 					if closerCampDistance + 1000 < campDistance and not Fu.Site.IsCampDangerous(bot, closerCamp) then
-						preferredCamp = closerCamp
+						SetPreferredCamp(closerCamp, "closer")
 					end
 				end
 			end
 		end
 	end
 	if preferredCamp == nil then
-		preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+		PickCamp(availableCamps, "pick")
 	end
 	if preferredCamp ~= nil then
 		local campLocation = preferredCamp.cattr.location
@@ -1292,10 +1639,10 @@ function Think()
 		-- Another ally is already on this camp: join it unless it is far (game 016: two bots near
 		-- one camp kept turning away from each other; this gave way at 400).
 		if allyFarmingCamp and campDistance > 1200 then
-			Fu.Role["availableCampTable"], preferredCamp =
+			Fu.Role["availableCampTable"] =
 				Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
-			availableCamps = Fu.Role["availableCampTable"]
-			preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+			availableCamps = FilterCamps(Fu.Role["availableCampTable"])
+			PickCamp(availableCamps, "ally-on-camp")
 		end
 		if preferredCamp == nil then
 		else
@@ -1313,10 +1660,10 @@ function Think()
 				if now - bot._campEmptySince > 1.2 then
 					bot._campEmptySince = 0
 					bot._farmCommitKind = nil
-					Fu.Role["availableCampTable"], preferredCamp =
+					Fu.Role["availableCampTable"] =
 						Fu.Site.UpdateAvailableCamp(bot, preferredCamp, Fu.Role["availableCampTable"])
-					availableCamps = Fu.Role["availableCampTable"]
-					preferredCamp = Fu.Site.GetClosestNeutralSpwan(bot, availableCamps)
+					availableCamps = FilterCamps(Fu.Role["availableCampTable"])
+					PickCamp(availableCamps, "cleared")
 					farmState = farmStateNone
 				end
 			end

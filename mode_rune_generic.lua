@@ -525,6 +525,253 @@ function RuneMode.WaterWalk()
 	end
 	return nil
 end
+-- River gold / water rune left at a river spot after the hold ended (#32, game 062, 0:00): a fight started at the
+-- top spot at the horn, Nature's Prophet stood 15 from the rune in attack mode (0.95), the water-walk hold ran out
+-- 8s after the spawn, everyone left (no-best) and the rune lay there until 0:35-0:55. Bots can't pick it up
+-- (UnpickableRiverRune below), Valve's item mode can, for a bot close by. So while a river spot shows a bounty or
+-- water rune that our team sees right now (an unseen spot's status is stale: game 062 kept taken runes "up"), the
+-- nearest bot in lane or farm mode within 1600, not hit by a hero, walks back and stands on the spot so the item
+-- mode takes it. Gives up when the rune is gone, 60s after the spawn, after 6s on the spot with the rune still
+-- reading up, or below 30% HP. Up to 3 tries per spawn (a fight in between ends a try, another can start after).
+-- Desire 0.65: above farm (0.60 in the game 062 log) and laning (0.27-0.30), below the item mode (0.90), attack
+-- (0.95) and retreat. [OHA-RUNE] river-bounty-return (start) / river-bounty-return-end why= (result).
+local RIVER_RETURN_DESIRE = 0.65
+local RIVER_RETURN_RANGE = 1600
+local RIVER_RETURN_GIVE_UP = 60
+local RIVER_RETURN_ON_SPOT = 6
+local RIVER_RETURN_TRIES = 3
+local RIVER_SPOT_RADIUS = 200
+local function RiverRuneSeenUp(id)
+	if GetRuneStatus(id) ~= RUNE_STATUS_AVAILABLE then
+		return false
+	end
+	local okV, visible = pcall(IsLocationVisible, GetRuneSpawnLocation(id))
+	if not okV or not visible then
+		return false
+	end
+	local okT, runeType = pcall(GetRuneType, id)
+	return okT and (runeType == RUNE_BOUNTY or RUNE_WATER ~= nil and runeType == RUNE_WATER)
+end
+local function FreeForRiverReturn(unit)
+	local mode = unit:GetActiveMode()
+	return (mode == BOT_MODE_LANING or mode == BOT_MODE_FARM)
+		and not unit:WasRecentlyDamagedByAnyHero(2.0)
+		and Fu.GetHP(unit) >= 0.4
+end
+local function RiverSpotContested(loc)
+	local enemiesAtSpot = #(Fu.GetEnemiesNearLoc(loc, 900) or {})
+	local alliesAtSpot = #(Fu.GetAlliesNearLoc(loc, 900) or {})
+	if GetUnitToLocationDistance(bot, loc) > 900 then
+		alliesAtSpot = alliesAtSpot + 1
+	end
+	return enemiesAtSpot > alliesAtSpot or bot:WasRecentlyDamagedByAnyHero(1.5) and enemiesAtSpot >= 1
+end
+-- Another ally is on it already: its own return for this spot and spawn, or standing on the spot in rune / item mode.
+local function RiverReturnClaimed(id, spawn, loc)
+	for i = 1, 5 do
+		local member = GetTeamMember(i)
+		if Fu.IsValidHero(member) and member ~= bot then
+			local claim = member._riverReturn
+			if claim ~= nil and claim.id == id and claim.spawn == spawn then
+				return true
+			end
+			local mode = member:GetActiveMode()
+			if
+				(mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM)
+				and GetUnitToLocationDistance(member, loc) <= RIVER_SPOT_RADIUS + 100
+			then
+				return true
+			end
+		end
+	end
+	return false
+end
+local function EndRiverReturn(why)
+	local riverReturn = bot._riverReturn
+	bot._riverReturn = nil
+	if riverReturn == nil then
+		return
+	end
+	if why ~= "fight" and why ~= "hp" and why ~= "far" then
+		bot._riverReturnDone = bot._riverReturnDone or {}
+		bot._riverReturnDone[riverReturn.spawn .. ":" .. riverReturn.id] = RIVER_RETURN_TRIES
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.0f %s river-bounty-return-end why=%s spot=%d dist=%d took=%.0fs status=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			why,
+			riverReturn.id,
+			GetUnitToLocationDistance(bot, riverReturn.loc),
+			DotaTime() - riverReturn.t0,
+			StatusTag(GetRuneStatus(riverReturn.id))
+		)
+	)
+end
+-- Returns "walk" / "near" while a return is on, nil otherwise.
+function RuneMode.RiverBountyReturn()
+	local now = DotaTime()
+	local riverReturn = bot._riverReturn
+	if riverReturn ~= nil then
+		local dist = GetUnitToLocationDistance(bot, riverReturn.loc)
+		if not bot:IsAlive() then
+			EndRiverReturn("dead")
+		elseif GetRuneStatus(riverReturn.id) ~= RUNE_STATUS_AVAILABLE then
+			EndRiverReturn("gone")
+		elseif now > riverReturn.spawn + RIVER_RETURN_GIVE_UP then
+			EndRiverReturn("timeout")
+		elseif Fu.GetHP(bot) < 0.3 then
+			EndRiverReturn("hp")
+		elseif dist > RIVER_RETURN_RANGE + 800 then
+			-- Another mode (a chase, a defend) took it far away.
+			EndRiverReturn("far")
+		elseif RiverSpotContested(riverReturn.loc) then
+			EndRiverReturn("fight")
+		elseif dist <= RIVER_SPOT_RADIUS then
+			riverReturn.onSpotAt = riverReturn.onSpotAt or now
+			if now - riverReturn.onSpotAt > RIVER_RETURN_ON_SPOT then
+				EndRiverReturn("stale")
+			else
+				return "near"
+			end
+		else
+			return "walk"
+		end
+		return nil
+	end
+	if now < 0 then
+		return nil
+	end
+	local spawn = math.floor(now / RuneCycle(RUNE_POWERUP_1)) * RuneCycle(RUNE_POWERUP_1)
+	if now > spawn + RIVER_RETURN_GIVE_UP or not FreeForRiverReturn(bot) then
+		return nil
+	end
+	bot._riverReturnDone = bot._riverReturnDone or {}
+	for _, id in ipairs({ RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
+		local key = spawn .. ":" .. id
+		local loc = GetRuneSpawnLocation(id)
+		local dist = GetUnitToLocationDistance(bot, loc)
+		if
+			(bot._riverReturnDone[key] or 0) < RIVER_RETURN_TRIES
+			and dist <= RIVER_RETURN_RANGE
+			and RiverRuneSeenUp(id)
+			and not RiverSpotContested(loc)
+			and not RiverReturnClaimed(id, spawn, loc)
+		then
+			-- The nearest of the free allies (a fighting one closer to it doesn't count).
+			local nearest = true
+			for i = 1, 5 do
+				local member = GetTeamMember(i)
+				if
+					Fu.IsValidHero(member)
+					and member ~= bot
+					and FreeForRiverReturn(member)
+					and GetUnitToLocationDistance(member, loc) < dist
+				then
+					nearest = false
+					break
+				end
+			end
+			if nearest then
+				bot._riverReturnDone[key] = (bot._riverReturnDone[key] or 0) + 1
+				bot._riverReturn = { id = id, loc = loc, spawn = spawn, t0 = now }
+				local okT, runeType = pcall(GetRuneType, id)
+				pcall(
+					print,
+					string.format(
+						"[OHA-RUNE] t=%.0f %s river-bounty-return spot=%d dist=%d type=%s since=%.0fs mode=%s try=%d",
+						now,
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						id,
+						dist,
+						tostring(okT and runeType),
+						now - spawn,
+						ModeTag(bot:GetActiveMode()),
+						bot._riverReturnDone[key]
+					)
+				)
+				return dist <= RIVER_SPOT_RADIUS and "near" or "walk"
+			end
+		end
+	end
+	return nil
+end
+-- Does Action_PickUpRune take a river bounty / water rune in 7.42? Games 015-025 said no (every id, at distance 0).
+-- Once per spawn per bot, standing on a river spot (the horn water-hold or a river-bounty-return) with the rune
+-- reading up: order the pick-up on the spot's id, and 1.5s later log whether the rune is gone. Bounty gold goes to
+-- the whole team, so gold alone proves nothing: worked=yes only when the rune is gone, the item mode was never
+-- active in between and no other hero stood within 300 of it; worked=unsure when one of those happened.
+function RuneMode.RiverPickupTry(id, spawn)
+	bot._riverPickupTried = bot._riverPickupTried or {}
+	local key = spawn .. ":" .. id
+	if bot._riverPickupTried[key] or bot._riverPickup ~= nil or GetRuneStatus(id) ~= RUNE_STATUS_AVAILABLE then
+		return false
+	end
+	bot._riverPickupTried[key] = true
+	local okT, runeType = pcall(GetRuneType, id)
+	bot._riverPickup = {
+		id = id,
+		at = DotaTime(),
+		gold = bot:GetGold(),
+		type = okT and runeType or nil,
+		mode = bot:GetActiveMode(),
+		itemMode = false,
+		others = false,
+	}
+	bot:Action_PickUpRune(id)
+	return true
+end
+local function OtherHeroAtSpot(loc)
+	for _, list in ipairs({ UNIT_LIST_ALLIED_HEROES, UNIT_LIST_ENEMY_HEROES }) do
+		for _, hero in pairs(GetUnitList(list) or {}) do
+			if
+				Fu.IsValidHero(hero)
+				and hero ~= bot
+				and not hero:IsIllusion()
+				and GetUnitToLocationDistance(hero, loc) <= 300
+			then
+				return true
+			end
+		end
+	end
+	return false
+end
+function RuneMode.RiverPickupCheck()
+	local pickup = bot._riverPickup
+	if pickup == nil then
+		return
+	end
+	if bot:GetActiveMode() == BOT_MODE_ITEM then
+		pickup.itemMode = true
+	end
+	if not pickup.others and OtherHeroAtSpot(GetRuneSpawnLocation(pickup.id)) then
+		pickup.others = true
+	end
+	if DotaTime() < pickup.at + 1.5 then
+		return
+	end
+	bot._riverPickup = nil
+	local gone = RawGetRuneStatus(pickup.id) ~= RUNE_STATUS_AVAILABLE
+	local worked = not gone and "no" or (pickup.itemMode or pickup.others) and "unsure" or "yes"
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.1f %s river-pickup-try id=%d worked=%s type=%s gold+=%d mode=%s itemMode=%s others=%s now=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			pickup.id,
+			worked,
+			tostring(pickup.type),
+			bot:GetGold() - pickup.gold,
+			ModeTag(pickup.mode),
+			tostring(pickup.itemMode),
+			tostring(pickup.others),
+			ModeTag(bot:GetActiveMode())
+		)
+	)
+end
 function RuneMode.RuneWatch()
 	local now = DotaTime()
 	if now < 0 or now < (RuneMode._runeWatchAt or -999) or not IsTeamLogger() then
@@ -652,6 +899,7 @@ function RuneMode.GoldCycleStep()
 end
 function GetDesire()
 	pcall(RuneMode.RuneWatch)
+	pcall(RuneMode.RiverPickupCheck)
 	if bot._goldCycle ~= nil and DotaTime() < 15 then
 		runeWhy = "river-gold-test"
 		return BOT_MODE_DESIRE_ABSOLUTE + 0.05
@@ -790,6 +1038,13 @@ function GetDesireRaw()
 				return give(0.6, "river-item-stay")
 			end
 			return give(RIVER_HOLD_DESIRE, "river-item-" .. waterState)
+		end
+	end
+	-- Back to a river rune left after the hold (RuneMode.RiverBountyReturn); before the lane-busy defer below.
+	do
+		local okR, returnState = pcall(RuneMode.RiverBountyReturn)
+		if okR and returnState ~= nil and bot._riverReturn ~= nil then
+			return give(RIVER_RETURN_DESIRE, "river-bounty-return-" .. returnState)
 		end
 	end
 	-- Laning first (user call): while the bot's lane needs it, runes, lotus pools and wisdom
@@ -1134,8 +1389,22 @@ function Think()
 			doing("water-walk")
 			return
 		end
-		-- On the spot: stand still, for Valve's item mode to take over and pick the rune up.
+		-- On the spot: stand still, for Valve's item mode to take over and pick the rune up. Once per spawn, try
+		-- the pick-up order too (RuneMode.RiverPickupTry: does 7.42 allow it?).
+		if DotaTime() >= bot._waterWalk.t0 then
+			pcall(RuneMode.RiverPickupTry, bot._waterWalk.id, bot._waterWalk.t0)
+		end
 		doing("water-hold")
+		return
+	end
+	if bot._riverReturn ~= nil then
+		if GetUnitToLocationDistance(bot, bot._riverReturn.loc) > RIVER_SPOT_RADIUS then
+			bot:Action_MoveToLocation(bot._riverReturn.loc)
+			doing("river-return-walk")
+			return
+		end
+		pcall(RuneMode.RiverPickupTry, bot._riverReturn.id, bot._riverReturn.spawn)
+		doing("river-return-hold")
 		return
 	end
 	if bot._goldCycle ~= nil then

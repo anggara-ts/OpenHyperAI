@@ -312,11 +312,44 @@ local function OverEvasiveDesire()
 	bot._overEvasiveUntil = nil
 	return 0
 end
--- Meepo's weakest body (#8) used to leave the fight alone at retreat desire 0.98 (RetreatRules.MeepoWeakBody, kept
--- with its test). Switched off: every game with it froze the whole game ("not responding") at 10-15 minutes,
--- 3 of 4 within 0-26s after a clone had been sent off by it (games 052-054, 056); with it out, the same lineup
--- with Meepo ran to the end (game 058). Our retreat mode has no Think, so Valve's own retreat drove the single
--- clone. To bring it back, move the body with our own orders instead of the retreat mode.
+-- Meepo's weakest body (#8): a body that dies takes every body with it, and the HP curve below left a body in
+-- attack or defend mode at 8-34% HP 3.5s before 6 of his 51 deaths in games 043-047 (game 046, 9:14: 14% HP in
+-- attack 0.95 beside a full-HP body; retreat won at 1%). The weak body leaves at 0.98, above attack like the hard
+-- retreat, while the other bodies keep their mode. When and how long: RetreatRules.MeepoWeakBody.
+local function MeepoWeakBodyDesire()
+	if bot:GetUnitName() ~= "npc_dota_hero_meepo" then
+		return 0
+	end
+	local now = DotaTime()
+	local bodies = #(Fu.GetMeepos() or {})
+	local hit = bot:WasRecentlyDamagedByAnyHero(2.0)
+	local holding = bot._meepoWeakUntil ~= nil and now < bot._meepoWeakUntil
+	-- Once on, the body has to get 1600 clear, not 1200, so attack mode does not take it back in at the edge.
+	local enemiesNear = CountRealHeroes(holding and 1600 or 1200, true)
+	if not RetreatRules.MeepoWeakBody(hpRatio, hit, enemiesNear, bodies, holding) then
+		bot._meepoWeakUntil = nil
+		return 0
+	end
+	bot._meepoWeakUntil = now + 2
+	if now >= (bot._meepoWeakLogAt or -999) then
+		bot._meepoWeakLogAt = now + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-MEEPO] t=%.0f %s weak-body %s hp=%.2f enemies=%d bodies=%d hit=%s mode=%d",
+				now,
+				Fu.IsMeepoClone(bot) and "clone" or "main",
+				holding and "hold" or "start",
+				hpRatio,
+				enemiesNear,
+				bodies,
+				tostring(hit),
+				activeMode or -1
+			)
+		)
+	end
+	return 0.98
+end
 -- Monkey King's Jingu charges heal 20-80% of each hit (game data, lifesteal): like Satanic's Unholy
 -- Rage (tag 142), don't back off while they last and he is hitting a hero in an even fight. The
 -- override attack mode had this as an attack bonus, but Monkey King does not load that file.
@@ -599,6 +632,10 @@ function GetDesireHelper()
 	local enemyLaneCreeps = nearby.enemyLaneCreeps1200
 	local weAreStronger = Fu.WeAreStronger(bot, 1600)
 	local isInTeamFight = Fu.IsInTeamFight(bot, 1200)
+	local weakBody = MeepoWeakBodyDesire()
+	if weakBody > 0 then
+		return RetreatTag(186, weakBody)
+	end
 	-- A hard retreat in progress (below) keeps priority over the rules in between.
 	if bot._hardRetreatUntil ~= nil then
 		local held, heldTag = HardRetreatDesire(hpRatio >= 0.4 and AncientLastStand())

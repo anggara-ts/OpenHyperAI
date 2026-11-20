@@ -255,12 +255,13 @@ local function installProjectile(Fu)
 		return store, now
 	end
 	-- A tracking projectile flying at `unit`: its time to impact and the window for a tool of this cast point.
-	-- Returns window ("now" | "wait" | "late", see DodgeRules.Window), tti, src (measured | default). The speed
+	-- Returns window ("now" | "wait" | "late", see DodgeRules.Window), tti, src (measured | default), first (seen
+	-- for the first time in this think). The speed
 	-- is the closing speed between two thinks (distance change / time); a projectile seen for the first time
 	-- uses DodgeRules.DEFAULT_SPEED.
 	function Fu.TrackingProjectileWindow(unit, projectile, castPoint)
 		if projectile == nil or projectile.location == nil then
-			return "wait", nil, "none"
+			return "wait", nil, "none", false
 		end
 		local dist = GetUnitToLocationDistance(unit, projectile.location)
 		local store, now = samples("tracking")
@@ -269,7 +270,7 @@ local function installProjectile(Fu)
 		local key = unit:GetUnitName() .. "|" .. abilityName .. "|" .. casterName
 		local sample = store[key]
 		if sample == nil or now - sample.t > 0.5 or dist > sample.d + 50 then
-			sample = { d = dist, t = now }
+			sample = { d = dist, t = now, first = now }
 			store[key] = sample
 		elseif now > sample.t then
 			local measured = DodgeRules.ClosingSpeed(sample.d, sample.t, dist, now)
@@ -283,7 +284,7 @@ local function installProjectile(Fu)
 			speed, src = DodgeRules.DEFAULT_SPEED, "default"
 		end
 		local tti = DodgeRules.TimeToImpact(math.max(0, dist - unitRadius(unit)), speed)
-		return DodgeRules.Window(tti, castPoint), tti, src
+		return DodgeRules.Window(tti, castPoint), tti, src, sample.first == now
 	end
 	-- GetLinearProjectiles once per think per bot, with each projectile's velocity: the API's velocity field when
 	-- it has one (src=api), else the move since the last think (src=measured), else caster -> projectile at the
@@ -307,9 +308,10 @@ local function installProjectile(Fu)
 					local key = type(projectile.handle) == "number" and projectile.handle or abilityName
 					local vx, vy = vectorXY(projectile.velocity)
 					local src = "api"
+					local prev = store[key]
+					local firstAt = prev ~= nil and now - prev.t <= 0.5 and prev.firstAt or now
 					if vx == nil or vx * vx + vy * vy < 1 then
 						vx, vy, src = nil, nil, nil
-						local prev = store[key]
 						if prev ~= nil and prev.t < now and now - prev.t <= 0.5 then
 							local dt = now - prev.t
 							vx, vy, src = (px - prev.x) / dt, (py - prev.y) / dt, "measured"
@@ -317,7 +319,7 @@ local function installProjectile(Fu)
 							vx, vy, src = prev.vx, prev.vy, prev.src
 						end
 					end
-					store[key] = { x = px, y = py, t = now, vx = vx, vy = vy, src = src }
+					store[key] = { x = px, y = py, t = now, vx = vx, vy = vy, src = src, firstAt = firstAt }
 					list[#list + 1] = {
 						projectile = projectile,
 						name = abilityName,
@@ -326,6 +328,7 @@ local function installProjectile(Fu)
 						vx = vx,
 						vy = vy,
 						src = src,
+						first = firstAt == now,
 					}
 				end
 			end
@@ -335,7 +338,8 @@ local function installProjectile(Fu)
 	end
 	-- The dangerous linear skillshot (DodgeRules.LINEAR) that will hit `unit` soonest and that `tool`
 	-- ("blink" | "cyclone" | "bkb") can answer. Returns a table { projectile, name, spec, tti, miss, window,
-	-- vx, vy, src } or nil. window as DodgeRules.Window for a tool of this cast point.
+	-- vx, vy, src, first } or nil. window as DodgeRules.Window for a tool of this cast point; first: seen for the
+	-- first time in this think. A spell BKB blocks is skipped while the unit is already magic immune.
 	function Fu.FindLinearProjectileIncoming(unit, castPoint, tool)
 		local best = nil
 		local hpRatio = unit:GetHealth() / math.max(1, unit:GetMaxHealth())
@@ -345,6 +349,7 @@ local function installProjectile(Fu)
 				spec ~= nil
 				and DodgeRules.ToolAnswers(spec, tool)
 				and DodgeRules.WorthDodging(spec, hpRatio)
+				and not (spec.bkb and unit:IsMagicImmune())
 				and Fu.IsAlliedProjectileSource(entry.projectile, unit:GetTeam()) ~= true
 			then
 				local vx, vy, src = entry.vx, entry.vy, entry.src
@@ -386,6 +391,7 @@ local function installProjectile(Fu)
 							vx = vx,
 							vy = vy,
 							src = src,
+							first = entry.first,
 						}
 					end
 				end

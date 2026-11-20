@@ -1838,6 +1838,9 @@ end
 function Usage.LogDodge(item, target, why, projectile, caster, ability, timing)
 	local itemName = item:GetName()
 	local now = DotaTime()
+	-- (#134) One dodge per target per think: the items after this one in the same think see it and keep their
+	-- charge (each item's order would replace the previous one anyway).
+	bot._dodgeChosen = { t = now, target = target }
 	bot._dodgeLogAt = bot._dodgeLogAt or {}
 	if now < (bot._dodgeLogAt[itemName] or -99) then
 		return
@@ -1878,6 +1881,24 @@ function Usage.LogDodge(item, target, why, projectile, caster, ability, timing)
 		{ at = now, item = itemName, handle = item, target = target, targetName = targetName, kind = kind }
 	)
 end
+-- (#134) Did an earlier item in this think already dodge for this target?
+local function DodgeChosenThisThink(target)
+	local chosen = bot._dodgeChosen
+	return chosen ~= nil and chosen.t == DotaTime() and chosen.target == target
+end
+-- [OHA-ERROR] dodge: an error in the projectile readers (fields of GetLinearProjectiles are not verified), first 3
+-- distinct per bot, so a game without [OHA-DODGE] lines can tell "no skillshot" from "the reader throws".
+local function LogDodgeError(where, err)
+	bot._dodgeErrs = bot._dodgeErrs or {}
+	local key = where .. ": " .. tostring(err)
+	if bot._dodgeErrs[key] or (bot._dodgeErrCount or 0) >= 3 then
+		return
+	end
+	bot._dodgeErrs[key] = true
+	bot._dodgeErrCount = (bot._dodgeErrCount or 0) + 1
+	print(string.format("[OHA-ERROR] t=%.1f %s dodge %s", DotaTime(), botName, key))
+end
+Usage.LogDodgeError = LogDodgeError
 -- (#134) The reaction time of a dodge item starts with its cast point: 0 for Blink, Eul's, Wind Waker (7.42
 -- items.txt AbilityCastPoint "0.0"), BKB, Lotus Orb and Linken's (no AbilityCastPoint: the default 0). Read from
 -- the handle so a change in a patch is followed.
@@ -1885,8 +1906,9 @@ local function DodgeCastPoint(item)
 	local ok, castPoint = pcall(item.GetCastPoint, item)
 	return ok and type(castPoint) == "number" and castPoint or 0
 end
--- [OHA-DODGE] too-late: a projectile that will land before the item can work, so the item is kept. At most once per
--- 3s per item. (No "kind" word here, so the `[OHA-DODGE] linear` / `tracking` checks only see real dodges.)
+-- [OHA-DODGE] too-late: a projectile that will land before the item can work, so the item is kept. Only for a
+-- projectile seen for the first time in this think (one that was in the window before and passed up for another
+-- reason is not "too late"); at most once per 3s per item. (No "kind" word here, so the `[OHA-DODGE] linear` / `tracking` checks only see real dodges.)
 local function LogDodgeTooLate(item, target, spell, tti, src)
 	local itemName = item:GetName()
 	local now = DotaTime()
@@ -1912,21 +1934,28 @@ end
 -- lands within the item's reaction time plus DodgeRules.SLACK (time to impact = distance / closing speed). The
 -- old fixed ranges (350-1200) are only the search radius now. Returns projectile, timing (for LogDodge) or nil.
 function Usage.TimedTrackingProjectile(item, target, finder, searchRange)
+	if DodgeChosenThisThink(target) then
+		return nil
+	end
 	local castPoint = DodgeCastPoint(item)
 	local timing, late = nil, nil
 	local ok, found = pcall(finder, target, searchRange, function(projectile)
 		Fu.LogTrackingProjectileFields(projectile)
-		local window, tti, src = Fu.TrackingProjectileWindow(target, projectile, castPoint)
+		local window, tti, src, first = Fu.TrackingProjectileWindow(target, projectile, castPoint)
 		if window == "now" then
 			timing = { kind = "tracking", tti = tti, src = src }
 			return true
 		end
-		if window == "late" and late == nil then
+		if window == "late" and first and late == nil then
 			late = { projectile = projectile, tti = tti, src = src }
 		end
 		return false
 	end)
-	if ok and found ~= nil then
+	if not ok then
+		LogDodgeError("tracking", found)
+		return nil
+	end
+	if found ~= nil then
 		return found, timing
 	end
 	if late ~= nil then
@@ -1939,11 +1968,18 @@ end
 -- this item ("blink" | "cyclone" | "bkb") answers, when it is time to react. Returns the threat
 -- (Fu.FindLinearProjectileIncoming) and the timing for LogDodge, or nil.
 function Usage.LinearThreat(item, target, tool)
-	local ok, threat = pcall(Fu.FindLinearProjectileIncoming, target, DodgeCastPoint(item), tool)
-	if not ok or threat == nil then
+	if DodgeChosenThisThink(target) then
 		return nil
 	end
-	if threat.window == "late" then
+	local ok, threat = pcall(Fu.FindLinearProjectileIncoming, target, DodgeCastPoint(item), tool)
+	if not ok then
+		LogDodgeError("linear", threat)
+		return nil
+	end
+	if threat == nil then
+		return nil
+	end
+	if threat.window == "late" and threat.first then
 		pcall(LogDodgeTooLate, item, target, threat.name, threat.tti, threat.src)
 	end
 	if threat.window ~= "now" then
@@ -2035,11 +2071,14 @@ Usage.ConsiderItemDesire["item_black_king_bar"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		-- (#134) by time to impact (was: any spell projectile within 350).
-		local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindNotAttackProjectileIncoming, 2000)
-		if projectile ~= nil and closeEnemyCount >= 1 then
-			pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
-			castReason = "防御弹道"
-			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
+		if closeEnemyCount >= 1 then
+			local projectile, timing =
+				Usage.TimedTrackingProjectile(item, bot, Fu.FindNotAttackProjectileIncoming, 2000)
+			if projectile ~= nil then
+				pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
+				castReason = "防御弹道"
+				return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
+			end
 		end
 		if Fu.IsWillBeCastUnitTargetSpell(bot, radius) and closeEnemyCount >= 1 then
 			pcall(Usage.LogDodge, item, bot, "will-cast", nil, Fu.FindWillBeCastUnitTargetSpell(bot, radius))
@@ -2220,14 +2259,13 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 		end
 	end
 	-- (#134) by time to impact (was: any dodgeable spell projectile within 1200).
-	local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindProjectileIncoming, 2000)
-	if
-		projectile ~= nil
-		and (botTarget == nil or not botTarget:IsHero() or not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100))
-	then
-		pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
-		local retreatLocation = Fu.GetLocationTowardDistanceLocation(bot, GetAncient(GetTeam()):GetLocation(), 1199)
-		return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
+	if botTarget == nil or not botTarget:IsHero() or not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100) then
+		local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindProjectileIncoming, 2000)
+		if projectile ~= nil then
+			pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
+			local retreatLocation = Fu.GetLocationTowardDistanceLocation(bot, GetAncient(GetTeam()):GetLocation(), 1199)
+			return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
+		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		if

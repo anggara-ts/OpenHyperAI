@@ -401,6 +401,27 @@ function X.ConsiderPhaseShift()
 		X.phaseWhy = "dodge-projectile"
 		return BOT_ACTION_DESIRE_HIGH
 	end
+	-- (#134) A dangerous skillshot (FuncLib/systems/dodge_rules.lua) about to hit: Phase Shift is "immune from
+	-- harm" (datafeed), like a self-cyclone. Cast point 0.01 (datafeed), read from the handle.
+	local okLinear, threat = pcall(Fu.FindLinearProjectileIncoming, bot, phaseShiftAbility:GetCastPoint(), "cyclone")
+	if okLinear and threat ~= nil and threat.window == "now" then
+		X.phaseWhy = "dodge-linear"
+		if DotaTime() >= (X.phaseLinearLogAt or -99) then
+			X.phaseLinearLogAt = DotaTime() + 2
+			print(
+				string.format(
+					"[OHA-DODGE] t=%.0f puck item=phase_shift target=self spell=%s dist=%.0f why=%s kind=linear tti=%.2f src=%s",
+					DotaTime(),
+					threat.name,
+					GetUnitToLocationDistance(bot, threat.projectile.location),
+					threat.spec.why,
+					threat.tti,
+					tostring(threat.src)
+				)
+			)
+		end
+		return BOT_ACTION_DESIRE_HIGH
+	end
 	if not bot:HasModifier("modifier_sniper_assassinate") and not bot:IsMagicImmune() then
 		if Fu.IsWillBeCastUnitTargetSpell(bot, 400) then
 			X.phaseWhy = "dodge-will-cast"

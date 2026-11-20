@@ -276,7 +276,10 @@ T.test("[OHA-DODGE]: Eul's and Blink answer a Sacred Arrow; the line has kind an
 	local line = Stub.printed[#Stub.printed] or ""
 	T.ok(string.find(line, "item=cyclone target=self spell=mirana_arrow", 1, true), line)
 	T.ok(string.find(line, "why=stun kind=linear tti=0.18 src=api", 1, true), line)
+	-- One dodge per target per think: Blink keeps its charge in the think Eul's went out.
 	local blink = Stub.newAbility("item_blink", bot, false)
+	T.eq((Usage.ConsiderItemDesire["item_blink"](blink)), BOT_ACTION_DESIRE_NONE, "Blink after Eul's, same think")
+	bot._dodgeChosen = nil
 	local blinkDesire, location = Usage.ConsiderItemDesire["item_blink"](blink)
 	T.eq(blinkDesire, BOT_ACTION_DESIRE_HIGH, "Blink")
 	local here = bot:GetLocation()
@@ -289,5 +292,63 @@ T.test("[OHA-DODGE]: Eul's and Blink answer a Sacred Arrow; the line has kind an
 		"BKB: caster 1500 away, no fight"
 	)
 	enemy._loc = bot:GetLocation() + Vector(1200, 0, 0)
+	bot._dodgeChosen = nil
 	T.eq((Usage.ConsiderItemDesire["item_black_king_bar"](bkb)), BOT_ACTION_DESIRE_HIGH, "BKB")
+end)
+
+T.test("[OHA-DODGE]: too-late only on first sight; reader errors print [OHA-ERROR] dodge", function()
+	local bot = Stub.reset({ hero = "npc_dota_hero_lich", time = 600 })
+	local ok, Usage = Stub.load("ability_item_usage_generic")
+	T.ok(ok, "ability_item_usage_generic loads: " .. tostring(Usage))
+	local enemy = Stub.teams[TEAM_DIRE][1]
+	enemy._loc = bot:GetLocation() + Vector(1000, 0, 0)
+	local euls = Stub.newAbility("item_cyclone", bot, false)
+	-- First sight 60 away at 900/s: lands in 0 s, before Eul's works: kept, one too-late line.
+	flying(bot, { linearAt(bot, 60, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	Stub.printed = {}
+	T.eq(Usage.LinearThreat(euls, bot, "cyclone"), nil, "too late: no dodge")
+	T.eq(#Stub.printed, 2, "the one-time [OHA-API] field line and the too-late line")
+	T.ok(
+		string.find(Stub.printed[1] or "", "[OHA-API] t=600 lich linear-projectile fields: ", 1, true),
+		Stub.printed[1]
+	)
+	T.ok(
+		string.find(Stub.printed[2] or "", "too-late item=cyclone target=self spell=mirana_arrow", 1, true),
+		Stub.printed[2]
+	)
+	-- Seen before (in the window, passed up): no too-late line when it gets close.
+	Stub.time = 610
+	flying(bot, { linearAt(bot, 400, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	Usage.LinearThreat(euls, bot, "cyclone")
+	Stub.time = 610.3
+	flying(bot, { linearAt(bot, 130, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	Stub.printed = {}
+	T.eq(Usage.LinearThreat(euls, bot, "cyclone"), nil, "late")
+	T.eq(#Stub.printed, 0, "no too-late for a projectile seen before")
+	-- A reader that throws: [OHA-ERROR] dodge, once.
+	Stub.time = 620
+	bot._linearRead = nil
+	_G.GetLinearProjectiles = function()
+		return { { location = bot:GetLocation(), ability = {
+			GetName = function()
+				error("boom")
+			end,
+		} } }
+	end
+	Stub.printed = {}
+	T.eq(Usage.LinearThreat(euls, bot, "cyclone"), nil, "error: no dodge")
+	Stub.time = 620.1
+	bot._linearRead = nil
+	Usage.LinearThreat(euls, bot, "cyclone")
+	T.eq(#Stub.printed, 1, "the same error prints once")
+	T.ok(
+		string.find(Stub.printed[1] or "", "[OHA-ERROR]", 1, true)
+			and string.find(Stub.printed[1], "dodge linear", 1, true),
+		Stub.printed[1]
+	)
+	local throwing = function()
+		error("bad finder")
+	end
+	T.eq(Usage.TimedTrackingProjectile(euls, bot, throwing, 2000), nil, "tracking error: no dodge")
+	T.ok(string.find(Stub.printed[2] or "", "dodge tracking", 1, true), Stub.printed[2])
 end)

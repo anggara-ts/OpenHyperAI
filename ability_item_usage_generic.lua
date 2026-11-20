@@ -272,6 +272,26 @@ local function LevelUpAbilities()
 		bot.stuckLoc = nil
 	end
 	local level = bot:GetLevel()
+	-- What the script finds on its first look after a level-up, levels 14 to 26 (#45): points= is the unspent
+	-- points, attr= the attribute bonus rank. points=0 with attr= one higher than on the line before means the
+	-- game spent that level's point on the attribute bonus before the script ran.
+	if level ~= bot.ohaLevelSeen then
+		bot.ohaLevelSeen = level
+		if level >= 14 and level <= 26 then
+			local attributeBonus = bot:GetAbilityByName("special_bonus_attributes")
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s level-up level=%d points=%d attr=%d next=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					level,
+					bot:GetAbilityPoints(),
+					attributeBonus ~= nil and attributeBonus:GetLevel() or -1,
+					tostring(abilityLevelUpList[1])
+				)
+			)
+		end
+	end
 	if GetGameMode() == GAMEMODE_ARDM and bot:GetAbilityPoints() > 0 then
 		if #abilityLevelUpList > 0 then
 			log(
@@ -377,6 +397,47 @@ local function LevelUpAbilities()
 	if #abilityLevelUpList >= 1 and bot:GetAbilityPoints() > 0 then
 		if Fu.IsTryingtoUseAbility(bot) then
 			return
+		end
+		-- The game gives a bot no point at levels 15-17 and 19-22 (Skill.GetLatePriorityIndex): the one point
+		-- at 18 goes to the ultimate, and from 23 an open talent goes before a basic rank. Not in ARDM.
+		if level >= Fu.Skill.LATE_ULTIMATE_LEVEL and GetGameMode() ~= GAMEMODE_ARDM then
+			local talentList = nil
+			local lateIndex, lateReason = Fu.Skill.GetLatePriorityIndex(abilityLevelUpList, level, function(name)
+				local listed = name ~= nil and bot:GetAbilityByName(name) or nil
+				return listed ~= nil
+					and not listed:IsNull()
+					and listed:IsUltimate()
+					and not listed:IsHidden()
+					and listed:CanAbilityBeUpgraded()
+					and listed:GetLevel() < listed:GetMaxLevel()
+					and level >= listed:GetHeroLevelRequiredToUpgrade()
+			end, function(name)
+				local listed = name ~= nil and bot:GetAbilityByName(name) or nil
+				if listed == nil or listed:IsNull() or not listed:IsTalent() or listed:GetLevel() >= 1 then
+					return nil
+				end
+				talentList = talentList or Fu.Skill.GetTalentList(bot)
+				return Fu.Skill.GetTalentHeroLevel(talentList, name, function(otherName)
+					local otherTalent = bot:GetAbilityByName(otherName)
+					return otherTalent ~= nil and otherTalent:GetLevel() >= 1
+				end)
+			end)
+			if lateIndex > 1 then
+				local promoted = table.remove(abilityLevelUpList, lateIndex)
+				table.insert(abilityLevelUpList, 1, promoted)
+				print(
+					string.format(
+						"[OHA-SKILL] t=%.0f %s promote entry=%s why=%s from=%d level=%d points=%d",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						promoted,
+						lateReason,
+						lateIndex,
+						level,
+						bot:GetAbilityPoints()
+					)
+				)
+			end
 		end
 		local abilityName = abilityLevelUpList[1]
 		if abilityName == nil then
@@ -9934,7 +9995,11 @@ function AbilityLevelUpThink()
 	if bot.lastLevelUpFrameProcessTime == nil then
 		bot.lastLevelUpFrameProcessTime = DotaTime()
 	end
-	if DotaTime() > 30 and DotaTime() - bot.lastLevelUpFrameProcessTime < 1 then
+	-- Once a second, except on the first call after a level-up: the [OHA-SKILL] level-up line should show the
+	-- points as the game left them.
+	local leveledUp = bot:GetLevel() ~= bot.ohaLevelAtThink
+	bot.ohaLevelAtThink = bot:GetLevel()
+	if DotaTime() > 30 and DotaTime() - bot.lastLevelUpFrameProcessTime < 1 and not leveledUp then
 		return
 	end
 	bot.lastLevelUpFrameProcessTime = DotaTime()

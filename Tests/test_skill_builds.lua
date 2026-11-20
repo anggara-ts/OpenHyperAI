@@ -94,9 +94,7 @@ local ULTIMATE_LATE = {
 }
 
 -- Known bugs that this PR cannot fix yet: [file] = reason. Reported as XFAIL; remove when fixed.
-local KNOWN_BROKEN = {
-	hero_nevermore = "Requiem rank 2 is the 13th point (level 13, not 12); waits for #108, which edits the same lines (#45)",
-}
+local KNOWN_BROKEN = {}
 
 -- The problems of one level-up list, as a list of strings.
 local function problems(skillList, byName, ultimateLate)
@@ -321,7 +319,8 @@ end)
 -- for a talent; `refuseBefore` makes the game itself refuse a tier's first talent before that hero level;
 -- `dropFirstOrderAt` loses the first talent order sent at that hero level. A hero level lasts 24s here.
 local NO_POINT = { [17] = true, [19] = true, [21] = true, [22] = true, [23] = true, [24] = true, [26] = true }
-local function levelLich(api, refuseBefore, dropFirstOrderAt)
+local function levelLich(api, refuseBefore, dropFirstOrderAt, noPoint)
+	noPoint = noPoint or NO_POINT
 	local unit = Stub.reset({ hero = "npc_dota_hero_lich", slot = 5 })
 	local abilityList, byName = heroAbilities("lich")
 	Stub.setSlots(unit, abilityList)
@@ -391,7 +390,7 @@ local function levelLich(api, refuseBefore, dropFirstOrderAt)
 	local think = _G.AbilityLevelUpThink
 	for level = 1, 30 do
 		heroLevel = level
-		if level > 1 and not NO_POINT[level] then
+		if level > 1 and not noPoint[level] then
 			points = points + 1
 		end
 		for _ = 1, 12 do
@@ -464,7 +463,11 @@ end)
 T.test("level-up: a talent the game refuses stays in the list and is retried each hero level", function()
 	local learnedAt, printed, points = levelLich({}, { 10, 18, 25, 26 })
 	local order = shortened(learnedAt)
-	T.ok(string.find(order, "lich_sinister_gaze@14,T@18,", 1, true), "the level 15 talent at 18: " .. order)
+	-- The ultimate goes first from level 15 (Skill.GetLatePriorityIndex), then the talent the game now accepts.
+	T.ok(
+		string.find(order, "lich_sinister_gaze@14,lich_chain_frost@18,T@18,", 1, true),
+		"Chain Frost, then the level 15 talent, at 18: " .. order
+	)
 	T.ok(string.find(order, ",T@25,T@26,T@27,T@28,T@29,T@30", 1, true), "the later talents: " .. order)
 	T.ok(string.find(order, "lich_chain_frost@18", 1, true), "Chain Frost rank 3 at 18: " .. order)
 	T.eq(points, 0, "unspent points at level 30")
@@ -479,4 +482,50 @@ T.test("level-up: a talent the game refuses stays in the list and is retried eac
 		string.find(printed, "%[OHA%-SKILL%] t=%d+ lich waiting ability=special_bonus"),
 		"the waiting entry is named:\n" .. printed
 	)
+end)
+
+T.test(
+	"level-up: with a bot's real points (none at 15-17 and 19-22) the ultimate comes at 18, talents from 23",
+	function()
+		-- Games 050 and 051: the game spends a bot's levels 15-17 and 19-22 on the attribute bonus by itself.
+		local botNoPoint = { [15] = true, [16] = true, [17] = true, [19] = true, [20] = true, [21] = true, [22] = true }
+		local learnedAt, printed, points = levelLich({}, nil, nil, botNoPoint)
+		local order = shortened(learnedAt)
+		T.ok(
+			string.find(
+				order,
+				"lich_sinister_gaze@14,lich_chain_frost@18,T@23,T@24,T@25,lich_sinister_gaze@26,T@27,T@28,T@29,T@30",
+				1,
+				true
+			),
+			"Chain Frost rank 3 at 18, the talents at 23 / 24 / 25, the last basic rank at 26: " .. order
+		)
+		T.eq(points, 0, "unspent points at level 30")
+		T.ok(string.find(printed, "promote entry=lich_chain_frost why=ultimate from=3 level=18", 1, true), printed)
+		T.ok(string.find(printed, "why=talent from=2 level=24", 1, true), printed)
+		T.ok(string.find(printed, "level-up level=15 points=0 attr=", 1, true), "the level-up line: " .. printed)
+	end
+)
+
+T.test("Skill.GetLatePriorityIndex: ultimate from 15, an open talent before a basic rank from 23", function()
+	Stub.reset({ hero = "npc_dota_hero_lich" })
+	local Skill = require(GetScriptDirectory() .. "/FuncLib/systems/skill")
+	local list = { "t15", "e", "r", "t20", "t25" }
+	local talentLevels = { t15 = 15, t20 = 20, t25 = 25 }
+	local function pick(skillList, heroLevel, ultimateReady)
+		local index, reason = Skill.GetLatePriorityIndex(skillList, heroLevel, function(name)
+			return ultimateReady and name == "r"
+		end, function(name)
+			return talentLevels[name]
+		end)
+		return index .. ":" .. tostring(reason)
+	end
+	T.eq(pick(list, 14, true), "1:nil", "before level 15 the list order stands")
+	T.eq(pick(list, 18, true), "3:ultimate", "the ultimate goes first at 18")
+	T.eq(pick(list, 16, false), "1:nil", "an ultimate that cannot be learned yet does not")
+	T.eq(pick({ "r", "e" }, 18, true), "1:nil", "the ultimate is already first")
+	T.eq(pick({ "e", "t20", "t25" }, 22, false), "1:nil", "before level 23 a basic rank keeps its place")
+	T.eq(pick({ "e", "t20", "t25" }, 24, false), "2:talent", "level 24: the level 20 talent before the basic rank")
+	T.eq(pick({ "e", "t25" }, 24, false), "1:nil", "a talent whose level is not reached stays behind")
+	T.eq(pick({ "t25", "e" }, 24, false), "1:nil", "a talent at the head is left to the talent code")
 end)

@@ -30,8 +30,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_octarine_core",
 }
 sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_crystal_maiden_outfit",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_blink",
 	"item_glimmer_cape",
 	"item_aether_lens",

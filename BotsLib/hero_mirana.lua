@@ -52,8 +52,13 @@ sRoleItemsBuyList["pos_4"] = {
 }
 -- One pair of boots in this build (user rule; Util/boots-check.js).
 sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_crystal_maiden_outfit",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_rod_of_atos",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",

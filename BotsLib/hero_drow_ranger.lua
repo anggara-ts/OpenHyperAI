@@ -23,6 +23,7 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
+	"item_falcon_blade",
 	"item_dragon_lance",
 	"item_yasha",
 	"item_manta",

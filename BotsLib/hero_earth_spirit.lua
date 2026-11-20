@@ -58,7 +58,14 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_gauntlets",
+	"item_quelling_blade",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_aghanims_shard",
 	"item_crimson_guard",
 	"item_heavens_halberd",
@@ -86,7 +93,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_wind_waker",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_mage_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_branches",
+	"item_circlet",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_tranquil_boots",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_boots_of_bearing",

@@ -47,12 +47,18 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_sheepstick",
 }
 sRoleItemsBuyList["pos_5"] = {
-	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves, Aether Lens, Blink Dagger and
+	-- Arcane Boots into Guardian Greaves, Aether Lens, Blink Dagger and
 	-- Aghanim's Shard instead of Tranquil -> Boots of Bearing (Drum), Pipe and an early Scepter: Arcane
 	-- 99% (#1), Blink 70%, Shard 65%, Aether 58%, Greaves 30% of his matches (Dotabuff, last patch);
 	-- Scepter, Pipe, Bearing and Drum are not in his top 25.
+	"item_tango",
 	"item_blood_grenade",
-	"item_crystal_maiden_outfit",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_aether_lens",
 	"item_glimmer_cape",
 	"item_blink",

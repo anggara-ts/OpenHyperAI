@@ -8,7 +8,7 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = {
-	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
+	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
 local tAllAbilityBuildList = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 4, 6, 4, 4, 6 } }
@@ -26,9 +26,11 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_faerie_fire",
 	"item_magic_wand",
 	"item_power_treads",
+	"item_falcon_blade",
+	"item_mask_of_madness",
 	"item_dragon_lance",
 	-- Yasha and Kaya and Blink Dagger: #5 and #3 by matches played (Dotabuff, last patch).
-	"item_yasha_and_kaya",
+	"item_manta",
 	"item_black_king_bar",
 	"item_blink",
 	"item_greater_crit",

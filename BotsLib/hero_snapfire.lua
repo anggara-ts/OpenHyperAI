@@ -75,10 +75,15 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter_2",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_blink",
 	"item_force_staff",
 	"item_aghanims_shard",

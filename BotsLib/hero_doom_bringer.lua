@@ -52,10 +52,11 @@ sRoleItemsBuyList["pos_2"] = {
 }
 sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
+	"item_gauntlets",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_magic_stick",
-	"item_enchanted_mango",
+	"item_circlet",
+	"item_bracer",
 	"item_magic_wand",
 	"item_helm_of_iron_will",
 	"item_boots",

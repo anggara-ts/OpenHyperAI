@@ -73,7 +73,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_ancient_janggo",
 	"item_glimmer_cape",
 	"item_pipe",

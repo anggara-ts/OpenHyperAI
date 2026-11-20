@@ -11,7 +11,8 @@ local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
-local tAllAbilityBuildList = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 4, 6, 4, 4, 6 } }
+-- Requiem of Souls rank 2 is entry 11 (the 12th point, hero level 12); it sat one entry later (#45).
+local tAllAbilityBuildList = { { 1, 5, 1, 5, 1, 6, 1, 5, 5, 4, 6, 4, 4, 4, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 local nTalentBuildList
 if sRole == "pos_1" or sRole == "pos_3" then

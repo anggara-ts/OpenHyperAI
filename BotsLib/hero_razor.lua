@@ -11,8 +11,11 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } },
 }
+-- Build 1 (pos 1 / 2): Static Link at level 1, Plasma Field maxed first, Static Link second, Storm Surge last.
+-- Plasma Field is maxed by level 7 in 39% (pos 1) and 37% (pos 2) of matches, Static Link in 29% and 31%.
+-- Stratz, week of 12-18 Nov 2026 (7.41f), 22,317 / 33,720 matches.
 local tAllAbilityBuildList =
-	{ { 2, 1, 2, 1, 2, 6, 2, 3, 1, 1, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
+	{ { 2, 1, 1, 2, 1, 6, 1, 3, 2, 2, 6, 3, 3, 3, 6 }, { 1, 2, 2, 1, 1, 6, 1, 3, 3, 3, 6, 3, 2, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_1" or sRole == "pos_2" then

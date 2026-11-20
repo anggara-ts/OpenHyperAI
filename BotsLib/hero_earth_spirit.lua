@@ -10,7 +10,9 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
-local tAllAbilityBuildList = { { 1, 2, 1, 2, 1, 6, 1, 2, 2, 3, 6, 3, 3, 3, 6 } }
+-- Boulder Smash maxed first, one Geomagnetic Grip point at level 4 (67% of pos 4 and 61% of pos 2 Earth
+-- Spirits have it by then), Rolling Boulder second. Stratz, week of 12-18 Nov 2026 (7.41f), 24,945 / 30,325 matches.
+local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}

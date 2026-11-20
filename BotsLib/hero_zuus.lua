@@ -10,8 +10,11 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
+-- Build 1 (cores): Arc Lightning maxed first, as 41% of mid Zeus do (Lightning Bolt first: 38%; 92,581 matches).
+-- Build 2 (pos 4 / 5): Lightning Bolt first (71%), Heavenly Jump at level 2 (74%), Arc Lightning at 4.
+-- Stratz, week of 12-18 Nov 2026 (7.41f).
 local tAllAbilityBuildList =
-	{ { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 2, 1, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
+	{ { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 }, { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = tAllAbilityBuildList[1]
 if sRole == "pos_2" then
 	nAbilityBuildList = tAllAbilityBuildList[1]

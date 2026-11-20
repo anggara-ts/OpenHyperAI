@@ -10,7 +10,9 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+-- Blade Fury maxed first, Blade Dance second, Healing Ward last after one early point (86% of carry
+-- Juggernauts max the Ward last, at 15). Stratz, week of 12-18 Nov 2026 (7.41f), pos 1, 387,059 matches.
+local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}

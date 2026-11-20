@@ -8,7 +8,10 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local tAllAbilityBuildList = { { 1, 2, 2, 2, 2, 6, 1, 1, 1, 3, 6, 3, 3, 3, 6 } }
+-- A basic ability's ranks need hero level 1/3/5/7: four March points by level 5 held every point back to
+-- level 7, Rearm too. March is still maxed at 7 (82% of mid Tinkers), with one Deploy Turrets point at 4
+-- (58% have it by then), then Laser. Stratz, week of 12-18 Nov 2026 (7.41f), pos 2, 93,044 matches.
+local tAllAbilityBuildList = { { 1, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}

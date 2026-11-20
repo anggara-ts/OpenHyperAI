@@ -502,87 +502,88 @@ T.test("the pins of Util/item-builds/pins.json hold in the lists", function()
 	end
 end)
 
--- Farm rules: Site.ConsiderIsTimeToFarm.<hero> farms while `not HasItem(bot, "item_x")`.
-local function farmRules()
-	local source = T.read("FuncLib/data/site.lua")
-	local rules, delegate = {}, {}
-	for hero, body in
-		string.gmatch(source, "\nSite%.ConsiderIsTimeToFarm%.npc_dota_hero_([%w_]+) = function%(%)(.-)\nend")
-	do
-		local to = string.match(body, "return Site%.ConsiderIsTimeToFarm%.npc_dota_hero_([%w_]+)%(%)")
-		if to then
-			delegate[hero] = to
-		else
-			local waits = {}
-			for condition in string.gmatch(body, "if ([^\n]-) then") do
-				for check, name in string.gmatch(condition, 'not (%a+)%(bot, "(item_[%w_]+)"%)') do
-					local rest = string.gsub(string.gsub(condition, "not HasItem", ""), "not FarmHas", "")
-					local capped = string.find(condition, "netWorth%s*<") ~= nil
-						or string.find(condition, "GetGold()", 1, true) ~= nil
-						or string.find(rest, "HasItem(bot", 1, true) ~= nil
-					if check == "HasItem" or check == "FarmHas" then
-						waits[#waits + 1] = { item = name, capped = capped, listAware = check == "FarmHas" }
-					end
+-- Must-have items (FuncLib/data/must_have_items.lua, Site.FarmForMustHave): the farm rules wait for these instead of
+-- item waits picked by hand (maintainer, 2026-11-20).
+local MUST_HAVE = assert(loadstring(T.read("FuncLib/data/must_have_items.lua"), "must_have_items"))()
+local OTHER_TEAM = {
+	"npc_dota_hero_drow_ranger",
+	"npc_dota_hero_drow_ranger",
+	"npc_dota_hero_drow_ranger",
+	"npc_dota_hero_drow_ranger",
+	"npc_dota_hero_drow_ranger",
+}
+T.test("the must-have items are core items of the hero's own list, in list order, with growing caps", function()
+	local positions = 0
+	for hero, heroRows in pairs(MUST_HAVE) do
+		for pos, rows in pairs(heroRows) do
+			T.ok(pos >= 1 and pos <= 3, hero .. ": core positions only, got " .. tostring(pos))
+			T.ok(#rows >= 1 and #rows <= 3, hero .. " pos " .. pos .. ": one to three items")
+			-- The team of five Snipers gives each slot its position; Sniper himself needs another team.
+			local team = hero == "sniper" and OTHER_TEAM or PLAIN_TEAM
+			local result = load("hero_" .. hero, pos, team)
+			local list = result.sBuyList or {}
+			local lastIndex, lastCap = 0, 0
+			for _, row in ipairs(rows) do
+				local at = indexOf(list, row[1])
+				T.ok(at ~= nil, hero .. " pos " .. pos .. ": " .. row[1] .. " is not in the list")
+				T.ok(at > lastIndex, hero .. " pos " .. pos .. ": " .. row[1] .. " out of list order")
+				T.ok(row[2] > lastCap, hero .. " pos " .. pos .. ": the caps grow")
+				for _, other in ipairs(row.done or {}) do
+					T.ok(
+						indexOf(list, other) ~= nil,
+						hero .. " pos " .. pos .. ": done item " .. other .. " is not in the list"
+					)
 				end
+				lastIndex, lastCap = at, row[2]
 			end
-			rules[hero] = waits
+			positions = positions + 1
 		end
 	end
-	for hero, to in pairs(delegate) do
-		rules[hero] = rules[to] or {}
-	end
-	return rules
-end
-
-T.test("a farm rule never waits for an item the list does not buy, unless a net-worth cap ends the wait", function()
-	local rules = farmRules()
-	local heroes = 0
-	for hero, waits in pairs(rules) do
-		local heroStatus = STATUS.heroes[hero]
-		if heroStatus ~= nil and #waits > 0 then
-			heroes = heroes + 1
-			for slot = 1, 5 do
-				local info = heroStatus[tostring(slot)]
-				if info ~= nil and BUILT[info.status] and info.status ~= "alias" then
-					local result, Item = load("hero_" .. hero, slot, PLAIN_TEAM)
-					local bought = {}
-					for _, entry in ipairs(result.sBuyList) do
-						closure(Item, entry, bought)
-					end
-					local onRecord = {}
-					for _, text in ipairs(info.farmWaitsNotBought or {}) do
-						onRecord[string.match(text, "^(item_[%w_]+)")] = true
-					end
-					for _, wait in ipairs(waits) do
-						local where = hero .. " pos " .. slot .. " " .. wait.item
-						if wait.listAware then
-							-- Site.FarmHas: an item the list never buys counts as owned, so the wait cannot hold him.
-							T.ok(true)
-						elseif not wait.capped then
-							T.ok(bought[wait.item], where .. ": the farm rule waits for it with no cap")
-						elseif not bought[wait.item] then
-							T.ok(
-								onRecord[wait.item],
-								where .. ": dropped from the list while the farm rule waits for it"
-							)
-						end
-					end
-				end
-			end
-		end
-	end
-	T.ok(heroes >= 50, "farm rules were read (" .. heroes .. " heroes)")
+	T.ok(positions >= 300, "core positions with must-have items (" .. positions .. ")")
 end)
 
-T.test("farm rules read the hero's list: no plain HasItem wait is left in Site.ConsiderIsTimeToFarm", function()
+T.test("no hero farm rule waits for an item picked by hand any more", function()
 	local source = T.read("FuncLib/data/site.lua")
 	local from = string.find(source, "\nSite%.ConsiderIsTimeToFarm = {}")
 	T.ok(from ~= nil, "the farm table")
-	local farmPart = string.sub(source, from)
-	local _, plain = string.gsub(farmPart, 'not HasItem%(bot, "item_', "")
-	local _, aware = string.gsub(farmPart, 'not FarmHas%(bot, "item_', "")
-	T.eq(plain, 0, "plain HasItem waits")
-	T.ok(aware >= 100, "FarmHas waits (" .. aware .. ")")
+	local _, waits = string.gsub(string.sub(source, from), 'not HasItem%(bot, "item_', "")
+	T.eq(waits, 0, "item waits in Site.ConsiderIsTimeToFarm")
+	T.ok(
+		string.find(source, "isTimeToFarm = Site.FarmForMustHave(bot)", 1, true) ~= nil,
+		"the shared farm decision asks the table"
+	)
+end)
+
+T.test("Site.FarmForMustHave: the next must-have item until its cap, a later one only away from a fight", function()
+	local unit = Stub.reset({ hero = "npc_dota_hero_antimage", slot = 1 })
+	local Site = require(GetScriptDirectory() .. "/FuncLib/data/site")
+	local rows = MUST_HAVE.antimage[1]
+	local owned, worth, allies = {}, 1000, 0
+	unit.FindItemSlot = function(_, name)
+		return owned[name] and 0 or -1
+	end
+	unit.GetNetWorth = function()
+		return worth
+	end
+	Site.GetPosition = function()
+		return 1
+	end
+	Site.GetAroundAllyCount = function()
+		return allies
+	end
+	local farm, item = Site.FarmForMustHave(unit)
+	T.ok(farm, "farms for the first item")
+	T.eq(item, rows[1][1], "the first item")
+	owned[rows[1][1]] = true
+	allies = 3
+	farm, item = Site.FarmForMustHave(unit)
+	T.eq(item, rows[2][1], "then the second")
+	T.ok(not farm, "a later item: not with three allies near")
+	allies = 1
+	T.ok((Site.FarmForMustHave(unit)), "a later item: farms away from a fight")
+	worth = rows[#rows][2] + 1
+	farm, item = Site.FarmForMustHave(unit)
+	T.ok(not farm and item == nil, "past every cap: no wait")
 end)
 
 -- Build-up parts (Util/item-builds/lib/build.js BUILD_PARTS): bought only on the way to an upgrade the list buys

@@ -2480,9 +2480,9 @@ Usage.ConsiderItemDesire["item_crimson_guard"] = function(item)
 	return BOT_ACTION_DESIRE_NONE
 end
 -- A silence only matters when it blocks a spell the hero could use now: a learned, non-passive ability that is
--- off cooldown and affordable. The self-dispel rules (Eul's, Stormcrafter) used to require an intelligence hero,
--- so universal, strength and agility heroes never dispelled a silence (#15). Eul's self-cast is a basic dispel
--- (datafeed, item 100).
+-- off cooldown and affordable. The self-dispel rule (Eul's; Stormcrafter's too until 7.42 made it passive) used to
+-- require an intelligence hero, so universal, strength and agility heroes never dispelled a silence (#15). Eul's
+-- self-cast is a basic dispel (datafeed, item 100).
 function Usage.SilenceBlocksASpell(unit)
 	-- Only when a spell is needed now: retreating (escape) or engaging (disable / nuke). A silenced right-clicker
 	-- in a calm moment should not Eul himself out of a fight. The silence's remaining time is not checked: it
@@ -3616,7 +3616,7 @@ Usage.ConsiderItemDesire["item_helm_of_the_dominator"] = function(item)
 				if
 					creepHealth > bestHealth
 					and creep:GetHealth() / creep:GetMaxHealth() > 0.75
-					and (not creep:IsAncientCreep() or item:GetName() == "item_helm_of_the_overlord")
+					and not creep:IsAncientCreep()
 					and not Fu.IsKeyWordUnit("siege", creep)
 				then
 					bestCreep = creep
@@ -3628,25 +3628,6 @@ Usage.ConsiderItemDesire["item_helm_of_the_dominator"] = function(item)
 	if bestCreep ~= nil then
 		hEffectTarget = bestCreep
 		castReason = "支配:" .. hEffectTarget:GetUnitName()
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_helm_of_the_overlord"] = function(item)
-	return Usage.ConsiderItemDesire["item_helm_of_the_dominator"](item)
-end
-Usage.ConsiderItemDesire["item_hood_of_defiance"] = function(item)
-	if bot:HasModifier("modifier_item_pipe_barrier") or Fu.GetHP(bot) > 0.88 then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local radius = 1000
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
-	if #enemyHeroes > 0 then
-		hEffectTarget = bot
-		castReason = "套盾"
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -4186,25 +4167,6 @@ Usage.ConsiderItemDesire["item_moon_shard"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_necronomicon"] = function(item)
-	local castRange = 750
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if botTarget ~= nil and botTarget:IsAlive() and Fu.IsInRange(bot, botTarget, 1000) then
-		hEffectTarget = botTarget
-		castReason = "进攻"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_necronomicon_2"] = function(item)
-	return Usage.ConsiderItemDesire["item_necronomicon"](item)
-end
-Usage.ConsiderItemDesire["item_necronomicon_3"] = function(item)
-	return Usage.ConsiderItemDesire["item_necronomicon"](item)
 end
 Usage.ConsiderItemDesire["item_nullifier"] = function(item)
 	local castRange = 800 + castRangeBonus
@@ -5278,19 +5240,6 @@ Usage.ConsiderItemDesire["item_tango_single"] = function(item)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
 		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_tome_of_knowledge"] = function(item)
-	local castRange = 300
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if item:IsFullyCastable() then
-		hEffectTarget = bot
-		castReason = "读书"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -6805,26 +6754,6 @@ Usage.ConsiderItemDesire["item_ex_machina"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-Usage.ConsiderItemDesire["item_stormcrafter"] = function(item)
-	local castRange = 300 + castRangeBonus
-	local castType = "unit"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-	if Fu.CanCastOnNonMagicImmune(bot) and #enemyHeroes > 0 then
-		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
-			hEffectTarget = bot
-			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-		end
-		if Fu.IsUnitTargetProjectileIncoming(bot, 400) then
-			hEffectTarget = bot
-			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 Usage.ConsiderItemDesire["item_gungir"] = function(item)
 	local nInRangeEnemy = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
 	for _, enemy in pairs(nInRangeEnemy) do
@@ -6965,41 +6894,6 @@ Usage.ConsiderItemDesire["item_heavy_blade"] = function(item)
 				castReason = "行巫之祸驱散敌军:" .. Fu.Chat.GetNormName(botTarget)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_revenants_brooch"] = function(item)
-	local castRange = bot:GetAttackRange() + 100
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) then
-			hEffectTarget = bot
-			castReason = "亡魂胸针进攻:" .. Fu.Chat.GetNormName(botTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_wraith_pact"] = function(item)
-	local castRange = 200 + castRangeBonus
-	local castType = "ground"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if Fu.IsGoingOnSomeone(bot) then
-		if
-			Fu.IsValidHero(botTarget)
-			and botTarget:GetAttackTarget() ~= nil
-			and Fu.IsInRange(bot, botTarget, 900)
-			and Fu.CanCastOnNonMagicImmune(botTarget)
-		then
-			hEffectTarget = Fu.GetFaceTowardDistanceLocation(bot, 200)
-			castReason = "怨灵之契进攻:" .. Fu.Chat.GetNormName(botTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -8058,20 +7952,6 @@ Usage.ConsiderItemDesire["item_light_collector"] = function(item)
 	if Fu.IsGoingOnSomeone(bot) then
 		if nearbyTrees ~= nil and #nearbyTrees >= 3 then
 			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_iron_talon"] = function(item)
-	local castRange = 350
-	if Fu.IsFarming(bot) then
-		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if #neutralCreeps <= 0 then
-			return 0
-		end
-		local healthiestCreep = Fu.GetMostHpUnit(neutralCreeps)
-		if Fu.CanBeAttacked(healthiestCreep) and Fu.GetHP(healthiestCreep) > 0.5 then
-			return BOT_ACTION_DESIRE_HIGH, healthiestCreep, "unit", nil
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -9871,8 +9751,6 @@ function Usage.DumpBotApi()
 		"item_crimson_guard",
 		"item_harpoon",
 		"item_heavens_halberd",
-		"item_angels_demise",
-		"item_helm_of_the_overlord",
 	}) do
 		local okC, cost = pcall(GetItemCost, itemName)
 		local okP, parts = pcall(GetItemComponents, itemName)

@@ -454,6 +454,76 @@ local function HardRetreatDesire(lastStand)
 	end
 	return BOT_MODE_DESIRE_ABSOLUTE, 201
 end
+-- Low HP in a creep wave or under a tower, at any game time (RetreatRules.CreepLowRetreat). Game 062, 17:34: Weaver
+-- died to creeps in attack mode (0.71-0.74), 13% -> 3% in 3.5s, no enemy hero near. 0.98 like the hard retreat:
+-- attack reads up to 0.95, and BOT_MODE_DESIRE_VERYHIGH is only 0.6. Held 3s while retreat is the active mode
+-- (mode_hold does not hold desires above 0.9), renewed while the rule still holds.
+local function CreepLowDesire()
+	local now = DotaTime()
+	if
+		bot:HasModifier("modifier_fountain_aura_buff")
+		-- Medusa's Mana Shield takes the hits while she has mana (the generic formula below reads her by mana too).
+		or botName == "npc_dota_hero_medusa" and mpRatio >= 0.3
+	then
+		bot._creepLowUntil = nil
+		return 0
+	end
+	local creepHit = bot:WasRecentlyDamagedByCreep(2.0)
+	local towerHit = bot:WasRecentlyDamagedByTower(2.0)
+	local holding = bot._creepLowUntil ~= nil and now < bot._creepLowUntil and activeMode == BOT_MODE_RETREAT
+	if not creepHit and not towerHit and not holding then
+		bot._creepLowUntil = nil
+		return 0
+	end
+	local creepCount = #(bot:GetNearbyCreeps(700, true) or {})
+	local towerNear = #(bot:GetNearbyTowers(900, true) or {}) > 0
+	local canFinish = Fu.ShouldFinishCommittedKill(bot, botTarget)
+	local fire = RetreatRules.CreepLowRetreat(
+		hpRatio,
+		creepHit,
+		towerHit,
+		canFinish,
+		bot:IsChanneling(),
+		holding,
+		creepCount > 0 or towerNear
+	)
+	if not fire then
+		if canFinish and hpRatio < RetreatRules.CREEP_LOW_HP and now >= (bot._creepLowSkipLogAt or -999) then
+			bot._creepLowSkipLogAt = now + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s creep-low-skip why=finish hp=%.2f creeps=%d mode=%d",
+					now,
+					HeroName(),
+					hpRatio,
+					creepCount,
+					activeMode or -1
+				)
+			)
+		end
+		bot._creepLowUntil = nil
+		return 0
+	end
+	bot._creepLowUntil = now + 3
+	if now >= (bot._creepLowLogAt or -999) then
+		bot._creepLowLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s creep-low %s hp=%.2f creeps=%d tower=%s mode=%d",
+				now,
+				HeroName(),
+				holding and "hold" or "start",
+				hpRatio,
+				creepCount,
+				tostring(towerHit or towerNear),
+				activeMode or -1
+			)
+		)
+	end
+	return 0.98
+end
 function GetDesire()
 	-- Death and respawn times, for the evasive logger; the retreat holds end with the death.
 	local now = DotaTime()
@@ -461,6 +531,7 @@ function GetDesire()
 		bot._retreatDeadAt = now
 		bot._hardRetreatUntil = nil
 		bot._overEvasiveUntil = nil
+		bot._creepLowUntil = nil
 	end
 	if now - (bot._retreatDesireAt or -999) > 1.5 then
 		bot._retreatResumeAt = now
@@ -554,6 +625,7 @@ function GetDesireHelper()
 	then
 		bot._hardRetreatUntil = nil
 		bot._overEvasiveUntil = nil
+		bot._creepLowUntil = nil
 		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
 	end
 	if activeMode == BOT_MODE_EVASIVE_MANEUVERS or bot._overEvasiveUntil ~= nil then
@@ -785,6 +857,11 @@ function GetDesireHelper()
 				hpRatio = 1
 			end
 		end
+	end
+	-- Before tag 350 (0.6 within 4000 of the fountain, below attack), after the Huskar HP rewrite above.
+	local creepLow = CreepLowDesire()
+	if creepLow > 0 then
+		return RetreatTag(340, creepLow)
 	end
 	if bot:DistanceFromFountain() <= 4000 and not isInTeamFight then
 		if hpRatio <= 0.6 or mpRatio < 0.4 then

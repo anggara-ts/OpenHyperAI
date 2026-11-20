@@ -29,3 +29,34 @@ T.test("hard retreat: still breaks off when it should", function()
 	-- Hurt but our side is stronger (Fu.WeAreStronger): keep fighting unless alone.
 	T.eq(R.HardRetreatOutnumbered(2, 3, 3, 0.50, false, true), false, "2 vs 3 at 50%, stronger")
 end)
+
+-- Arguments: hp, creep hit, tower hit, can finish a hero, channeling, holding, creeps/tower still in reach.
+T.test("creep-low: game 062 Weaver leaves the creep wave", function()
+	local R = rules()
+	-- t=1050: 13% HP, creeps hitting her, no enemy hero near.
+	T.eq(R.CreepLowRetreat(0.13, true, false, false, false, false, true), true, "Weaver 13%, creep hit")
+	-- A tower alone counts too.
+	T.eq(R.CreepLowRetreat(0.20, false, true, false, false, false, true), true, "20%, tower hit")
+end)
+
+T.test("creep-low: stays when it should", function()
+	local R = rules()
+	-- Not hit by creeps or a tower: other rules decide.
+	T.eq(R.CreepLowRetreat(0.10, false, false, false, false, false, true), false, "10%, not hit")
+	-- Healthy enough: 30% (the rule starts under 25%).
+	T.eq(R.CreepLowRetreat(0.30, true, false, false, false, false, true), false, "30%, creep hit")
+	-- A hero in reach dies to the next hit: finish it.
+	T.eq(R.CreepLowRetreat(0.15, true, false, true, false, false, true), false, "15%, kill to finish")
+	-- Channeling (a TP home): don't cancel it.
+	T.eq(R.CreepLowRetreat(0.15, true, false, false, true, false, true), false, "15%, channeling")
+end)
+
+T.test("creep-low: hold after it fired", function()
+	local R = rules()
+	-- Stepped away: the creep hit flag lapsed, creeps still in reach, 28%: keep retreating.
+	T.eq(R.CreepLowRetreat(0.28, false, false, false, false, true, true), true, "held at 28%, creeps near")
+	-- Out of creep reach: let go.
+	T.eq(R.CreepLowRetreat(0.28, false, false, false, false, true, false), false, "held, nothing in reach")
+	-- Healed past the release line (35%): let go.
+	T.eq(R.CreepLowRetreat(0.40, true, false, false, false, true, true), false, "held, healed to 40%")
+end)

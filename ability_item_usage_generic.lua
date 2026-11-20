@@ -9969,15 +9969,32 @@ end
 -- Diagnostic (#15): does a bot in a cyclone (Wind Waker or Eul's, ours or an enemy's) drift? Other modes keep giving
 -- move orders while it lasts, and Wind Waker's cyclone can be moved. One line when it ends: held time, distance moved
 -- and how much closer to the fountain it got.
--- Game 062, 47:55: Leshrac (84% HP 3.5s before) went into a Wind Waker cyclone while retreating with 4 enemies near,
--- moved 29 of the 750 a 2.5s cyclone can travel (7.42 item_wind_waker: tornado_speed 300, cyclone_duration 2.5),
--- landed among them and died a second later (#15). The start and landing fields show whether a self-cyclone buys
--- anything (enemies still there on landing), and steer= counts the move orders toward the fountain given while a
--- retreating bot is in a Wind Waker cyclone: if moved= stays small with steer>0, the cyclone cannot be steered.
+-- The start and landing fields show whether a self-cyclone buys anything (#15: are the enemies still there on
+-- landing?). own= is true when the bot's own Eul's or Wind Waker just went on cooldown (a self-cast); the two Wind
+-- Waker lines so far (game 062) were Death Prophet's casts on Leshrac and Medusa. A self-cast Wind Waker cyclone can
+-- travel 750 (7.42 item_wind_waker: tornado_speed 300, cyclone_duration 2.5); steer= counts the move orders toward
+-- the fountain given while a retreating bot is in its own one. moved= well above 100 with steer>0 means it can be
+-- steered; a small moved= means the bot API cannot steer it.
 local CYCLONE_MODIFIERS = { "modifier_wind_waker", "modifier_item_wind_waker", "modifier_eul_cyclone" }
 local CYCLONE_STEER_GAP = 0.3
+-- Steer only inside the cyclone's 2.5s (plus a margin), so a modifier that outlives it never keeps ordering moves.
+local CYCLONE_STEER_WINDOW = 3
 local function CycloneEnemies()
 	return #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+end
+-- The bot's own Eul's / Wind Waker went on cooldown just now (7.42: item_cyclone 23s, item_wind_waker 19s). The 0.6
+-- leaves room for cooldown reduction; a cast earlier than that would have ended its cyclone long ago.
+local function CycloneIsOwn(modifierName)
+	local itemName, cooldown = "item_cyclone", 23
+	if modifierName ~= "modifier_eul_cyclone" then
+		itemName, cooldown = "item_wind_waker", 19
+	end
+	local slot = bot:FindItemSlot(itemName)
+	if slot < 0 or slot > 5 then
+		return false
+	end
+	local item = bot:GetItemInSlot(slot)
+	return item ~= nil and not item:IsNull() and (item:GetCooldownTimeRemaining() or 0) > cooldown * 0.6
 end
 local function TrackCyclone()
 	local found = nil
@@ -9999,12 +10016,15 @@ local function TrackCyclone()
 			enemies = CycloneEnemies(),
 			rooted = bot:IsRooted(),
 			silenced = bot:IsSilenced(),
+			own = CycloneIsOwn(found),
 			steer = 0,
 			steerAt = -999,
 		}
 	elseif found ~= nil and cyclone ~= nil then
 		if
-			found ~= "modifier_eul_cyclone"
+			found == "modifier_wind_waker"
+			and cyclone.own
+			and DotaTime() - cyclone.at <= CYCLONE_STEER_WINDOW
 			and Fu.IsRetreating(bot)
 			and DotaTime() >= cyclone.steerAt + CYCLONE_STEER_GAP
 			and Fu.GetTeamFountain ~= nil
@@ -10019,7 +10039,7 @@ local function TrackCyclone()
 			print,
 			string.format(
 				"[OHA-ITEM] t=%.0f %s cyclone-end mod=%s held=%.1f moved=%d toFountain=%d mode=%d startMode=%d"
-					.. " startHp=%.2f hp=%.2f startEnemies=%d enemies=%d rooted=%s silenced=%s steer=%d",
+					.. " startHp=%.2f hp=%.2f startEnemies=%d enemies=%d rooted=%s silenced=%s own=%s steer=%d",
 				DotaTime(),
 				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 				cyclone.name,
@@ -10034,6 +10054,7 @@ local function TrackCyclone()
 				CycloneEnemies(),
 				tostring(cyclone.rooted),
 				tostring(cyclone.silenced),
+				tostring(cyclone.own),
 				cyclone.steer
 			)
 		)

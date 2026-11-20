@@ -5,8 +5,9 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local UBER_WALK = 7000
 local OBS_GAP = 1500
 -- Removed (#15): (4612, 767) and (-4348, -1008). Neither is walkable, so both were moved ((4439, 667) and
--- (-4348, -1108)), and no ward was ever planted at either in games 018-062: 39 and 36 give-ups
--- `[OHA-WARD] give-up why=in-range-no-plant`, with plant-try lines from 88-172 away showing spotPassable=true.
+-- (-4348, -1108)). Games 018-062: 39 and 36 give-ups `[OHA-WARD] give-up why=in-range-no-plant` (the next-worst
+-- spot: 5), with plant-try lines from 88-172 away showing spotPassable=true; none of the 156 plants logged with
+-- their spot (games 018-019) was at either.
 -- A replacement needs the maintainer's ping in a game.
 local UberWardSpots = {
 	{ location = Vector(1015, 3593, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "dire" },

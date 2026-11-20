@@ -34,7 +34,6 @@ local function installBotMode(Fu)
 		local mode = unit:GetActiveMode()
 		return mode == BOT_MODE_ROAM
 			or mode == BOT_MODE_TEAM_ROAM
-			or mode == BOT_MODE_GANK
 			or mode == BOT_MODE_ATTACK
 			or mode == BOT_MODE_DEFEND_ALLY
 	end

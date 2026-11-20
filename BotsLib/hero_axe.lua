@@ -28,7 +28,14 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_sven_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
 	"item_blade_mail",
 	"item_blink",
 	"item_crimson_guard",

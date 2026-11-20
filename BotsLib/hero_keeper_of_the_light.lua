@@ -66,27 +66,37 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_blood_grenade",
 	"item_boots",
 	"item_urn_of_shadows",
-	"item_arcane_boots",
-	"item_glimmer_cape",
+	"item_tranquil_boots",
+	"item_magic_wand",
 	"item_spirit_vessel",
-	"item_kaya_and_sange",
-	"item_guardian_greaves",
+	"item_force_staff",
+	"item_glimmer_cape",
+	"item_ultimate_scepter",
+	"item_boots_of_bearing",
 	"item_octarine_core",
 	"item_sheepstick",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 }
+-- Pos 5 (#9, game 039): no Solar Crest rush. Stratz 7.41f (week of 5-11 Nov 2026, all ranks), pos 5, 8,183
+-- matches: Solar Crest 4.3%, Mekansm 3.1% (its Guardian Greaves 1.5%); Aghanim's Scepter 79%, Magic Wand 52%,
+-- Urn of Shadows 47%, Force Staff 40%, Spirit Vessel 37%, Glimmer Cape 35%. Order by when they are bought:
+-- Wand and Urn by minute 10, Vessel ~17, Force Staff and Glimmer ~24, Scepter ~29. Pos 4 (12,985 matches)
+-- reads the same: Scepter 81%, Urn 55%, Wand 54%, Vessel 41%, Force Staff 41%; Kaya and Sange 0.5%.
 sRoleItemsBuyList["pos_5"] = {
 	"item_double_tango",
 	"item_faerie_fire",
 	"item_blood_grenade",
-	"item_arcane_boots",
-	"item_solar_crest",
+	"item_tranquil_boots",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_force_staff",
 	"item_glimmer_cape",
-	"item_mekansm",
+	"item_ultimate_scepter",
 	"item_cyclone",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_lotus_orb",
 	"item_sheepstick",
 	"item_wind_waker",
@@ -244,14 +254,32 @@ function X.SkillsComplement()
 		bot:Action_UseAbility(illuminateEndAbility)
 		return
 	end
-	illuminateDesire, illuminateLocation = X.ConsiderIlluminate()
+	local illuminateWhy
+	illuminateDesire, illuminateLocation, illuminateWhy = X.ConsiderIlluminate()
 	if illuminateDesire > 0 then
+		X.LogKotl("illuminate why=" .. tostring(illuminateWhy))
 		bot:Action_UseAbilityOnLocation(illuminateAbility, illuminateLocation)
 		illuminateCastTime = DotaTime()
 		return
 	end
-	chakraMagicDesire, chakraMagicTarget = X.ConsiderChakraMagic()
+	local chakraMagicWhy
+	chakraMagicDesire, chakraMagicTarget, chakraMagicWhy = X.ConsiderChakraMagic()
 	if chakraMagicDesire > 0 then
+		if DotaTime() >= (bot._kotlChakraLogAt or -999) then
+			bot._kotlChakraLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-KOTL] t=%.0f keeper_of_the_light chakra target=%s why=%s target-mana=%d%% own-mana=%d%%",
+					DotaTime(),
+					chakraMagicTarget == bot and "self"
+						or (string.gsub(chakraMagicTarget:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(chakraMagicWhy),
+					math.floor(100 * chakraMagicTarget:GetMana() / math.max(1, chakraMagicTarget:GetMaxMana())),
+					math.floor(100 * bot:GetMana() / math.max(1, bot:GetMaxMana()))
+				)
+			)
+		end
 		bot:Action_UseAbilityOnEntity(chakraMagicAbility, chakraMagicTarget)
 		return
 	end
@@ -285,10 +313,10 @@ function X.ConsiderIlluminate()
 				and not enemyHero:HasModifier("modifier_troll_warlord_battle_trance")
 			then
 				bot.illuminate_status = { "kill", enemyHero }
-				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "kill"
 			end
 			if Fu.IsInEtherealForm(enemyHero) or enemyHero:HasModifier("modifier_keeper_of_the_light_radiant_bind") then
-				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "bound"
 			end
 		end
 	end
@@ -300,7 +328,7 @@ function X.ConsiderIlluminate()
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 			and not botTarget:HasModifier("modifier_templar_assassin_refraction_absorb")
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "engage"
 		end
 	end
 	if Fu.IsFarming(bot) and manaAfterCast > 0.25 then
@@ -313,7 +341,7 @@ function X.ConsiderIlluminate()
 		then
 			local aoeLocation = bot:FindAoELocation(true, false, nearbyCreeps[1]:GetLocation(), 0, radius, 0, 0)
 			if aoeLocation.count >= 3 or aoeLocation.count >= 2 and nearbyCreeps[1]:IsAncientCreep() then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "farm"
 			end
 		end
 	end
@@ -327,7 +355,7 @@ function X.ConsiderIlluminate()
 		then
 			local aoeLocation = bot:FindAoELocation(true, false, laneCreeps[1]:GetLocation(), 0, radius, 0, 0)
 			if aoeLocation.count >= 3 then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "wave"
 			end
 		end
 	end
@@ -356,7 +384,7 @@ function X.ConsiderIlluminate()
 					)
 				then
 					bot.illuminate_status = { "laning", creep }
-					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation()
+					return BOT_ACTION_DESIRE_HIGH, creep:GetLocation(), "laning-harass"
 				end
 			end
 			if Fu.IsValid(creep) and Fu.CanKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL) then
@@ -364,7 +392,7 @@ function X.ConsiderIlluminate()
 			end
 		end
 		if #killableCreeps >= 2 then
-			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
+			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps), "laning-creeps"
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
@@ -374,12 +402,12 @@ function X.ConsiderIlluminate()
 			and Fu.CanBeAttacked(botTarget)
 			and isAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "roshan"
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(botTarget, bot, castRange) and isAttacking then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "tormentor"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
@@ -526,17 +554,68 @@ function X.ConsiderChakraMagic()
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, chakraMagicAbility:GetCastRange())
 	local manaRestore = chakraMagicAbility:GetSpecialValueInt("mana_restore")
-	if bot:GetMaxMana() - bot:GetMana() > manaRestore * 1.2 then
-		return BOT_ACTION_DESIRE_HIGH, bot
-	else
-		local alliesInRange = Fu.GetAlliesNearLoc(bot:GetLocation(), castRange)
-		for _, allyHero in pairs(alliesInRange) do
-			if Fu.IsValidHero(allyHero) and allyHero:GetMaxMana() - allyHero:GetMana() > manaRestore * 1.3 then
-				return BOT_ACTION_DESIRE_HIGH, allyHero
-			end
+	local selfBonusPct = chakraMagicAbility:GetSpecialValueInt("self_bonus")
+	local own = {
+		unit = bot,
+		missing = bot:GetMaxMana() - bot:GetMana(),
+		ratio = bot:GetMana() / math.max(1, bot:GetMaxMana()),
+		-- Illuminate and Blinding Light are the basic spells he keeps on cooldown; 2s left is worth cutting.
+		spellOnCooldown = illuminateAbility:GetCooldownTimeRemaining() >= 2
+			or blindingLightAbility:GetCooldownTimeRemaining() >= 2,
+	}
+	local allies = {}
+	for _, allyHero in pairs(Fu.GetAlliesNearLoc(bot:GetLocation(), castRange)) do
+		if Fu.IsValidHero(allyHero) and allyHero ~= bot and not allyHero:IsIllusion() and allyHero:GetMaxMana() > 0 then
+			allies[#allies + 1] = {
+				unit = allyHero,
+				missing = allyHero:GetMaxMana() - allyHero:GetMana(),
+				ratio = allyHero:GetMana() / allyHero:GetMaxMana(),
+			}
 		end
 	end
+	local target, why = X.ChakraMagicChoice(own, allies, manaRestore, selfBonusPct)
+	if target ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, target, why
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- Who gets Chakra Magic, and why. 7.42 game files (npc_dota_hero_keeper_of_the_light.txt): it restores
+-- mana_restore (105-300, self_bonus 30% more on himself), takes cooldown_reduction (2.5-5.5s) off the target's
+-- basic abilities that are on cooldown, costs no mana and has a 20-11s cooldown, so it is worth casting about
+-- every time it is ready.
+--   ally-low: an ally under half mana who can take the whole restore, the lowest first (unless Keeper is
+--     under 30% and lower than that ally);
+--   after-spell: himself right after Illuminate or Blinding Light, when half of the restore is not wasted;
+--   self-mana: himself when he misses 1.2x the restore (the old rule);
+--   ally-top-up: an ally missing 1.3x the restore (the old rule), the emptiest first.
+-- own: { unit, missing, ratio, spellOnCooldown }; allies: list of { unit, missing, ratio }.
+function X.ChakraMagicChoice(own, allies, manaRestore, selfBonusPct)
+	local lowAlly = nil
+	for _, ally in ipairs(allies) do
+		if ally.ratio < 0.5 and ally.missing >= manaRestore and (lowAlly == nil or ally.ratio < lowAlly.ratio) then
+			lowAlly = ally
+		end
+	end
+	if lowAlly ~= nil and (own.ratio >= 0.3 or own.ratio >= lowAlly.ratio) then
+		return lowAlly.unit, "ally-low"
+	end
+	local selfRestore = manaRestore * (1 + selfBonusPct / 100)
+	if own.spellOnCooldown and own.missing >= selfRestore * 0.5 then
+		return own.unit, "after-spell"
+	end
+	if own.missing > manaRestore * 1.2 then
+		return own.unit, "self-mana"
+	end
+	local topUpAlly = nil
+	for _, ally in ipairs(allies) do
+		if ally.missing > manaRestore * 1.3 and (topUpAlly == nil or ally.missing > topUpAlly.missing) then
+			topUpAlly = ally
+		end
+	end
+	if topUpAlly ~= nil then
+		return topUpAlly.unit, "ally-top-up"
+	end
+	return nil, nil
 end
 function X.ConsiderSolarBind()
 	if not Fu.CanCastAbility(solarBindAbility) then

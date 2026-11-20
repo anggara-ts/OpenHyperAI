@@ -8,8 +8,8 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = {
-	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
-	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } },
+	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
+	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 local tAllAbilityBuildList =
@@ -73,12 +73,12 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_blood_grenade",
 	"item_magic_stick",
 	"item_faerie_fire",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_magic_wand",
 	"item_blade_mail",
 	"item_solar_crest",
 	"item_holy_locket",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_lotus_orb",

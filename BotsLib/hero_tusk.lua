@@ -52,15 +52,20 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_1"] = {
-	"item_tank_outfit",
-	"item_echo_sabre",
-	"item_ring_of_health",
-	"item_vanguard",
-	"item_crimson_guard",
 	-- No Aghanim's Scepter on the core: its Walrus Kick often knocked a ganked enemy away
 	-- to safety. Blink to land the snowball/punch, BKB to stay in the fight.
+	"item_tango",
+	"item_quelling_blade",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
 	"item_blink",
+	"item_desolator",
 	"item_black_king_bar",
+	"item_echo_sabre",
 	"item_heavens_halberd",
 	"item_assault",
 	"item_travel_boots",

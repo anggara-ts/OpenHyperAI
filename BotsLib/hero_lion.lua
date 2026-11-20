@@ -9,20 +9,24 @@ local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
-local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
+local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } }
 local tAllAbilityBuildList = { { 1, 3, 1, 2, 3, 6, 1, 1, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_priest_outfit",
-	"item_mekansm",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_urn_of_shadows",
 	"item_glimmer_cape",
 	"item_blink",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_aghanims_shard",
-	"item_spirit_vessel",
 	"item_ultimate_scepter",
 	"item_shivas_guard",
 	"item_moon_shard",

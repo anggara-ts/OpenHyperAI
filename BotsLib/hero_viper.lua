@@ -26,7 +26,15 @@ local sSphereOrLotus = RandomInt(1, 9) > 5 and "item_sphere" or "item_lotus_orb"
 local sMkbOrButterfly = RandomInt(1, 9) > 6 and "item_monkey_king_bar" or "item_butterfly"
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
-	"item_ranged_carry_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_slippers",
+	"item_magic_wand",
+	"item_wraith_band",
+	"item_power_treads",
+	"item_infused_raindrop",
 	"item_dragon_lance",
 	"item_yasha",
 	"item_black_king_bar",

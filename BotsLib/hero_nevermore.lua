@@ -21,94 +21,127 @@ else
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 41,725 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
-	"item_power_treads",
 	"item_falcon_blade",
+	"item_power_treads",
 	"item_mask_of_madness",
 	"item_dragon_lance",
 	-- Yasha and Kaya and Blink Dagger: #5 and #3 by matches played (Dotabuff, last patch).
 	"item_manta",
-	"item_black_king_bar",
-	"item_blink",
-	"item_greater_crit",
 	"item_hurricane_pike",
-	"item_aghanims_shard",
+	"item_black_king_bar",
+	"item_greater_crit",
 	"item_satanic",
 	"item_moon_shard",
-	"item_travel_boots_2",
+	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 102,792 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_boots",
+	"item_blink",
+	-- Yasha and Kaya, Blink Dagger and Aghanim's Scepter: #5, #3 and #6 by matches played (Dotabuff,
+	-- last patch); Orchid / Bloodthorn are not in his top 25.
+	"item_yasha_and_kaya",
+	"item_travel_boots",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_refresher",
+	"item_ultimate_scepter_2",
+	"item_cyclone",
+	"item_swift_blink",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- One pair of boots in this build (user rule; Util/boots-check.js).
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 2,170 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_enchanted_mango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_boots",
+	"item_blink",
+	"item_yasha_and_kaya",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_refresher",
+	"item_ultimate_scepter_2",
+	"item_invis_sword",
+	"item_mask_of_madness",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,631 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_enchanted_mango",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_blink",
+	"item_yasha_and_kaya",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_refresher",
+	"item_ultimate_scepter_2",
+	"item_mask_of_madness",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 2,414 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
 	"item_enchanted_mango",
-	"item_enchanted_mango",
-	"item_bottle",
+	"item_magic_stick",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_dragon_lance",
-	-- Yasha and Kaya, Blink Dagger and Aghanim's Scepter: #5, #3 and #6 by matches played (Dotabuff,
-	-- last patch); Orchid / Bloodthorn are not in his top 25.
-	"item_yasha_and_kaya",
-	"item_black_king_bar",
+	"item_yasha",
+	"item_kaya",
 	"item_blink",
+	"item_yasha_and_kaya",
+	"item_travel_boots",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
-	"item_greater_crit",
-	"item_hurricane_pike",
+	"item_refresher",
+	"item_ultimate_scepter_2",
+	"item_cyclone",
+	"item_swift_blink",
 	"item_aghanims_shard",
-	"item_satanic",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_ultimate_scepter_2",
 }
--- One pair of boots in this build (user rule; Util/boots-check.js).
-sRoleItemsBuyList["pos_4"] = {
-	"item_tango",
-	"item_tango",
-	"item_double_branches",
-	"item_clarity",
-	"item_magic_wand",
-	"item_tranquil_boots",
-	"item_null_talisman",
-	"item_glimmer_cape",
-	"item_force_staff",
-	"item_cyclone",
-	"item_boots_of_bearing",
-	"item_octarine_core",
-	"item_hurricane_pike",
-	"item_aghanims_shard",
-	"item_wind_waker",
-	"item_ultimate_scepter_2",
-	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_5"] = {
-	"item_tango",
-	"item_tango",
-	"item_double_branches",
-	"item_clarity",
-	"item_magic_wand",
-	"item_tranquil_boots",
-	"item_null_talisman",
-	"item_glimmer_cape",
-	"item_pipe",
-	"item_force_staff",
-	"item_cyclone",
-	"item_boots_of_bearing",
-	"item_octarine_core",
-	"item_hurricane_pike",
-	"item_aghanims_shard",
-	"item_wind_waker",
-	"item_ultimate_scepter_2",
-	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_kaya", "item_quelling_blade", "item_octarine_core", "item_bottle" }
+X["sSellList"] = {
+	"item_kaya",
+	"item_quelling_blade",
+	"item_octarine_core",
+	"item_bottle",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_greater_crit",
+	"item_falcon_blade",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end

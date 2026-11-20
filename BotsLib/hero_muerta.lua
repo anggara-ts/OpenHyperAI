@@ -13,54 +13,128 @@ local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 30,825 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
 	"item_magic_stick",
 	"item_magic_wand",
-	"item_wraith_band",
-	"item_power_treads",
 	"item_falcon_blade",
-	-- Maelstrom, then Mjollnir: her most bought item after Power Treads (Dotabuff, last patch).
-	"item_maelstrom",
-	"item_dragon_lance",
-	"item_lesser_crit",
+	"item_power_treads",
+	"item_mjollnir",
 	"item_hurricane_pike",
 	-- Black King Bar instead of Shadow Blade / Silver Edge (user call: improve her build). Pierce the
 	-- Veil turns her damage magical and she stands in fights; she needs the spell immunity.
 	"item_black_king_bar",
-	"item_mjollnir",
-	"item_aghanims_shard",
+	"item_blink",
 	"item_greater_crit",
-	"item_travel_boots",
+	"item_aghanims_shard",
+	"item_swift_blink",
 	"item_moon_shard",
-	"item_satanic",
-	"item_travel_boots_2",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = {
-	"item_tango",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 8,036 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_mjollnir",
+	"item_blink",
+	"item_lesser_crit",
+	-- Black King Bar instead of Shadow Blade / Silver Edge (user call: improve her build). Pierce the
+	-- Veil turns her damage magical and she stands in fights; she needs the spell immunity.
+	"item_black_king_bar",
+	"item_greater_crit",
+	"item_travel_boots",
+	"item_swift_blink",
+	"item_hydras_breath",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 1,319 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_null_talisman",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_mjollnir",
+	"item_lesser_crit",
+	-- Black King Bar instead of Shadow Blade / Silver Edge (user call: improve her build). Pierce the
+	-- Veil turns her damage magical and she stands in fights; she needs the spell immunity.
+	"item_black_king_bar",
+	"item_greater_crit",
+	"item_monkey_king_bar",
+	"item_swift_blink",
+	"item_travel_boots",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 3,609 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
 	"item_blood_grenade",
+	"item_branches",
+	"item_magic_stick",
+	"item_circlet",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_rod_of_atos",
+	"item_force_staff",
+	"item_ultimate_scepter",
+	"item_gungir",
+	"item_black_king_bar",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_sheepstick",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,052 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
 	"item_faerie_fire",
 	"item_magic_wand",
 	"item_arcane_boots",
-	"item_urn_of_shadows",
-	"item_glimmer_cape",
-	"item_spirit_vessel",
-	"item_aghanims_shard",
-	"item_guardian_greaves",
-	"item_sheepstick",
+	"item_rod_of_atos",
+	"item_ultimate_scepter",
+	"item_dragon_lance",
+	"item_blink",
+	"item_black_king_bar",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
+	"item_sheepstick",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+X["sSellList"] = {
+	"item_black_king_bar",
+	"item_quelling_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_greater_crit",
+	"item_falcon_blade",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end

@@ -399,12 +399,15 @@ function X.ConsiderAS()
 	if not ability4:IsTrained() or not ability4:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	local castRange = ability4:GetCastRange() + 200
-	local nearbyEnemies = Fu.GetAroundEnemyHeroList(castRange + 200)
+	-- Every branch casts only on an enemy already in Spectral Slug's cast range (575, game files 7.42). The fight
+	-- and engage branches allowed 150-200 more, so she walked forward to cast it; the enemy list below still
+	-- reaches further, for the count of enemies in the fight.
+	local castRange = ability4:GetCastRange()
+	local nearbyEnemies = Fu.GetAroundEnemyHeroList(castRange + 400)
 	if Fu.IsRetreating(bot) and (bot:WasRecentlyDamagedByAnyHero(3.0) or bot:GetActiveModeDesire() > 0.7) then
 		for _, enemyHero in pairs(nearbyEnemies) do
-			-- Only an enemy already in Spectral Slug's cast range (500, game data): the list reaches 900, so
-			-- she used to walk up to 400 toward the enemy while retreating to cast it.
+			-- The list reaches 400 past the cast range: without the range test she walked toward the enemy
+			-- while retreating to cast it.
 			if
 				Fu.IsValid(enemyHero)
 				and Fu.IsInRange(bot, enemyHero, ability4:GetCastRange())
@@ -439,19 +442,40 @@ function X.ConsiderAS()
 				end
 			end
 		end
-		if bestTarget ~= nil and targetableCount >= 2 and Fu.IsInRange(bot, bestTarget, castRange + 150) then
+		if bestTarget ~= nil and targetableCount >= 2 and Fu.IsInRange(bot, bestTarget, castRange) then
 			local castTarget = bestTarget
 			local castReason = "团战控制输出"
+			X.LogSlug("fight", castTarget)
 			return BOT_ACTION_DESIRE_HIGH, castTarget, castReason
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = Fu.GetProperTarget(bot)
 		if Fu.IsValidHero(target) and Fu.IsInRange(bot, target, castRange) and Fu.CanCastOnNonMagicImmune(target) then
+			X.LogSlug("engage", target)
 			return BOT_ACTION_DESIRE_HIGH, target
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-MUERTA] slug why=fight|engage: a Spectral Slug order and the distance to its target (never beyond the
+-- cast range now), at most once per 3s.
+function X.LogSlug(why, target)
+	if DotaTime() < (bot._slugLogAt or -999) then
+		return
+	end
+	bot._slugLogAt = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-MUERTA] t=%.0f slug why=%s target=%s dist=%.0f range=%.0f",
+			DotaTime(),
+			why,
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToUnitDistance(bot, target),
+			ability4:GetCastRange()
+		)
+	)
 end
 function X.ConsiderSpectralSlug()
 	if not Fu.CanCastAbility(spectralSlugAbility) then

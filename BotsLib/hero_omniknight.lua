@@ -151,6 +151,7 @@ function X.SkillsComplement()
 			hammerOfPurityAbility:ToggleAutoCast()
 		end
 	end
+	X.LogMartyrResult()
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
@@ -178,6 +179,9 @@ function X.SkillsComplement()
 	if martyrDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnEntity(martyrAbility, martyrTarget)
+		if bot._martyrCheck == nil then
+			bot._martyrCheck = { target = martyrTarget, orderAt = DotaTime() }
+		end
 		return
 	end
 	hammerOfPurityDesire, hammerOfPurityTarget = X.ConsiderE()
@@ -399,6 +403,45 @@ function X.ConsiderQ()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-OMNI] martyr-result: once per Martyr cast, 0.3s after it went on cooldown: which buff the target has.
+-- The buff's tooltip in the game's abilities_english.txt is DOTA_Tooltip_modifier_omniknight_martyr ("Repel");
+-- the older name modifier_omniknight_repel is still in the game binary, so both are printed.
+function X.LogMartyrResult()
+	local pending = bot._martyrCheck
+	if pending == nil then
+		return
+	end
+	if DotaTime() > pending.orderAt + 6 then
+		bot._martyrCheck = nil
+		return
+	end
+	if martyrAbility == nil or martyrAbility:GetCooldownTimeRemaining() <= 0 then
+		return
+	end
+	if pending.castSeenAt == nil then
+		pending.castSeenAt = DotaTime()
+		return
+	end
+	if DotaTime() < pending.castSeenAt + 0.3 then
+		return
+	end
+	bot._martyrCheck = nil
+	local target = pending.target
+	if not Fu.IsValidHero(target) then
+		return
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-OMNI] t=%.0f martyr-result target=%s hp=%.2f martyr=%s repel=%s",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.GetHP(target),
+			target:HasModifier("modifier_omniknight_martyr") and "yes" or "no",
+			target:HasModifier("modifier_omniknight_repel") and "yes" or "no"
+		)
+	)
+end
 function X.ConsiderW()
 	if not martyrAbility:IsFullyCastable() then
 		return 0
@@ -419,6 +462,7 @@ function X.ConsiderW()
 		if
 			Fu.IsValidHero(allyHero)
 			and Fu.IsInRange(bot, allyHero, castRange + 300)
+			and not allyHero:HasModifier("modifier_omniknight_martyr")
 			and not allyHero:HasModifier("modifier_omniknight_repel")
 			and not allyHero:IsMagicImmune()
 			and not allyHero:IsInvulnerable()

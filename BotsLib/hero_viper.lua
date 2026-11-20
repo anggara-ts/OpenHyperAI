@@ -113,15 +113,9 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = Fu.GetMP(bot)
 	botTarget = Fu.GetProperTarget(bot)
-	if Fu.IsValidHero(botTarget) then
-		if not poisonAttackAbility:GetAutoCastState() then
-			poisonAttackAbility:ToggleAutoCast()
-		end
-	else
-		if poisonAttackAbility:GetAutoCastState() then
-			poisonAttackAbility:ToggleAutoCast()
-		end
-	end
+	-- Poison Attack's autocast is set in one place, X.ConsiderPoisonAttack. A second rule here (on for a hero
+	-- target, off otherwise) fought it: on here and off there in the same think, or the other way round at
+	-- Roshan, so the autocast flipped twice per think.
 	viperStrikeDesire, viperStrikeTarget = X.ConsiderViperStrike()
 	if viperStrikeDesire > 0 then
 		if Fu.HasPowerTreads(bot) then
@@ -161,6 +155,28 @@ function X.SkillsComplement()
 		end
 		return
 	end
+end
+-- Sets Poison Attack's autocast; true when it had to flip it.
+-- [OHA-VIPER] poison-autocast on|off why=engage|roshan|tormentor|low-mana|idle, at most once per 3s.
+function X.SetPoisonAutocast(wanted, why)
+	if poisonAttackAbility:GetAutoCastState() == wanted then
+		return false
+	end
+	poisonAttackAbility:ToggleAutoCast()
+	if DotaTime() >= (bot._viperAutocastLogAt or -999) then
+		bot._viperAutocastLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-VIPER] t=%.0f poison-autocast %s why=%s mp=%.2f",
+				DotaTime(),
+				wanted and "on" or "off",
+				why,
+				mpRatio or 0
+			)
+		)
+	end
+	return true
 end
 function X.ConsiderPoisonAttack()
 	if not poisonAttackAbility:IsFullyCastable() then
@@ -223,12 +239,10 @@ function X.ConsiderPoisonAttack()
 					> viperStrikeAbility:GetManaCost()
 			then
 				if Fu.IsInRange(bot, botTarget, attackRange) and not botTarget:IsAttackImmune() then
-					if not poisonAttackAbility:GetAutoCastState() then
-						poisonAttackAbility:ToggleAutoCast()
+					if X.SetPoisonAutocast(true, "engage") then
 						return BOT_ACTION_DESIRE_HIGH, nil
-					else
-						return BOT_ACTION_DESIRE_NONE, nil
 					end
+					return BOT_ACTION_DESIRE_NONE, nil
 				end
 				if Fu.IsInRange(bot, botTarget, castRange) and not Fu.IsInRange(bot, botTarget, attackRange) then
 					return BOT_ACTION_DESIRE_HIGH, botTarget
@@ -250,30 +264,24 @@ function X.ConsiderPoisonAttack()
 	end
 	if Fu.IsDoingRoshan(bot) then
 		if Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
-			if not poisonAttackAbility:GetAutoCastState() and mpRatio > 0.25 then
-				poisonAttackAbility:ToggleAutoCast()
+			if mpRatio > 0.25 and X.SetPoisonAutocast(true, "roshan") then
 				return BOT_ACTION_DESIRE_HIGH, nil
-			else
-				if poisonAttackAbility:GetAutoCastState() and mpRatio < 0.25 then
-					poisonAttackAbility:ToggleAutoCast()
-					return BOT_ACTION_DESIRE_HIGH, nil
-				end
-				return BOT_ACTION_DESIRE_NONE, nil
 			end
+			if mpRatio < 0.25 and X.SetPoisonAutocast(false, "low-mana") then
+				return BOT_ACTION_DESIRE_HIGH, nil
+			end
+			return BOT_ACTION_DESIRE_NONE, nil
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 500) and isAttacking then
-			if not poisonAttackAbility:GetAutoCastState() and mpRatio > 0.25 then
-				poisonAttackAbility:ToggleAutoCast()
+			if mpRatio > 0.25 and X.SetPoisonAutocast(true, "tormentor") then
 				return BOT_ACTION_DESIRE_HIGH, nil
-			else
-				if poisonAttackAbility:GetAutoCastState() and mpRatio < 0.25 then
-					poisonAttackAbility:ToggleAutoCast()
-					return BOT_ACTION_DESIRE_HIGH, nil
-				end
-				return BOT_ACTION_DESIRE_NONE, nil
 			end
+			if mpRatio < 0.25 and X.SetPoisonAutocast(false, "low-mana") then
+				return BOT_ACTION_DESIRE_HIGH, nil
+			end
+			return BOT_ACTION_DESIRE_NONE, nil
 		end
 	end
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
@@ -302,9 +310,7 @@ function X.ConsiderPoisonAttack()
 			end
 		end
 	end
-	if poisonAttackAbility:GetAutoCastState() then
-		poisonAttackAbility:ToggleAutoCast()
-	end
+	X.SetPoisonAutocast(false, "idle")
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 function X.ConsiderNetherToxin()

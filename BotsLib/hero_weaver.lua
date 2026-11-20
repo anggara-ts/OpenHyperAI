@@ -13,6 +13,10 @@ local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sCarryItem = RandomInt(1, 2) == 1 and "item_butterfly" or "item_monkey_king_bar"
 local sRoleItemsBuyList = {}
+-- No Aghanim's Scepter in this list (maintainer, 2026-11-20): the ally Time Lapse (weaver_time_lapse_ally, game
+-- files: IsGrantedByScepter) is not a core pick and the six slots are full without it (Treads, Desolator, Pike,
+-- Linken's, Daedalus, Satanic, then Butterfly or MKB). It sat after Magic Wand for the test games only (game
+-- 051: 4 ally rewinds, 3 of those allies lived). The Blessing at the end still gives the effect without a slot.
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
@@ -30,10 +34,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_satanic",
-	-- Aghanim's Scepter for the ally Time Lapse (weaver_time_lapse_ally, game files: IsGrantedByScepter). Late:
-	-- 2% of pos 1 Weavers buy it (Stratz 7.41f, 589 of 32068 matches). It sat after Magic Wand for the test
-	-- games (game 051: 4 ally rewinds, 3 of those allies lived); the Blessing at the end frees its slot.
-	"item_ultimate_scepter",
 	sCarryItem,
 	"item_moon_shard",
 	"item_ultimate_scepter_2",

@@ -9,6 +9,7 @@ end
 local function situation(overrides)
 	local s = {
 		towerOnBot = true,
+		outerTower = true,
 		pushing = false,
 		hasTarget = true,
 		teamDamage = 400,
@@ -23,13 +24,14 @@ local function situation(overrides)
 	return s
 end
 
-T.test("tower chase: no decision when the tower is not on the bot or a push handles it", function()
+T.test("tower chase: no decision when the tower is not on the bot, is a T3/T4, or a push handles it", function()
 	local R = rules()
 	T.eq(R.TowerChaseDecision(situation({ towerOnBot = false })), nil, "tower on someone else")
 	T.eq(R.TowerChaseDecision(situation({ pushing = true })), nil, "push mode steps out itself")
+	T.eq(R.TowerChaseDecision(situation({ outerTower = false })), nil, "base fight at a T3/T4")
 end)
 
-T.test("tower chase: game 048 17:30, a target the team can't kill in 2 shots: leave", function()
+T.test("tower chase: a target the team can't kill in 2 tower shots: leave", function()
 	local R = rules()
 	local act, why = R.TowerChaseDecision(situation())
 	T.eq(act, "leave", "act")

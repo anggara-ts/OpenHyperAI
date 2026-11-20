@@ -1018,7 +1018,8 @@ end
 -- After the early game (the #83 anti-dive below covers the first 12 minutes): an enemy tower is shooting this
 -- bot outside a push. Stop the chase unless the target dies within the tower's next 2 shots and the bot has the
 -- HP for them (FuncLib/systems/dive_rules.lua). Game 048, 17:30: Skywrath chased Sniper past Dire's mid T1 in
--- attack mode, took the tower from t=1058 and died at t=1069. Tower range, damage and attack interval are read
+-- attack mode and took the tower from t=1058 (he died at t=1069 after leaving push and evasive under it; the chase
+-- itself ended in a kill, so this rule would most likely have said "dive"). Tower range, damage and interval are read
 -- from the tower (pcall: GetAttackRange / GetSecondsPerAttack on a building are not in Docs/BOT_API_RUNTIME.md;
 -- the log prints what was used). Returns the run time (2.88s, as the early rule) or 0.
 local function TowerChaseRun()
@@ -1059,6 +1060,9 @@ local function TowerChaseRun()
 	end
 	local act, why = DiveRules.TowerChaseDecision({
 		towerOnBot = towerOnBot,
+		-- T1/T2 only (unit names npc_dota_<team>_tower1_mid ...): fights at a T3 or T4 are base fights, where
+		-- running from the tower's target would leave the team short.
+		outerTower = string.find(tower:GetUnitName() or "", "tower[12]_") ~= nil,
 		pushing = Fu.IsPushing(bot),
 		hasTarget = hasTarget,
 		teamDamage = teamDamage,
@@ -1070,9 +1074,14 @@ local function TowerChaseRun()
 	if act == nil then
 		return 0
 	end
+	-- On a change of decision (at most every 2s), else every 5s.
 	local logKey = act .. why
-	if logKey ~= bot._towerChaseLogKey or DotaTime() >= (bot._towerChaseLogAt or -999) then
+	if
+		DotaTime() >= (bot._towerChaseAnyAt or -999)
+		and (logKey ~= bot._towerChaseLogKey or DotaTime() >= (bot._towerChaseLogAt or -999))
+	then
 		bot._towerChaseLogKey = logKey
+		bot._towerChaseAnyAt = DotaTime() + 2
 		bot._towerChaseLogAt = DotaTime() + 5
 		pcall(
 			print,

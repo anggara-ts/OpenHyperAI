@@ -1536,6 +1536,7 @@ function Push.PushThink(bot, lane)
 				end
 			end
 			if weakestEnemy then
+				LogPushStep(bot, lane, "hit-hero", weakestEnemy, nil)
 				bot:Action_AttackUnit(weakestEnemy, true)
 				return
 			end
@@ -1559,6 +1560,7 @@ function Push.PushThink(bot, lane)
 		if hasEnemyTower and GetUnitToLocationDistance(unit, teamFountain) >= towerDistanceToFountain + 500 then
 			goto continue
 		end
+		LogPushStep(bot, lane, "hit-unit", unit, nil)
 		bot:Action_AttackUnit(unit, true)
 		do
 			return

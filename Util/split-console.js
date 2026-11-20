@@ -228,8 +228,12 @@ function summarize(g) {
 	{
 		let cur = {};
 		for (const line of g.lines) {
-			const m = line.match(/^\S+ \S+\s+(kills|deaths|assists|net_worth|player_slot): (\d+)\s*$/);
+			const m = line.match(
+				/^\S+ \S+\s+(kills|deaths|assists|net_worth|player_slot|last_hits|denies|misses|gold_per_min|xp_per_minute|level|outposts_captured): (\d+)\s*$/
+			);
 			if (!m) continue;
+			// "level" can appear in nested blocks too: the player's own comes first.
+			if (m[1] === "level" && cur.level != null) continue;
 			cur[m[1]] = Number(m[2]);
 			if (m[1] === "player_slot") {
 				if (cur.kills != null && cur.deaths != null) board.push(cur);
@@ -246,7 +250,12 @@ function summarize(g) {
 		const side = p.player_slot >= 128 ? "dire" : "radiant";
 		const hero = lineups[side][p.player_slot % 128] || "slot" + p.player_slot;
 		out.push(
-			`  ${side.padEnd(7)} ${hero.padEnd(20)} ${String(p.kills).padStart(2)}/${String(p.deaths).padStart(2)}/${String(p.assists ?? "?").padStart(2)}  net_worth=${p.net_worth ?? "?"}`
+			`  ${side.padEnd(7)} ${hero.padEnd(20)} ${String(p.kills).padStart(2)}/${String(p.deaths).padStart(2)}/${String(p.assists ?? "?").padStart(2)}  net_worth=${p.net_worth ?? "?"}` +
+				// Creep stats from the same end-of-match block (#71): last hits, denies, the engine's count of
+				// missed last hits, gold and XP per minute, outposts captured.
+				(p.last_hits != null
+					? `  lvl=${p.level ?? "?"} lh=${p.last_hits} dn=${p.denies ?? "?"} miss=${p.misses ?? "?"} gpm=${p.gold_per_min ?? "?"} xpm=${p.xp_per_minute ?? "?"} outposts=${p.outposts_captured ?? "?"}`
+					: "")
 		);
 	}
 	out.push("");

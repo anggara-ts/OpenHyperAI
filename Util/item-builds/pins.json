@@ -1,0 +1,25 @@
+{
+	"about": "Decisions the data must not override (Util/item-builds/generate.js reads this). Each pin: hero, pos (omit = every position), a reason, and any of: require (items the list must buy), forbid (items it must not), before ([a, b]: a is bought before b), adjacent ([a, b]: b right after a), boots (the pair to buy), start (the starting entries), next (entries right after the start), keep (true: the old list stays as it is). Tests/test_item_builds.lua holds the same decisions.",
+	"pins": [
+		{"hero":"night_stalker","require":["item_blink"],"reason":"#9: Blink Dagger in every position (maintainer, game 039)"},
+		{"hero":"night_stalker","pos":[4,5],"require":["item_echo_sabre"],"before":[["item_blink","item_echo_sabre"]],"forbid":["item_mekansm","item_glimmer_cape"],"reason":"#9: a hunting support, Blink before Echo Sabre, no caster-support items"},
+		{"hero":"meepo","require":["item_sange_and_yasha","item_blink","item_aghanims_shard"],"adjacent":[["item_sange_and_yasha","item_blink"]],"before":[["item_blink","item_aghanims_shard"]],"reason":"#9: Blink right after Sange and Yasha and before the Shard, in every position"},
+		{"hero":"keeper_of_the_light","pos":[4,5],"require":["item_magic_wand","item_urn_of_shadows","item_force_staff","item_ultimate_scepter","item_ultimate_scepter_2"],"forbid":["item_solar_crest","item_mekansm","item_kaya_and_sange"],"reason":"#9: Scepter, Urn and Force Staff; no Solar Crest rush (maintainer, game 039)"},
+		{"hero":"arc_warden","forbid":["item_spirit_vessel","item_diffusal_blade","item_disperser"],"reason":"#9: the Tempest Double cannot use them well"},
+		{"hero":"weaver","pos":[4,5],"require":["item_urn_of_shadows","item_spirit_vessel","item_ultimate_scepter"],"before":[["item_urn_of_shadows","item_spirit_vessel"]],"forbid":["item_satanic","item_greater_crit","item_falcon_blade"],"reason":"#38: a support list with Urn, Spirit Vessel and the Scepter (ally Time Lapse)"},
+		{"hero":"weaver","pos":[1,2,3],"forbid":["item_ultimate_scepter"],"reason":"#38: the ally Time Lapse is not a core pick"},
+		{"hero":"invoker","forbid":["item_ultimate_scepter","item_ultimate_scepter_2","item_aghanims_shard"],"reason":"7.41: his Scepter and Shard stay inert until an upgrade is picked, and the bot API cannot pick (games 016, 017)"},
+		{"hero":"grimstroke","pos":[5],"boots":"item_arcane_boots","reason":"#38 (PR #115): the boots the data buys"},
+		{"hero":"jakiro","pos":[5],"boots":"item_arcane_boots","reason":"#38 (PR #115): the boots the data buys"},
+		{"hero":"hoodwink","pos":[5],"boots":"item_arcane_boots","reason":"#38 (PR #115): the boots the data buys"},
+		{"hero":"snapfire","pos":[5],"boots":"item_arcane_boots","reason":"#38 (PR #115): the boots the data buys"},
+		{"hero":"tusk","pos":[3],"boots":"item_phase_boots","reason":"#38 (PR #115): the boots the data buys"},
+		{"hero":"invoker","pos":[2],"boots":"item_boots","reason":"#38 (PR #115): plain Boots, then Boots of Travel"},
+		{"hero":"lina","pos":[1],"boots":"item_boots","reason":"#38 (PR #115): plain Boots, then Boots of Travel"},
+		{"hero":"necrolyte","pos":[3],"boots":"item_boots","reason":"#38 (PR #115): plain Boots, then Boots of Travel"},
+		{"hero":"tinker","pos":[2],"next":["item_bottle"],"require":["item_bottle"],"forbid":["item_circlet"],"reason":"#38 (PR #115): mid Tinker starts without Circlets and buys Bottle next"},
+		{"hero":"spectre","pos":[1],"require":["item_manta"],"reason":"#9: her sell pair (Manta Style sells the Quelling Blade) is triggered by an item her carry list buys"},
+		{"hero":"lone_druid","keep":true,"reason":"the live list is the hero-and-bear block (two inventories); the data mixes what both carry"}
+	],
+	"comment_inside": ["weaver:1"]
+}

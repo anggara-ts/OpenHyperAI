@@ -14,32 +14,111 @@ local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 3, 3, 3, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 49,559 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_quelling_blade",
-	"item_slippers",
+	"item_double_branches",
 	"item_circlet",
-	"item_magic_wand",
+	"item_slippers",
 	"item_wraith_band",
+	"item_magic_wand",
 	"item_power_treads",
 	"item_diffusal_blade",
 	"item_manta",
-	"item_greater_crit",
-	"item_aghanims_shard",
 	"item_basher",
-	"item_sphere",
+	"item_disperser",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_abyssal_blade",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_phylactery",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 44,403 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_slippers",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_orb_of_corrosion",
+	"item_power_treads",
+	"item_diffusal_blade",
+	"item_manta",
+	"item_disperser",
+	"item_aghanims_shard",
+	"item_abyssal_blade",
+	"item_ultimate_scepter_2",
+	"item_skadi",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 11,602 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_slippers",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_diffusal_blade",
+	"item_basher",
+	"item_manta",
+	"item_disperser",
+	"item_abyssal_blade",
+	"item_greater_crit",
+	"item_ultimate_scepter",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 4,831 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_branches",
+	"item_circlet",
+	"item_magic_stick",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_diffusal_blade",
+	"item_basher",
+	"item_aghanims_shard",
+	"item_disperser",
+	"item_abyssal_blade",
+	"item_phylactery",
+	"item_ultimate_scepter",
+	"item_butterfly",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 9,130 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_slippers",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_diffusal_blade",
+	"item_manta",
+	"item_basher",
 	"item_disperser",
 	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
+	"item_nullifier",
+	"item_phylactery",
+	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_monkey_king_bar",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = {
 	"item_black_king_bar",

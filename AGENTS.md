@@ -129,7 +129,7 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   drives a number.
 - The bot API differs from online docs; see `Docs/BOT_API_RUNTIME.md` (e.g. no vector-targeted cast order).
 - **Known limitations** (what bots can't do because the API or engine doesn't allow it) are listed in the main post
-  of [discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50). When a game, test or source
+  of [discussion #50](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions/50). When a game, test or source
   confirms a new limitation, disproves one, or a workaround is found, **edit the main post** (not only a reply):
   move the item between "Confirmed" and "Not confirmed yet", with the evidence (log line, test, Valve source) and
   the related issue. `gh api graphql` with `updateDiscussion` edits it. The post is public: write it for readers outside the project, with no internal test-game numbers ("game 043") or match-log names; describe the evidence itself (the log line, the test, the game file). Record API facts in

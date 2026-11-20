@@ -27,6 +27,7 @@ local sRoleItemsBuyList = {}
 -- of three upgrades. Tested (games 016 and 017): bought, they sit in the inventory as castable
 -- items with no buff; cast by the bot, nothing changes (same abilities, still inert). The bot API
 -- cannot make the pick, so he does not buy them.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 259,009 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_circlet",
@@ -36,41 +37,115 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_null_talisman",
 	"item_magic_wand",
 	"item_boots",
-	"item_infused_raindrop",
-	"item_urn_of_shadows",
-	"item_spirit_vessel",
-	"item_orchid",
-	"item_sphere",
-	"item_black_king_bar",
-	"item_dragon_lance",
-	"item_hurricane_pike",
-	"item_travel_boots",
-	"item_bloodthorn",
-	"item_sheepstick",
-	"item_moon_shard",
-	"item_travel_boots_2",
-}
-sRoleItemsBuyList["pos_2_qe"] = {
-	"item_tango",
-	"item_double_branches",
-	"item_null_talisman",
-	"item_magic_wand",
-	"item_boots",
-	"item_hand_of_midas",
 	"item_meteor_hammer",
-	"item_sphere",
-	"item_black_king_bar",
 	"item_travel_boots",
+	"item_blink",
 	"item_octarine_core",
-	"item_sheepstick",
+	"item_black_king_bar",
 	"item_refresher",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_2"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2_qe, 259,009 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2_qe"] = {
+	"item_tango",
+	"item_circlet",
+	"item_double_branches",
+	"item_mantle",
+	"item_faerie_fire",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
+	"item_meteor_hammer",
+	"item_travel_boots",
+	"item_blink",
+	"item_octarine_core",
+	"item_black_king_bar",
+	"item_refresher",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 1,274 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
+	"item_witch_blade",
+	"item_travel_boots",
+	"item_blink",
+	"item_octarine_core",
+	"item_black_king_bar",
+	"item_refresher",
+	"item_devastator",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,329 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_circlet",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
+	"item_meteor_hammer",
+	"item_travel_boots",
+	"item_blink",
+	"item_octarine_core",
+	"item_black_king_bar",
+	"item_refresher",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 63,227 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_circlet",
+	"item_branches",
+	"item_magic_stick",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_boots",
+	"item_spirit_vessel",
+	"item_rod_of_atos",
+	"item_blink",
+	"item_travel_boots",
+	"item_octarine_core",
+	"item_refresher",
+	"item_gungir",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 34,457 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_circlet",
+	"item_branches",
+	"item_magic_stick",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_boots",
+	"item_spirit_vessel",
+	"item_rod_of_atos",
+	"item_blink",
+	"item_travel_boots",
+	"item_octarine_core",
+	"item_meteor_hammer",
+	"item_gungir",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 if Utils["GameStates"]["invoker"] == nil then
 	if (sRole == "pos_2" or sRole == "pos_1") and RandomInt(1, 9) >= 3 then

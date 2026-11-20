@@ -147,6 +147,17 @@ function X.SkillsComplement()
 	end
 	burningBarrageDesire, burningBarrageLocation = X.ConsiderBurningBarrage()
 	if burningBarrageDesire > 0 then
+		-- Every Barrage is logged (#94): strafe= must be false and since-strafe= longer than Strafe lasts.
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f barrage strafe=%s since-strafe=%.1f enemies=%d",
+				DotaTime(),
+				tostring(bot:HasModifier("modifier_clinkz_strafe")),
+				math.min(DotaTime() - (bot._strafeAt or -999), 99),
+				#Fu.GetEnemiesNearLoc(burningBarrageLocation, 400)
+			)
+		)
 		bot:Action_UseAbilityOnLocation(burningBarrageAbility, burningBarrageLocation)
 		return
 	end
@@ -229,6 +240,30 @@ function X.FindPrey()
 	end
 	return best
 end
+-- A hunt on a lone hero always ends with one line (#94, game 051: 12 or more of 20 hunts had none, so the log
+-- could not say why they ended). why = revealed | invis-gone | target-gone | lost-sight | timeout | too-far |
+-- low-hp | outnumbered | tower. keepTarget: the reveal keeps its target for the first hits.
+function X.EndHunt(why, keepTarget)
+	local prey = bot._huntPrey
+	if prey ~= nil then
+		local known = Fu.IsValidHero(prey)
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f hunt end why=%s target=%s dist=%d lasted=%.0f",
+				DotaTime(),
+				why,
+				known and (string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")) or "-",
+				known and GetUnitToUnitDistance(bot, prey) or -1,
+				DotaTime() - (bot._huntLockAt or DotaTime())
+			)
+		)
+	end
+	bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil
+	if not keepTarget then
+		bot._huntTarget = nil
+	end
+end
 -- The hero to hunt while invisible: the engage target, else the weakest hero within 1400 that isn't covered
 -- by more enemies than we have near. Kept for 6s (game 048: the target changed while he walked).
 function X.HuntTarget()
@@ -241,6 +276,19 @@ function X.HuntTarget()
 		and Fu.GetHP(bot) >= 0.35
 	then
 		return locked
+	end
+	if bot._huntPrey ~= nil then
+		local why = "timeout"
+		if not Fu.IsValidHero(locked) then
+			why = "target-gone"
+		elseif not locked:CanBeSeen() then
+			why = "lost-sight"
+		elseif Fu.GetHP(bot) < 0.35 then
+			why = "low-hp"
+		elseif GetUnitToUnitDistance(bot, locked) >= (bot._huntRange or 1600) then
+			why = "too-far"
+		end
+		X.EndHunt(why)
 	end
 	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
 	-- No new target for 15s after a cancelled hunt (else the same hero is picked again next think).
@@ -276,6 +324,7 @@ end
 -- point blank. bot._clinkzHuntUntil keeps the outpost mode holding the other modes' orders meanwhile.
 function X.HuntStep()
 	if not bot:HasModifier("modifier_clinkz_wind_walk") then
+		X.EndHunt("invis-gone")
 		bot._huntTarget = nil
 		return false
 	end
@@ -315,6 +364,7 @@ function X.HuntStep()
 	end
 	-- Outnumbered around Clinkz (the ally list includes him): no hunt.
 	if #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200) then
+		X.EndHunt("outnumbered")
 		bot._huntTarget = nil
 		bot._clinkzHuntUntil = nil
 		return false
@@ -327,6 +377,7 @@ function X.HuntStep()
 		for _, tower in pairs(bot:GetNearbyTowers(1600, true) or {}) do
 			if Fu.IsValidBuilding(tower) and GetUnitToLocationDistance(tower, ambush) < 850 then
 				X.LogHunt("skip-tower", target)
+				X.EndHunt("tower")
 				bot._huntTarget = nil
 				bot._clinkzHuntUntil = nil
 				return false
@@ -370,6 +421,7 @@ function X.HuntStep()
 			)
 		)
 	end
+	X.EndHunt("revealed", true)
 	-- Keep the other modes out until the first hit lands.
 	bot._clinkzHuntUntil = DotaTime() + 0.5
 	return true

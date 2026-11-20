@@ -1648,7 +1648,10 @@ function Usage.LogDodge(item, target, why, projectile, caster, ability)
 		)
 	)
 	bot._dodgePending = bot._dodgePending or {}
-	table.insert(bot._dodgePending, { at = now, item = itemName, target = target, targetName = targetName })
+	table.insert(
+		bot._dodgePending,
+		{ at = now, item = itemName, handle = item, target = target, targetName = targetName }
+	)
 end
 function Usage.WatchDodgeResults()
 	local pending = bot._dodgePending
@@ -1664,14 +1667,18 @@ function Usage.WatchDodgeResults()
 			local valid = target ~= nil and not target:IsNull()
 			local alive = valid and target:IsAlive()
 			local hit = valid and (not alive or target:WasRecentlyDamagedByAnyHero(now - entry.at))
+			-- cast=false: the order never went out (another item's order replaced it, or the bot was disabled).
+			local handle = entry.handle
+			local cast = handle ~= nil and not handle:IsNull() and handle:GetCooldownTimeRemaining() > 0
 			print(
 				string.format(
-					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s alive=%s after=%.1f",
+					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s cast=%s alive=%s after=%.1f",
 					now,
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					(string.gsub(entry.item, "^item_", "")),
 					entry.targetName,
 					valid and tostring(hit) or "unknown",
+					tostring(cast),
 					tostring(alive),
 					now - entry.at
 				)

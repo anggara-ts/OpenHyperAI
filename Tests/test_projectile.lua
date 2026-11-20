@@ -82,6 +82,34 @@ T.test("projectile finders: skip what the Is* helpers skipped", function()
 	T.eq(Fu.FindNotAttackProjectileIncoming(bot, 1200), bolt, "snake from a non-Medusa caster is skipped")
 end)
 
+T.test("[OHA-DODGE]: the dodge line and its result 1.5s later", function()
+	local bot = Stub.reset({ hero = "npc_dota_hero_lich", time = 600 })
+	local ok, Usage = Stub.load("ability_item_usage_generic")
+	T.ok(ok, "ability_item_usage_generic loads: " .. tostring(Usage))
+	local enemy = Stub.teams[TEAM_DIRE][1]
+	local bkb = Stub.newAbility("item_black_king_bar", bot, false)
+	local bolt = projectileAt(bot, 300, "sven_storm_bolt", enemy)
+	Stub.printed = {}
+	Usage.LogDodge(bkb, bot, "projectile", bolt)
+	Usage.LogDodge(bkb, bot, "projectile", bolt) -- throttled
+	T.eq(#Stub.printed, 1, "one line")
+	local line = Stub.printed[1] or ""
+	T.ok(string.find(line, "[OHA-DODGE] t=600 lich item=black_king_bar target=self", 1, true), line)
+	T.ok(string.find(line, "spell=sven_storm_bolt dist=300 why=stun", 1, true), line)
+	Stub.time = 601
+	Usage.WatchDodgeResults()
+	T.eq(#Stub.printed, 1, "no result before 1.5s")
+	Stub.time = 601.5
+	bot.WasRecentlyDamagedByAnyHero = function()
+		return true
+	end
+	Usage.WatchDodgeResults()
+	local result = Stub.printed[2] or ""
+	T.ok(string.find(result, "result item=black_king_bar target=self hit=true cast=false alive=true", 1, true), result)
+	Usage.WatchDodgeResults()
+	T.eq(#Stub.printed, 2, "the result prints once")
+end)
+
 T.test("will-cast finders: return the casting enemy and its spell", function()
 	local Fu, bot, enemy = load()
 	enemy._loc = bot:GetLocation() + Vector(500, 0, 0)

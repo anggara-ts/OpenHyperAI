@@ -1122,6 +1122,9 @@ local function DoomWastes(name)
 	end
 	return DOOM_HEAL_AND_MANA[name] == true and bot:GetMana() / math.max(1, bot:GetMaxMana()) >= 0.3
 end
+-- The slots ConsiderItems reads: main, backpack (Smoke only), TP scroll, neutral. Built once instead of on every
+-- item think (#52: one table less per bot per think); same slots in the same order.
+Usage.itemThinkSlots = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
 local function ConsiderItems()
 	Usage.SetStashItemTimeUpdate()
 	-- WD: cash Gris-Gris before other item logic (bypasses CanCastAbility).
@@ -1178,48 +1181,46 @@ local function ConsiderItems()
 	pcall(Usage.BannerFromBackpack)
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
+	-- The name is read first (#52): this loop asked "can it be cast" twice for each of the six main slots on every
+	-- item think (up to 12 ability reads a slot) and only then looked whether the item is a mushroom at all. Same
+	-- log and same orders; nothing goes stale.
 	for forageSlot = 0, 5 do
 		local forage = bot:GetItemInSlot(forageSlot)
-		if forage ~= nil and not forage:IsNull() and not Fu.CanCastAbility(forage) then
-			local forageItemName = forage:GetName()
-			if
-				(
-					forageItemName == "item_foragers_stats"
-					or forageItemName == "item_foragers_health"
-					or forageItemName == "item_foragers_mana"
-				) and DotaTime() >= (bot._forageStuckLogAt or -999)
-			then
-				bot._forageStuckLogAt = DotaTime() + 20
-				pcall(
-					print,
-					string.format(
-						"[OHA-FORAGE] t=%.0f %s cannot-eat %s slot%d fully=%s cd=%.1f hidden=%s passive=%s mana=%.0f",
-						DotaTime(),
-						(string.gsub(botName, "npc_dota_hero_", "")),
-						forageItemName,
-						forageSlot,
-						tostring(forage:IsFullyCastable()),
-						forage:GetCooldownTimeRemaining(),
-						tostring(forage:IsHidden()),
-						tostring(forage:IsPassive()),
-						bot:GetMana()
+		local forageName = forage ~= nil and not forage:IsNull() and forage:GetName() or nil
+		if
+			forageName == "item_foragers_stats"
+			or forageName == "item_foragers_health"
+			or forageName == "item_foragers_mana"
+		then
+			if not Fu.CanCastAbility(forage) then
+				if DotaTime() >= (bot._forageStuckLogAt or -999) then
+					bot._forageStuckLogAt = DotaTime() + 20
+					pcall(
+						print,
+						string.format(
+							"[OHA-FORAGE] t=%.0f %s cannot-eat %s slot%d fully=%s cd=%.1f hidden=%s passive=%s mana=%.0f",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							forageName,
+							forageSlot,
+							tostring(forage:IsFullyCastable()),
+							forage:GetCooldownTimeRemaining(),
+							tostring(forage:IsHidden()),
+							tostring(forage:IsPassive()),
+							bot:GetMana()
+						)
 					)
-				)
-			end
-		end
-		if forage ~= nil and not forage:IsNull() and Fu.CanCastAbility(forage) then
-			local forageName = forage:GetName()
-			if forageName == "item_foragers_stats" or forageName == "item_foragers_mana" then
-				bot:Action_UseAbility(forage)
-				return BOT_ACTION_DESIRE_NONE
+				end
 			elseif forageName == "item_foragers_health" then
 				bot:Action_UseAbilityOnEntity(forage, bot)
+				return BOT_ACTION_DESIRE_NONE
+			else
+				bot:Action_UseAbility(forage)
 				return BOT_ACTION_DESIRE_NONE
 			end
 		end
 	end
-	local itemSlots = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
-	for _, slot in pairs(itemSlots) do
+	for _, slot in pairs(Usage.itemThinkSlots) do
 		local item = bot:GetItemInSlot(slot)
 		local itemName = item ~= nil and item:GetName() or nil
 		local inBackpack = slot >= 6 and slot <= 8
@@ -9859,5 +9860,32 @@ do
 	BuybackUsageThink = Perf.Wrap("BuybackUsageThink", BuybackUsageThink)
 	CourierUsageThink = Perf.Wrap("CourierUsageThink", CourierUsageThink)
 	AbilityLevelUpThink = Perf.Wrap("AbilityLevelUpThink", AbilityLevelUpThink)
+	-- detail= (#52, games 048-050): "items" is the biggest part of ItemUsageThink (57-60ms of 128-160ms per 10s
+	-- window) and 33-50ms is in no part at all. Time each item's use rule and the gates that run on every item
+	-- think before the item loop, so the next game names the costly ones. Timing only: the rules and gates are
+	-- called through these tables, with the same arguments and returns.
+	for itemName in pairs(Usage.ConsiderItemDesire) do
+		Perf.WrapDetailIn(Usage.ConsiderItemDesire, itemName, itemName)
+	end
+	for _, gateName in ipairs({
+		"WatchStuckQueue",
+		"RunePickupLock",
+		"EatForage",
+		"UseDustNow",
+		"WalkOutOfSnakes",
+		"DeflectTowerAggro",
+		"LogStuck",
+		"LogModeFlip",
+		"BannerFromBackpack",
+	}) do
+		Perf.WrapDetailIn(Usage, gateName, gateName)
+	end
+	Perf.WrapDetailIn(MatchTrace, "Tick", "MatchTrace.Tick")
+	Perf.WrapDetailIn(ChargeTracker, "Tick", "ChargeTracker.Tick")
+	Perf.WrapDetailIn(SpecialUnits, "TryKiteInAttack", "TryKiteInAttack")
+	Perf.WrapDetailIn(AbilityContext, "IsCornered", "IsCornered")
+	Perf.WrapDetailIn(Dispel, "ShouldMantaDodge", "Dispel.Manta")
+	Perf.WrapDetailIn(Dispel, "ShouldUseSelfDispelItem", "Dispel.Self")
+	Perf.WrapDetailIn(Dispel, "ShouldUseAllyDispelItem", "Dispel.Ally")
 end
 return Usage

@@ -412,6 +412,9 @@ local protectionModifiers = {
 	"modifier_skeleton_king_reincarnation_scepter_active",
 	"modifier_item_aeon_disk_buff",
 }
+-- The debuff table as a list, built once (#52). AnalyzeDebuffs used to rebuild it on every call: 33 new tables per
+-- bot per item think, for a table that never changes. Same entries, same order; nothing goes stale.
+local debuffEntries = objectEntries(debuffInfo)
 function Dispel.AnalyzeDebuffs(unit)
 	local score = 0
 	local worstSeverity = 0
@@ -420,7 +423,7 @@ function Dispel.AnalyzeDebuffs(unit)
 	local hasRoot = false
 	local canBasicDispel = false
 	local canStrongDispel = false
-	for _, entry in ipairs(objectEntries(debuffInfo)) do
+	for _, entry in ipairs(debuffEntries) do
 		local modifierName = entry[1]
 		local info = entry[2]
 		do
@@ -532,7 +535,38 @@ local function isWorthSelfDispel(bot)
 	end
 	return true
 end
+-- Every item ShouldUseSelfDispelItem can answer with (its strong and its basic list together).
+local selfDispelItems = {
+	"item_black_king_bar",
+	"item_satanic",
+	"item_aeon_disk",
+	"item_manta",
+	"item_cyclone",
+	"item_guardian_greaves",
+	"item_lotus_orb",
+}
+-- Does the bot hold one of them ready to cast? The same test ShouldUseSelfDispelItem applies to each item before
+-- it answers with its slot, so without one the answer is always -1.
+function Dispel.HasReadySelfDispelItem(bot)
+	for _, itemName in ipairs(selfDispelItems) do
+		local slot = bot:FindItemSlot(itemName)
+		if slot >= 0 then
+			local item = bot:GetItemInSlot(slot)
+			if item and item:IsFullyCastable() then
+				return true
+			end
+		end
+	end
+	return false
+end
 function Dispel.ShouldUseSelfDispelItem(bot)
+	-- Asked first (#52): this runs at the end of every item think of every bot, and without a ready item the 32
+	-- HasModifier reads of AnalyzeDebuffs (plus the protection and worth checks) could only end in -1. Saves them
+	-- for every bot that holds none of the seven items, or has them on cooldown; no staleness, the item is read
+	-- in the same think.
+	if not Dispel.HasReadySelfDispelItem(bot) then
+		return -1
+	end
 	if Dispel.IsProtected(bot) then
 		return -1
 	end

@@ -116,7 +116,8 @@ end
 -- support / tower / harasser gates, so creeps a support left to its core counted as "missed" (game 062: Nyx 0 of 18,
 -- Dazzle 0 of 13), and the death was only seen at the next laning GetDesire (about 3 a second), which added up to
 -- 0.3s to took=. Now the attempt starts at the order, both the laning GetDesire and Think look, and the line adds:
---   launch=  seconds from the order to the bot's next attack (GetLastAttackTime), -1 when it never attacked;
+--   launch=  seconds from the order to the bot's first attack after it (GetLastAttackTime, read while the creep
+--            lived), -1 when none was seen;
 --   gap=     seconds since the previous look before the death was seen (took= can be late by up to this much);
 --   walk=    1 when the order was a walk-in, pos= the bot's position.
 local function TrackLastHitAttempt()
@@ -129,6 +130,13 @@ local function TrackLastHitAttempt()
 	end
 	local creep = attempt.creep
 	local dead = creep == nil or creep:IsNull() or not creep:IsAlive()
+	-- The bot's first attack after the order, read while the creep lives (later reads could be the next creep).
+	if attempt.deadAt == nil and attempt.launchAt == nil then
+		local lastAttack = bot:GetLastAttackTime()
+		if lastAttack ~= nil and lastAttack >= attempt.orderAt then
+			attempt.launchAt = lastAttack
+		end
+	end
 	if not dead then
 		if now - attempt.at > 4 then
 			bot._lhAttempt = nil
@@ -137,6 +145,11 @@ local function TrackLastHitAttempt()
 	end
 	-- The counter can update a moment after the death.
 	if attempt.deadAt == nil then
+		-- Not looked at for a while (dead bot, skipped think): when the creep died is unknown, no line.
+		if now - attempt.at > 4 or now - lastLook > 1 then
+			bot._lhAttempt = nil
+			return
+		end
 		attempt.deadAt = now
 		attempt.gap = now - lastLook
 	end
@@ -144,8 +157,7 @@ local function TrackLastHitAttempt()
 		return
 	end
 	bot._lhAttempt = nil
-	local lastAttack = bot:GetLastAttackTime()
-	local launch = (lastAttack ~= nil and lastAttack >= attempt.orderAt) and lastAttack - attempt.orderAt or -1
+	local launch = attempt.launchAt ~= nil and attempt.launchAt - attempt.orderAt or -1
 	pcall(
 		print,
 		string.format(

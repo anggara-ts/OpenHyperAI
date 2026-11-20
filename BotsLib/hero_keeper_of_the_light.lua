@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local CastRules = require(GetScriptDirectory() .. "/FuncLib/systems/hero_cast_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -315,6 +316,44 @@ function X.ConsiderIlluminate()
 	-- Illuminate is ready, so any earlier wave is over: drop its status, or a stale "kill"/"laning"
 	-- target could release this new cast early (only the kill and laning branches set a new status).
 	bot.illuminate_status = nil
+	-- Spirit Form: a spirit channels Illuminate and the wave heals allies in its path (datafeed Spirit Form;
+	-- 7.42 illuminate_heal 60, +40 with Shard). It was only aimed at enemies and creeps (#47). Aim it at the
+	-- lowest ally under hero attack within the wave range (CastRules.SpiritIlluminateHealWorth).
+	local inSpiritForm = bot:HasModifier("modifier_keeper_of_the_light_spirit_form")
+	if inSpiritForm then
+		local healTarget, healHp = nil, math.huge
+		for _, allyHero in pairs(nearbyAllies or {}) do
+			if
+				Fu.IsValidHero(allyHero)
+				and allyHero ~= bot
+				and not allyHero:IsIllusion()
+				and Fu.IsInRange(bot, allyHero, illuminateRange - 200)
+				and Fu.GetHP(allyHero) < healHp
+				and CastRules.SpiritIlluminateHealWorth(
+					Fu.GetHP(allyHero),
+					allyHero:WasRecentlyDamagedByAnyHero(2),
+					inSpiritForm
+				)
+			then
+				healTarget, healHp = allyHero, Fu.GetHP(allyHero)
+			end
+		end
+		if healTarget ~= nil then
+			if DotaTime() >= (bot._ohaSpiritHealLogAt or -999) then
+				bot._ohaSpiritHealLogAt = DotaTime() + 3
+				pcall(
+					print,
+					string.format(
+						"[OHA-KOTL] t=%.0f keeper_of_the_light spirit-heal ally=%s ally-hp=%.2f",
+						DotaTime(),
+						(string.gsub(healTarget:GetUnitName(), "npc_dota_hero_", "")),
+						healHp
+					)
+				)
+			end
+			return BOT_ACTION_DESIRE_HIGH, healTarget:GetLocation(), "spirit-heal"
+		end
+	end
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemyHero)

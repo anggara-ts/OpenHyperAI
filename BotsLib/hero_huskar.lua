@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local CastRules = require(GetScriptDirectory() .. "/FuncLib/systems/hero_cast_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -148,6 +149,13 @@ function X.SkillsComplement()
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
 	hurricanePike = Fu.IsItemAvailable("item_hurricane_pike")
+	X.CheckCauterizeTook()
+	local cauterizeDesire, cauterizeWhy = X.ConsiderCauterize()
+	if cauterizeDesire > 0 then
+		X.LogCauterize(cauterizeWhy)
+		bot:Action_UseAbility(berserkersBloodAbility)
+		return
+	end
 	pikeSpearDesire, pikeSpearTarget = X.ConsiderHW()
 	if pikeSpearDesire > 0 then
 		bot:Action_ClearActions(true)
@@ -520,5 +528,60 @@ function X.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Berserker's Blood with Aghanim's Shard can be activated (7.42 npc_dota_hero_huskar.txt: activatable +1,
+-- activation_healthcost_pct 30, activation_cooldown 20, activation_delay 3, activation_heal_pct_per_debuff 3;
+-- basic dispel). It was never cast (#47). Cast it in a fight to drop a root or a damage-over-time debuff
+-- (CastRules.HuskarCauterize). The ability is PASSIVE in the game file and becomes castable only with the
+-- Shard, so Fu.CanCastAbility (which rejects IsPassive) is not used; whether the bot API accepts the cast is
+-- unverified, so the next think logs whether the cooldown started (took=).
+function X.ConsiderCauterize()
+	if
+		berserkersBloodAbility == nil
+		or not berserkersBloodAbility:IsTrained()
+		or not Fu.HasAghanimsShard(bot)
+		or not berserkersBloodAbility:IsCooldownReady()
+		or berserkersBloodAbility:IsHidden()
+		-- If the API refuses the cast, retry at most every 3s rather than every think.
+		or DotaTime() < (bot._ohaCauterizeTryAt or -999) + 3
+	then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local rooted = bot:IsRooted()
+	local damageOverTime = Fu.HasDamageOverTimeDebuff(bot)
+	local enemiesNear = Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {}
+	if CastRules.HuskarCauterize(hpRatio, rooted, damageOverTime, bot:WasRecentlyDamagedByAnyHero(2), #enemiesNear) then
+		return BOT_ACTION_DESIRE_HIGH, rooted and "root" or "dot"
+	end
+	return BOT_ACTION_DESIRE_NONE
+end
+-- One line per cast, then one line ~1s later saying whether the cooldown started.
+function X.LogCauterize(why)
+	pcall(
+		print,
+		string.format(
+			"[OHA-HUSKAR] t=%.0f huskar berserkers-blood cast why=%s hp=%.2f",
+			DotaTime(),
+			tostring(why),
+			hpRatio or -1
+		)
+	)
+	bot._ohaCauterizeCheckAt = DotaTime() + 1
+	bot._ohaCauterizeTryAt = DotaTime()
+end
+function X.CheckCauterizeTook()
+	if bot._ohaCauterizeCheckAt == nil or DotaTime() < bot._ohaCauterizeCheckAt then
+		return
+	end
+	bot._ohaCauterizeCheckAt = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-HUSKAR] t=%.0f huskar berserkers-blood took=%d hp=%.2f",
+			DotaTime(),
+			berserkersBloodAbility:IsCooldownReady() and 0 or 1,
+			Fu.GetHP(bot)
+		)
+	)
 end
 return X

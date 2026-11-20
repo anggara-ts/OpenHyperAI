@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local CastRules = require(GetScriptDirectory() .. "/FuncLib/systems/hero_cast_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -173,6 +174,7 @@ function X.SkillsComplement()
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
 	hpRatio = Fu.GetHP(bot)
+	X.CheckTossTook()
 	blinkTossDesire, blinkTossTarget = X.ConsiderBlinkToss()
 	if blinkTossDesire > 0 then
 		bot:Action_ClearActions(false)
@@ -368,9 +370,8 @@ function X.ConsiderToss()
 			end
 		end
 	end
-	-- "and not CanDoBlinkToss()" removed: Blink + Toss is considered first in SkillsComplement, so
-	-- once that combo works the guard would only stop this Toss whenever a Blink was ready and the
-	-- combo declined. (Today CanDoBlinkToss is always false: blinkItem is never set.)
+	-- "and not CanDoBlinkToss()" removed: Blink + Toss is considered first in SkillsComplement, so the guard
+	-- would only stop this Toss whenever a Blink was ready and the combo declined.
 	if isGoingOnSomeone then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 200, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
@@ -398,6 +399,15 @@ function X.ConsiderToss()
 					then
 						chronoTarget = enemyHero
 						break
+					end
+				end
+				-- Toss the target onto an ally 400+ away (#47) instead of in place, when the target is the unit
+				-- Toss grabs (nearest within grab_radius).
+				if chronoTarget == nil and grab == botTarget then
+					local ally = X.TossAllyFor(botTarget, bot:GetLocation(), castRange)
+					if ally ~= nil then
+						X.LogToss("toss-onto-ally", botTarget, ally)
+						return BOT_ACTION_DESIRE_HIGH, ally
 					end
 				end
 				if chronoTarget ~= nil then
@@ -623,34 +633,125 @@ function X.ConsiderTreeVolley()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Blink + Toss (#47). It never ran: blinkItem was only set by HasBlink(), which nothing called, and the toss
+-- went to nearbyAllies[#nearbyAllies], a list that can hold Tiny himself. Now: Blink onto a target that
+-- stands alone (Toss grabs "the nearest unit in a 300 radius around Tiny", 7.42 tiny_toss grab_radius 300), then
+-- Toss it onto an allied hero at least 400 away (X.TossAllyFor), else in place. Blink range 1200 (Arcane 1400) from the 7.42
+-- item file; a Blink hit by hero damage is on its 3s cooldown (blink_damage_cooldown), so IsFullyCastable covers
+-- the damage lock.
 function X.ConsiderBlinkToss()
-	if CanDoBlinkToss() then
-		local castRange = Fu.GetProperCastRange(false, bot, tossAbility:GetCastRange())
-		local grabRadius = tossAbility:GetSpecialValueInt("grab_radius")
-		botTarget = Fu.GetProperTarget(bot)
-		if isGoingOnSomeone then
-			local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
-			local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-			if
-				Fu.IsValidTarget(botTarget)
-				and Fu.CanCastOnNonMagicImmune(botTarget)
-				and not Fu.IsSuspiciousIllusion(botTarget)
-				and not Fu.IsDisabled(botTarget)
-				and not botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not botTarget:HasModifier("modifier_legion_commander_duel")
-				and nearbyAllies ~= nil
-				and nearbyEnemies ~= nil
-				and #nearbyAllies >= #nearbyEnemies
-				and #nearbyAllies >= 1
-			then
-				if Fu.IsInRange(bot, botTarget, castRange) and GetUnitToUnitDistance(bot, botTarget) > grabRadius then
-					blinkLocation = botTarget:GetLocation()
-					return BOT_ACTION_DESIRE_HIGH, nearbyAllies[#nearbyAllies]
-				end
+	if not CanDoBlinkToss() then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	botTarget = Fu.GetProperTarget(bot)
+	if not isGoingOnSomeone or not Fu.IsValidTarget(botTarget) then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local grabRadius = tossAbility:GetSpecialValueInt("grab_radius")
+	local castRange = Fu.GetProperCastRange(false, bot, tossAbility:GetCastRange())
+	local blinkRange = blinkItem:GetName() == "item_arcane_blink" and 1400 or 1200
+	local targetDistance = GetUnitToUnitDistance(bot, botTarget)
+	if
+		targetDistance <= grabRadius
+		or targetDistance > blinkRange
+		or not Fu.CanCastOnNonMagicImmune(botTarget)
+		or Fu.IsSuspiciousIllusion(botTarget)
+		or Fu.IsDisabled(botTarget)
+		or botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+		or botTarget:HasModifier("modifier_legion_commander_duel")
+	then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- From here a declined combo hands the Blink back to the generic engage Blink (items are considered before
+	-- hero spells, so the flag counts from the next think).
+	if Fu.IsLocHaveTower(700, true, botTarget:GetLocation()) then
+		bot.shouldBlink = false
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- Any other unit within the grab radius of the target could be the one Toss picks up.
+	local others = 0
+	for _, list in ipairs({
+		Fu.GetNearbyHeroes(botTarget, grabRadius, false, BOT_MODE_NONE) or {},
+		botTarget:GetNearbyCreeps(grabRadius, false) or {},
+		botTarget:GetNearbyCreeps(grabRadius, true) or {},
+	}) do
+		for _, unit in pairs(list) do
+			if unit ~= botTarget and Fu.IsValid(unit) then
+				others = others + 1
 			end
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	if others > 0 then
+		bot.shouldBlink = false
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local alliesNear = Fu.GetAlliesNearLoc(botTarget:GetLocation(), 1400)
+	local enemiesNear = Fu.GetEnemiesNearLoc(botTarget:GetLocation(), 1200)
+	if #alliesNear < #enemiesNear then
+		bot.shouldBlink = false
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local blinkSpot = Fu.GetUnitTowardDistanceLocation(bot, botTarget, targetDistance - 75)
+	-- With no ally to throw it to, toss the target in place (onto itself): it is still lifted and hit.
+	local onto = X.TossAllyFor(botTarget, blinkSpot, castRange) or botTarget
+	blinkLocation = blinkSpot
+	X.LogToss("blink-toss", botTarget, onto)
+	return BOT_ACTION_DESIRE_HIGH, onto
+end
+-- The allied hero to toss `tossed` onto: not Tiny, not an illusion, at least 400 from the tossed unit and in
+-- Toss cast range of fromLoc (where Tiny stands when he casts). Nearest such ally, or nil.
+function X.TossAllyFor(tossed, fromLoc, castRange)
+	local allies = {}
+	local candidates = {}
+	for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
+		if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+			table.insert(allies, ally)
+			table.insert(candidates, {
+				ok = true,
+				spotDist = GetUnitToUnitDistance(ally, tossed),
+				tinyDist = GetUnitToLocationDistance(ally, fromLoc),
+			})
+		end
+	end
+	local index = CastRules.PickTossAlly(candidates, castRange, CastRules.TOSS_ALLY_MIN_DIST)
+	return index and allies[index] or nil
+end
+-- [OHA-TINY] one line per toss decision (at most every 3s per kind), and ~1.5s later whether Toss went on
+-- cooldown (took=): an allied hero as the Toss target is not confirmed by the game file (target team CUSTOM).
+function X.LogToss(what, tossed, onto)
+	bot._ohaTinyLogAt = bot._ohaTinyLogAt or {}
+	bot._ohaTossCheckAt = DotaTime() + 1.5
+	bot._ohaTossCheckWhat = what
+	if DotaTime() < (bot._ohaTinyLogAt[what] or -999) then
+		return
+	end
+	bot._ohaTinyLogAt[what] = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-TINY] t=%.0f tiny %s target=%s onto=%s dist=%d",
+			DotaTime(),
+			what,
+			(string.gsub(tossed:GetUnitName(), "npc_dota_hero_", "")),
+			(string.gsub(onto:GetUnitName(), "npc_dota_hero_", "")),
+			math.floor(GetUnitToUnitDistance(tossed, onto))
+		)
+	)
+end
+function X.CheckTossTook()
+	if bot._ohaTossCheckAt == nil or DotaTime() < bot._ohaTossCheckAt then
+		return
+	end
+	bot._ohaTossCheckAt = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-TINY] t=%.0f tiny toss-result kind=%s took=%d",
+			DotaTime(),
+			tostring(bot._ohaTossCheckWhat),
+			tossAbility:IsCooldownReady() and 0 or 1
+		)
+	)
 end
 -- The unit Toss would grab: the nearest hero or creep (either team) within `radius` of Tiny,
 -- not Tiny, not debuff/magic immune (datafeed: "Debuff Immune units ... cannot be tossed").
@@ -674,13 +775,14 @@ function X.TossGrabUnit(radius)
 	end
 	return best
 end
+-- Looks the Blink up (HasBlink sets blinkItem) and, while the combo is ready, keeps the generic engage Blink
+-- (ability_item_usage_generic, bot.shouldBlink) from spending it without a Toss.
 function CanDoBlinkToss()
-	if tossAbility:IsFullyCastable() and blinkItem ~= nil and blinkItem:IsFullyCastable() then
-		local manaCost = tossAbility:GetManaCost()
-		if bot:GetMana() >= manaCost then
-			return true
-		end
+	if tossAbility:IsFullyCastable() and HasBlink() and bot:GetMana() >= tossAbility:GetManaCost() then
+		bot.shouldBlink = true
+		return true
 	end
+	bot.shouldBlink = false
 	return false
 end
 function HasBlink()

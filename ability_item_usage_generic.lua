@@ -1100,7 +1100,8 @@ end
 local function BagHeal(unit)
 	local total = 0
 	local pending = unit._emergencyHealName
-	if pending ~= nil and DotaTime() - (unit._emergencyHealAt or -99) < 10 and unit:FindItemSlot(pending) < 0 then
+	-- Until it shows up in a slot, or 60s (a Salve bought in lane waits in the stash, then rides the courier).
+	if pending ~= nil and DotaTime() - (unit._emergencyHealAt or -99) < 60 and unit:FindItemSlot(pending) < 0 then
 		total = total + (bagHealPerCharge[pending] or 0)
 	end
 	for slot = 0, 14 do
@@ -5636,6 +5637,14 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 			local bagHeal = BagHeal(bot)
 			local hpFloor = 250 + 60 * bot:GetLevel()
 			local lowHp = hpRatio < 0.5 and hp + bagHeal < 0.6 * bot:GetMaxHealth() and hp < hpFloor
+			-- Low for 1.5s first (game 057, 4:22: Kez's emergency Salve and his heal trip came in the same second; the
+			-- trip was decided before the purchase in that frame). The purchase gets its turn, BagHeal then counts it.
+			if lowHp then
+				bot._healTripLowSince = bot._healTripLowSince or DotaTime()
+				lowHp = DotaTime() - bot._healTripLowSince >= 1.5
+			else
+				bot._healTripLowSince = nil
+			end
 			local lowMana = bot:GetMaxMana() > 600 and mpRatio < 0.25
 			local roshanNear = false
 			for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_ROSHAN) or {}) do

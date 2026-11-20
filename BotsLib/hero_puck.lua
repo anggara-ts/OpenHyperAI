@@ -164,13 +164,16 @@ function X.TrackPhaseShift()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase hold-left after=%.2f mode=%d desire=%.2f hold-for=%.2f hurt=%s",
+				"[OHA-PUCK] t=%.0f phase hold-left after=%.2f mode=%d desire=%.2f hold-for=%.2f hurt=%s hold-desire=%.2f age=%.2f invuln=%s",
 				DotaTime(),
 				DotaTime() - track.at,
 				bot:GetActiveMode(),
 				bot:GetActiveModeDesire(),
 				(bot._castHoldUntil or 0) - DotaTime(),
-				tostring(X.HurtSincePhaseOrder())
+				tostring(X.HurtSincePhaseOrder()),
+				bot._outpostLastDesire or -1,
+				DotaTime() - (bot._outpostLastDesireAt or -99),
+				tostring(bot:IsInvulnerable())
 			)
 		)
 	elseif not shifted and track ~= nil then

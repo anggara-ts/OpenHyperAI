@@ -207,7 +207,10 @@ function GetDesire()
 		chainFrostSpread = true
 		return 1.05
 	end
-	return GetDesireHelper()
+	-- Kept for Puck's [OHA-PUCK] phase hold-left line: what this mode asked for when another mode won (game 059).
+	local desire = GetDesireHelper()
+	bot._outpostLastDesire, bot._outpostLastDesireAt = desire, DotaTime()
+	return desire
 end
 function GetDesireHelper()
 	botName = bot:GetUnitName()

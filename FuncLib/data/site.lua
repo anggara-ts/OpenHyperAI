@@ -433,32 +433,39 @@ local function TowerSpots()
 	end
 	return spots
 end
--- "radiant", "dire" or nil, and the margin (FarmRules.CampSide).
+local function EngineSide(data)
+	return data.team == Team.Radiant and "radiant" or data.team == Team.Dire and "dire" or nil
+end
+-- The side the farm uses (FarmRules.DecideCampSide: position, or the engine's team for a camp by the river),
+-- the margin, what decided it, and the position side alone.
 Site.CampSide = function(camp)
-	local loc = CampData(camp).location
+	local data = CampData(camp)
+	local loc = data.location
 	if loc == nil then
-		return nil, 0
+		return EngineSide(data), 0, "engine", nil
 	end
 	local key = math.floor(loc.x) .. "," .. math.floor(loc.y)
 	local cached = campSideCache[key]
 	if cached == nil then
 		local spots = TowerSpots()
-		local side, margin = FarmRules.CampSide(loc.x, loc.y, spots.radiant, spots.dire)
-		if side == nil then
-			-- No tower found (should not happen): the closer Ancient, not cached.
+		local posSide, margin = FarmRules.CampSide(loc.x, loc.y, spots.radiant, spots.dire)
+		if posSide == nil then
+			-- No towers found (should not happen): the closer Ancient, not cached.
 			local radiantDist = GetLocationToLocationDistance(loc, Site.radiant_ancient)
 			local direDist = GetLocationToLocationDistance(loc, Site.dire_ancient)
-			return radiantDist <= direDist and "radiant" or "dire", math.abs(radiantDist - direDist)
+			local side = radiantDist <= direDist and "radiant" or "dire"
+			return side, math.abs(radiantDist - direDist), "ancient", nil
 		end
-		cached = { side = side, margin = margin }
+		local side, by = FarmRules.DecideCampSide(posSide, margin, EngineSide(data))
+		cached = { side = side, margin = margin, by = by, posSide = posSide }
 		campSideCache[key] = cached
 	end
-	return cached.side, cached.margin
+	return cached.side, cached.margin, cached.by, cached.posSide
 end
 -- Game 062: every camp read as an enemy camp. Farm passes { idx, cattr } wrappers and this read
 -- `camp.team` off the wrapper, which is nil, so nil ~= GetTeam() held for all of them (Radiant dropped
 -- -1454,-3356 in its own jungle, Dire dropped 8430,1263 in its own corner). The side now comes from the
--- camp's position (Site.CampSide); the engine's spawner team is only printed in the [OHA-CAMP] survey.
+-- camp's position, or the engine's team for a camp by the river (Site.CampSide).
 Site.IsEnemyCamp = function(camp)
 	local side = Site.CampSide(camp)
 	if side == nil then
@@ -466,8 +473,8 @@ Site.IsEnemyCamp = function(camp)
 	end
 	return (side == "radiant" and Team.Radiant or Team.Dire) ~= GetTeam()
 end
--- [OHA-CAMP] once per team per game: every camp's index, type, the engine's team, position, and the side
--- the position rule gives, so a game shows whether the two agree.
+-- [OHA-CAMP] once per team per game: every camp's index, type, the engine's team, the side by position
+-- (posSide, margin), the side the farm uses and what decided it, so a game shows where they differ.
 local campSurveyDone = {}
 Site.SurveyCamps = function(bot)
 	local team = GetTeam()
@@ -485,11 +492,9 @@ Site.SurveyCamps = function(bot)
 	for i, spawner in ipairs(spawners) do
 		if spawner ~= nil and spawner.location ~= nil then
 			total = total + 1
-			local side, margin = Site.CampSide(spawner)
-			local engineTeam = spawner.team == Team.Radiant and "radiant"
-				or spawner.team == Team.Dire and "dire"
-				or tostring(spawner.team)
-			local same = engineTeam == side
+			local side, margin, by, posSide = Site.CampSide(spawner)
+			local engineTeam = EngineSide(spawner) or tostring(spawner.team)
+			local same = engineTeam == posSide
 			if same then
 				agree = agree + 1
 			else
@@ -498,14 +503,16 @@ Site.SurveyCamps = function(bot)
 			pcall(
 				print,
 				string.format(
-					"[OHA-CAMP] t=%.0f %s survey idx=%s type=%s engineTeam=%s side=%s margin=%d agree=%d at=%.0f,%.0f",
+					"[OHA-CAMP] t=%.0f %s survey idx=%s type=%s engineTeam=%s posSide=%s margin=%d side=%s by=%s agree=%d at=%.0f,%.0f",
 					DotaTime(),
 					hero,
 					tostring(spawner.idx or i),
 					tostring(spawner.type),
 					engineTeam,
-					tostring(side),
+					tostring(posSide),
 					math.floor(margin or 0),
+					tostring(side),
+					tostring(by),
 					same and 1 or 0,
 					spawner.location.x,
 					spawner.location.y

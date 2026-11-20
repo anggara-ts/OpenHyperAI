@@ -25,13 +25,27 @@ function FarmRules.CampSide(x, y, radiantTowers, direTowers)
 		return best
 	end
 	local radiant, dire = nearest(radiantTowers), nearest(direTowers)
-	if radiant == math.huge and dire == math.huge then
+	if radiant == math.huge or dire == math.huge then
 		return nil, 0
 	end
 	if radiant <= dire then
 		return "radiant", dire - radiant
 	end
 	return "dire", radiant - dire
+end
+
+-- The side the farm uses. Clear of the river (margin of RIVER_MARGIN or more) the position decides. A camp by
+-- the river is close to both teams' towers, so there the engine's spawner team decides when it names one
+-- (game 062 towers, recovered from the withdraw targets: the river camps at -4824,3915 and 4649,-3699 are
+-- each other's mirror image, yet both measured Dire, by 761 and 200).
+--   posSide, margin  from CampSide; engineSide "radiant", "dire" or nil
+-- Returns the side and what decided it ("position" or "engine").
+FarmRules.RIVER_MARGIN = 1500
+function FarmRules.DecideCampSide(posSide, margin, engineSide)
+	if (posSide == nil or margin < FarmRules.RIVER_MARGIN) and (engineSide == "radiant" or engineSide == "dire") then
+		return engineSide, "engine"
+	end
+	return posSide, "position"
 end
 
 -- An enemy camp is covered when our wave on its lane is at least as deep toward their Ancient as the camp

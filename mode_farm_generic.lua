@@ -329,12 +329,16 @@ local function EnemyHalfWithdrawWhy()
 		why = "fewer-alive"
 	end
 	if why ~= nil then
-		-- Not while on the way to (within 3000) a camp the farm rules allow in this state: one of ours, or an
+		-- Not while farming toward (within 3000) a camp the farm rules allow in this state: one of ours, or an
 		-- enemy camp behind our deeper wave (CampOpenWhileBehind). Otherwise the withdraw walks the bot home
-		-- and the farm picks the same camp again.
+		-- and the farm picks the same camp again. Only when farm is the active mode and the camp was already
+		-- the target a second ago (the desire re-picks a camp every think, active or not).
 		local campLoc = CampLoc(preferredCamp)
 		if
 			campLoc ~= nil
+			and bot:GetActiveMode() == BOT_MODE_FARM
+			and campChosenAt ~= nil
+			and DotaTime() - campChosenAt >= 1
 			and GetUnitToLocationDistance(bot, campLoc) <= 3000
 			and (not Fu.Site.IsEnemyCamp(preferredCamp) or CampOpenWhileBehind(preferredCamp))
 		then
@@ -463,8 +467,15 @@ local function ModeName(mode)
 	return idleModeNames[mode] or tostring(mode)
 end
 -- Modes that wait on purpose at a low desire (rune: holding the river spot for the bounty; ward, shops, item).
+-- (pairs over a keyed table: a mode constant this game lacks is just skipped)
 local idleWaitModes = {}
-for _, mode in ipairs({ BOT_MODE_RUNE, BOT_MODE_WARD, BOT_MODE_SECRET_SHOP, BOT_MODE_SIDE_SHOP, BOT_MODE_ITEM }) do
+for _, mode in pairs({
+	rune = BOT_MODE_RUNE,
+	ward = BOT_MODE_WARD,
+	secret_shop = BOT_MODE_SECRET_SHOP,
+	side_shop = BOT_MODE_SIDE_SHOP,
+	item = BOT_MODE_ITEM,
+}) do
 	idleWaitModes[mode] = true
 end
 local function IdleBusy()
@@ -544,6 +555,15 @@ local function IdleFallback(rawDesire)
 		)
 		if ends == nil and (not bot:IsAlive() or #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600) > 0) then
 			ends = "enemy-or-dead"
+		end
+		-- There with creeps to hit: keep the desire until they are gone (or the 25s run out), so the bot
+		-- does not drop back to its low desire and stand next to the wave or camp for another 10s.
+		if
+			ends == "arrived"
+			and now - idleHold.at <= FarmRules.IDLE_HOLD
+			and (#bot:GetNearbyLaneCreeps(900, true) > 0 or #bot:GetNearbyNeutralCreeps(900) > 0)
+		then
+			ends = nil
 		end
 		if ends == nil then
 			bot.farmLocation = idleHold.to
@@ -1738,7 +1758,34 @@ function Think()
 			nearestFront = laneFront
 		end
 	end
-	if nearestFront ~= nil then
+	-- The walk to farmLocation above stops 1200 short of it; this fallback then attack-moved to the nearest lane
+	-- front. With that front more than 1200 from farmLocation the bot walked out of the ring and straight back
+	-- (game 062, 13:46-13:56: Dazzle by our bottom T1 in farm, [OHA-STUCK] action=5 attack-move, path=2043
+	-- moved=160; the likely cause). Head for farmLocation instead, so both branches agree.
+	if
+		nearestFront ~= nil
+		and bot.farmLocation ~= nil
+		and IsLocationPassable(bot.farmLocation)
+		and Fu.GetLocationToLocationDistance(nearestFront, bot.farmLocation) > 1200
+	then
+		if DotaTime() >= (bot._farmFallbackLogAt or -999) then
+			bot._farmFallbackLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-FARM] t=%.0f %s think-fallback to=farm-location at=%.0f,%.0f front=%.0f,%.0f dist=%d",
+					DotaTime(),
+					ShortName(bot),
+					bot.farmLocation.x,
+					bot.farmLocation.y,
+					nearestFront.x,
+					nearestFront.y,
+					math.floor(GetUnitToLocationDistance(bot, bot.farmLocation))
+				)
+			)
+		end
+		bot:Action_AttackMove(bot.farmLocation)
+	elseif nearestFront ~= nil then
 		bot:Action_AttackMove(nearestFront)
 	else
 		bot:Action_AttackMove((radiantBaseLocation + direBaseLocation) / 2)

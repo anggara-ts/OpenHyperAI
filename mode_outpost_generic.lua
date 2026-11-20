@@ -2545,6 +2545,24 @@ end
 
 function ConsiderOutpostCapture()
 	outpostMoveLoc = nil
+	-- 7.42: bots cannot capture outposts (#111). The capture ability is gone from the hero (GetAbilityByName nil), and
+	-- an attack order, a move-to-unit order and Action_UseShrine on the outpost started no capture (games 055-057,
+	-- 0 outposts in every 7.42 game; capturing became an interaction, ValveSoftware/Dota2-Gameplay#32850). No walk to
+	-- an outpost without the ability; one line per bot per game says so.
+	if bot:GetAbilityByName("ability_capture") == nil then
+		if not bot._outpostCaptureOffLogged then
+			bot._outpostCaptureOffLogged = true
+			pcall(
+				print,
+				string.format(
+					"[OHA-OUTPOST] t=%.0f %s capture-off why=no-ability",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
+		end
+		return BOT_MODE_DESIRE_NONE
+	end
 	-- Stop a capture in progress once enemy heroes show up and we do not outnumber them. The
 	-- 6s channel was never cancelled: Doom kept capturing with Tusk and Enigma on him.
 	-- Only the capture itself: a plain IsChanneling() check would also cancel ults like Black Hole.

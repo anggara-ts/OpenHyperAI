@@ -137,6 +137,58 @@ local function Raw()
 		return 0
 	end
 	local lamp = LampAbility()
+	-- Once per team, after the horn: which unit names the lists hold besides heroes, creeps and lane buildings
+	-- (game 051: UNIT_LIST_ALL shows no npc_dota_lantern all game; is the watcher in another list, or under
+	-- another name?).
+	if DotaTime() > 30 and not bot._watcherSurveyDone and GetTeamMember(1) == bot then
+		bot._watcherSurveyDone = true
+		local lists = {
+			{ "all", UNIT_LIST_ALL },
+			{ "allied-other", UNIT_LIST_ALLIED_OTHER },
+			{ "enemy-other", UNIT_LIST_ENEMY_OTHER },
+			{ "allied-buildings", UNIT_LIST_ALLIED_BUILDINGS },
+			{ "enemy-buildings", UNIT_LIST_ENEMY_BUILDINGS },
+			{ "neutral", UNIT_LIST_NEUTRAL_CREEPS },
+			{ "thinkers", UNIT_LIST_THINKERS },
+		}
+		for _, entry in ipairs(lists) do
+			local ok, units = pcall(GetUnitList, entry[2])
+			local names, seen, total = {}, {}, 0
+			for _, unit in pairs(ok and units or {}) do
+				if unit ~= nil and not unit:IsNull() then
+					total = total + 1
+					local name = unit:GetUnitName()
+					if
+						not seen[name]
+						and not string.find(name, "npc_dota_hero_", 1, true)
+						and not string.find(name, "creep", 1, true)
+						and not string.find(name, "neutral", 1, true)
+						and not string.find(name, "guys_tower", 1, true)
+						and not string.find(name, "guys_melee_rax", 1, true)
+						and not string.find(name, "guys_range_rax", 1, true)
+						and not string.find(name, "guys_fillers", 1, true)
+					then
+						seen[name] = true
+						if #names < 30 then
+							names[#names + 1] = name
+						end
+					end
+				end
+			end
+			pcall(
+				print,
+				string.format(
+					"[OHA-WATCHER] t=%.0f %s unit-survey list=%s ok=%s units=%d names=%s",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					entry[1],
+					tostring(ok),
+					total,
+					table.concat(names, ",")
+				)
+			)
+		end
+	end
 	-- State every 5 minutes: is the ability there, how many watchers does the unit list hold, how far is the
 	-- nearest (game 050 could not tell "no ability" from "no watcher in reach").
 	if DotaTime() >= (bot._watcherStateLogAt or -999) then

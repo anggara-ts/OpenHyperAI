@@ -52,6 +52,27 @@ local targetOutpost = nil
 local targetOutpostDistance = 10000
 local outpostMoveLoc = nil
 local captureAbility = bot:GetAbilityByName("ability_capture")
+-- One line per step of the capture probe (#111): what = try | worked | no-capture.
+local function OutpostProbeLog(what, try, outpost)
+	local mods = {}
+	for index = 0, bot:NumModifiers() - 1 do
+		mods[#mods + 1] = tostring(bot:GetModifierName(index))
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-OUTPOST] t=%.0f %s capture-probe %s order=%s dist=%d channelling=%s action=%s mods=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			try,
+			outpost ~= nil and not outpost:IsNull() and GetUnitToUnitDistance(bot, outpost) or -1,
+			tostring(bot:IsChanneling()),
+			tostring(bot:GetCurrentActionType()),
+			table.concat(mods, ",")
+		)
+	)
+end
 local isCapturingOutpost = false
 -- Chain Frost bouncing around us (Valve data: bounces to a hero within 550, 10 jumps). The
 -- projectile is visible in GetIncomingTrackingProjectiles of whoever it is flying at. Returns the
@@ -305,6 +326,10 @@ function Think()
 	end
 	if isCapturingOutpost then
 		if bot:IsChanneling() or bot:HasModifier("modifier_watch_tower_capturing") then
+			if bot._outpostProbeTry ~= nil then
+				OutpostProbeLog("worked", bot._outpostProbeTry, targetOutpost)
+				bot._outpostProbeTry = nil
+			end
 			bot._outpostNearSince = nil
 			return
 		end
@@ -355,6 +380,10 @@ function Think()
 						end)()
 					)
 				)
+				if bot._outpostProbeTry ~= nil then
+					OutpostProbeLog("no-capture", bot._outpostProbeTry, targetOutpost)
+					bot._outpostProbeTry = nil
+				end
 				bot:Action_ClearActions(true)
 				return
 			end
@@ -379,6 +408,23 @@ function Think()
 			if castable then
 				bot:Action_UseAbilityOnEntity(capture, targetOutpost)
 				bot.outpostOrderAt = DotaTime()
+			elseif capture == nil or capture:IsNull() then
+				-- 7.42: bots have no ability_capture (games 050 and 051: capture=nil on every give-up, no
+				-- outpost captured). Try the two orders a right-click could stand for, one after the other,
+				-- and log whether a capture starts (#111): an attack order for 5s, then a move-to-unit order.
+				local try = nearFor < 8 and "attack" or "move-to-unit"
+				if bot._outpostProbeTry ~= try then
+					if bot._outpostProbeTry ~= nil then
+						OutpostProbeLog("no-capture", bot._outpostProbeTry, targetOutpost)
+					end
+					bot._outpostProbeTry = try
+					OutpostProbeLog("try", try, targetOutpost)
+					if try == "attack" then
+						bot:Action_AttackUnit(targetOutpost, true)
+					else
+						bot:Action_MoveToUnit(targetOutpost)
+					end
+				end
 			end
 			-- No attack fallback: outposts are invulnerable, an attack order only made him stand.
 			return

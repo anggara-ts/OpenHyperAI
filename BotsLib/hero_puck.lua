@@ -157,6 +157,22 @@ function X.TrackPhaseShift()
 			mode = bot:GetActiveMode(),
 			by = channelling and "channel" or "modifier",
 		}
+	elseif shifted and track ~= nil and not track.leftLogged and bot:GetActiveMode() ~= (BOT_MODE_OUTPOST or 26) then
+		-- Game 057: 4 shifts inside the hold ended at 0.3-0.7s when the mode left the hold (to attack or roam). Which
+		-- mode took over, with what desire, and whether the hold was still meant to run.
+		track.leftLogged = true
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f phase hold-left after=%.2f mode=%d desire=%.2f hold-for=%.2f hurt=%s",
+				DotaTime(),
+				DotaTime() - track.at,
+				bot:GetActiveMode(),
+				bot:GetActiveModeDesire(),
+				(bot._castHoldUntil or 0) - DotaTime(),
+				tostring(X.HurtSincePhaseOrder())
+			)
+		)
 	elseif not shifted and track ~= nil then
 		bot._phaseTrack = nil
 		pcall(

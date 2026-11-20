@@ -475,20 +475,8 @@ function X.ConsiderD()
 	if not bot:HasScepter() or not nimbusAbility:IsFullyCastable() or bot:IsInvisible() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	-- Slot loop (GetTeamMember takes a slot 1..5, not a player ID).
-	for i = 1, 5 do
-		local teamMember = GetTeamMember(i)
-		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
-			local target = Fu.GetProperTarget(teamMember)
-			if
-				Fu.IsValidHero(target)
-				and Fu.IsInRange(teamMember, target, 1200)
-				and Fu.CanCastOnNonMagicImmune(target)
-			then
-				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0), "ally-fight", target
-			end
-		end
-	end
+	-- Order: the flee cases first, then an ally's fight, then the finish. An ally going on someone matches in
+	-- almost any fight, so checked first it left no 45 s cooldown for the flee cases.
 	if Fu.IsRetreating(bot) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		for _, enemy in pairs(nearbyEnemies) do
@@ -513,6 +501,20 @@ function X.ConsiderD()
 				then
 					return BOT_ACTION_DESIRE_HIGH, chaser:GetExtrapolatedLocation(1.0), "ally-flee", chaser
 				end
+			end
+		end
+	end
+	-- Slot loop (GetTeamMember takes a slot 1..5, not a player ID).
+	for i = 1, 5 do
+		local teamMember = GetTeamMember(i)
+		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
+			local target = Fu.GetProperTarget(teamMember)
+			if
+				Fu.IsValidHero(target)
+				and Fu.IsInRange(teamMember, target, 1200)
+				and Fu.CanCastOnNonMagicImmune(target)
+			then
+				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0), "ally-fight", target
 			end
 		end
 	end

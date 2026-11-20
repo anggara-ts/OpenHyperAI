@@ -155,6 +155,8 @@ local SAVE_TOWER_GAP = 900
 local SAVE_ES_DANGER = 500
 -- The landing spot must be at least this much farther from the nearest enemy hero than the ally is now.
 local SAVE_MIN_GAIN = 100
+-- When the current kick-move attempt started and when it last moved (the 1.5 s step limit).
+local kickMoveSince, kickMoveLast = -999, -999
 local function Dist2D(a, b)
 	local dx, dy = a.x - b.x, a.y - b.y
 	return math.sqrt(dx * dx + dy * dy)
@@ -184,8 +186,9 @@ function X.SaveLandingProblem(allyLoc, landingLoc, enemyLocs, towerLocs, esEnemy
 	end
 	return nil
 end
--- Pure: where a kicked ally lands. A unit-target cast turns Earth Spirit to the ally and the kick goes the
--- way he faces (datafeed, Liquipedia), so the ally flies along the line from him through the ally.
+-- Pure: where a kicked ally lands. The kick goes the way Earth Spirit faces (datafeed); a unit-target cast is
+-- assumed to turn him to the ally first (inferred, not confirmed: save-kick logs face= and bearing=), so the
+-- ally flies along the line from him through the ally.
 function X.KickLanding(esLoc, allyLoc, kickDist)
 	local dx, dy = allyLoc.x - esLoc.x, allyLoc.y - esLoc.y
 	local length = math.sqrt(dx * dx + dy * dy)
@@ -193,6 +196,28 @@ function X.KickLanding(esLoc, allyLoc, kickDist)
 		return nil
 	end
 	return { x = allyLoc.x + dx / length * kickDist, y = allyLoc.y + dy / length * kickDist }
+end
+-- An enemy hero this close to the ally, ahead of the kick and within this distance of its line, is in the path.
+local KICK_PATH_RANGE = 700
+local KICK_PATH_WIDTH = 350
+-- Pure: why kicking the ally (Earth Spirit at esLoc) would be wrong, or nil when it is safe. Besides the
+-- landing spot, the ally must not fly through or toward an enemy hero (a landing past the enemy still counts
+-- as "farther" by distance alone).
+function X.KickProblem(esLoc, allyLoc, kickDist, enemyLocs, towerLocs)
+	local landing = X.KickLanding(esLoc, allyLoc, kickDist)
+	if landing == nil then
+		return "no-direction"
+	end
+	local dirX, dirY = (landing.x - allyLoc.x) / kickDist, (landing.y - allyLoc.y) / kickDist
+	for _, enemyLoc in ipairs(enemyLocs or {}) do
+		local ex, ey = enemyLoc.x - allyLoc.x, enemyLoc.y - allyLoc.y
+		local ahead = ex * dirX + ey * dirY
+		local side = math.abs(ex * dirY - ey * dirX)
+		if ahead > 0 and ahead <= KICK_PATH_RANGE and side <= KICK_PATH_WIDTH then
+			return "closer-to-enemy"
+		end
+	end
+	return X.SaveLandingProblem(allyLoc, landing, enemyLocs, towerLocs, nil)
 end
 local ENEMY_TOWER_IDS = {
 	TOWER_TOP_1,
@@ -264,9 +289,7 @@ function X.ConsiderAllySave()
 				end
 				-- Kick: the ally must be next to him (cast range 150).
 				if miss == nil and smashReady and dist <= smashRange + 100 then
-					local landing = X.KickLanding(botLoc, allyLoc, kickDist)
-					local problem = landing == nil and "no-direction"
-						or X.SaveLandingProblem(allyLoc, landing, enemyLocs, towerLocs, nil)
+					local problem = X.KickProblem(botLoc, allyLoc, kickDist, enemyLocs, towerLocs)
 					if problem == nil then
 						LogES(
 							"save-kick",
@@ -291,12 +314,20 @@ function X.ConsiderAllySave()
 						end
 					end
 					local standLoc = nearestEnemyLoc ~= nil and X.KickLanding(nearestEnemyLoc, allyLoc, -100) or nil
-					local awayLanding = standLoc ~= nil and X.KickLanding(standLoc, allyLoc, kickDist) or nil
+					-- Not while he is fleeing or low himself, and at most 1.5 s of stepping per attempt.
+					local now = DotaTime()
+					if now - kickMoveLast > 1 then
+						kickMoveSince = now
+					end
 					if
-						awayLanding ~= nil
+						standLoc ~= nil
+						and not isRetreating
+						and Fu.GetHP(bot) >= 0.3
+						and now - kickMoveSince <= 1.5
 						and Dist2D(botLoc, standLoc) <= 400
-						and X.SaveLandingProblem(allyLoc, awayLanding, enemyLocs, towerLocs, nil) == nil
+						and X.KickProblem(standLoc, allyLoc, kickDist, enemyLocs, towerLocs) == nil
 					then
+						kickMoveLast = now
 						LogES(
 							"save-kick-move",
 							"ally=%s was=%s move=%d",

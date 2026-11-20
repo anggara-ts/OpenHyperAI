@@ -59,6 +59,19 @@ T.test("earth spirit: kick lands along the line from him through the ally", func
 	)
 end)
 
+T.test("earth spirit: no kick through or toward an enemy hero", function()
+	local X = earthSpirit()
+	-- He stands behind the ally, a melee enemy in front of it: the landing (500, 0) is 350 from the enemy
+	-- (farther than the 150 now), but the ally would fly through it.
+	T.eq(X.KickProblem(p(-120, 0), p(0, 0), 500, { p(150, 0) }, {}), "closer-to-enemy", "through the enemy")
+	-- Enemy behind the ally (on his side): the kick sends the ally away.
+	T.eq(X.KickProblem(p(100, 0), p(0, 0), 500, { p(250, 50) }, {}), nil, "enemy behind, kick away")
+	-- Enemy far to the side of the kick line: not in the path.
+	T.eq(X.KickProblem(p(-100, 0), p(0, 0), 500, { p(100, 600), p(-300, 0) }, {}), nil, "enemy off the path")
+	-- Tower near the landing.
+	T.eq(X.KickProblem(p(100, 0), p(0, 0), 500, { p(250, 0) }, { p(-1000, 0) }), "tower", "into tower range")
+end)
+
 -- The save scan and Zeus's global Nimbus pick run against the stub API (no "stub missing" call).
 T.test("earth spirit and zeus: save scan and nimbus finish pick run", function()
 	local X = earthSpirit()

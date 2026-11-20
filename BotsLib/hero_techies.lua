@@ -1514,19 +1514,22 @@ function X.ConsiderMineFieldSign()
 	then
 		if bot._signSpot ~= nil and minefieldSignAbility:GetCooldownTimeRemaining() > 0 then
 			X.LogTechies("minefield-sign-placed", bot._signSpot.mines, bot:GetLocation())
+			bot._lastSign = { location = bot:GetLocation(), untilTime = DotaTime() + 240 }
 			bot._signSpot = nil
 		end
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
+	-- Not while retreating or with an enemy hero near him: the cast point is 1.25s.
+	local busy = Fu.IsRetreating(bot) or #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > 0
 	local held = bot._signSpot
 	if held ~= nil then
-		if DotaTime() < held.untilTime and #Fu.GetEnemiesNearLoc(held.location, 1200) == 0 then
+		if not busy and DotaTime() < held.untilTime and #Fu.GetEnemiesNearLoc(held.location, 1200) == 0 then
 			return BOT_ACTION_DESIRE_HIGH, held.location
 		end
 		X.LogTechies("minefield-sign-drop", held.mines, held.location)
 		bot._signSpot = nil
 	end
-	if DotaTime() < (bot._signSearchAt or -999) then
+	if busy or DotaTime() < (bot._signSearchAt or -999) then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	bot._signSearchAt = DotaTime() + 2
@@ -1555,6 +1558,15 @@ function X.ConsiderMineFieldSign()
 		location = best[1]:GetLocation()
 	end
 	if #Fu.GetEnemiesNearLoc(location, 1200) > 0 then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- His last sign lasts 240s (game files): no second one over the same mines while it stands.
+	local last = bot._lastSign
+	if
+		last ~= nil
+		and DotaTime() < last.untilTime
+		and Fu.GetLocationToLocationDistance(last.location, location) < auraRadius
+	then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	bot._signSpot = { location = location, mines = bestCount, untilTime = DotaTime() + 20 }

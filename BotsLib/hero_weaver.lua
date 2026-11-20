@@ -514,7 +514,7 @@ function X.ConsiderTheSwarm()
 	return BOT_ACTION_DESIRE_NONE, 0
 end
 -- Why Weaver should Shukuchi away now, or nil: "retreat" (chased while retreating), "tower" (hit by a tower while
--- retreating) or "low-hp" (any other mode, WeaverRules.EscapeOutOfRetreat).
+-- retreating) or "low-hp" (any mode, retreat included: WeaverRules.EscapeOutOfRetreat).
 function X.ShukuchiEscapeReason()
 	if isRetreating then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
@@ -534,7 +534,6 @@ function X.ShukuchiEscapeReason()
 		if bot:WasRecentlyDamagedByTower(2) then
 			return "tower"
 		end
-		return nil
 	end
 	if hpRatio >= WeaverRules.ESCAPE_HP or not bot:WasRecentlyDamagedByAnyHero(1.5) then
 		return nil

@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local WeaverRules = require(GetScriptDirectory() .. "/FuncLib/systems/weaver_rules")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -310,10 +311,29 @@ function X.SkillsComplement()
 		end
 		return
 	end
-	-- Shukuchi kill: the cast set tryShukuchiKill but nothing read it, so the bot cast Shukuchi
-	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
-	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
-	-- once inside that radius (the hit has landed).
+	-- Escape Shukuchi out of retreat mode (#48): the mode would attack again and the first hit ends the invisibility,
+	-- so while it lasts she walks to the fountain. Retreat mode walks her home by itself.
+	do
+		local escape = bot._shukuchiEscape
+		if escape ~= nil then
+			local invisible = bot:HasModifier("modifier_weaver_shukuchi")
+			if DotaTime() > escape.untilTime or not invisible and DotaTime() > escape.castAt + 0.75 then
+				bot._shukuchiEscape = nil
+				X.LogWeaver(
+					"shukuchi-escape-end",
+					"why=%s hp=%.2f->%.2f died=%s enemies=%d",
+					escape.why,
+					escape.hp,
+					hpRatio,
+					GetHeroDeaths(bot:GetPlayerID()) > escape.deaths and "yes" or "no",
+					#Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)
+				)
+			elseif not isRetreating and invisible then
+				bot:Action_MoveToLocation(Fu.GetTeamFountain())
+				return
+			end
+		end
+	end
 	-- Chase Shukuchi (#48, maintainer): stopping at attack range left the target at the edge, and the first hit (which
 	-- ends the invisibility) let him walk out again. While it lasts, go through him to a point 150 past (Shukuchi's
 	-- damage lands on the way), then attack. Attack at once when the right-clicks in the time left kill him.
@@ -353,6 +373,10 @@ function X.SkillsComplement()
 			end
 		end
 	end
+	-- Shukuchi kill: the cast set tryShukuchiKill but nothing read it, so the bot cast Shukuchi
+	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
+	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
+	-- once inside that radius (the hit has landed).
 	if bot.tryShukuchiKill and not isRetreating then
 		local killTarget = bot.ShukuchiKillTarget
 		if
@@ -371,8 +395,30 @@ function X.SkillsComplement()
 		end
 		bot.tryShukuchiKill = false
 	end
-	shukuchiDesire = X.ConsiderShukuchi()
+	local shukuchiEscapeWhy
+	shukuchiDesire, shukuchiEscapeWhy = X.ConsiderShukuchi()
 	if shukuchiDesire > 0 then
+		if shukuchiEscapeWhy ~= nil then
+			local enemiesNear = #Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)
+			bot._shukuchiChase = nil
+			bot.tryShukuchiKill = false
+			bot._shukuchiEscape = {
+				why = shukuchiEscapeWhy,
+				hp = hpRatio,
+				castAt = DotaTime(),
+				untilTime = DotaTime() + shukuchiAbility:GetSpecialValueFloat("duration") + 0.5,
+				deaths = GetHeroDeaths(bot:GetPlayerID()),
+			}
+			X.LogWeaver(
+				"shukuchi-escape",
+				"why=%s hp=%.2f mp=%.2f enemies=%d mode=%d",
+				shukuchiEscapeWhy,
+				hpRatio,
+				mpRatio,
+				enemiesNear,
+				bot:GetActiveMode()
+			)
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbility(shukuchiAbility)
 		return
@@ -467,9 +513,69 @@ function X.ConsiderTheSwarm()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Why Weaver should Shukuchi away now, or nil: "retreat" (chased while retreating), "tower" (hit by a tower while
+-- retreating) or "low-hp" (any other mode, WeaverRules.EscapeOutOfRetreat).
+function X.ShukuchiEscapeReason()
+	if isRetreating then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsDisabled(enemyHero) then
+				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
+					return "retreat"
+				end
+			end
+		end
+		if bot:WasRecentlyDamagedByTower(2) then
+			return "tower"
+		end
+		return nil
+	end
+	if hpRatio >= WeaverRules.ESCAPE_HP or not bot:WasRecentlyDamagedByAnyHero(1.5) then
+		return nil
+	end
+	local enemiesNear = 0
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and not Fu.IsDisabled(enemyHero) then
+			enemiesNear = enemiesNear + 1
+		end
+	end
+	local targetDiesSoon = Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100)
+		and (bot:GetEstimatedDamageToTarget(true, botTarget, 1.5, DAMAGE_TYPE_PHYSICAL) or 0)
+			>= botTarget:GetHealth()
+	if WeaverRules.EscapeOutOfRetreat(hpRatio, true, enemiesNear, targetDiesSoon) then
+		return "low-hp"
+	end
+	return nil
+end
 function X.ConsiderShukuchi()
+	local escapeWhy = X.ShukuchiEscapeReason()
 	if not shukuchiAbility:IsFullyCastable() then
+		if escapeWhy ~= nil and not bot:HasModifier("modifier_weaver_shukuchi") then
+			X.LogWeaver(
+				"shukuchi-escape-skip",
+				"why=%s want=%s hp=%.2f mana=%d cd=%.1f",
+				WeaverRules.EscapeBlocked(
+					shukuchiAbility:GetCooldownTimeRemaining(),
+					bot:GetMana(),
+					shukuchiAbility:GetManaCost()
+				),
+				escapeWhy,
+				hpRatio,
+				bot:GetMana(),
+				shukuchiAbility:GetCooldownTimeRemaining()
+			)
+		end
 		return BOT_ACTION_DESIRE_NONE
+	end
+	if escapeWhy ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, escapeWhy
 	end
 	local attackRange = bot:GetAttackRange()
 	local shukuchiDamage = shukuchiAbility:GetSpecialValueInt("damage")
@@ -529,23 +635,6 @@ function X.ConsiderShukuchi()
 		end
 	end
 	if isRetreating then
-		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsDisabled(enemyHero) then
-				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
-				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if
-					alliesNearEnemy ~= nil
-					and enemiesNearEnemy ~= nil
-					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
-				then
-					return BOT_ACTION_DESIRE_HIGH
-				end
-			end
-		end
-		if bot:WasRecentlyDamagedByTower(2) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
 		if (Fu.IsTormentor(botTarget) or Fu.IsRoshan(botTarget)) and Fu.IsInRange(bot, botTarget, 500) then
 			if hpRatio < 0.4 then
 				return BOT_ACTION_DESIRE_HIGH

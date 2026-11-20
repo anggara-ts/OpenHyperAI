@@ -21,9 +21,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_magic_wand",
-	-- TEMPORARY, for testing #103/#104: Aghanim's Scepter early so the ally Time Lapse (weaver_time_lapse_ally,
-	-- game files: IsGrantedByScepter) shows up in test games. Move it to its proper slot once tested.
-	"item_ultimate_scepter",
 	"item_desolator",
 	"item_dragon_lance",
 	"item_sphere",
@@ -33,6 +30,10 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_force_staff",
 	"item_hurricane_pike",
 	"item_satanic",
+	-- Aghanim's Scepter for the ally Time Lapse (weaver_time_lapse_ally, game files: IsGrantedByScepter). Late:
+	-- 2% of pos 1 Weavers buy it (Stratz 7.41f, 589 of 32068 matches). It sat after Magic Wand for the test
+	-- games (game 051: 4 ally rewinds, 3 of those allies lived); the Blessing at the end frees its slot.
+	"item_ultimate_scepter",
 	sCarryItem,
 	"item_moon_shard",
 	"item_ultimate_scepter_2",

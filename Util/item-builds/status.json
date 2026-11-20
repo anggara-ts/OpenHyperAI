@@ -3,7 +3,7 @@
 	"week": "2026-11-09",
 	"patch": "7.41f",
 	"minMatches": 1000,
-	"totals": {"data":527,"neighbour":74,"alias":14,"kept":15},
+	"totals": {"data":529,"neighbour":74,"alias":14,"kept":15},
 	"heroes": {
 		"abaddon": {
 			"1": {"status":"data","matches":3081,"from":1,"fromMatches":3081,"notes":[],"dropped":["item_black_king_bar (18%): slots at item_black_king_bar","item_skadi (19%): slots at item_skadi","item_ultimate_scepter (21%): slots at item_ultimate_scepter","item_swift_blink (26%): does not fit before item_ultimate_scepter_2 (the list reaches it at minute 70, players buy it at 52)"],"gaps":[],"cost":37705,"mustHave":["item_radiance (78%, until 10500)","item_manta (55%, until 16000)"]},
@@ -888,6 +888,8 @@
 		},
 		"wisp": {
 			"1": {"status":"data","matches":3982,"from":1,"fromMatches":3982,"notes":["boots kept from the old list (item_boots): the data buys item_power_treads in 2% of matches"],"dropped":["item_shivas_guard (27%): does not fit before item_shivas_guard (the list reaches it at minute 42, players buy it at 29)","item_heart (21%): does not fit before item_heart (the list reaches it at minute 43, players buy it at 33)","item_skadi (16%): does not fit before item_satanic (the list reaches it at minute 52, players buy it at 38)","item_greater_crit (27%): does not fit before item_greater_crit (the list reaches it at minute 51, players buy it at 39)"],"gaps":[],"cost":39205,"mustHave":["item_helm_of_the_dominator (79%, until 6000)","item_ultimate_scepter (97%, until 11500)","item_black_king_bar (65%, until 21000)"]},
+			"2": {"status":"data","matches":14243,"from":2,"fromMatches":14243,"notes":["no boots, as in the old list: the data buys item_boots in 2% of matches"],"dropped":["item_cyclone (18%): does not fit before item_heart (the list reaches it at minute 52, players buy it at 36)","item_heart (28%): does not fit before item_heart (the list reaches it at minute 48, players buy it at 36)"],"gaps":[],"cost":36420,"mustHave":["item_ultimate_scepter (99%, until 8000)","item_black_king_bar (77%, until 13000)","item_shivas_guard (63%, until 18500)"]},
+			"3": {"status":"data","matches":1965,"from":3,"fromMatches":1965,"notes":["no boots, as in the old list: the data buys item_arcane_boots in 6% of matches"],"dropped":["item_helm_of_the_dominator (35%): does not fit before item_heart (the list reaches it at minute 46, players buy it at 33)","item_sheepstick (22%): does not fit before item_sheepstick (the list reaches it at minute 51, players buy it at 39)"],"gaps":[],"cost":35155,"mustHave":["item_ultimate_scepter (94%, until 8000)"]},
 			"4": {"status":"data","matches":12651,"from":4,"fromMatches":12651,"notes":[],"dropped":["item_ultimate_scepter (22%): does not fit before item_ultimate_scepter (the list reaches it at minute 38, players buy it at 26)","item_heart (19%): does not fit before item_heart (the list reaches it at minute 51, players buy it at 39)"],"gaps":[],"cost":28530},
 			"5": {"status":"data","matches":37792,"from":5,"fromMatches":37792,"notes":[],"dropped":["item_heart (17%): does not fit before item_heart (the list reaches it at minute 54, players buy it at 41)"],"gaps":[],"cost":26330}
 		},

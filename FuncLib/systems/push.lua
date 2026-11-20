@@ -1223,6 +1223,40 @@ local function getAllyLaneTower(team, lane)
 	end
 	return nil
 end
+-- #12 (game 050, 12:50): Ringmaster and Clinkz walked past Radiant's mid T1 in push mode and nothing said why.
+-- Which branch of PushThink ran, toward which unit or point, near an enemy tower (within 1600). Printed when the
+-- branch changes (at most every 2s), else every 5s.
+local function LogPushStep(bot, lane, step, unit, location)
+	local now = DotaTime()
+	if now < (bot._pushStepAnyAt or -999) or step == bot._pushStepLast and now < (bot._pushStepLogAt or -999) then
+		return
+	end
+	if #(bot:GetNearbyTowers(1600, true) or {}) == 0 then
+		bot._pushStepAnyAt = now + 1
+		return
+	end
+	bot._pushStepLast = step
+	bot._pushStepAnyAt = now + 2
+	bot._pushStepLogAt = now + 5
+	local to = location or (unit ~= nil and unit:GetLocation()) or bot:GetLocation()
+	local at = bot:GetLocation()
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUSH] t=%.0f %s step=%s lane=%d target=%s dist=%d at=%d,%d to=%d,%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			step,
+			lane,
+			unit ~= nil and (string.gsub(unit:GetUnitName(), "npc_dota_", "")) or "none",
+			math.floor(GetUnitToLocationDistance(bot, to)),
+			math.floor(at.x),
+			math.floor(at.y),
+			math.floor(to.x),
+			math.floor(to.y)
+		)
+	)
+end
 function Push.PushThink(bot, lane)
 	if Fu.CanNotUseAction(bot) then
 		return
@@ -1261,6 +1295,7 @@ function Push.PushThink(bot, lane)
 		local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
 		local distanceToFront = GetUnitToLocationDistance(bot, laneFront)
 		if distanceToFront > 2000 and not bot:WasRecentlyDamagedByAnyHero(3) then
+			LogPushStep(bot, lane, "to-front", nil, laneFront)
 			bot:Action_MoveToLocation(add(laneFront, RandomVector(100)))
 			return
 		end
@@ -1332,6 +1367,7 @@ function Push.PushThink(bot, lane)
 		if shouldStepOut then
 			local retreatLocation =
 				Fu.AdjustLocationWithOffsetTowardsFountain(enemyTowers[1]:GetLocation(), safeDistance)
+			LogPushStep(bot, lane, "tower-step-out", enemyTowers[1], retreatLocation)
 			bot:Action_MoveToLocation(add(retreatLocation, RandomVector(80)))
 			return
 		end
@@ -1455,10 +1491,12 @@ function Push.PushThink(bot, lane)
 	if not hasPushSupport then
 		local distanceToTarget = GetUnitToLocationDistance(bot, targetLocation)
 		if distanceToTarget > 300 then
+			LogPushStep(bot, lane, "no-support-move", nil, targetLocation)
 			bot:Action_MoveToLocation(targetLocation)
 			return
 		end
 		local laneFront = GetLaneFrontLocation(GetTeam(), lane, -300)
+		LogPushStep(bot, lane, "no-support-attack-move", nil, laneFront)
 		bot:Action_AttackMove(laneFront)
 		return
 	end
@@ -1535,9 +1573,11 @@ function Push.PushThink(bot, lane)
 		and not Push.HasBackdoorProtect(pushTarget)
 	then
 		if Fu.IsInRange(bot, pushTarget, attackRange + 150) then
+			LogPushStep(bot, lane, "hit-target", pushTarget, nil)
 			bot:Action_AttackUnit(pushTarget, true)
 		else
 			local approachLocation = Fu.AdjustLocationWithOffsetTowardsFountain(pushTarget:GetLocation(), attackRange)
+			LogPushStep(bot, lane, "approach-target", pushTarget, approachLocation)
 			bot:Action_MoveToLocation(add(approachLocation, RandomVector(50)))
 		end
 		return
@@ -1551,10 +1591,12 @@ function Push.PushThink(bot, lane)
 	then
 		local distance = GetUnitToUnitDistance(bot, laneTarget)
 		if distance <= attackRange + 150 then
+			LogPushStep(bot, lane, "hit-lane-building", laneTarget, nil)
 			bot:Action_AttackUnit(laneTarget, true)
 			return
 		else
 			local approachLocation = Fu.AdjustLocationWithOffsetTowardsFountain(laneTarget:GetLocation(), attackRange)
+			LogPushStep(bot, lane, "approach-lane-building", laneTarget, approachLocation)
 			bot:Action_MoveToLocation(approachLocation)
 			return
 		end
@@ -1604,13 +1646,16 @@ function Push.PushThink(bot, lane)
 	end
 	if distanceToEnemyFountain < 2500 and #allyLaneCreeps < 2 then
 		local retreatLocation = GetLaneFrontLocation(GetTeam(), lane, -500)
+		LogPushStep(bot, lane, "fallback-back", nil, retreatLocation)
 		bot:Action_MoveToLocation(add(retreatLocation, RandomVector(100)))
 	else
 		local distanceToTarget = GetUnitToLocationDistance(bot, targetLocation)
 		if distanceToTarget > 300 then
+			LogPushStep(bot, lane, "fallback-move", nil, targetLocation)
 			bot:Action_MoveToLocation(targetLocation)
 		else
 			local laneFront = GetLaneFrontLocation(gameState.team, lane, 200)
+			LogPushStep(bot, lane, "fallback-attack-move", nil, laneFront)
 			bot:Action_AttackMove(laneFront)
 		end
 	end

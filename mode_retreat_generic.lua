@@ -2,6 +2,7 @@
 local Retreat = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local RetreatRules = require(GetScriptDirectory() .. "/FuncLib/systems/retreat_rules")
+local DiveRules = require(GetScriptDirectory() .. "/FuncLib/systems/dive_rules")
 local bot = GetBot()
 local hpRatio, mpRatio, botName, botHealth, healthRegen, manaRegen, botLocation, botTarget
 local botLevel, activeMode
@@ -1014,6 +1015,87 @@ local function IsCommittedKill()
 		or bot:HasModifier("modifier_monkey_king_quadruple_tap_bonuses") and Fu.GetHP(bot) >= 0.2
 		or Fu.GetHP(bot) >= 0.35
 end
+-- After the early game (the #83 anti-dive below covers the first 12 minutes): an enemy tower is shooting this
+-- bot outside a push. Stop the chase unless the target dies within the tower's next 2 shots and the bot has the
+-- HP for them (FuncLib/systems/dive_rules.lua). Game 048, 17:30: Skywrath chased Sniper past Dire's mid T1 in
+-- attack mode, took the tower from t=1058 and died at t=1069. Tower range, damage and attack interval are read
+-- from the tower (pcall: GetAttackRange / GetSecondsPerAttack on a building are not in Docs/BOT_API_RUNTIME.md;
+-- the log prints what was used). Returns the run time (2.88s, as the early rule) or 0.
+local function TowerChaseRun()
+	local tower = (bot:GetNearbyTowers(1000, true) or {})[1]
+	if not Fu.IsValidBuilding(tower) then
+		return 0
+	end
+	local okRange, rawRange = pcall(function()
+		return tower:GetAttackRange()
+	end)
+	local towerRange = (okRange and type(rawRange) == "number" and rawRange > 0) and rawRange or 700
+	if GetUnitToUnitDistance(bot, tower) > towerRange + 200 then
+		return 0
+	end
+	local towerOnBot = tower:GetAttackTarget() == bot or bot:WasRecentlyDamagedByTower(1.5)
+	if not towerOnBot then
+		return 0
+	end
+	local okRate, rawRate = pcall(function()
+		return tower:GetSecondsPerAttack()
+	end)
+	local shotEvery = (okRate and type(rawRate) == "number" and rawRate > 0) and rawRate or 1.0
+	local window = Clamp(shotEvery * 2, 1.5, 3.0)
+	local shotDamage = bot:GetActualIncomingDamage(tower:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL) or 0
+	local hasTarget = Fu.IsValidHero(botTarget)
+		and Fu.CanBeAttacked(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+	local teamDamage, targetHealth = 0, 0
+	if hasTarget then
+		targetHealth = botTarget:GetHealth()
+		teamDamage = bot:GetEstimatedDamageToTarget(true, botTarget, window, DAMAGE_TYPE_ALL) or 0
+		for _, ally in pairs(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) do
+			if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+				teamDamage = teamDamage
+					+ (ally:GetEstimatedDamageToTarget(true, botTarget, window, DAMAGE_TYPE_ALL) or 0)
+			end
+		end
+	end
+	local act, why = DiveRules.TowerChaseDecision({
+		towerOnBot = towerOnBot,
+		pushing = Fu.IsPushing(bot),
+		hasTarget = hasTarget,
+		teamDamage = teamDamage,
+		targetHealth = targetHealth,
+		committed = hasTarget and IsCommittedKill(),
+		botHealth = botHealth,
+		shotDamage = shotDamage,
+	})
+	if act == nil then
+		return 0
+	end
+	local logKey = act .. why
+	if logKey ~= bot._towerChaseLogKey or DotaTime() >= (bot._towerChaseLogAt or -999) then
+		bot._towerChaseLogKey = logKey
+		bot._towerChaseLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s %s why=%s tower=%s target=%s hp=%d shot=%d every=%.2f range=%d dmg=%d targetHp=%d mode=%d",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				act == "leave" and "chase-stop" or "dive",
+				why,
+				tower:GetUnitName(),
+				hasTarget and (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) or "none",
+				math.floor(botHealth),
+				math.floor(shotDamage),
+				shotEvery,
+				math.floor(towerRange),
+				math.floor(teamDamage),
+				math.floor(targetHealth),
+				activeMode or -1
+			)
+		)
+	end
+	return act == "leave" and 2.88 or 0
+end
 function Retreat.ShouldRun()
 	if bot:IsChanneling() or not bot:IsAlive() then
 		return 0
@@ -1159,6 +1241,11 @@ function Retreat.ShouldRun()
 					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
 				)
 			)
+		end
+	elseif DotaTime() > 0 then
+		local chaseRun = TowerChaseRun()
+		if chaseRun > 0 then
+			return chaseRun
 		end
 	end
 	local nearbyEnemyTowers = bot:GetNearbyTowers(900, true)

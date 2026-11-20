@@ -1993,6 +1993,23 @@ function Defend.DefendThink(bot, lane)
 				end
 			end
 			if waveCreep ~= nil then
+				-- #12 (game 038, 49:36): which wave the defender walks out to, and how far.
+				if DotaTime() >= (bot._hgWaveLogAt or -999) then
+					bot._hgWaveLogAt = DotaTime() + 5
+					local waveCreepTarget = waveCreep:GetAttackTarget()
+					pcall(
+						print,
+						string.format(
+							"[OHA-DEFEND] t=%.0f %s hg-wave target=%s dist=%d toHgSpot=%d creepHits=%s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(waveCreep:GetUnitName()),
+							math.floor(waveCreepDistance),
+							math.floor(GetUnitToLocationDistance(waveCreep, highGroundSpot)),
+							waveCreepTarget ~= nil and tostring(waveCreepTarget:GetUnitName()) or "none"
+						)
+					)
+				end
 				bot:Action_AttackUnit(waveCreep, true)
 				return
 			end

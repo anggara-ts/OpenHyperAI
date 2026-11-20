@@ -533,9 +533,12 @@ end
 -- nearest bot in lane or farm mode within 1600, not hit by a hero, walks back and stands on the spot so the item
 -- mode takes it. Gives up when the rune is gone, 60s after the spawn, after 6s on the spot with the rune still
 -- reading up, or below 30% HP. Up to 3 tries per spawn (a fight in between ends a try, another can start after).
--- Desire 0.65: above farm (0.60 in the game 062 log) and laning (0.27-0.30), below the item mode (0.90), attack
--- (0.95) and retreat. [OHA-RUNE] river-bounty-return (start) / river-bounty-return-end why= (result).
-local RIVER_RETURN_DESIRE = 0.65
+-- Desire while walking 0.70: the active mode reads ~1.1x its desire (game 062: `mode=rune/0.58 des=0.53`), and an
+-- active farm mode read 0.66 (earth_spirit t=1289), so this must clear ~0.66; laning reads 0.27-0.30. Below attack
+-- (0.95) and retreat. On the spot 0.60, as river-item-stay: Valve's item mode (0.90) beat that at the horn.
+-- [OHA-RUNE] river-bounty-return (start) / river-return-end why= (result).
+local RIVER_RETURN_WALK_DESIRE = 0.70
+local RIVER_RETURN_HOLD_DESIRE = 0.60
 local RIVER_RETURN_RANGE = 1600
 local RIVER_RETURN_GIVE_UP = 60
 local RIVER_RETURN_ON_SPOT = 6
@@ -599,7 +602,7 @@ local function EndRiverReturn(why)
 	pcall(
 		print,
 		string.format(
-			"[OHA-RUNE] t=%.0f %s river-bounty-return-end why=%s spot=%d dist=%d took=%.0fs status=%s",
+			"[OHA-RUNE] t=%.0f %s river-return-end why=%s spot=%d dist=%d took=%.0fs status=%s",
 			DotaTime(),
 			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 			why,
@@ -700,9 +703,13 @@ function RuneMode.RiverBountyReturn()
 end
 -- Does Action_PickUpRune take a river bounty / water rune in 7.42? Games 015-025 said no (every id, at distance 0).
 -- Once per spawn per bot, standing on a river spot (the horn water-hold or a river-bounty-return) with the rune
--- reading up: order the pick-up on the spot's id, and 1.5s later log whether the rune is gone. Bounty gold goes to
--- the whole team, so gold alone proves nothing: worked=yes only when the rune is gone, the item mode was never
--- active in between and no other hero stood within 300 of it; worked=unsure when one of those happened.
+-- reading up: order the pick-up on the spot's id, and 1.5s later log whether the rune is gone. For those 1.5s rune
+-- mode holds at RIVER_PICKUP_TRY_DESIRE (GetDesire) so Valve's item mode doesn't take the rune first and blur the
+-- answer. The bot's gold doesn't show who took it (unverified who gets bounty gold), so worked=yes only when the rune
+-- is gone, the item mode was never active in between and no other hero stood within 300 of it; worked=unsure when
+-- one of those happened.
+-- 0.92: above the item mode's 0.90 (game 031 log); ended early by a hero hit or an enemy hero at the spot.
+local RIVER_PICKUP_TRY_DESIRE = 0.92
 function RuneMode.RiverPickupTry(id, spawn)
 	bot._riverPickupTried = bot._riverPickupTried or {}
 	local key = spawn .. ":" .. id
@@ -909,6 +916,21 @@ function GetDesire()
 		RuneMode.RuneDbg(0)
 		return 0
 	end
+	-- The pick-up try (RuneMode.RiverPickupTry): hold rune mode above the item mode for its 1.5s, unless a hero hits
+	-- the bot or an enemy hero is at the spot.
+	local pickup = bot._riverPickup
+	if pickup ~= nil and DotaTime() < pickup.at + 1.5 and GetRuneStatus(pickup.id) == RUNE_STATUS_AVAILABLE then
+		local spot = GetRuneSpawnLocation(pickup.id)
+		if
+			GetUnitToLocationDistance(bot, spot) <= 300
+			and not bot:WasRecentlyDamagedByAnyHero(1.5)
+			and #(Fu.GetEnemiesNearLoc(spot, 900) or {}) == 0
+		then
+			runeWhy = "river-pickup-try"
+			RuneMode.RuneDbg(RIVER_PICKUP_TRY_DESIRE)
+			return RIVER_PICKUP_TRY_DESIRE
+		end
+	end
 	local desire = GetDesireRaw()
 	RuneMode.RuneDbg(desire)
 	return desire
@@ -1044,7 +1066,10 @@ function GetDesireRaw()
 	do
 		local okR, returnState = pcall(RuneMode.RiverBountyReturn)
 		if okR and returnState ~= nil and bot._riverReturn ~= nil then
-			return give(RIVER_RETURN_DESIRE, "river-bounty-return-" .. returnState)
+			return give(
+				returnState == "near" and RIVER_RETURN_HOLD_DESIRE or RIVER_RETURN_WALK_DESIRE,
+				"river-bounty-return-" .. returnState
+			)
 		end
 	end
 	-- Laning first (user call): while the bot's lane needs it, runes, lotus pools and wisdom

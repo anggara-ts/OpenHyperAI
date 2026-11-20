@@ -188,6 +188,21 @@ function X.SkillsComplement()
 	nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	isAttacking = Fu.IsAttacking(bot)
 	if bot.useProphetTP and bot.ProphetTPLocation ~= nil and Fu.CanCastAbility(teleportationAbility) then
+		-- Set by the TP-scroll logic in ability_item_usage_generic.lua (push, defend, Roshan, ...), which picks
+		-- the lane from the active mode. lane= is the active push / defend mode's lane, 0 for other modes.
+		pcall(
+			print,
+			string.format(
+				"[OHA-FURION] t=%.0f teleport why=tp-redirect lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d",
+				DotaTime(),
+				Fu.GetModeLane(bot:GetActiveMode()) or 0,
+				bot.ProphetTPLocation.x,
+				bot.ProphetTPLocation.y,
+				GetUnitToLocationDistance(bot, bot.ProphetTPLocation),
+				Fu.GetHP(bot),
+				bot:GetActiveMode()
+			)
+		)
 		bot:Action_UseAbilityOnLocation(teleportationAbility, bot.ProphetTPLocation)
 		bot.useProphetTP = false
 		return
@@ -208,13 +223,16 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnLocation(naturesCallAbility, sproutCallLocation)
 		return
 	end
-	local teleportationDesire, teleportationLocation = X.ConsiderTeleportation()
+	local teleportationDesire, teleportationLocation, teleportationWhy, teleportationLane = X.ConsiderTeleportation()
 	if teleportationDesire > 0 then
+		-- lane= is the push / defend lane it teleports to, 0 for fight, gank, retreat, Roshan and Tormentor.
 		pcall(
 			print,
 			string.format(
-				"[OHA-FURION] t=%.0f teleport to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
+				"[OHA-FURION] t=%.0f teleport why=%s lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
 				DotaTime(),
+				teleportationWhy or "-",
+				teleportationLane or 0,
 				teleportationLocation.x,
 				teleportationLocation.y,
 				GetUnitToLocationDistance(bot, teleportationLocation),
@@ -337,7 +355,7 @@ function X.ConsiderTeleportation()
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	if Fu.IsStuck(bot) then
-		return BOT_ACTION_DESIRE_HIGH, Fu.GetTeamFountain()
+		return BOT_ACTION_DESIRE_HIGH, Fu.GetTeamFountain(), "stuck"
 	end
 	-- Game 031, 12:01: at 21% HP he teleported to a fight and fed OD. Joining a fight, a gank, a
 	-- push, a defense, Roshan or a Tormentor needs half HP; below it only the fountain is a target.
@@ -357,7 +375,7 @@ function X.ConsiderTeleportation()
 				and #alliesNearFight >= 1
 				and Fu.IsValidHero(alliesNearFight[#alliesNearFight])
 			then
-				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(alliesNearFight[#alliesNearFight], castPoint)
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(alliesNearFight[#alliesNearFight], castPoint), "fight"
 			end
 		end
 	end
@@ -388,7 +406,7 @@ function X.ConsiderTeleportation()
 						and #alliesNearTeammate + 1 >= #enemiesNearTarget
 						and not Fu.IsLocationInChrono(Fu.GetCorrectLoc(teamMember, castPoint))
 					then
-						return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(teamMember, castPoint)
+						return BOT_ACTION_DESIRE_HIGH, Fu.GetCorrectLoc(teamMember, castPoint), "gank"
 					end
 				end
 			end
@@ -404,33 +422,31 @@ function X.ConsiderTeleportation()
 		if #nearbyEnemies == 0 then
 			local timeToFountain = GetUnitToLocationDistance(bot, Fu.GetTeamFountain()) / moveSpeed
 			if timeToFountain > castPoint + 1 then
-				return BOT_ACTION_DESIRE_HIGH, Fu.GetTeamFountain()
+				return BOT_ACTION_DESIRE_HIGH, Fu.GetTeamFountain(), "retreat"
 			end
 		end
 	end
 	if not fitToJoin then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	if Fu.IsPushing(bot) and not isAttacking and #nearbyEnemies == 0 then
-		local assignedLane = bot:GetAssignedLane()
-		if assignedLane ~= nil and assignedLane > 0 then
-			local laneFrontLocation = GetLaneFrontLocation(GetTeam(), assignedLane, 0)
-			local distance = GetUnitToLocationDistance(bot, laneFrontLocation)
-			local travelTime = distance / moveSpeed
-			if travelTime > castPoint * 2 and IsLocationPassable(laneFrontLocation) then
-				return BOT_ACTION_DESIRE_MODERATE, laneFrontLocation
-			end
+	-- The lane of the active push / defend mode, not GetAssignedLane() or the team's most-wanted defend lane
+	-- (game 062: in push mid he teleported to his assigned top lane at 41:09 and 41:33, in push bot to top at
+	-- 20:34 and 21:40, and in defend bot / defend top to mid at 20:10, 23:22, 24:02 and 24:34).
+	local modeLane = Fu.GetModeLane(bot:GetActiveMode())
+	if Fu.IsPushing(bot) and not isAttacking and #nearbyEnemies == 0 and modeLane ~= nil then
+		local laneFrontLocation = GetLaneFrontLocation(GetTeam(), modeLane, 0)
+		local distance = GetUnitToLocationDistance(bot, laneFrontLocation)
+		local travelTime = distance / moveSpeed
+		if travelTime > castPoint * 2 and IsLocationPassable(laneFrontLocation) then
+			return BOT_ACTION_DESIRE_MODERATE, laneFrontLocation, "push", modeLane
 		end
 	end
-	if Fu.IsDefending(bot) and #nearbyEnemies == 0 then
-		local defendLane, _ = Fu.GetMostDefendLaneDesire()
-		if defendLane ~= nil then
-			local defendLocation = GetLaneFrontLocation(GetTeam(), defendLane, -1000)
-			local distance = GetUnitToLocationDistance(bot, defendLocation)
-			local travelTime = distance / moveSpeed
-			if travelTime > castPoint * 2 and IsLocationPassable(defendLocation) then
-				return BOT_ACTION_DESIRE_MODERATE, defendLocation
-			end
+	if Fu.IsDefending(bot) and #nearbyEnemies == 0 and modeLane ~= nil then
+		local defendLocation = GetLaneFrontLocation(GetTeam(), modeLane, -1000)
+		local distance = GetUnitToLocationDistance(bot, defendLocation)
+		local travelTime = distance / moveSpeed
+		if travelTime > castPoint * 2 and IsLocationPassable(defendLocation) then
+			return BOT_ACTION_DESIRE_MODERATE, defendLocation, "defend", modeLane
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
@@ -438,7 +454,7 @@ function X.ConsiderTeleportation()
 		local alliesNearRoshan = Fu.GetAlliesNearLoc(roshanLocation, 700)
 		local distance = GetUnitToLocationDistance(bot, roshanLocation)
 		if alliesNearRoshan and #alliesNearRoshan >= 2 and distance / moveSpeed > castPoint + 1 then
-			return BOT_ACTION_DESIRE_HIGH, roshanLocation
+			return BOT_ACTION_DESIRE_HIGH, roshanLocation, "roshan"
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
@@ -446,7 +462,7 @@ function X.ConsiderTeleportation()
 		local alliesNearTormentor = Fu.GetAlliesNearLoc(tormentorLocation, 700)
 		local distance = GetUnitToLocationDistance(bot, tormentorLocation)
 		if alliesNearTormentor and #alliesNearTormentor >= 2 and distance / moveSpeed > castPoint + 1 then
-			return BOT_ACTION_DESIRE_HIGH, tormentorLocation
+			return BOT_ACTION_DESIRE_HIGH, tormentorLocation, "tormentor"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

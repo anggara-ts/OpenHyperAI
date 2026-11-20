@@ -95,11 +95,10 @@ T.test("Weaver: a support list with Urn, Spirit Vessel and the Scepter; no Scept
 	end
 end)
 
--- One pair of boots per list (#38): a list may name a pair and what it is built into, never two pairs.
+-- One pair of boots per list (#38): a list may name a pair and what it is built into, never two pairs. Boots of
+-- Travel late in a list replace any pair (Tusk: Phase Boots, then Boots of Travel), so they are not counted.
 local BOOTS = {
 	item_boots = "boots",
-	item_travel_boots = "boots",
-	item_travel_boots_2 = "boots",
 	item_arcane_boots = "arcane",
 	item_guardian_greaves = "arcane",
 	item_tranquil_boots = "tranquil",
@@ -107,7 +106,7 @@ local BOOTS = {
 	item_phase_boots = "phase",
 	item_power_treads = "treads",
 }
-T.test("the heroes whose boots changed name one pair of boots, with its upgrade at most", function()
+T.test("the heroes whose boots changed name one pair of boots, with its upgrade or Boots of Travel at most", function()
 	local changed = {
 		{ "hero_grimstroke", 5, "arcane" },
 		{ "hero_jakiro", 5, "arcane" },

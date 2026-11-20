@@ -1,0 +1,562 @@
+-- Whole item builds (#38): every list Util/item-builds/generate.js wrote is walked here the way
+-- item_purchase_generic.lua buys it. The walk is the Lua twin of Util/item-builds/lib/sim.js: what each entry
+-- costs with the parts already held, what combines, what the sell rules take away. A list fails when
+--   * the hero would need more than six main slots (items of 600 gold or less and the early items the script
+--     sells by itself are backpack filler and do not count),
+--   * a sell rule sells something a later entry needs (the buy/sell loop),
+--   * an entry is already owned when its turn comes, or is not an item of the game file.
+-- Also here: the pins of Util/item-builds/pins.json, the farm rules of FuncLib/data/site.lua (an item a rule
+-- waits for without a net-worth cap must be in the list; one with a cap is either bought or on record in
+-- status.json), and URN_BUILDS of FuncLib/systems/item_strategy.lua against the lists.
+-- Util/item-builds/status.json says what the generator did with each hero and position; lists it kept as they
+-- were ("kept") are not walked: they are the old hand-written lists and wait for a decision.
+local T = ...
+local Stub = T.stub
+
+local RECIPES = assert(loadstring(T.read("Tests/data/item_recipes_742.lua"), "item_recipes_742"))()
+local json = assert(loadstring(T.read("FuncLib/lib/json.lua"), "json"))()
+local STATUS = json.decode(T.read("Util/item-builds/status.json"))
+local PINS = json.decode(T.read("Util/item-builds/pins.json"))
+
+local NO_SLOT = {
+	item_tango = true,
+	item_clarity = true,
+	item_flask = true,
+	item_faerie_fire = true,
+	item_enchanted_mango = true,
+	item_blood_grenade = true,
+	item_tpscroll = true,
+	item_smoke_of_deceit = true,
+	item_dust = true,
+	item_ward_observer = true,
+	item_ward_sentry = true,
+	item_aghanims_shard = true,
+	item_moon_shard = true,
+	item_ultimate_scepter_2 = true,
+	item_tome_of_knowledge = true,
+}
+local FILLER_COST = 600
+
+-- itemAliases is local to item.lua: read it from the source.
+local ALIAS = {}
+do
+	local source = T.read("FuncLib/systems/item.lua")
+	local from = string.find(source, "local itemAliases = {", 1, true)
+	local to = string.find(source, "\n}", from, true)
+	for name, target in string.gmatch(string.sub(source, from, to), '%["(item_[%w_]+)"%]%s*=%s*"(item_[%w_]+)"') do
+		ALIAS[name] = target
+	end
+end
+
+local function cost(name)
+	return RECIPES[name] and RECIPES[name].cost or 0
+end
+
+local function isBundle(Item, name)
+	return type(Item[name]) == "table" and (string.find(name, "^item_") ~= nil or string.find(name, "^PvN_") ~= nil)
+end
+
+local function closure(Item, entry, out)
+	out = out or {}
+	if out[entry] then
+		return out
+	end
+	out[entry] = true
+	if isBundle(Item, entry) then
+		for _, part in ipairs(Item[entry]) do
+			closure(Item, part, out)
+		end
+	end
+	return out
+end
+
+local function toSet(list)
+	local set = {}
+	for _, name in ipairs(list or {}) do
+		set[name] = true
+	end
+	return set
+end
+
+-- Returns the problems of one list (strings) and the items held at the end.
+local function simulate(Item, listIn, pos, heroSell)
+	local list = {}
+	local seenTravel = false
+	for _, entry in ipairs(listIn) do
+		if entry == "item_travel_boots" then
+			seenTravel = true
+		elseif entry == "item_travel_boots_2" and not seenTravel then
+			list[#list + 1] = "item_travel_boots"
+			seenTravel = true
+		end
+		list[#list + 1] = entry
+	end
+	local earlyItems = toSet(Item.tEarlyItem)
+	local supportSell = toSet(Item.tSupportSellWhenFull)
+	local pairsList = {}
+	for _, source in ipairs({ Item.sSellList, heroSell or {} }) do
+		for index = 2, #source, 2 do
+			pairsList[#pairsList + 1] = { source[index - 1], source[index] }
+		end
+	end
+	pairsList[#pairsList + 1] = { "item_satanic", "item_mask_of_madness" }
+	local inv = {}
+	local blessing, moon = false, false
+	local problems = {}
+	local function count(name)
+		local total = 0
+		for _, held in ipairs(inv) do
+			if held == name then
+				total = total + 1
+			end
+		end
+		return total
+	end
+	local function remove(name)
+		for index, held in ipairs(inv) do
+			if held == name then
+				table.remove(inv, index)
+				return true
+			end
+		end
+		return false
+	end
+	local function owned(name)
+		if ALIAS[name] then
+			return owned(ALIAS[name])
+		end
+		if string.find(name, "^item_double_") then
+			return count((string.gsub(name, "_double", ""))) >= 2
+		end
+		if string.find(name, "^PvN_") then
+			return moon
+		end
+		if name == "item_ultimate_scepter" then
+			return blessing or count(name) > 0
+		end
+		if name == "item_moon_shard" then
+			return moon
+		end
+		if name == "item_ultimate_scepter_2" then
+			return blessing and count("item_ultimate_scepter") == 0
+		end
+		return count(name) > 0
+	end
+	local function neededLater(name, from)
+		for index = from, #list do
+			if closure(Item, list[index])[name] then
+				return list[index]
+			end
+		end
+		return nil
+	end
+	local function fodder(name)
+		return cost(name) <= FILLER_COST or earlyItems[name] or (pos >= 4 and supportSell[name])
+	end
+	for index, entry in ipairs(list) do
+		local auraBoots = count("item_guardian_greaves") + count("item_boots_of_bearing") > 0
+		if owned(entry) then
+			problems[#problems + 1] = entry .. " is already owned when its turn comes"
+		elseif auraBoots and string.find(entry, "^item_travel_boots") then
+			problems[#problems + 1] = entry .. " is skipped in game: Guardian Greaves or Boots of Bearing is owned"
+		else
+			local ownedLeft = {}
+			local basics = {}
+			local function expand(name)
+				if ownedLeft[name] == nil then
+					ownedLeft[name] = owned(name) and math.max(1, count(name)) or 0
+				end
+				if ownedLeft[name] > 0 then
+					ownedLeft[name] = ownedLeft[name] - 1
+				elseif isBundle(Item, name) then
+					for _, part in ipairs(Item[name]) do
+						expand(part)
+					end
+				else
+					basics[#basics + 1] = name
+				end
+			end
+			expand(entry)
+			for _, basic in ipairs(basics) do
+				if RECIPES[basic] == nil then
+					problems[#problems + 1] = entry .. ": " .. basic .. " is not an item a hero can buy"
+				else
+					inv[#inv + 1] = basic
+				end
+			end
+			-- Combine, parts first.
+			local targets = {}
+			for name in pairs(closure(Item, entry)) do
+				if RECIPES[name] ~= nil and isBundle(Item, name) and not string.find(name, "^item_double_") then
+					targets[#targets + 1] = name
+				end
+			end
+			table.sort(targets)
+			for _ = 1, 8 do
+				local combined = false
+				for _, target in ipairs(targets) do
+					local need = {}
+					for _, part in ipairs(Item[target]) do
+						need[part] = (need[part] or 0) + 1
+					end
+					local complete = true
+					for part, wanted in pairs(need) do
+						if count(part) < wanted then
+							complete = false
+						end
+					end
+					if complete then
+						for _, part in ipairs(Item[target]) do
+							remove(part)
+						end
+						inv[#inv + 1] = string.find(target, "^item_power_treads_") and "item_power_treads" or target
+						combined = true
+					end
+				end
+				if not combined then
+					break
+				end
+			end
+			for at = #inv, 1, -1 do
+				if NO_SLOT[inv[at]] then
+					if inv[at] == "item_ultimate_scepter_2" then
+						blessing = true
+					elseif inv[at] == "item_moon_shard" then
+						moon = true
+					end
+					table.remove(inv, at)
+				end
+			end
+			local function sell(victim, why)
+				if remove(victim) then
+					local later = neededLater(victim, index + 1)
+					if later then
+						problems[#problems + 1] = victim
+							.. " is sold ("
+							.. why
+							.. ") and "
+							.. later
+							.. " needs it later"
+					end
+					return true
+				end
+				return false
+			end
+			for _ = 1, 4 do
+				local any = false
+				for _, pair in ipairs(pairsList) do
+					if pair[1] ~= pair[2] and count(pair[1]) > 0 and count(pair[2]) > 0 then
+						any = sell(pair[2], "pair with " .. pair[1]) or any
+					end
+				end
+				if not any then
+					break
+				end
+			end
+			if count("item_travel_boots") + count("item_travel_boots_2") > 0 then
+				for _, boots in ipairs(Item.tEarlyBoots) do
+					if count(boots) > 0 then
+						sell(boots, "Boots of Travel owned")
+					end
+				end
+			end
+			local keepers = {}
+			for _, held in ipairs(inv) do
+				if not fodder(held) then
+					keepers[#keepers + 1] = held
+				end
+			end
+			if #keepers > 6 then
+				problems[#problems + 1] = entry
+					.. ": "
+					.. #keepers
+					.. " items for six slots ("
+					.. table.concat(keepers, ", ")
+					.. ")"
+			end
+			while #inv >= 9 do
+				local victim = nil
+				for _, name in ipairs(Item.tEarlyItem) do
+					if count(name) > 0 then
+						victim = name
+						break
+					end
+				end
+				if victim == nil and pos >= 4 then
+					for _, name in ipairs(Item.tSupportSellWhenFull) do
+						if count(name) > 0 then
+							victim = name
+							break
+						end
+					end
+				end
+				if victim == nil then
+					for _, held in ipairs(inv) do
+						if cost(held) <= FILLER_COST then
+							victim = held
+							break
+						end
+					end
+				end
+				if victim == nil then
+					problems[#problems + 1] = entry .. ": the inventory is full (" .. table.concat(inv, ", ") .. ")"
+					break
+				end
+				sell(victim, "inventory full")
+			end
+		end
+	end
+	return problems, inv
+end
+
+local function load(file, slot, allies)
+	Stub.reset({ hero = "npc_dota_" .. file, slot = slot, allies = allies })
+	local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+	local ok, result = Stub.load("BotsLib/" .. file)
+	if not ok then
+		error(file .. " as pos " .. slot .. ": " .. tostring(result), 0)
+	end
+	return result, Item
+end
+
+local function indexOf(list, itemName)
+	for index, name in ipairs(list) do
+		if name == itemName then
+			return index
+		end
+	end
+	return nil
+end
+
+-- A team of heroes with no Urn build and no flexible team item, so the list under test keeps its own.
+local PLAIN_TEAM = {
+	"npc_dota_hero_sniper",
+	"npc_dota_hero_sniper",
+	"npc_dota_hero_sniper",
+	"npc_dota_hero_sniper",
+	"npc_dota_hero_sniper",
+}
+
+local BUILT = { data = true, neighbour = true, alias = true }
+
+for _, path in ipairs(T.files("^BotsLib/hero_[%w_]+%.lua$")) do
+	local file = string.match(path, "^BotsLib/(hero_[%w_]+)%.lua$")
+	local hero = string.sub(file, 6)
+	local heroStatus = STATUS.heroes[hero]
+	if heroStatus ~= nil then
+		T.test("build walk " .. file, function()
+			local problems = {}
+			for slot = 1, 5 do
+				local info = heroStatus[tostring(slot)]
+				if info ~= nil and BUILT[info.status] then
+					local result, Item = load(file, slot, PLAIN_TEAM)
+					local found = simulate(Item, result.sBuyList, slot, result.sSellList)
+					for _, problem in ipairs(found) do
+						problems[#problems + 1] = "pos " .. slot .. ": " .. problem
+					end
+				end
+			end
+			if #problems > 0 then
+				error(table.concat(problems, "\n      "), 0)
+			end
+		end)
+	end
+end
+
+T.test("the walk catches a seventh item, a sell loop and a repeated entry", function()
+	Stub.reset({ hero = "npc_dota_hero_lich" })
+	local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
+	local seven = {
+		"item_power_treads",
+		"item_blink",
+		"item_black_king_bar",
+		"item_sheepstick",
+		"item_shivas_guard",
+		"item_heart",
+		"item_assault",
+	}
+	local problems = simulate(Item, seven, 1, {})
+	T.eq(#problems, 1, table.concat(problems, " | "))
+	T.ok(string.find(problems[1], "7 items for six slots", 1, true), problems[1])
+	-- Boots of Travel sell the Arcane Boots that Guardian Greaves still needs.
+	problems = simulate(Item, { "item_arcane_boots", "item_travel_boots", "item_guardian_greaves" }, 5, {})
+	T.ok(string.find(table.concat(problems, " | "), "needs it later", 1, true), table.concat(problems, " | "))
+	problems = simulate(Item, { "item_blink", "item_blink" }, 1, {})
+	T.ok(string.find(table.concat(problems, " | "), "already owned", 1, true), table.concat(problems, " | "))
+	-- An upgrade uses the held item, and the Blessing frees the Scepter's slot.
+	local chain = { "item_force_staff", "item_hurricane_pike", "item_ultimate_scepter", "item_ultimate_scepter_2" }
+	local held
+	problems, held = simulate(Item, chain, 1, {})
+	T.eq(#problems, 0, table.concat(problems, " | "))
+	T.eq(table.concat(held, ","), "item_hurricane_pike", "held at the end")
+end)
+
+T.test("status.json covers every list the hero files return", function()
+	local counted = { data = 0, neighbour = 0, alias = 0, kept = 0 }
+	for hero, positions in pairs(STATUS.heroes) do
+		for pos, info in pairs(positions) do
+			if pos ~= "sell" then
+				T.ok(counted[info.status] ~= nil, hero .. " pos " .. pos .. " status " .. tostring(info.status))
+				counted[info.status] = counted[info.status] + 1
+				if info.status == "kept" or info.status == "alias" then
+					T.ok(type(info.reason) == "string" and #info.reason > 0, hero .. " pos " .. pos .. " has a reason")
+				end
+				if info.status == "data" then
+					T.ok(info.matches >= STATUS.minMatches, hero .. " pos " .. pos .. " has enough matches")
+				end
+			end
+		end
+	end
+	for status, total in pairs(counted) do
+		T.eq(total, STATUS.totals[status], "lists with status " .. status)
+	end
+end)
+
+local BOOT_FAMILY = {
+	item_boots = "item_boots",
+	item_arcane_boots = "item_arcane_boots",
+	item_guardian_greaves = "item_arcane_boots",
+	item_tranquil_boots = "item_tranquil_boots",
+	item_boots_of_bearing = "item_tranquil_boots",
+	item_phase_boots = "item_phase_boots",
+	item_power_treads = "item_power_treads",
+}
+
+T.test("the pins of Util/item-builds/pins.json hold in the lists", function()
+	T.ok(#PINS.pins >= 10, "pins.json has its pins")
+	for _, pin in ipairs(PINS.pins) do
+		T.ok(type(pin.reason) == "string" and #pin.reason > 0, pin.hero .. ": a pin has a reason")
+		if not pin.keep then
+			for _, pos in ipairs(pin.pos or { 1, 2, 3, 4, 5 }) do
+				local info = (STATUS.heroes[pin.hero] or {})[tostring(pos)]
+				if info ~= nil and BUILT[info.status] then
+					local list = load("hero_" .. pin.hero, pos, PLAIN_TEAM).sBuyList
+					local where = pin.hero .. " pos " .. pos .. ": "
+					for _, name in ipairs(pin.require or {}) do
+						T.ok(indexOf(list, name) ~= nil, where .. "buys " .. name)
+					end
+					for _, name in ipairs(pin.forbid or {}) do
+						T.eq(indexOf(list, name), nil, where .. name)
+					end
+					for _, order in ipairs(pin.before or {}) do
+						local first, second = indexOf(list, order[1]), indexOf(list, order[2])
+						T.ok(
+							first == nil or second == nil or first < second,
+							where .. order[1] .. " before " .. order[2]
+						)
+					end
+					for _, order in ipairs(pin.adjacent or {}) do
+						T.eq(
+							indexOf(list, order[2]),
+							indexOf(list, order[1]) + 1,
+							where .. order[2] .. " right after " .. order[1]
+						)
+					end
+					if pin.boots then
+						for _, name in ipairs(list) do
+							if BOOT_FAMILY[name] ~= nil then
+								T.eq(BOOT_FAMILY[name], pin.boots, where .. "boots")
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- Farm rules: Site.ConsiderIsTimeToFarm.<hero> farms while `not HasItem(bot, "item_x")`.
+local function farmRules()
+	local source = T.read("FuncLib/data/site.lua")
+	local rules, delegate = {}, {}
+	for hero, body in
+		string.gmatch(source, "\nSite%.ConsiderIsTimeToFarm%.npc_dota_hero_([%w_]+) = function%(%)(.-)\nend")
+	do
+		local to = string.match(body, "return Site%.ConsiderIsTimeToFarm%.npc_dota_hero_([%w_]+)%(%)")
+		if to then
+			delegate[hero] = to
+		else
+			local waits = {}
+			for condition in string.gmatch(body, "if ([^\n]-) then") do
+				for name in string.gmatch(condition, 'not HasItem%(bot, "(item_[%w_]+)"%)') do
+					local rest = string.gsub(condition, "not HasItem", "")
+					local capped = string.find(condition, "netWorth%s*<") ~= nil
+						or string.find(condition, "GetGold()", 1, true) ~= nil
+						or string.find(rest, "HasItem(bot", 1, true) ~= nil
+					waits[#waits + 1] = { item = name, capped = capped }
+				end
+			end
+			rules[hero] = waits
+		end
+	end
+	for hero, to in pairs(delegate) do
+		rules[hero] = rules[to] or {}
+	end
+	return rules
+end
+
+T.test("a farm rule never waits for an item the list does not buy, unless a net-worth cap ends the wait", function()
+	local rules = farmRules()
+	local heroes = 0
+	for hero, waits in pairs(rules) do
+		local heroStatus = STATUS.heroes[hero]
+		if heroStatus ~= nil and #waits > 0 then
+			heroes = heroes + 1
+			for slot = 1, 5 do
+				local info = heroStatus[tostring(slot)]
+				if info ~= nil and BUILT[info.status] and info.status ~= "alias" then
+					local result, Item = load("hero_" .. hero, slot, PLAIN_TEAM)
+					local bought = {}
+					for _, entry in ipairs(result.sBuyList) do
+						closure(Item, entry, bought)
+					end
+					local onRecord = {}
+					for _, text in ipairs(info.farmWaitsNotBought or {}) do
+						onRecord[string.match(text, "^(item_[%w_]+)")] = true
+					end
+					for _, wait in ipairs(waits) do
+						local where = hero .. " pos " .. slot .. " " .. wait.item
+						if not wait.capped then
+							T.ok(bought[wait.item], where .. ": the farm rule waits for it with no cap")
+						elseif not bought[wait.item] then
+							T.ok(
+								onRecord[wait.item],
+								where .. ": dropped from the list while the farm rule waits for it"
+							)
+						end
+					end
+				end
+			end
+		end
+	end
+	T.ok(heroes >= 50, "farm rules were read (" .. heroes .. " heroes)")
+end)
+
+T.test("URN_BUILDS names the positions whose list buys an Urn, a Spirit Vessel or an Essence Distiller", function()
+	local source = T.read("FuncLib/systems/item_strategy.lua")
+	local from = string.find(source, "local URN_BUILDS = {", 1, true)
+	local to = string.find(source, "\n}", from, true)
+	local urn = {}
+	for hero, positions in string.gmatch(string.sub(source, from, to), "npc_dota_hero_([%w_]+) = {([^}]*)}") do
+		urn[hero] = {}
+		for pos in string.gmatch(positions, "%d") do
+			urn[hero][tonumber(pos)] = true
+		end
+	end
+	local family = { item_urn_of_shadows = true, item_spirit_vessel = true, item_essence_distiller = true }
+	for hero, heroStatus in pairs(STATUS.heroes) do
+		for slot = 1, 5 do
+			local info = heroStatus[tostring(slot)]
+			if info ~= nil and BUILT[info.status] then
+				local result, Item = load("hero_" .. hero, slot, PLAIN_TEAM)
+				local buys = false
+				for _, entry in ipairs(result.sBuyList) do
+					for name in pairs(closure(Item, entry)) do
+						buys = buys or family[name] == true
+					end
+				end
+				T.eq(buys, (urn[hero] or {})[slot] == true, hero .. " pos " .. slot .. " in URN_BUILDS")
+			end
+		end
+	end
+end)

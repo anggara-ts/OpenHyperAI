@@ -24,47 +24,109 @@ else
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 38,631 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_quelling_blade",
+	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_desolator",
-	"item_orchid",
 	"item_dragon_lance",
-	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_bloodthorn",
-	"item_force_staff",
+	"item_lesser_crit",
 	"item_hurricane_pike",
 	"item_greater_crit",
-	"item_moon_shard",
-	"item_butterfly",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
+	"item_moon_shard",
+	"item_sphere",
+	"item_aghanims_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 34,387 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
-	"item_mid_outfit",
-	"item_dragon_lance",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_oblivion_staff",
 	"item_desolator",
 	"item_orchid",
+	"item_hurricane_pike",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_nullifier",
 	-- removed a second item_dragon_lance here: one lance already listed above, and Hurricane Pike takes only one
 	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_bloodthorn",
-	"item_force_staff",
-	"item_hurricane_pike",
-	"item_sheepstick",
 	"item_moon_shard",
-	"item_butterfly",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,106 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_sobi_mask",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_desolator",
+	"item_aghanims_shard",
+	"item_hurricane_pike",
+	"item_black_king_bar",
+	"item_monkey_king_bar",
 	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_sphere",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 4,261 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_blight_stone",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_orchid",
+	"item_desolator",
+	"item_hurricane_pike",
+	"item_black_king_bar",
+	"item_travel_boots",
+	"item_aghanims_shard",
+	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,731 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_orchid",
+	"item_dragon_lance",
+	"item_lesser_crit",
+	"item_bloodthorn",
+	"item_hurricane_pike",
+	"item_black_king_bar",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = {
 	"item_hurricane_pike",
@@ -76,6 +138,9 @@ X["sSellList"] = {
 	"item_greater_crit",
 	"item_hand_of_midas",
 	"item_greater_crit",
+	"item_falcon_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_ultimate_scepter",
 	"item_falcon_blade",
 }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

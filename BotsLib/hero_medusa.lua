@@ -15,47 +15,71 @@ local tAllAbilityBuildList = { { 2, 3, 2, 1, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 38,556 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
-	"item_tango",
 	"item_double_branches",
-	"item_null_talisman",
-	"item_null_talisman",
 	"item_magic_wand",
-	"item_ring_of_basilius",
+	"item_null_talisman",
 	"item_power_treads",
 	"item_manta",
-	"item_dragon_lance",
-	"item_hurricane_pike",
-	"item_skadi",
-	"item_aghanims_shard",
 	"item_butterfly",
-	"item_ultimate_scepter",
+	"item_skadi",
+	"item_lesser_crit",
+	"item_aghanims_shard",
 	"item_greater_crit",
+	"item_ultimate_scepter",
+	"item_ultimate_scepter_2",
+	"item_swift_blink",
 	"item_travel_boots",
-	"item_monkey_king_bar",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 7,001 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
-	"item_medusa_outfit",
-	"item_dragon_lance",
-	"item_hurricane_pike",
-	"item_ultimate_scepter",
-	"item_aghanims_shard",
+	"item_double_branches",
+	"item_enchanted_mango",
+	"item_circlet",
+	"item_magic_stick",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_manta",
-	"item_mjollnir",
-	"item_travel_boots",
+	"item_butterfly",
+	"item_aghanims_shard",
 	"item_skadi",
+	"item_greater_crit",
+	"item_ultimate_scepter",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_butterfly",
-	"item_hydras_breath",
+	"item_maelstrom",
+	"item_mjollnir",
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_2"]
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 1,987 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_double_branches",
+	"item_enchanted_mango",
+	"item_circlet",
+	"item_magic_stick",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_manta",
+	"item_aghanims_shard",
+	"item_butterfly",
+	"item_skadi",
+	"item_lesser_crit",
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_moon_shard",
+	"item_maelstrom",
+	"item_mjollnir",
+	"item_travel_boots_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

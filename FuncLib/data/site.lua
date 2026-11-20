@@ -1197,8 +1197,10 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin = function()
 	end
 	return false
 end
+-- Was Sven's rule, which farms until a Black King Bar is owned, with no net-worth cap: no Tidehunter list buys one
+-- as a core (Stratz 7.41f: 6% of offlane matches), so he was "time to farm" all game (#38).
 Site.ConsiderIsTimeToFarm.npc_dota_hero_tidehunter = function()
-	return Site.ConsiderIsTimeToFarm.npc_dota_hero_sven()
+	return Site.ConsiderIsTimeToFarm.npc_dota_hero_bristleback()
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_viper = function()
 	local bot = GetBot()

@@ -17,57 +17,113 @@ else
 	nAbilityBuildList = tAllAbilityBuildList[2]
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 18,664 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
+	"item_circlet",
+	"item_mantle",
 	"item_faerie_fire",
-	"item_double_circlet",
+	"item_null_talisman",
 	"item_magic_wand",
-	"item_double_null_talisman",
 	"item_power_treads",
-	-- Kaya, then Meteor Hammer (user call): timed to land as Astral Imprisonment ends.
-	"item_kaya",
-	"item_meteor_hammer",
 	"item_witch_blade",
 	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
 	"item_blink",
 	"item_hurricane_pike",
 	"item_black_king_bar",
-	"item_aghanims_shard",
 	"item_devastator",
 	"item_sheepstick",
-	"item_shivas_guard",
-	"item_moon_shard",
+	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
+	"item_travel_boots",
+	"item_moon_shard",
 	"item_travel_boots_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 229,094 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_faerie_fire",
-	"item_double_mantle",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
 	"item_magic_wand",
-	"item_double_null_talisman",
 	"item_power_treads",
-	-- Kaya, then Meteor Hammer (user call): timed to land as Astral Imprisonment ends.
-	"item_kaya",
+	"item_witch_blade",
+	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
+	"item_blink",
+	"item_hurricane_pike",
+	"item_black_king_bar",
+	"item_ultimate_scepter",
+	"item_devastator",
+	"item_ultimate_scepter_2",
 	"item_meteor_hammer",
+	"item_swift_blink",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 5,010 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_witch_blade",
 	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
 	"item_blink",
 	"item_hurricane_pike",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_devastator",
 	"item_sheepstick",
-	"item_shivas_guard",
-	"item_moon_shard",
 	"item_ultimate_scepter_2",
-	"item_travel_boots_2",
+	"item_swift_blink",
+	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_2"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 3,218 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_branches",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_witch_blade",
+	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
+	"item_blink",
+	"item_force_staff",
+	"item_hurricane_pike",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_aether_lens",
+	"item_aghanims_shard",
+	"item_ultimate_scepter_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,217 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_witch_blade",
+	-- Blink Dagger: #2 by matches played (Dotabuff, last patch). Force Staff still comes as part of Pike.
+	"item_blink",
+	"item_force_staff",
+	"item_aghanims_shard",
+	"item_sheepstick",
+	"item_devastator",
+	"item_moon_shard",
+	"item_aether_lens",
+	"item_ultimate_scepter_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 -- fix: pairs are { owned, sold }; they were reversed (owning a Magic Wand sold the Black King Bar,
 -- owning a Null Talisman sold Scythe of Vyse / Shiva's Guard)

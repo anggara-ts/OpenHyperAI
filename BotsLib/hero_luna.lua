@@ -12,33 +12,114 @@ local tAllAbilityBuildList = { { 1, 3, 1, 3, 1, 6, 1, 3, 3, 2, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 224,077 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_slippers",
-	"item_circlet",
-	"item_quelling_blade",
+	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
-	"item_wraith_band",
 	"item_power_treads",
 	"item_mask_of_madness",
 	"item_manta",
+	"item_blink",
+	"item_butterfly",
 	"item_black_king_bar",
 	"item_aghanims_shard",
+	"item_swift_blink",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 11,682 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_slippers",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_yasha",
+	"item_ultimate_scepter",
+	"item_manta",
+	"item_black_king_bar",
 	"item_butterfly",
+	"item_aghanims_shard",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_hurricane_pike",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 2,994 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_magic_stick",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_mask_of_madness",
+	"item_manta",
+	"item_blink",
+	"item_black_king_bar",
+	"item_butterfly",
+	"item_aghanims_shard",
 	"item_satanic",
 	"item_moon_shard",
-	"item_greater_crit",
-	"item_hydras_breath",
-	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 2,080 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_branches",
+	"item_circlet",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_manta",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_travel_boots",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_soul_booster",
+	"item_shivas_guard",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,838 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_mask_of_madness",
+	"item_manta",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_butterfly",
+	"item_lesser_crit",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_refresher",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+X["sSellList"] = {
+	"item_black_king_bar",
+	"item_quelling_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_lesser_crit",
+	"item_mask_of_madness",
+	"item_satanic",
+	"item_lesser_crit",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end

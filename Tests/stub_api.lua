@@ -965,8 +965,17 @@ end
 function api.GetItemCost()
 	return 500
 end
-function api.GetItemComponents()
-	return {}
+-- Recipes as the engine reports them: one set of parts per item, from the game file (Tests/data/item_recipes_742.lua).
+local itemRecipes = nil
+function api.GetItemComponents(itemName)
+	if itemRecipes == nil then
+		itemRecipes = assert(realLoadfile(Stub.root .. "/Tests/data/item_recipes_742.lua"))()
+	end
+	local recipe = itemRecipes[itemName]
+	if recipe == nil or recipe.parts == nil then
+		return {}
+	end
+	return { recipe.parts }
 end
 function api.GetItemStockCount()
 	return 1

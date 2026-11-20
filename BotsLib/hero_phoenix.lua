@@ -227,6 +227,7 @@ function X.SkillsComplement()
 	end
 	icarusDiveStopDesire = X.ConsiderIcarusDiveStop()
 	if icarusDiveStopDesire > 0 then
+		X.LogDive("dive-stop")
 		bot:Action_UseAbility(icarusDiveStopAbility)
 		bot.icarus_dive_stuck = false
 		return
@@ -279,6 +280,7 @@ function X.SkillsComplement()
 	if icarusDiveDesire > 0 then
 		bot:Action_UseAbilityOnLocation(icarusDiveAbility, icarusDiveLocation)
 		lastDiveTime = DotaTime()
+		X.LogDive("dive")
 		return
 	end
 	sunRayDesire, sunRayLocation = X.ConsiderSunRay()
@@ -379,7 +381,54 @@ function X.ConsiderIcarusDive()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- #47 diagnosis: games 044, 045 and 048 had Phoenix but no dive-stop line, so it is unknown whether a retreat
+-- dive happened or Stop never fires. Log every dive with its reason, every Stop, and (once per dive) why Stop
+-- could not be cast while the dive modifier was on.
+function X.LogDive(what, extra)
+	if DotaTime() < (bot._ohaDiveLogAt or -999) and what ~= "dive" then
+		return
+	end
+	bot._ohaDiveLogAt = DotaTime() + 1
+	local why = bot.icarus_dive_kill and "kill"
+		or bot.icarus_dive_engage and "engage"
+		or bot.icarus_dive_stuck and "stuck"
+		or bot.icarus_dive_retreat and "retreat"
+		or "none"
+	pcall(
+		print,
+		string.format(
+			"[OHA-PHOENIX] t=%.0f phoenix %s why=%s since=%.1f modifier=%s %s",
+			DotaTime(),
+			what,
+			why,
+			DotaTime() - lastDiveTime,
+			tostring(bot:HasModifier("modifier_phoenix_icarus_dive")),
+			extra or ""
+		)
+	)
+end
 function X.ConsiderIcarusDiveStop()
+	if
+		bot:HasModifier("modifier_phoenix_icarus_dive")
+		and not Fu.CanCastAbility(icarusDiveStopAbility)
+		and bot._ohaDiveStopBlockedFor ~= lastDiveTime
+		-- The Stop sub-ability may need a moment to swap in after the cast.
+		and DotaTime() - lastDiveTime >= 0.5
+	then
+		bot._ohaDiveStopBlockedFor = lastDiveTime
+		local stop = icarusDiveStopAbility
+		X.LogDive(
+			"dive-stop-blocked",
+			stop == nil and "stop=nil"
+				or string.format(
+					"hidden=%s trained=%s castable=%s activated=%s",
+					tostring(stop:IsHidden()),
+					tostring(stop:IsTrained()),
+					tostring(stop:IsFullyCastable()),
+					tostring(stop:IsActivated())
+				)
+		)
+	end
 	-- Stop only exists DURING the dive: the old guard returned when Phoenix had the dive modifier, so Stop
 	-- never fired and a retreat dive (an arc of dive_duration 2s) carried Phoenix back to where it started.
 	if

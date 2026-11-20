@@ -193,7 +193,7 @@ function X.SkillsComplement()
 		pcall(
 			print,
 			string.format(
-				"[OHA-FURION] t=%.0f teleport why=tp-redirect lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d",
+				"[OHA-FURION] t=%.0f teleport tp-redirect lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d",
 				DotaTime(),
 				Fu.GetModeLane(bot:GetActiveMode()) or 0,
 				bot.ProphetTPLocation.x,
@@ -229,7 +229,7 @@ function X.SkillsComplement()
 		pcall(
 			print,
 			string.format(
-				"[OHA-FURION] t=%.0f teleport why=%s lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
+				"[OHA-FURION] t=%.0f teleport %s lane=%d to=%.0f,%.0f dist=%.0f hp=%.2f mode=%d foes=%d",
 				DotaTime(),
 				teleportationWhy or "-",
 				teleportationLane or 0,

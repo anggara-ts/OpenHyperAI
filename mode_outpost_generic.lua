@@ -211,6 +211,19 @@ function GetDesire()
 end
 function GetDesireHelper()
 	botName = bot:GetUnitName()
+	-- A hero hold (Puck's Phase Shift, Tinker's Rearm, ...) above 1 keeps its mode while the hero is invulnerable:
+	-- the shift itself makes Puck invulnerable, so the gate below dropped the hold the moment the shift started and
+	-- Valve's mode ended the channel (game 058: [OHA-PUCK] phase hold-left after 0.03-0.33s, to modes with desire
+	-- 0.00-0.61 while 2.2-2.5s of the hold were left).
+	if bot:IsInvulnerable() and bot:IsAlive() and bot:IsHero() and not bot:IsIllusion() then
+		local holdFunc = heroSpecificDesire[botName]
+		if holdFunc ~= nil then
+			local okHold, holdDesire = pcall(holdFunc)
+			if okHold and holdDesire ~= nil and holdDesire > 1 then
+				return holdDesire
+			end
+		end
+	end
 	if
 		bot:IsInvulnerable()
 		or not bot:IsHero()

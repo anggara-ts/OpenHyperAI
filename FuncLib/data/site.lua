@@ -1244,13 +1244,26 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_beastmaster = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_helm_of_the_overlord") and netWorth < 14000 then
-		return true
+	local why = nil
+	if not HasItem(bot, "item_helm_of_the_dominator") and netWorth < 14000 then
+		why = "no-helm"
+	elseif not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
+		why = "no-bkb"
 	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
-		return true
+	-- One line when the answer changes (#105: the farm-only switch had no log, so a game could not show it).
+	if why ~= bot._bmFarmWhy then
+		bot._bmFarmWhy = why
+		pcall(
+			print,
+			string.format(
+				"[OHA-FARM] t=%.0f beastmaster farm-rule %s nw=%d",
+				DotaTime(),
+				why ~= nil and ("on why=" .. why) or "off",
+				netWorth
+			)
+		)
 	end
-	return false
+	return why ~= nil
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_rattletrap = function()
 	local bot = GetBot()

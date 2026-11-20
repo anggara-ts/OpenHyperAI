@@ -197,8 +197,67 @@ function X.CheckEchoResult()
 		)
 	)
 end
+-- Did the interrupt stop the channel (#27)? The game files don't say: the impale "prevents moving or turning" for
+-- impale_duration (a stun only with the Shard, from behind) and Talon Toss silences; neither is a plain stun.
+-- Once the spell has gone off (its cooldown runs) and had time to land, one line says whether the target is
+-- still channelling or teleporting. Given up 3s after the order.
+function X.NoteInterrupt(how, ability, target)
+	local pending = bot._kezInterrupt
+	if pending ~= nil and pending.target == target and pending.how == how then
+		return
+	end
+	bot._kezInterrupt = {
+		how = how,
+		ability = ability,
+		target = target,
+		at = DotaTime(),
+		teleporting = target:HasModifier("modifier_teleporting"),
+	}
+end
+function X.CheckInterruptResult()
+	local pending = bot._kezInterrupt
+	if pending == nil then
+		return
+	end
+	local cast = pending.ability ~= nil
+		and not pending.ability:IsNull()
+		and pending.ability:GetCooldownTimeRemaining() > 0
+	if cast and pending.castAt == nil then
+		pending.castAt = DotaTime()
+	end
+	-- Talon Toss flies at 2000 over at most 950 (game files): 0.7s covers it and the impale's attack.
+	local landed = pending.castAt ~= nil and DotaTime() >= pending.castAt + 0.7
+	if not landed and DotaTime() < pending.at + 3 then
+		return
+	end
+	bot._kezInterrupt = nil
+	local target = pending.target
+	local alive = target ~= nil and not target:IsNull() and target:IsAlive()
+	local seen = alive and target:CanBeSeen()
+	pcall(
+		print,
+		string.format(
+			"[OHA-KEZ] t=%.0f interrupt-result how=%s target=%s was=%s cast=%s after=%.1f alive=%s seen=%s"
+				.. " channelling=%s teleporting=%s silenced=%s rooted=%s stunned=%s",
+			DotaTime(),
+			pending.how,
+			alive and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "gone",
+			pending.teleporting and "tp" or "spell",
+			tostring(pending.castAt ~= nil),
+			DotaTime() - pending.at,
+			tostring(alive),
+			tostring(seen),
+			tostring(seen and target:IsChanneling()),
+			tostring(seen and target:HasModifier("modifier_teleporting")),
+			tostring(seen and target:IsSilenced()),
+			tostring(seen and target:IsRooted()),
+			tostring(seen and target:IsStunned())
+		)
+	)
+end
 function X.SkillsComplement()
 	X.CheckCastResult()
+	pcall(X.CheckInterruptResult)
 	pcall(X.CheckEchoResult)
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
@@ -745,6 +804,7 @@ function X.ConsiderKazuraiKatana()
 		then
 			if enemyHero:IsChanneling() then
 				X.LogKez("interrupt how=impale target=" .. enemyHero:GetUnitName())
+				X.NoteInterrupt("impale", kazuraiKatanaAbility, enemyHero)
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			-- The Katana bleed is a debuff on the enemy (datafeed: "applies stacking damage over time to
@@ -916,6 +976,7 @@ function X.ConsiderTalonToss()
 			and not enemyHero:HasModifier("modifier_teleporting")
 		then
 			X.LogKez("toss-channel target=" .. enemyHero:GetUnitName())
+			X.NoteInterrupt("toss", talonTossAbility, enemyHero)
 			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end

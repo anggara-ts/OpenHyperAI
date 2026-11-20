@@ -12,6 +12,10 @@ local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 
 local tAllAbilityBuildList = { { 2, 3, 6, 1, 2, 2, 2, 3, 3, 6, 3, 1, 1, 1, 6, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+-- Blink Dagger (#9) is in every list. Stratz 7.41f (week of 5-11 Nov 2026, all ranks): Blink in 86% of pos 1
+-- matches (3,626), over 95% of pos 2 (17,191) and 90% of pos 3 (1,061). It is bought right after Sange and Yasha
+-- and before the Shard: by minute 24, 61% of pos 2 Meepos have Blink and 16% the Shard (Shard 38% in all).
+-- Pos 3 gets Sange and Yasha too (94% of its matches; it was missing from that list).
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
@@ -23,8 +27,8 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_power_treads",
 	"item_diffusal_blade",
 	"item_sange_and_yasha",
-	"item_aghanims_shard",
 	"item_blink",
+	"item_aghanims_shard",
 	"item_skadi",
 	"item_nullifier",
 	"item_ultimate_scepter",
@@ -43,8 +47,8 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_power_treads",
 	"item_diffusal_blade",
 	"item_sange_and_yasha",
-	"item_aghanims_shard",
 	"item_blink",
+	"item_aghanims_shard",
 	"item_skadi",
 	"item_ultimate_scepter",
 	"item_disperser",
@@ -61,8 +65,9 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_diffusal_blade",
-	"item_aghanims_shard",
+	"item_sange_and_yasha",
 	"item_blink",
+	"item_aghanims_shard",
 	"item_skadi",
 	"item_ultimate_scepter",
 	"item_sheepstick",

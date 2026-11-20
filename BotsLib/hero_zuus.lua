@@ -197,8 +197,23 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnEntity(arcLightningAbility, arcLightningTarget)
 		return
 	end
-	nimbusDesire, nimbusLocation = X.ConsiderD()
+	local nimbusWhy, nimbusTarget
+	nimbusDesire, nimbusLocation, nimbusWhy, nimbusTarget = X.ConsiderD()
 	if nimbusDesire > 0 then
+		-- One line per cast (45 s cooldown; the 3 s gate only stops repeats when an order doesn't go through).
+		if DotaTime() >= (bot._zeusNimbusLogAt or -999) then
+			bot._zeusNimbusLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-ZEUS] t=%.0f nimbus why=%s target=%s dist=%d",
+					DotaTime(),
+					tostring(nimbusWhy),
+					nimbusTarget ~= nil and nimbusTarget:GetUnitName() or "none",
+					nimbusTarget ~= nil and math.floor(GetUnitToUnitDistance(bot, nimbusTarget)) or 0
+				)
+			)
+		end
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnLocation(nimbusAbility, nimbusLocation)
 		return
@@ -426,12 +441,16 @@ function X.ConsiderW2()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
+-- Nimbus (zuus_cloud, Scepter-granted), npc_abilities 7.42: AbilityCastRange 0 (global), AbilityCastPoint 0.2,
+-- cloud_radius 450, cloud_bolt_interval 2.5, cloud_duration 30, cooldown 45, mana 275. The file has no
+-- separate cloud-forming delay, so the target is led by 1 s (cast point plus the first bolt's wait).
+-- Returns desire, location, why, target.
 function X.ConsiderD()
 	if not bot:HasScepter() or not nimbusAbility:IsFullyCastable() or bot:IsInvisible() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	local teamPlayers = GetTeamPlayers(GetTeam())
-	for i = 1, #teamPlayers do
+	-- Slot loop (GetTeamMember takes a slot 1..5, not a player ID).
+	for i = 1, 5 do
 		local teamMember = GetTeamMember(i)
 		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
 			local target = Fu.GetProperTarget(teamMember)
@@ -440,7 +459,7 @@ function X.ConsiderD()
 				and Fu.IsInRange(teamMember, target, 1200)
 				and Fu.CanCastOnNonMagicImmune(target)
 			then
-				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0)
+				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0), "ally-fight", target
 			end
 		end
 	end
@@ -448,11 +467,53 @@ function X.ConsiderD()
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		for _, enemy in pairs(nearbyEnemies) do
 			if Fu.IsValid(enemy) and bot:WasRecentlyDamagedByHero(enemy, 1.0) and Fu.CanCastOnNonMagicImmune(enemy) then
-				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation(), "retreat", enemy
 			end
 		end
 	end
+	-- Finish (#47): the range is global, so also a low or fleeing enemy hero anywhere on the map, while Zeus is
+	-- not in danger himself.
+	local zeusInDanger = bot:WasRecentlyDamagedByAnyHero(2.0)
+		or #(Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {}) >= 1
+	if not zeusInDanger and not Fu.IsRetreating(bot) then
+		local finishTarget = X.NimbusFinishTarget()
+		if finishTarget ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, finishTarget:GetExtrapolatedLocation(1.0), "finish", finishTarget
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- A visible enemy hero under 25% HP, or under 50% and fleeing from an allied hero that chases it (a walking
+-- enemy alone is not worth a 275-mana, 45 s spell).
+function X.NimbusFinishTarget()
+	local best, bestHp = nil, math.huge
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if
+			Fu.IsValidHero(enemy)
+			and enemy:CanBeSeen()
+			and not enemy:HasModifier("modifier_fountain_aura_buff")
+			and not Fu.IsSuspiciousIllusion(enemy)
+			and Fu.CanCastOnNonMagicImmune(enemy)
+		then
+			local hp = Fu.GetHP(enemy)
+			local fleeing = false
+			if hp < 0.5 then
+				for _, ally in pairs(Fu.GetAlliesNearLoc(enemy:GetLocation(), 1200) or {}) do
+					if
+						Fu.IsValidHero(ally)
+						and (Fu.IsChasingTarget(ally, enemy) or enemy:WasRecentlyDamagedByHero(ally, 2.0))
+					then
+						fleeing = true
+						break
+					end
+				end
+			end
+			if (hp < 0.25 or fleeing) and hp < bestHp then
+				best, bestHp = enemy, hp
+			end
+		end
+	end
+	return best
 end
 function X.ConsiderR()
 	if not wrathAbility:IsFullyCastable() then

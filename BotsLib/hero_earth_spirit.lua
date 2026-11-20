@@ -163,6 +163,224 @@ local function LogES(kind, fmt, ...)
 		pcall(print, msg)
 	end
 end
+-- Ally saves (#47): a pull (Geomagnetic Grip) brings the ally next to Earth Spirit, a kick (Boulder Smash on
+-- the ally) sends it unit_distance away. Either must take the ally AWAY from danger.
+-- npc_units.txt 7.42: tower AttackRange 700; +200 margin so the ally doesn't land at the edge of it.
+local SAVE_TOWER_GAP = 900
+-- No pull when an enemy hero is this close to Earth Spirit (the ally would land next to it).
+local SAVE_ES_DANGER = 500
+-- The landing spot must be at least this much farther from the nearest enemy hero than the ally is now.
+local SAVE_MIN_GAIN = 100
+local function Dist2D(a, b)
+	local dx, dy = a.x - b.x, a.y - b.y
+	return math.sqrt(dx * dx + dy * dy)
+end
+local function NearestDist(point, locations)
+	local best = math.huge
+	for _, location in ipairs(locations or {}) do
+		local d = Dist2D(point, location)
+		if d < best then
+			best = d
+		end
+	end
+	return best
+end
+-- Pure: why a save that lands the ally at landingLoc would be wrong, or nil when it is safe.
+-- enemyLocs: enemy heroes around the ally; towerLocs: living enemy towers; esEnemyLocs (pull only): enemy
+-- heroes around Earth Spirit, whose position is the landing spot.
+function X.SaveLandingProblem(allyLoc, landingLoc, enemyLocs, towerLocs, esEnemyLocs)
+	if esEnemyLocs ~= nil and NearestDist(landingLoc, esEnemyLocs) <= SAVE_ES_DANGER then
+		return "es-in-danger"
+	end
+	if NearestDist(landingLoc, enemyLocs) < NearestDist(allyLoc, enemyLocs) + SAVE_MIN_GAIN then
+		return "closer-to-enemy"
+	end
+	if NearestDist(landingLoc, towerLocs) <= SAVE_TOWER_GAP then
+		return "tower"
+	end
+	return nil
+end
+-- Pure: where a kicked ally lands. A unit-target cast turns Earth Spirit to the ally and the kick goes the
+-- way he faces (datafeed, Liquipedia), so the ally flies along the line from him through the ally.
+function X.KickLanding(esLoc, allyLoc, kickDist)
+	local dx, dy = allyLoc.x - esLoc.x, allyLoc.y - esLoc.y
+	local length = math.sqrt(dx * dx + dy * dy)
+	if length < 1 then
+		return nil
+	end
+	return { x = allyLoc.x + dx / length * kickDist, y = allyLoc.y + dy / length * kickDist }
+end
+local ENEMY_TOWER_IDS = {
+	TOWER_TOP_1,
+	TOWER_TOP_2,
+	TOWER_TOP_3,
+	TOWER_MID_1,
+	TOWER_MID_2,
+	TOWER_MID_3,
+	TOWER_BOT_1,
+	TOWER_BOT_2,
+	TOWER_BOT_3,
+	TOWER_BASE_1,
+	TOWER_BASE_2,
+}
+local function EnemyTowerLocations()
+	local locations = {}
+	local enemyTeam = GetOpposingTeam()
+	for _, id in ipairs(ENEMY_TOWER_IDS) do
+		local tower = GetTower(enemyTeam, id)
+		if tower ~= nil then
+			table.insert(locations, tower:GetLocation())
+		end
+	end
+	return locations
+end
+local function HeroLocations(heroes)
+	local locations = {}
+	for _, hero in pairs(heroes or {}) do
+		if Fu.IsValidHero(hero) then
+			table.insert(locations, hero:GetLocation())
+		end
+	end
+	return locations
+end
+-- Returns "kick", ally / "kick-move", standLocation / "pull", ally, or nil. Logs the near-misses (why a
+-- hurt ally in danger got no save) once per 5 s.
+function X.ConsiderAllySave()
+	local smashReady = boulderSmashAbility:IsFullyCastable()
+	local gripReady = geomagneticGripAbility:IsFullyCastable()
+	local smashRange = boulderSmashAbility:GetCastRange()
+	if smashRange <= 0 then
+		smashRange = 150
+	end
+	-- npc_abilities 7.42: unit_distance 500/600/700/800 (how far a kicked unit flies).
+	local kickDist = boulderSmashAbility:GetSpecialValueInt("unit_distance")
+	if kickDist <= 0 then
+		kickDist = 500
+	end
+	-- npc_abilities 7.42: cast_range_heroes 550/600/650/700 (Shard +50%).
+	local gripRange = geomagneticGripAbility:GetSpecialValueInt("cast_range_heroes")
+	if gripRange <= 0 then
+		gripRange = 550
+	end
+	local botLoc = bot:GetLocation()
+	local towerLocs = nil
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}) do
+		if allyHero ~= bot and Fu.IsValidHero(allyHero) and not allyHero:IsIllusion() then
+			local allyLoc = allyHero:GetLocation()
+			local enemiesOnAlly = Fu.GetEnemiesNearLoc(allyLoc, 500)
+			local inTrouble = (Fu.GetHP(allyHero) < 0.45 or Fu.IsRetreating(allyHero))
+				and (allyHero:WasRecentlyDamagedByAnyHero(2.0) or #enemiesOnAlly >= 1)
+			if inTrouble then
+				local dist = GetUnitToUnitDistance(bot, allyHero)
+				local enemyLocs = HeroLocations(Fu.GetEnemiesNearLoc(allyLoc, 1600))
+				towerLocs = towerLocs or EnemyTowerLocations()
+				local miss = nil
+				if #enemyLocs == 0 then
+					miss = "no-enemy-seen"
+				end
+				-- Kick: the ally must be next to him (cast range 150).
+				if miss == nil and smashReady and dist <= smashRange + 100 then
+					local landing = X.KickLanding(botLoc, allyLoc, kickDist)
+					local problem = landing == nil and "no-direction"
+						or X.SaveLandingProblem(allyLoc, landing, enemyLocs, towerLocs, nil)
+					if problem == nil then
+						LogES(
+							"save-kick",
+							"ally=%s hp=%.2f dist=%d kick=%d face=%d bearing=%d",
+							allyHero:GetUnitName(),
+							Fu.GetHP(allyHero),
+							math.floor(dist),
+							kickDist,
+							math.floor(bot:GetFacing() or 0),
+							-- Direction from him to the ally (0 = east, like GetFacing): the kick should go this way.
+							math.floor(
+								math.deg((math.atan2 or math.atan)(allyLoc.y - botLoc.y, allyLoc.x - botLoc.x)) % 360
+							)
+						)
+						return "kick", allyHero
+					end
+					-- Stand on the enemies' side of the ally, so the next kick sends it away from them.
+					local nearestEnemyLoc = nil
+					for _, enemyLoc in ipairs(enemyLocs) do
+						if nearestEnemyLoc == nil or Dist2D(allyLoc, enemyLoc) < Dist2D(allyLoc, nearestEnemyLoc) then
+							nearestEnemyLoc = enemyLoc
+						end
+					end
+					local standLoc = nearestEnemyLoc ~= nil and X.KickLanding(nearestEnemyLoc, allyLoc, -100) or nil
+					local awayLanding = standLoc ~= nil and X.KickLanding(standLoc, allyLoc, kickDist) or nil
+					if
+						awayLanding ~= nil
+						and Dist2D(botLoc, standLoc) <= 400
+						and X.SaveLandingProblem(allyLoc, awayLanding, enemyLocs, towerLocs, nil) == nil
+					then
+						LogES(
+							"save-kick-move",
+							"ally=%s was=%s move=%d",
+							allyHero:GetUnitName(),
+							problem,
+							math.floor(Dist2D(botLoc, standLoc))
+						)
+						return "kick-move", Vector(standLoc.x, standLoc.y, allyLoc.z)
+					end
+					LogES(
+						"save-skip",
+						"why=%s kind=kick ally=%s dist=%d",
+						problem,
+						allyHero:GetUnitName(),
+						math.floor(dist)
+					)
+				end
+				-- Pull: the ally lands next to Earth Spirit.
+				if miss == nil then
+					if not gripReady then
+						miss = "grip-not-ready"
+					elseif dist > gripRange then
+						miss = "grip-range"
+					elseif dist < 250 then
+						miss = "too-close"
+					elseif
+						allyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
+						or allyHero:HasModifier("modifier_enigma_black_hole_pull")
+						or allyHero:HasModifier("modifier_legion_commander_duel")
+					then
+						miss = "pull-blocked"
+					else
+						local esEnemyLocs = HeroLocations(Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE))
+						local problem = X.SaveLandingProblem(allyLoc, botLoc, enemyLocs, towerLocs, esEnemyLocs)
+						if problem == nil then
+							LogES(
+								"grip",
+								"save ally=%s hp=%.2f dist=%d",
+								allyHero:GetUnitName(),
+								Fu.GetHP(allyHero),
+								math.floor(dist)
+							)
+							return "pull", allyHero
+						end
+						LogES(
+							"save-skip",
+							"why=%s kind=pull ally=%s dist=%d",
+							problem,
+							allyHero:GetUnitName(),
+							math.floor(dist)
+						)
+					end
+				end
+				if miss ~= nil then
+					LogES(
+						"save-miss",
+						"why=%s ally=%s hp=%.2f dist=%d",
+						miss,
+						allyHero:GetUnitName(),
+						Fu.GetHP(allyHero),
+						math.floor(dist)
+					)
+				end
+			end
+		end
+	end
+	return nil, nil
+end
 function X.SkillsComplement()
 	local context = AbilityContext.Build(bot)
 	isGoingOnSomeone = context.isEngaging
@@ -179,6 +397,18 @@ function X.SkillsComplement()
 	if enchantRemnantDesire > 0 then
 		bot:ActionQueue_UseAbilityOnEntity(enchantRemnantAbility, EnchantTarget)
 		bot:ActionQueue_UseAbilityOnLocation(boulderSmashAbility, bot:GetLocation() + RandomVector(800))
+		return
+	end
+	-- Ally saves first: the enemy kick below fired in the same situations and used up Boulder Smash.
+	local saveKind, saveTarget = X.ConsiderAllySave()
+	if saveKind == "kick" then
+		bot:Action_UseAbilityOnEntity(boulderSmashAbility, saveTarget)
+		return
+	elseif saveKind == "kick-move" then
+		bot:Action_MoveToLocation(saveTarget)
+		return
+	elseif saveKind == "pull" then
+		bot:Action_UseAbilityOnEntity(geomagneticGripAbility, saveTarget)
 		return
 	end
 	rollingBoulderDesire, rollingBoulderLocation, rollingBoulderNeedsStone = X.ConsiderRollingBoulder()
@@ -212,8 +442,7 @@ function X.SkillsComplement()
 			end
 		end
 	end
-	local onAlly
-	geomagneticGripDesire, geomagneticGripTarget, geomagneticGripNeedsStone, onAlly = X.ConsiderGeomagneticGrip()
+	geomagneticGripDesire, geomagneticGripTarget, geomagneticGripNeedsStone = X.ConsiderGeomagneticGrip()
 	if geomagneticGripDesire > 0 then
 		if geomagneticGripNeedsStone then
 			bot:Action_ClearActions(false)
@@ -221,13 +450,8 @@ function X.SkillsComplement()
 			bot:ActionQueue_UseAbilityOnLocation(geomagneticGripAbility, geomagneticGripTarget)
 			return
 		else
-			-- Ally pull is a unit-target cast; it used to depend on Shard, but the base spell
-			-- already targets allies (shard only adds range/speed).
-			if onAlly == true then
-				bot:Action_UseAbilityOnEntity(geomagneticGripAbility, geomagneticGripTarget)
-			else
-				bot:Action_UseAbilityOnLocation(geomagneticGripAbility, geomagneticGripTarget)
-			end
+			-- The ally pull (a unit-target cast) is in X.ConsiderAllySave.
+			bot:Action_UseAbilityOnLocation(geomagneticGripAbility, geomagneticGripTarget)
 			return
 		end
 	end
@@ -510,41 +734,7 @@ function X.ConsiderGeomagneticGrip()
 	local castPoint = geomagneticGripAbility:GetCastPoint()
 	local mpRatio = bot:GetMana() / bot:GetMaxMana()
 	local rockDamage = geomagneticGripAbility:GetSpecialValueInt("rock_damage")
-	-- Ally save. Grip pulls allied heroes without Shard (datafeed: "cast range is reduced when
-	-- targeting an ally"; cast_range_heroes 550-700, Shard +50%). It used to be Shard-only, used
-	-- the remnant range (1000-1300) and required no ally within 300 of Earth Spirit, but that list
-	-- includes himself, so it never fired. Now: a hurt or fleeing ally being hit by heroes, an enemy
-	-- hero near him, between 300 and the hero cast range, while Earth Spirit is not running himself.
-	local heroRange = geomagneticGripAbility:GetSpecialValueInt("cast_range_heroes")
-	if heroRange <= 0 then
-		heroRange = 550
-	end
-	if not isRetreating then
-		for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, heroRange, false, BOT_MODE_NONE) or {}) do
-			if
-				allyHero ~= bot
-				and Fu.IsValidHero(allyHero)
-				and not allyHero:IsIllusion()
-				and Fu.IsInRange(bot, allyHero, heroRange)
-				and not Fu.IsInRange(bot, allyHero, 300)
-				and allyHero:WasRecentlyDamagedByAnyHero(2.0)
-				and (Fu.GetHP(allyHero) < 0.4 or Fu.IsRetreating(allyHero))
-				and not allyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not allyHero:HasModifier("modifier_enigma_black_hole_pull")
-				and not allyHero:HasModifier("modifier_legion_commander_duel")
-				and #(Fu.GetEnemiesNearLoc(allyHero:GetLocation(), 700) or {}) >= 1
-			then
-				LogES(
-					"grip",
-					"save ally=%s hp=%.2f dist=%d",
-					allyHero:GetUnitName(),
-					Fu.GetHP(allyHero),
-					math.floor(GetUnitToUnitDistance(bot, allyHero))
-				)
-				return BOT_ACTION_DESIRE_HIGH, allyHero, false, true
-			end
-		end
-	end
+	-- The ally save (pull) moved to X.ConsiderAllySave (#47): it fired 0 times in games 055, 057 and 058.
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	local killableEnemy = Fu.GetCanBeKilledUnit(nearbyEnemies, rockDamage, DAMAGE_TYPE_MAGICAL, false)
 	if

@@ -344,7 +344,7 @@ function X.ConsiderIlluminate()
 				pcall(
 					print,
 					string.format(
-						"[OHA-KOTL] t=%.0f keeper_of_the_light spirit-heal ally=%s ally-hp=%.2f",
+						"[OHA-KOTL] t=%.0f keeper_of_the_light spirit-heal ally=%s allyHp=%.2f",
 						DotaTime(),
 						(string.gsub(healTarget:GetUnitName(), "npc_dota_hero_", "")),
 						healHp

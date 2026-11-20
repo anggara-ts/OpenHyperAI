@@ -25,7 +25,7 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_basher",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_sange",
+	"item_monkey_king_bar",
 	"item_abyssal_blade",
 	"item_swift_blink",
 	"item_travel_boots",
@@ -45,11 +45,12 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_basher",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_sange",
+	"item_ultimate_scepter",
+	"item_monkey_king_bar",
 	"item_abyssal_blade",
-	"item_satanic",
-	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_nullifier",
+	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4 has 892 matches, built from pos 5 (1,058) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
@@ -64,9 +65,10 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_basher",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_sange",
-	"item_ultimate_scepter_2",
+	"item_abyssal_blade",
+	"item_diffusal_blade",
 	"item_moon_shard",
+	"item_ultimate_scepter_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,058 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
@@ -81,9 +83,10 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_basher",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_sange",
-	"item_ultimate_scepter_2",
+	"item_abyssal_blade",
+	"item_diffusal_blade",
 	"item_moon_shard",
+	"item_ultimate_scepter_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 10,586 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
@@ -98,20 +101,14 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_basher",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_sange",
+	"item_ultimate_scepter",
 	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
 	"item_diffusal_blade",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_black_king_bar",
-	"item_quelling_blade",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_diffusal_blade",
-	"item_sange",
-}
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

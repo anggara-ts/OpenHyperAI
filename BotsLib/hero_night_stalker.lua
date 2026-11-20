@@ -29,11 +29,11 @@ sRoleItemsBuyList["pos_3"] = {
 	-- Harpoon (Echo Sabre upgrade): 41% of his matches, #6 (Dotabuff, last patch).
 	"item_harpoon",
 	sTeamAuraItem,
-	"item_sange",
 	"item_overwhelming_blink",
+	"item_ultimate_scepter_2",
+	"item_hand_of_midas",
 	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_ultimate_scepter_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 1, 1,609 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
@@ -100,8 +100,8 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_echo_sabre",
 	"item_black_king_bar",
 	"item_basher",
-	"item_sange",
 	"item_abyssal_blade",
+	"item_nullifier",
 	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",

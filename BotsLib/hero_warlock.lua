@@ -88,7 +88,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_ultimate_scepter_2",
 	"item_hand_of_midas",
 	"item_aeon_disk",
-	"item_kaya",
 	"item_kaya_and_sange",
 	"item_moon_shard",
 	"item_travel_boots_2",

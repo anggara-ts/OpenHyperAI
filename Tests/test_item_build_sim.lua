@@ -515,12 +515,14 @@ local function farmRules()
 		else
 			local waits = {}
 			for condition in string.gmatch(body, "if ([^\n]-) then") do
-				for name in string.gmatch(condition, 'not HasItem%(bot, "(item_[%w_]+)"%)') do
-					local rest = string.gsub(condition, "not HasItem", "")
+				for check, name in string.gmatch(condition, 'not (%a+)%(bot, "(item_[%w_]+)"%)') do
+					local rest = string.gsub(string.gsub(condition, "not HasItem", ""), "not FarmHas", "")
 					local capped = string.find(condition, "netWorth%s*<") ~= nil
 						or string.find(condition, "GetGold()", 1, true) ~= nil
 						or string.find(rest, "HasItem(bot", 1, true) ~= nil
-					waits[#waits + 1] = { item = name, capped = capped }
+					if check == "HasItem" or check == "FarmHas" then
+						waits[#waits + 1] = { item = name, capped = capped, listAware = check == "FarmHas" }
+					end
 				end
 			end
 			rules[hero] = waits
@@ -553,7 +555,10 @@ T.test("a farm rule never waits for an item the list does not buy, unless a net-
 					end
 					for _, wait in ipairs(waits) do
 						local where = hero .. " pos " .. slot .. " " .. wait.item
-						if not wait.capped then
+						if wait.listAware then
+							-- Site.FarmHas: an item the list never buys counts as owned, so the wait cannot hold him.
+							T.ok(true)
+						elseif not wait.capped then
 							T.ok(bought[wait.item], where .. ": the farm rule waits for it with no cap")
 						elseif not bought[wait.item] then
 							T.ok(
@@ -567,6 +572,70 @@ T.test("a farm rule never waits for an item the list does not buy, unless a net-
 		end
 	end
 	T.ok(heroes >= 50, "farm rules were read (" .. heroes .. " heroes)")
+end)
+
+T.test("farm rules read the hero's list: no plain HasItem wait is left in Site.ConsiderIsTimeToFarm", function()
+	local source = T.read("FuncLib/data/site.lua")
+	local from = string.find(source, "\nSite%.ConsiderIsTimeToFarm = {}")
+	T.ok(from ~= nil, "the farm table")
+	local farmPart = string.sub(source, from)
+	local _, plain = string.gsub(farmPart, 'not HasItem%(bot, "item_', "")
+	local _, aware = string.gsub(farmPart, 'not FarmHas%(bot, "item_', "")
+	T.eq(plain, 0, "plain HasItem waits")
+	T.ok(aware >= 100, "FarmHas waits (" .. aware .. ")")
+end)
+
+-- Build-up parts (Util/item-builds/lib/build.js BUILD_PARTS): bought only on the way to an upgrade the list buys
+-- later, never kept or sold on their own (maintainer, 2026-11-20: a list sells an early item it replaced, like
+-- Falcon Blade or boots for Boots of Travel, not a part).
+local BUILD_PARTS =
+	{ item_sange = true, item_yasha = true, item_kaya = true, item_pers = true, item_lesser_crit = true }
+local function recipeTree(name, out)
+	out = out or {}
+	if out[name] then
+		return out
+	end
+	out[name] = true
+	for _, part in ipairs((RECIPES[name] or {}).parts or {}) do
+		recipeTree(part, out)
+	end
+	return out
+end
+T.test("a build-up part is bought only before an upgrade the list buys, and no sell pair sells one", function()
+	local checked = 0
+	for hero, positions in pairs(STATUS.heroes) do
+		for slot = 1, 5 do
+			local info = positions[tostring(slot)]
+			if info ~= nil and BUILT[info.status] then
+				local result = load("hero_" .. hero, slot, PLAIN_TEAM)
+				local list = result.sBuyList or {}
+				for index, name in ipairs(list) do
+					if BUILD_PARTS[name] then
+						local upgraded = false
+						for later = index + 1, #list do
+							if
+								type(list[later]) == "string"
+								and list[later] ~= name
+								and recipeTree(list[later])[name]
+							then
+								upgraded = true
+							end
+						end
+						T.ok(upgraded, hero .. " pos " .. slot .. ": " .. name .. " with no upgrade after it")
+					end
+				end
+				local sell = result.sSellList or {}
+				for index = 2, #sell, 2 do
+					T.ok(
+						not BUILD_PARTS[sell[index]],
+						hero .. " pos " .. slot .. ": a sell pair sells " .. tostring(sell[index])
+					)
+				end
+				checked = checked + 1
+			end
+		end
+	end
+	T.ok(checked >= 500, "lists checked (" .. checked .. ")")
 end)
 
 T.test("URN_BUILDS names the positions whose list buys an Urn, a Spirit Vessel or an Essence Distiller", function()

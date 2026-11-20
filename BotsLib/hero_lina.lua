@@ -107,12 +107,12 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_travel_boots",
 	"item_yasha_and_kaya",
 	"item_ultimate_scepter",
-	"item_lesser_crit",
 	"item_black_king_bar",
 	"item_aghanims_shard",
 	"item_satanic",
 	"item_ultimate_scepter_2",
 	"item_cyclone",
+	"item_mjollnir",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }

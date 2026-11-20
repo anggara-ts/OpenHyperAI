@@ -38,16 +38,14 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_phase_boots",
 	"item_desolator",
 	"item_orchid",
-	"item_ultimate_scepter",
-	"item_sange",
 	"item_black_king_bar",
+	"item_basher",
 	"item_butterfly",
 	"item_travel_boots",
-	"item_ultimate_scepter_2",
-	"item_blink",
-	"item_swift_blink",
+	"item_abyssal_blade",
 	"item_aghanims_shard",
 	"item_moon_shard",
+	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 3,270 matches (Util/item-builds/generate.js).
@@ -120,9 +118,8 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_wind_lace",
 	"item_magic_wand",
 	"item_tranquil_boots",
-	"item_headdress",
-	"item_spirit_vessel",
 	"item_ancient_janggo",
+	"item_spirit_vessel",
 	"item_cyclone",
 	"item_boots_of_bearing",
 	"item_sheepstick",
@@ -143,9 +140,6 @@ X["sSellList"] = {
 	"item_magic_wand",
 	"item_assault",
 	"item_ancient_janggo",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_butterfly",
-	"item_sange",
 }
 if Fu.Role.IsPvNMode() then
 	X["sBuyList"], X["sSellList"] = { "PvN_BH" }, { "item_power_treads", "item_quelling_blade" }

@@ -53,10 +53,12 @@ function load() {
 		}
 		const waits = [];
 		for (const c of m[2].matchAll(/if ([^\n]*?) then/g)) {
-			for (const w of c[1].matchAll(/not HasItem\(bot, "(item_[a-z0-9_]+)"\)/g)) {
+			// FarmHas (site.lua) treats an item the hero's list never buys as owned: such a wait cannot hold the
+			// hero, so it is only reported. A plain HasItem wait still holds him until its cap.
+			for (const w of c[1].matchAll(/not (HasItem|FarmHas)\(bot, "(item_[a-z0-9_]+)"\)/g)) {
 				const worth = c[1].match(/netWorth\s*<=?\s*(\d+)/);
-				const gated = /GetGold\(\)/.test(c[1]) ? "gold" : /(^|and )HasItem\(bot/.test(c[1].replace(/not HasItem/g, "")) ? "part" : null;
-				waits.push({ item: w[1], cap: worth ? Number(worth[1]) : gated });
+				const gated = /GetGold\(\)/.test(c[1]) ? "gold" : /(^|and )HasItem\(bot/.test(c[1].replace(/not (HasItem|FarmHas)/g, "")) ? "part" : null;
+				waits.push({ item: w[2], cap: worth ? Number(worth[1]) : gated, listAware: w[1] === "FarmHas" });
 			}
 		}
 		farm[m[1]] = waits;

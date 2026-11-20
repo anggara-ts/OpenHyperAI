@@ -81,13 +81,14 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_armlet",
 	"item_power_treads",
 	"item_blink",
-	"item_black_king_bar",
+	"item_ultimate_scepter",
 	"item_travel_boots",
 	"item_glimmer_cape",
 	"item_sange_and_yasha",
+	"item_ultimate_scepter_2",
+	"item_blade_mail",
 	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 18,121 matches (Util/item-builds/generate.js).

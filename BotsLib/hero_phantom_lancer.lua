@@ -27,14 +27,16 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_wraith_band",
 	"item_power_treads",
 	"item_manta",
-	"item_skadi",
+	"item_ultimate_scepter",
+	"item_orchid",
 	"item_aghanims_shard",
-	"item_heart",
+	"item_bloodthorn",
 	sButterfly,
 	sMkbOrAbyssal,
 	"item_ultimate_scepter_2",
 	"item_travel_boots",
 	"item_moon_shard",
+	"item_disperser",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 2,755 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
@@ -47,13 +49,14 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_wraith_band",
 	"item_power_treads",
 	"item_manta",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_skadi",
 	"item_heart",
 	sButterfly,
 	sMkbOrAbyssal,
-	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_phylactery",
+	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4 has 583 matches, built from pos 5 (1,178) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
@@ -65,14 +68,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
+	"item_manta",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_skadi",
 	sButterfly,
 	"item_heart",
 	sMkbOrAbyssal,
 	"item_ultimate_scepter_2",
-	"item_sange",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,178 matches (Util/item-builds/generate.js).
@@ -85,14 +87,13 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_magic_wand",
 	"item_wraith_band",
 	"item_power_treads",
+	"item_manta",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_skadi",
 	sButterfly,
 	"item_heart",
 	sMkbOrAbyssal,
 	"item_ultimate_scepter_2",
-	"item_sange",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,631 matches (Util/item-builds/generate.js).
@@ -106,13 +107,15 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_wraith_band",
 	"item_power_treads",
 	"item_manta",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_skadi",
 	"item_heart",
 	sButterfly,
 	sMkbOrAbyssal,
-	"item_moon_shard",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
+	"item_disperser",
+	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }

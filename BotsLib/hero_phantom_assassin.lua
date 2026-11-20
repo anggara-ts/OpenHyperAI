@@ -27,7 +27,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_desolator",
 	"item_black_king_bar",
 	"item_basher",
-	"item_sange",
 	"item_satanic",
 	"item_abyssal_blade",
 	"item_aghanims_shard",
@@ -48,12 +47,13 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_desolator",
 	"item_black_king_bar",
 	"item_basher",
-	"item_sange",
-	"item_satanic",
+	"item_abyssal_blade",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_travel_boots",
-	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_moon_shard",
+	"item_nullifier",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4, 1,795 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
@@ -67,8 +67,9 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_desolator",
 	"item_basher",
 	"item_black_king_bar",
-	"item_satanic",
+	"item_abyssal_blade",
 	"item_travel_boots",
+	"item_monkey_king_bar",
 	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -86,7 +87,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_desolator",
 	"item_black_king_bar",
 	"item_basher",
-	"item_sange",
+	"item_abyssal_blade",
 	"item_satanic",
 	"item_travel_boots",
 	"item_aghanims_shard",
@@ -105,19 +106,14 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_desolator",
 	"item_black_king_bar",
 	"item_basher",
-	"item_sange",
-	"item_satanic",
+	"item_abyssal_blade",
 	"item_aghanims_shard",
 	"item_travel_boots",
-	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_satanic",
-	"item_sange",
-}
+X["sSellList"] = {}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_PA" }, { "item_power_treads", "item_quelling_blade" }
 end

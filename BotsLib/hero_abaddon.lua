@@ -39,14 +39,12 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_radiance",
 	"item_manta",
 	"item_blink",
+	"item_orchid",
 	"item_basher",
-	"item_sange",
+	"item_bloodthorn",
 	"item_abyssal_blade",
-	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_swift_blink",
 	"item_ultimate_scepter_2",
-	"item_monkey_king_bar",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2 has 703 matches, built from pos 3 (15,674) (Util/item-builds/generate.js).
@@ -141,9 +139,6 @@ X["sSellList"] = {
 	"item_magic_wand",
 	"item_wind_waker",
 	"item_blade_mail",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_ultimate_scepter",
-	"item_sange",
 }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}

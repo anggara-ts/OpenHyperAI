@@ -94,8 +94,7 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_skadi",
 	"item_ultimate_scepter_2",
 	"item_disperser",
-	"item_lesser_crit",
-	"item_greater_crit",
+	"item_maelstrom",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4, 5,380 matches (Util/item-builds/generate.js).

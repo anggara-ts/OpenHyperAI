@@ -70,11 +70,11 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_glimmer_cape",
 	"item_force_staff",
 	"item_ultimate_scepter",
-	"item_kaya",
 	"item_ultimate_scepter_2",
 	"item_gungir",
 	"item_hurricane_pike",
 	"item_witch_blade",
+	"item_octarine_core",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 85,039 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {

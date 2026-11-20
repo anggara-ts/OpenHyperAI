@@ -80,15 +80,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_power_treads",
 	"item_manta",
 	"item_ultimate_scepter",
-	"item_black_king_bar",
-	"item_travel_boots",
+	"item_butterfly",
 	"item_satanic",
 	"item_ultimate_scepter_2",
 	"item_soul_booster",
 	"item_shivas_guard",
 	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,838 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
@@ -101,9 +99,9 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_mask_of_madness",
 	"item_manta",
 	"item_ultimate_scepter",
-	"item_black_king_bar",
 	"item_butterfly",
-	"item_lesser_crit",
+	"item_black_king_bar",
+	"item_travel_boots",
 	"item_satanic",
 	"item_ultimate_scepter_2",
 	"item_refresher",
@@ -111,15 +109,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_black_king_bar",
-	"item_quelling_blade",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_lesser_crit",
-	"item_mask_of_madness",
-	"item_satanic",
-	"item_lesser_crit",
-}
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_ranged_carry" }, {}
 end

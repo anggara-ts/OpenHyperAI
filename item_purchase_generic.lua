@@ -78,6 +78,8 @@ local function FixTravelBoots(list)
 	return out
 end
 local buyList = FixTravelBoots(heroModule["sBuyList"])
+-- The farm rules (Site.ConsiderIsTimeToFarm) read the list: an item it never buys is not waited for (#38).
+bot.ohaBuyList = buyList
 local sellList = heroModule["sSellList"]
 if buyList == nil then
 	log("[ERROR] Can't load purchase list for: %s", botName)
@@ -1287,6 +1289,7 @@ function ItemPurchaseThink()
 		if loaded and newHeroModule ~= nil and newHeroModule["sBuyList"] ~= nil then
 			heroModule = newHeroModule
 			buyList = FixTravelBoots(newHeroModule["sBuyList"])
+			bot.ohaBuyList = buyList
 			sellList = newHeroModule["sSellList"]
 		else
 			buyList = {}
@@ -1402,6 +1405,7 @@ function ItemPurchaseThink()
 		if loaded and newHeroModule ~= nil and newHeroModule["sBuyList"] ~= nil then
 			heroModule = newHeroModule
 			buyList = FixTravelBoots(newHeroModule["sBuyList"])
+			bot.ohaBuyList = buyList
 			sellList = newHeroModule["sSellList"]
 		end
 		if buyList then

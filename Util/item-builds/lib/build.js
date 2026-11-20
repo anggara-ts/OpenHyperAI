@@ -35,6 +35,12 @@ const MAIN_BOOTS = ["item_power_treads", "item_phase_boots", "item_arcane_boots"
 const DOUBLE = new Set(["item_branches", "item_circlet", "item_mantle", "item_slippers", "item_gauntlets", "item_clarity", "item_flask", "item_enchanted_mango", "item_tango"]);
 // Never a list entry of its own: wards, dust, smoke, scrolls and the like are bought by other code.
 const NOT_AN_ENTRY = /^item_(ward_|smoke_of_deceit|dust|tpscroll|gem|rapier|tome_of_knowledge|recipe_|famango|great_famango|greater_famango|cheese|aegis|refresher_shard)/;
+// Build-up parts, never a list entry of their own (maintainer, 2026-11-20: a list sells an early item it replaced,
+// like boots for Boots of Travel or Falcon Blade for a better item, not a part). The 7.41f data counts them as
+// purchases on the way to items whose 7.42 recipes no longer use them (Heaven's Halberd was Sange + Talisman of
+// Evasion; 7.42: Ogre Axe + Helm of Iron Will), so isPart missed them and 16 lists sold a Sange, Perseverance or
+// Crystalys. Their upgrades in a list still buy them as components.
+const BUILD_PARTS = new Set(["item_sange", "item_yasha", "item_kaya", "item_pers", "item_lesser_crit"]);
 const START_ONLY = new Set(["item_tango", "item_flask", "item_clarity", "item_enchanted_mango", "item_faerie_fire", "item_blood_grenade", "item_branches"]);
 const SINKS = ["item_aghanims_shard", "item_moon_shard", "item_ultimate_scepter_2", "item_travel_boots_2"];
 
@@ -179,7 +185,7 @@ function makeBuilder(game, sim) {
 		const picked = [];
 		for (const item of candidates.slice().sort((a, b) => b.rate - a.rate)) {
 			if (item.rate < floorAt(item.minute)) continue;
-			if (isPart(item.name) || headTree.has(item.name)) continue;
+			if (isPart(item.name) || BUILD_PARTS.has(item.name) || headTree.has(item.name)) continue;
 			if (noUseRule(item.name) && item.name !== "item_radiance") {
 				gaps.push(`${item.name} (${Math.round(item.rate * 100)}%) has an active and no use rule: left out`);
 				continue;
@@ -192,7 +198,7 @@ function makeBuilder(game, sim) {
 		for (const wait of input.waits || []) {
 			// A wait with no net-worth cap never ends: the list buys the item. (The capped waits the old lists
 			// bought are pins in pins.json.)
-			if (wait.cap === null && buyable(wait.item) && !forbid.has(wait.item) && !variableItems.has(wait.item)) forced.set(wait.item, "farm rule waits for it");
+			if (!wait.listAware && wait.cap === null && buyable(wait.item) && !forbid.has(wait.item) && !variableItems.has(wait.item)) forced.set(wait.item, "farm rule waits for it");
 		}
 		const minuteFromOld = (name) => {
 			const at = oldNames.indexOf(name);
@@ -388,7 +394,7 @@ function makeBuilder(game, sim) {
 		const freeSlots = () => 6 - walk(true).keepers;
 		const upgradesHeld = (name) => list.some((other) => other.name && other.name !== name && tree(name).has(other.name) && bundle[other.name] !== undefined);
 		const extra = candidates
-			.filter((item) => item.rate >= TUNING.topUpFloor && item.matches >= TUNING.topUpMatches && !isPart(item.name) && !headTree.has(item.name))
+			.filter((item) => item.rate >= TUNING.topUpFloor && item.matches >= TUNING.topUpMatches && !isPart(item.name) && !BUILD_PARTS.has(item.name) && !headTree.has(item.name))
 			.filter((item) => !noUseRule(item.name) && cost(item.name) >= 1500)
 			.sort((a, b) => b.rate - a.rate);
 		let toppedUp = 0;
@@ -406,7 +412,7 @@ function makeBuilder(game, sim) {
 		lastMinute = Math.max(0, ...list.map((entry) => entry.minute));
 		const tailKept = [];
 		for (const name of oldNames) {
-			if (SINKS.includes(name) || NO_SLOT.has(name) || BOOTS.has(name) || !buyable(name) || cost(name) < 1500) continue;
+			if (SINKS.includes(name) || NO_SLOT.has(name) || BOOTS.has(name) || BUILD_PARTS.has(name) || !buyable(name) || cost(name) < 1500) continue;
 			if (list.some((other) => other.name === name) || dropped.some((text) => text.startsWith(name + " "))) continue;
 			if ([...list].some((other) => other.name && tree(other.name).has(name))) continue;
 			if (freeSlots() <= 0 && !upgradesHeld(name)) continue;

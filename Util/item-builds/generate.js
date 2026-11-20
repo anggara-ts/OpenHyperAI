@@ -248,7 +248,7 @@ async function main() {
 				// Farm-rule items this list does not buy (it did not buy them before either): the rule's net-worth cap ends the wait.
 				// (A random or team pick may still hold one of them; only what every game buys counts here.)
 				const bought = new Set(result.entries.flatMap((entry) => (entry.name ? [...sim.closure(entry.name)] : [])));
-				const missing = (game.farm[hero] || []).filter((wait) => !bought.has(wait.item));
+				const missing = (game.farm[hero] || []).filter((wait) => !wait.listAware && !bought.has(wait.item));
 				if (missing.length) info.farmWaitsNotBought = missing.map((wait) => `${wait.item} (until ${wait.cap === null ? "NEVER ENDS" : wait.cap})`);
 			} else {
 				info.reason = todo.reason;

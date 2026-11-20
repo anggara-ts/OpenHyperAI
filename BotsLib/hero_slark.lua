@@ -28,12 +28,12 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_diffusal_blade",
 	"item_invis_sword",
 	"item_ultimate_scepter",
-	"item_silver_edge",
+	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_abyssal_blade",
+	"item_skadi",
 	"item_ultimate_scepter_2",
 	"item_echo_sabre",
-	"item_blink",
+	"item_harpoon",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 39,645 matches (Util/item-builds/generate.js).
@@ -50,9 +50,9 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_black_king_bar",
-	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
 	"item_echo_sabre",
+	"item_abyssal_blade",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 15,241 matches (Util/item-builds/generate.js).
@@ -67,13 +67,11 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_diffusal_blade",
 	"item_invis_sword",
 	"item_ultimate_scepter",
-	"item_silver_edge",
 	"item_aghanims_shard",
-	"item_basher",
+	"item_black_king_bar",
 	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
 	"item_echo_sabre",
-	"item_monkey_king_bar",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4, 6,119 matches (Util/item-builds/generate.js).
@@ -89,8 +87,8 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_invis_sword",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_abyssal_blade",
 	"item_skadi",
+	"item_echo_sabre",
 	"item_disperser",
 	"item_ultimate_scepter_2",
 	"item_consecrated_wraps",

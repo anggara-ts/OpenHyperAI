@@ -120,7 +120,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_rod_of_atos",
 	"item_dragon_lance",
 	"item_force_staff",
-	"item_pers",
+	"item_travel_boots",
 	"item_hurricane_pike",
 	"item_aghanims_shard",
 	sSphereOrLotus,

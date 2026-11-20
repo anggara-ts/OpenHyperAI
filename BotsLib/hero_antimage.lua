@@ -24,8 +24,8 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_bfury",
 	"item_manta",
 	"item_butterfly",
-	"item_black_king_bar",
-	"item_sange",
+	"item_basher",
+	"item_skadi",
 	"item_abyssal_blade",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
@@ -44,14 +44,13 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
+	"item_butterfly",
 	"item_black_king_bar",
-	"item_sange",
 	"item_abyssal_blade",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
-	"item_vanguard",
 	"item_aghanims_shard",
+	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 5,671 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
@@ -65,8 +64,8 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
-	"item_sange",
-	"item_black_king_bar",
+	"item_butterfly",
+	"item_ultimate_scepter",
 	"item_abyssal_blade",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
@@ -87,8 +86,9 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
-	"item_sange",
-	"item_black_king_bar",
+	"item_butterfly",
+	"item_abyssal_blade",
+	"item_monkey_king_bar",
 	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -104,22 +104,17 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
-	"item_black_king_bar",
-	"item_sange",
+	"item_butterfly",
+	"item_ultimate_scepter",
 	"item_abyssal_blade",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
 	"item_diffusal_blade",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_skadi",
-	"item_magic_wand",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_abyssal_blade",
-	"item_sange",
-}
+X["sSellList"] = { "item_skadi", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

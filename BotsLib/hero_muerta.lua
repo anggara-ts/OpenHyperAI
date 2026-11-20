@@ -103,7 +103,6 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
 	"item_sheepstick",
-	"item_glimmer_cape",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
@@ -119,7 +118,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_rod_of_atos",
 	"item_ultimate_scepter",
 	"item_dragon_lance",
-	"item_lesser_crit",
+	"item_blink",
 	"item_black_king_bar",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",

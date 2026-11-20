@@ -34,7 +34,8 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_ultimate_scepter_2",
 	"item_overwhelming_blink",
 	"item_refresher",
-	"item_sange",
+	"item_basher",
+	"item_abyssal_blade",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
@@ -58,7 +59,6 @@ sRoleItemsBuyList["pos_2"] = {
 	sUtility,
 	"item_ultimate_scepter_2",
 	"item_overwhelming_blink",
-	"item_veil_of_discord",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }

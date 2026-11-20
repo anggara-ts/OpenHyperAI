@@ -57,7 +57,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_travel_boots",
 	"item_black_king_bar",
 	"item_ultimate_scepter",
-	"item_sange",
 	"item_refresher",
 	"item_ultimate_scepter_2",
 	"item_cyclone",
@@ -141,8 +140,6 @@ X["sSellList"] = {
 	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
 	"item_greater_crit",
 	"item_falcon_blade",
-	"item_refresher",
-	"item_sange",
 }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}

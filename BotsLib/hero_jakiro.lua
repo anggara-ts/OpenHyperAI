@@ -54,7 +54,7 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_aether_lens",
 	"item_aeon_disk",
-	"item_kaya",
+	"item_gungir",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
@@ -124,7 +124,7 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_devastator",
 	"item_ultimate_scepter_2",
 	"item_invis_sword",
-	"item_lesser_crit",
+	"item_satanic",
 	"item_silver_edge",
 	"item_moon_shard",
 }

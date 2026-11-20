@@ -22,17 +22,16 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_wraith_band",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_mask_of_madness",
-	"item_maelstrom",
-	"item_yasha",
-	"item_mjollnir",
+	"item_bfury",
 	"item_manta",
+	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_monkey_king_bar",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
+	"item_refresher",
 	"item_travel_boots",
+	"item_moon_shard",
 	"item_travel_boots_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 2,771 matches (Util/item-builds/generate.js).
@@ -46,10 +45,11 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_mask_of_madness",
-	"item_maelstrom",
+	"item_lesser_crit",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_monkey_king_bar",
+	"item_greater_crit",
 	"item_ultimate_scepter_2",
 	"item_refresher",
 	"item_aghanims_shard",
@@ -66,10 +66,12 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_magic_wand",
 	"item_power_treads",
 	"item_mask_of_madness",
-	"item_maelstrom",
 	"item_manta",
 	"item_ultimate_scepter",
+	"item_lesser_crit",
 	"item_black_king_bar",
+	"item_greater_crit",
+	"item_refresher",
 	"item_ultimate_scepter_2",
 	"item_skadi",
 	"item_aghanims_shard",
@@ -111,12 +113,19 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
 	"item_refresher",
+	"item_skadi",
 	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+X["sSellList"] = {
+	"item_black_king_bar",
+	"item_quelling_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_refresher",
+	"item_mask_of_madness",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

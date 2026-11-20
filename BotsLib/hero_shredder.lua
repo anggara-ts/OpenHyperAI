@@ -47,7 +47,6 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_arcane_boots",
 	"item_kaya_and_sange",
 	"item_blink",
-	"item_pers",
 	sUtility,
 	"item_shivas_guard",
 	"item_ultimate_scepter",
@@ -69,7 +68,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_arcane_boots",
 	"item_kaya_and_sange",
 	"item_blink",
-	"item_pers",
 	sUtility,
 	"item_shivas_guard",
 	"item_ultimate_scepter",
@@ -94,7 +92,6 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_kaya",
 	"item_blink",
 	"item_kaya_and_sange",
-	"item_pers",
 	sUtility,
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
@@ -106,13 +103,7 @@ sRoleItemsBuyList["pos_4"] = {
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5 has 492 matches, built from pos 4 (1,892) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_black_king_bar",
-	"item_quelling_blade",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_ultimate_scepter",
-	"item_pers",
-}
+X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_mid" }, {}
 end

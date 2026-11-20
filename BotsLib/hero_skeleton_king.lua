@@ -48,8 +48,8 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_aghanims_shard",
 	"item_black_king_bar",
 	"item_assault",
-	"item_sange",
 	"item_ultimate_scepter_2",
+	"item_harpoon",
 	"item_overwhelming_blink",
 	"item_moon_shard",
 }
@@ -91,8 +91,8 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter",
 	"item_assault",
 	"item_ultimate_scepter_2",
-	"item_sange",
 	"item_armlet",
+	"item_harpoon",
 	"item_overwhelming_blink",
 	"item_moon_shard",
 }
@@ -114,8 +114,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_assault",
 	"item_ultimate_scepter_2",
 	"item_echo_sabre",
-	"item_sange",
-	"item_harpoon",
+	"item_abyssal_blade",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]

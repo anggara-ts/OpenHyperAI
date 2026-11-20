@@ -32,8 +32,8 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_magic_wand",
 	"item_boots",
 	"item_blink",
-	"item_kaya",
 	"item_travel_boots",
+	"item_ethereal_blade",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_sheepstick",
@@ -41,7 +41,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_octarine_core",
 	"item_wind_waker",
 	"item_arcane_blink",
-	"item_kaya_and_sange",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 3,233 matches (Util/item-builds/generate.js).
@@ -55,8 +54,8 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_magic_wand",
 	"item_boots",
 	"item_blink",
-	"item_kaya",
 	"item_travel_boots",
+	"item_ethereal_blade",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_sheepstick",
@@ -64,7 +63,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_octarine_core",
 	"item_wind_waker",
 	"item_arcane_blink",
-	"item_kaya_and_sange",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 730 matches, built from pos 2 (3,233) (Util/item-builds/generate.js).
@@ -78,8 +76,8 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_magic_wand",
 	"item_boots",
 	"item_blink",
-	"item_kaya",
 	"item_travel_boots",
+	"item_ethereal_blade",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
 	"item_sheepstick",
@@ -87,7 +85,6 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_octarine_core",
 	"item_wind_waker",
 	"item_arcane_blink",
-	"item_kaya_and_sange",
 	"item_moon_shard",
 	"item_travel_boots_2",
 }

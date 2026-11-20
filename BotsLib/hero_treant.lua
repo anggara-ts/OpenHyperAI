@@ -46,13 +46,13 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_ring_of_basilius",
 	"item_arcane_boots",
 	"item_blink",
-	"item_meteor_hammer",
+	"item_aghanims_shard",
 	"item_mekansm",
 	"item_ultimate_scepter",
 	"item_guardian_greaves",
 	"item_refresher",
 	"item_lotus_orb",
-	"item_aghanims_shard",
+	"item_solar_crest",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
@@ -66,56 +66,20 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_bracer",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_meteor_hammer",
+	"item_echo_sabre",
 	"item_blink",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_ultimate_scepter_2",
-	"item_lesser_crit",
 	"item_blade_mail",
+	"item_heart",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 308 matches, built from pos 3 (2,313) (Util/item-builds/generate.js).
-sRoleItemsBuyList["pos_1"] = {
-	"item_tango",
-	"item_branches",
-	"item_quelling_blade",
-	"item_gauntlets",
-	"item_magic_stick",
-	"item_bracer",
-	"item_magic_wand",
-	"item_power_treads",
-	"item_echo_sabre",
-	"item_blink",
-	"item_ultimate_scepter",
-	"item_black_king_bar",
-	"item_ultimate_scepter_2",
-	"item_lesser_crit",
-	"item_blade_mail",
-	"item_aghanims_shard",
-	"item_moon_shard",
-}
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2 has 361 matches, built from pos 3 (2,313) (Util/item-builds/generate.js).
-sRoleItemsBuyList["pos_2"] = {
-	"item_tango",
-	"item_branches",
-	"item_quelling_blade",
-	"item_gauntlets",
-	"item_magic_stick",
-	"item_bracer",
-	"item_magic_wand",
-	"item_power_treads",
-	"item_echo_sabre",
-	"item_blink",
-	"item_ultimate_scepter",
-	"item_black_king_bar",
-	"item_ultimate_scepter_2",
-	"item_lesser_crit",
-	"item_blade_mail",
-	"item_aghanims_shard",
-	"item_moon_shard",
-}
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

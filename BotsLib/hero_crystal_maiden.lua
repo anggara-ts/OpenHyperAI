@@ -27,7 +27,6 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_ultimate_scepter_2",
 	"item_force_staff",
 	"item_aeon_disk",
-	"item_kaya",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
@@ -81,7 +80,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_magic_wand",
 	"item_tranquil_boots",
 	"item_blink",
-	"item_kaya",
 	"item_black_king_bar",
 	"item_ultimate_scepter",
 	"item_travel_boots",
@@ -104,7 +102,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_magic_wand",
 	"item_tranquil_boots",
 	"item_blink",
-	"item_kaya",
 	"item_black_king_bar",
 	"item_ultimate_scepter",
 	"item_travel_boots",

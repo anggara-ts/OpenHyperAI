@@ -21,13 +21,12 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_ring_of_protection",
 	"item_bracer",
 	"item_magic_wand",
+	"item_vanguard",
 	"item_phase_boots",
 	"item_blink",
-	"item_pipe",
-	"item_pers",
+	"item_heart",
 	sUtility,
 	"item_aghanims_shard",
-	"item_shivas_guard",
 	"item_ultimate_scepter",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
@@ -46,13 +45,13 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_magic_wand",
 	"item_phase_boots",
 	"item_blink",
-	"item_pipe",
-	"item_pers",
+	"item_heart",
 	sUtility,
 	"item_aghanims_shard",
 	"item_shivas_guard",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
+	"item_consecrated_wraps",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 4, 2,460 matches (Util/item-builds/generate.js).
@@ -65,12 +64,11 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_magic_wand",
 	"item_phase_boots",
 	"item_blink",
-	"item_pipe",
-	"item_pers",
 	sUtility,
+	"item_heart",
 	"item_aghanims_shard",
-	"item_overwhelming_blink",
 	"item_black_king_bar",
+	"item_ultimate_scepter",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
@@ -85,8 +83,8 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_magic_wand",
 	"item_tranquil_boots",
 	"item_blink",
-	"item_pipe",
 	sUtility,
+	"item_heart",
 	"item_shivas_guard",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter",
@@ -95,13 +93,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_ultimate_scepter_2",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_power_treads",
-	"item_quelling_blade",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_ultimate_scepter",
-	"item_pers",
-}
+X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

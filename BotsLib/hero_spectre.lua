@@ -26,13 +26,11 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_manta",
 	"item_skadi",
 	"item_basher",
-	"item_sange",
+	"item_butterfly",
 	"item_abyssal_blade",
 	"item_aghanims_shard",
-	"item_ultimate_scepter",
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
-	"item_black_king_bar",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 3,291 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
@@ -47,8 +45,8 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_manta",
 	"item_basher",
 	"item_skadi",
-	"item_sange",
 	"item_ultimate_scepter",
+	"item_abyssal_blade",
 	"item_aghanims_shard",
 	"item_ultimate_scepter_2",
 	"item_black_king_bar",
@@ -67,8 +65,9 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_manta",
 	"item_basher",
 	"item_skadi",
-	"item_sange",
+	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
+	"item_diffusal_blade",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
@@ -85,8 +84,9 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_manta",
 	"item_basher",
 	"item_skadi",
-	"item_sange",
+	"item_abyssal_blade",
 	"item_ultimate_scepter_2",
+	"item_diffusal_blade",
 	"item_aghanims_shard",
 	"item_moon_shard",
 }
@@ -114,10 +114,10 @@ X["sSellList"] = {
 	"item_manta",
 	"item_quelling_blade",
 	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_sange",
+	"item_butterfly",
 	"item_urn_of_shadows",
 	"item_ultimate_scepter",
-	"item_sange",
+	"item_urn_of_shadows",
 }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}

@@ -98,9 +98,9 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_sange_and_yasha",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_satanic",
 	"item_ultimate_scepter_2",
 	"item_consecrated_wraps",
+	"item_shivas_guard",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,551 matches (Util/item-builds/generate.js).
@@ -116,10 +116,9 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_sange_and_yasha",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_ultimate_scepter",
-	"item_satanic",
 	"item_ultimate_scepter_2",
 	"item_blade_mail",
+	"item_consecrated_wraps",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]

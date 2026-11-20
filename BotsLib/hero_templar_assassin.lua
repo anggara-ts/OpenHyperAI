@@ -50,13 +50,13 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_desolator",
 	"item_blink",
 	"item_dragon_lance",
-	"item_hurricane_pike",
+	"item_greater_crit",
 	"item_black_king_bar",
-	"item_monkey_king_bar",
 	"item_aghanims_shard",
 	"item_swift_blink",
 	"item_travel_boots",
 	"item_moon_shard",
+	"item_hydras_breath",
 	"item_ultimate_scepter_2",
 }
 sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]

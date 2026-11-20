@@ -13,7 +13,7 @@ local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = {
 	-- 7.41b replaced +1 Orb Levels (right) with Forged Spirit armor reduction; take +Chaos Meteors (left).
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
-	{ ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
+	{ ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
 }
 -- 8 levels per orb: 7.41b's extra points at levels 6, 12 and 18 fund the 8th orb level.
 local tAllAbilityBuildList = {

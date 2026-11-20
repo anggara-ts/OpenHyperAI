@@ -237,7 +237,7 @@ T.test("alchemist: which gates a throw may override, and which casts wait for th
 	local X = load()
 	T.eq(X.ConcoctionGateSoft("casting"), true, "another cast")
 	T.eq(X.ConcoctionGateSoft("queued"), true, "a queued order")
-	T.eq(X.ConcoctionGateSoft("channeling"), true, "a channel")
+	T.eq(X.ConcoctionGateSoft("channeling"), false, "a channel (maybe an escape Town Portal)")
 	T.eq(X.ConcoctionGateSoft("stunned"), false, "stunned")
 	T.eq(X.ConcoctionGateSoft("silenced"), false, "silenced")
 	T.eq(X.ConcoctionGateSoft("other"), false, "invulnerable and the rest")
@@ -308,4 +308,61 @@ T.test("alchemist: a brew whose end is seen long after (he died meanwhile) reads
 	Stub.time = 966
 	X.SkillsComplement()
 	T.ok(printedLine("concoction brew%-end outcome=died brewed=66.0s seen=1.0s"), "died, not unknown")
+end)
+
+T.test("alchemist: no brew on a low hero his allies are finishing", function()
+	local X = load()
+	local bot = GetBot()
+	local brew = bot:GetAbilityByName("alchemist_unstable_concoction")
+	local throw = bot:GetAbilityByName("alchemist_unstable_concoction_throw")
+	local values = { brew_explosion = 5.5, brew_time = 5.0, max_damage = 360, move_speed = 16 }
+	brew.GetSpecialValueFloat = function(_, key)
+		return values[key] or 0
+	end
+	brew.GetSpecialValueInt = brew.GetSpecialValueFloat
+	brew.IsFullyCastable = function()
+		return true
+	end
+	throw.GetCastRange = function()
+		return 775
+	end
+	throw.IsHidden = function()
+		return true
+	end
+	local started = false
+	bot.Action_UseAbility = function(_, ability)
+		if ability:GetName() == "alchemist_unstable_concoction" then
+			started = true
+		end
+	end
+	for _, enemy in ipairs(Stub.teams[GetOpposingTeam()]) do
+		enemy._loc = bot._loc + Vector(9000, 0, 0)
+	end
+	local ally
+	for _, unit in ipairs(Stub.teams[GetTeam()]) do
+		if unit ~= bot then
+			unit._loc = bot._loc + Vector(-9000, 0, 0)
+			ally = ally or unit
+		end
+	end
+	-- 15% HP at 400: max damage kills it, so the kill rule would start a brew.
+	local enemy = Stub.teams[GetOpposingTeam()][1]
+	enemy._loc = bot._loc + Vector(400, 0, 0)
+	enemy._hp = 150
+	enemy.GetActualIncomingDamage = function(_, damage)
+		return damage
+	end
+	ally._loc = enemy._loc + Vector(200, 0, 0)
+	Stub.time = 1000
+	X.SkillsComplement()
+	T.eq(started, false, "an ally is on it and nobody else is in range: no brew")
+	T.ok(
+		printedLine("concoction no%-brew why=allies%-finishing rule=kill target=npc_dota_hero_%S+ hp=0.15 allies=1"),
+		"line"
+	)
+	-- The ally walks off: the kill brew starts.
+	ally._loc = bot._loc + Vector(-9000, 0, 0)
+	Stub.time = 1010
+	X.SkillsComplement()
+	T.eq(started, true, "no ally on it: the kill brew starts")
 end)

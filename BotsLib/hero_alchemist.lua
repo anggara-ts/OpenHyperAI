@@ -90,7 +90,6 @@ local brewSeen = false -- the throw ability was seen in the slot since the start
 local brewSeenAt = 0 -- seconds brewed when it was last seen there
 local lastThrowWhy, lastThrowBrewed = "none", 0 -- the last throw order of this brew
 local lastGateWhy, lastGateBrewed = "none", 0 -- the last time the ability gate was closed during this brew
-local lastThrowAt = -999 -- DotaTime of the last throw order
 local brewDisabled = false -- the gate was closed by a stun, silence or hex during this brew (game 057)
 local brewLateGate = 0 -- seconds the gate was closed from the full-brew throw time (4.25s) on
 local brewGateCast = "-" -- the other cast or queued order that closed the gate last
@@ -156,15 +155,16 @@ function X.ConcoctionThreat(brewed, threat)
 	end
 	return nil
 end
--- Gate reasons a throw order may override while brewing: another cast in its cast point, a queued order or a
--- channel (a Town Portal with a brew in hand ends in the explosion). Stun, silence, hex, invulnerability: no.
-local softGateReasons = { casting = true, queued = true, channeling = true }
+-- Gate reasons a throw order may override while brewing: another cast in its cast point or a queued order.
+-- Not a channel (it may be an escape Town Portal), stun, silence, hex or invulnerability.
+local softGateReasons = { casting = true, queued = true }
 function X.ConcoctionGateSoft(reason)
 	return softGateReasons[reason] == true
 end
 -- #34, game 057: his other casts are held while a brew is in hand, so none of them is in its cast point when
--- the throw is due. Acid Spray (cast point 0.2) and Berserk Potion (0.2) wait for the whole brew; Chemical Rage
--- (0.35s transformation, datafeed transformation_time) only from 3.0s brewed, ahead of the 4.25s throws.
+-- the throw is due. Acid Spray and Berserk Potion (7.42 npc_heroes: AbilityCastPoint 0.1 and 0.2) wait for the
+-- whole brew; Chemical Rage (cast point 0.0, 0.35s transformation, datafeed transformation_time) only from 3.0s
+-- brewed, ahead of the 4.25s throws.
 function X.ConcoctionHoldsCast(castName, brewing, brewed)
 	if not brewing then
 		return false
@@ -277,12 +277,14 @@ local function AbilityGateReason()
 	return "other"
 end
 -- The throw he ordered is in its cast point (game data: AbilityCastPoint 0.2): a new order would restart it.
+-- When the active ability can't be read, any cast after a throw order in this brew counts as the throw (he
+-- may have turned or walked first), which is how the gate behaved before.
 local function IsThrowInProgress()
 	local activeAbility = bot:GetCurrentActiveAbility()
 	if activeAbility ~= nil and not activeAbility:IsNull() then
 		return activeAbility:GetName() == "alchemist_unstable_concoction_throw"
 	end
-	return DotaTime() - lastThrowAt < 0.3
+	return lastThrowWhy ~= "none"
 end
 -- Notes a closed gate during a brew for the brew's end line (#34, game 057: the line only named the last
 -- reason, which on most brews was the throw's own cast point).
@@ -437,7 +439,7 @@ end
 local function OrderConcoctionThrow(brewed, gate)
 	local why = unstableConcoctionThrowWhy or "none"
 	X.LogConcoctionThrow(why, unstableConcoctionThrowTarget, brewed, gate)
-	lastThrowWhy, lastThrowBrewed, lastThrowAt = why, brewed, DotaTime()
+	lastThrowWhy, lastThrowBrewed = why, brewed
 	bot:Action_UseAbilityOnEntity(unstableConcoctionThrowAbility, unstableConcoctionThrowTarget)
 end
 -- Another cast from this file is held while a brew is in hand (X.ConcoctionHoldsCast); one line per 3s.
@@ -523,9 +525,9 @@ function X.SkillsComplement()
 		end
 		local gateWhy = AbilityGateReason()
 		NoteBrewGate(gateWhy, brewed)
-		-- #34, game 057: another cast, a queued order or a channel no longer holds a due throw back; the throw
+		-- #34, game 057: another cast or a queued order no longer holds a due throw back; the throw
 		-- order replaces it. Not while the throw itself is in its cast point.
-		if not X.ConcoctionGateSoft(gateWhy) or IsThrowInProgress() then
+		if not X.ConcoctionGateSoft(gateWhy) or gateWhy == "casting" and IsThrowInProgress() then
 			return
 		end
 		ReadContext()
@@ -554,7 +556,7 @@ function X.SkillsComplement()
 	if unstableConcoctionDesire > 0 then
 		brewTarget, brewWhy = unstableConcoctionTarget, unstableConcoctionWhy or "none"
 		brewSeen, brewSeenAt = false, 0
-		lastThrowWhy, lastThrowBrewed, lastThrowAt = "none", 0, -999
+		lastThrowWhy, lastThrowBrewed = "none", 0
 		lastGateWhy, lastGateBrewed = "none", 0
 		brewDisabled, brewLateGate, brewGateCast, brewMaxGap, brewThreatKind = false, 0, "-", 0, "-"
 		hpMarkAt = -999
@@ -720,6 +722,50 @@ function X.ConsiderAcidSpray()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- No brew on a low hero his allies are finishing (X.ConcoctionKillPointless), for the kill and engage starts.
+-- His allies are counted from his own list (within 1600 of him, then within 700 of the target), himself not.
+-- [OHA-ALCHEMIST] concoction no-brew why=allies-finishing, at most every 5s.
+local function BrewWouldBeWasted(enemyHero, nearbyEnemies, rule)
+	local targetHp = Fu.GetHP(enemyHero)
+	if targetHp >= 0.3 then
+		return false
+	end
+	local alliesNearTarget = 0
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(allyHero)
+			and allyHero:GetUnitName() ~= bot:GetUnitName()
+			and not allyHero:IsIllusion()
+			and GetUnitToUnitDistance(allyHero, enemyHero) <= 700
+		then
+			alliesNearTarget = alliesNearTarget + 1
+		end
+	end
+	local otherEnemies = 0
+	for _, otherHero in pairs(nearbyEnemies or {}) do
+		if otherHero ~= enemyHero and Fu.IsValidHero(otherHero) and not Fu.IsSuspiciousIllusion(otherHero) then
+			otherEnemies = otherEnemies + 1
+		end
+	end
+	if not X.ConcoctionKillPointless(targetHp, alliesNearTarget, otherEnemies) then
+		return false
+	end
+	if DotaTime() >= (bot._alchFinishLogAt or -999) then
+		bot._alchFinishLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=allies-finishing rule=%s target=%s hp=%.2f allies=%d",
+				DotaTime(),
+				rule,
+				enemyHero:GetUnitName(),
+				targetHp,
+				alliesNearTarget
+			)
+		)
+	end
+	return true
+end
 -- Returns the desire, the hero the brew is for and the rule that fired (kill, channel, engage, retreat).
 function X.ConsiderUnstableConcoction()
 	if not unstableConcoctionAbility:IsFullyCastable() then
@@ -757,45 +803,11 @@ function X.ConsiderUnstableConcoction()
 				local lethalAfter = brewTime
 					* enemyHero:GetHealth()
 					/ math.max(1, enemyHero:GetActualIncomingDamage(maxDamage, DAMAGE_TYPE_PHYSICAL))
-				if WillStayInThrowRange(enemyHero, lethalAfter, castRange, false) then
-					local targetHp = Fu.GetHP(enemyHero)
-					-- His allies within 700 of the target (its enemies), himself not counted.
-					local alliesNearTarget = 0
-					for _, allyHero in pairs(Fu.GetNearbyHeroes(enemyHero, 700, true, BOT_MODE_NONE) or {}) do
-						if
-							Fu.IsValidHero(allyHero)
-							and allyHero:GetUnitName() ~= bot:GetUnitName()
-							and not allyHero:IsIllusion()
-						then
-							alliesNearTarget = alliesNearTarget + 1
-						end
-					end
-					local otherEnemies = 0
-					for _, otherHero in pairs(nearbyEnemies) do
-						if
-							otherHero ~= enemyHero
-							and Fu.IsValidHero(otherHero)
-							and not Fu.IsSuspiciousIllusion(otherHero)
-						then
-							otherEnemies = otherEnemies + 1
-						end
-					end
-					if not X.ConcoctionKillPointless(targetHp, alliesNearTarget, otherEnemies) then
-						return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
-					end
-					if DotaTime() >= (bot._alchFinishLogAt or -999) then
-						bot._alchFinishLogAt = DotaTime() + 5
-						pcall(
-							print,
-							string.format(
-								"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=allies-finishing target=%s hp=%.2f allies=%d",
-								DotaTime(),
-								enemyHero:GetUnitName(),
-								targetHp,
-								alliesNearTarget
-							)
-						)
-					end
+				if
+					WillStayInThrowRange(enemyHero, lethalAfter, castRange, false)
+					and not BrewWouldBeWasted(enemyHero, nearbyEnemies, "kill")
+				then
+					return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
 				end
 			end
 		end
@@ -817,7 +829,12 @@ function X.ConsiderUnstableConcoction()
 				and WillStayInThrowRange(enemyHero, retreatThrowDelay, castRange, false)
 			then
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1000, false, BOT_MODE_NONE)
-				if nearbyAllies ~= nil and targetAllies ~= nil and #nearbyAllies >= #targetAllies then
+				if
+					nearbyAllies ~= nil
+					and targetAllies ~= nil
+					and #nearbyAllies >= #targetAllies
+					and not BrewWouldBeWasted(enemyHero, nearbyEnemies, "engage")
+				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "engage"
 				end
 			end

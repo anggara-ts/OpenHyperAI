@@ -59,13 +59,18 @@ sRoleItemsBuyList["pos_3"] = {
 }
 sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
 sRoleItemsBuyList["pos_4"] = {
-	"item_enchanted_mango",
+	"item_tango",
 	"item_blood_grenade",
-	"item_priest_outfit",
+	"item_double_branches",
+	"item_circlet",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_urn_of_shadows",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_rod_of_atos",
-	"item_guardian_greaves",
+	"item_boots_of_bearing",
 	"item_gungir",
 	"item_shivas_guard",
 	"item_aghanims_shard",

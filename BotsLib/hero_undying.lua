@@ -16,9 +16,11 @@ local sRoleItemsBuyList = {}
 -- One pair of boots in this build (user rule; Util/boots-check.js).
 -- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 sRoleItemsBuyList["pos_4"] = {
-	"item_blood_grenade",
 	"item_tango",
-	"item_double_branches",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_enchanted_mango",
+	"item_branches",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_essence_distiller",
@@ -32,11 +34,15 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
+	"item_enchanted_mango",
+	"item_magic_stick",
+	"item_branches",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
@@ -63,7 +69,13 @@ sRoleItemsBuyList["pos_1"] = {
 }
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_magic_stick",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_blade_mail",
 	"item_crimson_guard",
 	"item_aghanims_shard",

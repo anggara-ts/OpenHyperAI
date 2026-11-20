@@ -51,7 +51,7 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_double_circlet",
 	"item_bottle",
 	"item_magic_wand",
-	"item_arcane_boots",
+	"item_power_treads",
 	"item_orchid",
 	"item_ultimate_scepter",
 	"item_aghanims_shard",
@@ -83,7 +83,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_wind_waker",
 }
 sRoleItemsBuyList["pos_5"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_holy_locket",
 	"item_glimmer_cape",
 	"item_guardian_greaves",

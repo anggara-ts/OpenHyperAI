@@ -33,7 +33,13 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_mantle",
+	"item_magic_wand",
+	"item_null_talisman",
+	"item_power_treads",
 	"item_falcon_blade",
 	"item_witch_blade",
 	"item_kaya_and_sange",

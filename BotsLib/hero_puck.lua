@@ -325,18 +325,39 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = Fu.GetMP(bot)
 	phaseShiftDesire = X.ConsiderPhaseShift()
+	-- Hold first, cast one frame later (game 055: 12 of 33 shifts held the full duration; 20 ended after
+	-- 0.03-0.17s, in retreat or attack mode). For Puck both modes are Valve's own: our retreat file has no Think
+	-- and our attack mode only replaces Valve's for a few heroes, so neither can be paused by the cast hold, and
+	-- their Think replaced the cast order. The outpost mode's hold (desire 1.5, Think gives no order) is asked for
+	-- first; the cast goes out once it is the active mode, or after 0.2s at most.
+	local outpostMode = BOT_MODE_OUTPOST or 26
+	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode then
+		if bot._phaseWantAt == nil or DotaTime() - bot._phaseWantAt > 0.5 then
+			bot._phaseWantAt = DotaTime()
+			bot._phaseWantMode = bot:GetActiveMode()
+			return
+		end
+		if DotaTime() - bot._phaseWantAt < 0.2 then
+			return
+		end
+	end
 	if phaseShiftDesire > 0 then
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s why=%s",
+				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s why=%s from-mode=%s mode=%d waited=%.2f",
 				DotaTime(),
 				Fu.GetHP(bot),
 				#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000),
 				tostring(isRetreating),
-				tostring(X.phaseWhy)
+				tostring(X.phaseWhy),
+				tostring(bot._phaseWantMode),
+				bot:GetActiveMode(),
+				bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt or -1
 			)
 		)
+		bot._phaseWantAt = nil
+		bot._phaseWantMode = nil
 		bot._phaseProbeAt = DotaTime() + 0.3
 		bot._phaseOrderAt = DotaTime()
 		bot._phaseOrderLoc = bot:GetLocation()

@@ -2040,8 +2040,12 @@ heroSpecificDesire["npc_dota_hero_puck"] = function()
 		local hurt = orderAt ~= nil
 			and DotaTime() - orderAt > 0.15
 			and bot:WasRecentlyDamagedByAnyHero(DotaTime() - orderAt - 0.1)
+		-- hero_puck.lua asks for the hold before it casts (bot._phaseWantAt): the cast goes out once this mode is
+		-- active, so Valve's retreat / attack Think can no longer replace the order (game 055).
+		local wanted = bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt < 0.3
 		if
-			not hurt and orderAt ~= nil and DotaTime() - orderAt < holdFor
+			wanted
+			or not hurt and orderAt ~= nil and DotaTime() - orderAt < holdFor
 			or highPriorityAbility:IsInAbilityPhase()
 			or bot:HasModifier("modifier_puck_phase_shift")
 		then

@@ -9969,7 +9969,16 @@ end
 -- Diagnostic (#15): does a bot in a cyclone (Wind Waker or Eul's, ours or an enemy's) drift? Other modes keep giving
 -- move orders while it lasts, and Wind Waker's cyclone can be moved. One line when it ends: held time, distance moved
 -- and how much closer to the fountain it got.
+-- Game 062, 47:55: Leshrac (84% HP 3.5s before) went into a Wind Waker cyclone while retreating with 4 enemies near,
+-- moved 29 of the 750 a 2.5s cyclone can travel (7.42 item_wind_waker: tornado_speed 300, cyclone_duration 2.5),
+-- landed among them and died a second later (#15). The start and landing fields show whether a self-cyclone buys
+-- anything (enemies still there on landing), and steer= counts the move orders toward the fountain given while a
+-- retreating bot is in a Wind Waker cyclone: if moved= stays small with steer>0, the cyclone cannot be steered.
 local CYCLONE_MODIFIERS = { "modifier_wind_waker", "modifier_item_wind_waker", "modifier_eul_cyclone" }
+local CYCLONE_STEER_GAP = 0.3
+local function CycloneEnemies()
+	return #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+end
 local function TrackCyclone()
 	local found = nil
 	for _, name in ipairs(CYCLONE_MODIFIERS) do
@@ -9980,21 +9989,52 @@ local function TrackCyclone()
 	end
 	local cyclone = bot._cycloneTrack
 	if found ~= nil and cyclone == nil then
-		bot._cycloneTrack =
-			{ name = found, at = DotaTime(), loc = bot:GetLocation(), fountain = bot:DistanceFromFountain() }
+		bot._cycloneTrack = {
+			name = found,
+			at = DotaTime(),
+			loc = bot:GetLocation(),
+			fountain = bot:DistanceFromFountain(),
+			mode = bot:GetActiveMode(),
+			hp = Fu.GetHP(bot),
+			enemies = CycloneEnemies(),
+			rooted = bot:IsRooted(),
+			silenced = bot:IsSilenced(),
+			steer = 0,
+			steerAt = -999,
+		}
+	elseif found ~= nil and cyclone ~= nil then
+		if
+			found ~= "modifier_eul_cyclone"
+			and Fu.IsRetreating(bot)
+			and DotaTime() >= cyclone.steerAt + CYCLONE_STEER_GAP
+			and Fu.GetTeamFountain ~= nil
+		then
+			cyclone.steerAt = DotaTime()
+			cyclone.steer = cyclone.steer + 1
+			bot:Action_MoveToLocation(Fu.GetTeamFountain())
+		end
 	elseif found == nil and cyclone ~= nil then
 		bot._cycloneTrack = nil
 		pcall(
 			print,
 			string.format(
-				"[OHA-ITEM] t=%.0f %s cyclone-end mod=%s held=%.1f moved=%d toFountain=%d mode=%d",
+				"[OHA-ITEM] t=%.0f %s cyclone-end mod=%s held=%.1f moved=%d toFountain=%d mode=%d startMode=%d"
+					.. " startHp=%.2f hp=%.2f startEnemies=%d enemies=%d rooted=%s silenced=%s steer=%d",
 				DotaTime(),
 				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 				cyclone.name,
 				DotaTime() - cyclone.at,
 				GetUnitToLocationDistance(bot, cyclone.loc),
 				cyclone.fountain - bot:DistanceFromFountain(),
-				bot:GetActiveMode()
+				bot:GetActiveMode(),
+				cyclone.mode,
+				cyclone.hp,
+				Fu.GetHP(bot),
+				cyclone.enemies,
+				CycloneEnemies(),
+				tostring(cyclone.rooted),
+				tostring(cyclone.silenced),
+				cyclone.steer
 			)
 		)
 	end

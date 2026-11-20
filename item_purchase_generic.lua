@@ -2522,7 +2522,23 @@ function ItemPurchaseThink()
 								for component, needed in pairs(CountList(components)) do
 									if not string.find(component, "recipe") then
 										for _ = CountItem(bot, component) + 1, needed do
-											table.insert(bot.currBuyingBasicItemList, 1, component)
+											-- A built part (Urn for Spirit Vessel) is bought as its basic parts (#15).
+											local parts = Item.PartsToBuy(component)
+											if #parts ~= 1 or parts[1] ~= component then
+												local short = {}
+												for i, part in ipairs(parts) do
+													short[i] = ShortItem(part)
+												end
+												BuyLog(
+													"rebuild-parts %s parts=%s for=%s",
+													ShortItem(component),
+													table.concat(short, ","),
+													ShortItem(bot.currBuyingItemInPurchaseList)
+												)
+											end
+											for _, part in ipairs(parts) do
+												table.insert(bot.currBuyingBasicItemList, 1, part)
+											end
 										end
 									end
 								end

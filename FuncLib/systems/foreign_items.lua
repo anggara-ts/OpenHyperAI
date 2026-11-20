@@ -39,7 +39,6 @@ ForeignItems.SHAREABLE = {
 	item_tier3_token = true,
 	item_tier4_token = true,
 	item_tier5_token = true,
-	item_tome_of_knowledge = true,
 	item_tpscroll = true,
 	item_ultimate_scepter_roshan = true,
 	item_ward_dispenser = true,

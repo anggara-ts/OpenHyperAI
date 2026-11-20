@@ -166,7 +166,40 @@ local specialDeliveryDesire
 local isAttacking = false
 local botTarget, hpRatio
 local nearbyAllies, nearbyEnemies
+-- #13: ConsiderBodyguard skips allies with "modifier_marci_guardian_buff", the name from when the spell was
+-- Sidekick (marci_guardian). Modifier names are not in the game's text files, so this lists the Marci
+-- modifiers on the partner once per cast, 1-3s after the order (7.42 npc_abilities: cast point 0.2s,
+-- bodyguard_duration 7s), to show in a game whether that name is still the right one.
+local bodyguardOrderTarget, bodyguardOrderAt
+function X.LogBodyguardModifiers()
+	if bodyguardOrderTarget == nil or DotaTime() < bodyguardOrderAt + 1 then
+		return
+	end
+	local target = bodyguardOrderTarget
+	bodyguardOrderTarget = nil
+	if DotaTime() > bodyguardOrderAt + 3 or not Fu.IsValidHero(target) or bodyguardAbility:IsCooldownReady() then
+		return
+	end
+	local mods = {}
+	for i = 0, target:NumModifiers() - 1 do
+		local name = tostring(target:GetModifierName(i))
+		if string.find(name, "marci", 1, true) then
+			mods[#mods + 1] = name
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-MARCI] t=%.0f marci bodyguard-mods target=%s guardianBuff=%s mods=%s",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(target:HasModifier("modifier_marci_guardian_buff")),
+			#mods > 0 and table.concat(mods, ",") or "none"
+		)
+	)
+end
 function X.SkillsComplement()
+	X.LogBodyguardModifiers()
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -196,6 +229,7 @@ function X.SkillsComplement()
 	if bodyguardDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnEntity(bodyguardAbility, bodyguardTarget)
+		bodyguardOrderTarget, bodyguardOrderAt = bodyguardTarget, DotaTime()
 		return
 	end
 end

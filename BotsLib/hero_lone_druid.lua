@@ -7,7 +7,6 @@ local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
-local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 if Utils.GetLoneDruid(bot).hero == nil then
 	Utils.GetLoneDruid(bot).hero = bot
 end
@@ -18,52 +17,34 @@ local tAllAbilityBuildList = { { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 } }
 local nBearAbilityBuildList = { 1, 2, 2, 1, 2, 6, 2, 1, 1, 3, 6, 3, 3, 3, 6 }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+-- One list for every position: the hero-and-bear block (two inventories). It was the only list ever used:
+-- the old per-position lists sat behind `GetAbilityByName("lone_druid_spirit_bear") ~= nil`, which is always
+-- true (Spirit Bear is on his slots), so they were removed (#13). Util/item-builds/pins.json keeps this block
+-- out of the Stratz generator.
 local sRoleItemsBuyList = {}
-local sCoreItemChoices = { "item_mjollnir", "item_radiance" }
-local sCoreItem = sCoreItemChoices[RandomInt(1, #sCoreItemChoices)]
 sRoleItemsBuyList["pos_1"] = {
-	"item_ranged_carry_outfit",
-	"item_mask_of_madness",
-	"item_maelstrom",
-	"item_mjollnir",
-	"item_basher",
-	"item_monkey_king_bar",
+	"item_tango",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_boots",
+	"item_diffusal_blade",
+	"item_desolator",
 	"item_black_king_bar",
-	"item_abyssal_blade",
-	"item_skadi",
-	"item_travel_boots",
-	"item_moon_shard",
+	"item_assault",
 	"item_ultimate_scepter",
+	"item_monkey_king_bar",
 	"item_ultimate_scepter_2",
+	"item_butterfly",
+	"item_moon_shard",
+	"item_satanic",
+	"item_travel_boots",
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
-local hasSpiritBearAbility = bot:GetAbilityByName("lone_druid_spirit_bear") ~= nil
-if hasSpiritBearAbility then
-	X["sBuyList"] = {
-		"item_tango",
-		"item_magic_wand",
-		"item_phase_boots",
-		"item_boots",
-		"item_diffusal_blade",
-		"item_desolator",
-		"item_black_king_bar",
-		"item_assault",
-		"item_ultimate_scepter",
-		"item_monkey_king_bar",
-		"item_ultimate_scepter_2",
-		"item_butterfly",
-		"item_moon_shard",
-		"item_satanic",
-		"item_travel_boots",
-		"item_travel_boots_2",
-	}
-else
-	X["sBuyList"] = sRoleItemsBuyList[sRole]
-end
+X["sBuyList"] = sRoleItemsBuyList["pos_1"]
 X["sSellList"] = {}
 if Utils.GetLoneDruid(bot).roleType == nil then
 	if RandomInt(1, 5) >= 0 then

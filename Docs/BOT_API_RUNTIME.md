@@ -74,6 +74,21 @@ The dump reads the live tables, so it also lists what OpenHyperAI defines or rep
 - Engine globals that our scripts wrap (the engine has them; ours adds checks or logging): `GetScriptDirectory`, `GetTeamPlayers`, `GetUnitToLocationDistance`, `GetUnitToUnitDistance`, `RandomFloat`, `next`, `print`.
 - Methods added to `CDOTA_Bot_Script` by `FuncLib/systems/global_overrides.lua`: `OriginalGetHealth`, `OriginalGetMaxHealth`, and `GetUnitToLocationDistance` as a method (the engine only has the global). It also wraps these engine methods: `ActionImmediate_SwapItems`, `ActionPush_UseAbility`, `Action_AttackUnit`, `Action_UseAbility`, `GetAbilityByName`, `GetAssignedLane`, `GetAttackRange`, `GetAttackTarget`, `GetCastRange`, `GetHealth`, `GetLocation`, `GetMagicResist`, `GetMana`, `GetMaxHealth`, `GetMaxMana`, `GetNearbyCreeps`, `GetNearbyHeroes`, `GetNearbyLaneCreeps`, `GetNearbyNeutralCreeps`, `GetNearbyTowers`, `GetTarget`, `GetUnitName`, `HasModifier`, `IsAttackImmune`, `IsChanneling`, `IsIllusion`, `IsInvulnerable`, `IsMagicImmune`, `IsUsingAbility`, `NumModifiers`, `WasRecentlyDamagedByAnyHero`.
 
+### Globals in the files the engine loads (#13)
+
+A global function written at the top level of a file the engine loads itself (`ability_item_usage_generic.lua`,
+`item_purchase_generic.lua`, `bot_generic.lua`, `hero_selection.lua`, `mode_*_generic.lua`) is **not** in the shared
+`_G`. The globals dump runs inside `ability_item_usage_generic.lua` from its own `ItemUsageThink`, walks `pairs(_G)`,
+and lists none of that file's own callbacks (`ItemUsageThink`, `AbilityUsageThink`, `BuybackUsageThink`), nor
+`ItemPurchaseThink`, `MinionThink` or the `GetDesireHelper` that eight mode files define; it does list the globals
+written by modules loaded with `require` (`ConsiderMove`, `SafeCall`, `VerifyLastSwap`). Same result in all 30 logs
+with the dump up to game 062 (n=167). The files do not share one private table either: in game 062 the
+`GetDesireHelper` of four different mode files each printed its own lines (`[OHA-TORMENTOR] ... stay` from
+`mode_assemble_with_humans_generic.lua`, `[OHA-FARM] ... enemy-camp`, `[OHA-ROAM] ... last-hit-skip`,
+`[OHA-WARD] ... objective-ward`); with one shared table, the last file loaded would have replaced the others. So the
+engine runs each of those files with its own environment, and a top-level helper there needs no `local` to stay
+apart. A global written by a `require`d module (`FuncLib/`, `BotsLib/`) is shared by every bot and every file.
+
 ## Counts
 
 | Group | Functions |

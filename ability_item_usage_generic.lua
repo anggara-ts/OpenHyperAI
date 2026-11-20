@@ -34,20 +34,25 @@ local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
+-- Which bot logs the pings, re-read once a second (#52: five team members read on every item think of every bot).
+local pingLoggerId, pingLoggerAt = nil, -999
 local function LogHumanPing()
 	local myId = bot:GetPlayerID()
-	local loggerId = nil
-	-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review).
-	for slot = 1, #GetTeamPlayers(GetTeam()) do
-		local member = GetTeamMember(slot)
-		if member ~= nil and member:IsBot() and not member:IsIllusion() and member:IsAlive() then
-			local id = member:GetPlayerID()
-			if loggerId == nil or id < loggerId then
-				loggerId = id
+	if DotaTime() >= pingLoggerAt or DotaTime() < pingLoggerAt - 1 then
+		pingLoggerAt = DotaTime() + 1
+		pingLoggerId = nil
+		-- GetTeamMember takes a team slot (1-5), not a player ID (game 037 review).
+		for slot = 1, #GetTeamPlayers(GetTeam()) do
+			local member = GetTeamMember(slot)
+			if member ~= nil and member:IsBot() and not member:IsIllusion() and member:IsAlive() then
+				local id = member:GetPlayerID()
+				if pingLoggerId == nil or id < pingLoggerId then
+					pingLoggerId = id
+				end
 			end
 		end
 	end
-	if loggerId ~= myId then
+	if pingLoggerId ~= myId then
 		return
 	end
 	local human, ping = Utils.GetHumanPing()
@@ -5506,28 +5511,18 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	if bot:GetLevel() > 12 and bot:DistanceFromFountain() < 600 then
 		tpDistance = tpDistance + 600
 	end
-	-- No TP out of the fountain while creeps are hitting our base: at 37:27 Tusk teleported
-	-- out to farm with 3 enemy creeps at our Ancient. Walk out and defend instead.
-	local baseCreeps = 0
-	local ourAncient = GetAncient(GetTeam())
-	if ourAncient ~= nil then
-		for _, creep in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
-			if creep ~= nil and creep:IsAlive() and GetUnitToUnitDistance(creep, ourAncient) <= 1600 then
-				baseCreeps = baseCreeps + 1
-			end
-		end
-	end
-	local baseUnderCreeps = baseCreeps >= 2
-		or Fu.Utils.HighGroundCreepWaveNear ~= nil and Fu.Utils.HighGroundCreepWaveNear(bot, 30000) ~= nil
 	if
 		bot:DistanceFromFountain() < 1500
 		and hpRatio > 0.75
 		and nearbyEnemyCount == 0
 		and not bot:HasModifier("modifier_teleporting")
 		and DotaTime() > 15
-		and not baseUnderCreeps
 		-- An item waits to be sold (item_purchase_generic SellMarkedItems): reach the fountain first.
 		and not (bot._sellPending and bot:DistanceFromFountain() > 500)
+		-- No TP out of the fountain while creeps are hitting our base: at 37:27 Tusk teleported
+		-- out to farm with 3 enemy creeps at our Ancient. Walk out and defend instead. Asked last: it reads every
+		-- enemy creep up to 10 times, and ran on every item think anywhere on the map (#52).
+		and not Fu.Utils.BaseUnderCreeps(bot)
 	then
 		local lane = Usage.GetLaneByPosition(bot)
 		if not Fu.IsInLaningPhase() and DotaTime() > 10 * 60 then
@@ -5878,16 +5873,19 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		-- line at 45%, and with one of our towers within 2500 walk to it instead unless under 35%.
 		tpHpLine = math.min(tpHpLine, 0.45)
 		local ownTowerNear = false
-		for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
-			if
-				building ~= nil
-				and not building:IsNull()
-				and building:IsAlive()
-				and building:IsTower()
-				and GetUnitToUnitDistance(bot, building) < 2500
-			then
-				ownTowerNear = true
-				break
+		-- Only read where it changes the line (#52: every allied building on every retreat think).
+		if hpRatio >= 0.35 and hpRatio < tpHpLine then
+			for _, building in pairs(GetUnitList(UNIT_LIST_ALLIED_BUILDINGS) or {}) do
+				if
+					building ~= nil
+					and not building:IsNull()
+					and building:IsAlive()
+					and building:IsTower()
+					and GetUnitToUnitDistance(bot, building) < 2500
+				then
+					ownTowerNear = true
+					break
+				end
 			end
 		end
 		if ownTowerNear and hpRatio >= 0.35 and hpRatio < tpHpLine then
@@ -6080,7 +6078,8 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		and (botTarget == nil or not botTarget:IsHero())
 	then
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1400, true, BOT_MODE_NONE)
-		local teamFightLocation = Fu.GetTeamFightLocation(bot)
+		-- Looked up only with no enemy hero near, the only case that reads it (#52: it asks every ally's fight).
+		local teamFightLocation = #enemyHeroes == 0 and Fu.GetTeamFightLocation(bot) or nil
 		local hasTravelBoots = false
 		if Fu.IsItemAvailable("item_travel_boots") or Fu.IsItemAvailable("item_travel_boots_2") then
 			hasTravelBoots = true
@@ -9576,17 +9575,16 @@ end
 -- Dust ahead of the item think's busy gate (queued orders and the like), as for the mushrooms:
 -- the Dust rule decides, this only makes sure it can act. Dust is no-target (datafeed).
 function Usage.UseDustNow()
+	-- The Dust slot first (#52): most bots carry no Dust, and the state reads below ran on every item think for them.
+	local slot = bot:FindItemSlot("item_dust")
+	if slot < 0 or slot > 5 then
+		return false
+	end
 	if not bot:IsAlive() or bot:IsStunned() or bot:IsHexed() or bot:IsChanneling() or bot:IsCastingAbility() then
 		return false
 	end
-	local okM, muted = pcall(function()
-		return bot:IsMuted()
-	end)
+	local okM, muted = pcall(bot.IsMuted, bot)
 	if okM and muted then
-		return false
-	end
-	local slot = bot:FindItemSlot("item_dust")
-	if slot < 0 or slot > 5 then
 		return false
 	end
 	local dust = bot:GetItemInSlot(slot)

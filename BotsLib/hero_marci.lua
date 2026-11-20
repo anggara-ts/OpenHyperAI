@@ -176,25 +176,36 @@ function X.LogBodyguardModifiers()
 		return
 	end
 	local target = bodyguardOrderTarget
-	bodyguardOrderTarget = nil
-	if DotaTime() > bodyguardOrderAt + 3 or not Fu.IsValidHero(target) or bodyguardAbility:IsCooldownReady() then
+	if DotaTime() > bodyguardOrderAt + 3 or not Fu.IsValidHero(target) then
+		bodyguardOrderTarget = nil
 		return
 	end
-	local mods = {}
+	-- Not cast yet (still turning or walking into range): wait, up to 3s after the order.
+	if bodyguardAbility:IsCooldownReady() then
+		return
+	end
+	bodyguardOrderTarget = nil
+	local mods, allMods = {}, {}
 	for i = 0, target:NumModifiers() - 1 do
 		local name = tostring(target:GetModifierName(i))
+		allMods[#allMods + 1] = name
 		if string.find(name, "marci", 1, true) then
 			mods[#mods + 1] = name
 		end
 	end
+	-- No name with "marci" in it: print them all, so the buff's real name still shows.
+	if #mods == 0 then
+		mods = allMods
+	end
 	pcall(
 		print,
 		string.format(
-			"[OHA-MARCI] t=%.0f marci bodyguard-mods target=%s guardianBuff=%s mods=%s",
+			"[OHA-MARCI] t=%.0f marci bodyguard-mods target=%s guardianBuff=%s mods=%s all=%s",
 			DotaTime(),
 			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
 			tostring(target:HasModifier("modifier_marci_guardian_buff")),
-			#mods > 0 and table.concat(mods, ",") or "none"
+			#mods > 0 and table.concat(mods, ",") or "none",
+			tostring(#mods == #allMods)
 		)
 	)
 end

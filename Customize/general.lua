@@ -58,6 +58,10 @@ Customize.Localization = "en"
 -- like near 100% of the heroes, bots will need to randomly pick heroes regardless of the ban list to continue the game.
 Customize.Ban = {
 	"npc_dota_hero_kez",
+	-- Patch 7.42: every game with a Meepo bot so far froze (the game stops responding, no script error); games
+	-- without him ran to the end. Banned until the cause is found (#139). A forced pick in Radiant_Heros /
+	-- Dire_Heros still plays him, for testing.
+	"npc_dota_hero_meepo",
 }
 
 --[[

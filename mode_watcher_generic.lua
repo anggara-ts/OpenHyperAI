@@ -209,6 +209,34 @@ local function Raw()
 				nearest < math.huge and tostring(math.floor(nearest)) or "-"
 			)
 		)
+		-- Game 055: no unit list holds a watcher. The shrine functions are the API's other way to see map objects
+		-- (7.42: watchers, outposts and gates are interactions, ValveSoftware/Dota2-Gameplay#32850); what do they
+		-- return near this bot? (pcall: the signature is not documented; (radius, enemies) like the other
+		-- GetNearby* calls.)
+		for _, enemies in ipairs({ false, true }) do
+			local ok, shrines = pcall(bot.GetNearbyShrines, bot, 1600, enemies)
+			local names = {}
+			if ok and type(shrines) == "table" then
+				for _, shrine in pairs(shrines) do
+					local okName, name = pcall(function()
+						return shrine:GetUnitName()
+					end)
+					names[#names + 1] = okName and tostring(name) or "?"
+				end
+			end
+			pcall(
+				print,
+				string.format(
+					"[OHA-WATCHER] t=%.0f %s shrine-survey enemies=%s ok=%s n=%d names=%s",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					tostring(enemies),
+					tostring(ok),
+					#names,
+					#names > 0 and table.concat(names, ",") or (ok and "-" or tostring(shrines))
+				)
+			)
+		end
 	end
 	if lamp == nil then
 		return 0

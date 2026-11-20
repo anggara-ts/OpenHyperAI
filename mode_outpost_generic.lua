@@ -412,17 +412,25 @@ function Think()
 				-- 7.42: bots have no ability_capture (games 050 and 051: capture=nil on every give-up, no
 				-- outpost captured). Try the two orders a right-click could stand for, one after the other,
 				-- and log whether a capture starts (#111): an attack order for 5s, then a move-to-unit order.
-				local try = nearFor < 8 and "attack" or "move-to-unit"
+				-- Game 055: attack and move-to-unit started no capture (4 tries each). 7.42 made capturing an
+				-- interaction rather than a hero ability (ValveSoftware/Dota2-Gameplay#32850), so the third try is
+				-- the API's interaction order for map objects, Action_UseShrine (pcall: its use on an outpost is
+				-- not documented).
+				local try = nearFor < 5 and "attack" or nearFor < 10 and "move-to-unit" or "use-shrine"
 				if bot._outpostProbeTry ~= try then
 					if bot._outpostProbeTry ~= nil then
 						OutpostProbeLog("no-capture", bot._outpostProbeTry, targetOutpost)
 					end
 					bot._outpostProbeTry = try
-					OutpostProbeLog("try", try, targetOutpost)
 					if try == "attack" then
+						OutpostProbeLog("try", try, targetOutpost)
 						bot:Action_AttackUnit(targetOutpost, true)
-					else
+					elseif try == "move-to-unit" then
+						OutpostProbeLog("try", try, targetOutpost)
 						bot:Action_MoveToUnit(targetOutpost)
+					else
+						local ok, err = pcall(bot.Action_UseShrine, bot, targetOutpost)
+						OutpostProbeLog("try", try .. (ok and "" or ("/error:" .. tostring(err))), targetOutpost)
 					end
 				end
 			end

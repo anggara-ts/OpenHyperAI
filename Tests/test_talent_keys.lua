@@ -127,6 +127,7 @@ T.test("talent watch: verdict", function()
 	T.eq(W.Verdict(315, 385, 70, 3, 4), "unknown", "ability levelled in the same sample")
 	T.eq(W.Verdict(nil, 385, 70, nil, 4), "unknown", "learned before the first sample")
 	T.eq(W.Verdict(315, 340, 70, 4, 4), "other", "some other change")
+	T.eq(W.Verdict(0, 0, 70, 0, 0), "unknown", "ability not learned yet")
 end)
 
 T.test("talent watch: every watched talent and ability is the hero's (7.42 slots)", function()
@@ -179,5 +180,8 @@ T.test("talent watch: one [OHA-TALENT] line when the talent is learned", functio
 	assert(ok, err)
 	T.eq(#lines, 1, "one line")
 	T.ok(string.find(lines[1] or "", "[OHA-TALENT] t=601 axe talent=special_bonus_unique_axe_2", 1, true), lines[1])
-	T.ok(string.find(lines[1] or "", "before=315.00 after=385.00 linked=70 included=yes", 1, true), lines[1])
+	T.ok(
+		string.find(lines[1] or "", "before=315.00 after=385.00 linked=70 included=yes talentValue=0.00", 1, true),
+		lines[1]
+	)
 end)

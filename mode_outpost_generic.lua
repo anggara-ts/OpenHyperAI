@@ -2087,6 +2087,24 @@ heroSpecificDesire["npc_dota_hero_tinker"] = function()
 	end
 	if highPriorityAbility:IsTrained() then
 		if highPriorityAbility:IsInAbilityPhase() or bot:IsChanneling() or bot:HasModifier("modifier_tinker_rearm") then
+			-- Which channel the hold protects when he is hurt (#48, game 051 9:45: he died in this hold at 8% HP,
+			-- 5s after a rearm-skip, and the log could not say whether it was Rearm or a teleport).
+			if Fu.GetHP(bot) < 0.5 and DotaTime() >= (bot._tinkerHoldLogAt or -999) then
+				bot._tinkerHoldLogAt = DotaTime() + 3
+				local active = bot:GetCurrentActiveAbility()
+				pcall(
+					print,
+					string.format(
+						"[OHA-TINKER] t=%.0f hold channel=%s rearm-mod=%s hp=%.2f enemies=%d hit=%s",
+						DotaTime(),
+						active ~= nil and not active:IsNull() and active:GetName() or "-",
+						tostring(bot:HasModifier("modifier_tinker_rearm")),
+						Fu.GetHP(bot),
+						#(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}),
+						tostring(bot:WasRecentlyDamagedByAnyHero(1.0))
+					)
+				)
+			end
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end

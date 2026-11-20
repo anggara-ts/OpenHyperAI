@@ -211,3 +211,17 @@ T.test("the item think still runs end to end with its item rules and gates timed
 		T.ok(detail[name] ~= nil, name .. " timed")
 	end
 end)
+
+T.test("Perf.FormatMemory: the Lua memory line, with peak, growth and the first reading", function()
+	local Perf = perf()
+	T.eq(
+		Perf.FormatMemory(600, "meepo", 51234.4, 50000, 52000, 30000),
+		"[OHA-MEM] t=600 meepo kb=51234 peak=52000 grew=1234 start=30000",
+		"a later line"
+	)
+	T.eq(
+		Perf.FormatMemory(-80, "lich", 30000, nil, 30000, nil),
+		"[OHA-MEM] t=-80 lich kb=30000 peak=30000 grew=0 start=30000",
+		"the first line"
+	)
+end)

@@ -160,6 +160,37 @@ function Perf.Format(tag, now, heroName, why, perf, span, limits)
 	)
 end
 
+-- [OHA-MEM] once per game minute (maintainer, 2026-11-20: two games froze with Dota at 8.2 GB; is it our scripts?).
+-- collectgarbage("count") is the memory of the Lua state this code runs in, shared by the bots that run in it, so
+-- the line is per state, not per bot: kb= now, peak= the highest seen, grew= the change since the last line, start=
+-- the first reading. A leak shows as kb= climbing line after line; a flat kb= puts the memory in the game client.
+local MEMORY_WINDOW = 60
+local memoryNextAt = nil
+local memoryStart, memoryLast, memoryPeak = nil, nil, 0
+function Perf.FormatMemory(now, heroName, kb, last, peak, start)
+	return string.format(
+		"[OHA-MEM] t=%.0f %s kb=%.0f peak=%.0f grew=%.0f start=%.0f",
+		now,
+		heroName,
+		kb,
+		peak,
+		last ~= nil and kb - last or 0,
+		start or kb
+	)
+end
+local function TrackMemory(bot, now)
+	if memoryKb == nil or (memoryNextAt ~= nil and now < memoryNextAt) then
+		return
+	end
+	memoryNextAt = now + MEMORY_WINDOW
+	local kb = memoryKb()
+	memoryStart = memoryStart or kb
+	memoryPeak = math.max(memoryPeak, kb)
+	local heroName = string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")
+	pcall(print, Perf.FormatMemory(now, heroName, kb, memoryLast, memoryPeak, memoryStart))
+	memoryLast = kb
+end
+
 local function Record(name, seconds, kbDelta)
 	local bot = GetBot()
 	if bot == nil then
@@ -167,6 +198,7 @@ local function Record(name, seconds, kbDelta)
 	end
 	local perf = bot._perf
 	local now = DotaTime()
+	TrackMemory(bot, now)
 	if perf == nil then
 		perf = NewWindow(now)
 		bot._perf = perf

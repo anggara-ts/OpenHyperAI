@@ -125,6 +125,15 @@ local lastAcornLogAt = -100
 local acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy
 local bushwhackDesire, bushwhackLocation
 local scurryDesire
+local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
+-- Scurry, game data 7.42 (npc_dota_hero_hoodwink.txt): 2 charges (restore 30/24/18/12s), 35 mana,
+-- movement_speed_pct 20/24/28/32 for duration 3.5/4/4.5/5s. Fallbacks when the API reads 0: level 1 values.
+local SCURRY_FALLBACK_SPEED_PCT = 20
+local SCURRY_FALLBACK_DURATION = 3.5
+-- Sharpshooter is cast from this range (ConsiderSharpshooter), not its 3000 game-file range.
+local SHARPSHOOTER_CAST_RANGE = 1600
+local lastScurryOrderAt = -100
+local lastScurryLogAt = -100
 local huntersBoomerangDesire, huntersBoomerangTarget
 local decoyDesire
 local sharpshooterDesire, sharpshooterLocation, sharpshooterTarget
@@ -159,6 +168,9 @@ function X.SkillsComplement()
 	scurryDesire = X.ConsiderScurry()
 	if scurryDesire > 0 then
 		bot:Action_UseAbility(scurryAbility)
+		-- No cast point, so the charge tracker only sees the cast through this mark and the mana drop.
+		pcall(ChargeTracker.Issued, bot, scurryAbility)
+		lastScurryOrderAt = DotaTime()
 		return
 	end
 	huntersBoomerangDesire, huntersBoomerangTarget = X.ConsiderHuntersBoomerang()
@@ -559,6 +571,76 @@ function X.ConsiderBushwhack()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Is a unit moving at velocity from one spot within maxDegrees of the direction to another? False when it stands
+-- (under 50 speed).
+function X.HeadingWithin(velocity, fromLocation, toLocation, maxDegrees)
+	local speed = math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y)
+	local toX, toY = toLocation.x - fromLocation.x, toLocation.y - fromLocation.y
+	local gap = math.sqrt(toX * toX + toY * toY)
+	if speed < 50 or gap < 1 then
+		return false
+	end
+	return (velocity.x * toX + velocity.y * toY) / (speed * gap) >= math.cos(math.rad(maxDegrees))
+end
+-- Why to use Scurry now (the caller checked it is castable), or nil. Escape may spend the last charge; chase and
+-- position only a spare one, so one charge is always kept for an escape. s: charges (tracked count, nil = unknown,
+-- counted as 1), retreating, headingHome, inDanger, engaging, targetDist, attackRange, headingToTarget,
+-- targetRunningAway, targetSpeed, mySpeed, speedPct, duration, castWalk (the shortest walk until a ready spell
+-- reaches the target, or nil).
+--   escape: retreating, heading home, and in danger;
+--   chase: the target is out of attack range but within the extra distance Scurry's speed buys over its duration,
+--     running from her and not slower than her (a slower one is caught without it);
+--   position: the walk to a spell's cast range takes over 2s, and she still arrives while Scurry lasts.
+function X.ScurryReason(s)
+	local charges = s.charges or 1
+	if s.retreating then
+		if s.headingHome and s.inDanger then
+			return "escape"
+		end
+		return nil
+	end
+	if not s.engaging or charges < 2 or s.targetDist == nil or not s.headingToTarget or s.mySpeed <= 0 then
+		return nil
+	end
+	local extraReach = s.mySpeed * s.speedPct / 100 * s.duration
+	if
+		s.targetDist > s.attackRange
+		and s.targetDist <= s.attackRange + extraReach
+		and s.targetRunningAway
+		and s.targetSpeed >= s.mySpeed
+	then
+		return "chase"
+	end
+	if
+		s.castWalk ~= nil
+		and s.castWalk / s.mySpeed > 2
+		and s.castWalk <= s.mySpeed * (1 + s.speedPct / 100) * s.duration
+	then
+		return "position"
+	end
+	return nil
+end
+-- The shortest walk until a ready spell she would cast on the target has it in range (nil: none ready, or one is in
+-- range already). The cast ranges are the ones the Consider functions use; mana is kept for the spell and Scurry.
+function X.ScurryCastWalk(target, targetDist)
+	local spareMana = bot:GetMana() - scurryAbility:GetManaCost()
+	local walk = nil
+	local function Add(ability, castRange)
+		if ability:IsFullyCastable() and spareMana >= ability:GetManaCost() then
+			local need = targetDist - castRange
+			walk = walk == nil and need or math.min(walk, need)
+		end
+	end
+	Add(acornShotAbility, Fu.GetProperCastRange(false, bot, acornShotAbility:GetCastRange()))
+	if Fu.CanCastOnNonMagicImmune(target) then
+		Add(bushwhackAbility, Fu.GetProperCastRange(false, bot, bushwhackAbility:GetCastRange()))
+		Add(sharpshooterAbility, SHARPSHOOTER_CAST_RANGE)
+	end
+	if walk == nil or walk <= 0 then
+		return nil
+	end
+	return walk
+end
 function X.ConsiderScurry()
 	if
 		not scurryAbility:IsFullyCastable()
@@ -567,27 +649,83 @@ function X.ConsiderScurry()
 	then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	local speedPct = scurryAbility:GetSpecialValueInt("movement_speed_pct")
+	local duration = scurryAbility:GetSpecialValueFloat("duration")
+	speedPct = speedPct > 0 and speedPct or SCURRY_FALLBACK_SPEED_PCT
+	duration = duration > 0 and duration or SCURRY_FALLBACK_DURATION
+	-- The order just given is still running (the tracker and the modifier can lag a think behind it).
+	if DotaTime() - lastScurryOrderAt < duration then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local botLocation = bot:GetLocation()
+	local s = {
+		charges = ChargeTracker.Count(bot, scurryAbility),
+		retreating = isRetreating,
+		engaging = isGoingOnSomeone,
+		mySpeed = bot:GetCurrentMovementSpeed(),
+		speedPct = speedPct,
+		duration = duration,
+	}
+	local logDist, logTarget = -1, "none"
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE)
 		local escapeLocation = Fu.GetEscapeLoc()
-		if bot:IsFacingLocation(escapeLocation, 30) then
-			if
-				nearbyAllies ~= nil
-				and nearbyEnemies
+		-- Moving toward home is enough (the retreat path bends); facing it within 30 degrees also counts.
+		s.headingHome = X.HeadingWithin(bot:GetVelocity(), botLocation, escapeLocation, 90)
+			or bot:IsFacingLocation(escapeLocation, 30)
+		s.inDanger = nearbyAllies ~= nil
+				and nearbyEnemies ~= nil
 				and (#nearbyEnemies > #nearbyAllies or hpRatio < 0.55 and bot:WasRecentlyDamagedByAnyHero(2))
 				and Fu.IsValidHero(nearbyEnemies[1])
 				and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 				and not Fu.IsDisabled(nearbyEnemies[1])
-			then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-			if hpRatio < 0.55 and bot:WasRecentlyDamagedByTower(2.5) then
-				return BOT_ACTION_DESIRE_HIGH
-			end
+			or hpRatio < 0.55 and bot:WasRecentlyDamagedByTower(2.5)
+		if nearbyEnemies ~= nil and Fu.IsValidHero(nearbyEnemies[1]) then
+			logDist = GetUnitToUnitDistance(bot, nearbyEnemies[1])
+			logTarget = (string.gsub(nearbyEnemies[1]:GetUnitName(), "npc_dota_hero_", ""))
+		end
+	elseif isGoingOnSomeone then
+		botTarget = Fu.GetProperTarget(bot)
+		if Fu.IsValidHero(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) and not Fu.IsDisabled(botTarget) then
+			local targetLocation = botTarget:GetLocation()
+			s.targetDist = GetUnitToUnitDistance(bot, botTarget)
+			-- Attack range is counted from the hull edges; 50 more before she is really out of range.
+			s.attackRange = bot:GetAttackRange() + 50
+			s.headingToTarget = X.HeadingWithin(bot:GetVelocity(), botLocation, targetLocation, 45)
+				or bot:IsFacingLocation(targetLocation, 30)
+			-- Running from her: moving within 90 degrees of straight away from her.
+			local awayLocation =
+				Vector(2 * targetLocation.x - botLocation.x, 2 * targetLocation.y - botLocation.y, targetLocation.z)
+			s.targetRunningAway = X.HeadingWithin(botTarget:GetVelocity(), targetLocation, awayLocation, 90)
+			s.targetSpeed = botTarget:GetCurrentMovementSpeed()
+			s.castWalk = X.ScurryCastWalk(botTarget, s.targetDist)
+			logDist = s.targetDist
+			logTarget = (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	local why = X.ScurryReason(s)
+	if why == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if DotaTime() - lastScurryLogAt >= 3 then
+		lastScurryLogAt = DotaTime()
+		print(
+			string.format(
+				"[OHA-HOODWINK] t=%.0f hoodwink scurry why=%s charges=%s dist=%d hp=%.2f target=%s speed=%d targetSpeed=%d walk=%d",
+				DotaTime(),
+				why,
+				tostring(s.charges),
+				math.floor(logDist),
+				hpRatio,
+				logTarget,
+				math.floor(s.mySpeed),
+				math.floor(s.targetSpeed or 0),
+				math.floor(s.castWalk or 0)
+			)
+		)
+	end
+	return BOT_ACTION_DESIRE_HIGH
 end
 function X.ConsiderSharpshooter()
 	if not sharpshooterAbility:IsFullyCastable() then

@@ -147,3 +147,147 @@ T.test("will-cast finders: return the casting enemy and its spell", function()
 	T.eq(ability, blast, "point ability")
 	T.eq(Fu.IsWillBeCastPointSpell(bot, 1200), true, "point: true")
 end)
+
+-- #134: linear skillshots (GetLinearProjectiles) and tracking projectiles by time to impact.
+local function linearAt(unit, offsetX, abilityName, caster, fields)
+	local projectile = {
+		location = unit:GetLocation() + Vector(offsetX, 0, 0),
+		ability = Stub.newAbility(abilityName, caster, false),
+		caster = caster,
+	}
+	for key, value in pairs(fields or {}) do
+		projectile[key] = value
+	end
+	return projectile
+end
+local function flying(bot, list)
+	bot._linearRead = nil
+	_G.GetLinearProjectiles = function()
+		return list
+	end
+end
+
+T.test("linear finder: a dangerous skillshot that will hit, by time to impact", function()
+	local Fu, bot, enemy, ally = load()
+	Stub.time = 600
+	enemy._loc = bot:GetLocation() + Vector(1500, 0, 0)
+	-- Sacred Arrow 300 away flying at the bot at 900: edge arrives (300 - 115 - 24) / 900 = 0.18s.
+	flying(bot, { linearAt(bot, 300, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	local threat = Fu.FindLinearProjectileIncoming(bot, 0, "blink")
+	T.ok(threat ~= nil, "arrow found")
+	T.eq(threat.name, "mirana_arrow", "name")
+	T.near(threat.tti, (300 - 115 - 24) / 900, 1e-6, "tti")
+	T.eq(threat.window, "now", "react now")
+	T.eq(threat.src, "api", "velocity from the API field")
+	-- 900 away: still coming, wait.
+	flying(bot, { linearAt(bot, 900, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink").window, "wait", "far arrow: wait")
+	-- Flying past (250 to the side): no threat.
+	flying(bot, { linearAt(bot, 300, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	bot._loc = bot._loc + Vector(0, 250, 0)
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "misses")
+	bot._loc = bot._loc - Vector(0, 250, 0)
+	-- An ally's arrow.
+	flying(bot, { linearAt(bot, 300, "mirana_arrow", ally, { velocity = Vector(-900, 0, 0) }) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "ally's arrow")
+	-- Not on the list (Illuminate is damage only): never a dodge.
+	flying(bot, { linearAt(bot, 300, "keeper_of_the_light_illuminate", enemy, { velocity = Vector(-900, 0, 0) }) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "illuminate")
+	-- Meat Hook pierces debuff immunity: not a BKB dodge, still a Blink dodge.
+	enemy._loc = bot:GetLocation() + Vector(900, 0, 0)
+	flying(bot, { linearAt(bot, 300, "pudge_meat_hook", enemy, { velocity = Vector(-1600, 0, 0) }) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "bkb"), nil, "hook: no BKB")
+	T.ok(Fu.FindLinearProjectileIncoming(bot, 0, "blink") ~= nil, "hook: Blink")
+	-- A caster farther than the spell flies (hook 1300): no threat.
+	enemy._loc = bot:GetLocation() + Vector(2000, 0, 0)
+	flying(bot, { linearAt(bot, 300, "pudge_meat_hook", enemy, { velocity = Vector(-1600, 0, 0) }) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "out of the hook's range")
+end)
+
+T.test("linear finder: no velocity field -> the move between thinks, or caster -> projectile", function()
+	local Fu, bot, enemy = load()
+	Stub.time = 600
+	-- No caster, no velocity: nothing to tell the direction on the first sight.
+	flying(bot, { linearAt(bot, 500, "mirana_arrow", nil) })
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "first sight")
+	Stub.time = 600.1
+	flying(bot, { linearAt(bot, 410, "mirana_arrow", nil) })
+	local threat = Fu.FindLinearProjectileIncoming(bot, 0, "blink")
+	T.ok(threat ~= nil, "second sight")
+	T.eq(threat.src, "measured", "measured")
+	T.near(threat.tti, (410 - 139) / 900, 1e-6, "tti from the measured 900/s")
+	-- A caster behind the projectile gives the direction at the spell's speed.
+	Stub.time = 700
+	enemy._loc = bot:GetLocation() + Vector(1000, 0, 0)
+	flying(bot, { linearAt(bot, 300, "mirana_arrow", enemy) })
+	threat = Fu.FindLinearProjectileIncoming(bot, 0, "blink")
+	T.ok(threat ~= nil, "caster direction")
+	T.eq(threat.src, "caster", "src caster")
+	T.near(threat.vx, -900, 1e-6, "Sacred Arrow speed 900 toward the bot")
+	-- Nukes only when hurt.
+	flying(bot, { linearAt(bot, 300, "queenofpain_sonic_wave", enemy, { velocity = Vector(-900, 0, 0) }) })
+	enemy._loc = bot:GetLocation() + Vector(600, 0, 0)
+	T.eq(Fu.FindLinearProjectileIncoming(bot, 0, "blink"), nil, "sonic wave at full HP")
+	bot._hp = bot._maxHp * 0.3
+	T.ok(Fu.FindLinearProjectileIncoming(bot, 0, "blink") ~= nil, "sonic wave when hurt")
+end)
+
+T.test("tracking window: closing speed between thinks", function()
+	local Fu, bot, enemy = load()
+	Stub.time = 600
+	local R = Fu.DodgeRules
+	-- First sight 900 away: default speed 1000 -> 0.88s: wait.
+	local window, tti, src = Fu.TrackingProjectileWindow(bot, projectileAt(bot, 900, "sven_storm_bolt", enemy), 0)
+	T.eq(window, "wait", "far")
+	T.eq(src, "default", "first sight: default speed")
+	T.near(tti, (900 - 24) / R.DEFAULT_SPEED, 1e-6, "tti default")
+	-- 0.1s later at 700: closing 2000/s -> (700 - 24) / 2000 = 0.34s: now.
+	Stub.time = 600.1
+	window, tti, src = Fu.TrackingProjectileWindow(bot, projectileAt(bot, 700, "sven_storm_bolt", enemy), 0)
+	T.eq(src, "measured", "measured")
+	T.near(tti, (700 - 24) / 2000, 1e-6, "tti measured")
+	T.eq(window, "now", "now")
+	-- The same think again (another item): same speed.
+	local _, _, sameThinkSrc = Fu.TrackingProjectileWindow(bot, projectileAt(bot, 700, "sven_storm_bolt", enemy), 0)
+	T.eq(sameThinkSrc, "measured", "same think keeps the speed")
+	-- The finder with the time check returns it; without one it still uses the range only.
+	incoming(
+		bot,
+		{ projectileAt(bot, 1500, "lion_finger_of_death", enemy), projectileAt(bot, 700, "sven_storm_bolt", enemy) }
+	)
+	local found = Fu.FindNotAttackProjectileIncoming(bot, 2000, function(projectile)
+		return (Fu.TrackingProjectileWindow(bot, projectile, 0)) == "now"
+	end)
+	T.eq(found ~= nil and found.ability:GetName(), "sven_storm_bolt", "the near one passes the time check")
+end)
+
+T.test("[OHA-DODGE]: Eul's and Blink answer a Sacred Arrow; the line has kind and tti", function()
+	local bot = Stub.reset({ hero = "npc_dota_hero_lich", time = 600 })
+	local ok, Usage = Stub.load("ability_item_usage_generic")
+	T.ok(ok, "ability_item_usage_generic loads: " .. tostring(Usage))
+	local enemy = Stub.teams[TEAM_DIRE][1]
+	enemy._loc = bot:GetLocation() + Vector(1500, 0, 0)
+	flying(bot, { linearAt(bot, 300, "mirana_arrow", enemy, { velocity = Vector(-900, 0, 0) }) })
+	local euls = Stub.newAbility("item_cyclone", bot, false)
+	Stub.printed = {}
+	local desire, target = Usage.ConsiderItemDesire["item_cyclone"](euls)
+	T.eq(desire, BOT_ACTION_DESIRE_HIGH, "Eul's on self")
+	T.eq(target, bot, "self")
+	local line = Stub.printed[#Stub.printed] or ""
+	T.ok(string.find(line, "item=cyclone target=self spell=mirana_arrow", 1, true), line)
+	T.ok(string.find(line, "why=stun kind=linear tti=0.18 src=api", 1, true), line)
+	local blink = Stub.newAbility("item_blink", bot, false)
+	local blinkDesire, location = Usage.ConsiderItemDesire["item_blink"](blink)
+	T.eq(blinkDesire, BOT_ACTION_DESIRE_HIGH, "Blink")
+	local here = bot:GetLocation()
+	T.near(math.abs(location.y - here.y), 500, 1e-6, "500 to the side of the arrow's line")
+	-- BKB: a stun BKB blocks, with the caster within the 1300 BKB looks at (or a fight / retreat going on).
+	local bkb = Stub.newAbility("item_black_king_bar", bot, false)
+	T.eq(
+		(Usage.ConsiderItemDesire["item_black_king_bar"](bkb)),
+		BOT_ACTION_DESIRE_NONE,
+		"BKB: caster 1500 away, no fight"
+	)
+	enemy._loc = bot:GetLocation() + Vector(1200, 0, 0)
+	T.eq((Usage.ConsiderItemDesire["item_black_king_bar"](bkb)), BOT_ACTION_DESIRE_HIGH, "BKB")
+end)

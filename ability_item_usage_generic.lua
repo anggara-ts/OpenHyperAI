@@ -1832,8 +1832,10 @@ Usage.ConsiderItemDesire["item_armlet"] = function(item)
 end
 -- [OHA-DODGE] (#134): a defensive item used against an incoming spell (Blink, Eul's / Wind Waker, BKB, Lotus Orb,
 -- Linken's), and 1.5s later whether the target was hit by a hero anyway, so a game shows if the dodge was in time.
--- projectile: from Fu.Find*ProjectileIncoming; caster / ability: from Fu.FindWillBeCast*Spell.
-function Usage.LogDodge(item, target, why, projectile, caster, ability)
+-- projectile: from Fu.Find*ProjectileIncoming or Fu.FindLinearProjectileIncoming; caster / ability: from
+-- Fu.FindWillBeCast*Spell. timing (#134): { kind = "tracking" | "linear", tti = seconds to impact, src = where the
+-- speed came from }; without it (a spell being cast) kind=cast tti=-1.
+function Usage.LogDodge(item, target, why, projectile, caster, ability, timing)
 	local itemName = item:GetName()
 	local now = DotaTime()
 	bot._dodgeLogAt = bot._dodgeLogAt or {}
@@ -1841,6 +1843,8 @@ function Usage.LogDodge(item, target, why, projectile, caster, ability)
 		return
 	end
 	bot._dodgeLogAt[itemName] = now + 2
+	timing = timing or {}
+	local kind = timing.kind or (projectile ~= nil and "tracking" or "cast")
 	local spell, dist = "will-cast", -1
 	if projectile ~= nil then
 		spell = projectile.ability ~= nil and projectile.ability:GetName() or "?"
@@ -1855,21 +1859,97 @@ function Usage.LogDodge(item, target, why, projectile, caster, ability)
 	local targetName = target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
 	print(
 		string.format(
-			"[OHA-DODGE] t=%.0f %s item=%s target=%s spell=%s dist=%.0f why=%s",
+			"[OHA-DODGE] t=%.0f %s item=%s target=%s spell=%s dist=%.0f why=%s kind=%s tti=%.2f src=%s",
 			now,
 			(string.gsub(botName, "npc_dota_hero_", "")),
 			(string.gsub(itemName, "^item_", "")),
 			targetName,
 			spell,
 			dist,
-			why
+			why,
+			kind,
+			timing.tti or -1,
+			timing.src or "none"
 		)
 	)
 	bot._dodgePending = bot._dodgePending or {}
 	table.insert(
 		bot._dodgePending,
-		{ at = now, item = itemName, handle = item, target = target, targetName = targetName }
+		{ at = now, item = itemName, handle = item, target = target, targetName = targetName, kind = kind }
 	)
+end
+-- (#134) The reaction time of a dodge item starts with its cast point: 0 for Blink, Eul's, Wind Waker (7.42
+-- items.txt AbilityCastPoint "0.0"), BKB, Lotus Orb and Linken's (no AbilityCastPoint: the default 0). Read from
+-- the handle so a change in a patch is followed.
+local function DodgeCastPoint(item)
+	local ok, castPoint = pcall(item.GetCastPoint, item)
+	return ok and type(castPoint) == "number" and castPoint or 0
+end
+-- [OHA-DODGE] too-late: a projectile that will land before the item can work, so the item is kept. At most once per
+-- 3s per item. (No "kind" word here, so the `[OHA-DODGE] linear` / `tracking` checks only see real dodges.)
+local function LogDodgeTooLate(item, target, spell, tti, src)
+	local itemName = item:GetName()
+	local now = DotaTime()
+	bot._dodgeLateAt = bot._dodgeLateAt or {}
+	if now < (bot._dodgeLateAt[itemName] or -99) then
+		return
+	end
+	bot._dodgeLateAt[itemName] = now + 3
+	print(
+		string.format(
+			"[OHA-DODGE] t=%.0f %s too-late item=%s target=%s spell=%s tti=%.2f src=%s",
+			now,
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			(string.gsub(itemName, "^item_", "")),
+			target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			spell,
+			tti or -1,
+			src or "none"
+		)
+	)
+end
+-- (#134) A tracking projectile from `finder` (a Fu.Find*ProjectileIncoming) that this item should answer now: it
+-- lands within the item's reaction time plus DodgeRules.SLACK (time to impact = distance / closing speed). The
+-- old fixed ranges (350-1200) are only the search radius now. Returns projectile, timing (for LogDodge) or nil.
+function Usage.TimedTrackingProjectile(item, target, finder, searchRange)
+	local castPoint = DodgeCastPoint(item)
+	local timing, late = nil, nil
+	local ok, found = pcall(finder, target, searchRange, function(projectile)
+		Fu.LogTrackingProjectileFields(projectile)
+		local window, tti, src = Fu.TrackingProjectileWindow(target, projectile, castPoint)
+		if window == "now" then
+			timing = { kind = "tracking", tti = tti, src = src }
+			return true
+		end
+		if window == "late" and late == nil then
+			late = { projectile = projectile, tti = tti, src = src }
+		end
+		return false
+	end)
+	if ok and found ~= nil then
+		return found, timing
+	end
+	if late ~= nil then
+		local spell = late.projectile.ability ~= nil and late.projectile.ability:GetName() or "?"
+		pcall(LogDodgeTooLate, item, target, spell, late.tti, late.src)
+	end
+	return nil
+end
+-- (#134) A dangerous linear skillshot (FuncLib/systems/dodge_rules.lua LINEAR) that will hit `target` and that
+-- this item ("blink" | "cyclone" | "bkb") answers, when it is time to react. Returns the threat
+-- (Fu.FindLinearProjectileIncoming) and the timing for LogDodge, or nil.
+function Usage.LinearThreat(item, target, tool)
+	local ok, threat = pcall(Fu.FindLinearProjectileIncoming, target, DodgeCastPoint(item), tool)
+	if not ok or threat == nil then
+		return nil
+	end
+	if threat.window == "late" then
+		pcall(LogDodgeTooLate, item, target, threat.name, threat.tti, threat.src)
+	end
+	if threat.window ~= "now" then
+		return nil
+	end
+	return threat, { kind = "linear", tti = threat.tti, src = threat.src }
 end
 function Usage.WatchDodgeResults()
 	local pending = bot._dodgePending
@@ -1890,7 +1970,7 @@ function Usage.WatchDodgeResults()
 			local cast = handle ~= nil and not handle:IsNull() and handle:GetCooldownTimeRemaining() > 0
 			print(
 				string.format(
-					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s cast=%s alive=%s after=%.1f",
+					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s cast=%s alive=%s after=%.1f kind=%s",
 					now,
 					(string.gsub(botName, "npc_dota_hero_", "")),
 					(string.gsub(entry.item, "^item_", "")),
@@ -1898,7 +1978,8 @@ function Usage.WatchDodgeResults()
 					valid and tostring(hit) or "unknown",
 					tostring(cast),
 					tostring(alive),
-					now - entry.at
+					now - entry.at,
+					entry.kind or "?"
 				)
 			)
 		end
@@ -1916,6 +1997,20 @@ Usage.ConsiderItemDesire["item_black_king_bar"] = function(item)
 	local hEffectTarget = nil
 	local castReason = nil
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
+	-- (#134) A skillshot BKB blocks (DodgeRules.LINEAR bkb=true: Sacred Arrow, Earth Spike, Impale, Spear, ...)
+	-- about to hit: the caster may stand farther than the 1300 above (Sacred Arrow flies 3000).
+	if
+		not bot:IsMagicImmune()
+		and not bot:IsInvulnerable()
+		and (#enemyHeroes > 0 or Fu.IsGoingOnSomeone(bot) or Fu.IsRetreating(bot))
+	then
+		local threat, timing = Usage.LinearThreat(item, bot, "bkb")
+		if threat ~= nil then
+			pcall(Usage.LogDodge, item, bot, threat.spec.why, threat.projectile, nil, nil, timing)
+			castReason = "防御弹道"
+			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
+		end
+	end
 	if
 		#enemyHeroes > 0
 		and not bot:IsMagicImmune()
@@ -1939,8 +2034,10 @@ Usage.ConsiderItemDesire["item_black_king_bar"] = function(item)
 			castReason = "解沉默"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
-		if Fu.IsNotAttackProjectileIncoming(bot, 350) and closeEnemyCount >= 1 then
-			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindNotAttackProjectileIncoming(bot, 350))
+		-- (#134) by time to impact (was: any spell projectile within 350).
+		local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindNotAttackProjectileIncoming, 2000)
+		if projectile ~= nil and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
 			castReason = "防御弹道"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
@@ -2101,11 +2198,34 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 			end
 		end
 	end
+	-- (#134) A dangerous skillshot about to hit: Blink to the side of its line (a Blink toward base can stay on the
+	-- line, the shot usually flies that way), on the side of our base, plus the part of the way home along it.
+	do
+		local threat, timing = Usage.LinearThreat(item, bot, "blink")
+		if threat ~= nil then
+			local DodgeRules = Fu.DodgeRules
+			local home = GetAncient(GetTeam()):GetLocation()
+			local here = bot:GetLocation()
+			local sideDist = math.min(castRange - 1, 500)
+			local x, y = DodgeRules.SideStep(threat.vx, threat.vy, here.x, here.y, sideDist, home.x, home.y, 600)
+			local blinkLocation = Vector(x, y, here.z)
+			if not IsLocationPassable(blinkLocation) then
+				x, y = DodgeRules.SideStep(threat.vx, threat.vy, here.x, here.y, -sideDist, home.x, home.y, 600)
+				blinkLocation = Vector(x, y, here.z)
+			end
+			if IsLocationPassable(blinkLocation) then
+				pcall(Usage.LogDodge, item, bot, threat.spec.why, threat.projectile, nil, nil, timing)
+				return BOT_ACTION_DESIRE_HIGH, blinkLocation, "ground", nil
+			end
+		end
+	end
+	-- (#134) by time to impact (was: any dodgeable spell projectile within 1200).
+	local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindProjectileIncoming, 2000)
 	if
-		Fu.IsProjectileIncoming(bot, 1200)
+		projectile ~= nil
 		and (botTarget == nil or not botTarget:IsHero() or not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100))
 	then
-		pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindProjectileIncoming(bot, 1200))
+		pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
 		local retreatLocation = Fu.GetLocationTowardDistanceLocation(bot, GetAncient(GetTeam()):GetLocation(), 1199)
 		return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
 	end
@@ -2585,8 +2705,21 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
-		if Fu.IsUnitTargetProjectileIncoming(bot, 800) then
-			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindUnitTargetProjectileIncoming(bot, 800))
+		-- (#134) by time to impact (was: any unit-target spell projectile within 800).
+		local projectile, timing = Usage.TimedTrackingProjectile(item, bot, Fu.FindUnitTargetProjectileIncoming, 2000)
+		if projectile ~= nil then
+			pcall(Usage.LogDodge, item, bot, "projectile", projectile, nil, nil, timing)
+			hEffectTarget = bot
+			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
+			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+		end
+	end
+	-- (#134) A dangerous skillshot about to hit: the self-cyclone is invulnerable, the projectile passes. The
+	-- caster may stand outside the 1600 the block above needs (Sacred Arrow flies 3000).
+	if Fu.CanCastOnNonMagicImmune(bot) then
+		local threat, timing = Usage.LinearThreat(item, bot, "cyclone")
+		if threat ~= nil then
+			pcall(Usage.LogDodge, item, bot, threat.spec.why, threat.projectile, nil, nil, timing)
 			hEffectTarget = bot
 			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -3767,8 +3900,12 @@ Usage.ConsiderItemDesire["item_lotus_orb"] = function(item)
 			and not ally:HasModifier("modifier_item_lotus_orb_active")
 			and not ally:HasModifier("modifier_antimage_spell_shield")
 		then
-			if Fu.IsUnitTargetProjectileIncoming(ally, 800) then
-				pcall(Usage.LogDodge, item, ally, "projectile", Fu.FindUnitTargetProjectileIncoming(ally, 800))
+			-- (#134) by time to impact (was: any unit-target spell projectile within 800). Skillshots: Lotus
+			-- re-casts targeted spells only (Valve item text), so linear projectiles are not answered here.
+			local projectile, timing =
+				Usage.TimedTrackingProjectile(item, ally, Fu.FindUnitTargetProjectileIncoming, 2000)
+			if projectile ~= nil then
+				pcall(Usage.LogDodge, item, ally, "projectile", projectile, nil, nil, timing)
 				hEffectTarget = ally
 				castReason = "反弹弹道"
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -4730,6 +4867,8 @@ Usage.ConsiderItemDesire["item_sphere"] = function(item)
 	local castReason = nil
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	local allyHeroes = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
+	-- (#134) Incoming projectiles by time to impact (was: any unit-target spell projectile within 800). Skillshots:
+	-- Linken's blocks targeted spells only (Valve item text), so linear projectiles are not answered here.
 	for _, ally in pairs(allyHeroes) do
 		if
 			Fu.IsValidHero(ally)
@@ -4739,21 +4878,22 @@ Usage.ConsiderItemDesire["item_sphere"] = function(item)
 			and not ally:IsIllusion()
 			and not ally:HasModifier("modifier_item_sphere_target")
 			and not ally:HasModifier("modifier_antimage_spell_shield")
-			and (
-				Fu.IsUnitTargetProjectileIncoming(ally, 800)
-				or Fu.IsWillBeCastUnitTargetSpell(ally, 1200)
-				or bot:GetHealth() < 150
-			)
 		then
-			local projectile = Fu.FindUnitTargetProjectileIncoming(ally, 800)
-			local caster, ability = Fu.FindWillBeCastUnitTargetSpell(ally, 1200)
-			if projectile ~= nil or caster ~= nil then
-				local why = projectile ~= nil and "projectile" or "will-cast"
-				pcall(Usage.LogDodge, item, ally, why, projectile, caster, ability)
+			local projectile, timing =
+				Usage.TimedTrackingProjectile(item, ally, Fu.FindUnitTargetProjectileIncoming, 2000)
+			local caster, ability = nil, nil
+			if projectile == nil then
+				caster, ability = Fu.FindWillBeCastUnitTargetSpell(ally, 1200)
 			end
-			hEffectTarget = ally
-			castReason = "帮助队友"
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+			if projectile ~= nil or caster ~= nil or bot:GetHealth() < 150 then
+				if projectile ~= nil or caster ~= nil then
+					local why = projectile ~= nil and "projectile" or "will-cast"
+					pcall(Usage.LogDodge, item, ally, why, projectile, caster, ability, timing)
+				end
+				hEffectTarget = ally
+				castReason = "帮助队友"
+				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+			end
 		end
 	end
 	if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 2400) and not Fu.IsInRange(bot, botTarget, 800) then

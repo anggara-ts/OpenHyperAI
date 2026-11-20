@@ -379,8 +379,24 @@ local function LevelUpAbilities()
 			end
 			return best
 		end
+		-- Every talent a bot learns (#107: the 7.42 first picks are checked from this line).
+		local function LogTalent(learned)
+			if learned ~= nil and learned:IsTalent() then
+				pcall(
+					print,
+					string.format(
+						"[OHA-TALENT] t=%.0f %s learned=%s level=%d",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						learned:GetName(),
+						level
+					)
+				)
+			end
+		end
 		if CanLearn(ability) then
 			bot:ActionImmediate_LevelAbility(ability:GetName())
+			LogTalent(ability)
 			table.remove(abilityLevelUpList, 1)
 		elseif
 			abilityName == "generic_hidden"
@@ -399,6 +415,7 @@ local function LevelUpAbilities()
 			)
 			if fallback ~= nil then
 				bot:ActionImmediate_LevelAbility(fallback:GetName())
+				LogTalent(fallback)
 			end
 		elseif not ability:IsHidden() and level >= ability:GetHeroLevelRequiredToUpgrade() then
 			table.remove(abilityLevelUpList, 1)
@@ -411,6 +428,7 @@ local function LevelUpAbilities()
 			)
 			if fallback ~= nil then
 				bot:ActionImmediate_LevelAbility(fallback:GetName())
+				LogTalent(fallback)
 			end
 		else
 			log("[WARN] Skipped to level up ability %s for %s for this time because it may fail.", abilityName, botName)

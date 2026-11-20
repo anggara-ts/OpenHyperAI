@@ -106,7 +106,6 @@ end
 local penitenceAbility = SafeAbility(bot:GetAbilityByName("chen_penitence"), "chen_penitence", "chen")
 local holyPersuasionAbility = SafeAbility(bot:GetAbilityByName("chen_holy_persuasion"), "chen_holy_persuasion", "chen")
 local divineFavorAbility = SafeAbility(bot:GetAbilityByName("chen_divine_favor"), "chen_divine_favor", "chen")
-local zealotAbility = SafeAbility(bot:GetAbilityByName("chen_zealot"), "chen_zealot", "chen")
 local handOfGodAbility = SafeAbility(bot:GetAbilityByName("chen_hand_of_god"), "chen_hand_of_god", "chen")
 local penitenceDesire, penitenceTarget
 local holyPersuasionDesire, holyPersuasionTarget
@@ -133,10 +132,15 @@ function X.SkillsComplement()
 		bot:Action_UseAbilityOnEntity(penitenceAbility, penitenceTarget)
 		return
 	end
-	zealotDesire = X.ConsiderZealot()
+	zealotDesire = X.ConsiderGatherCreeps()
 	if zealotDesire > 0 then
-		-- datafeed: Zealot is unit-target (behavior 8); targeting Chen teleports all controlled units to him
-		bot:Action_UseAbilityOnEntity(zealotAbility, bot)
+		-- 7.42 (Valve patch notes + datafeed): Zealot is a no-target resurrect now. The teleport of all
+		-- controlled creeps moved to Holy Persuasion: cast it on Chen himself (teleport_delay 6/5/4/3s).
+		if DotaTime() >= (bot._chenGatherLogAt or -999) then
+			bot._chenGatherLogAt = DotaTime() + 5
+			pcall(print, string.format("[OHA-CHEN] t=%.0f gather creeps=%d", DotaTime(), #(controlledCreeps or {})))
+		end
+		bot:Action_UseAbilityOnEntity(holyPersuasionAbility, bot)
 		return
 	end
 	holyPersuasionDesire, holyPersuasionTarget = X.ConsiderHolyPersuasion()
@@ -385,8 +389,8 @@ function X.ConsiderDivineFavor()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
-function X.ConsiderZealot()
-	if not zealotAbility:IsFullyCastable() then
+function X.ConsiderGatherCreeps()
+	if not holyPersuasionAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if Fu.IsInTeamFight(bot, 1200) then

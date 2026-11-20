@@ -143,9 +143,19 @@ local iceSpireDesire, iceSpireLocation
 local sacrificeDesire, sacrificeTarget
 local aetherRange = 0
 local manaReserve, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
--- Sacrifice charges from the shared tracker (2 charges, 120s each, none when learned).
+-- Sacrifice charges from the shared tracker (3 charges since 7.42, 120s each, none when learned).
 function X.SacrificeCharges()
 	return ChargeTracker.Count(bot, sacrificeAbility) or 0
+end
+-- Max charges: the game's own value, 3 as the fallback (Valve datafeed, patch 7.42: 2 -> 3).
+function X.SacrificeMaxCharges()
+	local ok, maxCharges = pcall(function()
+		return sacrificeAbility:GetSpecialValueInt("AbilityCharges")
+	end)
+	if ok and type(maxCharges) == "number" and maxCharges > 1 then
+		return maxCharges
+	end
+	return 3
 end
 function X.SkillsComplement()
 	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
@@ -164,7 +174,7 @@ function X.SkillsComplement()
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	-- Sacrifice first: with both charges up it goes at once, so the Frost Blast pokes below do not
+	-- Sacrifice first: with all charges up it goes at once, so the Frost Blast pokes below do not
 	-- keep pushing it back.
 	sacrificeDesire, sacrificeTarget = X.ConsiderSacrifice()
 	if sacrificeDesire > 0 then
@@ -1060,15 +1070,16 @@ function X.ConsiderSacrifice()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local castRange = sacrificeAbility:GetCastRange()
-	-- Both charges up (2 max, 120s each, Valve data): use one now even at full mana. It denies an
+	-- All charges up (3 max since 7.42, 120s each, Valve data): use one now even at full mana. It denies an
 	-- allied creep and gives 69% of its experience. Prefer a creep the enemy is about to kill.
 	-- Charges from our own tracker (the API has no ability-charge read). Not with an enemy hero
 	-- near: a fight wants Chain Frost, not a 0.4s cast on his own creep.
 	local charges = X.SacrificeCharges()
+	local maxCharges = X.SacrificeMaxCharges()
 	-- In lane an enemy hero is almost always within 1200, which blocked this rule; 600 is a hero
 	-- right on him.
 	local enemyNear = #(Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE) or {}) > 0
-	if charges ~= nil and charges >= 2 and not enemyNear and not Fu.IsInTeamFight(bot, 1200) then
+	if charges ~= nil and charges >= maxCharges and not enemyNear and not Fu.IsInTeamFight(bot, 1200) then
 		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
 		for _, creep in pairs(bot:GetNearbyLaneCreeps(Min(castRange + 300, 1600), false) or {}) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
@@ -1087,9 +1098,9 @@ function X.ConsiderSacrifice()
 			return BOT_ACTION_DESIRE_HIGH, pick
 		end
 	end
-	-- Both charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
+	-- All charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
 	-- 118s and 174s after laning).
-	if charges ~= nil and charges >= 2 and DotaTime() >= (bot._sac2SkipLogAt or -999) then
+	if charges ~= nil and charges >= maxCharges and DotaTime() >= (bot._sac2SkipLogAt or -999) then
 		bot._sac2SkipLogAt = DotaTime() + 15
 		local why = enemyNear and "enemy-within-600"
 			or Fu.IsInTeamFight(bot, 1200) and "team-fight"

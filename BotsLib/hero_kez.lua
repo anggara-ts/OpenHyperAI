@@ -404,7 +404,9 @@ function X.ConsiderEchoSlash()
 	local travelDistance = echoSlashAbility:GetSpecialValueInt("travel_distance")
 	local katanaRadius = echoSlashAbility:GetSpecialValueInt("katana_radius")
 	local echoDamagePct = echoSlashAbility:GetSpecialValueInt("katana_echo_damage") / 100
-	local echoHeroDamage = echoSlashAbility:GetSpecialValueInt("echo_hero_damage")
+	-- 7.42 (Valve datafeed): each echo strike is katana_echo_damage% of attack damage plus echo_base_damage
+	-- (40/70/100/130). The old +20/40/60/80 against heroes (echo_hero_damage) is gone.
+	local echoBaseDamage = echoSlashAbility:GetSpecialValueInt("echo_base_damage")
 	local echoDamage = bot:GetAttackDamage() * echoDamagePct
 	local strikes = echoSlashAbility:GetSpecialValueInt("katana_strikes")
 	local manaAfter = Fu.GetManaAfter(echoSlashAbility:GetManaCost())
@@ -415,7 +417,7 @@ function X.ConsiderEchoSlash()
 			and bot:IsFacingLocation(enemyHero:GetLocation(), 15)
 			and Fu.CanBeAttacked(enemyHero)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
-			and Fu.CanKillTarget(enemyHero, (echoDamage + echoHeroDamage) * strikes, DAMAGE_TYPE_PHYSICAL)
+			and Fu.CanKillTarget(enemyHero, (echoDamage + echoBaseDamage) * strikes, DAMAGE_TYPE_PHYSICAL)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -663,11 +665,12 @@ function X.ConsiderRaptorDance()
 	end
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, radius) and Fu.CanBeAttacked(enemyHero) then
-			-- Each strike is base_damage + max_health_damage_pct of max HP, both pure (game KV); no attack
-			-- damage. Adding Kez's attack damage per strike over-counted and cast Raptor Dance on survivors.
+			-- Each strike is base_damage + max_health_damage_pct of max HP, no attack damage added. Since 7.42
+			-- the strikes are fixed-damage attacks and the damage type is physical (Valve datafeed, patch
+			-- notes), so armor reduces them.
 			local totalDamage = (baseDamage + maxHealthDamagePct / 100 * enemyHero:GetMaxHealth()) * strikes
 			if
-				Fu.CanKillTarget(enemyHero, totalDamage, DAMAGE_TYPE_PURE)
+				Fu.CanKillTarget(enemyHero, totalDamage, DAMAGE_TYPE_PHYSICAL)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")

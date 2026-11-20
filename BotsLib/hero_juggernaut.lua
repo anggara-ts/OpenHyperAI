@@ -64,17 +64,12 @@ local bladeFuryAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAb
 local healingWardAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "juggernaut")
 local bladeDanceAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "juggernaut")
 local omnislashAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "juggernaut")
--- datafeed: Swift Slash is granted by Aghanim's Scepter; fetch it by name, since entry 4 of the ability list is
--- not guaranteed to be it (the hero also has the innate Bladeform).
-local swiftSlashAbility =
-	SafeAbility(bot:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "juggernaut")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "juggernaut")
 local bladeFuryDesire
 local healingWardDesire, healingWardLocation
 local bladeDanceDesire, bladeDanceTarget
 local omnislashDesire, omnislashTarget
-local swiftSlashDesire, swiftSlashTarget
 local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
@@ -87,12 +82,6 @@ function X.SkillsComplement()
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	swiftSlashDesire, swiftSlashTarget = X.ConsiderD()
-	if swiftSlashDesire > 0 then
-		Fu.SetQueuePtToINT(bot, true)
-		bot:ActionQueue_UseAbilityOnEntity(swiftSlashAbility, swiftSlashTarget)
-		return
-	end
 	omnislashDesire, omnislashTarget = X.ConsiderR()
 	if omnislashDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
@@ -256,9 +245,9 @@ function X.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
--- Omnislash and Swift Slash pierce spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
--- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR/ConsiderD check CanCastOnMagicImmune; they were held
--- on any target under BKB.
+-- Omnislash pierces spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
+-- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR checks CanCastOnMagicImmune; it was held
+-- on any target under BKB. (Swift Slash was removed in 7.42.)
 function X.ConsiderR()
 	if
 		not omnislashAbility:IsFullyCastable()
@@ -320,58 +309,6 @@ function X.ConsiderR()
 			then
 				castTarget = enemyHero
 				debugText = "R-撤退" .. Fu.Chat.GetNormName(castTarget)
-				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function X.ConsiderD()
-	if
-		not bot:HasScepter()
-		or not swiftSlashAbility:IsFullyCastable()
-		or bot:HasModifier("modifier_juggernaut_blade_fury")
-		or bot:HasModifier("modifier_juggernaut_omnislash")
-	then
-		return 0
-	end
-	local abilityLevel = swiftSlashAbility:GetLevel()
-	local castRange = swiftSlashAbility:GetCastRange()
-	local radius = 600
-	local castPoint = swiftSlashAbility:GetCastPoint()
-	local manaCost = swiftSlashAbility:GetManaCost()
-	local damage = 0
-	local damageType = DAMAGE_TYPE_MAGICAL
-	local enemiesInRange = Fu.GetAroundEnemyHeroList(castRange)
-	local enemiesNearby = Fu.GetAroundEnemyHeroList(castRange + 200)
-	local castTarget = nil
-	local debugText = nil
-	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, 1400) then
-			for _, enemyHero in pairs(enemiesInRange) do
-				if
-					Fu.IsValid(enemyHero)
-					and Fu.IsInRange(botTarget, enemyHero, 425)
-					and Fu.CanCastOnMagicImmune(enemyHero)
-					and Fu.CanCastOnTargetAdvanced(enemyHero)
-				then
-					castTarget = enemyHero
-					debugText = "D-攻击:" .. Fu.Chat.GetNormName(castTarget)
-					return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
-				end
-			end
-		end
-	end
-	if Fu.IsRetreating(bot) then
-		for _, enemyHero in pairs(enemiesInRange) do
-			if
-				Fu.IsValid(enemyHero)
-				and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
-				and Fu.CanCastOnMagicImmune(enemyHero)
-				and Fu.CanCastOnTargetAdvanced(enemyHero)
-			then
-				castTarget = enemyHero
-				debugText = "D-撤退" .. Fu.Chat.GetNormName(castTarget)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
 			end
 		end

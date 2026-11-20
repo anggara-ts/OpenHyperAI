@@ -126,7 +126,8 @@ function X.ConsiderGorgonGrasp()
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, gorgonGraspAbility:GetCastRange())
 	local castPoint = gorgonGraspAbility:GetCastPoint()
-	local delay = gorgonGraspAbility:GetSpecialValueInt("delay")
+	-- Float: the delay is 0.8s since 7.42 (Valve datafeed); the Int read gave 0.
+	local delay = gorgonGraspAbility:GetSpecialValueFloat("delay")
 	local damage = gorgonGraspAbility:GetSpecialValueInt("damage")
 	local damagePerSecond = gorgonGraspAbility:GetSpecialValueInt("damage_pers")
 	-- Float: duration is 0.8/1.2/1.6/2.0 (game data); the Int read gave 0/1/1/2 and undercounted the kill damage.
@@ -149,7 +150,7 @@ function X.ConsiderGorgonGrasp()
 				return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
 			end
 			if
-				Fu.CanKillTarget(enemyHero, damage + damagePerSecond * duration, DAMAGE_TYPE_PHYSICAL)
+				Fu.CanKillTarget(enemyHero, damage + damagePerSecond * duration, DAMAGE_TYPE_MAGICAL)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 				and not enemyHero:HasModifier("modifier_enigma_black_hole_pull")

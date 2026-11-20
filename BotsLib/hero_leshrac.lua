@@ -721,19 +721,19 @@ function X.ConsiderNihilism()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local radius = nihilismAbility:GetSpecialValueInt("radius")
-	if Fu.IsWithoutTarget(bot) and Fu.GetAttackProjectileDamageByRange(bot, 1200) >= bot:GetHealth() then
-		return BOT_ACTION_DESIRE_HIGH
-	end
+	-- 7.42 (Valve patch notes): Nihilism no longer makes Leshrac ethereal. The old rule "cast when the
+	-- incoming attack projectiles would kill him" relied on that, so it is gone; the cast now disarms
+	-- enemies within the radius (4s) and dispels him, which the retreat and fight rules below use.
 	if isRetreating then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		if bot:WasRecentlyDamagedByAnyHero(2) and enemiesInRadius ~= nil and #enemiesInRadius >= 1 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	-- Fights: Nihilism makes Leshrac and enemies within the radius ethereal (no attacks), slows them
-	-- and they take 30% more magic damage (Valve datafeed). It was only an escape. Now (1) in a
-	-- fight while heroes hit him below 60% HP, and (2) going on a target with no allied hero within
-	-- 1200, so no ally's right-clicks are lost to the ethereal enemies.
+	-- Fights: Nihilism disarms the enemies within the radius for 4s (7.42; it was an ethereal escape
+	-- before, which is why it once waited for "no ally nearby": ethereal enemies could not be hit by
+	-- allies either). A disarm does not block allies, so now (1) in a fight while heroes hit him below
+	-- 60% HP, and (2) going on a target within the radius, with or without allies near.
 	if isGoingOnSomeone or isInTeamFight then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		local enemiesHit = 0
@@ -747,12 +747,6 @@ function X.ConsiderNihilism()
 			end
 		end
 		if enemiesHit >= 1 then
-			local nearbyAllyCount = 0
-			for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}) do
-				if allyHero ~= bot and not Fu.IsSuspiciousIllusion(allyHero) then
-					nearbyAllyCount = nearbyAllyCount + 1
-				end
-			end
 			local castReason = nil
 			if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.6 then
 				castReason = "defend"
@@ -761,9 +755,8 @@ function X.ConsiderNihilism()
 				and Fu.IsValidHero(botTarget)
 				and Fu.IsInRange(bot, botTarget, radius)
 				and not botTarget:IsMagicImmune()
-				and nearbyAllyCount == 0
 			then
-				castReason = "solo"
+				castReason = "engage"
 			end
 			if castReason ~= nil then
 				if DotaTime() >= (bot._nihilLogAt or -999) then

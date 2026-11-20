@@ -1708,18 +1708,99 @@ function Item.ShouldClaimRoshanDrop(bot, loc, itemName)
 	local ally = winner(4000) or winner(math.huge)
 	return ally == bot
 end
-function Item.RoshanDropDesire(bot)
-	for _, drop in pairs(GetDroppedItemList() or {}) do
-		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
-			local name = drop.item:GetName()
+-- Items a bot dropped to make room for a Roshan item (#15): bot._roshReturn = { { name, at, location }, ... }.
+-- Game 051: Keeper dropped Tranquil Boots, Magic Wand and an Ogre Axe in one second for one Banner, Medusa
+-- her Aghanim's Scepter for the Aegis. Each think dropped the next cheapest item because the first drop had
+-- not landed yet, only the last name was remembered, and nothing kept the bot there to pick anything up.
+-- Now: one drop per claim, every dropped item is remembered and fetched (the desire below stays up for it),
+-- and each one ends with a line: picked-up, or lost with the reason.
+local ROSHAN_RETURN_SECONDS = 30
+local ROSHAN_RETURN_RANGE = 1500
+local ROSHAN_DROP_WAIT = 3
+local function RoshanRoomLog(bot, what, itemName, detail)
+	pcall(
+		print,
+		string.format(
+			"[OHA-ROSH] t=%.0f %s room %s %s%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			(string.gsub(itemName, "^item_", "")),
+			detail or ""
+		)
+	)
+end
+-- The dropped item to fetch next, as an entry of GetDroppedItemList, or nil. Entries that are done leave the
+-- list here: back in the bag (picked-up), gone from the ground, or out of time.
+local function RoshanReturnTarget(bot)
+	local pending = bot._roshReturn
+	if pending == nil then
+		return nil
+	end
+	local onGround = GetDroppedItemList() or {}
+	for index = #pending, 1, -1 do
+		local entry = pending[index]
+		local found = nil
+		for _, drop in pairs(onGround) do
 			if
-				Item.RoshanClaimKind(name) ~= nil
-				and Item.ShouldClaimRoshanDrop(bot, drop.location, name)
-				and GetUnitToLocationDistance(bot, drop.location) <= 4500
+				drop ~= nil
+				and drop.item ~= nil
+				and not drop.item:IsNull()
+				and drop.item:GetName() == entry.name
+				and GetUnitToLocationDistance(bot, drop.location) <= ROSHAN_RETURN_RANGE + 600
+				and math.abs(drop.location.x - entry.location.x) <= 300
+				and math.abs(drop.location.y - entry.location.y) <= 300
 			then
-				return 0.97
+				found = drop
+				break
 			end
 		end
+		local age = DotaTime() - entry.at
+		if found == nil and age > 1 then
+			-- A second after the drop order the item is on the ground; not there any more means taken.
+			RoshanRoomLog(bot, bot:FindItemSlot(entry.name) >= 0 and "picked-up" or "lost", entry.name, " why=gone")
+			table.remove(pending, index)
+		elseif age > ROSHAN_RETURN_SECONDS then
+			RoshanRoomLog(bot, "lost", entry.name, " why=timeout")
+			table.remove(pending, index)
+		elseif found ~= nil and GetUnitToLocationDistance(bot, found.location) > ROSHAN_RETURN_RANGE then
+			RoshanRoomLog(bot, "lost", entry.name, " why=too-far")
+			table.remove(pending, index)
+		elseif found ~= nil then
+			entry.drop = found
+		else
+			entry.drop = nil
+		end
+	end
+	if #pending == 0 then
+		bot._roshReturn = nil
+		return nil
+	end
+	for _, entry in ipairs(pending) do
+		if entry.drop ~= nil then
+			return entry.drop
+		end
+	end
+	return nil
+end
+function Item.RoshanDropDesire(bot)
+	if DotaTime() >= (bot._roshNoRoomUntil or -1) then
+		for _, drop in pairs(GetDroppedItemList() or {}) do
+			if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+				local name = drop.item:GetName()
+				if
+					Item.RoshanClaimKind(name) ~= nil
+					and Item.ShouldClaimRoshanDrop(bot, drop.location, name)
+					and GetUnitToLocationDistance(bot, drop.location) <= 4500
+				then
+					return 0.97
+				end
+			end
+		end
+	end
+	-- Stay for what was dropped to make room.
+	if bot._roshReturn ~= nil and #bot._roshReturn > 0 then
+		return 0.97
 	end
 	return 0
 end
@@ -1728,68 +1809,76 @@ function Item.TryPickupRoshanDrop(bot)
 		return false
 	end
 	local best, bestDist = nil, math.huge
-	for _, drop in pairs(GetDroppedItemList() or {}) do
-		if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
-			local name = drop.item:GetName()
-			if Item.RoshanClaimKind(name) ~= nil and Item.ShouldClaimRoshanDrop(bot, drop.location, name) then
-				local dist = GetUnitToLocationDistance(bot, drop.location)
-				if dist < bestDist then
-					best = drop
-					bestDist = dist
+	if DotaTime() >= (bot._roshNoRoomUntil or -1) then
+		for _, drop in pairs(GetDroppedItemList() or {}) do
+			if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() then
+				local name = drop.item:GetName()
+				if Item.RoshanClaimKind(name) ~= nil and Item.ShouldClaimRoshanDrop(bot, drop.location, name) then
+					local dist = GetUnitToLocationDistance(bot, drop.location)
+					if dist < bestDist then
+						best = drop
+						bestDist = dist
+					end
 				end
 			end
 		end
 	end
 	if best == nil or bestDist > 4500 then
-		-- Nothing left to claim: pick back up the item dropped to make room (20s, within 1500).
-		local ret = bot._roshReturn
-		if ret ~= nil then
-			if DotaTime() - ret.at > 20 then
-				bot._roshReturn = nil
-				return false
-			end
-			for _, drop in pairs(GetDroppedItemList() or {}) do
-				if drop ~= nil and drop.item ~= nil and not drop.item:IsNull() and drop.item:GetName() == ret.name then
-					local distance = GetUnitToLocationDistance(bot, drop.location)
-					if distance <= 1500 then
-						if distance > 120 then
-							bot:Action_MoveToLocation(drop.location)
-						else
-							bot:Action_PickUpItem(drop.item)
-							bot._roshReturn = nil
-						end
-						return true
-					end
-				end
-			end
-			bot._roshReturn = nil
+		-- Nothing left to claim: fetch what was dropped to make room.
+		local back = RoshanReturnTarget(bot)
+		if back == nil then
+			return bot._roshReturn ~= nil
 		end
-		return false
+		if GetUnitToLocationDistance(bot, back.location) > 120 then
+			bot:Action_MoveToLocation(back.location)
+		else
+			bot:Action_PickUpItem(back.item)
+		end
+		return true
 	end
 	if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the cheapest item
+		-- to the backpack never made room. Drop it at his feet instead, pick up the Roshan item into the
+		-- freed main slot, then pick the dropped item back up (it goes to the backpack). Game 021, 32:48:
+		-- nobody took the Aegis, the claimant's bag was full.
+		if bestDist > 600 then
+			bot:Action_MoveToLocation(best.location)
+			return true
+		end
+		if DotaTime() < (bot._roshDropAt or -99) + ROSHAN_DROP_WAIT then
+			-- The drop order is on its way: wait for the slot instead of dropping a second item.
+			return true
+		end
+		local kind = Item.RoshanClaimKind(best.item:GetName()) or "drop"
 		local cheap = Item.GetMainInvLessValItemSlot(bot)
-		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the
-		-- cheapest item to the backpack never made room. Drop it at his feet instead, pick up the
-		-- Roshan item into the freed main slot, then pick the dropped item back up (it goes to the
-		-- backpack). Game 021, 32:48: nobody took the Aegis, the claimant's bag was full.
-		if cheap ~= nil and cheap >= 0 and bestDist <= 600 then
-			local item = bot:GetItemInSlot(cheap)
-			if item ~= nil then
-				pcall(
-					print,
-					string.format(
-						"[OHA-ROSH] t=%.0f %s %s-room dropped %s",
-						DotaTime(),
-						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-						Item.RoshanClaimKind(best.item:GetName()) or "drop",
-						(string.gsub(item:GetName(), "^item_", ""))
-					)
-				)
-				bot._roshReturn = { name = item:GetName(), at = DotaTime() }
-				bot:Action_DropItem(item, bot:GetLocation())
-				return true
+		local item = cheap ~= nil and cheap >= 0 and bot:GetItemInSlot(cheap) or nil
+		if item == nil then
+			return false
+		end
+		-- The dropped item comes back into the backpack. With no backpack slot it would stay on the ground:
+		-- only the Aegis is worth that.
+		local backpackFree = 0
+		for slot = 6, 8 do
+			if bot:GetItemInSlot(slot) == nil then
+				backpackFree = backpackFree + 1
 			end
 		end
+		if backpackFree == 0 and kind ~= "aegis" then
+			bot._roshNoRoomUntil = DotaTime() + 30
+			RoshanRoomLog(bot, "skip", best.item:GetName(), " why=bag-full")
+			return false
+		end
+		RoshanRoomLog(
+			bot,
+			"dropped",
+			item:GetName(),
+			string.format(" for=%s cost=%d backpack-free=%d", kind, GetItemCost(item:GetName()), backpackFree)
+		)
+		bot._roshReturn = bot._roshReturn or {}
+		table.insert(bot._roshReturn, { name = item:GetName(), at = DotaTime(), location = bot:GetLocation() })
+		bot._roshDropAt = DotaTime()
+		bot:Action_DropItem(item, bot:GetLocation())
+		return true
 	end
 	if bestDist > 120 then
 		bot:Action_MoveToLocation(best.location)

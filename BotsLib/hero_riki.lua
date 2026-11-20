@@ -5,6 +5,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -159,7 +160,6 @@ local blinkStrikeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "s
 local tricksOfTheTradeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "riki")
 local slot4Ability = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "riki")
 local cloakAndDaggerAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "riki")
-local talent5 = SafeAbility(bot:GetAbilityByName(sTalentList[5]), "sTalentList[5]", "riki")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "riki")
 local talent8 = SafeAbility(bot:GetAbilityByName(sTalentList[8]), "sTalentList[8]", "riki")
 local smokeScreenDesire, smokeScreenLocation
@@ -171,6 +171,7 @@ local lastBlinkStrikeTime = -90
 local secondsPerAttack = 0
 local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if Fu.CanNotUseAbility(bot) or DotaTime() < lastBlinkStrikeTime + secondsPerAttack + 0.3 then
 		return
 	end
@@ -300,10 +301,9 @@ function X.ConsiderW()
 	-- Cloak and Dagger) has no damage_multiplier, so the bonus read 0.
 	local innateBackstabAbility = bot:GetAbilityByName("riki_innate_backstab")
 	if innateBackstabAbility ~= nil then
+		-- 7.42 game files: special_bonus_unique_riki_1 (+0.3) is linked into Backstab "damage_multiplier",
+		-- and the read includes it once learned (talent_watch.lua). The old talent "value" read added 0 (#46).
 		local backstabMultiplier = innateBackstabAbility:GetSpecialValueFloat("damage_multiplier")
-		if talent5:IsTrained() then
-			backstabMultiplier = backstabMultiplier + talent5:GetSpecialValueFloat("value")
-		end
 		attackDamage = attackDamage + bot:GetAttributeValue(ATTRIBUTE_AGILITY) * backstabMultiplier
 	end
 	local bonusDamage = blinkStrikeAbility:GetSpecialValueInt("bonus_damage")

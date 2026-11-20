@@ -5,6 +5,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -154,17 +155,16 @@ local unrefinedFireblastAbility =
 	SafeAbility(bot:GetAbilityByName("ogre_magi_unrefined_fireblast"), "ogre_magi_unrefined_fireblast", "ogre_magi")
 local fireShieldAbility = SafeAbility(bot:GetAbilityByName("ogre_magi_smash"), "ogre_magi_smash", "ogre_magi")
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "ogre_magi")
-local talent8 = SafeAbility(bot:GetAbilityByName(sTalentList[8]), "sTalentList[8]", "ogre_magi")
 local fireblastDesire, fireblastTarget
 local igniteDesire, igniteTarget
 local bloodlustDesire, bloodlustTarget
 local unrefinedFireblastDesire, unrefinedFireblastTarget
 local fireShieldDesire, fireShieldTarget
 local aetherRange = 0
-local fireblastDamageBonus = 0
 local isAttacking
 local botLevel, manaReserve, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
@@ -172,16 +172,12 @@ function X.SkillsComplement()
 	local context = AbilityContext.Build(bot)
 	manaReserve = 300
 	aetherRange = context.aetherRange
-	fireblastDamageBonus = 0
 	botLevel = context.level
 	mpRatio = context.mp
 	hpRatio = context.hp
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	if talent8:IsTrained() then
-		fireblastDamageBonus = fireblastDamageBonus + talent8:GetSpecialValueInt("value")
-	end
 	fireblastDesire, fireblastTarget = X.ConsiderQ()
 	if fireblastDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
@@ -224,7 +220,10 @@ function X.ConsiderQ()
 	end
 	local castPoint = fireblastAbility:GetCastPoint()
 	local manaCost = fireblastAbility:GetManaCost()
-	local damage = fireblastAbility:GetSpecialValueInt("fireblast_damage") + fireblastDamageBonus
+	-- The old bonus came from talent 8 (Multicast chance), not the Fireblast talent.
+	-- 7.42 game files: special_bonus_unique_ogre_magi_2 (+125) is linked into Fireblast "fireblast_damage",
+	-- and the read includes it once learned (talent_watch.lua). The old talent "value" read added 0 (#46).
+	local damage = fireblastAbility:GetSpecialValueInt("fireblast_damage")
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 	local enemiesInSearchRange = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)

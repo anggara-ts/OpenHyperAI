@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -125,17 +126,16 @@ local lucentBeamAbility = SafeAbility(bot:GetAbilityByName("luna_lucent_beam"), 
 local moonGlaiveAbility = SafeAbility(bot:GetAbilityByName("luna_moon_glaive"), "luna_moon_glaive", "luna")
 local lunarOrbitAbility = SafeAbility(bot:GetAbilityByName("luna_lunar_orbit"), "luna_lunar_orbit", "luna")
 local eclipseAbility = SafeAbility(bot:GetAbilityByName("luna_eclipse"), "luna_eclipse", "luna")
-local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "luna")
 local lucentBeamDesire, lucentBeamTarget
 local moonGlaivesDesire
 local lunarOrbitDesire
 local eclipseDesire
-local bonusBeamDamage = 0
 local botTarget
 local isGoingOnSomeone
 local isRetreating
 local isAttacking
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -144,9 +144,6 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	botTarget = Fu.GetProperTarget(bot)
 	Fu.ConsiderTarget()
-	if talent6:IsTrained() then
-		bonusBeamDamage = talent6:GetSpecialValueInt("value")
-	end
 	moonGlaivesDesire = X.ConsiderMoonGlaives()
 	if moonGlaivesDesire > 0 then
 		bot:Action_UseAbility(moonGlaiveAbility)
@@ -192,7 +189,10 @@ function X.ConsiderLucentBeam()
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, lucentBeamAbility:GetCastRange())
 	local abilityLevel = lucentBeamAbility:GetLevel()
-	local damage = lucentBeamAbility:GetSpecialValueInt("beam_damage") + bonusBeamDamage
+	-- The old bonus came from talent 6 (Lunar Orbit speed/damage), not the beam talent.
+	-- 7.42 game files: special_bonus_unique_luna_1 (+80) is linked into luna_lucent_beam "beam_damage", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
+	local damage = lucentBeamAbility:GetSpecialValueInt("beam_damage")
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 300, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if

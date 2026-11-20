@@ -35,8 +35,30 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_ultimate_scepter_2",
 }
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+-- Support Weaver (#38): its own list, it was a copy of the carry list. Stratz 7.41f, week to 11 Nov 2026, pos 4
+-- (21,846 matches) / pos 5 (9,450): Urn of Shadows 83% / 78%, Magic Wand 72% / 70%, Blood Grenade 67% / 66%,
+-- Spirit Vessel 65% / 61%, Circlet 57% / 53%, Magic Stick 50% / 50%, Perseverance 42% / 40% (Linken's Sphere
+-- 24% / 24%), Power Treads 29% / 32% (the most bought boots), Desolator 29% / 32%, Orchid 27% / 25%, Aghanim's
+-- Shard 20% / 21%, Aghanim's Scepter 18% / 19% (1% on pos 1; it gives the ally Time Lapse), Bloodthorn 8% / 7%.
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_circlet",
+	"item_urn_of_shadows",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_spirit_vessel",
+	"item_sphere",
+	"item_desolator",
+	"item_orchid",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_bloodthorn",
+	"item_ultimate_scepter_2",
+}
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }

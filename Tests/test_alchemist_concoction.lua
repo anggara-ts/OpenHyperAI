@@ -218,3 +218,94 @@ T.test("alchemist: a brew that ends early without a throw order reads unknown, n
 	X.SkillsComplement()
 	T.ok(printedLine("concoction brew%-end outcome=unknown brewed=2.1s"), "unknown")
 end)
+
+T.test("alchemist: a likely disable makes the brew go out early (pure rule)", function()
+	local X = load()
+	T.eq(X.ConcoctionThreat(1.0, {}), nil, "no threat")
+	T.eq(X.ConcoctionThreat(0.5, { projectile = true }), "projectile", "a stun projectile on its way")
+	T.eq(X.ConcoctionThreat(0.2, { projectile = true }), nil, "not in the first 0.3s")
+	T.eq(X.ConcoctionThreat(1.0, { afterDisable = true }), "after-disable", "disabled earlier in this brew")
+	T.eq(X.ConcoctionThreat(0.9, { afterDisable = true }), nil, "after-disable waits for 1.0s")
+	T.eq(X.ConcoctionThreat(1.5, { enemyCast = true }), "enemy-cast", "an enemy casting at him")
+	T.eq(X.ConcoctionThreat(1.4, { enemyCast = true }), nil, "enemy-cast waits for 1.5s")
+	T.eq(X.ConcoctionThreat(2.0, { hpLost = 0.25 }), "hp-drop", "a quarter of his HP in a second")
+	T.eq(X.ConcoctionThreat(2.0, { hpLost = 0.2 }), nil, "a smaller HP loss")
+	T.eq(X.ConcoctionThreat(2.0, nil), nil, "nil threat table")
+end)
+
+T.test("alchemist: which gates a throw may override, and which casts wait for the brew", function()
+	local X = load()
+	T.eq(X.ConcoctionGateSoft("casting"), true, "another cast")
+	T.eq(X.ConcoctionGateSoft("queued"), true, "a queued order")
+	T.eq(X.ConcoctionGateSoft("channeling"), true, "a channel")
+	T.eq(X.ConcoctionGateSoft("stunned"), false, "stunned")
+	T.eq(X.ConcoctionGateSoft("silenced"), false, "silenced")
+	T.eq(X.ConcoctionGateSoft("other"), false, "invulnerable and the rest")
+	T.eq(X.ConcoctionHoldsCast("acid_spray", false, 0), false, "not brewing: nothing held")
+	T.eq(X.ConcoctionHoldsCast("acid_spray", true, 0.5), true, "Acid Spray waits for the whole brew")
+	T.eq(X.ConcoctionHoldsCast("berserk_potion", true, 4.0), true, "Berserk Potion too")
+	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 2.9), false, "Chemical Rage early in the brew")
+	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 3.0), true, "Chemical Rage held from 3.0s")
+	T.eq(X.ConcoctionKillPointless(0.16, 4, 0), true, "a 16% target that allies are killing, nobody else")
+	T.eq(X.ConcoctionKillPointless(0.16, 4, 1), false, "another hero in range takes the brew")
+	T.eq(X.ConcoctionKillPointless(0.16, 0, 0), false, "no ally on it")
+	T.eq(X.ConcoctionKillPointless(0.35, 2, 0), false, "not that low")
+end)
+
+T.test("alchemist: the first open think after a stun during the brew throws it (stun-threat)", function()
+	local X = load()
+	local state = startBrew(X, 700)
+	state.enemy._hp = 1000 -- not a kill
+	local stunned = true
+	state.bot.IsStunned = function()
+		return stunned
+	end
+	Stub.time = 701.2
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "stunned: no order")
+	stunned = false
+	Stub.time = 701.5
+	X.SkillsComplement()
+	T.eq(#state.orders, 1, "thrown on the first open think")
+	T.eq(state.orders[1].target, state.enemy, "at the brew target")
+	T.ok(
+		printedLine(
+			"concoction throw why=stun%-threat target=npc_dota_hero_%S+ dist=400 brewed=1.5s illusion=false threat=after%-disable gate=open"
+		),
+		"throw line names the threat"
+	)
+end)
+
+T.test("alchemist: a queued order does not hold the throw back when the brew target is gone", function()
+	local X = load()
+	local state = startBrew(X, 800)
+	state.enemy._hp = 1000
+	-- The brew target dies; another enemy hero stands at 500.
+	state.enemy._alive = false
+	local other = Stub.teams[GetOpposingTeam()][2]
+	other._loc = state.bot._loc + Vector(500, 0, 0)
+	other._hp = 1000
+	state.bot.NumQueuedActions = function()
+		return #state.orders == 0 and 1 or 0
+	end
+	Stub.time = 801.2
+	X.SkillsComplement()
+	T.eq(#state.orders, 1, "thrown through the queued order")
+	T.eq(state.orders[1].target, other, "at the other hero")
+	T.ok(printedLine("concoction throw why=target%-lost target=npc_dota_hero_%S+ dist=500 brewed=1.2s"), "throw line")
+	T.ok(printedLine("gate=queued:"), "the throw line names the queued gate")
+end)
+
+T.test("alchemist: a brew whose end is seen long after (he died meanwhile) reads died", function()
+	local X = load()
+	local state = startBrew(X, 900)
+	state.enemy._hp = 1000
+	state.enemy._loc = state.bot._loc + Vector(9000, 0, 0)
+	Stub.time = 901
+	X.SkillsComplement()
+	-- Dead: the usage file runs no hero script; back after respawn.
+	state.brewing = false
+	Stub.time = 966
+	X.SkillsComplement()
+	T.ok(printedLine("concoction brew%-end outcome=died brewed=66.0s seen=1.0s"), "died, not unknown")
+end)

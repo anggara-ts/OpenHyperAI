@@ -90,6 +90,13 @@ local brewSeen = false -- the throw ability was seen in the slot since the start
 local brewSeenAt = 0 -- seconds brewed when it was last seen there
 local lastThrowWhy, lastThrowBrewed = "none", 0 -- the last throw order of this brew
 local lastGateWhy, lastGateBrewed = "none", 0 -- the last time the ability gate was closed during this brew
+local lastThrowAt = -999 -- DotaTime of the last throw order
+local brewDisabled = false -- the gate was closed by a stun, silence or hex during this brew (game 057)
+local brewLateGate = 0 -- seconds the gate was closed from the full-brew throw time (4.25s) on
+local brewGateCast = "-" -- the other cast or queued order that closed the gate last
+local brewLastThinkAt, brewThinkDt, brewMaxGap = 0, 0, 0 -- seconds between brew tracker runs
+local brewThreatKind = "-" -- what the stun-threat throw reacted to
+local hpMarkHp, hpMarkAt = 0, -999 -- his HP at most 1s ago, for the HP-drop threat
 local gapSampleUnit, gapSampleDist, gapSampleAt = nil, 0, 0 -- distance sample of the nearest throw target
 local botTarget
 local isEngaging
@@ -121,6 +128,58 @@ function X.ConcoctionSecondsInRange(distance, rate, castRange)
 		return math.huge
 	end
 	return (castRange - distance) / rate
+end
+-- #34, game 057: a disable while he holds the brew keeps him from throwing it, and it then blows up on him.
+-- Game 057, 52:47: Puck blinked onto him 1s into a brew and cast Waning Rift on him (7.42 npc_heroes:
+-- puck_waning_rift silence_duration 2.0/2.5/3.0/3.5, +1.25 talent); he was disabled from then to the explosion.
+-- Returns what makes a disable likely now, or nil. `threat`: projectile (a stun projectile is on its way),
+-- afterDisable (he was stunned, silenced or hexed earlier in this brew: a chained disable is likely), enemyCast
+-- (an enemy within 600 is casting at him), hpLost (share of his max HP lost within the last second).
+-- The brew time floors keep a throw worth its cooldown: game data (7.42 npc_heroes, alchemist_unstable_concoction)
+-- min_stun 0.25, max_stun 1.7/2.2/2.7/3.2 at brew_time 5.0 (the throw's own block lists 1.75/2.25/2.75/3.25);
+-- assuming a straight line, 1.5s brewed is 30% of max_damage and a 0.7-1.1s stun.
+function X.ConcoctionThreat(brewed, threat)
+	if threat == nil then
+		return nil
+	end
+	if threat.projectile and brewed >= 0.3 then
+		return "projectile"
+	end
+	if threat.afterDisable and brewed >= 1.0 then
+		return "after-disable"
+	end
+	if threat.enemyCast and brewed >= 1.5 then
+		return "enemy-cast"
+	end
+	if (threat.hpLost or 0) >= 0.25 and brewed >= 1.5 then
+		return "hp-drop"
+	end
+	return nil
+end
+-- Gate reasons a throw order may override while brewing: another cast in its cast point, a queued order or a
+-- channel (a Town Portal with a brew in hand ends in the explosion). Stun, silence, hex, invulnerability: no.
+local softGateReasons = { casting = true, queued = true, channeling = true }
+function X.ConcoctionGateSoft(reason)
+	return softGateReasons[reason] == true
+end
+-- #34, game 057: his other casts are held while a brew is in hand, so none of them is in its cast point when
+-- the throw is due. Acid Spray (cast point 0.2) and Berserk Potion (0.2) wait for the whole brew; Chemical Rage
+-- (0.35s transformation, datafeed transformation_time) only from 3.0s brewed, ahead of the 4.25s throws.
+function X.ConcoctionHoldsCast(castName, brewing, brewed)
+	if not brewing then
+		return false
+	end
+	if castName == "chemical_rage" then
+		return brewed >= 3.0
+	end
+	return true
+end
+-- #34, game 057: three "kill" brews were started on a hero at 11-16% HP that the allies around it killed in the
+-- same second (Puck at 18:52 and 22:40, Zeus at 50:20); with nobody else in range all three blew up on him.
+-- A kill brew is pointless when the target is that low, an allied hero is on it and no other enemy hero is in
+-- the throw range to take the brew instead.
+function X.ConcoctionKillPointless(targetHp, alliesNearTarget, otherEnemiesInRange)
+	return targetHp < 0.3 and alliesNearTarget >= 1 and otherEnemiesInRange == 0
 end
 -- Game data: brew_explosion 5.5 on the brew ability (the hidden throw ability's own block still lists 7.0);
 -- 5.5 is the deadline used, since it is safe under either value.
@@ -206,6 +265,8 @@ local function AbilityGateReason()
 		return "silenced"
 	elseif bot:IsHexed() then
 		return "hexed"
+	elseif bot:IsNightmared() or bot:IsInvulnerable() then
+		return "other"
 	elseif bot:IsChanneling() then
 		return "channeling"
 	elseif bot:IsUsingAbility() or bot:IsCastingAbility() then
@@ -215,15 +276,68 @@ local function AbilityGateReason()
 	end
 	return "other"
 end
+-- The throw he ordered is in its cast point (game data: AbilityCastPoint 0.2): a new order would restart it.
+local function IsThrowInProgress()
+	local activeAbility = bot:GetCurrentActiveAbility()
+	if activeAbility ~= nil and not activeAbility:IsNull() then
+		return activeAbility:GetName() == "alchemist_unstable_concoction_throw"
+	end
+	return DotaTime() - lastThrowAt < 0.3
+end
+-- Notes a closed gate during a brew for the brew's end line (#34, game 057: the line only named the last
+-- reason, which on most brews was the throw's own cast point).
+local function NoteBrewGate(reason, brewed)
+	lastGateWhy, lastGateBrewed = reason, brewed
+	if reason == "stunned" or reason == "silenced" or reason == "hexed" then
+		brewDisabled = true
+	end
+	if brewed >= fullBrewThrowDelay then
+		brewLateGate = brewLateGate + brewThinkDt
+	end
+	if reason == "casting" then
+		local activeAbility = bot:GetCurrentActiveAbility()
+		if activeAbility ~= nil and not activeAbility:IsNull() then
+			brewGateCast = activeAbility:GetName()
+		end
+	elseif reason == "queued" then
+		brewGateCast = "queued:" .. tostring(bot:GetQueuedActionType(0))
+	end
+end
+-- What makes a disable likely now (see X.ConcoctionThreat).
+local function ReadBrewThreat()
+	local now = DotaTime()
+	local hp = bot:GetHealth()
+	local hpLost = 0
+	if now - hpMarkAt > 1.0 then
+		hpMarkHp, hpMarkAt = hp, now
+	else
+		hpLost = (hpMarkHp - hp) / math.max(1, bot:GetMaxHealth())
+	end
+	return {
+		projectile = Fu.IsStunProjectileIncoming(bot, 1000),
+		afterDisable = brewDisabled,
+		enemyCast = Fu.IsWillBeCastUnitTargetSpell(bot, 600) or Fu.IsWillBeCastPointSpell(bot, 600),
+		hpLost = hpLost,
+	}
+end
+-- The hero the brew was started for is dead or out of sight.
+local function BrewTargetLost()
+	return brewTarget == nil or brewTarget:IsNull() or not brewTarget:IsAlive() or not brewTarget:CanBeSeen()
+end
 -- Runs every think, above the ability gate: the explosion on himself stuns him, so code below the gate never
 -- sees a brew end. Returns whether he is brewing and the seconds brewed. When a brew ends it prints one line:
 --   [OHA-ALCHEMIST] concoction brew-end outcome=thrown|self-explode|died|unknown ...
 -- self-explode: still brewing at the deadline, or it ended around the deadline with no throw order in this
 -- brew (only this file orders the throw), or he is stunned when the end is seen. thrown: a throw was ordered
--- and the brew ended before the deadline. unknown: anything else (this function did not run around the end
--- because the usage file returned before the hero script, and an order was pending).
+-- and the brew ended before the deadline. died: he is dead, or this function did not run for over 5s (it does
+-- not run while he is dead; game 057, 34:06: a brew seen at 1.0s ended "unknown" 66s later, after his death).
+-- unknown: anything else (this function did not run around the end because the usage file returned before the
+-- hero script, and an order was pending). stunned= is read after the end, so on a self-explode it is mostly the
+-- explosion's own stun; gate= is the last closed gate, lateGate= the seconds it was closed from 4.25s brewed on,
+-- cast= the other cast or queued order seen at the gate, maxGap= the longest pause between runs of this function.
 function X.TrackConcoctionBrew()
-	local brewed = DotaTime() - concoctionStartTime
+	local now = DotaTime()
+	local brewed = now - concoctionStartTime
 	local explodeAt = ConcoctionExplodeAt()
 	-- While brewing the throw ability takes the brew's slot (datafeed note: "While brewing, this ability is
 	-- replaced by Unstable Concoction Throw") and is hidden otherwise. The time bound keeps a wrong hidden
@@ -234,6 +348,13 @@ function X.TrackConcoctionBrew()
 		and unstableConcoctionThrowAbility:GetCastRange() > 0
 		and not unstableConcoctionThrowAbility:IsHidden()
 	if brewing then
+		if brewSeen then
+			brewThinkDt = math.min(0.5, now - brewLastThinkAt)
+			brewMaxGap = math.max(brewMaxGap, now - brewLastThinkAt)
+		else
+			brewThinkDt = 0
+		end
+		brewLastThinkAt = now
 		brewSeen = true
 		brewSeenAt = brewed
 		return true, brewed
@@ -246,6 +367,8 @@ function X.TrackConcoctionBrew()
 			outcome = "died"
 		elseif brewSeenAt >= explodeAt - 0.07 then
 			outcome = "self-explode"
+		elseif brewed - brewSeenAt > 5 then
+			outcome = "died"
 		elseif brewed < explodeAt - 0.07 then
 			if throwOrdered then
 				outcome = "thrown"
@@ -260,7 +383,8 @@ function X.TrackConcoctionBrew()
 			print(
 				string.format(
 					"[OHA-ALCHEMIST] t=%.0f concoction brew-end outcome=%s brewed=%.1fs seen=%.1fs rule=%s target=%s"
-						.. " lastThrow=%s@%.1f gate=%s@%.1f nearest=%s nearestDist=%.0f mode=%s stunned=%s",
+						.. " lastThrow=%s@%.1f gate=%s@%.1f nearest=%s nearestDist=%.0f mode=%s stunned=%s"
+						.. " lateGate=%.1fs cast=%s maxGap=%.1fs targetLost=%s",
 					DotaTime(),
 					outcome,
 					brewed,
@@ -274,15 +398,20 @@ function X.TrackConcoctionBrew()
 					UnitNameOrNone(nearest),
 					nearest ~= nil and nearestDist or -1,
 					tostring(bot:GetActiveMode()),
-					tostring(bot:IsStunned())
+					tostring(bot:IsStunned()),
+					brewLateGate,
+					brewGateCast,
+					brewMaxGap,
+					tostring(BrewTargetLost())
 				)
 			)
 		end)
 	end
 	return false, brewed
 end
--- One line per throw order (the order repeats while it is not carried out, so 1s per reason).
-function X.LogConcoctionThrow(why, target, brewed)
+-- One line per throw order (the order repeats while it is not carried out, so 1s per reason). threat= names
+-- what the stun-threat throw reacted to; gate= is "open", or the cast, queued order or channel the throw replaces.
+function X.LogConcoctionThrow(why, target, brewed, gate)
 	if bot._alchThrowLogWhy == why and DotaTime() < (bot._alchThrowLogAt or -999) then
 		return
 	end
@@ -291,16 +420,39 @@ function X.LogConcoctionThrow(why, target, brewed)
 	pcall(function()
 		print(
 			string.format(
-				"[OHA-ALCHEMIST] t=%.0f concoction throw why=%s target=%s dist=%.0f brewed=%.1fs illusion=%s",
+				"[OHA-ALCHEMIST] t=%.0f concoction throw why=%s target=%s dist=%.0f brewed=%.1fs illusion=%s"
+					.. " threat=%s gate=%s",
 				DotaTime(),
 				why,
 				UnitNameOrNone(target),
 				GetUnitToUnitDistance(bot, target),
 				brewed,
-				tostring(Fu.IsSuspiciousIllusion(target))
+				tostring(Fu.IsSuspiciousIllusion(target)),
+				why == "stun-threat" and brewThreatKind or "-",
+				gate or "open"
 			)
 		)
 	end)
+end
+local function OrderConcoctionThrow(brewed, gate)
+	local why = unstableConcoctionThrowWhy or "none"
+	X.LogConcoctionThrow(why, unstableConcoctionThrowTarget, brewed, gate)
+	lastThrowWhy, lastThrowBrewed, lastThrowAt = why, brewed, DotaTime()
+	bot:Action_UseAbilityOnEntity(unstableConcoctionThrowAbility, unstableConcoctionThrowTarget)
+end
+-- Another cast from this file is held while a brew is in hand (X.ConcoctionHoldsCast); one line per 3s.
+local function HoldsCastWhileBrewing(castName, brewing, brewed)
+	if not X.ConcoctionHoldsCast(castName, brewing, brewed) then
+		return false
+	end
+	if DotaTime() >= (bot._alchHoldLogAt or -999) then
+		bot._alchHoldLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format("[OHA-ALCHEMIST] t=%.0f concoction hold cast=%s brewed=%.1fs", DotaTime(), castName, brewed)
+		)
+	end
+	return true
 end
 -- While brewing and not retreating, walk back into range of a throw target (#34). Game 039, 15:09 and 39:01:
 -- the brew started in attack mode, the mode changed (push after a farm withdraw, Roshan) and walked him off,
@@ -354,14 +506,7 @@ function X.ConcoctionKeepRange(brewed)
 	bot:Action_MoveToLocation(chaseTarget:GetLocation())
 	return true
 end
-function X.SkillsComplement()
-	local brewing, brewed = X.TrackConcoctionBrew()
-	if Fu.CanNotUseAbility(bot) then
-		if brewing then
-			lastGateWhy, lastGateBrewed = AbilityGateReason(), brewed
-		end
-		return
-	end
+local function ReadContext()
 	local context = AbilityContext.Build(bot)
 	isEngaging = context.isEngaging
 	isRetreating = context.isRetreating
@@ -369,18 +514,39 @@ function X.SkillsComplement()
 	brewRetreating = isRetreating or bot:GetActiveMode() == BOT_MODE_RETREAT
 	isAttacking = Fu.IsAttacking(bot)
 	hpRatio = context.hp
+end
+function X.SkillsComplement()
+	local brewing, brewed = X.TrackConcoctionBrew()
+	if Fu.CanNotUseAbility(bot) then
+		if not brewing then
+			return
+		end
+		local gateWhy = AbilityGateReason()
+		NoteBrewGate(gateWhy, brewed)
+		-- #34, game 057: another cast, a queued order or a channel no longer holds a due throw back; the throw
+		-- order replaces it. Not while the throw itself is in its cast point.
+		if not X.ConcoctionGateSoft(gateWhy) or IsThrowInProgress() then
+			return
+		end
+		ReadContext()
+		unstableConcoctionThrowDesire, unstableConcoctionThrowTarget, unstableConcoctionThrowWhy =
+			X.ConsiderUnstableConcoctionThrow()
+		if unstableConcoctionThrowDesire > 0 then
+			OrderConcoctionThrow(brewed, gateWhy .. ":" .. brewGateCast)
+		end
+		return
+	end
+	ReadContext()
 	-- The throw comes before Chemical Rage: the Rage has a 0.35s transformation (datafeed: transformation_time)
 	-- in which nothing can be thrown, and the brew blows up on him 0.5s after it is full.
 	unstableConcoctionThrowDesire, unstableConcoctionThrowTarget, unstableConcoctionThrowWhy =
 		X.ConsiderUnstableConcoctionThrow()
 	if unstableConcoctionThrowDesire > 0 then
-		X.LogConcoctionThrow(unstableConcoctionThrowWhy or "none", unstableConcoctionThrowTarget, brewed)
-		lastThrowWhy, lastThrowBrewed = unstableConcoctionThrowWhy or "none", brewed
-		bot:Action_UseAbilityOnEntity(unstableConcoctionThrowAbility, unstableConcoctionThrowTarget)
+		OrderConcoctionThrow(brewed)
 		return
 	end
 	chemicalRageDesire = X.ConsiderChemicalRage()
-	if chemicalRageDesire > 0 then
+	if chemicalRageDesire > 0 and not HoldsCastWhileBrewing("chemical_rage", brewing, brewed) then
 		bot:Action_UseAbility(chemicalRageAbility)
 		return
 	end
@@ -388,8 +554,10 @@ function X.SkillsComplement()
 	if unstableConcoctionDesire > 0 then
 		brewTarget, brewWhy = unstableConcoctionTarget, unstableConcoctionWhy or "none"
 		brewSeen, brewSeenAt = false, 0
-		lastThrowWhy, lastThrowBrewed = "none", 0
+		lastThrowWhy, lastThrowBrewed, lastThrowAt = "none", 0, -999
 		lastGateWhy, lastGateBrewed = "none", 0
+		brewDisabled, brewLateGate, brewGateCast, brewMaxGap, brewThreatKind = false, 0, "-", 0, "-"
+		hpMarkAt = -999
 		gapSampleUnit = nil
 		-- [OHA-ALCHEMIST]: the brew start with its rule and target, throttled to 10s (the order repeats until
 		-- it is carried out; game data: AbilityCooldown 17).
@@ -416,13 +584,13 @@ function X.SkillsComplement()
 		return
 	end
 	acidSprayDesire, acidSprayLocation = X.ConsiderAcidSpray()
-	if acidSprayDesire > 0 then
+	if acidSprayDesire > 0 and not HoldsCastWhileBrewing("acid_spray", brewing, brewed) then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbilityOnLocation(acidSprayAbility, acidSprayLocation)
 		return
 	end
 	berserkPotionDesire, berserkPotionTarget = X.ConsiderBerserkPotion()
-	if berserkPotionDesire > 0 then
+	if berserkPotionDesire > 0 and not HoldsCastWhileBrewing("berserk_potion", brewing, brewed) then
 		bot:Action_UseAbilityOnEntity(berserkPotionAbility, berserkPotionTarget)
 		return
 	end
@@ -590,7 +758,44 @@ function X.ConsiderUnstableConcoction()
 					* enemyHero:GetHealth()
 					/ math.max(1, enemyHero:GetActualIncomingDamage(maxDamage, DAMAGE_TYPE_PHYSICAL))
 				if WillStayInThrowRange(enemyHero, lethalAfter, castRange, false) then
-					return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
+					local targetHp = Fu.GetHP(enemyHero)
+					-- His allies within 700 of the target (its enemies), himself not counted.
+					local alliesNearTarget = 0
+					for _, allyHero in pairs(Fu.GetNearbyHeroes(enemyHero, 700, true, BOT_MODE_NONE) or {}) do
+						if
+							Fu.IsValidHero(allyHero)
+							and allyHero:GetUnitName() ~= bot:GetUnitName()
+							and not allyHero:IsIllusion()
+						then
+							alliesNearTarget = alliesNearTarget + 1
+						end
+					end
+					local otherEnemies = 0
+					for _, otherHero in pairs(nearbyEnemies) do
+						if
+							otherHero ~= enemyHero
+							and Fu.IsValidHero(otherHero)
+							and not Fu.IsSuspiciousIllusion(otherHero)
+						then
+							otherEnemies = otherEnemies + 1
+						end
+					end
+					if not X.ConcoctionKillPointless(targetHp, alliesNearTarget, otherEnemies) then
+						return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
+					end
+					if DotaTime() >= (bot._alchFinishLogAt or -999) then
+						bot._alchFinishLogAt = DotaTime() + 5
+						pcall(
+							print,
+							string.format(
+								"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=allies-finishing target=%s hp=%.2f allies=%d",
+								DotaTime(),
+								enemyHero:GetUnitName(),
+								targetHp,
+								alliesNearTarget
+							)
+						)
+					end
 				end
 			end
 		end
@@ -708,6 +913,31 @@ function X.ConsiderUnstableConcoctionThrow()
 			end
 		end
 	end
+	local nearestCastable, nearestCastableDist = NearestCastable(nearbyEnemies)
+	if nearestCastable ~= nil then
+		-- #34, game 057: throw before a likely disable instead of holding the brew for the full stun (see
+		-- X.ConcoctionThreat). At the brew target when it is in range, else the nearest hero.
+		local threat = X.ConcoctionThreat(brewed, ReadBrewThreat())
+		if threat ~= nil then
+			brewThreatKind = threat
+			local threatTarget = nearestCastable
+			if
+				not BrewTargetLost()
+				and Fu.CanCastOnNonMagicImmune(brewTarget)
+				and not Fu.IsSuspiciousIllusion(brewTarget)
+				and GetUnitToUnitDistance(bot, brewTarget) <= castRange
+			then
+				threatTarget = brewTarget
+			end
+			return BOT_ACTION_DESIRE_HIGH, threatTarget, "stun-threat"
+		end
+		-- #34, game 057: the brew target died or went out of sight (16:27: Zeus died 1s into the brew; at 2.6s
+		-- Puck stood at 614, inside the throw range, and no rule threw at him before he left). Any other hero in
+		-- range takes the brew from 1.0s on.
+		if brewed >= 1.0 and BrewTargetLost() then
+			return BOT_ACTION_DESIRE_HIGH, nearestCastable, "target-lost"
+		end
+	end
 	if isEngaging then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
 		local nInRangeEnemy = Fu.GetNearbyHeroes(bot, castRange - 175, true, BOT_MODE_NONE)
@@ -730,7 +960,6 @@ function X.ConsiderUnstableConcoctionThrow()
 			end
 		end
 	end
-	local nearestCastable, nearestCastableDist = NearestCastable(nearbyEnemies)
 	-- Retreating: from 2s brewed, the nearest hero in range. #34: it also asked for "outnumbered, or below 60%
 	-- HP and just hit"; without that he carried the brew away and it blew up on him (game 040, 3:35-3:40:
 	-- retreat at 0.60 with 83% HP, two enemies near, "no-target" at 5.0s).

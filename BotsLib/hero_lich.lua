@@ -15,6 +15,7 @@ local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 66,556 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
 	"item_blood_grenade",
@@ -23,20 +24,17 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_enchanted_mango",
 	"item_magic_wand",
 	"item_tranquil_boots",
-	"item_urn_of_shadows",
-	"item_force_staff",
-	"item_mekansm",
 	"item_glimmer_cape",
-	"item_blink",
 	"item_aghanims_shard",
-	"item_boots_of_bearing",
-	"item_shivas_guard",
 	"item_ultimate_scepter",
-	"item_ultimate_scepter_2",
-	"item_sheepstick",
+	"item_aeon_disk",
 	"item_refresher",
+	"item_ultimate_scepter_2",
+	"item_cyclone",
+	"item_mekansm",
 	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 152,464 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
 	"item_blood_grenade",
@@ -44,68 +42,59 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_double_branches",
 	"item_enchanted_mango",
 	"item_magic_wand",
-	"item_boots",
-	"item_urn_of_shadows",
 	"item_tranquil_boots",
 	"item_glimmer_cape",
-	"item_blink",
 	"item_aghanims_shard",
-	"item_pipe",
-	"item_spirit_vessel",
-	"item_solar_crest",
-	"item_boots_of_bearing",
-	"item_octarine_core",
-	"item_sheepstick",
+	"item_ultimate_scepter",
+	"item_aeon_disk",
+	"item_refresher",
 	"item_ultimate_scepter_2",
+	"item_cyclone",
+	"item_pipe",
 	"item_moon_shard",
 }
 -- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 634 matches, built from pos 2 (1,192) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
-	"item_mage_outfit",
-	"item_glimmer_cape",
-	"item_boots_of_bearing",
-	"item_aghanims_shard",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_phylactery",
+	"item_blink",
 	"item_ultimate_scepter",
-	"item_veil_of_discord",
-	"item_cyclone",
-	"item_shivas_guard",
+	"item_travel_boots",
 	"item_refresher",
 	"item_ultimate_scepter_2",
-	"item_sheepstick",
-	"item_wind_waker",
+	"item_aether_lens",
+	"item_glimmer_cape",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 1,192 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
-	"item_crystal_maiden_outfit",
-	"item_force_staff",
-	"item_aghanims_shard",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_phylactery",
+	"item_blink",
 	"item_ultimate_scepter",
-	"item_kaya",
-	"item_meteor_hammer",
-	"item_rod_of_atos",
-	"item_hurricane_pike",
-	"item_shivas_guard",
-	"item_octarine_core",
-	"item_gungir",
-	"item_moon_shard",
+	"item_travel_boots",
+	"item_refresher",
 	"item_ultimate_scepter_2",
+	"item_aether_lens",
+	"item_glimmer_cape",
+	"item_aghanims_shard",
+	"item_moon_shard",
 	"item_travel_boots_2",
 }
-sRoleItemsBuyList["pos_1"] = {
-	"item_crystal_maiden_outfit",
-	"item_force_staff",
-	"item_aghanims_shard",
-	"item_ultimate_scepter",
-	"item_kaya",
-	"item_meteor_hammer",
-	"item_rod_of_atos",
-	"item_gungir",
-	"item_hurricane_pike",
-	"item_shivas_guard",
-	"item_moon_shard",
-	"item_ultimate_scepter_2",
-	"item_travel_boots_2",
-}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 414 matches, built from pos 2 (1,192) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
@@ -143,9 +132,19 @@ local iceSpireDesire, iceSpireLocation
 local sacrificeDesire, sacrificeTarget
 local aetherRange = 0
 local manaReserve, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
--- Sacrifice charges from the shared tracker (2 charges, 120s each, none when learned).
+-- Sacrifice charges from the shared tracker (3 charges since 7.42, 120s each, none when learned).
 function X.SacrificeCharges()
 	return ChargeTracker.Count(bot, sacrificeAbility) or 0
+end
+-- Max charges: the game's own value, 3 as the fallback (Valve datafeed, patch 7.42: 2 -> 3).
+function X.SacrificeMaxCharges()
+	local ok, maxCharges = pcall(function()
+		return sacrificeAbility:GetSpecialValueInt("AbilityCharges")
+	end)
+	if ok and type(maxCharges) == "number" and maxCharges > 1 then
+		return maxCharges
+	end
+	return 3
 end
 function X.SkillsComplement()
 	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
@@ -164,7 +163,7 @@ function X.SkillsComplement()
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	-- Sacrifice first: with both charges up it goes at once, so the Frost Blast pokes below do not
+	-- Sacrifice first: with all charges up it goes at once, so the Frost Blast pokes below do not
 	-- keep pushing it back.
 	sacrificeDesire, sacrificeTarget = X.ConsiderSacrifice()
 	if sacrificeDesire > 0 then
@@ -1060,15 +1059,16 @@ function X.ConsiderSacrifice()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local castRange = sacrificeAbility:GetCastRange()
-	-- Both charges up (2 max, 120s each, Valve data): use one now even at full mana. It denies an
+	-- All charges up (3 max since 7.42, 120s each, Valve data): use one now even at full mana. It denies an
 	-- allied creep and gives 69% of its experience. Prefer a creep the enemy is about to kill.
 	-- Charges from our own tracker (the API has no ability-charge read). Not with an enemy hero
 	-- near: a fight wants Chain Frost, not a 0.4s cast on his own creep.
 	local charges = X.SacrificeCharges()
+	local maxCharges = X.SacrificeMaxCharges()
 	-- In lane an enemy hero is almost always within 1200, which blocked this rule; 600 is a hero
 	-- right on him.
 	local enemyNear = #(Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE) or {}) > 0
-	if charges ~= nil and charges >= 2 and not enemyNear and not Fu.IsInTeamFight(bot, 1200) then
+	if charges ~= nil and charges >= maxCharges and not enemyNear and not Fu.IsInTeamFight(bot, 1200) then
 		local deny, denyHp, any, anyHp = nil, 0.4, nil, 0
 		for _, creep in pairs(bot:GetNearbyLaneCreeps(Min(castRange + 300, 1600), false) or {}) do
 			if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
@@ -1087,9 +1087,9 @@ function X.ConsiderSacrifice()
 			return BOT_ACTION_DESIRE_HIGH, pick
 		end
 	end
-	-- Both charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
+	-- All charges up but none spent: say why, at most every 15s (game 014: 2 charges sat for
 	-- 118s and 174s after laning).
-	if charges ~= nil and charges >= 2 and DotaTime() >= (bot._sac2SkipLogAt or -999) then
+	if charges ~= nil and charges >= maxCharges and DotaTime() >= (bot._sac2SkipLogAt or -999) then
 		bot._sac2SkipLogAt = DotaTime() + 15
 		local why = enemyNear and "enemy-within-600"
 			or Fu.IsInTeamFight(bot, 1200) and "team-fight"

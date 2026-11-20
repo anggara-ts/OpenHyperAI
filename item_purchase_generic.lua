@@ -126,6 +126,18 @@ local function CountList(list)
 	end
 	return counts
 end
+-- How many of each part the bot must hold once the parts still to buy (list) are bought: what it holds now plus
+-- the list (#38). Game 055: Weaver held a Magic Stick and one Iron Branch; the plan for Magic Wand (Stick + 2
+-- Branches + recipe) was one Branch and the recipe. The count was the list alone (1 Branch), she held 1, so
+-- ShouldBuyBasicItem skipped the Branch, the recipe was bought and the Wand never formed. 90 rebuilt lists start
+-- with one Branch and build a Wand later.
+local function RequiredCounts(list)
+	local counts = CountList(list)
+	for name, count in pairs(counts) do
+		counts[name] = count + CountItem(bot, name)
+	end
+	return counts
+end
 local tEarlyGameItems = {
 	item_tango = true,
 	item_double_tango = true,
@@ -2446,7 +2458,7 @@ function ItemPurchaseThink()
 			bot._resumeBuy[bot.currBuyingItemInPurchaseList] = nil
 			bot.currBuyingBasicItemList = resume.list
 			bot.currBuyingBasicItemRefList = resume.ref
-			bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
+			bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 			bot._recipeTarget = resume.target or {}
 			BuyLog("resume %s left=%d", ShortItem(bot.currBuyingItemInPurchaseList), #bot.currBuyingBasicItemList)
 			NextBasicItem()
@@ -2458,7 +2470,7 @@ function ItemPurchaseThink()
 			bot.currBuyingBasicItemList[#basicItems - i + 1] = basicItems[i]
 		end
 		bot.currBuyingBasicItemRefList = Utils.Deepcopy(bot.currBuyingBasicItemList)
-		bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
+		bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 		-- How many of each recipe item this build should end with: owned now plus the recipes in it.
 		bot._recipeTarget = {}
 		for _, part in ipairs(bot.currBuyingBasicItemRefList) do
@@ -2505,13 +2517,17 @@ function ItemPurchaseThink()
 							local parentName = string.gsub(itemName, "item_recipe_", "item_")
 							local components = Item[parentName] or Item.GetComponentList(parentName)
 							if components and #components > 0 then
-								for _, component in pairs(components) do
-									if not string.find(component, "recipe") and not Item.IsItemInHero(component) then
-										table.insert(bot.currBuyingBasicItemList, 1, component)
+								-- Each part as many times as the item needs it, less what is held (a held recipe for a
+								-- Magic Wand with one Branch is still one Branch short).
+								for component, needed in pairs(CountList(components)) do
+									if not string.find(component, "recipe") then
+										for _ = CountItem(bot, component) + 1, needed do
+											table.insert(bot.currBuyingBasicItemList, 1, component)
+										end
 									end
 								end
 								if #bot.currBuyingBasicItemList > 0 then
-									bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
+									bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 									break
 								end
 							end
@@ -2524,7 +2540,7 @@ function ItemPurchaseThink()
 						bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList + 1] = itemName
 					end
 				end
-				bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
+				bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 				NextBasicItem()
 			else
 				bot.countInvCheck = bot.countInvCheck + 1

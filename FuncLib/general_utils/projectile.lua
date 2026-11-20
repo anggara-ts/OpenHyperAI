@@ -12,7 +12,12 @@ local function installProjectile(Fu)
 	function Fu.IsStunProjectileSpell(abilityName)
 		return Fu.Skill["sStunProjectileAbilityIndex"][abilityName] == true
 	end
+	-- Find* return what the Is* helpers saw (the projectile, or the casting enemy and its ability), for the
+	-- [OHA-DODGE] log; each Is* is Find* ~= nil, so its callers get the same true/false as before.
 	function Fu.IsWillBeCastUnitTargetSpell(unit, range)
+		return Fu.FindWillBeCastUnitTargetSpell(unit, range) ~= nil
+	end
+	function Fu.FindWillBeCastUnitTargetSpell(unit, range)
 		if range > 1600 then
 			range = 1600
 		end
@@ -30,12 +35,12 @@ local function installProjectile(Fu)
 					if not Fu.IsAllyUnitSpell(abilityName) then
 						if Fu.IsInRange(enemyHero, unit, 330) or not Fu.IsProjectileUnitSpell(abilityName) then
 							if not Fu.IsHumanPlayer(enemyHero) then
-								return true
+								return enemyHero, activeAbility
 							else
 								local animCycle = enemyHero:GetAnimCycle()
 								local castPoint = activeAbility:GetCastPoint()
 								if animCycle > 0.1 and castPoint * (1 - animCycle) < 0.27 then
-									return true
+									return enemyHero, activeAbility
 								end
 							end
 						end
@@ -43,9 +48,12 @@ local function installProjectile(Fu)
 				end
 			end
 		end
-		return false
+		return nil
 	end
 	function Fu.IsWillBeCastPointSpell(unit, range)
+		return Fu.FindWillBeCastPointSpell(unit, range) ~= nil
+	end
+	function Fu.FindWillBeCastPointSpell(unit, range)
 		local nearbyEnemies = Fu.GetNearbyHeroes(unit, range, true, BOT_MODE_NONE)
 		for _, enemyHero in pairs(nearbyEnemies) do
 			if
@@ -61,14 +69,17 @@ local function installProjectile(Fu)
 						or activeAbility:GetBehavior() == ABILITY_BEHAVIOR_NO_TARGET
 						or activeAbility:GetBehavior() == 48
 					then
-						return true
+						return enemyHero, activeAbility
 					end
 				end
 			end
 		end
-		return false
+		return nil
 	end
 	function Fu.IsProjectileIncoming(unit, range)
+		return Fu.FindProjectileIncoming(unit, range) ~= nil
+	end
+	function Fu.FindProjectileIncoming(unit, range)
 		local projectiles = unit:GetIncomingTrackingProjectiles()
 		for _, projectile in pairs(projectiles) do
 			if
@@ -86,12 +97,15 @@ local function installProjectile(Fu)
 					)
 				)
 			then
-				return true
+				return projectile
 			end
 		end
-		return false
+		return nil
 	end
 	function Fu.IsUnitTargetProjectileIncoming(unit, range)
+		return Fu.FindUnitTargetProjectileIncoming(unit, range) ~= nil
+	end
+	function Fu.FindUnitTargetProjectileIncoming(unit, range)
 		local projectiles = unit:GetIncomingTrackingProjectiles()
 		for _, projectile in pairs(projectiles) do
 			if
@@ -104,10 +118,10 @@ local function installProjectile(Fu)
 					or not Fu.IsOnlyProjectileSpell(projectile.ability:GetName())
 				)
 			then
-				return true
+				return projectile
 			end
 		end
-		return false
+		return nil
 	end
 	function Fu.IsStunProjectileIncoming(unit, range)
 		local projectiles = unit:GetIncomingTrackingProjectiles()
@@ -133,6 +147,9 @@ local function installProjectile(Fu)
 		return false
 	end
 	function Fu.IsNotAttackProjectileIncoming(unit, range)
+		return Fu.FindNotAttackProjectileIncoming(unit, range) ~= nil
+	end
+	function Fu.FindNotAttackProjectileIncoming(unit, range)
 		local projectiles = unit:GetIncomingTrackingProjectiles()
 		for _, projectile in pairs(projectiles) do
 			if
@@ -148,10 +165,10 @@ local function installProjectile(Fu)
 					)
 				)
 			then
-				return true
+				return projectile
 			end
 		end
-		return false
+		return nil
 	end
 	local ignoredSelfCasts = {
 		["antimage_blink"] = true,

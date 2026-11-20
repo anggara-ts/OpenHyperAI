@@ -493,7 +493,26 @@ function X.ConsiderD()
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		for _, enemy in pairs(nearbyEnemies) do
 			if Fu.IsValid(enemy) and bot:WasRecentlyDamagedByHero(enemy, 1.0) and Fu.CanCastOnNonMagicImmune(enemy) then
-				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation(), "retreat", enemy
+				-- The bolt strikes an enemy within cloud_radius (450) of the cloud and mini-stuns it. On Zeus's
+				-- own spot it misses a chaser more than 450 away, so the cloud goes where the chaser will be.
+				return BOT_ACTION_DESIRE_HIGH, enemy:GetExtrapolatedLocation(1.0), "retreat", enemy
+			end
+		end
+	end
+	-- Ally flee (maintainer, 2026-11-20): an allied hero retreating with an enemy hero chasing it within 600 gets
+	-- the cloud on the chaser's path, so the mini-stun bolts slow the chase.
+	for i = 1, 5 do
+		local ally = GetTeamMember(i)
+		if ally ~= bot and Fu.IsValidHero(ally) and Fu.IsRetreating(ally) then
+			for _, chaser in pairs(Fu.GetEnemiesNearLoc(ally:GetLocation(), 600) or {}) do
+				if
+					Fu.IsValidHero(chaser)
+					and not Fu.IsSuspiciousIllusion(chaser)
+					and Fu.CanCastOnNonMagicImmune(chaser)
+					and (Fu.IsChasingTarget(chaser, ally) or ally:WasRecentlyDamagedByHero(chaser, 2.0))
+				then
+					return BOT_ACTION_DESIRE_HIGH, chaser:GetExtrapolatedLocation(1.0), "ally-flee", chaser
+				end
 			end
 		end
 	end

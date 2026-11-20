@@ -1198,8 +1198,9 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin = function()
 	return false
 end
 -- Sven's rule with one change (#38): Sven's farms while no Black King Bar is owned, with no net-worth cap. Sven
--- buys one; Tidehunter's lists do not (Stratz 7.41f, offlane: 8% of matches), so past level 25 and 20,000 net worth,
--- where the first clause ends, he was still "time to farm" for the rest of the game. The clause now ends at 20,000.
+-- buys one; Tidehunter's offlane list does not (Stratz 7.41f: 8% of his offlane matches), so past level 25 and
+-- 20,000 net worth, where the first clause ends, he was still "time to farm" for the rest of the game. The clause
+-- now ends at 20,000; the Satanic and Daedalus clauses below end at 22,000 and 26,000 as before.
 Site.ConsiderIsTimeToFarm.npc_dota_hero_tidehunter = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()

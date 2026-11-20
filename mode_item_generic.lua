@@ -10,14 +10,18 @@
 -- and 0 while another player's item is the nearest dropped item within 900. The values and reasons are in
 -- FuncLib/systems/item_mode_rules.lua.
 -- UNVERIFIED: that Valve's Think still picks things up when this GetDesire drives the mode. [OHA-ITEMMODE] logs each
--- target and, 5s later, picked=yes/no and ran=yes/no (whether the item mode was active meanwhile). A target not
--- picked up is skipped for 45s, so a Think that does nothing can't hold a bot still.
+-- target and a result line (picked=, ran= seconds the item mode was active). A target the item mode had 3s+ on and
+-- did not pick up is skipped for 45s, so a Think that does nothing can't hold a bot still.
 local ItemModeRules = require(GetScriptDirectory() .. "/FuncLib/systems/item_mode_rules")
 local ForeignItems = require(GetScriptDirectory() .. "/FuncLib/systems/foreign_items")
 local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 local bot = GetBot()
 
+-- Result: 5s after the target was first wanted once the item mode has been active 3s in total; else after 20s
+-- (another mode kept winning: no skip then, it may get its turn later).
 local RESULT_AFTER = 5
+local RAN_ENOUGH = 3
+local RESULT_GIVE_UP = 20
 local SKIP_FOR = 45
 
 local function HeroName()
@@ -135,45 +139,59 @@ local function TargetGone(try)
 	return true
 end
 
--- The result line, 5s after a target was first wanted: picked (the target is gone), mine (the item is in this bot's
--- inventory, or its gold went up for a rune), ran (the item mode was the active mode meanwhile, so Valve's Think had
--- its turn). Not picked: skip that target for 45s.
+-- The result line: picked (the target is gone; "unknown" for a river-spawn target, whose status the API may read
+-- wrong, so its status and type now are printed), mine (the item is in this bot's inventory, or its gold went up for
+-- a rune), ran (seconds the item mode was the active mode, so Valve's Think had its turn). Not picked after a real
+-- turn: skip that target for 45s.
 local function CheckResult(now)
 	local try = bot._itemModeTry
 	if try == nil then
 		return
 	end
 	if bot:GetActiveMode() == BOT_MODE_ITEM then
-		try.ran = true
+		try.ranTime = try.ranTime + math.min(0.5, math.max(0, now - try.tick))
 	end
-	if now < try.at + RESULT_AFTER then
+	try.tick = now
+	local hadTurn = try.ranTime >= RAN_ENOUGH
+	if not (hadTurn and now >= try.at + RESULT_AFTER) and now < try.at + RESULT_GIVE_UP then
 		return
 	end
 	bot._itemModeTry = nil
-	local picked = TargetGone(try)
+	local picked
+	if try.why == "river-spawn" then
+		local okT, runeType = pcall(GetRuneType, try.runeId)
+		picked = string.format(
+			"unknown(status=%s,type=%s)",
+			tostring(GetRuneStatus(try.runeId)),
+			tostring(okT and runeType or nil)
+		)
+	else
+		picked = TargetGone(try) and "yes" or "no"
+	end
 	local mine
 	if try.runeId ~= nil then
 		mine = string.format("gold=%+d", math.floor(bot:GetGold() - try.gold))
 	else
 		mine = "inBag=" .. (bot:FindItemSlot(try.name) >= 0 and "yes" or "no")
 	end
-	if not picked then
+	local skip = hadTurn and picked == "no"
+	if skip then
 		bot._itemModeSkip = bot._itemModeSkip or {}
 		bot._itemModeSkip[try.key] = now + SKIP_FOR
 	end
 	pcall(
 		print,
 		string.format(
-			"[OHA-ITEMMODE] t=%.0f %s result why=%s target=%s picked=%s ran=%s %s dist=%d%s",
+			"[OHA-ITEMMODE] t=%.0f %s result why=%s target=%s picked=%s ran=%.1f %s dist=%d%s",
 			now,
 			HeroName(),
 			try.why,
 			try.label,
-			picked and "yes" or "no",
-			try.ran and "yes" or "no",
+			picked,
+			try.ranTime,
 			mine,
 			math.floor(GetUnitToLocationDistance(bot, try.loc)),
-			picked and "" or " skip=45s"
+			skip and " skip=45s" or ""
 		)
 	)
 end
@@ -183,9 +201,10 @@ local function Compute(now)
 	if now >= 0 then
 		RiverCandidates(now, candidates)
 	end
+	local hasRiver = #candidates > 0
 	DropCandidates(now, candidates)
 	if #candidates == 0 then
-		return 0, "none", nil
+		return 0, "none", nil, false
 	end
 	local enemies = #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
 	local allies = #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {})
@@ -194,9 +213,15 @@ local function Compute(now)
 		hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth()),
 		retreating = mode == BOT_MODE_RETREAT and bot:GetActiveModeDesire() >= 0.5,
 		outnumbered = enemies > allies,
+		riverOutnumbered = enemies > allies + 1,
 	}
 	local desire, why, index = ItemModeRules.Decide(candidates, ctx)
-	return desire, why, index and candidates[index] or nil
+	local target = index and candidates[index] or nil
+	-- A river rune in reach that got no desire: name it on the 0 line too.
+	if desire == 0 and target == nil and hasRiver then
+		target = candidates[1]
+	end
+	return desire, why, target, hasRiver
 end
 
 function GetDesire()
@@ -210,11 +235,13 @@ function GetDesire()
 		return bot._itemModeDesire or 0
 	end
 	bot._itemModeAt = now + 0.25
-	local desire, why, target = Compute(now)
+	local desire, why, target, hasRiver = Compute(now)
 	bot._itemModeDesire = desire
 	if desire > 0 and target ~= nil and bot._itemModeTry == nil then
 		bot._itemModeTry = {
 			at = now,
+			tick = now,
+			ranTime = 0,
 			key = target.key,
 			why = why,
 			label = target.label,
@@ -222,14 +249,13 @@ function GetDesire()
 			name = target.name,
 			loc = target.loc,
 			gold = bot:GetGold(),
-			ran = false,
 		}
 	end
 	-- One line when the decision changes (desire, why or target), at most every 2s per bot. A 0 is logged only when
-	-- it follows a desire or a foreign item blocked it.
+	-- it follows a desire, a foreign item blocked it, or a river rune is in reach (why the horn rune was refused).
 	local label = target ~= nil and target.label or "-"
 	local sig = string.format("%.2f|%s|%s", desire, why, label)
-	local worth = desire > 0 or why == "foreign-nearest" or (bot._itemModeLogDesire or 0) > 0
+	local worth = desire > 0 or why == "foreign-nearest" or hasRiver or (bot._itemModeLogDesire or 0) > 0
 	if sig ~= bot._itemModeLogSig and worth and now >= (bot._itemModeLogAt or -999) then
 		bot._itemModeLogSig = sig
 		bot._itemModeLogAt = now + 2

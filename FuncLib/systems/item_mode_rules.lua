@@ -41,7 +41,8 @@ ItemModeRules.VALUABLE = {
 }
 
 -- candidates: list of { kind = <DESIRE key or "foreign">, dist = number, item = true for dropped items }
--- ctx: { hp = ratio, retreating = bool, outnumbered = bool }
+-- ctx: { hp = ratio, retreating = bool, outnumbered = bool (enemies > allies, for items),
+--        riverOutnumbered = bool (enemies > allies + 1, for river runes) }
 -- Returns desire, why, index of the chosen candidate (nil when the desire is 0).
 -- Another player's item that is the nearest dropped item within reach stops it: Valve's item Think picks its own
 -- target and would walk to that one (game 062: Medusa and Nyx Assassin ended up with Nature's Prophet's mushrooms).
@@ -58,14 +59,17 @@ function ItemModeRules.Decide(candidates, ctx)
 	if nearestItem ~= nil and candidates[nearestItem].kind == "foreign" then
 		return 0, "foreign-nearest", nearestItem
 	end
-	if ctx.outnumbered then
-		return 0, "outnumbered", nil
-	end
+	-- Outnumbered: no walk to an item. A river rune keeps the rune mode's own rule (RuneMode.WaterWalk holds the spot
+	-- while enemies <= allies + 1 near it), so the item mode doesn't refuse a spot the rune mode holds.
 	local best, bestDesire, bestDist = nil, 0, math.huge
+	local blocked = false
 	for i, cand in ipairs(candidates) do
 		local desire = ItemModeRules.DESIRE[cand.kind] or 0
 		local reach = cand.item and ItemModeRules.ITEM_REACH or ItemModeRules.RIVER_REACH
-		if
+		local unsafe = cand.item and ctx.outnumbered or not cand.item and ctx.riverOutnumbered
+		if desire > 0 and cand.dist <= reach and unsafe then
+			blocked = true
+		elseif
 			desire > 0
 			and cand.dist <= reach
 			and (desire > bestDesire or desire == bestDesire and cand.dist < bestDist)
@@ -74,7 +78,7 @@ function ItemModeRules.Decide(candidates, ctx)
 		end
 	end
 	if best == nil then
-		return 0, "none", nil
+		return 0, blocked and "outnumbered" or "none", nil
 	end
 	return bestDesire, candidates[best].kind, best
 end

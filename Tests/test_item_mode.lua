@@ -110,8 +110,17 @@ T.test("item mode: desire rules", function()
 	T.eq(why, "unsafe", "low HP")
 	d, why = R.Decide({ { kind = "gem", dist = 100, item = true } }, { hp = 1, retreating = true })
 	T.eq(why, "unsafe", "retreating")
+	d, why = R.Decide({ { kind = "gem", dist = 100, item = true } }, { hp = 1, outnumbered = true })
+	T.eq(d, 0, "outnumbered: no item walk")
+	T.eq(why, "outnumbered", "why")
+	-- The river spot follows the rune mode's hold rule (enemies <= allies + 1).
 	d, why = R.Decide({ { kind = "river-bounty", dist = 100 } }, { hp = 1, outnumbered = true })
-	T.eq(d, 0, "outnumbered")
+	T.eq(why, "river-bounty", "one enemy more: the rune mode still holds, so do we")
+	d, why = R.Decide(
+		{ { kind = "river-bounty", dist = 100 } },
+		{ hp = 1, outnumbered = true, riverOutnumbered = true }
+	)
+	T.eq(d, 0, "two enemies more: no")
 	T.eq(why, "outnumbered", "why")
 	d, why = R.Decide({}, calm)
 	T.eq(why, "none", "nothing near")

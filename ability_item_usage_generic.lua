@@ -9605,7 +9605,8 @@ end
 -- minutes and stood still at the end (44:57-49:30) while the base was sieged. 1.5s later a result line says
 -- whether it left the bag and whose the ground says it is. Checks once per second.
 function Usage.DropForeignItems()
-	if not bot:IsAlive() then
+	-- Heroes only: this runs before the item think's hero gate (a bear's player ID against its owner's is unverified).
+	if not bot:IsAlive() or not bot:IsHero() or bot:IsIllusion() then
 		bot._foreignDropPending = nil
 		return false
 	end
@@ -9651,6 +9652,11 @@ function Usage.DropForeignItems()
 			local foreign, owner, how = ForeignItems.Check(bot, item)
 			if foreign then
 				local mode = bot:GetActiveMode()
+				-- Not in rune or item mode: the order would replace the river hold or a pick-up, and a mushroom
+				-- dropped on a river spot would keep the item mode off that spot.
+				if mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM then
+					return false
+				end
 				local attackTarget = bot:GetAttackTarget()
 				local safe = ForeignItems.SafeToDrop(
 					#(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}),

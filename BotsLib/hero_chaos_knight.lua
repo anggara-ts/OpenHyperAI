@@ -13,7 +13,14 @@ local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
-	"item_bristleback_outfit",
+	"item_tango",
+	"item_quelling_blade",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_armlet",
 	"item_aghanims_shard",
 	"item_echo_sabre",
@@ -29,7 +36,14 @@ sRoleItemsBuyList["pos_1"] = {
 }
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_quelling_blade",
+	"item_gauntlets",
+	"item_branches",
+	"item_magic_stick",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_aghanims_shard",
 	"item_crimson_guard",
 	"item_armlet",

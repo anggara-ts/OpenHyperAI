@@ -15,12 +15,12 @@ local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_slippers",
-	"item_circlet",
+	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
 	"item_wraith_band",
-	"item_wraith_band",
 	"item_power_treads",
+	"item_falcon_blade",
 	-- Maelstrom, then Mjollnir: her most bought item after Power Treads (Dotabuff, last patch).
 	"item_maelstrom",
 	"item_dragon_lance",

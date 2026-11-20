@@ -34,6 +34,7 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_bracer",
 	"item_boots",
 	"item_radiance",
+	"item_consecrated_wraps",
 	"item_kaya_and_sange",
 	"item_aghanims_shard",
 	"item_heart",
@@ -48,10 +49,18 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_wind_waker",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_mage_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_magic_stick",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_boots",
 	"item_shadow_amulet",
 	-- Radiance: bought in nearly every Necrophos game (Dotabuff, last patch); Veil was not.
 	"item_radiance",
+	"item_consecrated_wraps",
+	"item_travel_boots",
 	sUtility,
 	"item_glimmer_cape",
 	"item_crellas_crozier",

@@ -7,7 +7,7 @@ local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
-local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
+local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } }
 local tAllAbilityBuildList = { { 1, 2, 3, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
@@ -40,13 +40,13 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_boots",
 	"item_magic_wand",
 	"item_urn_of_shadows",
-	"item_tranquil_boots",
+	"item_arcane_boots",
 	"item_pavise",
 	"item_pipe",
 	"item_glimmer_cape",
 	"item_spirit_vessel",
 	"item_force_staff",
-	"item_boots_of_bearing",
+	"item_guardian_greaves",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_wind_waker",

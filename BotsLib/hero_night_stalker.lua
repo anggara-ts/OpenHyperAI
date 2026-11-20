@@ -38,40 +38,36 @@ sRoleItemsBuyList["pos_3"] = {
 }
 sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
 sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
+-- Pos 4/5 (#9): players build him as a Blink initiator in every position, not as a caster support.
+-- Stratz 7.41f (week of 5-11 Nov 2026, all ranks), pos 4, 1,309 matches: Blink, Bracer and Magic Wand in over
+-- 95% of matches, Echo Sabre 68%, Black King Bar 67%, first boots Phase 57% (plain Boots 33%, Arcane/Tranquil
+-- under 3%). The old support list's items: Mekansm 0.3%, Glimmer Cape 0.9%, Mjollnir 1.4%, Scythe of Vyse 0.5%,
+-- Guardian Greaves never. Blink comes before Echo Sabre here: by minute 16, 26% have Blink and 19% Echo Sabre,
+-- by minute 20, 64% and 44% (at pos 3 Echo Sabre is the earlier one: 68% against 50% by minute 16). Pos 5 has
+-- only 289 matches, so it follows pos 4; its own numbers agree (Blink and Bracer over 95%, Pavise 0.7%,
+-- Solar Crest 0.7%, Glimmer Cape 2.4%).
 sRoleItemsBuyList["pos_4"] = {
-	"item_priest_outfit",
-	"item_hand_of_midas",
-	"item_mekansm",
-	"item_glimmer_cape",
+	"item_tango",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_blink",
+	"item_echo_sabre",
+	"item_black_king_bar",
+	"item_harpoon",
+	"item_basher",
 	"item_aghanims_shard",
-	"item_guardian_greaves",
-	"item_spirit_vessel",
-	"item_lotus_orb",
-	"item_mjollnir",
-	"item_ultimate_scepter",
-	"item_sheepstick",
-	"item_mystic_staff",
-	"item_ultimate_scepter_2",
-	"item_shivas_guard",
+	"item_assault",
+	"item_abyssal_blade",
+	"item_overwhelming_blink",
 	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_5"] = {
-	"item_mage_outfit",
-	"item_hand_of_midas",
-	"item_glimmer_cape",
-	"item_pavise",
-	"item_pipe",
-	"item_solar_crest",
-	"item_lotus_orb",
-	"item_aghanims_shard",
-	"item_spirit_vessel",
-	"item_ultimate_scepter",
-	"item_shivas_guard",
-	"item_mystic_staff",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
-	"item_sheepstick",
 }
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
@@ -289,73 +285,114 @@ function X.ConsiderVoid()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
+-- Why to cast Crippling Fear now, or nil (#11). 7.42 game files (npc_dota_hero_night_stalker.txt): no target, for
+-- duration_day 3s / duration_night 4.5-6s he silences and burns (dps 25-40) the enemies within radius 350 of
+-- him; cooldown 30-15s. It was spent on creep waves while pushing (no mana or hero check) and was then on
+-- cooldown for the fight, and a fight needed two heroes near him or a target with no more enemies than allies.
+--   fight: in a fight, an enemy hero that can still act is inside the radius (or two heroes of any kind);
+--   target: the hero he is going on is nearly inside it (the silence walks with him);
+--   creeps-push / creeps-farm: at night only (the short day cast does little), while attacking, with over half
+--     his mana left after it and no enemy hero in sight.
+-- s: { inFight, heroesInAura, freeHeroesInAura, targetClose, heroesNearby, night, attacking, manaAfter, pushing,
+--      farming, laneCreeps, neutrals, ancient }
+function X.CripplingFearReason(s)
+	if s.inFight and (s.freeHeroesInAura >= 1 or s.heroesInAura >= 2) then
+		return "fight"
+	end
+	if s.targetClose then
+		return "target"
+	end
+	if s.heroesNearby == 0 and s.night and s.attacking and s.manaAfter > 0.5 then
+		if s.pushing and s.laneCreeps >= 4 then
+			return "creeps-push"
+		end
+		if s.farming and (s.neutrals >= 3 or s.neutrals >= 2 and s.ancient or s.laneCreeps >= 3) then
+			return "creeps-farm"
+		end
+	end
+	return nil
+end
 function X.ConsiderCripplingFear()
 	if not cripplingFearAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local radius = cripplingFearAbility:GetSpecialValueInt("radius")
 	botTarget = Fu.GetProperTarget(bot)
-	if isInTeamFight then
-		-- Enemies near enough to be silenced: Crippling Fear only works on enemies near him (datafeed,
-		-- radius 350, game data). radius * 2 started the timed effect with both enemies 700 away.
-		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius + 150)
-		if nearbyEnemies ~= nil and #nearbyEnemies >= 2 then
-			return BOT_ACTION_DESIRE_HIGH
+	local heroesInAura, freeHeroesInAura = 0, 0
+	for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+		then
+			heroesInAura = heroesInAura + 1
+			if not Fu.IsDisabled(enemyHero) then
+				freeHeroesInAura = freeHeroesInAura + 1
+			end
 		end
 	end
-	if isGoingOnSomeone then
-		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
-		if
-			Fu.IsValidTarget(botTarget)
+	local visibleEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
+	local laneCreeps = bot:GetNearbyLaneCreeps(radius, true)
+	local neutrals = bot:GetNearbyNeutralCreeps(radius)
+	local darkUntil = (bot._nsDarkAt or -999) + math.max(darknessAbility:GetSpecialValueFloat("duration"), 0)
+	local situation = {
+		inFight = isInTeamFight or isGoingOnSomeone,
+		heroesInAura = heroesInAura,
+		freeHeroesInAura = freeHeroesInAura,
+		targetClose = isGoingOnSomeone
+			and Fu.IsValidHero(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
 			and Fu.IsInRange(bot, botTarget, radius + 150)
 			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not Fu.IsDisabled(botTarget)
-			and not Fu.IsTaunted(botTarget)
-		then
-			local enemiesNearTarget = Fu.GetNearbyHeroes(botTarget, 800, false, BOT_MODE_NONE)
-			if nearbyAllies ~= nil and enemiesNearTarget ~= nil and #nearbyAllies >= #enemiesNearTarget then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-	end
-	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then
-		local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)
-		if isAttacking and nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 4 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	if Fu.IsFarming(bot) and mpRatio > 0.25 then
-		if isAttacking then
-			local nearbyNeutrals = bot:GetNearbyNeutralCreeps(radius)
-			if
-				nearbyNeutrals ~= nil
-				and (#nearbyNeutrals >= 3 or #nearbyNeutrals >= 2 and nearbyNeutrals[1]:IsAncientCreep())
-			then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-			local nearbyLaneCreeps = bot:GetNearbyLaneCreeps(radius, true)
-			if nearbyLaneCreeps ~= nil and #nearbyLaneCreeps >= 3 then
-				return BOT_ACTION_DESIRE_HIGH
-			end
-		end
-	end
-	if Fu.IsDoingRoshan(bot) then
+			and not Fu.IsTaunted(botTarget),
+		heroesNearby = visibleEnemies ~= nil and #visibleEnemies or 0,
+		-- Night by the clock, or the night his own Dark Ascension makes (datafeed; noted at the cast).
+		night = Fu.CheckTimeOfDay() == "night" or DotaTime() < darkUntil,
+		attacking = isAttacking,
+		manaAfter = Fu.GetManaAfter(cripplingFearAbility:GetManaCost()),
+		pushing = Fu.IsPushing(bot) or Fu.IsDefending(bot),
+		farming = Fu.IsFarming(bot),
+		laneCreeps = laneCreeps ~= nil and #laneCreeps or 0,
+		neutrals = neutrals ~= nil and #neutrals or 0,
+		ancient = neutrals ~= nil and Fu.IsValid(neutrals[1]) and neutrals[1]:IsAncientCreep(),
+	}
+	local why = X.CripplingFearReason(situation)
+	if why == nil and Fu.IsDoingRoshan(bot) then
 		if
 			Fu.IsRoshan(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
 			and Fu.IsInRange(bot, botTarget, radius)
 			and isAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			why = "roshan"
 		end
 	end
-	if Fu.IsDoingTormentor(bot) then
+	if why == nil and Fu.IsDoingTormentor(bot) then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, radius) and isAttacking then
-			return BOT_ACTION_DESIRE_HIGH
+			why = "tormentor"
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	if why == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if DotaTime() >= (bot._nsFearLogAt or -999) then
+		bot._nsFearLogAt = DotaTime() + 3
+		print(
+			string.format(
+				"[OHA-NS] t=%.0f night_stalker fear why=%s enemies=%d free=%d nearby=%d creeps=%d night=%s mp=%.2f",
+				DotaTime(),
+				why,
+				heroesInAura,
+				freeHeroesInAura,
+				situation.heroesNearby,
+				situation.laneCreeps + situation.neutrals,
+				tostring(situation.night),
+				mpRatio
+			)
+		)
+	end
+	return BOT_ACTION_DESIRE_HIGH
 end
 function X.ConsiderHunterInTheNight()
 	if hunterInTheNightAbility:IsPassive() or not hunterInTheNightAbility:IsFullyCastable() then

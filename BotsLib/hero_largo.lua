@@ -63,9 +63,13 @@ sRoleItemsBuyList["pos_5"] = {
 }
 -- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 sRoleItemsBuyList["pos_3"] = {
-	"item_mage_outfit",
+	"item_tango",
+	"item_double_gauntlets",
+	"item_double_branches",
+	"item_soul_ring",
+	"item_magic_wand",
+	"item_phase_boots",
 	"item_glimmer_cape",
-	"item_boots_of_bearing",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_kaya_and_sange",

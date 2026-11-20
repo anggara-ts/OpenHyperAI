@@ -2600,6 +2600,19 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 		-- At full HP and mana only when an item waits in the stash or on the courier (game 048 42:00: Puck ate
 		-- the lotus she had just taken at full HP and mana).
 		local waiting = bot:GetStashValue() > 0 or bot:GetCourierValue() > 0
+		-- Not while the backpack has room: the waiting item lands there, and the lotus keeps its heal for later.
+		-- Game 058, 27:11: Hoodwink walked to the pool, took a lotus at 90% HP and ate it a second later at 98% HP
+		-- and full mana (`use why=free-slot ... waiting=true`) to make room for a Dust on the courier.
+		if waiting and hp >= 0.8 and mp >= 0.7 then
+			local backpackFree = false
+			for slot = 6, 8 do
+				if bot:GetItemInSlot(slot) == nil then
+					backpackFree = true
+					break
+				end
+			end
+			waiting = not backpackFree
+		end
 		local freeNow = hp >= 0.9 and mp >= 0.85 and waiting or hp < 0.8 or mp < 0.7
 		if freeNow and DotaTime() >= (bot._lotusFreeLogAt or -999) then
 			bot._lotusFreeLogAt = DotaTime() + 10

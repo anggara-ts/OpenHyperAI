@@ -18,4 +18,40 @@ function RetreatRules.HardRetreatOutnumbered(allies, visible, recent, hp, hit, s
 	return hit and visible >= allies + 2 and not stronger
 end
 
+-- Meepo's weakest body (#8, hero_meepo.lua X.ConsiderWeakPoof): a body that dies takes every body with it, so a
+-- weak body leaves the fight by Poof while the others keep fighting.
+--   hp       this body's HP ratio; hit: damaged by a hero in the last ~2s
+--   enemies  enemy heroes near it (the caller counts within 1200, and within 1600 while the rule is on)
+--   bodies   Meepo bodies alive, this one included (a lone body is a normal hero: no rule)
+--   holding  the rule is already on for this body
+-- Starts under 40% while a hero is hitting it, or under 25% with an enemy hero near. Once on, it stays until the
+-- body is back at 45% or no enemy hero is near: "being hit" stops the moment it steps out of range, and the rule
+-- would hand the body back to attack mode (0.95) on the next think.
+function RetreatRules.MeepoWeakBody(hp, hit, enemies, bodies, holding)
+	if bodies < 2 or enemies < 1 then
+		return false
+	end
+	if holding then
+		return hp < 0.45
+	end
+	return hp < 0.25 or hp < 0.4 and hit
+end
+
+-- The body a weak Meepo body Poofs to (#8). candidates: one table per other body with
+--   hp        its HP ratio
+--   enemies   enemy heroes within 1200 of it
+--   dist      its distance from the weak body
+--   fountain  its distance from our fountain
+-- Safe: at 50% HP or more, no enemy hero near it, and 1200 or more away (a closer body stands in the same fight).
+-- Of the safe bodies, the one nearest our fountain. Returns its index in candidates, or nil.
+function RetreatRules.MeepoSafeBody(candidates)
+	local best, bestFountain = nil, math.huge
+	for i, body in ipairs(candidates) do
+		if body.hp >= 0.5 and body.enemies == 0 and body.dist >= 1200 and body.fountain < bestFountain then
+			best, bestFountain = i, body.fountain
+		end
+	end
+	return best
+end
+
 return RetreatRules

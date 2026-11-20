@@ -312,6 +312,11 @@ local function OverEvasiveDesire()
 	bot._overEvasiveUntil = nil
 	return 0
 end
+-- Meepo's weakest body (#8) used to leave the fight alone at retreat desire 0.98 (RetreatRules.MeepoWeakBody, kept
+-- with its test). Switched off: every game with it froze the whole game ("not responding") at 10-15 minutes,
+-- 3 of 4 within 0-26s after a clone had been sent off by it (games 052-054, 056); with it out, the same lineup
+-- with Meepo ran to the end (game 058). Our retreat mode has no Think, so Valve's own retreat drove the single
+-- clone. To bring it back, move the body with our own orders instead of the retreat mode.
 -- Monkey King's Jingu charges heal 20-80% of each hit (game data, lifesteal): like Satanic's Unholy
 -- Rage (tag 142), don't back off while they last and he is hitting a hero in an even fight. The
 -- override attack mode had this as an attack bonus, but Monkey King does not load that file.

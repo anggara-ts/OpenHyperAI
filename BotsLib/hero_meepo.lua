@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local RetreatRules = require(GetScriptDirectory() .. "/FuncLib/systems/retreat_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -319,7 +320,17 @@ end
 -- A Poof onto another body, unless it is an escape (that body near the fountain), only into a fight
 -- that is not clearly lost.
 function X.ConsiderPoof()
+	X.HoldFountainTp()
+	X.LogWeakPoofResult()
+	local weakTarget = X.ConsiderWeakPoof()
+	if weakTarget ~= nil then
+		bot._weakPoofCheckAt = DotaTime() + 4
+		return BOT_ACTION_DESIRE_ABSOLUTE, weakTarget
+	end
 	local desire, target = X.ConsiderPoofRaw()
+	if desire <= 0 then
+		X.LogPoofIdle()
+	end
 	if desire > 0 and target ~= nil and target ~= bot and target:DistanceFromFountain() >= 800 then
 		local allies, enemies = FightCountAt(target:GetLocation())
 		if IsFightLost(allies, enemies) then
@@ -342,6 +353,93 @@ function X.ConsiderPoof()
 		end
 	end
 	return desire, target
+end
+-- Weak body out by Poof (#8). A body that dies takes every body with it: before 6 of 51 deaths in games 043-047 one
+-- body stayed in attack or defend mode at 8-34% HP beside a healthy body. The first fix gave that body a retreat
+-- desire of 0.98 in mode_retreat_generic.lua; every game with that rule loaded froze (Windows "Application Hang",
+-- no script error; games 052-056 and 060, even when the rule never fired; the cause is not proven), so it was
+-- removed. Here the body leaves by Poof instead, onto another body that is healthy and away from enemy heroes
+-- (RetreatRules.MeepoWeakBody / MeepoSafeBody). Poof has a 1.5s cast point (7.42 npc_abilities, meepo_poof
+-- AbilityCastPoint "1.5"), so not with a stun projectile on the way. No safe body or no Poof: the body stays with
+-- the normal retreat.
+local WEAK_RADIUS = 1200
+function X.ConsiderWeakPoof()
+	if #meepos < 2 then
+		return nil
+	end
+	local enemiesNear = #Fu.GetEnemiesNearLoc(bot:GetLocation(), WEAK_RADIUS)
+	local hit = bot:WasRecentlyDamagedByAnyHero(2.0)
+	if not RetreatRules.MeepoWeakBody(hpRatio, hit, enemiesNear, #meepos, false) then
+		return nil
+	end
+	local target, why = nil, nil
+	if not poofAbility:IsFullyCastable() then
+		why = poofAbility:GetCooldownTimeRemaining() > 0 and "cooldown" or "mana"
+	elseif Fu.IsStunProjectileIncoming(bot, 400) then
+		why = "stun-incoming"
+	else
+		local bodies, candidates = {}, {}
+		for _, meepo in pairs(meepos) do
+			if meepo ~= bot and Fu.IsValidHero(meepo) then
+				table.insert(bodies, meepo)
+				table.insert(candidates, {
+					hp = Fu.GetHP(meepo),
+					enemies = #Fu.GetEnemiesNearLoc(meepo:GetLocation(), WEAK_RADIUS),
+					dist = GetUnitToUnitDistance(bot, meepo),
+					fountain = meepo:DistanceFromFountain(),
+				})
+			end
+		end
+		local index = RetreatRules.MeepoSafeBody(candidates)
+		if index ~= nil then
+			target = bodies[index]
+		else
+			why = "no-safe-body"
+		end
+	end
+	local now = DotaTime()
+	if target ~= nil or now >= (bot._weakPoofLogAt or -999) then
+		bot._weakPoofLogAt = now + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-MEEPO] t=%.0f %s weak-poof %s hp=%.2f hit=%s enemies=%d bodies=%d dist=%d mode=%d",
+				now,
+				MeepoTag(),
+				target ~= nil and "to=" .. (Fu.IsMeepoClone(target) and "clone" or "main") or "none why=" .. why,
+				hpRatio,
+				tostring(hit),
+				enemiesNear,
+				#meepos,
+				target ~= nil and GetUnitToUnitDistance(bot, target) or -1,
+				bot:GetActiveMode()
+			)
+		)
+	end
+	return target
+end
+-- 4s after a weak-body Poof: did the body get out (HP, enemy heroes near it, its mode)? A dead body does not think,
+-- so a missing line plus an [OHA-DEATH] line means it died during the 1.5s cast.
+function X.LogWeakPoofResult()
+	local checkAt = bot._weakPoofCheckAt
+	if checkAt == nil or DotaTime() < checkAt then
+		return
+	end
+	bot._weakPoofCheckAt = nil
+	if DotaTime() > checkAt + 10 then
+		return
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-MEEPO] t=%.0f %s weak-poof-result hp=%.2f enemies=%d mode=%d",
+			DotaTime(),
+			MeepoTag(),
+			hpRatio,
+			#Fu.GetEnemiesNearLoc(bot:GetLocation(), WEAK_RADIUS),
+			bot:GetActiveMode()
+		)
+	)
 end
 -- Pull a body toward another body that is fighting (enemy hero within 1200, hero damage in the last 2s)
 -- when the fight is not clearly lost, this body is 1600-3000 away, out of a fight, not retreating and not
@@ -382,6 +480,95 @@ function X.ConsiderRegroup()
 	end
 	return nil
 end
+-- Back to the others by Poof (#8). A body that went home to heal (TP, walk or an escape Poof) only had a Poof
+-- back in laning, push / defend, Roshan and Tormentor mode or onto a body chasing a hero; otherwise it spent the
+-- TP scroll ("fountain TP out", from 75% HP) or walked. Game 045, 16:38: the main body, healed to 85%, used the
+-- scroll to reach the bottom lane where another body was farming. Poof reaches a body anywhere (game data:
+-- meepo_poof has no AbilityCastRange; the branches below already cross the map with it), costs 80 mana and
+-- keeps the scroll for the next escape.
+-- The body to go to: 3500+ from our fountain, above half HP, not retreating, not in a fight that is clearly lost.
+-- Not while the base needs this body: it is in a defend mode, an enemy hero is within 1600, or enemy heroes were
+-- seen within 3500 of our Ancient (the same check that keeps the fountain TP at home).
+function X.PoofOutBody(fountainRange)
+	if bot:DistanceFromFountain() > fountainRange or not poofAbility:IsTrained() or Fu.IsDefending(bot) then
+		return nil
+	end
+	if #(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}) > 0 then
+		return nil
+	end
+	local ancient = GetAncient(GetTeam())
+	if ancient ~= nil and #(Fu.GetLastSeenEnemiesNearLoc(ancient:GetLocation(), 3500) or {}) > 0 then
+		return nil
+	end
+	local bestBody, bestHp = nil, 0.5
+	for _, meepo in pairs(meepos) do
+		if
+			meepo ~= bot
+			and Fu.IsValidHero(meepo)
+			and meepo:DistanceFromFountain() > 3500
+			and Fu.GetHP(meepo) > bestHp
+			and not Fu.IsRetreating(meepo)
+		then
+			local allies, enemies = FightCountAt(meepo:GetLocation())
+			if not IsFightLost(allies, enemies) then
+				bestBody, bestHp = meepo, Fu.GetHP(meepo)
+			end
+		end
+	end
+	return bestBody
+end
+-- Items think before spells, so the scroll would go first. While this body is at the fountain and such a body
+-- exists, hold its TP: the tpscroll rule in ability_item_usage_generic.lua reads bot._meepoPoofOutHold. The hold
+-- lapses 2s after the last think that set it, and after 30s in a row it pauses for 20s, so a Poof that never
+-- comes (silenced, mana burned) cannot keep him in the base. It is set from 2500 out, because that rule fires
+-- within 1500 on the same think: a body walking in above 75% HP would teleport before this ran once.
+function X.HoldFountainTp()
+	local now = DotaTime()
+	if now < (bot._meepoPoofOutPause or -999) or X.PoofOutBody(2500) == nil then
+		return
+	end
+	if bot._meepoPoofOutSince == nil or now > (bot._meepoPoofOutHold or -999) then
+		bot._meepoPoofOutSince = now
+	end
+	if now - bot._meepoPoofOutSince > 30 then
+		bot._meepoPoofOutPause = now + 20
+		return
+	end
+	bot._meepoPoofOutHold = now + 2
+end
+-- Poof into a trade (#8, game 038, 4:00), log only. The card asks for a Poof while an enemy hero is "in reach",
+-- but Poof only hits within its radius (400) of a body after a 1.5s cast, and at that moment Alchemist stood
+-- 755-802 away. This says how often an enemy hero really is inside the radius with Poof ready and no rule casting it
+-- (the fight rules need a kill or a disabled enemy), and whether he stands still: the facts a trade rule needs.
+function X.LogPoofIdle()
+	if DotaTime() < (bot._poofIdleLogAt or -999) or not poofAbility:IsFullyCastable() then
+		return
+	end
+	local radius = poofAbility:GetSpecialValueInt("radius")
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			bot._poofIdleLogAt = DotaTime() + 8
+			pcall(
+				print,
+				string.format(
+					"[OHA-MEEPO] t=%.0f %s poof-idle enemy=%s dist=%d enemyHp=%.2f running=%s onMe=%s hp=%.2f mp=%.2f mode=%d bodies=%d",
+					DotaTime(),
+					MeepoTag(),
+					(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+					GetUnitToUnitDistance(bot, enemyHero),
+					Fu.GetHP(enemyHero),
+					tostring(Fu.IsRunning(enemyHero)),
+					tostring(enemyHero:GetAttackTarget() == bot),
+					hpRatio,
+					mpRatio,
+					bot:GetActiveMode(),
+					#meepos
+				)
+			)
+			return
+		end
+	end
+end
 function X.ConsiderPoofRaw()
 	if not poofAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, nil
@@ -395,6 +582,30 @@ function X.ConsiderPoofRaw()
 			if meepo ~= bot and meepo:DistanceFromFountain() < 800 and not Fu.IsStunProjectileIncoming(bot, 400) then
 				return BOT_ACTION_DESIRE_ABSOLUTE, meepo
 			end
+		end
+	end
+	-- Healed at the fountain (the HP and mana at which retreat lets go of it: mode_retreat_generic.lua, tag 360)
+	-- with another body out on the map: Poof to it (X.PoofOutBody above).
+	if hpRatio > 0.9 and mpRatio > 0.8 and not bot._sellPending then
+		local outBody = X.PoofOutBody(1500)
+		if outBody ~= nil then
+			if DotaTime() >= (bot._poofOutLogAt or -999) then
+				bot._poofOutLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-MEEPO] t=%.0f %s poof-out dist=%d targetHp=%.2f hp=%.2f mp=%.2f held=%.0f",
+						DotaTime(),
+						MeepoTag(),
+						GetUnitToUnitDistance(bot, outBody),
+						Fu.GetHP(outBody),
+						hpRatio,
+						mpRatio,
+						DotaTime() - (bot._meepoPoofOutSince or DotaTime())
+					)
+				)
+			end
+			return BOT_ACTION_DESIRE_HIGH, outBody
 		end
 	end
 	-- Fight Poofs (#8). Poof damages at the departure AND the arrival spot (datafeed: "damaging the enemy in

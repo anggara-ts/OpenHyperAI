@@ -22,7 +22,7 @@ local MIN_SAVED = 8 -- seconds a TP or gate has to save over walking
 local GATE_CHANNEL = 4 -- twin_gate_portal_warp AbilityChannelTime (7.42 game data, above)
 local GATE_RANGE = 200 -- twin_gate_portal_warp AbilityCastRange
 local PROBE_ORDERS = { "move-to-unit", "use-shrine", "attack" }
-local PROBE_STEP = 5 -- seconds per order: a 4s channel started by one order ends inside its step
+local PROBE_STEP = 7 -- seconds per order: the walk-in to cast range plus a 4s channel fit in one step
 local PROBE_MAX_TRIES = 3 -- interrupted tries (enemies, damage, the trip ended) per game
 local PROBE_ARRIVED = 1500 -- this close to the far gate after a try: the warp worked
 
@@ -204,13 +204,14 @@ local function ProbeEnd(result, why)
 	pcall(
 		print,
 		string.format(
-			"[OHA-TRAVEL] t=%.0f %s gate-try result=%s arrived=%s why=%s order=%s channel=%s try=%d for=%s",
+			"[OHA-TRAVEL] t=%.0f %s gate-try result=%s arrived=%s why=%s order=%s action=%s channel=%s try=%d for=%s",
 			DotaTime(),
 			bot ~= nil and HeroName(bot) or "-",
 			result,
 			tostring(arrived),
 			why,
 			probe.order or "-",
+			bot ~= nil and tostring(bot:GetCurrentActionType()) or "-",
 			tostring(probe.channelSeen == true),
 			probe.tries + 1,
 			tostring(probe.tag)
@@ -235,6 +236,13 @@ local function ProbeOrder(bot, order, gate)
 		return pcall(bot.Action_UseShrine, bot, gate)
 	end
 	return pcall(bot.Action_AttackUnit, bot, gate, true)
+end
+
+-- Whether the gate route would save MIN_SAVED over walking (as if the bot could warp).
+local function GateSaves(bot, near, far, loc, walkSeconds)
+	local gateTime =
+		ObjectiveTravel.GateSeconds(GetUnitToUnitDistance(bot, near), GetUnitToLocationDistance(far, loc), Speed(bot))
+	return gateTime + MIN_SAVED < walkSeconds
 end
 
 -- Returns true while the probe drives this bot (the caller does not move it).
@@ -265,16 +273,19 @@ function ObjectiveTravel.GateProbe(bot, loc, tag, walkSeconds)
 			return false
 		end
 		local near, far = NearFar(bot, list)
-		local gateTime = ObjectiveTravel.GateSeconds(
-			GetUnitToUnitDistance(bot, near),
-			GetUnitToLocationDistance(far, loc),
-			Speed(bot)
-		)
-		if gateTime + MIN_SAVED >= walkSeconds then
+		if not GateSaves(bot, near, far, loc, walkSeconds) then
 			return false
 		end
 		probe.owner, probe.near, probe.far, probe.tag, probe.startAt = bot, near, far, tag, now
 		probe.channelSeen = false
+	elseif probe.orderStart ~= nil and now - (probe.seenAt or now) > 1 then
+		-- Another mode moved the bot during an order step: that step proved nothing.
+		ProbeEnd("aborted", "interrupted")
+		return false
+	elseif probe.orderStart == nil and not GateSaves(bot, probe.near, probe.far, loc, walkSeconds) then
+		-- On the way to the gate it stopped paying off (a TP, a respawn, a new target).
+		ProbeEnd("aborted", "not-faster")
+		return false
 	end
 	probe.seenAt = now
 	if ProbeArrived(bot) then
@@ -310,11 +321,12 @@ function ObjectiveTravel.GateProbe(bot, loc, tag, walkSeconds)
 		pcall(
 			print,
 			string.format(
-				"[OHA-TRAVEL] t=%.0f %s gate-try order=%s ok=%s err=%s dist=%.0f far=%.0f mods=%s",
+				"[OHA-TRAVEL] t=%.0f %s gate-try order=%s ok=%s action=%s err=%s dist=%.0f far=%.0f mods=%s",
 				DotaTime(),
 				HeroName(bot),
 				probe.order,
 				tostring(ok),
+				tostring(bot:GetCurrentActionType()),
 				ok and "-" or string.gsub(tostring(err), "%s+", "_"),
 				GetUnitToUnitDistance(bot, probe.near),
 				GetUnitToUnitDistance(bot, probe.far),

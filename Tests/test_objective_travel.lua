@@ -54,22 +54,29 @@ local function printed(pattern)
 	return count
 end
 
-T.test("travel: the gate probe tries each order for 5s, then gives up for the game", function()
+-- Calls Go every half second (a mode Think calls it every frame) from the current time up to `untilTime`.
+local function thinkUntil(Travel, bot, target, untilTime)
+	local result
+	while T.stub.time < untilTime do
+		T.stub.time = T.stub.time + 0.5
+		result = Travel.Go(bot, target, "tormentor")
+	end
+	return result
+end
+
+T.test("travel: the gate probe tries each order for 7s, then gives up for the game", function()
 	local Travel, bot, _, _, target = gateWorld(load())
 	T.eq(bot:GetAbilityByName("twin_gate_portal_warp"), nil, "stub hero has no warp ability (7.42)")
 	T.eq(Travel.Go(bot, target, "tormentor"), true, "probe drives the bot")
 	T.eq(printed("gate%-try order=move%-to%-unit"), 1, "first order")
-	T.stub.time = 5
-	T.eq(Travel.Go(bot, target, "tormentor"), true, "second order")
+	T.eq(thinkUntil(Travel, bot, target, 7), true, "second order")
 	T.eq(printed("gate%-try order=use%-shrine"), 1, "second order logged")
-	T.stub.time = 10
-	T.eq(Travel.Go(bot, target, "tormentor"), true, "third order")
+	T.eq(thinkUntil(Travel, bot, target, 14), true, "third order")
 	T.eq(printed("gate%-try order=attack"), 1, "third order logged")
-	T.stub.time = 15
-	T.eq(Travel.Go(bot, target, "tormentor"), false, "no warp: walk")
+	T.eq(thinkUntil(Travel, bot, target, 21), false, "no warp: walk")
 	T.eq(printed("gate%-try result=failed arrived=false"), 1, "result logged")
-	T.stub.time = 16
-	T.eq(Travel.Go(bot, target, "tormentor"), false, "probe done for the game")
+	T.eq(thinkUntil(Travel, bot, target, 22), false, "probe done for the game")
+	T.eq(printed("gate%-try order="), 3, "each order once")
 	T.eq(printed("warp%-abilities twin=false portal=false"), 1, "ability check logged once")
 end)
 
@@ -77,9 +84,20 @@ T.test("travel: the gate probe reports a warp when the bot ends up at the far ga
 	local Travel, bot, _, _, target = gateWorld(load())
 	T.eq(Travel.Go(bot, target, "roshan"), true, "probe starts")
 	bot._loc = Vector(5800, -4800, 0)
-	T.stub.time = 4
+	T.stub.time = 0.5
 	T.eq(Travel.Go(bot, target, "roshan"), false, "arrived: carry on walking")
 	T.eq(printed("gate%-try result=arrived arrived=true why=far%-gate order=move%-to%-unit"), 1, "arrived logged")
+end)
+
+T.test("travel: a gap in an order step (another mode moved the bot) is not a failure", function()
+	local Travel, bot, _, _, target = gateWorld(load())
+	T.eq(Travel.Go(bot, target, "tormentor"), true, "probe starts")
+	T.stub.time = 3
+	T.eq(Travel.Go(bot, target, "tormentor"), false, "3s without a call: aborted")
+	T.eq(printed("gate%-try result=aborted arrived=false why=interrupted"), 1, "interrupted logged")
+	T.eq(printed("result=failed"), 0, "not counted as failed")
+	T.stub.time = 4
+	T.eq(Travel.Go(bot, target, "tormentor"), true, "a later trip tries again")
 end)
 
 T.test("travel: no probe when the gate is not faster", function()

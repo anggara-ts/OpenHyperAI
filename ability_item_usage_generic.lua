@@ -1093,9 +1093,17 @@ function Usage.StillTakingDamage()
 	-- Lower than either of the last two samples (2-4s back): still falling.
 	return hp < math.max(sample.hp, sample.prev) - 25
 end
+-- Main slots, backpack and stash (a Salve bought in lane lands in the stash first), plus a Salve or Tango the
+-- emergency buy just ordered (item_purchase_generic.lua, bot._emergencyHealAt / _emergencyHealName) that is not in
+-- any slot yet. Game 053, 7:05: Alchemist TP'd home on a heal trip (bag=15, his Magic Wand) with a Salve he had
+-- just bought in his third slot.
 local function BagHeal(unit)
 	local total = 0
-	for slot = 0, 5 do
+	local pending = unit._emergencyHealName
+	if pending ~= nil and DotaTime() - (unit._emergencyHealAt or -99) < 10 and unit:FindItemSlot(pending) < 0 then
+		total = total + (bagHealPerCharge[pending] or 0)
+	end
+	for slot = 0, 14 do
 		local item = unit:GetItemInSlot(slot)
 		local perCharge = item ~= nil and bagHealPerCharge[item:GetName()] or nil
 		if perCharge ~= nil then

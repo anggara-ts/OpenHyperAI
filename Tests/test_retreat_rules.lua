@@ -61,3 +61,15 @@ T.test("meepo weak body: once on, it holds until 45% or no enemy near", function
 	T.eq(R.MeepoWeakBody(0.46, true, 2, 3, true), false, "46%: released")
 	T.eq(R.MeepoWeakBody(0.30, false, 0, 3, true), false, "enemies gone: released")
 end)
+
+T.test("meepo weak body: Poofs to the safe body nearest our fountain", function()
+	local R = rules()
+	local safeFar = { hp = 0.9, enemies = 0, dist = 3000, fountain = 6000 }
+	local safeHome = { hp = 0.7, enemies = 0, dist = 5000, fountain = 2000 }
+	T.eq(R.MeepoSafeBody({ safeFar, safeHome }), 2, "two safe bodies: the one nearer home")
+	T.eq(R.MeepoSafeBody({ safeFar }), 1, "one safe body")
+	T.eq(R.MeepoSafeBody({ { hp = 0.9, enemies = 1, dist = 3000, fountain = 2000 } }), nil, "enemy hero near it")
+	T.eq(R.MeepoSafeBody({ { hp = 0.4, enemies = 0, dist = 3000, fountain = 2000 } }), nil, "under half HP")
+	T.eq(R.MeepoSafeBody({ { hp = 0.9, enemies = 0, dist = 800, fountain = 2000 } }), nil, "in the same fight")
+	T.eq(R.MeepoSafeBody({}), nil, "no other body")
+end)

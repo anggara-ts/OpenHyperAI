@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local RetreatRules = require(GetScriptDirectory() .. "/FuncLib/systems/retreat_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -320,6 +321,12 @@ end
 -- that is not clearly lost.
 function X.ConsiderPoof()
 	X.HoldFountainTp()
+	X.LogWeakPoofResult()
+	local weakTarget = X.ConsiderWeakPoof()
+	if weakTarget ~= nil then
+		bot._weakPoofCheckAt = DotaTime() + 4
+		return BOT_ACTION_DESIRE_ABSOLUTE, weakTarget
+	end
 	local desire, target = X.ConsiderPoofRaw()
 	if desire <= 0 then
 		X.LogPoofIdle()
@@ -346,6 +353,93 @@ function X.ConsiderPoof()
 		end
 	end
 	return desire, target
+end
+-- Weak body out by Poof (#8). A body that dies takes every body with it: before 6 of 51 deaths in games 043-047 one
+-- body stayed in attack or defend mode at 8-34% HP beside a healthy body. The first fix gave that body a retreat
+-- desire of 0.98 in mode_retreat_generic.lua; every game with that rule loaded froze (Windows "Application Hang",
+-- no script error; games 052-056 and 060, even when the rule never fired; the cause is not proven), so it was
+-- removed. Here the body leaves by Poof instead, onto another body that is healthy and away from enemy heroes
+-- (RetreatRules.MeepoWeakBody / MeepoSafeBody). Poof has a 1.5s cast point (7.42 npc_abilities, meepo_poof
+-- AbilityCastPoint "1.5"), so not with a stun projectile on the way. No safe body or no Poof: the body stays with
+-- the normal retreat.
+local WEAK_RADIUS = 1200
+function X.ConsiderWeakPoof()
+	if #meepos < 2 then
+		return nil
+	end
+	local enemiesNear = #Fu.GetEnemiesNearLoc(bot:GetLocation(), WEAK_RADIUS)
+	local hit = bot:WasRecentlyDamagedByAnyHero(2.0)
+	if not RetreatRules.MeepoWeakBody(hpRatio, hit, enemiesNear, #meepos, false) then
+		return nil
+	end
+	local target, why = nil, nil
+	if not poofAbility:IsFullyCastable() then
+		why = poofAbility:GetCooldownTimeRemaining() > 0 and "cooldown" or "mana"
+	elseif Fu.IsStunProjectileIncoming(bot, 400) then
+		why = "stun-incoming"
+	else
+		local bodies, candidates = {}, {}
+		for _, meepo in pairs(meepos) do
+			if meepo ~= bot and Fu.IsValidHero(meepo) then
+				table.insert(bodies, meepo)
+				table.insert(candidates, {
+					hp = Fu.GetHP(meepo),
+					enemies = #Fu.GetEnemiesNearLoc(meepo:GetLocation(), WEAK_RADIUS),
+					dist = GetUnitToUnitDistance(bot, meepo),
+					fountain = meepo:DistanceFromFountain(),
+				})
+			end
+		end
+		local index = RetreatRules.MeepoSafeBody(candidates)
+		if index ~= nil then
+			target = bodies[index]
+		else
+			why = "no-safe-body"
+		end
+	end
+	local now = DotaTime()
+	if target ~= nil or now >= (bot._weakPoofLogAt or -999) then
+		bot._weakPoofLogAt = now + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-MEEPO] t=%.0f %s weak-poof %s hp=%.2f hit=%s enemies=%d bodies=%d dist=%d mode=%d",
+				now,
+				MeepoTag(),
+				target ~= nil and "to=" .. (Fu.IsMeepoClone(target) and "clone" or "main") or "none why=" .. why,
+				hpRatio,
+				tostring(hit),
+				enemiesNear,
+				#meepos,
+				target ~= nil and GetUnitToUnitDistance(bot, target) or -1,
+				bot:GetActiveMode()
+			)
+		)
+	end
+	return target
+end
+-- 4s after a weak-body Poof: did the body get out (HP, enemy heroes near it, its mode)? A dead body does not think,
+-- so a missing line plus an [OHA-DEATH] line means it died during the 1.5s cast.
+function X.LogWeakPoofResult()
+	local checkAt = bot._weakPoofCheckAt
+	if checkAt == nil or DotaTime() < checkAt then
+		return
+	end
+	bot._weakPoofCheckAt = nil
+	if DotaTime() > checkAt + 10 then
+		return
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-MEEPO] t=%.0f %s weak-poof-result hp=%.2f enemies=%d mode=%d",
+			DotaTime(),
+			MeepoTag(),
+			hpRatio,
+			#Fu.GetEnemiesNearLoc(bot:GetLocation(), WEAK_RADIUS),
+			bot:GetActiveMode()
+		)
+	)
 end
 -- Pull a body toward another body that is fighting (enemy hero within 1200, hero damage in the last 2s)
 -- when the fight is not clearly lost, this body is 1600-3000 away, out of a fight, not retreating and not

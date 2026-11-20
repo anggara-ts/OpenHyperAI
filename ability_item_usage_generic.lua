@@ -1175,7 +1175,7 @@ local function ConsiderItems()
 	else
 		castRangeBonus = 0
 	end
-	pcall(Usage.BannerPlantCheck)
+	pcall(Usage.BannerFromBackpack)
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
 	for forageSlot = 0, 5 do
@@ -7430,7 +7430,8 @@ end
 -- maintainer, 2026-11-20), so the item loop reads the backpack slots for it. The swap into a main slot that
 -- stood here is gone: bot swaps never took (game 036: 6 swaps, none; game 029: 9 tries).
 -- After a plant order: is the Banner out of the bag 1.5s later? (Proves the cast from the backpack.)
-function Usage.BannerPlantCheck()
+-- The name is the old swap function's: the item think's timing list (#52) wraps it by this name.
+function Usage.BannerFromBackpack()
 	local plantAt = bot._bannerPlantAt
 	if plantAt == nil or DotaTime() < plantAt + 1.5 then
 		return

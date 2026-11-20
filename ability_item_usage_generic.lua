@@ -1830,6 +1830,80 @@ Usage.ConsiderItemDesire["item_armlet"] = function(item)
 	end
 	return TurnOff("not-worth")
 end
+-- [OHA-DODGE] (#134): a defensive item used against an incoming spell (Blink, Eul's / Wind Waker, BKB, Lotus Orb,
+-- Linken's), and 1.5s later whether the target was hit by a hero anyway, so a game shows if the dodge was in time.
+-- projectile: from Fu.Find*ProjectileIncoming; caster / ability: from Fu.FindWillBeCast*Spell.
+function Usage.LogDodge(item, target, why, projectile, caster, ability)
+	local itemName = item:GetName()
+	local now = DotaTime()
+	bot._dodgeLogAt = bot._dodgeLogAt or {}
+	if now < (bot._dodgeLogAt[itemName] or -99) then
+		return
+	end
+	bot._dodgeLogAt[itemName] = now + 2
+	local spell, dist = "will-cast", -1
+	if projectile ~= nil then
+		spell = projectile.ability ~= nil and projectile.ability:GetName() or "?"
+		dist = projectile.location ~= nil and GetUnitToLocationDistance(target, projectile.location) or -1
+		if Fu.IsStunProjectileSpell(spell) then
+			why = "stun"
+		end
+	elseif ability ~= nil then
+		spell = ability:GetName()
+		dist = caster ~= nil and GetUnitToUnitDistance(target, caster) or -1
+	end
+	local targetName = target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
+	print(
+		string.format(
+			"[OHA-DODGE] t=%.0f %s item=%s target=%s spell=%s dist=%.0f why=%s",
+			now,
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			(string.gsub(itemName, "^item_", "")),
+			targetName,
+			spell,
+			dist,
+			why
+		)
+	)
+	bot._dodgePending = bot._dodgePending or {}
+	table.insert(
+		bot._dodgePending,
+		{ at = now, item = itemName, handle = item, target = target, targetName = targetName }
+	)
+end
+function Usage.WatchDodgeResults()
+	local pending = bot._dodgePending
+	if pending == nil or #pending == 0 then
+		return
+	end
+	local now = DotaTime()
+	for i = #pending, 1, -1 do
+		local entry = pending[i]
+		if now - entry.at >= 1.5 then
+			table.remove(pending, i)
+			local target = entry.target
+			local valid = target ~= nil and not target:IsNull()
+			local alive = valid and target:IsAlive()
+			local hit = valid and (not alive or target:WasRecentlyDamagedByAnyHero(now - entry.at))
+			-- cast=false: the order never went out (another item's order replaced it, or the bot was disabled).
+			local handle = entry.handle
+			local cast = handle ~= nil and not handle:IsNull() and handle:GetCooldownTimeRemaining() > 0
+			print(
+				string.format(
+					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s cast=%s alive=%s after=%.1f",
+					now,
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					(string.gsub(entry.item, "^item_", "")),
+					entry.targetName,
+					valid and tostring(hit) or "unknown",
+					tostring(cast),
+					tostring(alive),
+					now - entry.at
+				)
+			)
+		end
+	end
+end
 Usage.ConsiderItemDesire["item_bfury"] = function(item)
 	return Usage.ConsiderItemDesire["item_quelling_blade"](item)
 end
@@ -1866,14 +1940,17 @@ Usage.ConsiderItemDesire["item_black_king_bar"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsNotAttackProjectileIncoming(bot, 350) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindNotAttackProjectileIncoming(bot, 350))
 			castReason = "防御弹道"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsWillBeCastUnitTargetSpell(bot, radius) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "will-cast", nil, Fu.FindWillBeCastUnitTargetSpell(bot, radius))
 			castReason = "防御指向技能"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsWillBeCastPointSpell(bot, radius) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "will-cast", nil, Fu.FindWillBeCastPointSpell(bot, radius))
 			castReason = "防御地点技能"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
@@ -2028,6 +2105,7 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 		Fu.IsProjectileIncoming(bot, 1200)
 		and (botTarget == nil or not botTarget:IsHero() or not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100))
 	then
+		pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindProjectileIncoming(bot, 1200))
 		local retreatLocation = Fu.GetLocationTowardDistanceLocation(bot, GetAncient(GetTeam()):GetLocation(), 1199)
 		return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
 	end
@@ -2508,6 +2586,7 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 		if Fu.IsUnitTargetProjectileIncoming(bot, 800) then
+			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindUnitTargetProjectileIncoming(bot, 800))
 			hEffectTarget = bot
 			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -3708,6 +3787,7 @@ Usage.ConsiderItemDesire["item_lotus_orb"] = function(item)
 			and not ally:HasModifier("modifier_antimage_spell_shield")
 		then
 			if Fu.IsUnitTargetProjectileIncoming(ally, 800) then
+				pcall(Usage.LogDodge, item, ally, "projectile", Fu.FindUnitTargetProjectileIncoming(ally, 800))
 				hEffectTarget = ally
 				castReason = "反弹弹道"
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -3722,6 +3802,7 @@ Usage.ConsiderItemDesire["item_lotus_orb"] = function(item)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
 			if Fu.IsWillBeCastUnitTargetSpell(ally, 1200) then
+				pcall(Usage.LogDodge, item, ally, "will-cast", nil, Fu.FindWillBeCastUnitTargetSpell(ally, 1200))
 				hEffectTarget = ally
 				castReason = "给队友反弹技能:" .. Fu.Chat.GetNormName(hEffectTarget)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -4702,6 +4783,12 @@ Usage.ConsiderItemDesire["item_sphere"] = function(item)
 				or bot:GetHealth() < 150
 			)
 		then
+			local projectile = Fu.FindUnitTargetProjectileIncoming(ally, 800)
+			local caster, ability = Fu.FindWillBeCastUnitTargetSpell(ally, 1200)
+			if projectile ~= nil or caster ~= nil then
+				local why = projectile ~= nil and "projectile" or "will-cast"
+				pcall(Usage.LogDodge, item, ally, why, projectile, caster, ability)
+			end
 			hEffectTarget = ally
 			castReason = "帮助队友"
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -9710,6 +9797,7 @@ function ItemUsageThink()
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.DumpHeroAbilities)
 	pcall(Usage.LogHomeWalk)
+	pcall(Usage.WatchDodgeResults)
 	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)
 	if okQ and cleared then

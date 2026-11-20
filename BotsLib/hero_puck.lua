@@ -412,13 +412,16 @@ function X.ConsiderPhaseShift()
 	-- datafeed: Phase Shift duration is fractional (1/1.75/2.5/3.25s).
 	local duration = phaseShiftAbility:GetSpecialValueFloat("duration")
 	if Fu.IsStunProjectileIncoming(bot, 600) then
+		X.phaseWhy = "dodge-stun"
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if Fu.IsUnitTargetProjectileIncoming(bot, 400) then
+		X.phaseWhy = "dodge-projectile"
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if not bot:HasModifier("modifier_sniper_assassinate") and not bot:IsMagicImmune() then
 		if Fu.IsWillBeCastUnitTargetSpell(bot, 400) then
+			X.phaseWhy = "dodge-will-cast"
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end

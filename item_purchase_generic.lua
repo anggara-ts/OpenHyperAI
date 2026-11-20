@@ -1006,11 +1006,7 @@ local function BuyBasicItem()
 		bot.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(bot.currBuyingBasicItem)
 		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 	end
-	if
-		bot.currBuyingBasicItem == "item_infused_raindrop"
-		or bot.currBuyingBasicItem == "item_tome_of_knowledge"
-		or bot.currBuyingBasicItem == "item_flask"
-	then
+	if bot.currBuyingBasicItem == "item_infused_raindrop" or bot.currBuyingBasicItem == "item_flask" then
 		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
 			FinishBasicItem()
 			return
@@ -1216,7 +1212,7 @@ local function BuyBasicItemTurbo()
 		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 		bot.lastItemToBuy = bot.currBuyingBasicItem
 	end
-	if bot.currBuyingBasicItem == "item_infused_raindrop" or bot.currBuyingBasicItem == "item_tome_of_knowledge" then
+	if bot.currBuyingBasicItem == "item_infused_raindrop" then
 		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
 			FinishBasicItem()
 			return

@@ -52,9 +52,14 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_3"] = {
-	"item_tank_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_quelling_blade",
+	"item_bracer",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_helm_of_the_dominator",
-	"item_helm_of_the_overlord",
 	"item_ultimate_scepter",
 	"item_blink",
 	"item_black_king_bar",

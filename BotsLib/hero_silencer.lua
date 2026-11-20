@@ -77,7 +77,14 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_ultimate_scepter_2",
 }
 sRoleItemsBuyList["pos_1"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_mantle",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_null_talisman",
+	"item_power_treads",
 	"item_dragon_lance",
 	"item_witch_blade",
 	"item_hurricane_pike",

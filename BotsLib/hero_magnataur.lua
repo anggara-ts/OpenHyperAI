@@ -71,7 +71,6 @@ sRoleItemsBuyList["pos_2"] = {
 -- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
 sRoleItemsBuyList["pos_4"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
@@ -86,7 +85,6 @@ sRoleItemsBuyList["pos_4"] = {
 }
 sRoleItemsBuyList["pos_5"] = {
 	"item_priest_outfit",
-	"item_hand_of_midas",
 	"item_mekansm",
 	"item_glimmer_cape",
 	"item_pipe",

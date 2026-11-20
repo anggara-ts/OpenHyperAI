@@ -19,9 +19,10 @@ local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_quelling_blade",
-	"item_enchanted_mango",
 	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_quelling_blade",
 	"item_magic_wand",
 	"item_falcon_blade",
 	"item_power_treads",
@@ -55,7 +56,13 @@ sRoleItemsBuyList["pos_4"] = {
 }
 -- One pair of boots in this build (user rule; Util/boots-check.js).
 sRoleItemsBuyList["pos_5"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_force_staff",
 	"item_aghanims_shard",

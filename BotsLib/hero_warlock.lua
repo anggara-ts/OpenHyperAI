@@ -14,9 +14,10 @@ local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
 sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
-	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
+	"item_magic_stick",
+	"item_branches",
+	"item_clarity",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_glimmer_cape",
@@ -32,9 +33,10 @@ sRoleItemsBuyList["pos_4"] = {
 }
 sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
-	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_clarity",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_glimmer_cape",

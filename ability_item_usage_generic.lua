@@ -379,8 +379,24 @@ local function LevelUpAbilities()
 			end
 			return best
 		end
+		-- Every talent a bot learns (#107: the 7.42 first picks are checked from this line).
+		local function LogTalent(learned)
+			if learned ~= nil and learned:IsTalent() then
+				pcall(
+					print,
+					string.format(
+						"[OHA-TALENT] t=%.0f %s learned=%s level=%d",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						learned:GetName(),
+						level
+					)
+				)
+			end
+		end
 		if CanLearn(ability) then
 			bot:ActionImmediate_LevelAbility(ability:GetName())
+			LogTalent(ability)
 			table.remove(abilityLevelUpList, 1)
 		elseif
 			abilityName == "generic_hidden"
@@ -399,6 +415,7 @@ local function LevelUpAbilities()
 			)
 			if fallback ~= nil then
 				bot:ActionImmediate_LevelAbility(fallback:GetName())
+				LogTalent(fallback)
 			end
 		elseif not ability:IsHidden() and level >= ability:GetHeroLevelRequiredToUpgrade() then
 			table.remove(abilityLevelUpList, 1)
@@ -411,6 +428,7 @@ local function LevelUpAbilities()
 			)
 			if fallback ~= nil then
 				bot:ActionImmediate_LevelAbility(fallback:GetName())
+				LogTalent(fallback)
 			end
 		else
 			log("[WARN] Skipped to level up ability %s for %s for this time because it may fail.", abilityName, botName)
@@ -1718,6 +1736,32 @@ Usage.ConsiderItemDesire["item_blade_mail"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-ITEM] blink-initiate / blink-hold (#9): the Blink onto a fight target 500-1200 away, and the times it
+-- was held back (fewer allies than enemies near the target, or the fight looks lost). The next game shows
+-- whether Blink carriers (Meepo, Night Stalker, ...) jump in and their stun / Poof follows. Each kind prints at
+-- most once per `wait` seconds per bot.
+function Usage.LogBlinkInitiate(what, wait, allyCount, enemyCount, stronger)
+	local now = DotaTime()
+	bot._blinkLogAt = bot._blinkLogAt or {}
+	if now < (bot._blinkLogAt[what] or -999) then
+		return
+	end
+	bot._blinkLogAt[what] = now + wait
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s %s target=%s dist=%.0f allies=%d enemies=%d stronger=%s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToUnitDistance(bot, botTarget),
+			allyCount,
+			enemyCount,
+			tostring(stronger)
+		)
+	)
+end
 Usage.ConsiderItemDesire["item_blink"] = function(item)
 	local castRange = 1200
 	if item:GetName() == "item_arcane_blink" then
@@ -1869,8 +1913,11 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 				local blinkLocation = Fu.GetUnitTowardDistanceLocation(bot, botTarget, blinkDistance)
 					+ RandomVector(150)
 				if IsLocationPassable(blinkLocation) then
+					Usage.LogBlinkInitiate("blink-initiate", 3, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 					return BOT_ACTION_DESIRE_HIGH, blinkLocation, "ground", nil
 				end
+			else
+				Usage.LogBlinkInitiate("blink-hold", 10, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 			end
 		end
 	end
@@ -3965,7 +4012,7 @@ Usage.ConsiderItemDesire["item_phase_boots"] = function(item)
 	if
 		actionType == BOT_ACTION_TYPE_MOVE_TO
 		or actionType == BOT_ACTION_TYPE_MOVE_TO_DIRECTLY
-		or actionType == BOT_ACTION_TYPE_ATTACK_MOVE
+		or actionType == BOT_ACTION_TYPE_ATTACKMOVE
 		or Fu.IsRunning(bot)
 	then
 		return BOT_ACTION_DESIRE_HIGH, bot, castType, "phase: moving"
@@ -6332,7 +6379,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and not Fu.IsSuspiciousIllusion(botTarget)
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
@@ -6343,7 +6390,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and #nEnemyHeroes == 0
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
@@ -6353,7 +6400,7 @@ Usage.ConsiderItemDesire["item_flayers_bota"] = function(item)
 			and #nEnemyHeroes == 0
 			and bAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -6361,7 +6408,7 @@ end
 Usage.ConsiderItemDesire["item_idol_of_screeauk"] = function(item)
 	if Fu.IsGoingOnSomeone(bot) then
 		if bot:WasRecentlyDamagedByAnyHero(2.0) and Fu.IsRunning(bot) then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -6386,7 +6433,7 @@ Usage.ConsiderItemDesire["item_jidi_pollen_bag"] = function(item)
 				end
 			end
 			if validEnemyCount >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+				return BOT_ACTION_DESIRE_HIGH, nil, "none"
 			end
 		end
 	end
@@ -6401,7 +6448,7 @@ Usage.ConsiderItemDesire["item_jidi_pollen_bag"] = function(item)
 			and not botTarget:HasModifier("modifier_ice_blast")
 			and not botTarget:HasModifier("modifier_item_spirit_vessel_damage")
 		then
-			return BOT_ACTION_DESIRE_HIGH, nil, ITEM_TARGET_TYPE_NONE
+			return BOT_ACTION_DESIRE_HIGH, nil, "none"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -7132,7 +7179,7 @@ local function SmokeDesireRaw(item)
 		-- Game 044, 15:08: Puck smoked a team roam right in front of Radiant's bottom T1 while flipping between team
 		-- roam and pushing that tower (16 mode changes); walking on to the tower breaks the Smoke. Like push-group:
 		-- not within 2500 of an enemy tower, and not while an ally near is in a push mode.
-		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_GANK or activeMode == BOT_MODE_TEAM_ROAM
+		local roamMode = activeMode == BOT_MODE_ROAM or activeMode == BOT_MODE_TEAM_ROAM
 		local roamSkip = nil
 		if roamMode then
 			for _, towerId in ipairs({
@@ -7280,8 +7327,47 @@ Usage.ConsiderItemDesire["item_dust"] = function(item)
 	end
 	return DustDesire(item)
 end
+-- Every Dust use says why (#15, game 048 22:27: Radiant dusted the bottom lane with no Dire hero near; the
+-- fog-vanish, Radiance and unseen-damage uses printed nothing).
+local function DustUse(why, name)
+	if DotaTime() >= (bot._dustUseLogAt or -999) then
+		bot._dustUseLogAt = DotaTime() + 2
+		pcall(
+			print,
+			string.format(
+				"[OHA-DUST] t=%.0f %s use why=%s on=%s",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				why,
+				name ~= nil and (string.gsub(name, "npc_dota_hero_", "")) or "-"
+			)
+		)
+	end
+	return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+end
+-- Enemy players who can go invisible: seen with an invisibility ability or item, or an invisibility hero.
+local function CanGoInvisible(playerId)
+	bot._invisCapable = bot._invisCapable or {}
+	if bot._invisCapable[playerId] == nil then
+		local name = GetSelectedHeroName(playerId)
+		local okR, roles = pcall(require, GetScriptDirectory() .. "/FuncLib/data/hero_roles_map")
+		if name ~= nil and okR and type(roles) == "table" and roles.InvisHeroes ~= nil then
+			bot._invisCapable[playerId] = roles.InvisHeroes[name] == 1 or nil
+		end
+	end
+	return bot._invisCapable[playerId] == true
+end
 DustDesire = function(item)
 	local radius = 1050
+	bot._invisCapable = bot._invisCapable or {}
+	for _, enemy in pairs(Fu.GetEnemiesNearLoc(bot:GetLocation(), 1600) or {}) do
+		if Fu.IsValidHero(enemy) and not Fu.IsSuspiciousIllusion(enemy) then
+			local playerId = enemy:GetPlayerID()
+			if bot._invisCapable[playerId] ~= true and Fu.HasInvisibilityOrItem(enemy) then
+				bot._invisCapable[playerId] = true
+			end
+		end
+	end
 	-- Game 031, 28:40: Dazzle used Glimmer Cape (datafeed: 0.5s fade, 5s invisible) and no Dust
 	-- came; the rules below only catch the half-second fade, or 0.2-0.5s after he vanished within
 	-- 600. An enemy hero seen fading is remembered for 4s; while he is out of sight within 900 of
@@ -7379,7 +7465,7 @@ DustDesire = function(item)
 							)
 						)
 					end
-					return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+					return DustUse("faded", fader.name)
 				end
 			end
 		end
@@ -7391,7 +7477,7 @@ DustDesire = function(item)
 	if #nearbyTrees < 5 then
 		for _, playerId in pairs(enemyPlayerIds) do
 			local lastSeenInfo = GetHeroLastSeenInfo(playerId)
-			if IsHeroAlive(playerId) and lastSeenInfo ~= nil then
+			if IsHeroAlive(playerId) and lastSeenInfo ~= nil and CanGoInvisible(playerId) then
 				local lastSeen = lastSeenInfo[1]
 				if
 					lastSeen ~= nil
@@ -7405,7 +7491,7 @@ DustDesire = function(item)
 						behindLoc = Fu.GetXUnitsTowardsLocation2(lastSeen.location, radiantFountain, 200)
 					end
 					if IsLocationVisible(behindLoc) and IsLocationPassable(behindLoc) then
-						return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+						return DustUse("fog-vanish", GetSelectedHeroName(playerId))
 					end
 				end
 			end
@@ -7415,20 +7501,22 @@ DustDesire = function(item)
 		bot:HasModifier("modifier_sandking_sand_storm_slow")
 		or bot:HasModifier("modifier_sandking_sand_storm_slow_aura_thinker")
 	then
-		return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+		return DustUse("sand-storm", nil)
 	end
 	local nInRangeEnemy = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 	if nInRangeEnemy ~= nil and #nInRangeEnemy == 0 then
 		if bot:HasModifier("modifier_item_radiance_debuff") then
-			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+			return DustUse("radiance", nil)
 		end
 		for _, playerId in pairs(enemyPlayerIds) do
-			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) then
+			-- Only an enemy who can go invisible (game 049: 4 unseen-damage Dusts on Puck, Tinker and Weaver; Puck and
+			-- Tinker have no invisibility, they were in fog).
+			if IsHeroAlive(playerId) and bot:WasRecentlyDamagedByPlayer(playerId, 0.5) and CanGoInvisible(playerId) then
 				local lastSeenInfo = GetHeroLastSeenInfo(playerId)
 				if lastSeenInfo ~= nil then
 					local lastSeen = lastSeenInfo[1]
 					if lastSeen ~= nil and GetUnitToLocationDistance(bot, lastSeen.location) < radius then
-						return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+						return DustUse("unseen-damage", GetSelectedHeroName(playerId))
 					end
 				end
 			end
@@ -7444,7 +7532,7 @@ DustDesire = function(item)
 			then
 				local towersNearEnemy = enemy:GetNearbyTowers(700, true)
 				if towersNearEnemy == nil or #towersNearEnemy == 0 then
-					return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
+					return DustUse("about-to-fade", enemy:GetUnitName())
 				end
 			end
 		end
@@ -9131,6 +9219,31 @@ local function ApiPrint(label, names)
 		)
 	end
 end
+-- Each bot once (#109, 7.42): the engine's own ability names in every slot (abilities, innates, talents), to
+-- compare with the names the hero files use. (h) hidden, (t) talent.
+function Usage.DumpHeroAbilities()
+	if bot._abilitiesDumped or bot:IsIllusion() then
+		return
+	end
+	bot._abilitiesDumped = true
+	local names = {}
+	for slot = 0, 35 do
+		local ability = bot:GetAbilityInSlot(slot)
+		if ability ~= nil and not ability:IsNull() then
+			local abilityName = ability:GetName()
+			if abilityName ~= nil and abilityName ~= "" and abilityName ~= "generic_hidden" then
+				local tag = ""
+				if ability:IsTalent() then
+					tag = "(t)"
+				elseif ability:IsHidden() then
+					tag = "(h)"
+				end
+				names[#names + 1] = slot .. ":" .. abilityName .. tag
+			end
+		end
+	end
+	ApiPrint("abilities " .. string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""), names)
+end
 function Usage.DumpBotApi()
 	if _G.OHA_API_DUMPED or GetTeam() ~= TEAM_RADIANT then
 		return
@@ -9161,21 +9274,79 @@ function Usage.DumpBotApi()
 	end
 	-- The bot's own handle, in case its class table is not a global.
 	ApiPrint("bot-handle", ApiNames(bot))
-	-- Numeric constants for shrines and ability behaviors (is ABILITY_BEHAVIOR_VECTOR_TARGETING
-	-- defined for bots?), and what the old healing-shrine API returns now that 7.33 replaced those
-	-- shrines with lotus pools and watchers: GetShrine for every SHRINE_* id on both teams.
+	-- Every numeric engine constant (#109, 7.42): BOT_MODE_*, ITEM_SLOT_*, RUNE_*, DAMAGE_TYPE_*, UNIT_LIST_*,
+	-- SHRINE_*, ABILITY_BEHAVIOR_*, ... to compare with FuncLib/dota/enums.lua and the numbers our logs print.
+	-- Then what the old healing-shrine API returns now that 7.33 replaced those shrines with lotus pools and
+	-- watchers: GetShrine for every SHRINE_* id on both teams.
 	local consts = {}
 	for k, v in pairs(_G) do
-		if
-			type(k) == "string"
-			and type(v) == "number"
-			and (string.find(k, "^SHRINE_") or string.find(k, "^ABILITY_BEHAVIOR_"))
-		then
+		if type(k) == "string" and type(v) == "number" and string.find(k, "^[A-Z][A-Z0-9_]+$") then
 			consts[#consts + 1] = k .. "=" .. tostring(v)
 		end
 	end
 	table.sort(consts)
 	ApiPrint("constants", consts)
+	-- Every item name in our dictionary (FuncLib/data/item_names.lua) against the engine (#109): a name the
+	-- engine has no cost for is unknown to it (or free: neutrals, Roshan drops). Our own placeholders are skipped.
+	local okN, itemNames = pcall(require, GetScriptDirectory() .. "/FuncLib/data/item_names")
+	if okN and type(itemNames) == "table" then
+		local unknown, known = {}, 0
+		for _, entry in ipairs(itemNames) do
+			local itemName = type(entry) == "table" and entry.sRawName or nil
+			if type(itemName) == "string" and not string.find(itemName, "^item_new_") then
+				local okC, cost = pcall(GetItemCost, itemName)
+				if okC and type(cost) == "number" and cost > 0 then
+					known = known + 1
+				else
+					unknown[#unknown + 1] = itemName .. "=" .. (okC and tostring(cost) or "error")
+				end
+			end
+		end
+		pcall(print, string.format("[OHA-API] item-names known=%d no-cost=%d", known, #unknown))
+		ApiPrint("item-names no-cost", unknown)
+	end
+	-- 7.42 items (#109): does the engine know the new items and the changed recipes? Cost and components as the
+	-- buy code sees them (it buys by GetItemComponents). Names from the installed 7.42 items.txt.
+	for _, itemName in ipairs({
+		"item_bloodslinger",
+		"item_caduceus",
+		"item_ristuls_devotion",
+		"item_berserkers_sabatons",
+		"item_skypiercer",
+		"item_starforge",
+		"item_horn_of_battle_greater",
+		"item_skadi",
+		"item_bloodthorn",
+		"item_abyssal_blade",
+		"item_mjollnir",
+		"item_butterfly",
+		"item_basher",
+		"item_crimson_guard",
+		"item_harpoon",
+		"item_heavens_halberd",
+		"item_angels_demise",
+		"item_helm_of_the_overlord",
+	}) do
+		local okC, cost = pcall(GetItemCost, itemName)
+		local okP, parts = pcall(GetItemComponents, itemName)
+		local recipes = {}
+		if okP and type(parts) == "table" then
+			for _, recipe in ipairs(parts) do
+				if type(recipe) == "table" then
+					recipes[#recipes + 1] = table.concat(recipe, "+")
+				end
+			end
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-API] item %s cost=%s parts=%s",
+				itemName,
+				okC and tostring(cost) or "error",
+				okP and (#recipes > 0 and table.concat(recipes, " | ") or "-") or "error"
+			)
+		)
+	end
 	local shrineIds = {}
 	for k, v in pairs(_G) do
 		if type(k) == "string" and type(v) == "number" and string.find(k, "^SHRINE_") then
@@ -9443,6 +9614,7 @@ function ItemUsageThink()
 	pcall(Usage.WatchStillUnderHit)
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
+	pcall(Usage.DumpHeroAbilities)
 	pcall(Usage.LogHomeWalk)
 	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)

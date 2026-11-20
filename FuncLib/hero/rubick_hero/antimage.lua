@@ -1,17 +1,13 @@
 -- How Rubick plays after stealing a spell from Antimage.
 -- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
-local CounterSpellDesire, BlinkFragmentDesire, BlinkFragmentLocation, BlinkDesire, BlinkLocation, ManaVoidDesire, ManaVoidTarget, CounterSpellAllyDesire
-local CounterSpellAllyTarget
+local CounterSpellDesire, BlinkDesire, BlinkLocation, ManaVoidDesire, ManaVoidTarget
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local blinkAbility
 local counterspellAbility
-local counterspellAllyAbility
-local manaOverloadAbility
 local manaVoidAbility
 local botTarget
-local lastBlinkFragmentLogTime = -999
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -25,14 +21,6 @@ function X.ConsiderStolenSpell(ability)
 		if CounterSpellDesire > 0 then
 			Fu.SetQueuePtToINT(bot, false)
 			bot:ActionQueue_UseAbility(counterspellAbility)
-			return
-		end
-	end
-	if abilityName == "antimage_mana_overload" then
-		manaOverloadAbility = ability
-		BlinkFragmentDesire, BlinkFragmentLocation = X.ConsiderBlinkFragment()
-		if BlinkFragmentDesire > 0 then
-			bot:Action_UseAbilityOnLocation(manaOverloadAbility, BlinkFragmentLocation)
 			return
 		end
 	end
@@ -51,15 +39,6 @@ function X.ConsiderStolenSpell(ability)
 		if ManaVoidDesire > 0 then
 			Fu.SetQueuePtToINT(bot, false)
 			bot:ActionQueue_UseAbilityOnEntity(manaVoidAbility, ManaVoidTarget)
-			return
-		end
-	end
-	if abilityName == "antimage_counterspell_ally" then
-		counterspellAllyAbility = ability
-		CounterSpellAllyDesire, CounterSpellAllyTarget = X.ConsiderCounterSpellAlly()
-		if CounterSpellAllyDesire > 0 then
-			Fu.SetQueuePtToINT(bot, false)
-			bot:ActionQueue_UseAbilityOnEntity(counterspellAllyAbility, CounterSpellAllyTarget)
 			return
 		end
 	end
@@ -299,103 +278,5 @@ function X.ConsiderManaVoid()
 		end
 	end
 	return 0
-end
-function X.ConsiderCounterSpellAlly()
-	if not counterspellAllyAbility:IsTrained() or not counterspellAllyAbility:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, nil
-	end
-	local castRange = Fu.GetProperCastRange(false, bot, counterspellAllyAbility:GetCastRange())
-	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
-	for _, allyHero in pairs(nearbyAllies) do
-		if
-			Fu.IsValidHero(allyHero)
-			and not Fu.IsSuspiciousIllusion(allyHero)
-			and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
-		then
-			if Fu.IsUnitTargetProjectileIncoming(allyHero, 400) and not allyHero:IsMagicImmune() then
-				return BOT_ACTION_DESIRE_HIGH, allyHero
-			end
-			if not allyHero:HasModifier("modifier_sniper_assassinate") and not allyHero:IsMagicImmune() then
-				if Fu.IsWillBeCastUnitTargetSpell(allyHero, castRange) then
-					return BOT_ACTION_DESIRE_HIGH, allyHero
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, nil
-end
-function X.ConsiderBlinkFragment()
-	if not bot:HasScepter() or not manaOverloadAbility:IsTrained() or not manaOverloadAbility:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	local castRange = Fu.GetProperCastRange(false, bot, manaOverloadAbility:GetCastRange())
-	if Fu.IsGoingOnSomeone(bot) then
-		local blinkTarget = nil
-		local targetHealth = 99999
-		local nearbyEnemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), castRange)
-		for _, enemyHero in pairs(nearbyEnemies) do
-			if
-				Fu.IsValidTarget(enemyHero)
-				and Fu.CanCastOnMagicImmune(enemyHero)
-				and not Fu.IsInRange(bot, enemyHero, castRange / 2)
-				and not enemyHero:IsAttackImmune()
-				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
-				and not enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
-				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
-			then
-				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
-				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if
-					enemyNearbyEnemies ~= nil
-					and enemyNearbyAllies ~= nil
-					and #enemyNearbyEnemies >= #enemyNearbyAllies
-					-- fix: was "targetHealth < GetHealth()" with targetHealth starting at 99999, so no target was
-					-- ever picked; now the lowest-health enemy, as the 99999 start means.
-					and enemyHero:GetHealth() < targetHealth
-				then
-					targetHealth = enemyHero:GetHealth()
-					blinkTarget = enemyHero
-				end
-			end
-		end
-		if blinkTarget ~= nil then
-			if DotaTime() >= lastBlinkFragmentLogTime + 5 then
-				lastBlinkFragmentLogTime = DotaTime()
-				pcall(
-					print,
-					string.format(
-						"[OHA-RUBICK] t=%.0f stolen blink fragment engage target=%s hp=%d",
-						DotaTime(),
-						blinkTarget:GetUnitName(),
-						targetHealth
-					)
-				)
-			end
-			return BOT_ACTION_DESIRE_HIGH, blinkTarget:GetLocation()
-		end
-	end
-	if Fu.IsRetreating(bot) then
-		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-		for _, enemyHero in pairs(nearbyEnemies) do
-			if
-				Fu.IsValidHero(enemyHero)
-				and Fu.IsChasingTarget(enemyHero, bot)
-				and not Fu.IsSuspiciousIllusion(enemyHero)
-				and not Fu.IsDisabled(enemyHero)
-				and not Fu.IsRealInvisible(bot)
-			then
-				local enemyNearbyEnemies = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
-				local enemyNearbyAllies = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if
-					enemyNearbyEnemies ~= nil
-					and enemyNearbyAllies ~= nil
-					and (#enemyNearbyAllies > #enemyNearbyEnemies or bot:WasRecentlyDamagedByAnyHero(1.2))
-				then
-					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
-				end
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 return X

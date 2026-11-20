@@ -1,15 +1,13 @@
 -- How Rubick plays after stealing a spell from Bloodseeker.
 -- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
-local BloodMistDesire, RuptureDesire, RuptureTarget, BloodrageDesire, BloodrageTarget, BloodRiteDesire, BloodRiteLocation
+local RuptureDesire, RuptureTarget, BloodrageDesire, BloodrageTarget, BloodRiteDesire, BloodRiteLocation
 local bot = GetBot()
 local X = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local bloodrageAbility
 local bloodRiteAbility
-local bloodMistAbility
 local ruptureAbility
 local botTarget
-local hpRatio
 function X.ConsiderStolenSpell(ability)
 	bot = GetBot()
 	if Fu.CanNotUseAbility(bot) then
@@ -17,15 +15,6 @@ function X.ConsiderStolenSpell(ability)
 	end
 	botTarget = Fu.GetProperTarget(bot)
 	local abilityName = ability:GetName()
-	hpRatio = bot:GetHealth() / bot:GetMaxHealth()
-	if abilityName == "bloodseeker_blood_mist" then
-		bloodMistAbility = ability
-		BloodMistDesire = X.ConsiderBloodMist()
-		if BloodMistDesire > 0 then
-			bot:Action_UseAbility(bloodMistAbility)
-			return
-		end
-	end
 	if abilityName == "bloodseeker_rupture" then
 		ruptureAbility = ability
 		RuptureDesire, RuptureTarget = X.ConsiderRupture()
@@ -231,31 +220,5 @@ function X.ConsiderRupture()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
-end
-function X.ConsiderBloodMist()
-	if not bot:HasScepter() or not bloodMistAbility:IsFullyCastable() then
-		return BOT_MODE_NONE
-	end
-	local radius = 450
-	local nearbyEnemies = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
-	if bloodMistAbility:GetToggleState() == true then
-		if hpRatio < 0.2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-		if #nearbyEnemies == 0 then
-			return BOT_ACTION_DESIRE_ABSOLUTE
-		end
-	end
-	-- Toggle Blood Mist on (it was `not toggle == false`, which only fired while it was already on)
-	if bloodMistAbility:GetToggleState() == false and hpRatio > 0.5 then
-		if
-			Fu.IsValidHero(botTarget)
-			and Fu.IsInRange(bot, botTarget, radius * 0.8)
-			and Fu.CanCastOnNonMagicImmune(botTarget)
-		then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_MODE_NONE
 end
 return X

@@ -166,7 +166,51 @@ local specialDeliveryDesire
 local isAttacking = false
 local botTarget, hpRatio
 local nearbyAllies, nearbyEnemies
+-- #13: ConsiderBodyguard skips allies with "modifier_marci_guardian_buff", the name from when the spell was
+-- Sidekick (marci_guardian). Modifier names are not in the game's text files, so this lists the Marci
+-- modifiers on the partner once per cast, 1-3s after the order (7.42 npc_abilities: cast point 0.2s,
+-- bodyguard_duration 7s), to show in a game whether that name is still the right one.
+local bodyguardOrderTarget, bodyguardOrderAt
+function X.LogBodyguardModifiers()
+	if bodyguardOrderTarget == nil or DotaTime() < bodyguardOrderAt + 1 then
+		return
+	end
+	local target = bodyguardOrderTarget
+	if DotaTime() > bodyguardOrderAt + 3 or not Fu.IsValidHero(target) then
+		bodyguardOrderTarget = nil
+		return
+	end
+	-- Not cast yet (still turning or walking into range): wait, up to 3s after the order.
+	if bodyguardAbility:IsCooldownReady() then
+		return
+	end
+	bodyguardOrderTarget = nil
+	local mods, allMods = {}, {}
+	for i = 0, target:NumModifiers() - 1 do
+		local name = tostring(target:GetModifierName(i))
+		allMods[#allMods + 1] = name
+		if string.find(name, "marci", 1, true) then
+			mods[#mods + 1] = name
+		end
+	end
+	-- No name with "marci" in it: print them all, so the buff's real name still shows.
+	if #mods == 0 then
+		mods = allMods
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-MARCI] t=%.0f marci bodyguard-mods target=%s guardianBuff=%s mods=%s all=%s",
+			DotaTime(),
+			(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(target:HasModifier("modifier_marci_guardian_buff")),
+			#mods > 0 and table.concat(mods, ",") or "none",
+			tostring(#mods == #allMods)
+		)
+	)
+end
 function X.SkillsComplement()
+	X.LogBodyguardModifiers()
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -196,6 +240,7 @@ function X.SkillsComplement()
 	if bodyguardDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnEntity(bodyguardAbility, bodyguardTarget)
+		bodyguardOrderTarget, bodyguardOrderAt = bodyguardTarget, DotaTime()
 		return
 	end
 end

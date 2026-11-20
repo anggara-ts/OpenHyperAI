@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local LaneNukeRules = require(GetScriptDirectory() .. "/FuncLib/systems/lane_nuke_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -170,6 +171,7 @@ local isAttacking
 local mpRatio
 local isInTeamFight
 function X.SkillsComplement()
+	X.LogStormLastHitResult()
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -653,7 +655,118 @@ function X.ConsiderLightningStorm()
 			end
 		end
 	end
+	-- Last: every fight rule above goes first.
+	local lastHitCreep = X.GetStormLastHitCreep(castRange, damage, radius)
+	if lastHitCreep ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, lastHitCreep
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- Lightning Storm on a lane creep with spare mana (#143, game 062 ~2:40: Leshrac sat at full mana in lane and
+-- never used it on creeps; the laning rule above needs two killable creeps and an enemy hero near). 7.42
+-- npc_abilities leshrac_lightning_storm: cooldown 4, mana 80/100/120/140, damage 90/140/190/240 (magical),
+-- jump_count 5/7/9/11, radius 450 (jump range), jump_delay 0.25, cast point 0.3, cast range 600.
+-- In the laning phase, in laning mode or in team_roam near its own lane front with no hero target (game 062:
+-- laning 0.56 <-> team_roam 0.72 every few seconds in lane, [OHA-FLIP] 2:14 and 2:50).
+function X.GetStormLastHitCreep(castRange, damage, radius)
+	if not Fu.IsInLaningPhase() or isRetreating then
+		return nil
+	end
+	local inLane = Fu.IsLaning(bot)
+	if not inLane and bot:GetActiveMode() == BOT_MODE_TEAM_ROAM and not Fu.IsValidHero(botTarget) then
+		local assignedLane = bot:GetAssignedLane()
+		if assignedLane ~= nil and assignedLane > 0 then
+			inLane = GetUnitToLocationDistance(bot, GetLaneFrontLocation(GetTeam(), assignedLane, 0)) <= 1600
+		end
+	end
+	if not inLane then
+		return nil
+	end
+	-- Keep mana for a fight: one more Lightning Storm plus Diabolic Edict and Split Earth once learned.
+	local manaCost = lightningStormAbility:GetManaCost()
+	local reserve = manaCost
+	if diabolicEdictAbility:IsTrained() then
+		reserve = reserve + diabolicEdictAbility:GetManaCost()
+	end
+	if splitEarthAbility:IsTrained() then
+		reserve = reserve + splitEarthAbility:GetManaCost()
+	end
+	local mana = bot:GetMana()
+	if not LaneNukeRules.SpareManaForLastHit(mana, bot:GetMaxMana(), manaCost, reserve) then
+		return nil
+	end
+	local castPoint = lightningStormAbility:GetCastPoint()
+	local jumpDelay = lightningStormAbility:GetSpecialValueFloat("jump_delay")
+	local jumpCount = lightningStormAbility:GetSpecialValueInt("jump_count")
+	local attackDamage = bot:GetAttackDamage()
+	-- Bounce candidates: creeps up to one jump beyond the cast range.
+	local laneCreeps = bot:GetNearbyLaneCreeps(math.min(castRange + radius, 1600), true) or {}
+	local bestCreep, bestScore, bestKills = nil, 0, 0
+	for _, creep in pairs(laneCreeps) do
+		if
+			Fu.IsValid(creep)
+			and Fu.CanBeAttacked(creep)
+			and GetUnitToUnitDistance(bot, creep) <= castRange
+			and Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_MAGICAL, castPoint)
+		then
+			local kills = 1
+			for _, other in pairs(laneCreeps) do
+				if
+					kills < 1 + jumpCount
+					and other ~= creep
+					and Fu.IsValid(other)
+					and GetUnitToUnitDistance(creep, other) <= radius
+					and Fu.WillKillTarget(other, damage, DAMAGE_TYPE_MAGICAL, castPoint + jumpDelay)
+				then
+					kills = kills + 1
+				end
+			end
+			local attackCanKill = creep:GetActualIncomingDamage(attackDamage, DAMAGE_TYPE_PHYSICAL) >= creep:GetHealth()
+			local score = LaneNukeRules.LastHitScore(kills, attackCanKill)
+			if score > bestScore then
+				bestCreep, bestScore, bestKills = creep, score, kills
+			end
+		end
+	end
+	if bestCreep == nil then
+		return nil
+	end
+	if DotaTime() >= (bot._stormLastHitLogAt or -999) then
+		bot._stormLastHitLogAt = DotaTime() + 3
+		-- Checked about 2s later by X.LogStormLastHitResult: did the last-hit count go up?
+		bot._stormLastHit = { at = DotaTime(), lastHits = bot:GetLastHits(), kills = bestKills }
+		pcall(
+			print,
+			string.format(
+				"[OHA-LESHRAC] t=%.0f leshrac storm-lasthit why=spare-mana mp=%.2f creepHp=%d dmg=%d kills=%d mode=%d",
+				DotaTime(),
+				mana / math.max(1, bot:GetMaxMana()),
+				bestCreep:GetHealth(),
+				damage,
+				bestKills,
+				bot:GetActiveMode()
+			)
+		)
+	end
+	return bestCreep
+end
+-- The effect of a storm-lasthit cast: last hits gained in the ~2s after it (other last hits in that window
+-- count too).
+function X.LogStormLastHitResult()
+	local pending = bot._stormLastHit
+	if pending == nil or DotaTime() - pending.at < 2 then
+		return
+	end
+	bot._stormLastHit = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-LESHRAC] t=%.0f leshrac storm-result got=%d expected=%d",
+			DotaTime(),
+			bot:GetLastHits() - pending.lastHits,
+			pending.kills
+		)
+	)
 end
 function X.ConsiderPulseNova()
 	if not pulseNovaAbility:IsFullyCastable() then

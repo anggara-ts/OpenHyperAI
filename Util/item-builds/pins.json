@@ -18,6 +18,7 @@
 		{"hero":"lina","pos":[1],"boots":"item_boots","reason":"#38 (PR #115): plain Boots, then Boots of Travel"},
 		{"hero":"necrolyte","pos":[3],"boots":"item_boots","reason":"#38 (PR #115): plain Boots, then Boots of Travel"},
 		{"hero":"tinker","pos":[2],"next":["item_bottle"],"require":["item_bottle"],"forbid":["item_circlet"],"reason":"#38 (PR #115): mid Tinker starts without Circlets and buys Bottle next"},
+		{"hero":"spectre","pos":[1],"require":["item_manta"],"reason":"#9: her sell pair (Manta Style sells the Quelling Blade) is triggered by an item her carry list buys"},
 		{"hero":"lone_druid","keep":true,"reason":"the live list is the hero-and-bear block (two inventories); the data mixes what both carry"},
 		{"hero":"abyssal_underlord","pos":[4,5],"require":["item_pipe"],"reason":"farm rule: Site.ConsiderIsTimeToFarm waits for it (until net worth 10000) and the list bought it before the rebuild"},
 		{"hero":"abyssal_underlord","pos":[4,5],"require":["item_guardian_greaves"],"reason":"farm rule: Site.ConsiderIsTimeToFarm waits for it (until net worth 14000) and the list bought it before the rebuild"},

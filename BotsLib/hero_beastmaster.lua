@@ -74,7 +74,6 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_assault",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
-	"item_ancient_janggo",
 	"item_heart",
 	"item_moon_shard",
 	"item_travel_boots_2",

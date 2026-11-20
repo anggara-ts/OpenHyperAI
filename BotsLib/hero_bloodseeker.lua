@@ -51,11 +51,9 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_basher",
 	"item_aghanims_shard",
 	"item_butterfly",
-	"item_ultimate_scepter",
 	"item_abyssal_blade",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
-	"item_blade_mail",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 11,964 matches (Util/item-builds/generate.js).
@@ -78,7 +76,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_ultimate_scepter_2",
 	"item_moon_shard",
 	"item_skadi",
-	"item_maelstrom",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 9,596 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
@@ -142,15 +139,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_ultimate_scepter_2",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = {
-	"item_power_treads",
-	"item_quelling_blade",
-	"item_abyssal_blade",
-	"item_magic_wand",
-	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
-	"item_ultimate_scepter",
-	"item_sange",
-}
+X["sSellList"] = { "item_power_treads", "item_quelling_blade", "item_abyssal_blade", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_melee_carry" }, { "item_power_treads", "item_quelling_blade" }
 end

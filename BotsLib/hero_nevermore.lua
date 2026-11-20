@@ -84,7 +84,6 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_refresher",
 	"item_ultimate_scepter_2",
 	"item_invis_sword",
-	"item_sange",
 	"item_mask_of_madness",
 	"item_aghanims_shard",
 	"item_moon_shard",

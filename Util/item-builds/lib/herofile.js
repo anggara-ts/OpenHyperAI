@@ -13,7 +13,8 @@ const literals = (text) => [...text.matchAll(/"(item_[a-z0-9_]+)"/g)].map((m) =>
 const STYLES = [
 	{
 		name: "standard",
-		open: /^sRoleItemsBuyList\["pos_(\d)"\] = \{$/,
+		// "pos_2_qe" (Invoker): a second list of position 2, picked at random in game.
+		open: /^sRoleItemsBuyList\["pos_(\d(?:_[a-z]+)?)"\] = \{$/,
 		close: "}",
 		alias: /^sRoleItemsBuyList\["pos_(\d)"\] = sRoleItemsBuyList\["pos_(\d)"\]$/,
 		openLine: (pos) => `sRoleItemsBuyList["pos_${pos}"] = {`,

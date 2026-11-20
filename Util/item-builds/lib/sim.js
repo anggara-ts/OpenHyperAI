@@ -133,6 +133,8 @@ function makeSim(game) {
 					violations.push({ index, entry, kind: "unknown-item", detail: basic });
 					continue;
 				}
+				// A finished item with no recipe in item.lua would be bought whole, at full price in one go.
+				if (items[basic].parts) violations.push({ index, entry, kind: "unknown-item", detail: `${basic} has a recipe in the game file and none in item.lua (sCompositeItems)` });
 				spent += cost(basic);
 				inv.push(basic);
 			}
@@ -161,11 +163,16 @@ function makeSim(game) {
 			}
 			// Sell rules.
 			const sold = [];
-			const sell = (victim, why) => {
+			const sell = (victim, why, trigger) => {
+				const pair = trigger ? [trigger, victim] : null;
 				if (!remove(victim)) return false;
 				sold.push(`${victim} (${why})`);
 				const later = neededLater(victim, index + 1);
-				if (later) violations.push({ index, entry, kind: "sold-then-needed", detail: `${victim} is sold (${why}) and ${later} needs it later` });
+				if (later) violations.push({ index, entry, kind: "sold-then-needed", pair, detail: `${victim} is sold (${why}) and ${later} needs it later` });
+				// Bought while the item that sells it is already owned: gold spent on something the next shop visit sells.
+				else if (closure(entry).has(victim) && !/^inventory full/.test(why)) {
+					violations.push({ index, entry, kind: "bought-then-sold", pair, detail: `${victim} is bought for ${entry} and sold at once (${why})` });
+				}
 				return true;
 			};
 			const allPairs = () => [...game.globalSellPairs, ...heroPairs, ...newPairs, ["item_satanic", "item_mask_of_madness"]];
@@ -173,7 +180,7 @@ function makeSim(game) {
 				for (let pass = 0; pass < 4; pass++) {
 					let any = false;
 					for (const [trigger, victim] of allPairs()) {
-						if (count(trigger) > 0 && count(victim) > 0 && trigger !== victim) any = sell(victim, `pair with ${trigger}`) || any;
+						if (count(trigger) > 0 && count(victim) > 0 && trigger !== victim) any = sell(victim, `pair with ${trigger}`, trigger) || any;
 					}
 					if (!any) break;
 				}

@@ -12,6 +12,8 @@ const RAW = path.join(CACHE, "raw");
 const ROOT = path.join(__dirname, "..", "..", "..");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+// Item ids in the purchase rows that the constants do not name (a patch added items since the constants were fetched).
+const unknownIds = new Set();
 
 function meta() {
 	const file = path.join(RAW, "_meta.json");
@@ -46,6 +48,8 @@ async function stratz(query) {
 
 async function constants(allowFetch) {
 	const file = path.join(CACHE, "stratz_constants.json");
+	// A new week (no _meta.json yet) may bring new item ids: the constants are fetched again with it.
+	if (allowFetch && !meta()) fs.rmSync(file, { force: true });
 	if (fs.existsSync(file)) return readJson(file);
 	if (!allowFetch) throw new Error("no Stratz constants in the cache: run with --fetch");
 	const data = await stratz("{ constants { heroes { id shortName displayName } items { id shortName components { componentId } } } }");
@@ -116,7 +120,10 @@ function position(hero, pos, itemName) {
 	for (const row of raw.f || []) {
 		if (row.instance !== 0) continue;
 		const name = itemName.get(row.itemId);
-		if (!name) continue;
+		if (!name) {
+			unknownIds.add(row.itemId);
+			continue;
+		}
 		const item = (items[name] = items[name] || { name, matches: 0, rows: [] });
 		item.matches += row.matchCount;
 		item.rows.push([row.time, row.matchCount]);
@@ -154,4 +161,4 @@ function position(hero, pos, itemName) {
 	return { hero, pos, matches, remaining, minuteOfNetWorth, items, start, startTop, boots };
 }
 
-module.exports = { RAW, meta, constants, fetchMissing, position };
+module.exports = { RAW, meta, constants, fetchMissing, position, unknownIds };

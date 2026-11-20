@@ -282,6 +282,12 @@ function makeBuilder(game, sim) {
 			order();
 			newPairs.length = 0;
 			const found = walk(true);
+			const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+			const hurtful = found.violations.map((violation) => violation.pair).find((pair) => pair && !input.handPairs.some((hand) => same(hand, pair)) && !game.globalSellPairs.some((global) => same(global, pair)) && pair[0] !== "item_satanic");
+			if (hurtful) {
+				input.banned.add(`${hurtful[0]}>${hurtful[1]}`);
+				return { ok: false, restart: true, problems: [], entries: [], newPairs: [], notes: [], dropped: [], gaps: [] };
+			}
 			let problem = null;
 			for (const violation of found.violations) {
 				const at = indexOfName(violation.entry);

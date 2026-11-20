@@ -56,7 +56,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_satanic",
 	"item_travel_boots",
 	"item_ultimate_scepter_2",
-	"item_mask_of_madness",
 	"item_blink",
 	"item_swift_blink",
 	"item_travel_boots_2",

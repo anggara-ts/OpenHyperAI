@@ -181,6 +181,13 @@ local function simulate(Item, listIn, pos, heroSell)
 				if RECIPES[basic] == nil then
 					problems[#problems + 1] = entry .. ": " .. basic .. " is not an item a hero can buy"
 				else
+					if RECIPES[basic].parts ~= nil then
+						-- A finished item with no recipe in item.lua would be bought whole, at full price in one go.
+						problems[#problems + 1] = entry
+							.. ": "
+							.. basic
+							.. " has no recipe in item.lua (sCompositeItems)"
+					end
 					inv[#inv + 1] = basic
 				end
 			end
@@ -237,6 +244,14 @@ local function simulate(Item, listIn, pos, heroSell)
 							.. ") and "
 							.. later
 							.. " needs it later"
+					elseif closure(Item, entry)[victim] and why ~= "inventory full" then
+						-- Bought while the item that sells it is already owned.
+						problems[#problems + 1] = victim
+							.. " is bought for "
+							.. entry
+							.. " and sold at once ("
+							.. why
+							.. ")"
 					end
 					return true
 				end
@@ -389,13 +404,35 @@ T.test("the walk catches a seventh item, a sell loop and a repeated entry", func
 	problems, held = simulate(Item, chain, 1, {})
 	T.eq(#problems, 0, table.concat(problems, " | "))
 	T.eq(table.concat(held, ","), "item_hurricane_pike", "held at the end")
+	-- Assault Cuirass sells a Drum of Endurance (Item.sSellList): a Drum bought after it is gold thrown away.
+	problems = simulate(Item, { "item_assault", "item_ancient_janggo" }, 3, {})
+	T.ok(string.find(table.concat(problems, " | "), "sold at once", 1, true), table.concat(problems, " | "))
+end)
+
+-- Invoker's second mid list is picked at random in game (Quas-Exort), so no team slot returns it for sure: it is
+-- read from the file and walked like the others.
+T.test("build walk hero_invoker, the pos_2_qe list", function()
+	local source = T.read("BotsLib/hero_invoker.lua")
+	local body = string.match(source, 'sRoleItemsBuyList%["pos_2_qe"%] = {(.-)\n}')
+	T.ok(body ~= nil, "the pos_2_qe list is in the file")
+	local list = {}
+	for name in string.gmatch(body, '"(item_[%w_]+)"') do
+		list[#list + 1] = name
+	end
+	T.ok(#list >= 10, "the pos_2_qe list has " .. #list .. " entries")
+	local result, Item = load("hero_invoker", 2, PLAIN_TEAM)
+	local problems = simulate(Item, list, 2, result.sSellList)
+	T.eq(#problems, 0, table.concat(problems, " | "))
+	for _, gone in ipairs({ "item_ultimate_scepter", "item_ultimate_scepter_2", "item_aghanims_shard" }) do
+		T.eq(indexOf(list, gone), nil, "pos_2_qe " .. gone)
+	end
 end)
 
 T.test("status.json covers every list the hero files return", function()
 	local counted = { data = 0, neighbour = 0, alias = 0, kept = 0 }
 	for hero, positions in pairs(STATUS.heroes) do
 		for pos, info in pairs(positions) do
-			if pos ~= "sell" then
+			if string.find(pos, "^%d$") then
 				T.ok(counted[info.status] ~= nil, hero .. " pos " .. pos .. " status " .. tostring(info.status))
 				counted[info.status] = counted[info.status] + 1
 				if info.status == "kept" or info.status == "alias" then

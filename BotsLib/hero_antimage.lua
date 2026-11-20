@@ -65,7 +65,6 @@ sRoleItemsBuyList["pos_3"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
-	"item_ultimate_scepter",
 	"item_sange",
 	"item_black_king_bar",
 	"item_abyssal_blade",
@@ -90,7 +89,6 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_basher",
 	"item_sange",
 	"item_black_king_bar",
-	"item_monkey_king_bar",
 	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
@@ -106,7 +104,6 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_bfury",
 	"item_manta",
 	"item_basher",
-	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_sange",
 	"item_abyssal_blade",
@@ -121,8 +118,6 @@ X["sSellList"] = {
 	"item_magic_wand",
 	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
 	"item_abyssal_blade",
-	"item_sange",
-	"item_black_king_bar",
 	"item_sange",
 }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

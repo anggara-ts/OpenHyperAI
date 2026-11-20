@@ -1197,10 +1197,29 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin = function()
 	end
 	return false
 end
--- Was Sven's rule, which farms until a Black King Bar is owned, with no net-worth cap: no Tidehunter list buys one
--- as a core (Stratz 7.41f: 6% of offlane matches), so he was "time to farm" all game (#38).
+-- Sven's rule with one change (#38): Sven's farms while no Black King Bar is owned, with no net-worth cap. Sven
+-- buys one; Tidehunter's lists do not (Stratz 7.41f, offlane: 8% of matches), so past level 25 and 20,000 net worth,
+-- where the first clause ends, he was still "time to farm" for the rest of the game. The clause now ends at 20,000.
 Site.ConsiderIsTimeToFarm.npc_dota_hero_tidehunter = function()
-	return Site.ConsiderIsTimeToFarm.npc_dota_hero_bristleback()
+	local bot = GetBot()
+	local netWorth = bot:GetNetWorth()
+	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
+		return true
+	end
+	if not HasItem(bot, "item_black_king_bar") and netWorth < 20000 then
+		return true
+	end
+	if not HasItem(bot, "item_satanic") and netWorth < 22000 then
+		if Site.GetAroundAllyCount(bot, 1000) <= 2 then
+			return true
+		end
+	end
+	if not HasItem(bot, "item_greater_crit") and netWorth < 26000 then
+		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
+			return true
+		end
+	end
+	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_viper = function()
 	local bot = GetBot()

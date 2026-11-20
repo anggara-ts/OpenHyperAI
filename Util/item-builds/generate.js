@@ -40,6 +40,8 @@ function weekLabel(week) {
 }
 const thousands = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 const short = (name) => String(name).replace(/^item_/, "");
+// "2_qe" (Invoker's second mid list) is a list of position 2.
+const posNumber = (pos) => Number(String(pos)[0]);
 
 async function main() {
 	const game = Game.load();
@@ -79,6 +81,7 @@ async function main() {
 	const report = [];
 	const urn = {};
 	const totals = { data: 0, neighbour: 0, alias: 0, kept: 0 };
+	const missingFromGame = new Set();
 	let changedFiles = 0;
 
 	for (const hero of files) {
@@ -94,7 +97,8 @@ async function main() {
 		const oldPairs = file.sell ? file.sell.pairs.filter(([a, b]) => game.items[a] && game.items[b]) : [];
 		const positions = Object.keys(file.positions).sort();
 		const datas = {};
-		for (const pos of positions) datas[pos] = Data.position(hero, Number(pos), itemName);
+		for (const pos of positions) datas[pos] = Data.position(hero, posNumber(pos), itemName);
+		for (const data of Object.values(datas)) for (const name of Object.keys((data || {}).items || {})) if (!game.items[name]) missingFromGame.add(name);
 		const oldEntries = (pos) => {
 			const position = file.positions[pos];
 			return position.source ? position.source.entries : null;
@@ -105,7 +109,7 @@ async function main() {
 		const plan = {};
 		for (const pos of positions) {
 			const position = file.positions[pos];
-			const pin = pinsFor(hero, Number(pos));
+			const pin = pinsFor(hero, posNumber(pos));
 			const own = datas[pos];
 			const matches = own ? own.matches : 0;
 			const old = oldEntries(pos);
@@ -114,7 +118,7 @@ async function main() {
 				plan[pos] = { status: "kept", reason: "the list is not a plain table the generator can rewrite", matches };
 			} else if (matches >= MIN_MATCHES) plan[pos] = { status: "data", matches, from: pos };
 			else {
-				const neighbour = GROUPS[pos].filter((other) => datas[other] && datas[other].matches >= MIN_MATCHES && file.positions[other]).sort((a, b) => datas[b].matches - datas[a].matches)[0];
+				const neighbour = (GROUPS[pos] || []).filter((other) => datas[other] && datas[other].matches >= MIN_MATCHES && file.positions[other]).sort((a, b) => datas[b].matches - datas[a].matches)[0];
 				if (neighbour) plan[pos] = { status: "neighbour", matches, from: String(neighbour) };
 				else if (position.kind === "alias") plan[pos] = { status: "alias", matches, to: position.to, reason: `${matches} matches and no position of its group has ${MIN_MATCHES}: follows pos ${position.to} as before` };
 				else plan[pos] = { status: "kept", matches, reason: `${matches} matches and no position of its group has ${MIN_MATCHES}` };
@@ -135,7 +139,8 @@ async function main() {
 		const banned = new Set();
 		let built = {};
 		let pairs = oldPairs.slice();
-		for (let attempt = 0; attempt < 6; attempt++) {
+		for (let attempt = 0; attempt < 12; attempt++) {
+			let restart = false;
 			built = {};
 			pairs = oldPairs.slice();
 			for (const pos of positions) {
@@ -144,11 +149,12 @@ async function main() {
 				if (explain) console.log(`== ${hero} pos ${pos} (${todo.status}, data of pos ${todo.from}, ${datas[todo.from].matches} matches)`);
 				const result = builder.build({
 					hero,
-					pos: Number(pos),
+					pos: posNumber(pos),
 					data: datas[todo.from],
 					old: oldEntries(pos),
 					variables: file.variables,
-					pin: pinsFor(hero, Number(pos)),
+					pin: pinsFor(hero, posNumber(pos)),
+					handPairs: oldPairs,
 					waits: game.farm[hero] || [],
 					sellPairs: pairs,
 					banned,
@@ -156,9 +162,14 @@ async function main() {
 					heroUses,
 					explain,
 				});
+				if (result.restart) {
+					restart = true;
+					break;
+				}
 				for (const pair of result.newPairs) if (!pairs.some((p) => p[0] === pair[0] && p[1] === pair[1])) pairs.push(pair);
 				built[pos] = result;
 			}
+			if (restart) continue;
 			// Every finished list again, with the whole sell list and no new pairs.
 			let hurt = null;
 			for (const pos of positions) {
@@ -170,10 +181,10 @@ async function main() {
 					else lists = lists.flatMap((list) => (entry.options.length ? entry.options : [null]).map((o) => (o ? [...list, o] : list.slice())));
 				}
 				for (const list of lists.slice(0, 40)) {
-					const check = sim.simulate(list, { pos: Number(pos), sellPairs: pairs });
+					const check = sim.simulate(list, { pos: posNumber(pos), sellPairs: pairs });
 					const bad = check.violations.find((violation) => violation.kind !== "no-op");
 					if (!bad) continue;
-					const culprit = pairs.find(([trigger, victim]) => bad.kind === "sold-then-needed" && bad.detail.startsWith(`${victim} is sold (pair with ${trigger})`));
+					const culprit = bad.pair ? pairs.find(([trigger, victim]) => trigger === bad.pair[0] && victim === bad.pair[1]) : undefined;
 					hurt = hurt || { pos, bad, culprit };
 				}
 			}
@@ -224,7 +235,7 @@ async function main() {
 				const target = todo.status === "neighbour" && built[todo.from] && file.positions[todo.from].open < position.open ? built[todo.from] : null;
 				const same = target && JSON.stringify(target.entries.map((e) => e.name || e.variable)) === JSON.stringify(result.entries.map((e) => e.name || e.variable));
 				changes[pos] = same && file.style.alias ? { comment: inside ? [] : comment, aliasTo: todo.from } : { comment: inside ? [] : comment, entries };
-				info.from = Number(todo.from);
+				info.from = posNumber(todo.from);
 				info.fromMatches = from.matches;
 				info.notes = result.notes;
 				info.dropped = result.dropped;
@@ -241,14 +252,15 @@ async function main() {
 				if (todo.problem) info.problem = todo.problem;
 				if (todo.status === "alias") info.to = Number(todo.to);
 			}
-			totals[todo.status]++;
+			if (/^[0-9]$/.test(pos)) totals[todo.status]++;
+			else info.note = "a second list of this position, picked at random in game; not one of the counted position lists";
 			if (todo.status === "data" || todo.status === "neighbour") {
 				const now = result.entries.map((entry) => entry.name || entry.variable);
 				report.push({ hero, pos, status: todo.status, matches: todo.matches, from: todo.from, old: oldNames, now, notes: result.notes, dropped: result.dropped });
 			} else {
 				const row = { hero, pos, status: todo.status, matches: todo.matches, reason: todo.reason, old: oldNames, now: null, notes: [] };
 				if (todo.status === "kept" && todo.matches >= MIN_MATCHES && option("--report")) {
-					const idea = builder.build({ hero, pos: Number(pos), data: datas[pos], old: [], variables: {}, pin: {}, waits: game.farm[hero] || [], sellPairs: oldPairs, banned, canPair: false, heroUses });
+					const idea = builder.build({ hero, pos: posNumber(pos), handPairs: oldPairs, data: datas[pos], old: [], variables: {}, pin: {}, waits: game.farm[hero] || [], sellPairs: oldPairs, banned, canPair: false, heroUses });
 					row.proposal = idea.entries.map((entry) => entry.name);
 				}
 				report.push(row);
@@ -261,7 +273,7 @@ async function main() {
 			const names = finalNames[at] ? finalNames[at].map((entry) => entry.name) : oldEntries(pos) ? resolve(oldEntries(pos)) : null;
 			if (names === null) urn[hero] = urn[hero] || "keep";
 			else if (names.some((name) => name && [...sim.closure(name)].some((part) => URN_FAMILY.includes(part)))) {
-				if (urn[hero] !== "keep") (urn[hero] = urn[hero] || []).push(Number(pos));
+				if (urn[hero] !== "keep" && /^[0-9]$/.test(pos)) (urn[hero] = urn[hero] || []).push(Number(pos));
 			}
 		}
 		// The hand-written pairs stay (minus one that sold what a new list needs); the generator's own follow its marker.
@@ -337,6 +349,8 @@ async function main() {
 			fs.writeFileSync(file, out.join("\n") + "\n");
 		}
 	}
+	if (Data.unknownIds.size) console.log(`${Data.unknownIds.size} item id(s) in the data are not in the Stratz constants (delete cache/stratz_constants.json and run --fetch): ${[...Data.unknownIds].slice(0, 12).join(", ")}`);
+	if (missingFromGame.size) console.log(`items in the data that items.json does not have (run game-items.js on the current items.txt): ${[...missingFromGame].slice(0, 12).join(", ")}`);
 	console.log(`${files.length} hero files, lists: ${JSON.stringify(totals)}; ${changedFiles} file(s) ${flag("--write") ? "written" : "would change"}`);
 }
 

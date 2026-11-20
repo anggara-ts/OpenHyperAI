@@ -814,7 +814,28 @@ function X.TryKite(unit, meleeEnemy)
 	local point = math.max(unit:GetAttackPoint() / math.max(unit:GetAttackSpeed(), 0.1), 0.25)
 	local since = GameTime() - unit:GetLastAttackTime()
 	local from, to = point + KITE_BUF, spa - point - KITE_BUF
-	if to - from < 0.15 or since < from or since > to then
+	-- Kite only when the gap between attacks leaves room for a real step (maintainer: with high attack speed, e.g.
+	-- Clinkz's Strafe, Mask of Madness or Hurricane Pike, stepping only costs attacks; early on, with a long gap,
+	-- kiting is right). The gap must be at least 0.35s and long enough to walk 100+ units at the hero's speed.
+	local gap = to - from
+	local stepRoom = gap * math.max(1, unit:GetCurrentMovementSpeed())
+	if gap < 0.35 or stepRoom < 100 then
+		if DotaTime() >= (unit._kiteSkipLogAt or -99) + 20 then
+			unit._kiteSkipLogAt = DotaTime()
+			pcall(
+				print,
+				string.format(
+					"[OHA-KITE] t=%.0f %s kite-skip why=fast-attack gap=%.2f spa=%.2f",
+					DotaTime(),
+					(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+					gap,
+					spa
+				)
+			)
+		end
+		return false
+	end
+	if since < from or since > to then
 		return false
 	end
 	local away = Fu.VectorAway(unit:GetLocation(), meleeEnemy:GetLocation(), step)

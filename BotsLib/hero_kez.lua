@@ -790,7 +790,6 @@ function X.ConsiderKazuraiKatana()
 	-- katana_attack_range lives on Switch Discipline (o), not on Kazurai Katana (game KV), so the old
 	-- lookup read 0 and the impale was never cast.
 	local katanaAttackRange = switchDisciplineAbility:GetSpecialValueInt("katana_attack_range")
-	local katanaBonusDamage = kazuraiKatanaAbility:GetSpecialValueInt("katana_bonus_damage") / 100
 	-- The impale bursts bleed_as_rupture_pct (50%) of the target's Katana stacks at once (datafeed:
 	-- "STACKS AS BURST DAMAGE"; shard +50). Modifier name and "1 stack = 1 damage" are inherited from the
 	-- old code and not verified.

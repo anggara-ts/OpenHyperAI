@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -121,8 +122,6 @@ local iceSpireAbility = SafeAbility(bot:GetAbilityByName("lich_ice_spire"), "lic
 local chainFrostAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "lich")
 local sacrificeAbility = SafeAbility(bot:GetAbilityByName("lich_death_charge"), "lich_death_charge", "lich")
 local talent1 = SafeAbility(bot:GetAbilityByName(sTalentList[1]), "sTalentList[1]", "lich")
-local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "lich")
-local talent5 = SafeAbility(bot:GetAbilityByName(sTalentList[5]), "sTalentList[5]", "lich")
 local talent7 = SafeAbility(bot:GetAbilityByName(sTalentList[7]), "sTalentList[7]", "lich")
 local frostBlastDesire, frostBlastTarget
 local frostShieldDesire, frostShieldTarget
@@ -147,6 +146,7 @@ function X.SacrificeMaxCharges()
 	return 3
 end
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	-- Scepter: other spells can be cast while channeling Sinister Gaze (Valve data). The busy check
 	-- below stops everything during a channel, so the weave runs first.
 	if X.ConsiderGazeWeave() then
@@ -243,10 +243,9 @@ function X.ConsiderQ()
 	local castPoint = frostBlastAbility:GetCastPoint()
 	local manaCost = frostBlastAbility:GetManaCost()
 	local damage = frostBlastAbility:GetSpecialValueInt("damage") -- datafeed: primary-target damage 40/80/120/160 (was abilityLevel * 50)
+	-- 7.42 game files: special_bonus_unique_lich_6 (+125) is linked into lich_frost_nova "aoe_damage", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
 	local aoeDamage = frostBlastAbility:GetSpecialValueInt("aoe_damage")
-	if talent2:IsTrained() then
-		aoeDamage = aoeDamage + talent2:GetSpecialValueInt("value")
-	end
 	local totalDamage = damage + aoeDamage
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local radius = frostBlastAbility:GetSpecialValueInt("radius")
@@ -788,10 +787,9 @@ function X.ConsiderR()
 	local castRange = chainFrostAbility:GetCastRange() + aetherRange
 	local castPoint = chainFrostAbility:GetCastPoint()
 	local manaCost = chainFrostAbility:GetManaCost()
+	-- No 7.42 talent changes Chain Frost damage (game files); the old bonus read special_bonus_unique_lich_4
+	-- (Frost Shield charges) with a key it does not have, so it added 0 (#46).
 	local damage = chainFrostAbility:GetSpecialValueInt("damage")
-	if talent5:IsTrained() then
-		damage = damage + talent5:GetSpecialValueInt("value")
-	end
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange + 50, true, BOT_MODE_NONE)
 	local bounceRadius = chainFrostAbility:GetSpecialValueInt("jump_range") / 2

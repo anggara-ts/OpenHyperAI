@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -142,10 +143,6 @@ local demonicConversionAbility =
 local midnightPulseAbility =
 	SafeAbility(bot:GetAbilityByName("enigma_midnight_pulse"), "enigma_midnight_pulse", "enigma")
 local blackHoleAbility = SafeAbility(bot:GetAbilityByName("enigma_black_hole"), "enigma_black_hole", "enigma")
-local maleficeTalent =
-	SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_2"), "special_bonus_unique_enigma_2", "enigma")
-local midnightPulseTalent =
-	SafeAbility(bot:GetAbilityByName("special_bonus_unique_enigma_6"), "special_bonus_unique_enigma_6", "enigma")
 local maleficeDesire, maleficeTarget
 local demonicConversionDesire, demonicConversionLocation
 local midnightPulseDesire, midnightPulseLocation
@@ -159,6 +156,7 @@ local isGoingOnSomeone
 local isAttacking
 local isInTeamFight
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -249,10 +247,9 @@ function X.ConsiderMalefice()
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, maleficeAbility:GetCastRange())
 	-- datafeed: Malefice's instance count is "stun_instances" (3); it has no "value", so stunInstances (and the kill damage) was 0.
+	-- 7.42 game files: special_bonus_unique_enigma_2 (+4) is linked into enigma_malefice "stun_instances", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
 	local stunInstances = maleficeAbility:GetSpecialValueInt("stun_instances")
-	if maleficeTalent:IsTrained() then
-		stunInstances = stunInstances + maleficeAbility:GetSpecialValueInt("value")
-	end
 	local damage = maleficeAbility:GetSpecialValueInt("damage") * stunInstances
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 150, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
@@ -523,10 +520,10 @@ function X.ConsiderMidnightPulse()
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = Fu.GetProperCastRange(false, bot, midnightPulseAbility:GetCastRange())
+	-- The pulse radius talent is special_bonus_unique_enigma_9, not enigma_6 (Black Hole damage).
+	-- 7.42 game files: special_bonus_unique_enigma_9 (+200) is linked into enigma_midnight_pulse "radius", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
 	local radius = midnightPulseAbility:GetSpecialValueInt("radius")
-	if midnightPulseTalent:IsTrained() then
-		radius = radius + midnightPulseAbility:GetSpecialValueInt("value")
-	end
 	if isInTeamFight then
 		local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius / 2, 0, 0)
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius * 0.8)

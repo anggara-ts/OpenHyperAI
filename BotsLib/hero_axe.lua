@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -142,7 +143,6 @@ local berserkersCallAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]),
 local battleHungerAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "axe")
 local counterHelixAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "axe")
 local cullingBladeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "axe")
-local talent7 = SafeAbility(bot:GetAbilityByName(sTalentList[7]), "sTalentList[7]", "axe")
 local talent5 = SafeAbility(bot:GetAbilityByName(sTalentList[5]), "sTalentList[5]", "axe")
 local berserkersCallDesire
 local battleHungerDesire, battleHungerTarget
@@ -153,6 +153,7 @@ local isAttacking
 local mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 local botTarget -- was a global set every think
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
@@ -198,10 +199,9 @@ function X.ConsiderQ()
 		return 0
 	end
 	local abilityLevel = berserkersCallAbility:GetLevel()
+	-- 7.42 game files: special_bonus_unique_axe_2 (+70) is linked into axe_berserkers_call "radius", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
 	local radius = berserkersCallAbility:GetSpecialValueInt("radius")
-	if talent7:IsTrained() then
-		radius = radius + talent7:GetSpecialValueInt("value")
-	end
 	local castRange = radius
 	local castPoint = berserkersCallAbility:GetCastPoint()
 	local manaCost = berserkersCallAbility:GetManaCost()

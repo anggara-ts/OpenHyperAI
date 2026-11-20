@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local TalentWatch = require(GetScriptDirectory() .. "/FuncLib/systems/talent_watch")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -109,16 +110,15 @@ local brainSapAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbi
 local nightmareAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "bane")
 local fiendsGripAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "bane")
 local talent4 = SafeAbility(bot:GetAbilityByName(sTalentList[4]), "sTalentList[4]", "bane")
-local talent7 = SafeAbility(bot:GetAbilityByName(sTalentList[7]), "sTalentList[7]", "bane")
 local enfeebleDesire, enfeebleTarget
 local brainSapDesire, brainSapTarget
 local nightmareDesire, nightmareTarget
 local fiendsGripDesire, fiendsGripTarget
-local brainSapBonusDamage = 0
 local brainSapTargetType = nil
 local botLevel, mpRatio, nearbyEnemies, nearbyAllies
 local botTarget -- was a global set every think
 function X.SkillsComplement()
+	TalentWatch.Tick(bot)
 	if brainSapTargetType == nil and brainSapAbility:IsTrained() then
 		brainSapTargetType = brainSapAbility:GetTargetType()
 	end
@@ -131,9 +131,6 @@ function X.SkillsComplement()
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	if talent7:IsTrained() then
-		brainSapBonusDamage = talent7:GetSpecialValueInt("value")
-	end
 	enfeebleDesire, enfeebleTarget = X.ConsiderQ()
 	if enfeebleDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
@@ -279,7 +276,9 @@ function X.ConsiderW()
 	local radius = 600
 	local castPoint = brainSapAbility:GetCastPoint()
 	local manaCost = brainSapAbility:GetManaCost()
-	local damage = brainSapAbility:GetSpecialValueInt("brain_sap_damage") + brainSapBonusDamage
+	-- 7.42 game files: special_bonus_unique_bane_2 (+275) is linked into bane_brain_sap "brain_sap_damage", and the
+	-- read includes it once learned (FuncLib/systems/talent_watch.lua). The old talent "value" read added 0 (#46).
+	local damage = brainSapAbility:GetSpecialValueInt("brain_sap_damage")
 	-- datafeed: Brain Sap deals pure damage (damage 4), not magical.
 	local damageType = DAMAGE_TYPE_PURE
 	local enemiesInRange = Fu.GetAroundEnemyHeroList(castRange)

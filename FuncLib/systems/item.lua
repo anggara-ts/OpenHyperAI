@@ -1836,7 +1836,23 @@ function Item.TryPickupRoshanDrop(bot)
 		end
 		return true
 	end
-	if Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0 then
+	local bestKind = Item.RoshanClaimKind(best.item:GetName()) or "drop"
+	local backpackFree = 0
+	for slot = 6, 8 do
+		if bot:GetItemInSlot(slot) == nil then
+			backpackFree = backpackFree + 1
+		end
+	end
+	-- 7.42: the Banner is used from the backpack, like Smoke of Deceit (game file: AllowedInBackpack 1 for
+	-- item_roshans_banner, 0 for item_aegis; maintainer, 2026-11-20). With the main slots full it goes into a
+	-- free backpack slot and nothing is dropped for it; with no slot at all it is left alone.
+	local mainFull = Item.GetEmptyNonBackpackInventoryAmount(bot) <= 0
+	if mainFull and bestKind == "banner" and backpackFree == 0 then
+		bot._roshNoRoomUntil = DotaTime() + 30
+		RoshanRoomLog(bot, "skip", best.item:GetName(), " why=bag-full")
+		return false
+	end
+	if mainFull and bestKind ~= "banner" then
 		-- Bot swaps do not take effect (216 of 217 checked swaps did nothing), so moving the cheapest item
 		-- to the backpack never made room. Drop it at his feet instead, pick up the Roshan item into the
 		-- freed main slot, then pick the dropped item back up (it goes to the backpack). Game 021, 32:48:
@@ -1849,7 +1865,7 @@ function Item.TryPickupRoshanDrop(bot)
 			-- The drop order is on its way: wait for the slot instead of dropping a second item.
 			return true
 		end
-		local kind = Item.RoshanClaimKind(best.item:GetName()) or "drop"
+		local kind = bestKind
 		local cheap = Item.GetMainInvLessValItemSlot(bot)
 		local item = cheap ~= nil and cheap >= 0 and bot:GetItemInSlot(cheap) or nil
 		if item == nil then
@@ -1857,12 +1873,6 @@ function Item.TryPickupRoshanDrop(bot)
 		end
 		-- The dropped item comes back into the backpack. With no backpack slot it would stay on the ground:
 		-- only the Aegis is worth that.
-		local backpackFree = 0
-		for slot = 6, 8 do
-			if bot:GetItemInSlot(slot) == nil then
-				backpackFree = backpackFree + 1
-			end
-		end
 		if backpackFree == 0 and kind ~= "aegis" then
 			bot._roshNoRoomUntil = DotaTime() + 30
 			RoshanRoomLog(bot, "skip", best.item:GetName(), " why=bag-full")

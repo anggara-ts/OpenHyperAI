@@ -1175,7 +1175,7 @@ local function ConsiderItems()
 	else
 		castRangeBonus = 0
 	end
-	pcall(Usage.BannerFromBackpack)
+	pcall(Usage.BannerPlantCheck)
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
 	for forageSlot = 0, 5 do
@@ -1223,7 +1223,8 @@ local function ConsiderItems()
 		local item = bot:GetItemInSlot(slot)
 		local itemName = item ~= nil and item:GetName() or nil
 		local inBackpack = slot >= 6 and slot <= 8
-		local smokeFromBag = inBackpack and itemName == "item_smoke_of_deceit"
+		-- Used from the backpack: Smoke of Deceit, and Roshan's Banner since 7.42.
+		local smokeFromBag = inBackpack and (itemName == "item_smoke_of_deceit" or itemName == "item_roshans_banner")
 		if inBackpack and not smokeFromBag then
 			itemName = nil
 		end
@@ -7423,93 +7424,30 @@ DustDesire = function(item)
 end
 -- Roshan's Banner (datafeed: placed within 1200, 120s, buffs our lane creeps in a 600/900/1200
 -- radius by level; can be destroyed, melee heroes hit it twice as hard). Bots had no rule for it.
--- Bots carry it in the backpack: a.BannerFromBackpack swaps it into a main slot first.
 -- Pushing (user call): planted behind our wave once the wave is at an enemy tower, barracks or
 -- the ancient, so the creeps fighting the building get the buff. One banner per push.
--- Pushing, with an enemy tower, barracks or the ancient within 2500: a banner in the backpack goes
--- into a main slot (an empty one, else the cheapest), early enough for any backpack cooldown to run
--- out before the wave reaches the building. Once per 5s.
-function Usage.BannerFromBackpack()
-	-- Game 036: GetNearbyTowers/GetNearbyBarracks at 2500 ran every tick while pushing (the 5s gate was
-	-- set only when a building was found) and the engine warned "querying nearby units with a distance
-	-- greater than cached (2500)" 3185 times. Now at most once per 1s, and buildings are read from the
-	-- enemy building list by distance, which has no radius cache.
-	local now = DotaTime()
-	if now < (bot._bannerCheckAt or -999) then
+-- 7.42: it is used straight from the backpack, like Smoke of Deceit (game file: AllowedInBackpack 1;
+-- maintainer, 2026-11-20), so the item loop reads the backpack slots for it. The swap into a main slot that
+-- stood here is gone: bot swaps never took (game 036: 6 swaps, none; game 029: 9 tries).
+-- After a plant order: is the Banner out of the bag 1.5s later? (Proves the cast from the backpack.)
+function Usage.BannerPlantCheck()
+	local plantAt = bot._bannerPlantAt
+	if plantAt == nil or DotaTime() < plantAt + 1.5 then
 		return
 	end
-	bot._bannerCheckAt = now + 1
+	bot._bannerPlantAt = nil
 	local slot = bot:FindItemSlot("item_roshans_banner")
-	if slot >= 0 and slot <= 5 then
-		-- In a main slot: the last swap worked.
-		bot._bannerSwapPending, bot._bannerSwapFails = false, 0
-	end
-	if slot < 6 or slot > 8 or not Fu.IsPushing(bot) or now < (bot._bannerSwapAt or -999) or bot._bannerSwapGaveUp then
-		return
-	end
-	-- A swap was ordered and the banner is still in the backpack: count it. Game 036: 6 swaps, none took.
-	if bot._bannerSwapPending then
-		bot._bannerSwapPending = false
-		bot._bannerSwapFails = (bot._bannerSwapFails or 0) + 1
-		if bot._bannerSwapFails >= 3 then
-			bot._bannerSwapGaveUp = true
-			pcall(
-				print,
-				string.format(
-					"[OHA-BANNER] t=%.0f %s swap-failed tries=%d slot=%d, giving up",
-					now,
-					(string.gsub(botName, "npc_dota_hero_", "")),
-					bot._bannerSwapFails,
-					slot
-				)
-			)
-			return
-		end
-	end
-	local nearestBuilding, nearestDist = nil, 2500
-	for _, enemyBuilding in pairs(GetUnitList(UNIT_LIST_ENEMY_BUILDINGS) or {}) do
-		if Fu.IsValidBuilding(enemyBuilding) then
-			local unitName = enemyBuilding:GetUnitName() or ""
-			if enemyBuilding:IsTower() or string.find(unitName, "rax", 1, true) ~= nil then
-				local dist = GetUnitToUnitDistance(bot, enemyBuilding)
-				if dist <= nearestDist then
-					nearestBuilding, nearestDist = enemyBuilding, dist
-				end
-			end
-		end
-	end
-	local enemyAncient = GetAncient(GetOpposingTeam())
-	if nearestBuilding == nil and enemyAncient ~= nil and GetUnitToUnitDistance(bot, enemyAncient) <= 2500 then
-		nearestBuilding = enemyAncient
-	end
-	if nearestBuilding == nil then
-		return
-	end
-	local destSlot = require(GetScriptDirectory() .. "/FuncLib/systems/item").GetMainInvLessValItemSlot(bot)
-	if destSlot == nil or destSlot < 0 then
-		return
-	end
-	bot._bannerSwapAt = DotaTime() + 5
-	local swappedOutItem = bot:GetItemInSlot(destSlot)
-	-- Forced: the swap wrapper (global_overrides) refuses a swap with an enemy hero within 1000,
-	-- and an enemy base always has one (game 029, 52:33-53:24: 9 tries, the banner never moved).
-	bot._swapDespiteEnemies = true
-	bot._swapDespiteCooldown = true
 	pcall(
 		print,
 		string.format(
-			"[OHA-BANNER] t=%.0f %s swap slot%d->%d out=%s building=%s dist=%.0f",
+			"[OHA-BANNER] t=%.0f %s plant-result planted=%s from-slot=%d now-slot=%d",
 			DotaTime(),
 			(string.gsub(botName, "npc_dota_hero_", "")),
-			slot,
-			destSlot,
-			swappedOutItem ~= nil and swappedOutItem:GetName() or "-",
-			(string.gsub(nearestBuilding:GetUnitName(), "npc_dota_", "")),
-			GetUnitToUnitDistance(bot, nearestBuilding)
+			slot < 0 and "yes" or "no",
+			bot._bannerPlantSlot or -1,
+			slot
 		)
 	)
-	bot._bannerSwapPending = true
-	bot:ActionImmediate_SwapItems(slot, destSlot)
 end
 Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 	if not Fu.IsPushing(bot) or bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.4 then
@@ -7568,19 +7506,25 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 	if GetUnitToLocationDistance(bot, loc) > 1150 or not IsLocationPassable(loc) then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	pcall(
-		print,
-		string.format(
-			"[OHA-BANNER] t=%.0f %s plant at=%.0f,%.0f building=%s dist=%.0f creeps=%d",
-			DotaTime(),
-			(string.gsub(botName, "npc_dota_hero_", "")),
-			loc.x,
-			loc.y,
-			(string.gsub(building:GetUnitName(), "npc_dota_", "")),
-			bestDist,
-			#wave
+	if bot._bannerPlantAt == nil then
+		bot._bannerPlantAt = DotaTime()
+		bot._bannerPlantSlot = bot:FindItemSlot("item_roshans_banner")
+		pcall(
+			print,
+			string.format(
+				"[OHA-BANNER] t=%.0f %s plant at=%.0f,%.0f building=%s dist=%.0f creeps=%d slot=%d from=%s",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				loc.x,
+				loc.y,
+				(string.gsub(building:GetUnitName(), "npc_dota_", "")),
+				bestDist,
+				#wave,
+				bot._bannerPlantSlot,
+				bot._bannerPlantSlot >= 6 and "backpack" or "main"
+			)
 		)
-	)
+	end
 	return BOT_ACTION_DESIRE_HIGH, loc, "ground", nil
 end
 Usage.ConsiderItemDesire["item_trusty_shovel"] = function(item)

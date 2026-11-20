@@ -119,19 +119,19 @@ local FULL_MAIN = {
 	"item_ultimate_scepter",
 }
 
-T.test("roshan drop: one item is dropped for the Banner, however often the think runs", function()
+T.test("roshan drop: one item is dropped for the Aegis, however often the think runs", function()
 	local unit, Item, world = scene(FULL_MAIN, { "item_ward_observer" })
-	world.putOnGround("item_roshans_banner")
+	world.putOnGround("item_aegis")
 	Stub.time = 2294
 	for _ = 1, 6 do
-		T.ok(Item.TryPickupRoshanDrop(unit), "busy with the Banner")
+		T.ok(Item.TryPickupRoshanDrop(unit), "busy with the Aegis")
 		Stub.time = Stub.time + 0.1
 	end
 	T.eq(table.concat(world.orders, ","), "drop item_magic_wand", "one drop order, the cheapest main item")
-	T.eq(world.printed("room dropped magic_wand for=banner cost=450 backpack%-free=2"), 1, "the drop is logged")
+	T.eq(world.printed("room dropped magic_wand for=aegis cost=450 backpack%-free=2"), 1, "the drop is logged")
 	world.land()
-	T.ok(Item.TryPickupRoshanDrop(unit), "takes the Banner")
-	T.eq(world.orders[#world.orders], "pick item_roshans_banner", "into the freed slot")
+	T.ok(Item.TryPickupRoshanDrop(unit), "takes the Aegis")
+	T.eq(world.orders[#world.orders], "pick item_aegis", "into the freed slot")
 	world.land()
 	Stub.time = Stub.time + 1.5
 	T.eq(Item.RoshanDropDesire(unit), 0.97, "the desire stays up for the dropped item")
@@ -142,6 +142,20 @@ T.test("roshan drop: one item is dropped for the Banner, however often the think
 	T.eq(world.printed("room picked%-up magic_wand"), 1, "the pick-up is logged")
 	T.eq(Item.RoshanDropDesire(unit), 0, "nothing left to do")
 	T.eq(unit:FindItemSlot("item_magic_wand"), 7, "it came back into the backpack")
+end)
+
+T.test("roshan drop: the Banner goes into the backpack and nothing is dropped for it", function()
+	-- 7.42: the Banner is used from the backpack (game file: AllowedInBackpack 1).
+	local unit, Item, world = scene(FULL_MAIN, { "item_ward_observer" })
+	world.putOnGround("item_roshans_banner")
+	Stub.time = 2294
+	T.ok(Item.TryPickupRoshanDrop(unit), "takes the Banner")
+	T.eq(table.concat(world.orders, ","), "pick item_roshans_banner", "picked up, no drop order")
+	world.land()
+	T.eq(unit:FindItemSlot("item_roshans_banner"), 7, "it sits in the backpack")
+	T.ok(not Item.TryPickupRoshanDrop(unit), "done")
+	T.eq(world.printed("room dropped"), 0, "nothing was dropped")
+	T.eq(Item.RoshanDropDesire(unit), 0, "nothing left to do")
 end)
 
 T.test("roshan drop: a full backpack leaves the Banner alone but still makes room for the Aegis", function()

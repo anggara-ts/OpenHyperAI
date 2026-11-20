@@ -58,8 +58,28 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_moon_shard",
 }
 sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+-- Pos 4/5: a support start (Stratz 7.41f pos 4, n=902: Tango 100%, Blood Grenade 47%, Magic Stick 47%,
+-- Branches 70%) and the same core items (Blink 105%, Witch Blade 59%, Eul's 59%).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_blink",
+	"item_witch_blade",
+	"item_cyclone",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_devastator",
+	"item_sphere",
+	"item_octarine_core",
+	"item_ultimate_scepter_2",
+	"item_moon_shard",
+}
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

@@ -38,7 +38,9 @@ sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+-- Sell pair { owned item, item to sell }: Quelling Blade goes once Manta Style is owned. The old trigger was
+-- Black King Bar, which no Spectre list buys (#9), so the Quelling Blade was never sold.
+X["sSellList"] = { "item_manta", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

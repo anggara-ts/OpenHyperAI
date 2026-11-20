@@ -55,10 +55,14 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_sheepstick",
 }
 sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_mage_outfit",
-	"item_ancient_janggo",
-	"item_boots_of_bearing",
+	"item_branches",
+	"item_magic_stick",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_guardian_greaves",
 	"item_pipe",
 	"item_ultimate_scepter",
 	"item_cyclone",

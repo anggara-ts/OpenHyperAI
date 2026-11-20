@@ -1691,6 +1691,32 @@ Usage.ConsiderItemDesire["item_blade_mail"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-ITEM] blink-initiate / blink-hold (#9): the Blink onto a fight target 500-1200 away, and the times it
+-- was held back (fewer allies than enemies near the target, or the fight looks lost). The next game shows
+-- whether Blink carriers (Meepo, Night Stalker, ...) jump in and their stun / Poof follows. Each kind prints at
+-- most once per `wait` seconds per bot.
+function Usage.LogBlinkInitiate(what, wait, allyCount, enemyCount, stronger)
+	local now = DotaTime()
+	bot._blinkLogAt = bot._blinkLogAt or {}
+	if now < (bot._blinkLogAt[what] or -999) then
+		return
+	end
+	bot._blinkLogAt[what] = now + wait
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s %s target=%s dist=%.0f allies=%d enemies=%d stronger=%s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToUnitDistance(bot, botTarget),
+			allyCount,
+			enemyCount,
+			tostring(stronger)
+		)
+	)
+end
 Usage.ConsiderItemDesire["item_blink"] = function(item)
 	local castRange = 1200
 	if item:GetName() == "item_arcane_blink" then
@@ -1842,8 +1868,11 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 				local blinkLocation = Fu.GetUnitTowardDistanceLocation(bot, botTarget, blinkDistance)
 					+ RandomVector(150)
 				if IsLocationPassable(blinkLocation) then
+					Usage.LogBlinkInitiate("blink-initiate", 3, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 					return BOT_ACTION_DESIRE_HIGH, blinkLocation, "ground", nil
 				end
+			else
+				Usage.LogBlinkInitiate("blink-hold", 10, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 			end
 		end
 	end

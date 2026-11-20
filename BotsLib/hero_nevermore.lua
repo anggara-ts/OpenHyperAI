@@ -26,9 +26,11 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_faerie_fire",
 	"item_magic_wand",
 	"item_power_treads",
+	"item_falcon_blade",
+	"item_mask_of_madness",
 	"item_dragon_lance",
 	-- Yasha and Kaya and Blink Dagger: #5 and #3 by matches played (Dotabuff, last patch).
-	"item_yasha_and_kaya",
+	"item_manta",
 	"item_black_king_bar",
 	"item_blink",
 	"item_greater_crit",

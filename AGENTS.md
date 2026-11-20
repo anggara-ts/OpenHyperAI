@@ -291,6 +291,7 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 | `/review-game` | the game ended: `after-game.js`, tracker, PR comments, findings, issues, next lineup |
 | `/merge-pr` | a PR is READY TO MERGE: mute proven logs, tick checks, squash-merge, tick issue items |
 | `/goodnight` | the maintainer is away: fix every open, unresolved issue in priority order, one ready PR each, build the next game |
+| `/release` | a release: next version, release notes from the PRs merged since the last tag (dry run by default), then version files, tag and GitHub release on "publish" |
 
 ## Things not to do
 

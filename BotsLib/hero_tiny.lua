@@ -651,27 +651,28 @@ function X.ConsiderBlinkToss()
 	local castRange = Fu.GetProperCastRange(false, bot, tossAbility:GetCastRange())
 	local blinkRange = blinkItem:GetName() == "item_arcane_blink" and 1400 or 1200
 	local targetDistance = GetUnitToUnitDistance(bot, botTarget)
-	if
-		targetDistance <= grabRadius
-		or targetDistance > blinkRange
-		or not Fu.CanCastOnNonMagicImmune(botTarget)
-		or Fu.IsSuspiciousIllusion(botTarget)
-		or Fu.IsDisabled(botTarget)
-		or botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
-		or botTarget:HasModifier("modifier_legion_commander_duel")
-	then
+	if targetDistance <= grabRadius or targetDistance > blinkRange then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	-- From here a declined combo hands the Blink back to the generic engage Blink (items are considered before
 	-- hero spells, so the flag counts from the next think).
-	if Fu.IsLocHaveTower(700, true, botTarget:GetLocation()) then
+	if
+		not Fu.CanCastOnNonMagicImmune(botTarget)
+		or Fu.IsSuspiciousIllusion(botTarget)
+		or Fu.IsDisabled(botTarget)
+		or botTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
+		or botTarget:HasModifier("modifier_legion_commander_duel")
+		or Fu.IsLocHaveTower(700, true, botTarget:GetLocation())
+	then
 		bot.shouldBlink = false
 		return BOT_ACTION_DESIRE_NONE
 	end
-	-- Any other unit within the grab radius of the target could be the one Toss picks up.
+	-- Any other unit within the grab radius of the target could be the one Toss picks up: its allies, ours
+	-- (a teammate on the target would be thrown instead) and creeps of both teams.
 	local others = 0
 	for _, list in ipairs({
 		Fu.GetNearbyHeroes(botTarget, grabRadius, false, BOT_MODE_NONE) or {},
+		Fu.GetNearbyHeroes(botTarget, grabRadius, true, BOT_MODE_NONE) or {},
 		botTarget:GetNearbyCreeps(grabRadius, false) or {},
 		botTarget:GetNearbyCreeps(grabRadius, true) or {},
 	}) do
@@ -699,7 +700,8 @@ function X.ConsiderBlinkToss()
 	return BOT_ACTION_DESIRE_HIGH, onto
 end
 -- The allied hero to toss `tossed` onto: not Tiny, not an illusion, at least 400 from the tossed unit and in
--- Toss cast range of fromLoc (where Tiny stands when he casts). Nearest such ally, or nil.
+-- Toss cast range of fromLoc (where Tiny stands when he casts), not retreating and at 30%+ HP. Nearest such ally,
+-- or nil.
 function X.TossAllyFor(tossed, fromLoc, castRange)
 	local allies = {}
 	local candidates = {}
@@ -707,7 +709,8 @@ function X.TossAllyFor(tossed, fromLoc, castRange)
 		if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
 			table.insert(allies, ally)
 			table.insert(candidates, {
-				ok = true,
+				-- Not onto an ally who is running or low: the enemy would land on them.
+				ok = not Fu.IsRetreating(ally) and Fu.GetHP(ally) >= 0.3,
 				spotDist = GetUnitToUnitDistance(ally, tossed),
 				tinyDist = GetUnitToLocationDistance(ally, fromLoc),
 			})
@@ -717,11 +720,13 @@ function X.TossAllyFor(tossed, fromLoc, castRange)
 	return index and allies[index] or nil
 end
 -- [OHA-TINY] one line per toss decision (at most every 3s per kind), and ~1.5s later whether Toss went on
--- cooldown (took=): an allied hero as the Toss target is not confirmed by the game file (target team CUSTOM).
+-- cooldown (took=; toss-ally-result when thrown onto an ally): an allied hero as the Toss target is not confirmed
+-- by the game file (target team CUSTOM).
 function X.LogToss(what, tossed, onto)
 	bot._ohaTinyLogAt = bot._ohaTinyLogAt or {}
 	bot._ohaTossCheckAt = DotaTime() + 1.5
 	bot._ohaTossCheckWhat = what
+	bot._ohaTossCheckAlly = onto ~= tossed
 	if DotaTime() < (bot._ohaTinyLogAt[what] or -999) then
 		return
 	end
@@ -746,8 +751,10 @@ function X.CheckTossTook()
 	pcall(
 		print,
 		string.format(
-			"[OHA-TINY] t=%.0f tiny toss-result kind=%s took=%d",
+			"[OHA-TINY] t=%.0f tiny %s kind=%s took=%d",
 			DotaTime(),
+			-- Only a toss onto an allied hero answers whether the API accepts an ally target.
+			bot._ohaTossCheckAlly and "toss-ally-result" or "toss-result",
 			tostring(bot._ohaTossCheckWhat),
 			tossAbility:IsCooldownReady() and 0 or 1
 		)

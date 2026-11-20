@@ -195,6 +195,8 @@ function X.SkillsComplement()
 	local lifeDrainWhy
 	lifeDrainDesire, lifeDrainTarget, lifeDrainWhy = X.ConsiderR()
 	if lifeDrainDesire > 0 then
+		-- A drain on an enemy or the ward must not be cancelled by an older ally drain left in the handle.
+		bot._ohaDrainAlly = nil
 		if lifeDrainWhy == "ally" then
 			bot._ohaDrainAlly = lifeDrainTarget
 			bot._ohaDrainAllyAt = DotaTime()
@@ -584,7 +586,8 @@ end
 -- takes magical damage equal to the amount healed. This damage cannot kill Pugna" (datafeed). It was only
 -- ever cast on enemies. Heal a hurt ally who is being hit, while Pugna is healthy (CastRules.LifeDrainAllyWorth).
 function X.ConsiderLifeDrainAlly(castRange)
-	if Fu.GetHP(bot) < CastRules.DRAIN_SELF_MIN_HP then
+	-- At most one ally drain try every 3s, so a refused cast is not repeated every think.
+	if Fu.GetHP(bot) < CastRules.DRAIN_SELF_MIN_HP or DotaTime() < (bot._ohaDrainAllyAt or -999) + 3 then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local best, bestHp = nil, math.huge

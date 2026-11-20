@@ -548,12 +548,34 @@ function X.ConsiderCauterize()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local rooted = bot:IsRooted()
-	local damageOverTime = Fu.HasDamageOverTimeDebuff(bot)
+	local damageOverTime = X.HasDispellableDot()
 	local enemiesNear = Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {}
 	if CastRules.HuskarCauterize(hpRatio, rooted, damageOverTime, bot:WasRecentlyDamagedByAnyHero(2), #enemiesNear) then
 		return BOT_ACTION_DESIRE_HIGH, rooted and "root" or "dot"
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Damage-over-time debuffs a basic dispel removes (7.42 SpellDispellableType YES for viper_poison_attack,
+-- viper_corrosive_skin, venomancer_poison_sting, venomancer_venomous_gale, jakiro_liquid_fire,
+-- queenofpain_shadow_strike, ogre_magi_ignite, batrider_sticky_napalm). The shared Fu.HasDamageOverTimeDebuff
+-- list also holds undispellable ones (Ice Blast, Scorched Earth, Rot, Radiance), which would waste the HP cost.
+local dispellableDots = {
+	"modifier_viper_corrosive_skin_slow",
+	"modifier_viper_poison_attack_slow",
+	"modifier_venomancer_poison_sting_debuff",
+	"modifier_venomancer_venomous_gale",
+	"modifier_jakiro_liquid_fire_burn",
+	"modifier_queenofpain_shadow_strike",
+	"modifier_ogre_magi_ignite",
+	"modifier_batrider_napalm",
+}
+function X.HasDispellableDot()
+	for _, modifierName in ipairs(dispellableDots) do
+		if bot:HasModifier(modifierName) then
+			return true
+		end
+	end
+	return false
 end
 -- One line per cast, then one line ~1s later saying whether the cooldown started.
 function X.LogCauterize(why)
@@ -577,9 +599,10 @@ function X.CheckCauterizeTook()
 	pcall(
 		print,
 		string.format(
-			"[OHA-HUSKAR] t=%.0f huskar berserkers-blood took=%d hp=%.2f",
+			"[OHA-HUSKAR] t=%.0f huskar berserkers-blood took=%d passive=%s hp=%.2f",
 			DotaTime(),
 			berserkersBloodAbility:IsCooldownReady() and 0 or 1,
+			tostring(berserkersBloodAbility:IsPassive()),
 			Fu.GetHP(bot)
 		)
 	)

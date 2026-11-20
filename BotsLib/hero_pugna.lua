@@ -201,7 +201,7 @@ function X.SkillsComplement()
 			pcall(
 				print,
 				string.format(
-					"[OHA-PUGNA] t=%.0f pugna drain-ally ally=%s ally-hp=%.2f hp=%.2f",
+					"[OHA-PUGNA] t=%.0f pugna drain-ally-start ally=%s ally-hp=%.2f hp=%.2f",
 					DotaTime(),
 					(string.gsub(lifeDrainTarget:GetUnitName(), "npc_dota_hero_", "")),
 					Fu.GetHP(lifeDrainTarget),
@@ -640,7 +640,7 @@ function X.ConsiderStopLifeDrainAlly()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUGNA] t=%.0f pugna drain-ally stop why=%s ally-hp=%.2f hp=%.2f",
+				"[OHA-PUGNA] t=%.0f pugna drain-ally-stop why=%s ally-hp=%.2f hp=%.2f",
 				DotaTime(),
 				why,
 				Fu.IsValidHero(ally) and Fu.GetHP(ally) or -1,

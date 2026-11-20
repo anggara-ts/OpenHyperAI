@@ -178,7 +178,10 @@ async function main() {
 				let lists = [[]];
 				for (const entry of names) {
 					if (!entry.variable) lists.forEach((list) => list.push(entry.name));
-					else lists = lists.flatMap((list) => (entry.options.length ? entry.options : [null]).map((o) => (o ? [...list, o] : list.slice())));
+					else {
+						const fixedNames = new Set(names.map((other) => other.name).filter(Boolean));
+						lists = lists.flatMap((list) => (entry.options.length ? entry.options : [null]).map((o) => (o && !fixedNames.has(o) ? [...list, o] : list.slice())));
+					}
 				}
 				for (const list of lists.slice(0, 40)) {
 					const check = sim.simulate(list, { pos: posNumber(pos), sellPairs: pairs });

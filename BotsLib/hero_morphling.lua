@@ -27,6 +27,7 @@ local sRoleItemsBuyList = {}
 -- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
 -- Stratz 7.41f, week of 9 Nov 2026: pos 1, 59,094 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
+	"item_tango",
 	"item_double_branches",
 	"item_magic_wand",
 	"item_power_treads",

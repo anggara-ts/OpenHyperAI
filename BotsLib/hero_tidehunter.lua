@@ -48,19 +48,17 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_magic_wand",
 	"item_soul_ring",
 	"item_phase_boots",
-	"item_vladmir",
 	"item_desolator",
 	"item_blink",
 	"item_lesser_crit",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
 	"item_greater_crit", -- was "item_great_scepter", not an item in items.txt; Daedalus fills the damage slot (pos_2 has MKB here)
-	"item_travel_boots",
+	"item_satanic",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
 	"item_shivas_guard",
 	"item_moon_shard",
-	"item_travel_boots_2",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 4,844 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
@@ -77,11 +75,11 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_blink",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_shivas_guard",
+	"item_satanic",
 	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
-	"item_vladmir",
 	"item_black_king_bar",
+	"item_assault",
 	"item_moon_shard",
 }
 -- No Boots of Travel: this build's Guardian Greaves / Boots of Bearing are its one pair of boots.
@@ -98,7 +96,7 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_blink",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_shivas_guard",
+	"item_black_king_bar",
 	"item_ultimate_scepter_2",
 	"item_pipe",
 	"item_blade_mail",
@@ -119,7 +117,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_blink",
 	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_refresher",
+	"item_black_king_bar",
 	"item_vladmir",
 	"item_pipe",
 	"item_ultimate_scepter_2",

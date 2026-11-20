@@ -63,18 +63,33 @@ function makeBuilder(game, sim) {
 		const kit = [];
 		const have = {};
 		let gold = START_GOLD;
+		// What an item costs with the kit so far: a Magic Wand after two Iron Branches is the Stick and the recipe.
+		const used = {};
+		const price = (name) => {
+			let total = cost(name);
+			const taken = {};
+			for (const part of parts(name)) {
+				if ((have[part] || 0) - (used[part] || 0) - (taken[part] || 0) > 0) {
+					taken[part] = (taken[part] || 0) + 1;
+					total -= cost(part);
+				}
+			}
+			return { total, taken };
+		};
 		const add = (name) => {
+			const { total, taken } = price(name);
+			for (const [part, count] of Object.entries(taken)) used[part] = (used[part] || 0) + count;
 			kit.push(name);
-			gold -= cost(name);
+			gold -= total;
 			have[name] = (have[name] || 0) + 1;
 		};
 		for (const [name, copy] of slots) {
 			if (share(name, copy) < TUNING.startMin) break;
-			if ((have[name] || 0) === copy - 1 && cost(name) <= gold) add(name);
+			if ((have[name] || 0) === copy - 1 && price(name).total <= gold) add(name);
 		}
 		for (const [name, copy] of slots) {
 			if (copy !== 1 || have[name] || share(name, 1) < TUNING.startFill || name === "item_magic_wand") continue;
-			if (gold >= 150 && cost(name) <= gold) add(name);
+			if (gold >= 150 && price(name).total <= gold) add(name);
 		}
 		return { kit, share };
 	}
@@ -249,7 +264,11 @@ function makeBuilder(game, sim) {
 			let lists = [[]];
 			for (const entry of list) {
 				if (!entry.variable) lists.forEach((names) => names.push(entry.name));
-				else lists = lists.flatMap((names) => (entry.options.length ? entry.options : [null]).map((option) => (option ? [...names, option] : names.slice())));
+				else {
+					// A pick that is already a fixed entry of the list adds nothing (the team-item plan skips it too).
+					const fixedNames = new Set(list.map((other) => other.name).filter(Boolean));
+					lists = lists.flatMap((names) => (entry.options.length ? entry.options : [null]).map((option) => (option && !fixedNames.has(option) ? [...names, option] : names.slice())));
+				}
 			}
 			return lists.slice(0, 40);
 		};

@@ -534,7 +534,25 @@ function X.TowerHoldEndWhy(o)
 	end
 	return nil
 end
--- Returns true when it holds (an order given). [OHA-CLINKZ] hunt step=tower-hold-end why= target= held=.
+-- [OHA-CLINKZ] hunt step=tower-hold-end why= target= held=: every tower-hold gets one (also when the walk ends).
+function X.EndTowerHold(why)
+	local pause = bot._huntTowerPause
+	if pause == nil then
+		return
+	end
+	bot._huntTowerPause = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-CLINKZ] t=%.0f hunt step=tower-hold-end why=%s target=%s held=%.1f",
+			DotaTime(),
+			why,
+			pause.name or "-",
+			DotaTime() - pause.at
+		)
+	)
+end
+-- Returns true when it holds (an order given).
 function X.TowerHoldStep()
 	local pause = bot._huntTowerPause
 	if pause == nil then
@@ -554,17 +572,7 @@ function X.TowerHoldStep()
 		targetTowerDist = targetAlive and towerValid and GetUnitToUnitDistance(target, tower) or 0,
 	})
 	if why ~= nil then
-		bot._huntTowerPause = nil
-		pcall(
-			print,
-			string.format(
-				"[OHA-CLINKZ] t=%.0f hunt step=tower-hold-end why=%s target=%s held=%.1f",
-				DotaTime(),
-				why,
-				pause.name or "-",
-				DotaTime() - pause.at
-			)
-		)
+		X.EndTowerHold(why)
 		return false
 	end
 	bot._clinkzHuntUntil = DotaTime() + 0.6
@@ -815,7 +823,7 @@ function X.HuntStep()
 		end
 		X.EndHunt("invis-gone")
 		bot._huntTarget = nil
-		bot._huntTowerPause = nil
+		X.EndTowerHold("invis-gone")
 		return false
 	end
 	-- Invisible: a pact on the biggest creep in range first (heal + max HP, keeps him invisible).

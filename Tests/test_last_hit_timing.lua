@@ -331,3 +331,31 @@ T.test("death estimate: our creeps and towers hitting the creep", function()
 	units = {}
 	T.eq((Timing.DeathEta(bot, creep)), math.huge, "nothing hits it")
 end)
+
+T.test("team roam's overlay owns a hit (#171 bot._lhOwn): no arm, no order, one skip line", function()
+	local _, Timing, bot, creep, state = setup(30)
+	Stub.time = 1300
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true })
+	local other = Stub.newUnit({ name = "npc_dota_creep_badguys_melee", loc = bot:GetLocation() + Vector(80, 0, 0) })
+	bot._lhOwn = { unit = other, t = GameTime() }
+	for _ = 1, 5 do
+		Stub.time = Stub.time + 1 / 30
+		T.eq(Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true }), nil, "not armed")
+		T.eq(Timing.Tick(bot), false, "the overlay keeps the frame")
+	end
+	T.eq(#state.orders, 0, "no attack over the overlay's swing (the creep was a sure hit)")
+	T.eq(bot._lhTiming, nil, "our timing dropped")
+	local lines = 0
+	for _, line in ipairs(Stub.printed) do
+		if string.find(line, "skip why=overlay-owns", 1, true) then
+			lines = lines + 1
+		end
+	end
+	T.eq(lines, 1, "logged once per hold")
+	-- The hold ends: the timing works again.
+	bot._lhOwn = nil
+	Stub.time = Stub.time + 1 / 30
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true })
+	Timing.Tick(bot)
+	T.eq(state.orders[1], "attack", "the sure walk-in attacks once the overlay let go")
+end)

@@ -296,8 +296,42 @@ function X.BeginThink(bot)
 	end
 end
 
+-- Team roam's last-hit overlay (#171, FuncLib/systems/last_hit_overlay.lua, not on main yet) owns a hit while
+-- bot._lhOwn is set: from its attack order until the attack is released, the unit dies or 1s passes. It runs after
+-- this module in ItemUsageThink, so an order from here would replace its swing. While it owns one: no arm, no order;
+-- on the same creep the overlay times it. A plain field read, so this works with or without #171.
+-- [OHA-LH] skip why=overlay-owns once per hold (and at most every 3s).
+local function overlayOwns(bot)
+	local own = bot._lhOwn
+	if own == nil then
+		bot._lhtOverlaySeen = nil
+		return false
+	end
+	if bot._lhtOverlaySeen ~= own then
+		bot._lhtOverlaySeen = own
+		local st = bot._lhTiming
+		local unit = own.unit
+		throttledLog(
+			bot,
+			"overlay",
+			"[OHA-LH] t=%.0f %s skip why=overlay-owns ours=%s same=%s phase=%s",
+			DotaTime(),
+			heroName(bot),
+			st ~= nil and "yes" or "no",
+			(st ~= nil and st.creep == unit) and "yes" or "no",
+			st ~= nil and st.phase or "-"
+		)
+	end
+	bot._lhTiming = nil
+	return true
+end
+X.OverlayOwns = overlayOwns
+
 -- The laning Think orders (or keeps) a last hit on creep. info = { damage, allowEarly, walk }. Returns the state.
 function X.Arm(bot, creep, info)
+	if overlayOwns(bot) then
+		return nil
+	end
 	local now = GameTime()
 	local st = bot._lhTiming
 	if st == nil or st.creep ~= creep then
@@ -560,6 +594,9 @@ end
 function X.Tick(bot)
 	local now = GameTime()
 	noteFrame(bot, now)
+	if overlayOwns(bot) then
+		return false
+	end
 	local st = bot._lhTiming
 	if st == nil then
 		return false

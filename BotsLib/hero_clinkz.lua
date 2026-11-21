@@ -295,7 +295,15 @@ local function CheckHuntResult()
 	local target = reveal.target
 	local result
 	local dmg = 0
-	if target == nil or target:IsNull() or not target:IsAlive() then
+	-- A null handle is a hero out of vision, not a kill (game 065): ask the player ID.
+	local goneAlive = false
+	if (target == nil or target:IsNull()) and reveal.pid ~= nil then
+		local okAlive, alive = pcall(IsHeroAlive, reveal.pid)
+		goneAlive = okAlive and alive == true
+	end
+	if goneAlive then
+		result = "lost"
+	elseif target == nil or target:IsNull() or not target:IsAlive() then
 		result = "kill"
 	elseif target:CanBeSeen() then
 		dmg = reveal.hp - target:GetHealth()
@@ -702,6 +710,8 @@ function X.HuntStep()
 	-- The target is alive but can't be seen or hit for now: no order, he stays invisible where he is, the hold stays.
 	if waiting then
 		bot._clinkzHuntUntil = DotaTime() + 0.3
+		-- The outpost hold's whole-walk rule reads this while the locked handle is null (out of vision).
+		bot._huntWaitUntil = DotaTime() + 1.5
 		if DotaTime() >= (bot._huntWaitLogAt or -999) then
 			bot._huntWaitLogAt = DotaTime() + 3
 			X.LogHunt("wait-unseen", target, bot._huntName)
@@ -798,8 +808,10 @@ function X.HuntStep()
 	-- The target stays locked for the first hits (after Strafe he is still invisible and comes back here).
 	bot._huntLockAt, bot._huntLockFor = DotaTime(), 3
 	if huntReveal == nil then
+		local okId, pid = pcall(target.GetPlayerID, target)
 		huntReveal = {
 			target = target,
+			pid = okId and pid or nil,
 			name = (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
 			hp = target:GetHealth(),
 			at = DotaTime(),

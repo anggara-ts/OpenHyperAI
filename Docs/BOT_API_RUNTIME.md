@@ -24,6 +24,7 @@ confirmed or disproved.
   - A mode file that defines only `GetDesire` still replaces that Valve mode entirely: Valve's `Think` does not run behind it (the item-mode trial, #141, game 063).
   - No hidden item or extra ability gives outpost capture or watcher use: every bot's slots 17-25 are empty and there is no `capture` / `lamp` / `watcher` ability beyond the normal slots (`[OHA-API] slots`, #172, game 064).
   - Unconfirmed: `IsAlive()` on an enemy hero handle may read false after it TPs out, turns invisible or leaves vision (seen 5 times in game 064's hunt trace).
+  - An enemy hero's handle can read `IsNull()` once the hero leaves vision, while the hero is alive: game 065, Clinkz's hunt ended at once with `hunt end why=target-gone target=-` (the name read needs a live handle) right after Zeus' Heavenly Jump (t=2001) and Alchemist's Blink (t=2353); both lived. So a script that keeps an enemy hero should also keep its player ID (`IsHeroAlive`, `GetHeroDeaths`, `GetHeroLastSeenInfo`) and look the hero up again in `GetUnitList` (#97 does this for the hunt; whether the new handle is found has not been confirmed yet, `[OHA-CLINKZ] hunt step=refind`).
 
 ## 7.42 check (2026-11-19)
 

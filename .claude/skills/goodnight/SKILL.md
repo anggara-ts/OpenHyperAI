@@ -73,6 +73,8 @@ Open cards and PRs drift: a merged PR fixes items nobody ticked, and finished PR
   `node Util/build-info.js`.
 - `node Util/verify.js lineup --suggest --write` (free slots only). Put P1/P2 heroes first when slots are short.
 - Parse-check `Customize/general.lua`.
+- Copy the build into Dota last: `node Util/export-bots.js --test-game` (skill `prepare-game` step 4). Without it the
+  morning game runs the previous copy.
 
 ## 6. Morning report
 Write `Util/verify/goodnight-YYYY-MM-DD.md` (git-ignored) and post the same summary:

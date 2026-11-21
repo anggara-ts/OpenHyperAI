@@ -20,6 +20,7 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
+local ForeignItems = require(GetScriptDirectory() .. "/FuncLib/systems/foreign_items")
 -- Observer stock is shared with the human. When a ward lands in the shop, leave it
 -- for 30s. Buy only what is still there after that.
 local OBS_HUMAN_WINDOW = 30
@@ -1614,6 +1615,9 @@ function ItemPurchaseThink()
 			and drop.item:GetName() ~= "item_ward_sentry"
 			and drop.item:GetName() ~= "item_ward_dispenser"
 			and Item.RoshanClaimKind(drop.item:GetName()) == nil
+			-- Not another player's item this bot dropped (#141): whether drop.owner names the buyer or whoever
+			-- dropped it is unverified, and the second would walk the bot straight back to it.
+			and not ForeignItems.WasDropped(bot, drop.item:GetName())
 		then
 			local distance = GetUnitToLocationDistance(bot, drop.location)
 			if distance > 200 and distance < 1000 then
@@ -2202,9 +2206,12 @@ function ItemPurchaseThink()
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
 				local backedOff = bot._forageSwapBackoff ~= nil and now < (bot._forageSwapBackoff[name] or -999)
+				-- Not another player's mushroom (#141; game 062, 44:39: Medusa swapped Nature's Prophet's into a main
+				-- slot): it can't be eaten, and the item think drops it.
 				if
 					(name == "item_foragers_health" or name == "item_foragers_stats" or name == "item_foragers_mana")
 					and not backedOff
+					and not ForeignItems.Check(bot, it)
 				then
 					return name, slot, it
 				end

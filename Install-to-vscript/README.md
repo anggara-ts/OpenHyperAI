@@ -1,6 +1,11 @@
 ## Quick Install Scripts
 
-These scripts create a symbolic link from the Steam Workshop download folder to the Dota 2 vscripts/bots folder. This lets the bot scripts load correctly in Custom Lobbies with **Local Host** server.
+These scripts put the Steam Workshop download (`workshop/content/570/3843444501`) into Dota's `vscripts/bots`
+folder (a link on Windows and macOS, a copy on Linux), for players whose bots don't load from the Workshop folder
+alone. Then choose **Local Dev Script** in the lobby's Bot Settings, with server location **Local Host**.
+
+The Workshop download holds only the bot scripts, not this folder: get the scripts from GitHub (this folder, or the
+[repository zip](https://github.com/anggara-ts/Supercharged-OpenHyperAI/archive/refs/heads/main.zip)).
 
 ### Available Scripts
 
@@ -15,21 +20,23 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
 
 ## Usage — Windows
 
-1. In Dota 2, subscribe to **Open Hyper AI** in the Steam Workshop. Wait for the download to complete.
-2. Navigate to folder: `Steam\steamapps\workshop\content\570\3246316298\Install-to-vscript`
+1. In Dota 2, subscribe to **Supercharged OpenHyperAI** in the Steam Workshop. Wait for the download to complete.
+2. Put this `Install-to-vscript` folder inside the Workshop folder, so the script sits at
+   `Steam\steamapps\workshop\content\570\3843444501\Install-to-vscript\quick-install-oha.bat` (the Windows script
+   finds Steam from its own location).
 3. Double-click `quick-install-oha.bat` to install.
 
-**Finding the folder:** Right-click Dota 2 in your Steam Library → Properties → Installed Files → Browse. This opens `Steam\steamapps\common\dota 2 beta`. In the address bar, replace `common\dota 2 beta` with `workshop\content\570\3246316298\Install-to-vscript` and press Enter.
+**Finding the folder:** Right-click Dota 2 in your Steam Library → Properties → Installed Files → Browse. This opens `Steam\steamapps\common\dota 2 beta`. In the address bar, replace `common\dota 2 beta` with `workshop\content\570\3843444501` and press Enter.
 
 ---
 
 ## Usage — macOS
 
-1. Subscribe to **Open Hyper AI** in the Steam Workshop and wait for download.
+1. Subscribe to **Supercharged OpenHyperAI** in the Steam Workshop and wait for download.
 2. Open Terminal.
-3. Navigate to the script folder:
+3. Go to the folder where you saved the script (it finds the Workshop folder by itself):
     ```bash
-    cd ~/Library/Application\ Support/Steam/steamapps/workshop/content/570/3246316298/Install-to-vscript
+    cd ~/Downloads/Install-to-vscript
     ```
 4. Make it executable and run:
     ```bash
@@ -41,13 +48,11 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
 
 ## Usage — Linux
 
-1. Subscribe to **Open Hyper AI** in the Steam Workshop and wait for download.
+1. Subscribe to **Supercharged OpenHyperAI** in the Steam Workshop and wait for download.
 2. Open a terminal.
-3. Navigate to the script folder (common Steam locations):
+3. Go to the folder where you saved the script:
     ```bash
-    # Try one of these:
-    cd ~/.steam/steam/steamapps/workshop/content/570/3246316298/Install-to-vscript
-    cd ~/.local/share/Steam/steamapps/workshop/content/570/3246316298/Install-to-vscript
+    cd ~/Downloads/Install-to-vscript
     ```
 4. Make it executable and run:
     ```bash
@@ -64,7 +69,7 @@ The Linux script automatically checks multiple common Steam install locations (`
 The script creates a **symbolic link** from the Workshop folder to the Dota 2 vscripts directory:
 
 ```
-Workshop:  Steam/steamapps/workshop/content/570/3246316298
+Workshop:  Steam/steamapps/workshop/content/570/3843444501
      ↓ (symlink)
 Target:    Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots
 ```
@@ -104,8 +109,8 @@ This only removes the shortcut — your Workshop subscription and Dota 2 files a
 ## Troubleshooting
 
 -   **"Steam folder not found"**: Make sure Steam and Dota 2 are installed. If Steam is in a custom location, edit the script and set the path manually.
--   **"Workshop folder not found"**: Subscribe to Open Hyper AI in Workshop and wait for the download to complete before running the script.
+-   **"Workshop folder not found"**: Subscribe to Supercharged OpenHyperAI in Workshop and wait for the download to complete before running the script.
 -   **Permission errors**: Run with administrator privileges (`Run as Administrator` on Windows, `sudo` on Mac/Linux).
 -   **Bots still not loading**: Create a Custom Lobby and select **Local Host** as the server location.
 
-For more detailed guides: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions
+For more detailed guides: https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions

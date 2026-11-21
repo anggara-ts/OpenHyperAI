@@ -136,12 +136,17 @@ end
 local function RoamTrace(raw, final)
 	local now = DotaTime()
 	local activeMode = bot:GetActiveMode()
-	local modeName = RoamStats.ModeName(activeMode)
+	local roamActive = activeMode == BOT_MODE_TEAM_ROAM
+	-- Step tells activations by this name: never rely on the BOT_MODE_* scan for team roam itself.
+	local modeName = roamActive and "team_roam" or RoamStats.ModeName(activeMode)
 	if HuntTrace.IsTraced(botName) then
-		HuntTrace.Tick(bot, modeName)
+		local okH, errH = pcall(HuntTrace.Tick, bot, modeName)
+		if not okH and not bot._huntTraceErr then
+			bot._huntTraceErr = true
+			print(string.format("[OHA-HUNT] t=%.0f %s error=%s", now, botName, tostring(errH)))
+		end
 	end
 	local cap = RoamStats.CapLabel(raw, final)
-	local roamActive = activeMode == BOT_MODE_TEAM_ROAM
 	if not roamActive then
 		bot._roamWhy, bot._roamRaw, bot._roamDes, bot._roamCap, bot._roamMode = roamWhy, raw, final, cap, modeName
 	end
@@ -161,7 +166,12 @@ local function RoamTrace(raw, final)
 end
 -- Returns final unchanged; the diagnostics cannot change it (pcall).
 local function RoamDone(raw, final)
-	pcall(RoamTrace, raw, final)
+	local okT, errT = pcall(RoamTrace, raw, final)
+	-- A broken trace prints once per bot instead of leaving no ROAMSTAT line and no clue.
+	if not okT and not bot._roamTraceErr then
+		bot._roamTraceErr = true
+		pcall(print, string.format("[OHA-ROAMSTAT] t=%.0f %s error=%s", DotaTime(), botName, tostring(errT)))
+	end
 	return final
 end
 function GetDesire()

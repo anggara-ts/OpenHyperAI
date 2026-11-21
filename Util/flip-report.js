@@ -110,8 +110,9 @@ function parse(lines) {
 		m = line.match(HUNT);
 		if (m) out.hunts.push({ t: Number(m[1]), hero: m[2], kind: m[3], ...fields(m[4]) });
 	}
-	// One ROAMSTAT line per bot per game minute; older builds: the last game second times 10 bots.
-	out.botMinutes = out.roamstats.length || (out.tMax / 60) * Math.max(out.heroes.size, 10);
+	// The flip rate's denominator: the last game second times the bots (at least 10), as #165 measured it, also on
+	// new logs (ROAMSTAT lines skip pre-game and partial minutes; they are only the activations' denominator).
+	out.botMinutes = (out.tMax / 60) * Math.max(out.heroes.size, 10);
 	return out;
 }
 // Several games' parse() results -> one.

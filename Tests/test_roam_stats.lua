@@ -113,3 +113,127 @@ T.test("hunt trace: end reasons and line format", function()
 	local h = { spell = "vendetta", targetName = "lich", changes = 1, snipe = 1, other = 0 }
 	inSample(H.FormatEnd(306, "nyx_assassin", "hit", 120, 6.0, h), "sample HUNT end")
 end)
+
+-- A fake unit: only what HuntTrace.Tick reads.
+local function fakeUnit(name, team, x)
+	local u = { name = name, team = team, alive = true, visible = true, modifiers = {}, _loc = Vector(x, 0, 0) }
+	function u:GetUnitName()
+		return self.name
+	end
+	function u:IsNull()
+		return false
+	end
+	function u:IsAlive()
+		return self.alive
+	end
+	function u:IsHero()
+		return string.find(self.name, "npc_dota_hero_", 1, true) ~= nil
+	end
+	function u:GetTeam()
+		return self.team
+	end
+	function u:CanBeSeen()
+		return self.visible
+	end
+	function u:HasModifier(m)
+		return self.modifiers[m] == true
+	end
+	function u:GetAttackTarget()
+		return self.attackTarget
+	end
+	function u:GetTarget()
+		return self.target
+	end
+	function u:WasRecentlyDamagedByHero(_, _)
+		return self.damaged == true
+	end
+	return u
+end
+
+local function printed(what)
+	local found = {}
+	for _, line in ipairs(T.stub.printed) do
+		if string.find(line, what, 1, true) then
+			found[#found + 1] = line
+		end
+	end
+	return found
+end
+
+T.test("hunt trace: Vendetta from the cast to the hit, with a mode change and a snipe", function()
+	local _, H = load()
+	local nyx = fakeUnit("npc_dota_hero_nyx_assassin", 2, 0)
+	local lich = fakeUnit("npc_dota_hero_lich", 3, 1800)
+	local creep = fakeUnit("npc_dota_creep_badguys_melee", 3, 500)
+	local vendetta = "modifier_nyx_assassin_vendetta"
+	T.stub.time = 300
+	H.Tick(nyx, "outpost")
+	T.eq(nyx._huntTrace, nil, "no modifier: no hunt")
+	nyx.modifiers[vendetta] = true
+	H.Tick(nyx, "outpost")
+	T.eq(nyx._huntTrace, nil, "escape Vendetta (no canVendettaKill): not traced")
+	nyx.modifiers[vendetta] = nil
+	H.Tick(nyx, "outpost")
+	nyx.canVendettaKill, nyx.vendettaTarget = true, lich
+	nyx.modifiers[vendetta] = true
+	H.Tick(nyx, "outpost")
+	T.ok(nyx._huntTrace ~= nil, "kill Vendetta traced")
+	T.eq(#printed("start spell=vendetta target=lich mode=outpost dist=1800"), 1, "start line")
+	T.stub.time = 302
+	nyx._loc = Vector(900, 0, 0)
+	H.Tick(nyx, "team_roam")
+	T.eq(#printed("mode-change from=outpost to=team_roam dist=900"), 1, "mode-change line")
+	H.NoteSnipe(nyx, creep)
+	H.NoteSnipe(nyx, creep)
+	T.eq(#printed("interrupt by=snipe unit=npc_dota_creep_badguys_melee"), 1, "one snipe line per hunt")
+	nyx.attackTarget = creep
+	H.Tick(nyx, "team_roam")
+	T.eq(#printed("interrupt by=other unit=npc_dota_creep_badguys_melee"), 1, "attack on another unit")
+	-- Ticks come every think; one under 3s apart, so no "died" gap.
+	T.stub.time = 304
+	H.Tick(nyx, "team_roam")
+	T.stub.time = 306
+	nyx._loc = Vector(1680, 0, 0)
+	nyx.attackTarget = lich
+	nyx.modifiers[vendetta] = nil
+	lich.damaged = true
+	H.Tick(nyx, "team_roam")
+	T.eq(nyx._huntTrace, nil, "hunt over")
+	local ends = printed("end why=hit dist=120 lasted=6.0 spell=vendetta target=lich changes=1 snipe=2 other=1")
+	T.eq(#ends, 1, "end line: " .. table.concat(printed("end why"), " / "))
+end)
+
+T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target", function()
+	local _, H = load()
+	local sb = fakeUnit("npc_dota_hero_spirit_breaker", 2, 0)
+	local lich = fakeUnit("npc_dota_hero_lich", 3, 3500)
+	local charge = "modifier_spirit_breaker_charge_of_darkness"
+	T.stub.time = 400
+	sb._chargeTarget = lich
+	sb.modifiers[charge] = true
+	H.Tick(sb, "outpost")
+	T.stub.time = 403
+	sb.modifiers[charge] = nil
+	H.Tick(sb, "outpost")
+	T.ok(sb._huntTrace ~= nil, "waits up to 1s for the hit")
+	T.stub.time = 404.1
+	H.Tick(sb, "farm")
+	T.eq(#printed("end why=cancel"), 1, "no hit: cancel")
+	-- A tick gap of 3s+ during a hunt: the bot died (desires are not asked while dead).
+	sb.modifiers[charge] = true
+	H.Tick(sb, "outpost")
+	T.stub.time = 410
+	H.Tick(sb, "outpost")
+	T.eq(#printed("end why=died"), 1, "gap: died")
+	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
+	local creep = fakeUnit("npc_dota_creep_badguys_melee", 3, 500)
+	clinkz.modifiers.modifier_clinkz_wind_walk = true
+	clinkz.target = creep
+	H.Tick(clinkz, "farm")
+	T.eq(clinkz._huntTrace, nil, "walk with a creep target: no hunt")
+	clinkz.target = lich
+	H.Tick(clinkz, "retreat")
+	T.eq(clinkz._huntTrace, nil, "retreating: no hunt")
+	H.Tick(clinkz, "attack")
+	T.ok(clinkz._huntTrace ~= nil and clinkz._huntTrace.spell == "skeleton_walk", "found the hero during the walk")
+end)

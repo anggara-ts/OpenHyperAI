@@ -183,3 +183,10 @@ T.test("hoodwink: Scurry reason", function()
 		"retreat wins over engage"
 	)
 end)
+
+T.test("hoodwink: cast results and Bushwhack scan run against the stub API", function()
+	local X = hoodwink()
+	X.ThinkCastResults()
+	X.ConsiderBushwhackSave(1200, 275, 0.2, 1200)
+	T.eq(X.ReissuePendingCast(), false, "nothing pending")
+end)

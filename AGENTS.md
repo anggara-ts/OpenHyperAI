@@ -44,6 +44,8 @@ Adding `mode_<name>_generic.lua` replaces Valve's built-in mode **entirely**: th
   (`mode_rune_generic.lua` walks a bot to the river spot and holds it for the item mode). Our own item mode
   (own drops, Gem, Rapier, tokens only) stopped the river gold being taken, so it was removed (2026-11-17).
   The cost: bots may still pick up another hero's dropped item.
+  A GetDesire-only `mode_item_generic.lua` was tried (#141, game 063): Valve's item Think did not run behind it
+  and no river rune was picked up.
 - **Evasive maneuvers (`mode_evasive_maneuvers_generic.lua`)** - Valve's projectile/AoE dodging. Overriding
   it would drop the dodging. Where it gets bots killed (low HP, outnumbered), `mode_retreat_generic.lua`
   returns a desire above it instead (`[OHA-RETREAT] over-evasive`).
@@ -129,7 +131,7 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
   drives a number.
 - The bot API differs from online docs; see `Docs/BOT_API_RUNTIME.md` (e.g. no vector-targeted cast order).
 - **Known limitations** (what bots can't do because the API or engine doesn't allow it) are listed in the main post
-  of [discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50). When a game, test or source
+  of [discussion #50](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions/50). When a game, test or source
   confirms a new limitation, disproves one, or a workaround is found, **edit the main post** (not only a reply):
   move the item between "Confirmed" and "Not confirmed yet", with the evidence (log line, test, Valve source) and
   the related issue. `gh api graphql` with `updateDiscussion` edits it. The post is public: write it for readers outside the project, with no internal test-game numbers ("game 043") or match-log names; describe the evidence itself (the log line, the test, the game file). Record API facts in
@@ -150,8 +152,12 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
 
 ## Testing in a game
 
-1. The local dev setup links `dota 2 beta/game/dota/scripts/vscripts/bots` to this repo, so the game runs the
-   checked-out branch. Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script** (Valve
+1. The game runs a copy of the build in `dota 2 beta/game/dota/scripts/vscripts/bots`, made by
+   `node Util/export-bots.js --test-game` (`/prepare-game` runs it): the bot scripts of `HEAD`, the uncommitted
+   test lineup and a `Customize/build_info.lua` for that commit, nothing else. Editing or switching branches in
+   the clone during a game changes nothing in it; run the export again after a change. (An old dev setup links
+   `vscripts/bots` to the clone; the tool refuses to write through a link, so rename it, e.g. `bots-dev`.)
+   Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script** (Valve
    only offers bot scripts in lobbies, and third-party scripts only load on a Local Host server).
 2. Launch Dota with `-condebug` so the console is written to `game/dota/console*.log`.
 3. The game prints `[OHA-BUILD]` (exact commit) at the start. After the game, `node Util/after-game.js` splits
@@ -210,7 +216,9 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    lists PRs that conflict (fix the conflict in that PR, not in test/next), writes `Util/verify/test-build.json`
    and switches the working tree to it, carrying `Customize/general.lua` (other modified files make it refuse;
    `--dry-run` only reports, `--no-switch` builds without switching). Never push `test/next`. Then run
-   `node Util/build-info.js` (a reset fires no hook) so `[OHA-BUILD]` names the build, and play. PRs no longer
+   `node Util/build-info.js` (a reset fires no hook) and, once the lineup is final,
+   `node Util/export-bots.js --test-game`, which copies the build into `vscripts/bots` with a `build_info.lua`
+   so `[OHA-BUILD]` names it, and play. PRs no longer
    need to be stacked to be tested together: branch each one from `main`.
 7. **During the game** the maintainer may post observations with game times ("2:50 kez and tusk won't hit
    dawnbreaker trapped in ice shards"). Check each against the running log (newest `console*.log`, grep a
@@ -286,15 +294,19 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 |---|---|
 | `/start-issue` | file findings or requests as grouped issue cards with task items and a priority |
 | `/create-pr` | code done: checks, signed commit, CI, change-log description, tracker entry |
-| `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, what the game tests |
+| `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, copy into `vscripts/bots`, what the game tests |
+| `/prepare-workshop` | a Workshop upload: clean copy of `origin/main` or a release tag (no lineup, git, env, tests, logs) in `vscripts/bots` |
 | `/check-live-event` | the maintainer reports an event during a live game |
 | `/review-game` | the game ended: `after-game.js`, tracker, PR comments, findings, issues, next lineup |
 | `/merge-pr` | a PR is READY TO MERGE: mute proven logs, tick checks, squash-merge, tick issue items |
 | `/goodnight` | the maintainer is away: fix every open, unresolved issue in priority order, one ready PR each, build the next game |
+| `/release` | a release: next version, release notes from the PRs merged since the last tag (dry run by default), then version files, tag and GitHub release on "publish" |
 
 ## Things not to do
 
 - Do not commit `Customize/general.lua` test lineups, match logs, or anything with the Steam ID.
+- Do not upload the clone or a link to it to the Workshop (it has `.git`, `.env`, match logs, the test lineup):
+  upload the clean copy from `/prepare-workshop` (`node Util/export-bots.js`).
 - Do not commit `.env` or print, log or paste its values (API tokens; template and docs: `.env.example`,
   CONTRIBUTING.md step 6).
 - Do not force-push, rewrite published history, or skip signing.

@@ -20,8 +20,11 @@ end
 -- that isn't an item!" every call (game 014). [OHA-CHARGES] probe lines print castable, cooldown
 -- and GetSpecialValueInt("AbilityCharges") next to the tracked count.
 local ChargeTracker = {}
+-- The [OHA-CHARGES] lines are muted above, but every tracked ability still built its probe line's key and text on every
+-- think (#52: ChargeTracker.Tick 3.3s in game 059's detail= totals). Set true to print them again (and drop the filter).
+local CHARGES_LOG = false
 
--- From Valve's datafeed (2026-11-15). base: charges; shard/scepter: charges with it; talent:
+-- From Valve's datafeed (patch 7.42, 2026-11-19). base: charges; shard/scepter: charges with it; talent:
 -- extra charges once that talent is learned; restore/restoreShard: seconds per charge by level.
 local DATA = {
 	bloodseeker_rupture = { base = 0, scepter = 2 },
@@ -29,7 +32,7 @@ local DATA = {
 	broodmother_sticky_snare = { base = 2, restore = { 30 } },
 	clinkz_death_pact = { base = { 1, 1, 2, 2 }, restore = { 40 } },
 	dark_seer_ion_shell = { base = 0, talent = { "special_bonus_unique_dark_seer_14", 2 } },
-	death_prophet_spirit_siphon = { base = { 1, 2, 3, 4 }, restore = { 40 } },
+	death_prophet_spirit_siphon = { base = { 1, 2, 3, 4 }, restore = { 35 } },
 	disruptor_glimpse = { base = 0, talent = { "special_bonus_unique_disruptor_4", 2 } },
 	doom_bringer_devour = { base = 0, shard = 2, restoreShard = { 66 } },
 	earth_spirit_stone_caller = { base = 7, restore = { 18 } },
@@ -48,7 +51,7 @@ local DATA = {
 	keeper_of_the_light_radiant_bind = { base = 0, shard = 2, restoreShard = { 14 } },
 	kunkka_tidebringer = { base = 0, talent = { "special_bonus_unique_kunkka_tidebringer_charges", 2 } },
 	largo_catchy_lick = { base = 0, talent = { "special_bonus_unique_largo_8", 2 } },
-	lich_death_charge = { base = 2, restore = { 120 }, startEmpty = true },
+	lich_death_charge = { base = 3, restore = { 120 }, startEmpty = true },
 	lich_frost_shield = { base = 0, talent = { "special_bonus_unique_lich_4", 2 }, restore = { 30, 25, 20, 15 } },
 	mirana_celestial_quiver = { base = 2, restore = { 7 } },
 	mirana_leap = { base = 2, restore = { 45, 35, 25, 15 } },
@@ -75,7 +78,7 @@ local DATA = {
 		restore = { 21, 19, 17, 15 },
 	},
 	sniper_shrapnel = { base = 3, restore = { 35 } },
-	techies_land_mines = { base = 3, restore = { 15 } },
+	techies_land_mines = { base = 3, talent = { "special_bonus_unique_techies_6", 1 }, restore = { 14, 13, 12 } },
 	tiny_toss = { base = 0, talent = { "special_bonus_unique_tiny_2", 2 } },
 	treant_eyes_in_the_forest = { base = 2, restore = { 135 } },
 	ursa_earthshock = { base = 0, talent = { "special_bonus_unique_ursa_3", 2 }, restore = { 15, 13, 11, 9 } },
@@ -105,25 +108,28 @@ local function Short(bot)
 	return (string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
 end
 
+-- pcall(object.Method, object, ...) rather than pcall(function() ... end): no new closure on every think (#52).
 local function Has(bot, methodName)
-	local ok, result = pcall(function()
-		return bot[methodName](bot)
-	end)
+	local ok, result = pcall(bot[methodName], bot)
 	return ok and result == true
 end
 
 local function TalentLearned(bot, name)
-	local ok, result = pcall(function()
-		local talent = bot:GetAbilityByName(name)
-		return talent ~= nil and talent:IsTrained()
-	end)
+	local ok, talent = pcall(bot.GetAbilityByName, bot, name)
+	if not ok or talent == nil then
+		return false
+	end
+	local okT, trained = pcall(talent.IsTrained, talent)
+	return okT and trained == true
+end
+
+local function HasShard(bot)
+	local ok, result = pcall(bot.HasModifier, bot, "modifier_item_aghanims_shard")
 	return ok and result == true
 end
 
 local function RuntimeMax(ability)
-	local ok, result = pcall(function()
-		return ability:GetSpecialValueInt("AbilityCharges")
-	end)
+	local ok, result = pcall(ability.GetSpecialValueInt, ability, "AbilityCharges")
 	if ok and type(result) == "number" and result > 0 and result < 20 then
 		return result
 	end
@@ -133,11 +139,7 @@ end
 local function MaxCharges(bot, ability, chargeData)
 	local level = ability:GetLevel()
 	local max = ByLevel(chargeData.base, level) or 0
-	local hasShard = false
-	pcall(function()
-		hasShard = bot:HasModifier("modifier_item_aghanims_shard")
-	end)
-	if chargeData.shard ~= nil and hasShard then
+	if chargeData.shard ~= nil and HasShard(bot) then
 		max = chargeData.shard
 	end
 	if chargeData.scepter ~= nil and Has(bot, "HasScepter") then
@@ -151,23 +153,16 @@ end
 
 local function RestoreTime(bot, ability, chargeData)
 	local level = ability:GetLevel()
-	local ok, result = pcall(function()
-		return ability:GetSpecialValueFloat("AbilityChargeRestoreTime")
-	end)
+	local ok, result = pcall(ability.GetSpecialValueFloat, ability, "AbilityChargeRestoreTime")
 	if ok and type(result) == "number" and result > 0 then
 		return result
 	end
-	local hasShard = false
-	pcall(function()
-		hasShard = bot:HasModifier("modifier_item_aghanims_shard")
-	end)
-	local tableRestore = (hasShard and ByLevel(chargeData.restoreShard, level)) or ByLevel(chargeData.restore, level)
+	local tableRestore = (HasShard(bot) and ByLevel(chargeData.restoreShard, level))
+		or ByLevel(chargeData.restore, level)
 	if tableRestore ~= nil and tableRestore > 0 then
 		return tableRestore
 	end
-	local okCd, cooldown = pcall(function()
-		return ability:GetCooldown()
-	end)
+	local okCd, cooldown = pcall(ability.GetCooldown, ability)
 	if okCd and type(cooldown) == "number" and cooldown > 0 then
 		return cooldown
 	end
@@ -175,6 +170,9 @@ local function RestoreTime(bot, ability, chargeData)
 end
 
 local function Log(bot, ability, chargeState, why)
+	if not CHARGES_LOG then
+		return
+	end
 	pcall(
 		print,
 		string.format(
@@ -201,6 +199,9 @@ local function Spend(bot, ability, chargeState, restoreTime, why)
 end
 
 local function Probe(bot, ability, chargeState, castable)
+	if not CHARGES_LOG then
+		return
+	end
 	local okCd, cooldown = pcall(function()
 		return ability:GetCooldownTimeRemaining()
 	end)

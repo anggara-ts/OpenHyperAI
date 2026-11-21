@@ -120,6 +120,83 @@ function Skill.GetTalentBuild(talentTree)
 	}
 	return talentBuild
 end
+-- Hero level from which a talent can be learned (#45). talentList is GetTalentList's order: two talents per
+-- tier, the level 10 tier first. The first talent of a tier comes at 10 / 15 / 20 / 25 (the levels Valve's own
+-- bot builds take them at, "Bot" > "Build" in scripts/npc/heroes/*.txt); the tier's other talent only from
+-- level 27 (levels 27-30 give the four that are left; game 050: Beastmaster's second level 10 talent, at 27).
+-- isLearned(name) says whether the hero has that talent. Nil for a name that is not one of the 8 talents.
+local TALENT_TIER_LEVELS = { 10, 15, 20, 25 }
+local SECOND_TALENT_LEVEL = 27
+function Skill.GetTalentHeroLevel(talentList, talentName, isLearned)
+	for index = 1, 8 do
+		if talentList[index] == talentName then
+			local otherTalent = talentList[index % 2 == 1 and index + 1 or index - 1]
+			if otherTalent ~= nil and isLearned(otherTalent) then
+				return SECOND_TALENT_LEVEL
+			end
+			return TALENT_TIER_LEVELS[math.floor((index + 1) / 2)]
+		end
+	end
+	return nil
+end
+-- Which entry of the level-up list to learn now, when it is not the first one (#45). Games 050 and 051 (20
+-- heroes): a bot's script gets no point at hero levels 15-17 and 19-22. The game puts those seven levels into
+-- the attribute bonus by itself, before the script runs ([OHA-TALENT] attr=3 at level 18 and attr=7 at 25 on
+-- every hero, and the script never saw an unspent point there). So only one point comes between 14 and 23, at
+-- level 18, and the list's 15th entry (the level 15 talent) used to take it: the ultimate's third rank waited
+-- until level 24.
+-- - From level 15: an ultimate rank that can be learned now goes first.
+-- - From level 23 (the attribute bonus is full, every level gives a point again): a talent whose level is
+--   reached goes before a basic ability rank, so the level 15 / 20 / 25 talents come at 23 / 24 / 25.
+-- isUltimateReady(name): an ultimate that can take a rank now. talentLevelOf(name): Skill.GetTalentHeroLevel's
+-- answer, nil for a non-talent. Returns the index and "ultimate" / "talent", or 1 and nil.
+Skill.LATE_ULTIMATE_LEVEL = 15
+Skill.LATE_TALENT_LEVEL = 23
+function Skill.GetLatePriorityIndex(skillList, heroLevel, isUltimateReady, talentLevelOf)
+	if heroLevel < Skill.LATE_ULTIMATE_LEVEL then
+		return 1, nil
+	end
+	for index = 1, #skillList do
+		if isUltimateReady(skillList[index]) then
+			if index == 1 then
+				return 1, nil
+			end
+			return index, "ultimate"
+		end
+	end
+	if heroLevel < Skill.LATE_TALENT_LEVEL or talentLevelOf(skillList[1]) ~= nil then
+		return 1, nil
+	end
+	for index = 2, #skillList do
+		local talentLevel = talentLevelOf(skillList[index])
+		if talentLevel ~= nil and talentLevel <= heroLevel then
+			return index, "talent"
+		end
+	end
+	return 1, nil
+end
+-- The part of a level-up list the hero has not learned yet, in order: the Nth entry of an ability is
+-- dropped when the ability already has N ranks. getAbilityLevel(name) is the ability's current level.
+-- (Counting "hero level minus unspent points" is wrong once the hero passes a level that gives no point.)
+function Skill.GetRemainingSkillList(skillList, getAbilityLevel)
+	local lastIndex = 0
+	for index in pairs(skillList) do
+		if type(index) == "number" and index > lastIndex then
+			lastIndex = index
+		end
+	end
+	local seen, remaining = {}, {}
+	for index = 1, lastIndex do
+		local name = skillList[index]
+		if name ~= nil then
+			seen[name] = (seen[name] or 0) + 1
+			if seen[name] > (getAbilityLevel(name) or 0) then
+				remaining[#remaining + 1] = name
+			end
+		end
+	end
+	return remaining
+end
 function Skill.GetSkillList(abilityList, abilityBuild, talentList, talentBuild)
 	local heroName = GetBot():GetUnitName()
 	local skillList = {}

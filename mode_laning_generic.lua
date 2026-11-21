@@ -42,10 +42,98 @@ end
 local function IsHumanSupportOnTeam()
 	return Fu.IsPosxHuman(4) or Fu.IsPosxHuman(5)
 end
+-- Diagnostic (#71, game 047: enemy heroes kept walking behind our tower in the laning phase): when this bot is inside
+-- an enemy tower's range in the laning phase, say which mode took it there. At most every 10s.
+local function LogInEnemyTower()
+	if not Fu.IsInLaningPhase() or DotaTime() < (bot._inEnemyTowerLogAt or -999) or not bot:IsAlive() then
+		return
+	end
+	for _, tower in pairs(bot:GetNearbyTowers(1000, true) or {}) do
+		if Fu.IsValidBuilding(tower) and GetUnitToUnitDistance(bot, tower) <= (tower:GetAttackRange() or 700) + 100 then
+			bot._inEnemyTowerLogAt = DotaTime() + 10
+			local target = bot:GetAttackTarget()
+			pcall(
+				print,
+				string.format(
+					"[OHA-LANE] t=%.0f %s in-enemy-tower mode=%d desire=%.2f towerOnMe=%s target=%s hp=%.2f",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+					bot:GetActiveMode(),
+					bot:GetActiveModeDesire(),
+					tostring(tower:GetAttackTarget() == bot),
+					target ~= nil and not target:IsNull() and target:GetUnitName() or "-",
+					Fu.GetHP(bot)
+				)
+			)
+			return
+		end
+	end
+end
+-- Creep score (#71, maintainer game 050: "check all heroes' creep stats"). Last hits and denies every minute
+-- until 15:00, then every 5 minutes. (Finished games also have the engine's end-of-match numbers.)
+local function LogCreepScore()
+	local now = DotaTime()
+	if now < 0 or now < (bot._csLogAt or -999) or bot:IsIllusion() then
+		return
+	end
+	bot._csLogAt = now + (now < 900 and 60 or 300)
+	pcall(
+		print,
+		string.format(
+			"[OHA-CS] t=%.0f %s lh=%d dn=%d lvl=%d nw=%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			bot:GetLastHits(),
+			bot:GetDenies(),
+			bot:GetLevel(),
+			bot:GetNetWorth()
+		)
+	)
+end
+-- Last-hit attempts in the laning phase (#71, maintainer game 050 6:30: Weaver's hits look late; she missed 42
+-- last hits, Kez 11). GetBestLastHitCreep notes the creep it picked, its HP and when it expects the hit to land;
+-- when that creep dies, say whether the bot's last-hit count went up and how long it really took.
+local function TrackLastHitAttempt()
+	local attempt = bot._lhAttempt
+	if attempt == nil then
+		return
+	end
+	local now = DotaTime()
+	local creep = attempt.creep
+	local dead = creep == nil or creep:IsNull() or not creep:IsAlive()
+	if not dead then
+		if now - attempt.at > 4 then
+			bot._lhAttempt = nil
+		end
+		return
+	end
+	-- The counter can update a moment after the death.
+	attempt.deadAt = attempt.deadAt or now
+	if now - attempt.deadAt < 0.3 then
+		return
+	end
+	bot._lhAttempt = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-LH] t=%.0f %s %s creep-hp=%d dmg=%d expect=%.2f took=%.2f",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			bot:GetLastHits() > attempt.lastHits and "got" or "missed",
+			attempt.hp,
+			attempt.damage,
+			attempt.delay,
+			attempt.deadAt - attempt.at
+		)
+	)
+end
 function GetDesire()
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
+	pcall(LogInEnemyTower)
+	pcall(LogCreepScore)
+	pcall(TrackLastHitAttempt)
 	return GetDesireRaw()
 end
 function GetDesireRaw()
@@ -192,21 +280,82 @@ local function GetCreepValue(creep)
 	end
 	return 1
 end
+-- Our tower's next shot on a creep (#71, game 045: enemy creeps under our T1 were missed or ignored). The incoming-
+-- damage prediction counts tower projectiles already flying, not the next shot: when our tower is attacking this
+-- creep and its next shot lands before our hit, count it. Returns the damage the creep takes from it, or 0.
+local function OurTowerShotBefore(creep, hitDelay)
+	-- An unreachable hit (delay inf, game 046: a melee bot far from the creep) has no timing to plan.
+	if hitDelay == nil or hitDelay ~= hitDelay or hitDelay > 3 then
+		return 0
+	end
+	for _, tower in pairs(bot:GetNearbyTowers(1000, false) or {}) do
+		if Fu.IsValidBuilding(tower) and tower:GetAttackTarget() == creep then
+			local nextShot = tower:GetLastAttackTime() + tower:GetSecondsPerAttack()
+			local travel = GetUnitToUnitDistance(tower, creep) / math.max(1, tower:GetAttackProjectileSpeed())
+			if nextShot + travel < GameTime() + hitDelay then
+				return creep:GetActualIncomingDamage(tower:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+			end
+		end
+	end
+	return 0
+end
 function GetBestLastHitCreep(creeps)
 	local damage = attackDamage - 3
 	local bestCreep = nil
 	local bestValue = 0
+	local bestDelay = 0
 	for _, creep in pairs(creeps) do
 		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
 			local value = GetCreepValue(creep)
-			if Fu.WillKillTarget(creep, damage, DAMAGE_TYPE_PHYSICAL, attackDelay) then
+			local okT, towerShot = pcall(OurTowerShotBefore, creep, attackDelay)
+			towerShot = okT and towerShot or 0
+			-- The tower shot lands first; our hit then needs to finish what's left, and the tower alone must not
+			-- kill it (that gold is lost either way).
+			local towerKills = towerShot > 0 and towerShot >= creep:GetHealth()
+			if towerShot > 0 and not towerKills and DotaTime() >= (bot._lhTowerLogAt or -999) then
+				bot._lhTowerLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-LANE] t=%.0f %s lh-tower creep-hp=%d tower=%d hit=%d delay=%.2f",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						creep:GetHealth(),
+						math.floor(towerShot),
+						damage,
+						attackDelay
+					)
+				)
+			end
+			local bonus = bot._lastHitBonus or 0
+			local plainKill = not towerKills
+				and Fu.WillKillTarget(creep, damage + towerShot, DAMAGE_TYPE_PHYSICAL, attackDelay)
+			local bonusKill = not plainKill
+				and not towerKills
+				and bonus > 0
+				and Fu.WillKillTarget(creep, damage + towerShot + bonus, DAMAGE_TYPE_PHYSICAL, attackDelay)
+			if bonusKill then
+				bot._lastHitNeedsBonus = { creep = creep, at = DotaTime() }
+			end
+			if plainKill or bonusKill then
 				if value > bestValue then
 					bestValue = value
 					bestCreep = creep
+					bestDelay = attackDelay
 				end
 			end
 		end
+	end
+	if bestCreep ~= nil and Fu.IsInLaningPhase() and (bot._lhAttempt == nil or bot._lhAttempt.creep ~= bestCreep) then
+		bot._lhAttempt = {
+			creep = bestCreep,
+			at = DotaTime(),
+			hp = bestCreep:GetHealth(),
+			damage = damage,
+			delay = bestDelay,
+			lastHits = bot:GetLastHits(),
+		}
 	end
 	return bestCreep
 end
@@ -740,6 +889,46 @@ do
 				else
 					bot:Action_AttackUnit(reset.target, true)
 					return
+				end
+			end
+		end
+		-- Tower punish (#71, maintainer game 047: enemy heroes walked behind our tower and nobody hit them). An enemy hero
+		-- inside our tower's range is a free target above 40% HP: the tower hits him and takes the creep aggro.
+		do
+			local ourTower = GetLaneT1(GetTeam(), botLane)
+			for _, tower in pairs(bot:GetNearbyTowers(1200, false) or {}) do
+				if Fu.IsValidBuilding(tower) then
+					ourTower = tower
+					break
+				end
+			end
+			if Fu.IsValidBuilding(ourTower) and ourTower:IsAlive() and Fu.GetHP(bot) > 0.4 then
+				local reach = (ourTower:GetAttackRange() or 700) - 50
+				for _, enemyHero in pairs(nearbyEnemies) do
+					if
+						Fu.IsValidHero(enemyHero)
+						and not Fu.IsSuspiciousIllusion(enemyHero)
+						and Fu.CanBeAttacked(enemyHero)
+						and GetUnitToUnitDistance(enemyHero, ourTower) <= reach
+						and GetUnitToUnitDistance(bot, enemyHero) <= attackRange + 400
+					then
+						if DotaTime() >= (bot._towerPunishLogAt or -999) then
+							bot._towerPunishLogAt = DotaTime() + 5
+							pcall(
+								print,
+								string.format(
+									"[OHA-LANE] t=%.0f %s tower-punish target=%s towerOn=%s hp=%.2f",
+									DotaTime(),
+									(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+									(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+									tostring(ourTower:GetAttackTarget() == enemyHero),
+									Fu.GetHP(bot)
+								)
+							)
+						end
+						bot:Action_AttackUnit(enemyHero, true)
+						return
+					end
 				end
 			end
 		end

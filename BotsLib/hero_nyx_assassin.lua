@@ -14,64 +14,103 @@ local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 95,516 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
-	"item_double_tango",
-	"item_double_branches",
+	"item_tango",
 	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_enchanted_mango",
 	"item_magic_wand",
 	"item_arcane_boots",
-	"item_dagon_2",
-	"item_aghanims_shard",
-	"item_phylactery",
+	"item_ultimate_scepter",
+	"item_soul_booster",
 	"item_blink",
-	"item_force_staff",
+	"item_aether_lens",
+	"item_ultimate_scepter_2",
+	"item_octarine_core",
+	"item_wind_waker",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 32,993 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_ultimate_scepter",
+	"item_soul_booster",
+	"item_aether_lens",
+	"item_blink",
+	"item_octarine_core",
+	"item_ultimate_scepter_2",
+	"item_wind_waker",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 14,128 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
+	"item_quelling_blade",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_phylactery",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_octarine_core",
+	"item_ultimate_scepter_2",
+	"item_soul_booster",
+	"item_blink",
+	"item_aether_lens",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 852 matches, built from pos 2 (47,859) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_phylactery",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
 	"item_cyclone",
 	"item_octarine_core",
-	"item_ultimate_scepter",
-	"item_dagon_5",
-	"item_swift_blink",
+	"item_soul_booster",
 	"item_ultimate_scepter_2",
 	"item_wind_waker",
+	"item_yasha_and_kaya",
 	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_5"] = {
-	"item_double_tango",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 47,859 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
 	"item_double_branches",
+	"item_faerie_fire",
+	"item_quelling_blade",
+	"item_circlet",
 	"item_magic_wand",
 	"item_arcane_boots",
-	"item_dagon_2",
 	"item_phylactery",
 	"item_aghanims_shard",
-	"item_blink",
-	"item_force_staff",
-	"item_octarine_core",
 	"item_ultimate_scepter",
-	"item_dagon_5",
-	"item_swift_blink",
+	"item_cyclone",
+	"item_octarine_core",
+	"item_soul_booster",
 	"item_ultimate_scepter_2",
 	"item_wind_waker",
+	"item_yasha_and_kaya",
 	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_3"] = {
-	"item_double_tango",
-	"item_double_branches",
-	"item_magic_wand",
-	"item_arcane_boots",
-	"item_dagon_2",
-	"item_aghanims_shard",
-	"item_blink",
-	"item_force_staff",
-	"item_phylactery",
-	"item_octarine_core",
-	"item_ultimate_scepter",
-	"item_dagon_5",
-	"item_swift_blink",
-	"item_ultimate_scepter_2",
-	"item_wind_waker",
-	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 Pos4SellList = { "item_magic_wand" }
 Pos5SellList = { "item_magic_wand" }
@@ -147,15 +186,12 @@ function X.SkillsComplement()
 	end
 	impaleDesire, impaleLocation = X.ConsiderImpale()
 	if impaleDesire > 0 then
-		X.RecordImpale(impaleLocation)
 		bot:Action_UseAbilityOnLocation(impaleAbility, impaleLocation)
 		return
 	end
-	-- Impale -> Dagon -> Mind Flare: Dagon on the stunned target, so Mind Flare's echo (15% of
-	-- the damage Nyx dealt in the last 15s) includes it.
+	-- Impale -> Dagon -> Mind Flare: Dagon on the stunned target.
 	local dagon, dagonTarget = X.ConsiderDagonCombo()
 	if dagon ~= nil then
-		X.AddDealt(dagonTarget, dagon:GetSpecialValueInt("damage"))
 		X.LogNyx("dagon-combo", dagonTarget)
 		bot:Action_UseAbilityOnEntity(dagon, dagonTarget)
 		return
@@ -200,40 +236,6 @@ function X.LogNyx(kind, target)
 		)
 	)
 end
--- Damage Nyx dealt to each enemy hero from his spells and Dagon, for Mind Flare's echo
--- (15% of the damage he dealt the target in the last 15s, Valve data). Attacks are not counted.
-local dealt = {}
-function X.AddDealt(target, damage)
-	if target == nil or damage == nil or damage <= 0 or not target:IsHero() then
-		return
-	end
-	local id = target:GetPlayerID()
-	dealt[id] = dealt[id] or {}
-	table.insert(dealt[id], { t = DotaTime(), dmg = damage })
-end
-function X.EchoDamage(target)
-	local list = dealt[target:GetPlayerID()]
-	if list == nil then
-		return 0
-	end
-	local echoPct = mindFlareAbility:GetSpecialValueInt("damage_echo_pct")
-	if echoPct == nil or echoPct <= 0 then
-		echoPct = 15
-	end
-	local echoWindow = mindFlareAbility:GetSpecialValueInt("damage_echo_duration")
-	if echoWindow == nil or echoWindow <= 0 then
-		echoWindow = 15
-	end
-	local sum, kept = 0, {}
-	for _, entry in ipairs(list) do
-		if DotaTime() - entry.t <= echoWindow then
-			sum = sum + entry.dmg
-			kept[#kept + 1] = entry
-		end
-	end
-	dealt[target:GetPlayerID()] = kept
-	return sum * echoPct / 100
-end
 -- Not worth a combo: the target cannot die right now.
 function X.SafeToCombo(target)
 	return Fu.CanCastOnNonMagicImmune(target)
@@ -244,12 +246,11 @@ function X.SafeToCombo(target)
 		and not target:HasModifier("modifier_skeleton_king_reincarnation_scepter_active")
 end
 -- Damage of his combo on the target after resists, spending mana in cast order, and whether it kills.
--- Order: [Vendetta hit (pure bonus + attack)], Impale, Dagon, Mind Flare (max-mana part plus the
--- echo of everything before it and of the last 15s). Only spells ready now count.
+-- Order: [Vendetta hit (pure bonus + attack)], Impale, Dagon, Mind Flare (max-mana part only: since 7.42
+-- it has no echo of damage dealt before). Only spells ready now count.
 function X.ComboDamage(target, withVendetta)
 	local mana = bot:GetMana()
 	local total = 0
-	local dealtNow = 0
 	local function spend(ability)
 		if ability == nil or not ability:IsFullyCastable() then
 			return false
@@ -269,13 +270,11 @@ function X.ComboDamage(target, withVendetta)
 		local hit = target:GetActualIncomingDamage(bonus, DAMAGE_TYPE_PURE)
 			+ target:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 		total = total + hit
-		dealtNow = dealtNow + hit
 	end
 	if spend(impaleAbility) then
 		local hit =
 			target:GetActualIncomingDamage(impaleAbility:GetSpecialValueInt("impale_damage"), DAMAGE_TYPE_MAGICAL)
 		total = total + hit
-		dealtNow = dealtNow + hit
 	end
 	for slot = 0, 5 do
 		local item = bot:GetItemInSlot(slot)
@@ -283,18 +282,13 @@ function X.ComboDamage(target, withVendetta)
 			if spend(item) then
 				local hit = target:GetActualIncomingDamage(item:GetSpecialValueInt("damage"), DAMAGE_TYPE_MAGICAL)
 				total = total + hit
-				dealtNow = dealtNow + hit
 			end
 			break
 		end
 	end
 	if spend(mindFlareAbility) then
 		local maxManaPct = mindFlareAbility:GetSpecialValueInt("max_mana_as_damage_pct")
-		local echoPct = mindFlareAbility:GetSpecialValueInt("damage_echo_pct")
-		if echoPct == nil or echoPct <= 0 then
-			echoPct = 15
-		end
-		local rawDamage = target:GetMaxMana() * maxManaPct / 100 + X.EchoDamage(target) + dealtNow * echoPct / 100
+		local rawDamage = target:GetMaxMana() * maxManaPct / 100
 		total = total + target:GetActualIncomingDamage(rawDamage, DAMAGE_TYPE_MAGICAL)
 	end
 	local neededDamage = target:GetHealth() + target:GetHealthRegen() * 3
@@ -349,41 +343,6 @@ function X.ConsiderBlinkCombo()
 		end
 	end
 	return nil
-end
--- Enemies on the Impale line at cast time get its damage recorded.
-function X.RecordImpale(loc)
-	if loc == nil then
-		return
-	end
-	local botLocation = bot:GetLocation()
-	local deltaX, deltaY = loc.x - botLocation.x, loc.y - botLocation.y
-	local distance = math.sqrt(deltaX * deltaX + deltaY * deltaY)
-	if distance < 1 then
-		return
-	end
-	local directionX, directionY = deltaX / distance, deltaY / distance
-	local length = impaleAbility:GetSpecialValueInt("length")
-	if length == nil or length <= 0 then
-		length = 750
-	end
-	local width = impaleAbility:GetSpecialValueInt("width")
-	if width == nil or width <= 0 then
-		width = 140
-	end
-	local damage = impaleAbility:GetSpecialValueInt("impale_damage")
-	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, length + 200, true, BOT_MODE_NONE) or {}) do
-		if Fu.IsValidHero(enemyHero) then
-			local enemyLocation = enemyHero:GetLocation()
-			local along = (enemyLocation.x - botLocation.x) * directionX
-				+ (enemyLocation.y - botLocation.y) * directionY
-			local sideOffset = math.abs(
-				(enemyLocation.x - botLocation.x) * directionY - (enemyLocation.y - botLocation.y) * directionX
-			)
-			if along >= 0 and along <= length + 100 and sideOffset <= width + 60 then
-				X.AddDealt(enemyHero, damage)
-			end
-		end
-	end
 end
 -- Dagon on a stunned enemy hero while engaging, before Mind Flare.
 function X.ConsiderDagonCombo()
@@ -569,11 +528,7 @@ function X.ConsiderMindflare()
 		if
 			Fu.IsValidHero(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
-			and Fu.CanKillTarget(
-				enemyHero,
-				enemyHero:GetMaxMana() * maxManaPct / 100 + X.EchoDamage(enemyHero),
-				DAMAGE_TYPE_MAGICAL
-			)
+			and Fu.CanKillTarget(enemyHero, enemyHero:GetMaxMana() * maxManaPct / 100, DAMAGE_TYPE_MAGICAL)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
@@ -689,7 +644,7 @@ function X.ConsiderVendetta()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	botTarget = Fu.GetProperTarget(bot)
-	-- Combo kill: Vendetta hit + Impale + Dagon + Mind Flare (with echo), as far as his mana goes,
+	-- Combo kill: Vendetta hit + Impale + Dagon + Mind Flare, as far as his mana goes,
 	-- kills the target. It used to count the Vendetta hit alone, and needed his side to match the
 	-- target's within 800, so one enemy next to the target called it off. Now up to 2 enemy heroes
 	-- near the target is fine (Carapace and the stuns cover the way out), if he is above 50% HP.

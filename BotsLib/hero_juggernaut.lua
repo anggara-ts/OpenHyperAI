@@ -10,35 +10,117 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 0, 10 }, ["t20"] = { 0, 10 }, ["t15"] = { 10, 0 }, ["t10"] = { 0, 10 } }
-local tAllAbilityBuildList = { { 1, 2, 1, 3, 1, 6, 1, 2, 2, 2, 6, 3, 3, 3, 6 } }
+-- Blade Fury maxed first, Blade Dance second, Healing Ward last after one early point (86% of carry
+-- Juggernauts max the Ward last, at 15). Stratz, week of 12-18 Nov 2026 (7.41f), pos 1, 387,059 matches.
+local tAllAbilityBuildList = { { 1, 3, 1, 2, 1, 6, 1, 3, 3, 3, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 364,643 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_double_branches",
-	"item_slippers",
-	"item_circlet",
 	"item_quelling_blade",
-	"item_wraith_band",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
 	"item_magic_wand",
 	"item_power_treads",
 	"item_bfury",
 	"item_manta",
-	"item_ultimate_scepter",
-	"item_skadi",
-	"item_aghanims_shard",
-	"item_basher",
+	"item_blink",
 	"item_butterfly",
-	"item_moon_shard",
-	"item_abyssal_blade",
-	"item_travel_boots_2",
+	"item_ultimate_scepter",
+	"item_swift_blink",
 	"item_ultimate_scepter_2",
+	"item_moon_shard",
+	"item_nullifier",
+	"item_aghanims_shard",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 5,974 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_quelling_blade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_bfury",
+	"item_yasha",
+	"item_blink",
+	"item_manta",
+	"item_ultimate_scepter",
+	"item_basher",
+	"item_abyssal_blade",
+	"item_swift_blink",
+	"item_ultimate_scepter_2",
+	"item_diffusal_blade",
+	"item_disperser",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 1,430 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_bfury",
+	"item_yasha",
+	"item_blink",
+	"item_manta",
+	"item_ultimate_scepter",
+	"item_basher",
+	"item_swift_blink",
+	"item_ultimate_scepter_2",
+	"item_maelstrom",
+	"item_mjollnir",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,009 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_quelling_blade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_bfury",
+	"item_manta",
+	"item_butterfly",
+	"item_ultimate_scepter",
+	"item_swift_blink",
+	"item_ultimate_scepter_2",
+	"item_maelstrom",
+	"item_mjollnir",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 6,679 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_quelling_blade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_bfury",
+	"item_blink",
+	"item_manta",
+	"item_ultimate_scepter",
+	"item_basher",
+	"item_abyssal_blade",
+	"item_swift_blink",
+	"item_ultimate_scepter_2",
+	"item_mjollnir",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
@@ -62,17 +144,12 @@ local bladeFuryAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAb
 local healingWardAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "juggernaut")
 local bladeDanceAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "juggernaut")
 local omnislashAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "juggernaut")
--- datafeed: Swift Slash is granted by Aghanim's Scepter; fetch it by name, since entry 4 of the ability list is
--- not guaranteed to be it (the hero also has the innate Bladeform).
-local swiftSlashAbility =
-	SafeAbility(bot:GetAbilityByName("juggernaut_swift_slash"), "juggernaut_swift_slash", "juggernaut")
 local talent2 = SafeAbility(bot:GetAbilityByName(sTalentList[2]), "sTalentList[2]", "juggernaut")
 local talent6 = SafeAbility(bot:GetAbilityByName(sTalentList[6]), "sTalentList[6]", "juggernaut")
 local bladeFuryDesire
 local healingWardDesire, healingWardLocation
 local bladeDanceDesire, bladeDanceTarget
 local omnislashDesire, omnislashTarget
-local swiftSlashDesire, swiftSlashTarget
 local botLevel, mpRatio, hpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
@@ -85,12 +162,6 @@ function X.SkillsComplement()
 	botTarget = context.target
 	nearbyEnemies = context.enemies
 	nearbyAllies = context.allies
-	swiftSlashDesire, swiftSlashTarget = X.ConsiderD()
-	if swiftSlashDesire > 0 then
-		Fu.SetQueuePtToINT(bot, true)
-		bot:ActionQueue_UseAbilityOnEntity(swiftSlashAbility, swiftSlashTarget)
-		return
-	end
 	omnislashDesire, omnislashTarget = X.ConsiderR()
 	if omnislashDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
@@ -254,9 +325,9 @@ function X.ConsiderW()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
--- Omnislash and Swift Slash pierce spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
--- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR/ConsiderD check CanCastOnMagicImmune; they were held
--- on any target under BKB.
+-- Omnislash pierces spell immunity (game files: SPELL_IMMUNITY_ENEMIES_YES,
+-- FLAG_MAGIC_IMMUNE_ENEMIES), so ConsiderR checks CanCastOnMagicImmune; it was held
+-- on any target under BKB. (Swift Slash was removed in 7.42.)
 function X.ConsiderR()
 	if
 		not omnislashAbility:IsFullyCastable()
@@ -318,58 +389,6 @@ function X.ConsiderR()
 			then
 				castTarget = enemyHero
 				debugText = "R-撤退" .. Fu.Chat.GetNormName(castTarget)
-				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function X.ConsiderD()
-	if
-		not bot:HasScepter()
-		or not swiftSlashAbility:IsFullyCastable()
-		or bot:HasModifier("modifier_juggernaut_blade_fury")
-		or bot:HasModifier("modifier_juggernaut_omnislash")
-	then
-		return 0
-	end
-	local abilityLevel = swiftSlashAbility:GetLevel()
-	local castRange = swiftSlashAbility:GetCastRange()
-	local radius = 600
-	local castPoint = swiftSlashAbility:GetCastPoint()
-	local manaCost = swiftSlashAbility:GetManaCost()
-	local damage = 0
-	local damageType = DAMAGE_TYPE_MAGICAL
-	local enemiesInRange = Fu.GetAroundEnemyHeroList(castRange)
-	local enemiesNearby = Fu.GetAroundEnemyHeroList(castRange + 200)
-	local castTarget = nil
-	local debugText = nil
-	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(botTarget, bot, 1400) then
-			for _, enemyHero in pairs(enemiesInRange) do
-				if
-					Fu.IsValid(enemyHero)
-					and Fu.IsInRange(botTarget, enemyHero, 425)
-					and Fu.CanCastOnMagicImmune(enemyHero)
-					and Fu.CanCastOnTargetAdvanced(enemyHero)
-				then
-					castTarget = enemyHero
-					debugText = "D-攻击:" .. Fu.Chat.GetNormName(castTarget)
-					return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
-				end
-			end
-		end
-	end
-	if Fu.IsRetreating(bot) then
-		for _, enemyHero in pairs(enemiesInRange) do
-			if
-				Fu.IsValid(enemyHero)
-				and bot:WasRecentlyDamagedByHero(enemyHero, 2.0)
-				and Fu.CanCastOnMagicImmune(enemyHero)
-				and Fu.CanCastOnTargetAdvanced(enemyHero)
-			then
-				castTarget = enemyHero
-				debugText = "D-撤退" .. Fu.Chat.GetNormName(castTarget)
 				return BOT_ACTION_DESIRE_HIGH, castTarget, debugText
 			end
 		end

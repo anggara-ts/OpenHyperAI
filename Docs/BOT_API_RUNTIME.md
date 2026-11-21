@@ -5,16 +5,25 @@ Runtime dump from the game itself, not from the online docs. Taken on 2026-11-16
 The online references ([Valve Developer Wiki](https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting), [ModDota](https://docs.moddota.com/lua_bots/)) carry no date and describe an older API. Where they disagree with this file, this file wins.
 
 The list of known limitations (what bots can't do, why, and the workaround) is kept in the main post of
-[discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50); update it when a limitation is
+[discussion #50](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions/50); update it when a limitation is
 confirmed or disproved.
 
 ## Key findings
 
 - **No vector-target order.** Abilities can only be cast with no target, on a unit, on a location or on a tree (plus the Push/Queue variants). A vector-targeted spell such as Muerta's Dead Shot cannot have its direction chosen.
+- **No alt-cast.** Cast orders have no alt flag. `ToggleAutoCast()` on an alt-castable ability flips the button's state (`GetAutoCastState()` reads it back), but bot casts ignore it: Puck's Illusory Orb and Grimstroke's Stroke of Fate still curved with it on (game 043). It works for real autocast abilities (Quill Spray, Frost Arrows). For Illusory Orb and Stroke of Fate, aiming at the full range and turning to face the point first were both tried: the path still curves (#36). Discussion #50 item 2.
 - `GetCurrentCharges`, `GetInitialCharges` and `GetSecondaryCharges` exist on abilities as well as items. On the Ward Dispenser the first is observers and the second sentries (game 032). Whether they return charges for charge-based abilities (Mirana's Leap, Techies' mines, ...) has not been tested; `FuncLib/systems/charge_tracker.lua` still tracks those itself.
 - `GetToggleState`, `IsInAbilityPhase`, `GetDamageType`, `GetTargetType/Team/Flags` are available on abilities.
 - Item management beyond buy/sell: `ActionImmediate_DisassembleItem`, `ActionImmediate_SetItemCombineLock`, `ActionImmediate_SwapItems`.
 - Shrines and runes have their own orders: `Action_UseShrine`, `Action_PickUpRune` (plus Push/Queue). `GetOutpost`, `GetShrine`, `GetShrineCooldown`, `IsShrineHealing`, `GetNearbyShrines` are available.
+- **A mode file replaces Valve's mode whole, even without `Think`.** Game 063 (#141): a `mode_item_generic.lua` that defined only `GetDesire` won the item mode 3.5-5.3s at a time on the river bounties and water runes, and nothing was picked up (`[OHA-ITEMMODE] result ... picked=no`); Valve's item `Think` did not run behind it. The file was removed.
+- **Tested in 7.42 games (063-064):**
+  - `Action_ClearActions(true)` stops an attack wind-up: 70 of 70 stops held (`[OHA-LH] cancel-result stopped=yes method=clear`, #157).
+  - The time left on an enemy hero's `modifier_teleporting` counts down with the clock (`[OHA-ALCHEMIST] tp-left ... real=yes`, 4 of 4, #122/#166), so it is the real remaining TP time.
+  - `Action_PickUpRune` on a river rune spot: a water rune (type 7) was taken (`river-pickup-try worked=yes type=7`, 1 sample); the river bounty (type 5) was not, 0 of 4 (games 063-064). Valve's own item mode takes both (#149).
+  - A mode file that defines only `GetDesire` still replaces that Valve mode entirely: Valve's `Think` does not run behind it (the item-mode trial, #141, game 063).
+  - No hidden item or extra ability gives outpost capture or watcher use: every bot's slots 17-25 are empty and there is no `capture` / `lamp` / `watcher` ability beyond the normal slots (`[OHA-API] slots`, #172, game 064).
+  - Unconfirmed: `IsAlive()` on an enemy hero handle may read false after it TPs out, turns invisible or leaves vision (seen 5 times in game 064's hunt trace).
 
 ## 7.42 check (2026-11-19)
 

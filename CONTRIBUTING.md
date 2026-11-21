@@ -24,8 +24,8 @@ the VS Code extension **StyLua** (JohnnyMorganz.stylua) formats on save with the
 ### 1. Get the code
 
 ```bash
-git clone git@github.com:anggara-ts/OpenHyperAI-too.git
-cd OpenHyperAI-too
+git clone git@github.com:anggara-ts/Supercharged-OpenHyperAI.git
+cd Supercharged-OpenHyperAI
 ```
 
 Contributors without write access fork the repo on GitHub, clone their fork, and open PRs from it.
@@ -58,19 +58,21 @@ Then on GitHub go to **Settings → SSH and GPG keys → New SSH key**, set **Ke
 
 ### 4. Point Dota at your checkout
 
-Dota loads bot scripts from `dota 2 beta/game/dota/scripts/vscripts/bots`. Make that folder a link to your clone, so the game runs whatever branch you have checked out. Rename an existing `bots` folder first.
+Dota loads bot scripts from `dota 2 beta/game/dota/scripts/vscripts/bots`. The usual way is a copy: `node Util/export-bots.js --test-game` copies the bot scripts of the checked-out commit (plus your uncommitted `Customize/general.lua` and the build info) there, and nothing else. Run it again after every change; `/prepare-game` does it before a test game. `node Util/export-bots.js` without `--test-game` makes the clean copy of `origin/main` for a Workshop upload (`/prepare-workshop`). Rename an existing `bots` folder first, or let the tool take it over with `--force` (it deletes what is in it).
+
+For quick edits you can instead make that folder a link to your clone, so the game runs whatever branch you have checked out. Don't name the link `bots` while you use the tool (it refuses to write through a link):
 
 - **Windows** (Command Prompt):
   ```bat
-  mklink /J "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\path\to\OpenHyperAI-too"
+  mklink /J "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\path\to\Supercharged-OpenHyperAI"
   ```
 - **macOS:**
   ```bash
-  ln -s ~/path/to/OpenHyperAI-too "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+  ln -s ~/path/to/Supercharged-OpenHyperAI "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
   ```
 - **Linux:**
   ```bash
-  ln -s ~/path/to/OpenHyperAI-too "$HOME/.local/share/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+  ln -s ~/path/to/Supercharged-OpenHyperAI "$HOME/.local/share/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
   ```
 
 Settings come from `vscripts/game/Customize/general.lua` when that file exists (the Workshop installer creates it), otherwise from the repo's `Customize/general.lua`. While developing, rename `vscripts/game/Customize`, so your edits to the repo copy take effect.
@@ -171,4 +173,4 @@ You can also comment observations on the PR you are testing, with game times (e.
 
 ## Credits
 
-Open Hyper AI builds on [forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI) and earlier community bot scripts. If a fix belongs upstream, consider contributing it back there too.
+See [Credits in the README](README.md#credits).

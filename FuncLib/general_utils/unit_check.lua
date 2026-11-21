@@ -138,8 +138,17 @@ local function installUnitCheck(Fu)
 		end
 		return false
 	end
+	-- A clone of our own Meepo (a Meepo on our team that is not one of our team members). Only our team: for the
+	-- enemy team GetTeamMember cannot tell the real Meepo from a clone, and every enemy Meepo body is a threat and a
+	-- target (#132, game 052: the check was true for the enemy's real Meepo too, so Fu.GetNearbyHeroes left all
+	-- enemy Meepo bodies out and Shadow Fiend, rooted and hit by two of them, counted enemies=0).
 	function Fu.IsMeepoClone(unit)
-		if Fu.IsValidHero(unit) and unit:GetUnitName() == "npc_dota_hero_meepo" and not Fu.IsRealBot(unit) then
+		if
+			Fu.IsValidHero(unit)
+			and unit:GetUnitName() == "npc_dota_hero_meepo"
+			and unit:GetTeam() == GetTeam()
+			and not Fu.IsRealBot(unit)
+		then
 			return true
 		end
 		return false

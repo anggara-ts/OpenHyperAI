@@ -52,6 +52,27 @@ local targetOutpost = nil
 local targetOutpostDistance = 10000
 local outpostMoveLoc = nil
 local captureAbility = bot:GetAbilityByName("ability_capture")
+-- One line per step of the capture probe (#111): what = try | worked | no-capture.
+local function OutpostProbeLog(what, try, outpost)
+	local mods = {}
+	for index = 0, bot:NumModifiers() - 1 do
+		mods[#mods + 1] = tostring(bot:GetModifierName(index))
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-OUTPOST] t=%.0f %s capture-probe %s order=%s dist=%d channelling=%s action=%s mods=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			try,
+			outpost ~= nil and not outpost:IsNull() and GetUnitToUnitDistance(bot, outpost) or -1,
+			tostring(bot:IsChanneling()),
+			tostring(bot:GetCurrentActionType()),
+			table.concat(mods, ",")
+		)
+	)
+end
 local isCapturingOutpost = false
 -- Chain Frost bouncing around us (Valve data: bounces to a hero within 550, 10 jumps). The
 -- projectile is visible in GetIncomingTrackingProjectiles of whoever it is flying at. Returns the
@@ -179,7 +200,34 @@ local function EnemyFountainEscape()
 	local dest = fountain + away:Normalized() * 1800
 	return dest
 end
+-- Holds that must outlast the hero's own invulnerability: Puck's Phase Shift makes her invulnerable, and the gate in
+-- GetDesire (like every other mode's) skips invulnerable bots. Puck only: the other holds read this mode's target and
+-- enemy lists, which are not refreshed while the hero is invulnerable.
+local invulnerableHolds = { npc_dota_hero_puck = true }
+local function InvulnerableHoldDesire()
+	if not invulnerableHolds[botName] or not bot:IsAlive() or bot:IsIllusion() then
+		return nil
+	end
+	local holdFunc = heroSpecificDesire[botName]
+	if holdFunc == nil then
+		return nil
+	end
+	local okHold, holdDesire = pcall(holdFunc)
+	if okHold and holdDesire ~= nil and holdDesire > 1 then
+		return holdDesire
+	end
+	return nil
+end
 function GetDesire()
+	-- Before the invulnerable gate (game 064: the gate returned 0 as soon as the shift made Puck invulnerable, so the
+	-- hold never ran inside the shift; 6 of 10 shifts broke at 0.1-1.2s, and hold-left age= equalled after=).
+	if bot:IsInvulnerable() then
+		local holdDesire = InvulnerableHoldDesire()
+		if holdDesire ~= nil then
+			bot._outpostLastDesire, bot._outpostLastDesireAt = holdDesire, DotaTime()
+			return holdDesire
+		end
+	end
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
@@ -207,10 +255,15 @@ function GetDesire()
 		chainFrostSpread = true
 		return 1.05
 	end
-	return GetDesireHelper()
+	-- Kept for Puck's [OHA-PUCK] phase hold-left line: what this mode asked for when another mode won (game 059).
+	local desire = GetDesireHelper()
+	bot._outpostLastDesire, bot._outpostLastDesireAt = desire, DotaTime()
+	return desire
 end
 function GetDesireHelper()
 	botName = bot:GetUnitName()
+	-- An invulnerable hero's hold (Puck's Phase Shift) is checked in GetDesire, before its invulnerable gate (game 058:
+	-- [OHA-PUCK] phase hold-left after 0.03-0.33s, to modes with desire 0.00-0.61 while 2.2-2.5s of the hold were left).
 	if
 		bot:IsInvulnerable()
 		or not bot:IsHero()
@@ -288,6 +341,10 @@ function GetDesireHelper()
 	return BOT_MODE_DESIRE_NONE
 end
 function Think()
+	-- A hero hold (Puck's Phase Shift): no order at all, or the channel ends.
+	if bot._outpostHoldUntil ~= nil and DotaTime() < bot._outpostHoldUntil then
+		return
+	end
 	if Fu.CanNotUseAction(bot) then
 		return
 	end
@@ -305,6 +362,10 @@ function Think()
 	end
 	if isCapturingOutpost then
 		if bot:IsChanneling() or bot:HasModifier("modifier_watch_tower_capturing") then
+			if bot._outpostProbeTry ~= nil then
+				OutpostProbeLog("worked", bot._outpostProbeTry, targetOutpost)
+				bot._outpostProbeTry = nil
+			end
 			bot._outpostNearSince = nil
 			return
 		end
@@ -333,15 +394,32 @@ function Think()
 				pcall(
 					print,
 					string.format(
-						"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d",
+						"[OHA-OUTPOST] t=%.0f %s capture-giveup outpost=%s at=%.0f,%.0f dist=%d capture=%s",
 						DotaTime(),
 						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 						targetOutpost:GetUnitName(),
 						outpostLocation.x,
 						outpostLocation.y,
-						math.floor(dist)
+						math.floor(dist),
+						-- What the bot has of ability_capture (game 050: 6 give-ups at ~140, none in games 047-049).
+						(function()
+							local found = bot:GetAbilityByName("ability_capture")
+							if found == nil or found:IsNull() then
+								return "nil"
+							end
+							return string.format(
+								"castable:%s/hidden:%s/level:%d",
+								tostring(found:IsFullyCastable()),
+								tostring(found:IsHidden()),
+								found:GetLevel()
+							)
+						end)()
 					)
 				)
+				if bot._outpostProbeTry ~= nil then
+					OutpostProbeLog("no-capture", bot._outpostProbeTry, targetOutpost)
+					bot._outpostProbeTry = nil
+				end
 				bot:Action_ClearActions(true)
 				return
 			end
@@ -366,6 +444,31 @@ function Think()
 			if castable then
 				bot:Action_UseAbilityOnEntity(capture, targetOutpost)
 				bot.outpostOrderAt = DotaTime()
+			elseif capture == nil or capture:IsNull() then
+				-- 7.42: bots have no ability_capture (games 050 and 051: capture=nil on every give-up, no
+				-- outpost captured). Try the two orders a right-click could stand for, one after the other,
+				-- and log whether a capture starts (#111): an attack order for 5s, then a move-to-unit order.
+				-- Game 055: attack and move-to-unit started no capture (4 tries each). 7.42 made capturing an
+				-- interaction rather than a hero ability (ValveSoftware/Dota2-Gameplay#32850), so the third try is
+				-- the API's interaction order for map objects, Action_UseShrine (pcall: its use on an outpost is
+				-- not documented).
+				local try = nearFor < 5 and "attack" or nearFor < 10 and "move-to-unit" or "use-shrine"
+				if bot._outpostProbeTry ~= try then
+					if bot._outpostProbeTry ~= nil then
+						OutpostProbeLog("no-capture", bot._outpostProbeTry, targetOutpost)
+					end
+					bot._outpostProbeTry = try
+					if try == "attack" then
+						OutpostProbeLog("try", try, targetOutpost)
+						bot:Action_AttackUnit(targetOutpost, true)
+					elseif try == "move-to-unit" then
+						OutpostProbeLog("try", try, targetOutpost)
+						bot:Action_MoveToUnit(targetOutpost)
+					else
+						local ok, err = pcall(bot.Action_UseShrine, bot, targetOutpost)
+						OutpostProbeLog("try", try .. (ok and "" or ("/error:" .. tostring(err))), targetOutpost)
+					end
+				end
 			end
 			-- No attack fallback: outposts are invulnerable, an attack order only made him stand.
 			return
@@ -1873,6 +1976,9 @@ heroSpecificDesire["npc_dota_hero_hoodwink"] = function()
 	end
 	if highPriorityAbility:IsTrained() then
 		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_hoodwink_sharpshooter_windup") then
+			-- hero_hoodwink.lua turns the bolt and releases it; a move order from this mode's Think (it walks
+			-- toward the fountain when idle) would turn her off the target.
+			bot._outpostHoldUntil = DotaTime() + 0.15
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
@@ -2027,7 +2133,25 @@ heroSpecificDesire["npc_dota_hero_puck"] = function()
 		highPriorityAbility = bot:GetAbilityByName("puck_phase_shift")
 	end
 	if highPriorityAbility:IsTrained() then
-		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_puck_phase_shift") then
+		-- From the order on (#15, games 046-047: every Phase Shift ended at once; Valve's retreat Think moves the bot
+		-- every think and a move ends the channel). The shift's modifier was only seen after it had ended, so the hold
+		-- starts at hero_puck.lua's order time and lasts the shift's duration (game data) + 0.1s; Think gives no order.
+		local orderAt = bot._phaseOrderAt
+		local holdFor = highPriorityAbility:GetSpecialValueFloat("duration") + 0.1
+		-- Hit by a hero after the order (0.1s for the cast): the shift is not on, no hold (game 048, t=752).
+		local hurt = orderAt ~= nil
+			and DotaTime() - orderAt > 0.15
+			and bot:WasRecentlyDamagedByAnyHero(DotaTime() - orderAt - 0.1)
+		-- hero_puck.lua asks for the hold before it casts (bot._phaseWantAt): the cast goes out once this mode is
+		-- active, so Valve's retreat / attack Think can no longer replace the order (game 055).
+		local wanted = bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt < 0.5
+		if
+			wanted
+			or not hurt and orderAt ~= nil and DotaTime() - orderAt < holdFor
+			or highPriorityAbility:IsInAbilityPhase()
+			or bot:HasModifier("modifier_puck_phase_shift")
+		then
+			bot._outpostHoldUntil = DotaTime() + 0.15
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
@@ -2478,6 +2602,24 @@ end
 
 function ConsiderOutpostCapture()
 	outpostMoveLoc = nil
+	-- 7.42: bots cannot capture outposts (#111). The capture ability is gone from the hero (GetAbilityByName nil), and
+	-- an attack order, a move-to-unit order and Action_UseShrine on the outpost started no capture (games 055-057,
+	-- 0 outposts in every 7.42 game; capturing became an interaction, ValveSoftware/Dota2-Gameplay#32850). No walk to
+	-- an outpost without the ability; one line per bot per game says so.
+	if bot:GetAbilityByName("ability_capture") == nil then
+		if not bot._outpostCaptureOffLogged then
+			bot._outpostCaptureOffLogged = true
+			pcall(
+				print,
+				string.format(
+					"[OHA-OUTPOST] t=%.0f %s capture-off why=no-ability",
+					DotaTime(),
+					(string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
+		end
+		return BOT_MODE_DESIRE_NONE
+	end
 	-- Stop a capture in progress once enemy heroes show up and we do not outnumber them. The
 	-- 6s channel was never cancelled: Doom kept capturing with Tusk and Enigma on him.
 	-- Only the capture itself: a plain IsChanneling() check would also cancel ults like Black Hole.

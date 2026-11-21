@@ -20,6 +20,7 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
+local ForeignItems = require(GetScriptDirectory() .. "/FuncLib/systems/foreign_items")
 -- Observer stock is shared with the human. When a ward lands in the shop, leave it
 -- for 30s. Buy only what is still there after that.
 local OBS_HUMAN_WINDOW = 30
@@ -123,6 +124,18 @@ local function CountList(list)
 	local counts = {}
 	for _, name in ipairs(list) do
 		counts[name] = (counts[name] or 0) + 1
+	end
+	return counts
+end
+-- How many of each part the bot must hold once the parts still to buy (list) are bought: what it holds now plus
+-- the list (#38). Game 055: Weaver held a Magic Stick and one Iron Branch; the plan for Magic Wand (Stick + 2
+-- Branches + recipe) was one Branch and the recipe. The count was the list alone (1 Branch), she held 1, so
+-- ShouldBuyBasicItem skipped the Branch, the recipe was bought and the Wand never formed. 90 rebuilt lists start
+-- with one Branch and build a Wand later.
+local function RequiredCounts(list)
+	local counts = CountList(list)
+	for name, count in pairs(counts) do
+		counts[name] = count + CountItem(bot, name)
 	end
 	return counts
 end
@@ -641,6 +654,99 @@ local function CheckPulls()
 	end
 	bot._pullWatch = keep
 end
+-- [OHA-NEUTRAL] madstone (#116): the first neutral item came at 11-19 min in games 050-062 although tier 1 opens at
+-- 0:00. 7.42 rules (resource/localization/dota_english.txt, DOTA_Madstone_Explaination_1/2): "Fully clear a neutral
+-- creep camp to earn 2 Madstone for yourself and 1 for a random ally (Ancient camps earn 3 and 2)"; tier 1 takes 6
+-- (scripts/npc/neutral_items.txt craft_cost), later tiers 10; a team limit rises over time (its numbers are not in
+-- the game files). The reward drops as item_madstone_bundle (scripts/npc/items.txt: AutoPickup 1, ItemCastOnPickup
+-- 1, die_time 20). Whether bots collect it is not known, so every bundle that comes within 1200 of the bot is
+-- logged when seen and when gone (fate=expired when it lay the full 20 s, else taken; minDist = how close the bot
+-- came), and a bot without a neutral item says so every 2 min. No bundle line at all means the bundles are not in
+-- GetDroppedItemList. Until 30:00 only (tier 3).
+local MADSTONE_LOG_UNTIL = 1800
+local madstoneNextScan = 0
+local function LogMadstone(neutralName)
+	local now = DotaTime()
+	if now < 0 or now > MADSTONE_LOG_UNTIL or now < madstoneNextScan then
+		return
+	end
+	madstoneNextScan = now + 1
+	local heroName = (string.gsub(botName, "npc_dota_hero_", ""))
+	local bundles = bot._madstoneBundles or {}
+	bot._madstoneBundles = bundles
+	local stats = bot._madstoneStats or { seen = 0, taken = 0, expired = 0, nextSummary = 0 }
+	bot._madstoneStats = stats
+	local present = {}
+	for _, drop in pairs(GetDroppedItemList() or {}) do
+		if
+			drop ~= nil
+			and drop.item ~= nil
+			and drop.location ~= nil
+			and not drop.item:IsNull()
+			and drop.item:GetName() == "item_madstone_bundle"
+		then
+			local key = string.format("%.0f,%.0f", drop.location.x, drop.location.y)
+			local dist = GetUnitToLocationDistance(bot, drop.location)
+			local entry = bundles[key]
+			if entry == nil then
+				entry = { firstAt = now, minDist = dist, logged = false }
+				bundles[key] = entry
+			end
+			present[key] = true
+			entry.minDist = math.min(entry.minDist, dist)
+			if not entry.logged and dist <= 1200 then
+				entry.logged = true
+				stats.seen = stats.seen + 1
+				print(
+					string.format(
+						"[OHA-NEUTRAL] t=%.0f %s madstone-bundle seen at=%s dist=%.0f age=%.0f slot16=%s",
+						now,
+						heroName,
+						key,
+						dist,
+						now - entry.firstAt,
+						neutralName
+					)
+				)
+			end
+		end
+	end
+	for key, entry in pairs(bundles) do
+		if not present[key] then
+			bundles[key] = nil
+			if entry.logged then
+				local age = now - entry.firstAt
+				local fate = age >= 19 and "expired" or "taken"
+				stats[fate] = stats[fate] + 1
+				print(
+					string.format(
+						"[OHA-NEUTRAL] t=%.0f %s madstone-bundle gone at=%s age=%.0f fate=%s minDist=%.0f",
+						now,
+						heroName,
+						key,
+						age,
+						fate,
+						entry.minDist
+					)
+				)
+			end
+		end
+	end
+	if neutralName == "none" and now >= stats.nextSummary then
+		stats.nextSummary = now + 120
+		print(
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s no-neutral-yet bundlesSeen=%d taken=%d expired=%d lastHits=%d",
+				now,
+				heroName,
+				stats.seen,
+				stats.taken,
+				stats.expired,
+				bot:GetLastHits()
+			)
+		)
+	end
+end
 local function PromoteBackpackCounters()
 	CheckPulls()
 	-- [OHA-NEUTRAL]: which neutral item the bot carries (slot 16), printed when it changes. Game 039: the
@@ -659,6 +765,7 @@ local function PromoteBackpackCounters()
 			)
 		)
 	end
+	pcall(LogMadstone, neutralName)
 	if DotaTime() < promoteNextCheck then
 		return
 	end
@@ -994,11 +1101,7 @@ local function BuyBasicItem()
 		bot.bPurchaseFromSecret = IsItemPurchasedFromSecretShop(bot.currBuyingBasicItem)
 		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 	end
-	if
-		bot.currBuyingBasicItem == "item_infused_raindrop"
-		or bot.currBuyingBasicItem == "item_tome_of_knowledge"
-		or bot.currBuyingBasicItem == "item_flask"
-	then
+	if bot.currBuyingBasicItem == "item_infused_raindrop" or bot.currBuyingBasicItem == "item_flask" then
 		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
 			FinishBasicItem()
 			return
@@ -1204,7 +1307,7 @@ local function BuyBasicItemTurbo()
 		nextItemCost = GetItemCost(bot.currBuyingBasicItem)
 		bot.lastItemToBuy = bot.currBuyingBasicItem
 	end
-	if bot.currBuyingBasicItem == "item_infused_raindrop" or bot.currBuyingBasicItem == "item_tome_of_knowledge" then
+	if bot.currBuyingBasicItem == "item_infused_raindrop" then
 		if GetItemStockCount(bot.currBuyingBasicItem) <= 0 then
 			FinishBasicItem()
 			return
@@ -1529,6 +1632,9 @@ function ItemPurchaseThink()
 			and drop.item:GetName() ~= "item_ward_sentry"
 			and drop.item:GetName() ~= "item_ward_dispenser"
 			and Item.RoshanClaimKind(drop.item:GetName()) == nil
+			-- Not another player's item this bot dropped (#141): whether drop.owner names the buyer or whoever
+			-- dropped it is unverified, and the second would walk the bot straight back to it.
+			and not ForeignItems.WasDropped(bot, drop.item:GetName())
 		then
 			local distance = GetUnitToLocationDistance(bot, drop.location)
 			if distance > 200 and distance < 1000 then
@@ -2117,9 +2223,12 @@ function ItemPurchaseThink()
 			if it ~= nil and not it:IsNull() then
 				local name = it:GetName()
 				local backedOff = bot._forageSwapBackoff ~= nil and now < (bot._forageSwapBackoff[name] or -999)
+				-- Not another player's mushroom (#141; game 062, 44:39: Medusa swapped Nature's Prophet's into a main
+				-- slot): it can't be eaten, and the item think drops it.
 				if
 					(name == "item_foragers_health" or name == "item_foragers_stats" or name == "item_foragers_mana")
 					and not backedOff
+					and not ForeignItems.Check(bot, it)
 				then
 					return name, slot, it
 				end
@@ -2463,7 +2572,7 @@ function ItemPurchaseThink()
 			bot._resumeBuy[bot.currBuyingItemInPurchaseList] = nil
 			bot.currBuyingBasicItemList = resume.list
 			bot.currBuyingBasicItemRefList = resume.ref
-			bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
+			bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 			bot._recipeTarget = resume.target or {}
 			BuyLog("resume %s left=%d", ShortItem(bot.currBuyingItemInPurchaseList), #bot.currBuyingBasicItemList)
 			NextBasicItem()
@@ -2475,7 +2584,7 @@ function ItemPurchaseThink()
 			bot.currBuyingBasicItemList[#basicItems - i + 1] = basicItems[i]
 		end
 		bot.currBuyingBasicItemRefList = Utils.Deepcopy(bot.currBuyingBasicItemList)
-		bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemRefList)
+		bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 		-- How many of each recipe item this build should end with: owned now plus the recipes in it.
 		bot._recipeTarget = {}
 		for _, part in ipairs(bot.currBuyingBasicItemRefList) do
@@ -2522,13 +2631,17 @@ function ItemPurchaseThink()
 							local parentName = string.gsub(itemName, "item_recipe_", "item_")
 							local components = Item[parentName] or Item.GetComponentList(parentName)
 							if components and #components > 0 then
-								for _, component in pairs(components) do
-									if not string.find(component, "recipe") and not Item.IsItemInHero(component) then
-										table.insert(bot.currBuyingBasicItemList, 1, component)
+								-- Each part as many times as the item needs it, less what is held (a held recipe for a
+								-- Magic Wand with one Branch is still one Branch short).
+								for component, needed in pairs(CountList(components)) do
+									if not string.find(component, "recipe") then
+										for _ = CountItem(bot, component) + 1, needed do
+											table.insert(bot.currBuyingBasicItemList, 1, component)
+										end
 									end
 								end
 								if #bot.currBuyingBasicItemList > 0 then
-									bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
+									bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 									break
 								end
 							end
@@ -2541,7 +2654,7 @@ function ItemPurchaseThink()
 						bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList + 1] = itemName
 					end
 				end
-				bot.currBuyingRequiredCounts = CountList(bot.currBuyingBasicItemList)
+				bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 				NextBasicItem()
 			else
 				bot.countInvCheck = bot.countInvCheck + 1

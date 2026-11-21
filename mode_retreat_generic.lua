@@ -745,10 +745,13 @@ function GetDesireHelper()
 		return RetreatTag(229, BOT_MODE_DESIRE_ABSOLUTE)
 	end
 	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
-		-- Roshan's hits count as creep hits: the low-HP creep rule runs before the exemption (game 063, #145).
-		local roshanLow = CreepLowDesire(true)
-		if roshanLow > 0 then
-			return RetreatTag(231, roshanLow)
+		-- Roshan's hits count as creep hits: the low-HP creep rule runs before the exemption (game 063, #145). Not for
+		-- Huskar (he wants to be low; the HP rewrite for him comes later, and Fu.ShouldLeaveRoshanFight skips him too).
+		if botName ~= "npc_dota_hero_huskar" then
+			local roshanLow = CreepLowDesire(true)
+			if roshanLow > 0 then
+				return RetreatTag(231, roshanLow)
+			end
 		end
 		if hpRatio > 0.2 then
 			return RetreatTag(232, BOT_MODE_DESIRE_NONE)

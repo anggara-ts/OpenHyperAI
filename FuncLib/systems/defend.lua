@@ -1568,9 +1568,13 @@ local function LogBaseDefense(bot, defendLane, desire, why, gameState)
 	bot._defendLaneDesire[defendLane] = desire
 	bot._defendLaneWhy[defendLane] = why
 	local now = DotaTime()
-	if now < (bot._defendLogAt or -999) or Fu.IsMeepoClone(bot) then
+	-- Checked at most once a second (#52): the line prints at most every 5s, but until it printed the threat and
+	-- high-ground wave reads below (every enemy creep, once per high-ground building) ran on every defend desire of
+	-- all three lanes. The lane desires above are still stored on every call.
+	if now < (bot._defendLogAt or -999) or now < (bot._defendLogCheckAt or -999) or Fu.IsMeepoClone(bot) then
 		return
 	end
+	bot._defendLogCheckAt = now + 1
 	local threat = ReadBaseThreat(gameState)
 	local hgBuilding, hgCreeps = Fu.Utils.HighGroundCreepWaveNear(bot, 30000)
 	if not threat.exposed and hgBuilding == nil then

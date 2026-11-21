@@ -4,7 +4,7 @@
 -- Customize/general.lua had local changes. Without it (Workshop copies) the static release number below is used.
 -- Release format: YYYY.MM.DD-NNN.
 local Version = {
-	number = "2026.11.17-148",
+	number = "2026.11.21-201",
 }
 
 local infoOk, info = pcall(require, GetScriptDirectory() .. "/Customize/build_info")

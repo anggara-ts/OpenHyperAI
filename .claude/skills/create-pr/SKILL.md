@@ -28,4 +28,5 @@ Rules: `AGENTS.md` (Branches and pull requests, Commits, Checks, Logging). Check
    Create with `gh pr create --body-file ...` or update with `gh pr edit <n> --body-file ...`; mark ready with
    `gh pr ready <n>` when the code is done.
 7. **Track it:** `node Util/verify.js add <pr>` for anything visible in a game; if it needs specific heroes, run
-   `node Util/verify.js lineup --suggest` (and `--write` when slots are free).
+   `node Util/verify.js lineup --suggest` (and `--write` when slots are free). The game sees a lineup change
+   only after the export (skill `prepare-game` step 4).

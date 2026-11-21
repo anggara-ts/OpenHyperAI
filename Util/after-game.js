@@ -11,6 +11,7 @@
 // 3. Tracker: `node Util/verify.js check <log> --game NNN` (its output, verbatim).
 // 4. Script errors grouped by message, log spam (top [OHA-*] tags by peak lines per second), deaths and the
 //    scoreboard from the summary.
+// 4b. Mode flip-flops: Util/flip-report.js's summary of [OHA-FLIP], [OHA-ROAMSTAT] and [OHA-HUNT] (#165).
 // 5. Maintainer comments on every tracked PR posted since the last review (`lastReviewAt` in
 //    Util/verify/tracker.json; set at the end unless --no-mark).
 // 6. Writes Util/match-logs/game-NNN_review.md (git-ignored) and prints its path. An existing review file is
@@ -293,6 +294,15 @@ function deathsSection(summary) {
 	return out.join("\n");
 }
 
+// --- 4b. mode flip-flops (#165) ----------------------------------------------------------------------------
+function flipsSection(lines) {
+	try {
+		return require("./flip-report").summary(lines);
+	} catch (err) {
+		return `flip-report.js failed: ${err.message || err}`;
+	}
+}
+
 // --- 5. maintainer comments ------------------------------------------------------------------------------
 function commentsSection(tracker) {
 	const since = tracker.lastReviewAt || null;
@@ -378,6 +388,10 @@ function main() {
 		"",
 		deathsSection(summary),
 		"",
+		"## Mode flips",
+		"",
+		flipsSection(lines),
+		"",
 		"## Maintainer comments",
 		"",
 		commentsSection(tracker),
@@ -411,4 +425,4 @@ if (require.main === module) {
 		process.exit(1);
 	}
 }
-module.exports = { buildSection, errorsSection, spamSection, deathsSection };
+module.exports = { buildSection, errorsSection, spamSection, deathsSection, flipsSection };

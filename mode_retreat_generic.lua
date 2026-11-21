@@ -350,6 +350,84 @@ local function JinguFightOn()
 	end
 	return true
 end
+-- The kill the creep-low rule and the hard retreat let a bot stay for: its own target (not any enemy near) dies to
+-- the next hit (Fu.IsOneAutoAttackKill: its hit, or an ally's already in range), and the bot lives until that hit
+-- lands (RetreatRules.DiesBeforeFinish). Game 064, 22:23: Alchemist at 18% HP with 5 enemy heroes on him stayed
+-- (creep-low-skip why=finish) because Fu.ShouldFinishCommittedKill is true for any enemy within ~1200 one hit
+-- kills, with no look at the bot's own HP, and he died the same second. src names the caller in the log.
+local function FinishKillExempt(src)
+	if not Fu.IsValidHero(botTarget) then
+		return false
+	end
+	local attackRange = bot:GetAttackRange() or 150
+	local dist = GetUnitToUnitDistance(bot, botTarget)
+	-- The reach Fu.ShouldFinishCommittedKill uses.
+	local targetKill = dist <= math.max(attackRange + 750, 1100) and Fu.IsOneAutoAttackKill(bot, botTarget)
+	local now = DotaTime()
+	if not targetKill then
+		-- Say when the old rule (any enemy near) would have let the bot stay. At most every 5s.
+		if hpRatio < 0.6 and now >= (bot._finishDenyLogAt or -999) and Fu.ShouldFinishCommittedKill(bot, botTarget) then
+			bot._finishDenyLogAt = now + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s finish-denied why=not-target src=%s hp=%.2f target=%s",
+					now,
+					HeroName(),
+					src,
+					hpRatio,
+					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
+		end
+		return false
+	end
+	-- Until the hit lands: one attack interval, the projectile's flight, and the walk into range.
+	local hitTime = bot:GetSecondsPerAttack() or 1.7
+	local projectileSpeed = bot:GetAttackProjectileSpeed() or 0
+	if attackRange > 300 and projectileSpeed > 0 then
+		hitTime = hitTime + math.min(dist, attackRange) / projectileSpeed
+	end
+	if dist > attackRange then
+		hitTime = hitTime + (dist - attackRange) / math.max(100, bot:GetCurrentMovementSpeed() or 300)
+	end
+	hitTime = math.min(hitTime, 3.0)
+	local hitting, incoming = 0, 0
+	for _, enemyHero in pairs(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and bot:WasRecentlyDamagedByHero(enemyHero, 1.0)
+		then
+			hitting = hitting + 1
+			incoming = incoming + (enemyHero:GetEstimatedDamageToTarget(true, bot, hitTime, DAMAGE_TYPE_ALL) or 0)
+		end
+	end
+	local diesFirst, why = RetreatRules.DiesBeforeFinish(hpRatio, botHealth, hitting, incoming)
+	if diesFirst then
+		if now >= (bot._finishDenyLogAt or -999) then
+			bot._finishDenyLogAt = now + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s finish-denied why=%s src=%s hp=%.2f health=%d hitting=%d incoming=%d hitTime=%.1f target=%s",
+					now,
+					HeroName(),
+					why,
+					src,
+					hpRatio,
+					math.floor(botHealth or 0),
+					hitting,
+					math.floor(incoming),
+					hitTime,
+					(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
+				)
+			)
+		end
+		return false
+	end
+	return true
+end
 -- Alone / outnumbered after enemy backup: hard retreat so sticky engage cannot win.
 -- It returned 0.7 (BOT_MODE_DESIRE_ABSOLUTE) while attack sits at 0.95, so it never won a
 -- fight (game 036: 28 deaths straight out of attack mode). Below 60% HP it returns 0.98,
@@ -376,7 +454,7 @@ local function HardRetreatDesire(lastStand)
 	local enemiesNearby = Fu.GetEnemyCount(bot, 1400)
 	local lastSeen = Fu.GetLastSeenEnemiesNearLoc and Fu.GetLastSeenEnemiesNearLoc(bot:GetLocation(), 2000) or {}
 	local pressure = math.max(enemiesNearby, #lastSeen)
-	local freeKill = Fu.ShouldFinishCommittedKill(bot, botTarget)
+	local freeKill = FinishKillExempt("hard-retreat")
 	local stronger = Fu.WeAreStronger(bot, 1400)
 	local hit = bot:WasRecentlyDamagedByAnyHero(2.0)
 	local outnumbered =
@@ -458,6 +536,135 @@ local function HardRetreatDesire(lastStand)
 	end
 	return BOT_MODE_DESIRE_ABSOLUTE, 201
 end
+-- Low HP in a creep wave or under a tower, at any game time (RetreatRules.CreepLowRetreat). Game 062, 17:34: Weaver
+-- died to creeps in attack mode (0.71-0.74), 13% -> 3% in 3.5s, no enemy hero near. 0.98 like the hard retreat:
+-- attack reads up to 0.95, and BOT_MODE_DESIRE_VERYHIGH is only 0.6. Held 3s whichever mode is active (mode_hold does
+-- not hold desires above 0.9), renewed while creeps or a tower are in reach and through a TP home (game 064, 42:04:
+-- Death Prophet's TP was lost to push mode, see RetreatRules.CreepLowRetreat).
+-- byRoshan: called from the Roshan / Tormentor exemption below, where Roshan's hits count as creep hits. Game 063,
+-- 21:15 Earth Spirit and 46:03 Alchemist died to Roshan in Roshan mode: the exemption returned NONE above 20% HP, so
+-- this rule fired only at 15% / 11%, and Roshan mode called Alchemist back in between (t=2755 out at 18%, t=2758
+-- called, died t=2764). A Roshan exit holds while HP is under 35% and the bot is within 2500 of the pit (the radius
+-- of the pit-leave rule, tag 217), not only while a creep is within 700.
+local CREEP_LOW_PIT_HOLD = 2500
+local function CreepLowDesire(byRoshan)
+	local now = DotaTime()
+	if
+		bot:HasModifier("modifier_fountain_aura_buff")
+		-- Medusa's Mana Shield takes the hits while she has mana (the generic formula below reads her by mana too).
+		or botName == "npc_dota_hero_medusa" and mpRatio >= 0.3
+	then
+		bot._creepLowUntil = nil
+		bot._creepLowByRoshan = nil
+		return 0
+	end
+	local creepHit = bot:WasRecentlyDamagedByCreep(2.0)
+	local towerHit = bot:WasRecentlyDamagedByTower(2.0)
+	local holding = bot._creepLowUntil ~= nil and now < bot._creepLowUntil
+	if not creepHit and not towerHit and not holding then
+		bot._creepLowUntil = nil
+		bot._creepLowByRoshan = nil
+		return 0
+	end
+	local channeling = bot:IsChanneling()
+	local teleporting = channeling and bot:HasModifier("modifier_teleporting")
+	local creepCount = #(bot:GetNearbyCreeps(700, true) or {})
+	local towerNear = #(bot:GetNearbyTowers(900, true) or {}) > 0
+	local roshanPit = (byRoshan or bot._creepLowByRoshan) and Fu.GetCurrentRoshanLocation() or nil
+	local nearPit = roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < CREEP_LOW_PIT_HOLD
+	local canFinish = not channeling and FinishKillExempt("creep-low")
+	local fire, renew = RetreatRules.CreepLowRetreat(
+		hpRatio,
+		creepHit,
+		towerHit,
+		canFinish,
+		channeling,
+		holding,
+		creepCount > 0 or towerNear or nearPit,
+		teleporting
+	)
+	if not fire then
+		if canFinish and hpRatio < RetreatRules.CREEP_LOW_HP and now >= (bot._creepLowSkipLogAt or -999) then
+			bot._creepLowSkipLogAt = now + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s creep-low-skip why=finish hp=%.2f creeps=%d mode=%d",
+					now,
+					HeroName(),
+					hpRatio,
+					creepCount,
+					activeMode or -1
+				)
+			)
+		end
+		-- A channel that is not a TP (or a TP that modifier_teleporting did not show) ended a live hold: say so,
+		-- so a game without tp-keep lines tells "no TP" from "TP not detected".
+		if channeling and holding then
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s creep-low drop why=channel tp=%s hp=%.2f mode=%d",
+					now,
+					HeroName(),
+					tostring(teleporting),
+					hpRatio,
+					activeMode or -1
+				)
+			)
+		end
+		bot._creepLowUntil = nil
+		bot._creepLowByRoshan = nil
+		bot._creepLowTpLogged = nil
+		return 0
+	end
+	if renew then
+		bot._creepLowUntil = now + 3
+	end
+	if byRoshan then
+		bot._creepLowByRoshan = true
+	end
+	-- Once per TP channel: the line that shows retreat kept the TP (did the bot arrive? the next creep-low line, or
+	-- none because the fountain ended the rule).
+	if teleporting then
+		if not bot._creepLowTpLogged then
+			bot._creepLowTpLogged = true
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s creep-low tp-keep hp=%.2f creeps=%d tower=%s mode=%d",
+					now,
+					HeroName(),
+					hpRatio,
+					creepCount,
+					tostring(towerHit or towerNear),
+					activeMode or -1
+				)
+			)
+		end
+		return 0.98
+	end
+	bot._creepLowTpLogged = nil
+	if now >= (bot._creepLowLogAt or -999) then
+		bot._creepLowLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s creep-low %s hp=%.2f creeps=%d tower=%s mode=%d src=%s renew=%s",
+				now,
+				HeroName(),
+				holding and "hold" or "start",
+				hpRatio,
+				creepCount,
+				tostring(towerHit or towerNear),
+				activeMode or -1,
+				bot._creepLowByRoshan and "roshan" or "wave",
+				tostring(renew)
+			)
+		)
+	end
+	return 0.98
+end
 function GetDesire()
 	-- Death and respawn times, for the evasive logger; the retreat holds end with the death.
 	local now = DotaTime()
@@ -465,6 +672,7 @@ function GetDesire()
 		bot._retreatDeadAt = now
 		bot._hardRetreatUntil = nil
 		bot._overEvasiveUntil = nil
+		bot._creepLowUntil = nil
 	end
 	if now - (bot._retreatDesireAt or -999) > 1.5 then
 		bot._retreatResumeAt = now
@@ -536,6 +744,30 @@ function GetDesire()
 			)
 		end
 	end
+	-- The creep-low window is live but another rule returned first with less than its 0.98 (game 064, 42:08: push
+	-- 0.90 won right after a creep-low hold line and the log could not say which rule let it). At most every 3s.
+	if
+		type(desire) == "number"
+		and desire < 0.98
+		and bot._creepLowUntil ~= nil
+		and now < bot._creepLowUntil
+		and now >= (bot._creepLowUnderLogAt or -999)
+	then
+		bot._creepLowUnderLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s creep-low-undercut desire=%.2f line=%d hp=%.2f mode=%d channel=%s",
+				now,
+				HeroName(),
+				desire,
+				retreatLine,
+				hpRatio or -1,
+				activeMode or -1,
+				tostring(bot:IsChanneling())
+			)
+		)
+	end
 	return desire
 end
 function GetDesireHelper()
@@ -558,6 +790,7 @@ function GetDesireHelper()
 	then
 		bot._hardRetreatUntil = nil
 		bot._overEvasiveUntil = nil
+		bot._creepLowUntil = nil
 		return RetreatTag(142, BOT_MODE_DESIRE_NONE)
 	end
 	if activeMode == BOT_MODE_EVASIVE_MANEUVERS or bot._overEvasiveUntil ~= nil then
@@ -647,11 +880,81 @@ function GetDesireHelper()
 			return RetreatTag(211, BOT_MODE_DESIRE_MODERATE)
 		end
 	end
-	if Fu.ShouldLeaveRoshanFight(bot) then
-		local roshanPit = Fu.GetCurrentRoshanLocation()
-		if roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < 2500 then
-			return RetreatTag(217, BOT_MODE_DESIRE_ABSOLUTE)
+	-- Pit leave (tag 217) only for a bot in a Roshan fight: in Roshan mode, hitting Roshan or hit by him in the last
+	-- 5s, or already sent out of this fight (RetreatRules.RoshanLeaveApplies; game 065: it fired for lane bots near
+	-- the pit and for Primal Beast after Roshan died, cutting their creep-low holds). In the fight the creep-low rule
+	-- runs first, so its 0.98 (and the src=roshan hold near the pit) is not cut to 0.70.
+	local roshanPit = Fu.GetCurrentRoshanLocation()
+	local nearPit = roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < 2500
+	local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+	local roshanSeenAlive = Fu.IsUnitValid(roshanHandle) and roshanHandle:IsAlive()
+	if nearPit then
+		local attackTarget = bot:GetAttackTarget()
+		if
+			activeMode == BOT_MODE_ROSHAN
+			or attackTarget ~= nil and Fu.IsRoshan(attackTarget)
+			or roshanSeenAlive and roshanHandle:GetAttackTarget() == bot
+		then
+			bot._roshanFightAt = DotaTime()
 		end
+	end
+	if Fu.ShouldLeaveRoshanFight(bot) then
+		-- Fu.IsRoshanAlive goes by the kill time and a fixed respawn time; a Roshan seen alive counts too (he can be
+		-- back before that time runs out).
+		local roshanAlive = roshanSeenAlive or Fu.IsRoshanAlive()
+		local applies, leaveWhy = RetreatRules.RoshanLeaveApplies(
+			nearPit,
+			roshanAlive,
+			DotaTime() - (bot._roshanFightAt or -999),
+			bot._roshLeaveLatched == true
+		)
+		if not roshanAlive then
+			bot._roshLeaveLatched = nil
+		end
+		if applies then
+			local roshanLow = CreepLowDesire(true)
+			local leaveDesire = math.max(BOT_MODE_DESIRE_ABSOLUTE, roshanLow)
+			if not bot._roshLeaveLatched or DotaTime() >= (bot._roshLeaveLogAt or -999) then
+				bot._roshLeaveLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-RETREAT] t=%.0f %s rosh-leave why=%s hp=%.2f desire=%.2f creepLow=%.2f mode=%d",
+						DotaTime(),
+						HeroName(),
+						leaveWhy,
+						hpRatio,
+						leaveDesire,
+						roshanLow,
+						activeMode or -1
+					)
+				)
+			end
+			bot._roshLeaveLatched = true
+			return RetreatTag(217, leaveDesire)
+		end
+		-- On a change of reason, else every 15s (a hurt laner near the pit would repeat it).
+		if
+			leaveWhy ~= "far"
+			and (leaveWhy ~= bot._roshLeaveSkipWhy or DotaTime() >= (bot._roshLeaveSkipLogAt or -999))
+		then
+			bot._roshLeaveSkipWhy = leaveWhy
+			bot._roshLeaveSkipLogAt = DotaTime() + 15
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s rosh-leave-skip why=%s hp=%.2f dist=%d mode=%d",
+					DotaTime(),
+					HeroName(),
+					leaveWhy,
+					hpRatio,
+					math.floor(GetUnitToLocationDistance(bot, roshanPit)),
+					activeMode or -1
+				)
+			)
+		end
+	else
+		bot._roshLeaveLatched = nil
 	end
 	if
 		Fu.IsDoingRoshan(bot)
@@ -661,8 +964,18 @@ function GetDesireHelper()
 	then
 		return RetreatTag(229, BOT_MODE_DESIRE_ABSOLUTE)
 	end
-	if (Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot)) and hpRatio > 0.2 then
-		return RetreatTag(232, BOT_MODE_DESIRE_NONE)
+	if Fu.IsDoingRoshan(bot) or Fu.IsDoingTormentor(bot) then
+		-- Roshan's hits count as creep hits: the low-HP creep rule runs before the exemption (game 063, #145). Not for
+		-- Huskar (he wants to be low; the HP rewrite for him comes later, and Fu.ShouldLeaveRoshanFight skips him too).
+		if botName ~= "npc_dota_hero_huskar" then
+			local roshanLow = CreepLowDesire(true)
+			if roshanLow > 0 then
+				return RetreatTag(231, roshanLow)
+			end
+		end
+		if hpRatio > 0.2 then
+			return RetreatTag(232, BOT_MODE_DESIRE_NONE)
+		end
 	end
 	local enemiesAroundAncient = Fu.GetEnemiesAroundAncient(bot, 3200)
 	if enemiesAroundAncient > 0 then
@@ -789,6 +1102,11 @@ function GetDesireHelper()
 				hpRatio = 1
 			end
 		end
+	end
+	-- Before tag 350 (0.6 within 4000 of the fountain, below attack), after the Huskar HP rewrite above.
+	local creepLow = CreepLowDesire()
+	if creepLow > 0 then
+		return RetreatTag(340, creepLow)
 	end
 	if bot:DistanceFromFountain() <= 4000 and not isInTeamFight then
 		if hpRatio <= 0.6 or mpRatio < 0.4 then

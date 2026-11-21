@@ -101,9 +101,21 @@ function HuntTrace.EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit)
 	return "cancel"
 end
 
+-- Is the hunt's target dead? Game 064: 5 of 16 "kill" ends had a living target (Clinkz: Puck had teleported home,
+-- Hoodwink was 2710 away or under Shadow Amulet): the handle's IsAlive() reads false for an enemy that teleported,
+-- turned invisible or left vision. Only the scoreboard confirms a death: the target player's GetHeroDeaths went up
+-- since the hunt started. Returns dead, and how it was read ("deaths", or "unread" when the count is unreadable:
+-- then never dead, so a not-alive handle is a target out of sight and the hunt ends hit / lost).
+function HuntTrace.TargetDead(deathsAtStart, deathsNow)
+	if deathsAtStart ~= nil and deathsNow ~= nil then
+		return deathsNow > deathsAtStart, "deaths"
+	end
+	return false, "unread"
+end
+
 function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 	return string.format(
-		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d",
+		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d death=%s",
 		now,
 		hero,
 		why,
@@ -113,8 +125,27 @@ function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 		h.targetName,
 		h.changes,
 		h.snipe,
-		h.other
+		h.other,
+		h.deathCheck or "unread"
 	)
+end
+
+-- The target player's death count (the scoreboard), or nil when it cannot be read.
+local function heroDeaths(unit)
+	if unit == nil or unit:IsNull() then
+		return nil
+	end
+	local okP, pid = pcall(function()
+		return unit:GetPlayerID()
+	end)
+	if not okP or type(pid) ~= "number" or pid < 0 then
+		return nil
+	end
+	local okD, deaths = pcall(GetHeroDeaths, pid)
+	if okD and type(deaths) == "number" then
+		return deaths
+	end
+	return nil
 end
 
 local function finish(bot, hero, h, why, now)
@@ -186,6 +217,7 @@ function HuntTrace.Tick(bot, modeName)
 			targetName = shortName(target),
 			mode = modeName,
 			dist = math.floor(GetUnitToUnitDistance(bot, target)),
+			deaths = heroDeaths(target),
 			changes = 0,
 			snipe = 0,
 			other = 0,
@@ -207,8 +239,12 @@ function HuntTrace.Tick(bot, modeName)
 	end
 	h.seen = now
 	local target = h.target
-	local alive = target ~= nil and not target:IsNull() and target:IsAlive()
-	local seen = alive and target:CanBeSeen()
+	-- The handle can read not-alive for a living enemy out of sight: alive unless the scoreboard has the death.
+	local handleAlive = target ~= nil and not target:IsNull() and target:IsAlive()
+	local dead, deathCheck = HuntTrace.TargetDead(h.deaths, heroDeaths(target))
+	h.deathCheck = deathCheck
+	local alive = not dead
+	local seen = handleAlive and not dead and target:CanBeSeen()
 	if seen then
 		h.dist = math.floor(GetUnitToUnitDistance(bot, target))
 		if target:WasRecentlyDamagedByHero(bot, 1.0) then

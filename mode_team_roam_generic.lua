@@ -56,6 +56,9 @@ local towerEscapeDuration = 2
 local towerEscapeLocation = nil
 -- The hit team roam offers the last-hit overlay this think (#165): the snipe, or a hunt on a creep.
 local offerUnit, offerDesire, offerWhy = nil, 0, nil
+-- A snipe that wins team roam as a mode (a Valve-run active mode, RoamRules.SnipePath): Think hits it. snipeModeWin:
+-- this think's desire came from it, so team roam keeps that path on its next think instead of flipping back.
+local snipeCreep, snipeModeWin, snipeWinLast = nil, false, false
 -- The hero / courier hunt that set team roam's desire last think, and when it started (exit rules while team roam
 -- runs: RoamRules.HuntExitWhy). roamNoHold: this think's desire must not be bridged by mode_hold (a hunt that ended
 -- on purpose, a special unit cut below retreat).
@@ -157,7 +160,7 @@ local function RoamTrace(raw, final)
 		and engageTarget ~= nil
 		and Fu.IsValid(engageTarget)
 		and TeamRoam.CanBeAttacked(engageTarget)
-	local line = RoamStats.Step(stats, now, modeName, roamWhy, cap, bot:GetLastHits(), targetValid)
+	local line = RoamStats.Step(stats, now, modeName, roamWhy, cap, bot:GetLastHits() + bot:GetDenies(), targetValid)
 	if line ~= nil then
 		print(string.format("[OHA-ROAMSTAT] t=%.0f %s %s", now, (string.gsub(botName, "npc_dota_hero_", "")), line))
 	end
@@ -177,6 +180,7 @@ function GetDesire()
 	roamNoHold = false
 	offerUnit, offerDesire, offerWhy = nil, 0, nil
 	LastHitOverlay.Offer(bot, nil)
+	snipeWinLast, snipeModeWin, snipeCreep = snipeModeWin, false, nil
 	local botMode = bot:GetActiveMode()
 	if
 		DotaTime() > 0
@@ -372,14 +376,50 @@ function GetDesireHelper()
 		end
 	end
 	-- The snipe no longer wins team roam as a mode (#165): it is offered to the last-hit overlay at its old desire
-	-- (1.50, cut like team roam's own), which hits only where that desire beats the active mode. Team roam's other
-	-- rules below still decide its own desire.
+	-- (1.50, cut like team roam's own), which hits only where that desire beats the active mode, and holds the mode's
+	-- Think until the hit. Team roam's other rules below still decide its own desire. A Valve-run mode (defend,
+	-- Valve's attack mode, ...) cannot be held from Lua: there the snipe wins team roam as a mode as before (game 064:
+	-- 1/23 overlay snipes got the hit in attack mode, 39/53 as a mode in game 063). No snipe during a hunting
+	-- spell's trace or next to an enemy hero in a fight (RoamRules.SnipePath).
 	if hpRatio > 0.3 then
 		local lastHitCreep = TeamRoam.GetLastHitCreep()
 		if Fu.IsValid(lastHitCreep) and Fu.CanBeAttacked(lastHitCreep) then
 			local why = TeamRoam.LastHitWithdrawWhy(lastHitCreep)
+			local path = nil
 			if why == nil then
+				local activeMode = bot:GetActiveMode()
+				local modeName = activeMode == BOT_MODE_TEAM_ROAM and "team_roam" or RoamStats.ModeName(activeMode)
+				path = RoamRules.SnipePath(
+					LastHitOverlay.ModeHoldable(bot),
+					LastHitOverlay.FightingHero(bot),
+					bot._huntTrace ~= nil or bot:HasModifier("modifier_spirit_breaker_charge_of_darkness"),
+					snipeWinLast and activeMode == BOT_MODE_TEAM_ROAM
+				)
+				if path ~= "overlay" and DotaTime() >= (bot._roamSnipePathLogAt or -999) then
+					bot._roamSnipePathLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-ROAM] t=%.0f %s snipe-path path=%s mode=%s fight=%s hunting=%s",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							path,
+							modeName,
+							tostring(LastHitOverlay.FightingHero(bot)),
+							tostring(bot._huntTrace ~= nil)
+						)
+					)
+				end
+			end
+			if path == "overlay" then
 				offerUnit, offerDesire, offerWhy = lastHitCreep, BOT_DESIRE_OVERRIDE * 1.5, "snipe"
+			elseif path == "mode" then
+				snipeCreep = lastHitCreep
+				snipeModeWin = true
+				roamWhy = "snipe"
+				return BOT_DESIRE_OVERRIDE * 1.5
+			elseif path == "none" then
+				roamWhy = "snipe-none"
 			elseif DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
 				bot._roamLastHitSkipLogAt = DotaTime() + 5
 				pcall(
@@ -621,11 +661,16 @@ function GetDesireHelper()
 				return clampedDesire
 			end
 			-- A creep, a deny, a tower: one hit next to the bot, by the last-hit overlay, without a mode change. The
-			-- snipe (checked above) goes first.
-			if offerUnit == nil then
-				offerUnit, offerDesire, offerWhy = attackTarget, clampedDesire, HuntWhy(prefix, attackTarget)
+			-- snipe (checked above) goes first. Not in a Valve-run mode (defend, Valve's attack mode): the overlay cannot
+			-- hold its Think, and winning team roam for it was the old one-think flip.
+			if not LastHitOverlay.ModeHoldable(bot) then
+				roamWhy = "valve-mode-" .. HuntWhy(prefix, attackTarget)
+			else
+				if offerUnit == nil then
+					offerUnit, offerDesire, offerWhy = attackTarget, clampedDesire, HuntWhy(prefix, attackTarget)
+				end
+				roamWhy = "overlay-" .. HuntWhy(prefix, attackTarget)
 			end
-			roamWhy = "overlay-" .. HuntWhy(prefix, attackTarget)
 			if keepHunt then
 				EndHunt("to-creep", runningHunt)
 			end
@@ -811,7 +856,12 @@ function Think()
 		end
 	end
 	ItemOpsThink()
-	-- The snipe's hit is the last-hit overlay's now (FuncLib/systems/last_hit_overlay.lua, from ItemUsageThink).
+	-- The snipe's hit is the last-hit overlay's (FuncLib/systems/last_hit_overlay.lua, from ItemUsageThink), except
+	-- where it won team roam as a mode (a Valve-run mode was active: RoamRules.SnipePath).
+	if snipeCreep ~= nil and Fu.IsValid(snipeCreep) then
+		bot:Action_AttackUnit(snipeCreep, true)
+		return
+	end
 	if engageTarget ~= nil then
 		if not Fu.Utils.IsValidUnit(engageTarget) or not TeamRoam.CanBeAttacked(engageTarget) then
 			engageTarget = nil

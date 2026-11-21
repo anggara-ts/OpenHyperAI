@@ -54,8 +54,12 @@ end
 --                        fires where team roam would have won the mode
 --   retreat, evasive     active mode is retreat (any desire) / evasive maneuvers (dodging)
 --   invisible            invisible and not a hero that attacks out of it (Riki, PA, TA, Bounty Hunter)
---   charging             Spirit Breaker's Charge, or a hunting spell is running ([OHA-HUNT])
+--   charging             Spirit Breaker's Charge, or a hunting spell's [OHA-HUNT] trace is open (from the cast to
+--                        its end line, up to HuntTrace.KILL_WINDOW after the reveal)
+--   heroFight            attack / team roam is on an enemy hero in attack range: the hit belongs to the hero
 --   channeling, busy     channeling / casting, using an ability or a queued order
+--   valveMode            the active mode's Think is Valve's (ModeHoldable): it cannot be held, team roam should not
+--                        have offered (the mode changed after its GetDesire)
 function Rules.OverlaySkipWhy(s)
 	if s.retreat then
 		return "retreat"
@@ -69,14 +73,94 @@ function Rules.OverlaySkipWhy(s)
 	if s.charging then
 		return "charging"
 	end
+	if s.heroFight then
+		return "fight"
+	end
 	if s.channeling then
 		return "channel"
 	end
 	if s.busy then
 		return "busy"
 	end
+	if s.valveMode then
+		return "valve"
+	end
 	if s.desire == nil or s.modeDesire == nil or s.desire <= s.modeDesire then
 		return "mode"
+	end
+	return nil
+end
+
+-- Modes whose Think is ours (Lua) for every hero: the last-hit overlay can hold them while it owns a hit
+-- (OhaCastGuard skips their Think). Defend, item, side shop, roam, defend ally and evasive maneuvers are Valve's
+-- (no Think in our files), and so is attack for the heroes not on Utils.BuggyHeroesDueToValveTooLazy. Lotus and
+-- wisdom shrine have a Lua Think that does not call the guard. Names as RoamStats.ModeName.
+local HOLDABLE_MODES = {
+	laning = true,
+	farm = true,
+	push_tower_top = true,
+	push_tower_mid = true,
+	push_tower_bot = true,
+	assemble = true,
+	rune = true,
+	secret_shop = true,
+	ward = true,
+	roshan = true,
+	outpost = true,
+	team_roam = true,
+}
+-- attackOverride: the bot runs our attack mode (mode_attack_generic.lua sets bot._ohaAttackOverride).
+function Rules.ModeHoldable(modeName, attackOverride)
+	if modeName == "attack" then
+		return attackOverride == true
+	end
+	return HOLDABLE_MODES[modeName] == true
+end
+
+-- How team roam takes its snipe this think:
+--   "overlay"  offer it to the last-hit overlay (the bot stays in its mode; the overlay holds the mode's Think)
+--   "mode"     win team roam as a mode, as before #165: the active mode is Valve's and cannot be held from Lua, or
+--              team roam already won the mode with the snipe (keep it until the creep is gone, no flip back)
+--   "none"     no snipe: a hunting spell's trace is open, or attack / team roam is on an enemy hero in range
+function Rules.SnipePath(holdable, heroFight, hunting, modeWinRunning)
+	if heroFight or hunting then
+		return "none"
+	end
+	if modeWinRunning then
+		return "mode"
+	end
+	if holdable then
+		return "overlay"
+	end
+	return "mode"
+end
+
+-- The overlay owns a hit from its first attack order on the unit; the mode Thinks are held meanwhile. Why it lets
+-- go, or nil to keep holding. o (GameTime seconds):
+--   now, since       now, and when the hold started
+--   alive            the unit is alive
+--   lastAttack       bot:GetLastAttackTime() now; ownAttack: the same when the hold started
+--   windup           the bot's attack point in seconds (GetAttackPoint / GetAttackSpeed): the hit counts as released
+--                    only once lastAttack + windup has passed, as it is not known whether GetLastAttackTime is the
+--                    start of the attack or its release (special_units.lua's kiting assumes the same)
+--   free             the active mode is retreat or evasive maneuvers: never held
+-- HOLD_CAP ends a hold whose hit never comes (the unit walked off, an item or spell order replaced the attack).
+local HOLD_CAP = 1.0
+Rules.HOLD_CAP = HOLD_CAP
+function Rules.OverlayHoldWhy(o)
+	if not o.alive then
+		return "dead"
+	end
+	if o.free then
+		return "free"
+	end
+	if o.lastAttack ~= nil and o.ownAttack ~= nil and o.lastAttack > o.ownAttack then
+		if o.now >= o.lastAttack + (o.windup or 0) then
+			return "hit"
+		end
+	end
+	if o.now - o.since >= HOLD_CAP then
+		return "cap"
 	end
 	return nil
 end

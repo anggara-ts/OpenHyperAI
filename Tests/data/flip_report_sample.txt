@@ -5,8 +5,8 @@
 11/21 20:00:05 [VScript] [OHA-HUNT] t=300 nyx_assassin start spell=vendetta target=lich mode=outpost dist=1800
 11/21 20:00:06 [VScript] [OHA-HUNT] t=302 nyx_assassin mode-change from=outpost to=team_roam dist=900 spell=vendetta target=lich
 11/21 20:00:07 [VScript] [OHA-HUNT] t=302 nyx_assassin interrupt by=snipe unit=npc_dota_creep_badguys_melee dist=900 spell=vendetta target=lich
-11/21 20:00:08 [VScript] [OHA-HUNT] t=306 nyx_assassin end why=hit dist=120 lasted=6.0 spell=vendetta target=lich changes=1 snipe=1 other=0
+11/21 20:00:08 [VScript] [OHA-HUNT] t=306 nyx_assassin end why=hit dist=120 lasted=6.0 spell=vendetta target=lich changes=1 snipe=1 other=0 death=deaths
 11/21 20:00:09 [VScript] [OHA-HUNT] t=400 spirit_breaker start spell=charge target=lich mode=outpost dist=3500
-11/21 20:00:10 [VScript] [OHA-HUNT] t=403 spirit_breaker end why=cancel dist=2100 lasted=3.4 spell=charge target=lich changes=0 snipe=0 other=0
+11/21 20:00:10 [VScript] [OHA-HUNT] t=403 spirit_breaker end why=cancel dist=2100 lasted=3.4 spell=charge target=lich changes=0 snipe=0 other=0 death=deaths
 11/21 20:00:11 [VScript] [OHA-HUNT] t=900 clinkz start spell=skeleton_walk target=nevermore mode=attack dist=900
-11/21 20:00:12 [VScript] [OHA-HUNT] t=903 clinkz end why=kill dist=180 lasted=2.7 spell=skeleton_walk target=nevermore changes=0 snipe=0 other=0
+11/21 20:00:12 [VScript] [OHA-HUNT] t=903 clinkz end why=kill dist=180 lasted=2.7 spell=skeleton_walk target=nevermore changes=0 snipe=0 other=0 death=deaths

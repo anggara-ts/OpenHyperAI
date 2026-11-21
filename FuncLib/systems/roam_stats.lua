@@ -152,8 +152,8 @@ function RoamStats.Format(minute, c)
 	)
 end
 
--- A pending last-hit try (a snipe, or a hunt on a creep) resolves once a last hit follows (true) or after 1.5s
--- (false), or when a new try starts before it resolved (force: a try without a last hit). nil: still pending.
+-- A snipe that won team roam as a mode (a Valve-run mode, see RoamRules.SnipePath) resolves once a last hit follows
+-- (true) or after 1.5s (false), or when a new one starts before it resolved (force: no last hit). nil: pending.
 local function resolvePending(pending, now, lastHits, force)
 	if pending == nil then
 		return nil
@@ -183,38 +183,96 @@ local function resolveSnipe(s, now, lastHits, force)
 	s.snipe = nil
 end
 
-local function resolveCreep(s, now, lastHits, force)
-	local got = resolvePending(s.creep, now, lastHits, force)
-	if got == nil then
-		return
+-- The last-hit overlay's tries (FuncLib/systems/last_hit_overlay.lua): a try is the overlay ordering hits on one
+-- unit, without a mode change. Game 064 counted an open try as a miss as soon as the overlay moved to another unit,
+-- and a deny never counted (only GetLastHits was read). Now a try stays open until its unit dies or the overlay has
+-- not ordered it for TRY_DROP seconds:
+--   got   the unit died and our score (last hits + denies) went up since the try started; each point is claimed
+--         by one try only (two open tries, one hit: one got, one miss)
+--   miss  the unit died, no new point
+--   drop  the unit lived and the overlay stopped ordering it (another mode or a newer offer took the bot)
+-- A snipe counts in snipeLH (as the snipe activations did before), a hunt on a creep in creepLH; a drop is a try
+-- without a hit, as an activation without a last hit in 1.5s was.
+local TRY_DROP = 3
+RoamStats.TRY_DROP = TRY_DROP
+
+-- The overlay ordered a hit on key (the unit handle) this think. Returns the try (the overlay keeps notes on it:
+-- held, release, capped) and whether it is new.
+--   why    "snipe" (team roam's snipe) or the hunt's rule ("hunt-carry/lane", ...)
+--   mode   the active mode's name (the snipe's previous mode in snipeLHbyPrev)
+--   score  bot:GetLastHits() + bot:GetDenies() now
+function RoamStats.OverlayTry(s, now, key, why, mode, score)
+	s.tries = s.tries or {}
+	for _, try in ipairs(s.tries) do
+		if try.key == key then
+			try.last = now
+			return try, false
+		end
 	end
-	local c = s.c
-	c.creepTries = c.creepTries + 1
-	if got then
-		c.creepGot = c.creepGot + 1
-	end
-	s.creep = nil
+	local try = { key = key, why = why, mode = mode or "?", t = now, last = now, score = score, held = 0 }
+	s.tries[#s.tries + 1] = try
+	return try, true
 end
 
--- The last-hit overlay (FuncLib/systems/last_hit_overlay.lua) started a hit on a new unit, without a mode change.
---   why       "snipe" (team roam's snipe) or the hunt's rule ("hunt-carry/lane", ...)
---   mode      the active mode's name (the snipe's previous mode in snipeLHbyPrev)
---   lastHits  bot:GetLastHits() now
--- A snipe counts in snipeLH (as the snipe activations did before), a hunt on a creep in creepLH.
-function RoamStats.NoteOverlay(s, now, why, mode, lastHits)
-	if why == "snipe" then
-		resolveSnipe(s, now, lastHits, true)
-		s.snipe = { t = now, lh = lastHits, prev = mode or "?" }
+local function countTry(s, try, got)
+	local c = s.c
+	if try.why == "snipe" then
+		local byPrev = c.snipeByPrev[try.mode] or { got = 0, tries = 0 }
+		c.snipeByPrev[try.mode] = byPrev
+		byPrev.tries = byPrev.tries + 1
+		c.snipeTries = c.snipeTries + 1
+		if got then
+			byPrev.got = byPrev.got + 1
+			c.snipeGot = c.snipeGot + 1
+		end
 	else
-		resolveCreep(s, now, lastHits, true)
-		s.creep = { t = now, lh = lastHits }
+		c.creepTries = c.creepTries + 1
+		if got then
+			c.creepGot = c.creepGot + 1
+		end
 	end
+end
+
+-- Every overlay think. isDead(key): the try's unit is dead (or gone). Returns the tries that resolved this think,
+-- each with .result ("got" / "miss" / "drop"), or nil.
+function RoamStats.OverlayResolve(s, now, score, isDead)
+	local tries = s.tries
+	if tries == nil or #tries == 0 then
+		return nil
+	end
+	local done = nil
+	local i = 1
+	while i <= #tries do
+		local try = tries[i]
+		local result = nil
+		if isDead(try.key) then
+			local base = math.max(try.score or 0, s.claimed or -1)
+			if score ~= nil and score > base then
+				result = "got"
+				s.claimed = base + 1
+			else
+				result = "miss"
+			end
+		elseif now - try.last > TRY_DROP then
+			result = "drop"
+		end
+		if result ~= nil then
+			try.result = result
+			countTry(s, try, result == "got")
+			table.remove(tries, i)
+			done = done or {}
+			done[#done + 1] = try
+		else
+			i = i + 1
+		end
+	end
+	return done
 end
 
 -- Once per team roam GetDesire (every think, whatever mode is active).
 --   mode         the active mode's name this think ("team_roam" while team roam runs)
 --   why, cap     the rule team roam's desire came from this think, and adjustDesire's cut (CapLabel)
---   lastHits     bot:GetLastHits()
+--   lastHits     bot:GetLastHits() + bot:GetDenies() (a deny snipe counts too)
 --   targetValid  team roam's engage target still alive, visible and attackable (only read while team roam runs)
 -- Activation = the active mode turns into team_roam; the rule that won it is the one from the think before.
 -- Returns the fields of a finished minute's [OHA-ROAMSTAT] line once per game minute, else nil.
@@ -230,10 +288,9 @@ function RoamStats.Step(s, now, mode, why, cap, lastHits, targetValid)
 	end
 	local c = s.c
 	-- A snipe is worth it when a last hit follows within 1.5s. Before #165's fix a snipe was a team roam activation
-	-- (kept for that path); now it is an overlay hit (NoteOverlay), counted the same way.
+	-- (kept for the Valve-run modes); otherwise it is an overlay try (OverlayTry / OverlayResolve).
 	local newSnipe = mode == "team_roam" and s.prevMode ~= "team_roam" and s.winWhy == "snipe"
 	resolveSnipe(s, now, lastHits, newSnipe)
-	resolveCreep(s, now, lastHits, false)
 	local roam = "team_roam"
 	if mode == roam and s.prevMode ~= roam then
 		local winWhy = s.winWhy or "?"

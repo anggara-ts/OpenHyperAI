@@ -36,14 +36,17 @@ T.test("roam stats: FLIP annotation", function()
 	inSample("team_roam:0.64@20" .. R.FlipNote("hunt-carry/lane", 0.64, 0.64, "none", 0.64), "sample FLIP")
 end)
 
--- One think: mode, rule, cap, last hits, engage target valid, and (7th) the rule of a last-hit overlay hit that
--- started this think (NoteOverlay, called before the think's Step as in the game: the hook runs after GetDesire,
--- the next Step resolves it).
+-- One think: mode, rule, cap, score (last hits + denies), engage target valid, and the last-hit overlay: (7th) the
+-- rule of an overlay hit ordered this think on (8th) a unit key, and (9th) a unit key that died this think.
 local function run(R, s, steps)
 	local lines = {}
 	for _, step in ipairs(steps) do
+		local dead = step[9]
+		R.OverlayResolve(s, step[1], step[5] or 0, function(key)
+			return key == dead
+		end)
 		if step[7] ~= nil then
-			R.NoteOverlay(s, step[1], step[7], step[2], step[5] or 0)
+			R.OverlayTry(s, step[1], step[8] or "unit", step[7], step[2], step[5] or 0)
 		end
 		local line = R.Step(s, step[1], step[2], step[3] or "none", step[4] or "none", step[5] or 0, step[6] or false)
 		if line ~= nil then
@@ -90,8 +93,8 @@ T.test("roam stats: activations, the hunt switching itself off, cap lift, snipe 
 		{ 100.4, "team_roam", "snipe", "lane", 8 },
 		{ 100.9, "laning", "none", "none", 8 },
 		-- 8. a hunt on a lane creep by the last-hit overlay (no mode change), last hit 0.4s later
-		{ 110.0, "farm", "overlay-hunt-carry/lane", "none", 8, false, "hunt-carry/lane" },
-		{ 110.4, "farm", "none", "none", 9 },
+		{ 110.0, "farm", "overlay-hunt-carry/lane", "none", 8, false, "hunt-carry/lane", "c8" },
+		{ 110.4, "farm", "none", "none", 9, false, nil, nil, "c8" },
 		{ 120.0, "farm", "none", "none", 9 },
 	})
 	T.eq(#lines, 2, "one line per finished minute")
@@ -99,28 +102,53 @@ T.test("roam stats: activations, the hunt switching itself off, cap lift, snipe 
 	inSample(lines[2] or "?", "minute 1")
 end)
 
-T.test("roam stats: snipes by the last-hit overlay count in snipeLH, creep hunts in creepLH", function()
+T.test("roam stats: overlay tries resolve on their unit's death, a deny counts, no forced miss", function()
 	local R = load()
 	local s = R.New()
 	local lines = run(R, s, {
-		-- a snipe from farm with a last hit, one from laning without (1.5s pass), one replaced by a new one at once
-		{ 1.0, "farm", "none", "none", 0, false, "snipe" },
-		{ 1.3, "farm", "none", "none", 1 },
-		{ 5.0, "laning", "none", "none", 1, false, "snipe" },
-		{ 6.6, "laning", "none", "none", 1 },
-		{ 8.0, "farm", "none", "none", 1, false, "snipe" },
-		{ 8.1, "farm", "none", "none", 1, false, "snipe" },
-		{ 8.5, "farm", "none", "none", 2 },
-		-- creep hunts: one with a last hit, one without
-		{ 20.0, "push_tower_mid", "none", "none", 2, false, "hunt-carry/lane" },
-		{ 20.2, "push_tower_mid", "none", "none", 3 },
-		{ 30.0, "farm", "none", "none", 3, false, "hunt-support/deny" },
-		{ 32.0, "farm", "none", "none", 3 },
+		-- a snipe from farm with a last hit
+		{ 1.0, "farm", "none", "none", 0, false, "snipe", "a" },
+		{ 1.3, "farm", "none", "none", 1, false, nil, nil, "a" },
+		-- a snipe from laning whose creep walks off: a drop after 3s without an order
+		{ 5.0, "laning", "none", "none", 1, false, "snipe", "b" },
+		{ 8.1, "laning", "none", "none", 1 },
+		-- two snipes open at once (the offer moved to the next creep): both die, one point: one got, one miss, and
+		-- the first is not counted as a miss when the second starts (game 064)
+		{ 10.0, "farm", "none", "none", 1, false, "snipe", "c" },
+		{ 10.1, "farm", "none", "none", 1, false, "snipe", "d" },
+		{ 10.4, "farm", "none", "none", 2, false, nil, nil, "c" },
+		{ 10.6, "farm", "none", "none", 2, false, nil, nil, "d" },
+		-- creep hunts: a deny (score = last hits + denies) and one killed by someone else
+		{ 20.0, "push_tower_mid", "none", "none", 2, false, "hunt-support/deny", "e" },
+		{ 20.2, "push_tower_mid", "none", "none", 3, false, nil, nil, "e" },
+		{ 30.0, "farm", "none", "none", 3, false, "hunt-carry/lane", "f" },
+		{ 30.5, "farm", "none", "none", 3, false, nil, nil, "f" },
 		{ 60.0, "farm", "none", "none", 3 },
 	})
 	local line = lines[1] or "?"
 	T.ok(string.find(line, "acts=0 ", 1, true) ~= nil, "no team roam activation: " .. line)
 	T.ok(string.find(line, "snipeLH=2/4 snipeLHbyPrev=farm:2/3,laning:0/1 creepLH=1/2", 1, true) ~= nil, line)
+end)
+
+T.test("roam stats: one overlay try per unit, its result", function()
+	local R = load()
+	local s = R.New()
+	local try, isNew = R.OverlayTry(s, 1, "a", "snipe", "farm", 5)
+	T.ok(isNew, "new")
+	local again, isNew2 = R.OverlayTry(s, 1.2, "a", "snipe", "farm", 5)
+	T.ok(again == try and not isNew2, "the same try")
+	T.eq(
+		R.OverlayResolve(s, 1.3, 5, function()
+			return false
+		end),
+		nil,
+		"open"
+	)
+	local done = R.OverlayResolve(s, 1.4, 6, function()
+		return true
+	end)
+	T.ok(done ~= nil and done[1] == try and try.result == "got", "got")
+	T.eq(#s.tries, 0, "closed")
 end)
 
 T.test("roam stats: a hunt whose target died is not a self-off", function()
@@ -150,7 +178,7 @@ T.test("hunt trace: end reasons and line format", function()
 	T.eq(H.EndWhy(false, false, 0, -5, nil, false), "lost", "died before the reveal, not by the hunter")
 	T.eq(H.EndWhy(false, false, 0, -5, 8, false), "lost", "the hunter's hit was long before")
 	T.ok(H.IsTraced("npc_dota_hero_nyx_assassin") and not H.IsTraced("npc_dota_hero_medusa"), "traced heroes")
-	local h = { spell = "vendetta", targetName = "lich", changes = 1, snipe = 1, other = 0 }
+	local h = { spell = "vendetta", targetName = "lich", changes = 1, snipe = 1, other = 0, deathCheck = "deaths" }
 	inSample(H.FormatEnd(306, "nyx_assassin", "hit", 120, 6.0, h), "sample HUNT end")
 end)
 
@@ -159,6 +187,9 @@ local function fakeUnit(name, team, x)
 	local u = { name = name, team = team, alive = true, visible = true, modifiers = {}, _loc = Vector(x, 0, 0) }
 	function u:GetUnitName()
 		return self.name
+	end
+	function u:GetPlayerID()
+		return self.pid
 	end
 	function u:IsNull()
 		return false
@@ -286,10 +317,34 @@ T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target"
 	T.ok(clinkz._huntTrace ~= nil and clinkz._huntTrace.spell == "skeleton_walk", "found the hero during the walk")
 end)
 
+-- The scoreboard's death counts (GetHeroDeaths) for the hunt tests; restore() puts the stub's back.
+local function scoreboard()
+	local deaths = {}
+	local original = GetHeroDeaths
+	GetHeroDeaths = function(pid)
+		return deaths[pid] or 0
+	end
+	return deaths, function()
+		GetHeroDeaths = original
+	end
+end
+
+T.test("hunt trace: a death needs the scoreboard", function()
+	local _, H = load()
+	T.eq(H.TargetDead(2, 3), true, "deaths went up")
+	T.eq(H.TargetDead(2, 2), false, "same deaths: alive, whatever the handle says")
+	T.eq(H.TargetDead(nil, 2), false, "unread at the start: never dead")
+	T.eq(select(2, H.TargetDead(2, 2)), "deaths", "how")
+	T.eq(select(2, H.TargetDead(nil, nil)), "unread", "how, unread")
+end)
+
 T.test("hunt trace: a reveal that kills is a kill, not lost (game 063)", function()
 	local _, H = load()
+	local deaths, restore = scoreboard()
 	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
 	local sf = fakeUnit("npc_dota_hero_nevermore", 3, 900)
+	sf.pid = 7
+	deaths[7] = 1
 	local walk = "modifier_clinkz_wind_walk"
 	T.stub.time = 900
 	clinkz.target = sf
@@ -303,10 +358,48 @@ T.test("hunt trace: a reveal that kills is a kill, not lost (game 063)", functio
 	H.Tick(clinkz, "attack")
 	T.stub.time = 902.7
 	sf.alive, sf.visible = false, false
+	deaths[7] = 2
 	H.Tick(clinkz, "attack")
+	restore()
 	T.eq(clinkz._huntTrace, nil, "hunt over")
 	T.eq(#printed("end why=kill"), 1, "kill: " .. table.concat(printed("end why"), " / "))
+	T.ok(string.find(printed("end why=kill")[1] or "", "death=deaths", 1, true) ~= nil, "read from the scoreboard")
 	T.eq(#printed("end why=lost"), 0, "not lost")
-	local h = { spell = "skeleton_walk", targetName = "nevermore", changes = 0, snipe = 0, other = 0 }
+	local h = {
+		spell = "skeleton_walk",
+		targetName = "nevermore",
+		changes = 0,
+		snipe = 0,
+		other = 0,
+		deathCheck = "deaths",
+	}
 	inSample(H.FormatEnd(903, "clinkz", "kill", 180, 2.7, h), "sample HUNT kill")
+end)
+
+T.test("hunt trace: a target that teleports or turns invisible is not a kill (game 064)", function()
+	local _, H = load()
+	local deaths, restore = scoreboard()
+	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
+	local puck = fakeUnit("npc_dota_hero_puck", 3, 700)
+	puck.pid = 8
+	deaths[8] = 3
+	local walk = "modifier_clinkz_wind_walk"
+	T.stub.time = 745
+	clinkz.target = puck
+	clinkz.modifiers[walk] = true
+	H.Tick(clinkz, "attack")
+	-- The reveal hits Puck; she teleports home and the handle reads not alive, but the scoreboard has no death.
+	T.stub.time = 748
+	clinkz.modifiers[walk] = nil
+	puck.damaged = true
+	H.Tick(clinkz, "attack")
+	T.stub.time = 749
+	puck.alive, puck.visible, puck.damaged = false, false, false
+	H.Tick(clinkz, "attack")
+	T.ok(clinkz._huntTrace ~= nil, "not ended as a kill")
+	T.stub.time = 751.1
+	H.Tick(clinkz, "attack")
+	restore()
+	T.eq(#printed("end why=kill"), 0, "no kill")
+	T.eq(#printed("end why=hit"), 1, "hit (damaged after the reveal): " .. table.concat(printed("end why"), " / "))
 end)

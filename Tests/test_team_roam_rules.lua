@@ -62,6 +62,8 @@ T.test("team roam rules: the last-hit overlay holds back", function()
 	T.eq(R.OverlaySkipWhy(state({ charging = true, modeDesire = 1.2 })), "charging", "Charge of Darkness")
 	T.eq(R.OverlaySkipWhy(state({ channeling = true, busy = true })), "channel", "channeling before busy")
 	T.eq(R.OverlaySkipWhy(state({ busy = true })), "busy", "casting")
+	T.eq(R.OverlaySkipWhy(state({ heroFight = true })), "fight", "attack mode on an enemy hero in range")
+	T.eq(R.OverlaySkipWhy(state({ charging = true, heroFight = true })), "charging", "a hunting spell first")
 	T.eq(R.OverlaySkipWhy({ modeDesire = 0.6 }), "mode", "no desire")
 end)
 
@@ -87,4 +89,42 @@ T.test("team roam rules: special units never above retreat when outnumbered", fu
 	T.ok(not cut, "not cut")
 	d = R.SpecialUnitCap(0.9, 1, 3, 0.03, false)
 	T.eq(d, 0, "never negative")
+end)
+
+T.test("team roam rules: which modes the overlay can hold, and the snipe's path", function()
+	local R = rules()
+	for _, mode in ipairs({ "laning", "farm", "push_tower_mid", "assemble", "rune", "ward", "roshan", "team_roam" }) do
+		T.ok(R.ModeHoldable(mode, false), mode .. ": Lua Think")
+	end
+	for _, mode in ipairs({ "defend_tower_top", "item", "side_shop", "roam", "defend_ally", "evasive_maneuvers" }) do
+		T.ok(not R.ModeHoldable(mode, false), mode .. ": Valve's Think")
+	end
+	T.ok(not R.ModeHoldable("attack", false), "Valve's attack mode")
+	T.ok(not R.ModeHoldable("attack", nil), "Valve's attack mode (flag unset)")
+	T.ok(R.ModeHoldable("attack", true), "our attack override")
+	-- SnipePath(holdable, heroFight, hunting, modeWinRunning)
+	T.eq(R.SnipePath(true, false, false, false), "overlay", "farm: the overlay")
+	T.eq(R.SnipePath(false, false, false, false), "mode", "Valve's defend: win the mode as before")
+	T.eq(R.SnipePath(true, false, false, true), "mode", "team roam won it with the snipe: keep the mode")
+	T.eq(R.SnipePath(false, true, false, false), "none", "attack on an enemy hero in range: no snipe")
+	T.eq(R.SnipePath(true, false, true, true), "none", "hunting spell trace open: no snipe")
+end)
+
+T.test("team roam rules: the overlay's hold on a hit", function()
+	local R = rules()
+	local function hold(over)
+		local o = { now = 100.2, since = 100, alive = true, lastAttack = 99, ownAttack = 99, windup = 0.35 }
+		for k, v in pairs(over or {}) do
+			o[k] = v
+		end
+		return R.OverlayHoldWhy(o)
+	end
+	T.eq(hold(), nil, "walking to the creep: held")
+	T.eq(hold({ lastAttack = 100.1 }), nil, "attack started 0.1s ago: in the wind-up, held")
+	T.eq(hold({ lastAttack = 99.8 }), "hit", "attack 0.4s ago: released")
+	T.eq(hold({ alive = false }), "dead", "the creep died")
+	T.eq(hold({ free = true }), "free", "retreat / dodging")
+	T.eq(hold({ now = 101.0 }), "cap", "1s without an attack")
+	T.eq(hold({ now = 100.99 }), nil, "just under the cap")
+	T.eq(R.HOLD_CAP, 1.0, "cap")
 end)

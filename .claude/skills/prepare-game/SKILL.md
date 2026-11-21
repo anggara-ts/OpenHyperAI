@@ -19,8 +19,10 @@ Rules: `AGENTS.md` (workflow steps 4-6). Checklist:
    the main clone. It copies only the bot scripts of `HEAD` (`test/next`), plus the uncommitted lineup and a
    `Customize/build_info.lua` for that commit, into `vscripts/bots`, so `[OHA-BUILD]` names the build and editing
    or switching branches in the clone during the game changes nothing in it. Check its output:
-   - `NOT in the copy: ...` lists uncommitted code changes the game will not run. Commit them in their PR and
-     rebuild, or tell the maintainer.
+   - `NOT in the copy: ...` lists uncommitted bot scripts, edited or `(new)`, that the game will not run. Commit
+     them in their PR and rebuild, or tell the maintainer.
+   - `.lua files in a folder the export does not know`: a PR added a new top-level Lua folder. Add it to
+     `RUNTIME_DIRS` or `NOT_RUNTIME_DIRS` in `Util/export-bots.js` (in that PR).
    - `is a link`: `vscripts/bots` is still the old dev link to the clone. Ask the maintainer before renaming it
      (e.g. to `bots-dev`); renaming changes what the game loads.
    - `has files this tool did not write`: list them to the maintainer. Use `--force` only after they agree.

@@ -33,7 +33,10 @@ host's Steam ID and server IPs) and the local test lineup.
 7. **After:** leave the copy, or `node Util/export-bots.js --remove`, then `/prepare-game` before the next test
    game.
 
-Not in the copy on purpose: `Install-to-vscript/` (the helper that links a Workshop download into
-`vscripts/bots`, which subscribers need while Valve's Workshop bot loading is broken, ValveSoftware/Dota2-Gameplay
-#3725) and docs. Its scripts and `Customize/general.lua` still name the upstream Workshop item 3246316298; a first
-upload of this fork gets a new ID, which those files need before they are useful to subscribers.
+Not in the copy on purpose (maintainer's decision, #177): `Install-to-vscript/` and docs. The Workshop copy is
+the bot scripts only. `Customize/general.lua` and `Customize/hero/viper.lua` still link the upstream Workshop item
+3246316298 in their comments; a first upload of this fork gets a new ID.
+
+New Lua files: a committed file under the root, `BotsLib/`, `FuncLib/` or `Customize/` is in the copy
+automatically. A `.lua` file in any other new folder stops the export until the folder is added to
+`RUNTIME_DIRS` or `NOT_RUNTIME_DIRS` in `Util/export-bots.js`.

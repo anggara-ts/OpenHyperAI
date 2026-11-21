@@ -48,10 +48,19 @@ function gitText(args) {
 
 // ---------------------------------------------------------------- what goes in
 
+// Folders with .lua files the game never loads.
+const NOT_RUNTIME_DIRS = ["Tests/", "Util/", "Docs/", ".github/", ".claude/", "Install-to-vscript/"];
+
 function isBotScript(file) {
 	if (!file.endsWith(".lua")) return false;
 	if (!file.includes("/")) return true;
 	return RUNTIME_DIRS.some((dir) => file.startsWith(dir));
+}
+
+// .lua files in a folder that is in neither list (a new folder): the copy would silently miss them.
+function unplacedLua(files) {
+	return files.filter((file) => file.endsWith(".lua") && !isBotScript(file) &&
+		!NOT_RUNTIME_DIRS.some((dir) => file.startsWith(dir)));
 }
 
 // Reads the bot scripts of one commit: Map(path -> Buffer), plus the counts of what was left out.
@@ -65,6 +74,13 @@ function collect(ref) {
 			const [mode, type, sha] = line.slice(0, tab).split(" ");
 			return { mode, type, sha, file: line.slice(tab + 1) };
 		});
+	const unplaced = unplacedLua(entries.map((entry) => entry.file));
+	if (unplaced.length > 0) {
+		throw new Error(
+			`.lua files in a folder the export does not know: ${unplaced.slice(0, 10).join(", ")}. Add the folder ` +
+				"to RUNTIME_DIRS (the game loads it) or NOT_RUNTIME_DIRS (it does not) in Util/export-bots.js."
+		);
+	}
 	const selected = [];
 	const leftOut = {};
 	for (const entry of entries) {
@@ -368,14 +384,18 @@ function megabytes(files) {
 	return (bytes / 1024 / 1024).toFixed(1) + " MB";
 }
 
-// Tracked bot scripts other than the lineup that differ from HEAD: they are not in a test-game copy.
+// Bot scripts other than the lineup that differ from HEAD, edited or new (not committed yet; git-ignored files
+// such as build_info.lua are not listed): they are not in a test-game copy. Also new .lua files in a new folder.
 function uncommittedChanges() {
 	// Not gitText: trimming would eat the leading status column of the first line.
-	return git(["status", "--porcelain", "--untracked-files=no"], { encoding: "utf8" })
+	const changed = git(["status", "--porcelain", "--untracked-files=all"], { encoding: "utf8" })
 		.split(/\r?\n/)
 		.filter(Boolean)
-		.map((line) => line.slice(3).replace(/^.* -> /, "").replace(/^"|"$/g, ""))
-		.filter((file) => file !== LINEUP_FILE && isBotScript(file));
+		.map((line) => ({ isNew: line.startsWith("??"), file: line.slice(3).replace(/^.* -> /, "").replace(/^"|"$/g, "") }));
+	const unplaced = new Set(unplacedLua(changed.map((c) => c.file)));
+	return changed
+		.filter((c) => c.file !== LINEUP_FILE && (isBotScript(c.file) || unplaced.has(c.file)))
+		.map((c) => (c.isNew ? `${c.file} (new)` : c.file));
 }
 
 function resolveDest(args) {
@@ -472,6 +492,8 @@ function selfTest() {
 		"Install-to-vscript/quick-install-oha.bat", ".env.example", ".github/workflows/lua-check.yml"];
 	check("selection: runtime .lua files are in", inCopy.every(isBotScript));
 	check("selection: tests, tools, docs, configs are out", notInCopy.every((file) => !isBotScript(file)));
+	check("selection: .lua in a new folder is reported, known folders are not",
+		unplacedLua(["Lib/new.lua", "Tests/run.lua", "BotsLib/hero_new.lua", "Util/a.md"]).join() === "Lib/new.lua");
 
 	const sources = new Map([
 		["a.lua", Buffer.from([

@@ -551,6 +551,10 @@ function X.ConsiderSoloCombo()
 		X.LogCombo(step, why, target, disabled, slaveDamage)
 		return step, location
 	elseif step == "laguna" then
+		-- Laguna only once the stun has landed: if her LSA missed, the blade is not spent on a target that walks away.
+		if not disabledNow then
+			return nil
+		end
 		X.LogCombo(step, why, target, disabled, lagunaDamage)
 		return step, target
 	end

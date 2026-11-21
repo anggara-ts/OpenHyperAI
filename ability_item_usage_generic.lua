@@ -5439,9 +5439,25 @@ end
 if bot.ProphetTPLocation == nil then
 	bot.ProphetTPLocation = bot:GetLocation()
 end
-Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
-	if
-		botMode == BOT_MODE_RUNE
+-- [OHA-PERFSUM] detail markers inside the TP rule (#52). Game 063: item_tpscroll still took 23.8s of detail time
+-- (24.5s in game 062) after the fountain check moved BaseUnderCreeps last, so the costly part is elsewhere.
+-- Usage.TpTimed(name, fn, ...) calls fn(...) and adds its time to detail=<name> ("tp:" names). The markers sit
+-- inside item_tpscroll's own time, so their sum is at most it; what is left is the rule's own code. Timing
+-- only: same calls, arguments and returns.
+local function TpTimedEnd(name, startedAt, ...)
+	PerfParts.Detail(name, RealTime() - startedAt)
+	return ...
+end
+function Usage.TpTimed(name, fn, ...)
+	if RealTime == nil then
+		return fn(...)
+	end
+	return TpTimedEnd(name, RealTime(), fn(...))
+end
+-- The TP rule's first gates (modifiers, rune mode, Roshan / Tormentor nearby), in one function so they are timed
+-- together as tp:gates.
+function Usage.TpGatesClosed()
+	return botMode == BOT_MODE_RUNE
 		or bot:IsRooted()
 		or bot:HasModifier("modifier_item_armlet_unholy_strength")
 		or bot:HasModifier("modifier_kunkka_x_marks_the_spot")
@@ -5460,7 +5476,9 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		or Fu.IsDoingRoshan(bot) and GetUnitToLocationDistance(bot, Fu.GetCurrentRoshanLocation()) <= 2800
 		or bot._roshDipActive and bot:IsAlive() and GetUnitToLocationDistance(bot, Fu.GetCurrentRoshanLocation()) <= 3000
 		or Fu.IsDoingTormentor(bot) and GetUnitToLocationDistance(bot, Fu.GetTormentorLocation(GetTeam())) <= 2800
-	then
+end
+Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
+	if Usage.TpTimed("tp:gates", Usage.TpGatesClosed) then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if bot:GetHealth() < 240 then
@@ -5472,7 +5490,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	if bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") or bot.healInBase then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local enemyTowers = bot:GetNearbyTowers(888, true)
+	local enemyTowers = Usage.TpTimed("tp:towers", bot.GetNearbyTowers, bot, 888, true)
 	if #enemyTowers > 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
@@ -5486,8 +5504,8 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	local botLocation = bot:GetLocation()
 	local hpRatio = Fu.GetHP(bot)
 	local mpRatio = Fu.GetMP(bot)
-	local nearbyEnemyCount = Usage.GetNumHeroWithinRange(1600)
-	local nearbyAllyCount = Fu.GetAllyCount(bot, 1600)
+	local nearbyEnemyCount = Usage.TpTimed("tp:enemies", Usage.GetNumHeroWithinRange, 1600)
+	local nearbyAllyCount = Usage.TpTimed("tp:allies", Fu.GetAllyCount, bot, 1600)
 	local flask = Fu.IsItemAvailable("item_flask")
 	if bot:GetLevel() > 12 and bot:DistanceFromFountain() < 600 then
 		tpDistance = tpDistance + 600
@@ -5503,7 +5521,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		-- No TP out of the fountain while creeps are hitting our base: at 37:27 Tusk teleported
 		-- out to farm with 3 enemy creeps at our Ancient. Walk out and defend instead. Asked last: it reads every
 		-- enemy creep up to 10 times, and ran on every item think anywhere on the map (#52).
-		and not Fu.Utils.BaseUnderCreeps(bot)
+		and not Usage.TpTimed("tp:base-creeps", Fu.Utils.BaseUnderCreeps, bot)
 	then
 		local lane = Usage.GetLaneByPosition(bot)
 		if not Fu.IsInLaningPhase() and DotaTime() > 10 * 60 then
@@ -5589,7 +5607,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	end
 	if activeMode == BOT_MODE_LANING and not Usage.JustTeleported() then
 		local shouldTp
-		hEffectTarget, shouldTp = Usage.GetLaningTPLocation(bot, tpDistance, botLocation)
+		hEffectTarget, shouldTp = Usage.TpTimed("tp:laning", Usage.GetLaningTPLocation, bot, tpDistance, botLocation)
 		castReason = "出去发育"
 		if shouldTp then
 			if botName == "npc_dota_hero_furion" then
@@ -5956,7 +5974,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		and hpRatio > 0.9
 		and mpRatio > 0.8
 	then
-		local farmLane, farmLaneDesire = Fu.GetMostFarmLaneDesire(bot)
+		local farmLane, farmLaneDesire = Usage.TpTimed("tp:farm-lane", Fu.GetMostFarmLaneDesire, bot)
 		if farmLaneDesire > 0.1 then
 			local farmTpLoc = GetLaneFrontLocation(team, farmLane, 0)
 			local nearestTpSpot = Fu.GetNearbyLocationToTp(farmTpLoc)
@@ -5991,16 +6009,16 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		and activeMode ~= BOT_MODE_ROSHAN
 		and not Usage.IsBaseTowerDestroyed()
 		and Fu.GetAllyCount(bot, 1600) <= 2
-		and Fu.Role.ShouldTpToFarm()
+		and Usage.TpTimed("tp:should-farm", Fu.Role.ShouldTpToFarm)
 		and not Fu.Role.IsAllyHaveAegis()
 		and not Fu.Role.CanBeSupport(botName)
-		and not Fu.IsEnemyHeroAroundLocation(GetAncient(team):GetLocation(), 3300)
-		and Fu.Utils.CountEnemyHeroesOnHighGround(GetTeam()) < 1
+		and not Usage.TpTimed("tp:enemy-at-ancient", Fu.IsEnemyHeroAroundLocation, GetAncient(team):GetLocation(), 3300)
+		and Usage.TpTimed("tp:enemy-hg", Fu.Utils.CountEnemyHeroesOnHighGround, GetTeam()) < 1
 	then
 		local attackingAllies = Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_ATTACK)
 		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1400, true, BOT_MODE_NONE)
 		local enemyCreeps = bot:GetNearbyCreeps(1600, true)
-		local farmLane, farmLaneDesire = Fu.GetMostFarmLaneDesire(bot)
+		local farmLane, farmLaneDesire = Usage.TpTimed("tp:farm-lane", Fu.GetMostFarmLaneDesire, bot)
 		local hasTravelBoots = false
 		if Fu.IsItemAvailable("item_travel_boots") or Fu.IsItemAvailable("item_travel_boots_2") then
 			hasTravelBoots = true
@@ -6058,9 +6076,10 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		and activeMode ~= BOT_MODE_ATTACK
 		and (botTarget == nil or not botTarget:IsHero())
 	then
-		local enemyHeroes = Fu.GetNearbyHeroes(bot, 1400, true, BOT_MODE_NONE)
+		local enemyHeroes = Usage.TpTimed("tp:nearby-enemies", Fu.GetNearbyHeroes, bot, 1400, true, BOT_MODE_NONE)
 		-- Looked up only with no enemy hero near, the only case that reads it (#52: it asks every ally's fight).
-		local teamFightLocation = #enemyHeroes == 0 and Fu.GetTeamFightLocation(bot) or nil
+		local teamFightLocation = #enemyHeroes == 0 and Usage.TpTimed("tp:teamfight", Fu.GetTeamFightLocation, bot)
+			or nil
 		local hasTravelBoots = false
 		if Fu.IsItemAvailable("item_travel_boots") or Fu.IsItemAvailable("item_travel_boots_2") then
 			hasTravelBoots = true
@@ -6111,7 +6130,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		if
 			bot:GetLevel() >= 15
 			and #enemyHeroes == 0
-			and Fu.Role.ShouldTpToFarm()
+			and Usage.TpTimed("tp:should-farm", Fu.Role.ShouldTpToFarm)
 			and bot:DistanceFromFountain() > 2000
 			and GetUnitToUnitDistance(bot, ancient) > tpDistance - 200
 			and Fu.GetAroundTargetAllyHeroCount(ancient, 1400) == 0
@@ -6219,7 +6238,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 	end
-	if Usage.IsFarmingAlways(bot) then
+	if Usage.TpTimed("tp:farming-always", Usage.IsFarmingAlways, bot) then
 		tpLocation = GetAncient(team):GetLocation()
 		castReason = "处理特殊情况一"
 		if botName == "npc_dota_hero_furion" then
@@ -6232,7 +6251,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		end
 		return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
 	end
-	if Fu.IsStuck(bot) then
+	if Usage.TpTimed("tp:stuck", Fu.IsStuck, bot) then
 		tpLocation = GetAncient(team):GetLocation()
 		castReason = "处理特殊情况二"
 		if botName == "npc_dota_hero_furion" then
@@ -6245,7 +6264,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		end
 		return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
 	end
-	if Fu.Role.ShouldTpToDefend() and bot:DistanceFromFountain() > 3800 then
+	if Usage.TpTimed("tp:should-defend", Fu.Role.ShouldTpToDefend) and bot:DistanceFromFountain() > 3800 then
 		tpLocation = GetAncient(team):GetLocation()
 		castReason = "立即TP守家"
 		return BOT_ACTION_DESIRE_HIGH, tpLocation, castType, castReason
@@ -6317,7 +6336,7 @@ do
 		if desire == nil or desire <= 0 or target == nil then
 			return desire, target, castType, castReason
 		end
-		local why, enemies, allies = TpHoldReason(target)
+		local why, enemies, allies = Usage.TpTimed("tp:hold", TpHoldReason, target)
 		if why == nil then
 			return desire, target, castType, castReason
 		end
@@ -10459,6 +10478,56 @@ CourierUsageThink = OHA_Guard("CourierUsageThink", CourierUsageThink)
 AbilityLevelUpThink = OHA_Guard("AbilityLevelUpThink", AbilityLevelUpThink)
 Usage.AbilityUsageThink = AbilityUsageThink
 Usage.ItemUsageThink = ItemUsageThink
+-- TP rule throttle (#52, game 063: item_tpscroll 23.8s of detail time over the game, the biggest item rule).
+-- Placed after every wrapper of the rule (hold, worth, heal trip) so it covers all of them. A "no TP" answer is
+-- kept for TP_RECHECK seconds per bot: TP decisions do not need every think. The rule runs every think while
+-- the bot is in danger (hit by an enemy hero in the last 2s, HP under 40%, or Rupture on it), and a "TP"
+-- answer is never kept. [OHA-TP] tp-throttle prints how many calls were skipped, at most once per 120s per bot.
+do
+	local TP_RECHECK = 0.3
+	local tpRule = Usage.ConsiderItemDesire["item_tpscroll"]
+	local nextRunAt, skipped, ran, dangerRuns, logAt = -999, 0, 0, 0, nil
+	if tpRule ~= nil then
+		Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
+			local now = DotaTime()
+			local danger = Fu.GetHP(bot) < 0.4
+				or bot:WasRecentlyDamagedByAnyHero(2.0)
+				or bot:HasModifier("modifier_bloodseeker_rupture")
+			if not danger and now < nextRunAt then
+				skipped = skipped + 1
+				return BOT_ACTION_DESIRE_NONE
+			end
+			ran = ran + 1
+			if danger then
+				dangerRuns = dangerRuns + 1
+			end
+			logAt = logAt or now + 120
+			if now >= logAt then
+				logAt = now + 120
+				pcall(
+					print,
+					string.format(
+						"[OHA-TP] t=%.0f %s tp-throttle skipped=%d ran=%d danger=%d recheck=%.2f",
+						now,
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						skipped,
+						ran,
+						dangerRuns,
+						TP_RECHECK
+					)
+				)
+				skipped, ran, dangerRuns = 0, 0, 0
+			end
+			local desire, target, castType, castReason = tpRule(item)
+			if desire == nil or desire <= 0 then
+				nextRunAt = now + TP_RECHECK
+			else
+				nextRunAt = -999
+			end
+			return desire, target, castType, castReason
+		end
+	end
+end
 -- [OHA-PERF] timing (#52): FuncLib/systems/perf.lua
 do
 	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")

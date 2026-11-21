@@ -50,11 +50,45 @@ T.test("item_tpscroll reads the enemy creeps only near the fountain", function()
 	bot.DistanceFromFountain = function()
 		return 300
 	end
+	-- Past the rule's 0.3s recheck (a "no TP" answer is kept that long).
+	T.stub.time = T.stub.time + 1
 	local at = GetAncient(GetTeam()):GetLocation()
 	calls = countUnitLists({ creepAt(at.x + 300, at.y), creepAt(at.x, at.y + 500) })
 	local desire = rule(nil)
 	T.ok((calls[UNIT_LIST_ENEMY_CREEPS] or 0) >= 1, "enemy creeps read at the fountain")
 	T.ok(desire == nil or desire <= 0, "no fountain TP while creeps are at the Ancient")
+end)
+
+-- Game 063: item_tpscroll was still the biggest item rule (23.8s). A "no TP" answer is kept 0.3s per bot,
+-- except in danger (hit by an enemy hero within 2s, HP under 40%).
+T.test("item_tpscroll: a no-TP answer is kept 0.3s, the rule runs every think in danger", function()
+	T.stub.reset({ hero = "npc_dota_hero_lich", time = 600 })
+	local Usage = dofile("ability_item_usage_generic.lua")
+	local bot = GetBot()
+	local rule = Usage.ConsiderItemDesire.item_tpscroll
+	bot.DistanceFromFountain = function()
+		return 300
+	end
+	local hitByHero = false
+	bot.WasRecentlyDamagedByAnyHero = function()
+		return hitByHero
+	end
+	-- Two creeps at our Ancient hold the fountain TP: the answer is "no TP".
+	local at = GetAncient(GetTeam()):GetLocation()
+	local calls = countUnitLists({ creepAt(at.x + 300, at.y), creepAt(at.x, at.y + 500) })
+	local desire = rule(nil)
+	T.ok(desire == nil or desire <= 0, "no TP")
+	T.eq(calls[UNIT_LIST_ENEMY_CREEPS], 1, "first call runs the rule")
+	T.stub.time = T.stub.time + 0.1
+	rule(nil)
+	T.eq(calls[UNIT_LIST_ENEMY_CREEPS], 1, "0.1s later: kept")
+	T.stub.time = T.stub.time + 0.3
+	rule(nil)
+	T.eq(calls[UNIT_LIST_ENEMY_CREEPS], 2, "0.4s later: runs again")
+	hitByHero = true
+	T.stub.time = T.stub.time + 0.05
+	rule(nil)
+	T.eq(calls[UNIT_LIST_ENEMY_CREEPS], 3, "hit by a hero 0.05s later: runs again")
 end)
 
 T.test("MatchTrace.Markers builds the lineup only until the game marker is sent", function()

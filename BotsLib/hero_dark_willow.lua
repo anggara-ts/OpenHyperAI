@@ -251,64 +251,179 @@ function X.EnemyChannelLeft(enemy)
 	return InterruptRules.TrackChannel(channelMemory, enemy:GetUnitName(), active:GetName(), channelTime, DotaTime()),
 		"channel"
 end
+-- A channel or cast phase a root cancels (InterruptRules.ROOT_CANCELS, from the game files): time left, the
+-- ability name and src tp|channel|cast; src "none" when the enemy is doing nothing a root cancels.
+function X.EnemyRootCancelLeft(enemy)
+	local active = enemy:GetCurrentActiveAbility()
+	local name = nil
+	if active ~= nil and not active:IsNull() then
+		name = active:GetName()
+	end
+	if enemy:HasModifier("modifier_teleporting") then
+		return Fu.GetModifierTime(enemy, "modifier_teleporting"), name or "item_tpscroll", "tp"
+	end
+	local entry = name ~= nil and InterruptRules.ROOT_CANCELS[name] or nil
+	if entry == nil then
+		return 0, name, "none"
+	end
+	local total = 0
+	if entry.kind == "channel" and enemy:IsChanneling() then
+		total = active:GetChannelTime() or 0
+	elseif entry.kind == "cast" and active:IsInAbilityPhase() then
+		total = active:GetCastPoint() or 0
+	end
+	if total <= 0 then
+		return 0, name, "none"
+	end
+	return InterruptRules.TrackChannel(channelMemory, enemy:GetUnitName(), name, total, DotaTime()), name, entry.kind
+end
+-- [OHA-DARK_WILLOW] bramble why=... lines, each why at most once per 3s.
+local brambleLogAt = {}
+function X.LogBramble(why, fmt, ...)
+	if DotaTime() < (brambleLogAt[why] or -999) then
+		return
+	end
+	brambleLogAt[why] = DotaTime() + 3
+	pcall(print, string.format("[OHA-DARK_WILLOW] t=%.0f " .. fmt, DotaTime(), ...))
+end
+-- Bramble Maze (#48, maintainer 2026-11-21: "team fight, engaging, cancelling channeling (that can be cancelled
+-- with roots)"). Datafeed (hero 119): cast range 1000-1300, cast point 0.3, 8 brambles in a 500 area that grow
+-- after 0.3s; an enemy within 90 of one is rooted 1-2.5s; "Does not interrupt channeling spells upon rooting".
+-- Single targets: cast so the first (east) inner bramble grows on the hero (InterruptRules.BrambleAim), an
+-- instant root 0.7s after the order. Fights: the zone over the most enemies that are free to move.
 function X.ConsiderBrambleMaze()
 	X.CheckInterruptProbes()
 	if not brambleMazeAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = brambleMazeAbility:GetCastRange()
-	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	local castPoint = brambleMazeAbility:GetCastPoint()
+	local growDelay = brambleMazeAbility:GetSpecialValueFloat("initial_creation_delay")
+	local latchDelay = brambleMazeAbility:GetSpecialValueFloat("latch_creation_delay")
+	local interval = brambleMazeAbility:GetSpecialValueFloat("latch_creation_interval")
+	local zoneRadius = brambleMazeAbility:GetSpecialValueInt("placement_range")
+	if zoneRadius <= 0 then
+		zoneRadius = 500
+	end
+	local botLocation = bot:GetLocation()
+	-- Where to cast so a bramble grows on `location`; nil when no cardinal spot is in range.
+	local function Aim(location)
+		local x, y, aim, index =
+			InterruptRules.BrambleAim(location.x, location.y, botLocation.x, botLocation.y, castRange)
+		if x == nil then
+			return nil
+		end
+		return Vector(x, y, location.z),
+			aim,
+			InterruptRules.BrambleRootTime(castPoint, growDelay, latchDelay, interval, index)
+	end
+	-- An inner bramble sits 200 from the cast point, so a target up to 200 past cast range can still be aimed at.
+	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange + 200, true, BOT_MODE_NONE)
 	botTarget = Fu.GetProperTarget(bot)
-	-- Only on a teleport (#48): Bramble's root "does not interrupt channeling spells upon rooting" (7.42
-	-- abilities_english, dark_willow_bramble_maze_Note0), so it was wasted on other channels and ultimate cast
-	-- points; the TP scroll "can be prevented or canceled by Root abilities" (item_tpscroll_Note1, ROOT_DISABLES
-	-- in items.txt). Whether a bramble latches onto a hero standing still in the maze is logged (interrupt-result).
+	-- Cancel what a root cancels, if the root lands first (cast point + grow + latch delay + spawn order).
 	for _, enemy in pairs(nearbyEnemies) do
 		if
 			Fu.IsValidHero(enemy)
-			and enemy:HasModifier("modifier_teleporting")
+			and (enemy:IsChanneling() or enemy:IsCastingAbility() or enemy:HasModifier("modifier_teleporting"))
 			and Fu.CanCastOnNonMagicImmune(enemy)
 			and not Fu.IsSuspiciousIllusion(enemy)
+			and not enemy:IsRooted()
 		then
-			if DotaTime() >= (bot._brambleLogAt or -999) then
-				bot._brambleLogAt = DotaTime() + 3
-				local left = Fu.GetModifierTime(enemy, "modifier_teleporting")
-				-- Game data: cast point 0.3, brambles grow after initial_creation_delay 0.3, 8 of them every
-				-- 0.075s, latch after 0.1; plus turning. The root lasts 1.0s+, so look after 1.5s.
-				X.StartInterruptProbe("bramble", enemy, 1.5)
-				pcall(
-					print,
-					string.format(
-						"[OHA-DARK_WILLOW] t=%.0f bramble why=tp target=%s left=%.2f",
-						DotaTime(),
+			local left, channel, src = X.EnemyRootCancelLeft(enemy)
+			if src ~= "none" then
+				local location, aim, arrive = Aim(enemy:GetLocation())
+				if location ~= nil then
+					if InterruptRules.LandsBeforeChannelEnds(arrive, left) then
+						X.LogBramble(
+							"interrupt",
+							"bramble why=interrupt target=%s channel=%s aim=%s arrive=%.2f left=%.2f margin=%.2f src=%s",
+							enemy:GetUnitName(),
+							channel,
+							aim,
+							arrive,
+							left,
+							left - arrive,
+							src
+						)
+						X.StartInterruptProbe("bramble", enemy, arrive + 0.5)
+						return BOT_ACTION_DESIRE_HIGH, location
+					end
+					X.LogBramble(
+						"too-late",
+						"bramble-skip why=too-late target=%s channel=%s arrive=%.2f left=%.2f margin=%.2f src=%s",
 						enemy:GetUnitName(),
-						left
+						channel,
+						arrive,
+						left,
+						left - arrive,
+						src
 					)
-				)
+				end
 			end
-			return BOT_ACTION_DESIRE_HIGH, enemy:GetLocation()
 		end
 	end
+	-- Team fight: the zone where it catches the most enemy heroes that are free to move (predicted to where they
+	-- will be when the brambles grow), 2 or more.
+	if not isRetreating and (isInTeamFight or #nearbyEnemies >= 2) then
+		local aoe = bot:FindAoELocation(true, true, botLocation, castRange, zoneRadius, castPoint + growDelay, 0)
+		if aoe ~= nil and aoe.count ~= nil and aoe.count >= 2 then
+			local free = 0
+			for _, enemy in pairs(Fu.GetEnemiesNearLoc(aoe.targetloc, zoneRadius)) do
+				if
+					Fu.IsValidHero(enemy)
+					and not Fu.IsSuspiciousIllusion(enemy)
+					and Fu.CanCastOnNonMagicImmune(enemy)
+					and not Fu.IsDisabled(enemy)
+					and not enemy:IsRooted()
+				then
+					free = free + 1
+				end
+			end
+			if free >= 2 then
+				X.LogBramble("teamfight", "bramble why=teamfight n=%d aim=zone", free)
+				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+			end
+		end
+	end
+	-- Engage: put the first bramble where the target will stand when it grows (still targets: where it is).
 	if isGoingOnSomeone then
 		if
 			Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
-			and Fu.IsInRange(bot, botTarget, castRange)
-			and Fu.IsMoving(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange + 200)
 			and not Fu.IsDisabled(botTarget)
+			and not botTarget:IsRooted()
 			and not Fu.IsSuspiciousIllusion(botTarget)
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			local lead = InterruptRules.BrambleRootTime(castPoint, growDelay, latchDelay, 0, 0)
+			local predicted = botTarget:GetLocation()
+			if Fu.IsMoving(botTarget) then
+				predicted = botTarget:GetExtrapolatedLocation(lead)
+			end
+			local location, aim = Aim(predicted)
+			if location ~= nil then
+				X.LogBramble(
+					"engage",
+					"bramble why=engage target=%s lead=%.2f aim=%s moving=%s",
+					botTarget:GetUnitName(),
+					lead,
+					aim,
+					tostring(Fu.IsMoving(botTarget))
+				)
+				return BOT_ACTION_DESIRE_HIGH, location
+			end
 		end
 	end
 	if
 		isRetreating
 		and Fu.IsValid(nearbyEnemies[1])
+		and Fu.IsInRange(bot, nearbyEnemies[1], castRange)
 		and Fu.CanCastOnNonMagicImmune(nearbyEnemies[1])
 		and not Fu.IsDisabled(nearbyEnemies[1])
 		and not Fu.IsRealInvisible(bot)
 		and not Fu.IsSuspiciousIllusion(nearbyEnemies[1])
 	then
+		X.LogBramble("retreat", "bramble why=retreat target=%s aim=zone", nearbyEnemies[1]:GetUnitName())
 		return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

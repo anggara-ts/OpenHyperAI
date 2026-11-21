@@ -32,6 +32,7 @@ local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
+local LastHitTiming = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_timing")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()
@@ -10140,6 +10141,18 @@ function ItemUsageThink()
 	if okDeaggro and deaggroed then
 		return
 	end
+	-- Laning last hits every frame (#71): the attack on the right frame, the wind-up release / cancel. While it owns
+	-- the hit, no kiting step, item or spell order replaces it.
+	local okLastHit, timingLastHit = pcall(LastHitTiming.Tick, bot)
+	if not okLastHit and not bot._lhTimingErr then
+		-- Once per bot: a broken hook would silently drop every timed last hit.
+		bot._lhTimingErr = true
+		pcall(print, string.format("[OHA-LH] t=%.0f %s timing error=%s", DotaTime(), botName, tostring(timingLastHit)))
+	elseif okLastHit and timingLastHit then
+		_perfDone()
+		return
+	end
+
 	-- Kiting for heroes on Valve's attack mode (the override attack mode kites from its own Think).
 	local okKite, kited = pcall(SpecialUnits.TryKiteInAttack, bot)
 	if okKite and kited then

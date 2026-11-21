@@ -3,6 +3,8 @@ local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local LaneHarassRules = require(GetScriptDirectory() .. "/FuncLib/systems/lane_harass_rules")
+local LastHitRules = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_rules")
+local LastHitTiming = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_timing")
 local bot = GetBot()
 local botName = bot:GetUnitName()
 if
@@ -42,6 +44,10 @@ end
 -- When a human is supporting, AI cores in the lane should farm more actively.
 local function IsHumanSupportOnTeam()
 	return Fu.IsPosxHuman(4) or Fu.IsPosxHuman(5)
+end
+-- Creep value (#71, maintainer 2026-11-21): flagbearer > siege > ranged > melee, LastHitRules.KIND_VALUE.
+local function GetCreepKind(creep)
+	return LastHitRules.CreepKind(creep:GetUnitName())
 end
 -- Diagnostic (#71, game 047: enemy heroes kept walking behind our tower in the laning phase): when this bot is inside
 -- an enemy tower's range in the laning phase, say which mode took it there. At most every 10s.
@@ -158,13 +164,15 @@ local function TrackLastHitAttempt()
 	end
 	bot._lhAttempt = nil
 	local launch = attempt.launchAt ~= nil and attempt.launchAt - attempt.orderAt or -1
+	local got = bot:GetLastHits() > attempt.lastHits
+	pcall(LastHitTiming.NoteResult, bot, got, launch, attempt.early, attempt.cancels)
 	pcall(
 		print,
 		string.format(
-			"[OHA-LH] t=%.0f %s %s creep-hp=%d dmg=%d expect=%.2f took=%.2f launch=%.2f gap=%.2f walk=%d pos=%d",
+			"[OHA-LH] t=%.0f %s %s creep-hp=%d dmg=%d expect=%.2f took=%.2f launch=%.2f gap=%.2f walk=%d pos=%d kind=%s turn=%.2f early=%s cancels=%d",
 			now,
 			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-			bot:GetLastHits() > attempt.lastHits and "got" or "missed",
+			got and "got" or "missed",
 			attempt.hp,
 			attempt.damage,
 			attempt.delay,
@@ -172,7 +180,11 @@ local function TrackLastHitAttempt()
 			launch,
 			attempt.gap or 0,
 			attempt.walk and 1 or 0,
-			Fu.GetPosition(bot)
+			Fu.GetPosition(bot),
+			attempt.kind or "-",
+			attempt.turn or 0,
+			attempt.early and "yes" or "no",
+			attempt.cancels or 0
 		)
 	)
 end
@@ -202,8 +214,16 @@ local function ProbeAttackTiming(creep)
 		)
 	)
 end
--- An attack or walk-in order on a last-hit creep: starts the attempt the first time for this creep.
+-- An attack or walk-in order on a last-hit creep: arms the per-frame timing (LastHitTiming) and starts the attempt the
+-- first time for this creep.
 local function OrderLastHit(creep, walk)
+	local pick = bot._lhPick
+	local picked = pick ~= nil and pick.creep == creep
+	LastHitTiming.Arm(bot, creep, {
+		damage = picked and pick.damage or attackDamage - 3,
+		allowEarly = picked and pick.allowEarly or false,
+		walk = walk,
+	})
 	local attempt = bot._lhAttempt
 	if attempt ~= nil and attempt.creep == creep then
 		pcall(ProbeAttackTiming, creep)
@@ -212,8 +232,6 @@ local function OrderLastHit(creep, walk)
 	if not Fu.IsInLaningPhase() then
 		return
 	end
-	local pick = bot._lhPick
-	local picked = pick ~= nil and pick.creep == creep
 	bot._lhAttempt = {
 		creep = creep,
 		at = DotaTime(),
@@ -223,6 +241,10 @@ local function OrderLastHit(creep, walk)
 		delay = picked and pick.delay or Fu.GetAttackProDelayTime(bot, creep),
 		lastHits = bot:GetLastHits(),
 		walk = walk,
+		kind = picked and pick.kind or GetCreepKind(creep),
+		turn = picked and pick.turn or 0,
+		early = picked and pick.early or false,
+		cancels = 0,
 	}
 end
 function GetDesire()
@@ -232,6 +254,7 @@ function GetDesire()
 	pcall(LogInEnemyTower)
 	pcall(LogCreepScore)
 	pcall(TrackLastHitAttempt)
+	pcall(LastHitTiming.LogMinute, bot)
 	return GetDesireRaw()
 end
 function GetDesireRaw()
@@ -368,45 +391,25 @@ function GetFurthestEnemyAttackRange(enemies)
 	end
 	return furthestRange
 end
-local function GetCreepValue(creep)
-	local unitName = creep:GetUnitName()
-	if string.find(unitName, "ranged") then
-		return 3
-	end
-	if string.find(unitName, "flagbearer") then
-		return 2
-	end
-	return 1
+-- Early starts (#71, game 063): a support leaves last hits to a core near it, so it only starts early alone.
+local function AllowEarlyStart()
+	return not IsSupportRole() or not Fu.IsThereNonSelfCoreNearby(1000)
 end
--- Our tower's next shot on a creep (#71, game 045: enemy creeps under our T1 were missed or ignored). The incoming-
--- damage prediction counts tower projectiles already flying, not the next shot: when our tower is attacking this
--- creep and its next shot lands before our hit, count it. Returns the damage the creep takes from it, or 0.
-local function OurTowerShotBefore(creep, hitDelay)
-	-- An unreachable hit (delay inf, game 046: a melee bot far from the creep) has no timing to plan.
-	if hitDelay == nil or hitDelay ~= hitDelay or hitDelay > 3 then
-		return 0
-	end
-	for _, tower in pairs(bot:GetNearbyTowers(1000, false) or {}) do
-		if Fu.IsValidBuilding(tower) and tower:GetAttackTarget() == creep then
-			local nextShot = tower:GetLastAttackTime() + tower:GetSecondsPerAttack()
-			local travel = GetUnitToUnitDistance(tower, creep) / math.max(1, tower:GetAttackProjectileSpeed())
-			if nextShot + travel < GameTime() + hitDelay then
-				return creep:GetActualIncomingDamage(tower:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
-			end
-		end
-	end
-	return 0
-end
+-- The last-hit pick (#71). Every creep is classified for the moment our hit would land (turn, walk, wind-up, flight;
+-- attacks in flight, creeps and towers mid-swing, our tower's next shot): "sure" (our hit kills it) or "early" (within
+-- 1.5 of our hits: start the swing, LastHitTiming cancels it if the creep is not low enough at the attack point).
+-- Among them: a sure kill beats an early one, then creep value less a walk-in penalty, then the hit that lands first
+-- (LastHitRules.PickScore). Before: the first creep in list order with the highest of ranged 3 / flagbearer 2 / melee 1,
+-- sure kills only.
 function GetBestLastHitCreep(creeps)
 	local damage = attackDamage - 3
-	local bestCreep = nil
-	local bestValue = 0
-	local bestDelay = 0
+	local bonus = bot._lastHitBonus or 0
+	local allowEarly = AllowEarlyStart()
+	local best = nil
 	for _, creep in pairs(creeps) do
 		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
-			local value = GetCreepValue(creep)
-			local okT, towerShot = pcall(OurTowerShotBefore, creep, attackDelay)
+			local okT, towerShot = pcall(LastHitTiming.TowerShotBefore, bot, creep, attackDelay)
 			towerShot = okT and towerShot or 0
 			-- The tower shot lands first; our hit then needs to finish what's left, and the tower alone must not
 			-- kill it (that gold is lost either way).
@@ -426,28 +429,42 @@ function GetBestLastHitCreep(creeps)
 					)
 				)
 			end
-			local bonus = bot._lastHitBonus or 0
-			local plainKill = not towerKills
-				and Fu.WillKillTarget(creep, damage + towerShot, DAMAGE_TYPE_PHYSICAL, attackDelay)
-			local bonusKill = not plainKill
-				and not towerKills
-				and bonus > 0
-				and Fu.WillKillTarget(creep, damage + towerShot + bonus, DAMAGE_TYPE_PHYSICAL, attackDelay)
-			if bonusKill then
-				bot._lastHitNeedsBonus = { creep = creep, at = DotaTime() }
+			local predictedHp, ourHit, incomingKills = LastHitTiming.Predict(creep, damage, attackDelay, towerShot)
+			local class = LastHitRules.Classify(predictedHp, ourHit, incomingKills, allowEarly)
+			local hitDamage = damage
+			if class ~= "sure" and bonus > 0 then
+				-- Clinkz's Searing Arrows (#48): a hit that only kills with the bonus.
+				local _, bonusHit = LastHitTiming.Predict(creep, damage + bonus, attackDelay, towerShot)
+				if LastHitRules.Classify(predictedHp, bonusHit, incomingKills, false) == "sure" then
+					class, hitDamage = "sure", damage + bonus
+				end
 			end
-			if plainKill or bonusKill then
-				if value > bestValue then
-					bestValue = value
-					bestCreep = creep
-					bestDelay = attackDelay
+			if class ~= nil then
+				local kind = GetCreepKind(creep)
+				local walk = GetUnitToUnitDistance(bot, creep) > attackRange
+				local score = LastHitRules.PickScore(kind, class == "sure", walk)
+				if best == nil or LastHitRules.BetterPick(score, attackDelay, best.score, best.delay) then
+					best = {
+						creep = creep,
+						damage = hitDamage,
+						bonus = hitDamage > damage,
+						delay = attackDelay,
+						score = score,
+						kind = kind,
+						early = class == "early",
+						turn = Fu.GetTurnTime(bot, creep),
+						allowEarly = allowEarly,
+					}
 				end
 			end
 		end
 	end
+	if best ~= nil and best.bonus then
+		bot._lastHitNeedsBonus = { creep = best.creep, at = DotaTime() }
+	end
 	-- The pick only: the attempt for [OHA-LH] starts when Think orders the hit (OrderLastHit).
-	bot._lhPick = bestCreep ~= nil and { creep = bestCreep, damage = damage, delay = bestDelay } or nil
-	return bestCreep
+	bot._lhPick = best
+	return best ~= nil and best.creep or nil
 end
 function GetBestDenyCreep(creeps)
 	local bestCreep = nil
@@ -462,7 +479,8 @@ function GetBestDenyCreep(creeps)
 			and creep:GetHealth() <= attackDamage
 			and Fu.IsDeniableLaneCreep(creep)
 		then
-			local value = GetCreepValue(creep)
+			-- Same order as last hits (#71): a denied flagbearer gives the enemy none of its area gold.
+			local value = LastHitRules.KIND_VALUE[GetCreepKind(creep)]
 			-- Prefer a deny that can be executed immediately. Otherwise keep the
 			-- best creep as a fallback so the bot can walk up to it.
 			if GetUnitToUnitDistance(bot, creep) <= attackRange + 100 then
@@ -701,8 +719,7 @@ local function LastHitRisk(creep, spot, needsWalk)
 	if danger == nil then
 		return nil
 	end
-	local name = creep:GetUnitName() or ""
-	local valuable = GetCreepValue(creep) >= 2 or string.find(name, "siege", 1, true) ~= nil
+	local valuable = GetCreepKind(creep) ~= "melee"
 	if hp < 0.4 then
 		return "low-hp", danger
 	end
@@ -774,6 +791,8 @@ end
 do
 	function Think()
 		pcall(TrackLastHitAttempt)
+		-- A last-hit timing this think does not re-arm is dropped (LastHitTiming.Tick, next frame at the latest).
+		LastHitTiming.BeginThink(bot)
 		LogLaning()
 		-- Standing at the lane spot while two or more summons bite is how a hero melted to
 		-- spiderlings. Step back toward the tower and let the creeps or tower take them.
@@ -906,12 +925,31 @@ do
 						goto a5
 					end
 				end
+				-- The per-frame timing owns this hit (a wind-up being watched, holding after a cancel, or an attack it
+				-- ordered): keep it armed and give no order that would replace it.
+				if LastHitTiming.Holding(bot, lastHitCreep) then
+					OrderLastHit(lastHitCreep, false)
+					return
+				end
+				local pick = bot._lhPick
+				local early = pick ~= nil and pick.creep == lastHitCreep and pick.early
 				if creepDistance > attackRange then
 					local attackDistance = attackRange - lastHitCreep:GetBoundingRadius()
 					local moveLocation =
 						Fu.GetXUnitsTowardsLocation2(lastHitCreep:GetLocation(), bot:GetLocation(), attackDistance)
 					OrderLastHit(lastHitCreep, true)
 					bot:Action_MoveDirectly(moveLocation)
+					return
+				elseif
+					early
+					and not LastHitRules.CanTimeWindup(
+						bot:GetAttackPoint() / math.max(0.1, bot:GetAttackSpeed()),
+						LastHitTiming.FrameGap(bot)
+					)
+				then
+					-- Too few frames inside this hero's wind-up to check it: no early swing, the per-frame timing
+					-- attacks when the hit is sure.
+					OrderLastHit(lastHitCreep, true)
 					return
 				else
 					OrderLastHit(lastHitCreep, false)

@@ -571,6 +571,7 @@ local function GiveUpWardSpot(why)
 			why,
 			wardSpot ~= nil and string.format("%.0f,%.0f", wardSpot.location.x, wardSpot.location.y) or "-",
 			observerWard ~= nil
+					and not observerWard:IsNull()
 					and string.format(
 						"%s/slot%d/%s",
 						observerWard:GetName(),
@@ -579,6 +580,7 @@ local function GiveUpWardSpot(why)
 					)
 				or "-",
 			sentryWard ~= nil
+					and not sentryWard:IsNull()
 					and string.format(
 						"%s/slot%d/%s",
 						sentryWard:GetName(),

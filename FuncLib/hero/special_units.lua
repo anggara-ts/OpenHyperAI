@@ -768,6 +768,8 @@ local function KiteStats(unit)
 				baseHit = 0,
 				inRange = 0,
 				baseInRange = 0,
+				fromHit = 0,
+				baseFromHit = 0,
 				why = {},
 			}
 		end
@@ -786,9 +788,18 @@ local function KiteSample(unit, attacker, kind, stepped, why, stepEnd, checkIn)
 		return
 	end
 	local spa = unit:GetSecondsPerAttack()
+	local kindStats = KiteStats(unit).kinds[kind]
+	-- Not a like-for-like baseline (KiteRules.NOT_BASELINE): counted in no-step= once per attack cycle, no sample.
+	if not stepped and KiteRules.NOT_BASELINE[why] then
+		unit._kiteSkipNext = unit._kiteSkipNext or {}
+		if GameTime() >= (unit._kiteSkipNext[kind] or -99) then
+			unit._kiteSkipNext[kind] = GameTime() + spa
+			kindStats.why[why] = (kindStats.why[why] or 0) + 1
+		end
+		return
+	end
 	local attackerSpa = attacker:GetSecondsPerAttack() or spa
 	local window = checkIn or math.max(attackerSpa, spa) + 0.1
-	local kindStats = KiteStats(unit).kinds[kind]
 	if stepped then
 		kindStats.steps = kindStats.steps + 1
 	else
@@ -805,6 +816,9 @@ local function KiteSample(unit, attacker, kind, stepped, why, stepEnd, checkIn)
 		stepEnd = stepEnd,
 		stepLeft = stepEnd ~= nil and Fu.GetLocationToLocationDistance(unit:GetLocation(), stepEnd) or nil,
 		closest = math.huge,
+		-- from-hit: the unit we stepped from (not any creep) released an attack on us before the check.
+		attackerLast = attacker:GetLastAttackTime(),
+		fromHit = false,
 	}
 end
 function X.KiteResultTick(unit)
@@ -814,6 +828,18 @@ function X.KiteResultTick(unit)
 	if pending ~= nil and pending.stepEnd ~= nil then
 		pending.closest =
 			math.min(pending.closest, Fu.GetLocationToLocationDistance(unit:GetLocation(), pending.stepEnd))
+	end
+	-- from-hit (#72, game 064: the creep metric counted any creep's hit): the attacker's last attack time moved after
+	-- the sample started while its target was this bot. Read every frame, so the target at the release is seen.
+	if pending ~= nil and pending.kind ~= "chase" and not pending.fromHit then
+		local attacker = pending.enemy
+		if
+			Fu.IsValid(attacker)
+			and attacker:GetLastAttackTime() > (pending.attackerLast or math.huge)
+			and attacker:GetAttackTarget() == unit
+		then
+			pending.fromHit = true
+		end
 	end
 	if pending ~= nil and GameTime() >= pending.checkAt then
 		unit._kitePending = nil
@@ -838,6 +864,9 @@ function X.KiteResultTick(unit)
 			if hit then
 				kindStats.hitAfter = kindStats.hitAfter + 1
 			end
+			if pending.fromHit then
+				kindStats.fromHit = kindStats.fromHit + 1
+			end
 			if inRange then
 				kindStats.inRange = kindStats.inRange + 1
 			end
@@ -851,6 +880,9 @@ function X.KiteResultTick(unit)
 			if hit then
 				kindStats.baseHit = kindStats.baseHit + 1
 			end
+			if pending.fromHit then
+				kindStats.baseFromHit = kindStats.baseFromHit + 1
+			end
 			if inRange then
 				kindStats.baseInRange = kindStats.baseInRange + 1
 			end
@@ -860,7 +892,7 @@ function X.KiteResultTick(unit)
 	if stats ~= nil and DotaTime() - stats.since >= 60 then
 		for _, kind in ipairs(KITE_KINDS) do
 			local kindStats = stats.kinds[kind]
-			if kindStats.steps > 0 or kindStats.base > 0 then
+			if kindStats.steps > 0 or kindStats.base > 0 or next(kindStats.why) ~= nil then
 				local why = {}
 				for reason, count in pairs(kindStats.why) do
 					why[#why + 1] = reason .. ":" .. count
@@ -887,16 +919,18 @@ function X.KiteResultTick(unit)
 					pcall(
 						print,
 						string.format(
-							"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d late-attack=%d moved=%d base=%d base-hit=%d no-step=%s window=%.0fs",
+							"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d from-hit=%d late-attack=%d moved=%d base=%d base-hit=%d base-from-hit=%d no-step=%s window=%.0fs",
 							DotaTime(),
 							ShortName(unit),
 							kind,
 							kindStats.steps,
 							kindStats.hitAfter,
+							kindStats.fromHit,
 							kindStats.late,
 							kindStats.moved,
 							kindStats.base,
 							kindStats.baseHit,
+							kindStats.baseFromHit,
 							#why > 0 and table.concat(why, ",") or "-",
 							DotaTime() - stats.since
 						)
@@ -1096,7 +1130,9 @@ function X.ChaseStep(unit, target)
 	local since = GameTime() - unit:GetLastAttackTime()
 	local nextIn = KiteRules.NextAttackIn(spa, since, from)
 	local here, targetAt = unit:GetLocation(), target:GetLocation()
-	local ahead = target:GetExtrapolatedLocation(nextIn)
+	-- Extrapolated to our next attack, at most KiteRules.CHASE_HORIZON ahead.
+	local horizon = KiteRules.ChaseHorizon(nextIn)
+	local ahead = target:GetExtrapolatedLocation(horizon)
 	local step, endX, endY = KiteRules.ChaseStep(here.x, here.y, targetAt.x, targetAt.y, ahead.x, ahead.y, range)
 	if step == nil then
 		return false
@@ -1110,6 +1146,32 @@ function X.ChaseStep(unit, target)
 		return false
 	end
 	if unit:GetAnimActivity() == 1503 and unit:GetAnimCycle() < unit:GetAttackPoint() + 0.05 then
+		return false
+	end
+	-- Not toward a group: 2+ enemy heroes near the target or near us, and fewer of us (KiteRules.ChaseOutnumbered).
+	local enemies = math.max(
+		#Fu.GetEnemiesNearLoc(targetAt, KiteRules.CHASE_GROUP_RADIUS),
+		#Fu.GetEnemiesNearLoc(here, KiteRules.CHASE_GROUP_RADIUS)
+	)
+	local allies = #Fu.GetAlliesNearLoc(here, KiteRules.CHASE_ALLY_RADIUS)
+	if KiteRules.ChaseOutnumbered(enemies, allies) then
+		KiteSample(unit, target, "chase", false, "outnumbered", nil, checkIn)
+		unit._kiteLogAt = unit._kiteLogAt or {}
+		if DotaTime() >= (unit._kiteLogAt.outnumbered or -99) + 10 then
+			unit._kiteLogAt.outnumbered = DotaTime()
+			pcall(
+				print,
+				string.format(
+					"[OHA-KITE] t=%.0f %s chase-skip why=outnumbered target=%s enemies=%d allies=%d dist=%d",
+					DotaTime(),
+					ShortName(unit),
+					ShortName(target),
+					enemies,
+					allies,
+					GetUnitToUnitDistance(unit, target)
+				)
+			)
+		end
 		return false
 	end
 	local stepEnd = Vector(endX, endY, here.z)
@@ -1136,13 +1198,16 @@ function X.ChaseStep(unit, target)
 		pcall(
 			print,
 			string.format(
-				"[OHA-KITE] t=%.0f %s chase %s kind=chase mode=%d dist=%d ahead=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
+				"[OHA-KITE] t=%.0f %s chase %s kind=chase mode=%d dist=%d ahead=%d horizon=%.2f enemies=%d allies=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
 				DotaTime(),
 				ShortName(unit),
 				ShortName(target),
 				unit:GetActiveMode(),
 				GetUnitToUnitDistance(unit, target),
 				GetUnitToLocationDistance(unit, ahead),
+				horizon,
+				enemies,
+				allies,
 				step,
 				since,
 				from,

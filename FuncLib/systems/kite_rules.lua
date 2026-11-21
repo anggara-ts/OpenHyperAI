@@ -86,8 +86,9 @@ end
 --   (bx, by)  the bot          (tx, ty)  the target now
 --   (px, py)  the target at our next attack (its extrapolated location)
 -- Returns the step (MIN_STEP..MAX_STEP) and its end point, or nil and why not:
+--   "in-range"  it is within range - RANGE_MARGIN now (game 064 t=2444: Zeus stepped 250 toward Death Prophet at
+--               193, already in range), or stays within it anyway
 --   "not-away"  it does not get CHASE_AWAY_MIN farther by then (standing, coming at us, circling)
---   "in-range"  it stays within range - RANGE_MARGIN anyway
 --   "far"       already CHASE_FAR past our range now: the mode walks after it, a step does not keep it in range
 KiteRules.CHASE_AWAY_MIN = 20
 KiteRules.CHASE_FAR = 200
@@ -96,13 +97,17 @@ function KiteRules.ChaseStep(bx, by, tx, ty, px, py, range)
 	local nextX, nextY = px - bx, py - by
 	local distNow = math.sqrt(nowX * nowX + nowY * nowY)
 	local distNext = math.sqrt(nextX * nextX + nextY * nextY)
+	local reach = range - KiteRules.RANGE_MARGIN
 	if distNow > range + KiteRules.CHASE_FAR then
 		return nil, nil, nil, "far"
+	end
+	if distNow <= reach then
+		return nil, nil, nil, "in-range"
 	end
 	if distNext < distNow + KiteRules.CHASE_AWAY_MIN then
 		return nil, nil, nil, "not-away"
 	end
-	local need = distNext - (range - KiteRules.RANGE_MARGIN)
+	local need = distNext - reach
 	if need <= 0 then
 		return nil, nil, nil, "in-range"
 	end
@@ -115,6 +120,30 @@ end
 function KiteRules.NextAttackIn(secondsPerAttack, since, from)
 	return math.max(0, secondsPerAttack - since) + from - KiteRules.BUF
 end
+
+-- How far ahead the target's position is extrapolated for a chase step: the time to our next attack, at most
+-- CHASE_HORIZON. Game 064 t=2444: Zeus (seconds per attack 6.2 that moment, window 1.38-4.83) extrapolated Death
+-- Prophet about 5s ahead (ahead=680) and stepped 250 toward her; GetExtrapolatedLocation assumes she keeps running
+-- straight, which over seconds she does not.
+KiteRules.CHASE_HORIZON = 1.0
+function KiteRules.ChaseHorizon(nextIn)
+	return math.max(0, math.min(nextIn, KiteRules.CHASE_HORIZON))
+end
+
+-- No chase step toward a group (game 064: all 3 Zeus deaths came 2-5s after a chase step toward 2-3 enemy heroes):
+-- enemies = the most enemy heroes near the target or near us (the target counted), allies = our heroes near us (we
+-- counted). Two or more enemies need at least as many allies. Enemies within 1000 of the target or of us, allies within
+-- 1200 of us (a fight's reach, not a game value).
+KiteRules.CHASE_GROUP_RADIUS = 1000
+KiteRules.CHASE_ALLY_RADIUS = 1200
+function KiteRules.ChaseOutnumbered(enemies, allies)
+	return enemies >= 2 and allies < enemies
+end
+
+-- No-step reasons that are not a like-for-like baseline (#72, game 064: 135 of 152 chase base samples were "fast"):
+-- a hero with attacks too fast to kite is in a different situation from one a gate (tower, last hit, blocked spot,
+-- no room, outnumbered) stopped. They still count in no-step=, not in base=.
+KiteRules.NOT_BASELINE = { fast = true }
 
 -- Within attack range at the next attack: Dota measures attack range between the two hulls.
 function KiteRules.InAttackRange(dist, range, botRadius, targetRadius)

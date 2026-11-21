@@ -220,19 +220,21 @@ end)
 
 T.test("chase step: toward a hero running out of range", function()
 	local R = rules()
-	-- Range 600; the hero is 550 away now and 700 away at our next attack: step 700 - 570 = 130 toward it.
-	local step, x, y = R.ChaseStep(0, 0, 550, 0, 700, 0, 600)
+	-- Range 600; the hero is 590 away now and 700 away at our next attack: step 700 - 570 = 130 toward it.
+	local step, x, y = R.ChaseStep(0, 0, 590, 0, 700, 0, 600)
 	T.near(step, 130, 1e-6, "just enough")
 	T.near(x, 130, 1e-6, "toward where it heads")
 	T.near(y, 0, 1e-6, "straight")
 	-- Running far: the step is capped at 250.
 	T.near((R.ChaseStep(0, 0, 600, 0, 1000, 0, 600)), 250, 1e-6, "capped")
 	-- Only a little out of range: at least the 60 minimum.
-	T.near((R.ChaseStep(0, 0, 540, 0, 580, 0, 600)), 60, 1e-6, "minimum step")
+	T.near((R.ChaseStep(0, 0, 575, 0, 600, 0, 600)), 60, 1e-6, "minimum step")
 	-- Running sideways at the same distance, or toward us: no chase.
-	T.eq(select(4, R.ChaseStep(0, 0, 500, 0, 495, 100, 600)), "not-away", "sideways")
-	T.eq(select(4, R.ChaseStep(0, 0, 500, 0, 300, 0, 600)), "not-away", "coming at us")
-	-- Getting farther but still in range at the next attack.
+	T.eq(select(4, R.ChaseStep(0, 0, 580, 0, 575, 100, 600)), "not-away", "sideways")
+	T.eq(select(4, R.ChaseStep(0, 0, 580, 0, 300, 0, 600)), "not-away", "coming at us")
+	-- In range now (game 064 t=2444: Zeus, range 380, stepped toward Death Prophet at 193): no step, even when the
+	-- extrapolation says it runs off.
+	T.eq(select(4, R.ChaseStep(0, 0, 193, 0, 680, 0, 380)), "in-range", "in range now")
 	T.eq(select(4, R.ChaseStep(0, 0, 300, 0, 450, 0, 600)), "in-range", "stays in range")
 	-- Already well past our range: the mode walks after it.
 	T.eq(select(4, R.ChaseStep(0, 0, 900, 0, 1100, 0, 600)), "far", "too far")
@@ -253,7 +255,7 @@ local function chaseScene()
 	local here = bot:GetLocation()
 	-- A real enemy hero of the stub game (a made-up one has no player and reads as an illusion).
 	local runner = T.stub.teams[TEAM_DIRE][2]
-	runner._loc = here + Vector(550, 0, 0)
+	runner._loc = here + Vector(590, 0, 0)
 	runner.GetExtrapolatedLocation = function()
 		return here + Vector(700, 0, 0)
 	end
@@ -285,6 +287,9 @@ end)
 
 T.test("chase hook: a melee unit hitting the bot wins, and no chase into a tower", function()
 	local bot, SpecialUnits, runner, moves = chaseScene()
+	-- The runner still in range, so the step away from the creep keeps it there.
+	local runnerAt = runner._loc
+	runner._loc = bot:GetLocation() + Vector(550, 0, 0)
 	-- A melee creep hits the bot from the north: the step goes south, away from it, not east after the runner.
 	local creep = T.stub.newUnit({ name = "npc_dota_creep_badguys_melee", loc = bot:GetLocation() + Vector(0, 100, 0) })
 	creep.GetAttackTarget = function()
@@ -301,6 +306,7 @@ T.test("chase hook: a melee unit hitting the bot wins, and no chase into a tower
 	T.ok(printedWith("kind=lane") ~= nil, "lane step")
 	-- No creep, but an enemy tower covers the step end: no chase, counted in the baseline.
 	bot._kitePending = nil
+	runner._loc = runnerAt
 	bot.GetNearbyLaneCreeps = function()
 		return {}
 	end
@@ -323,4 +329,72 @@ T.test("chase hook: a melee unit hitting the bot wins, and no chase into a tower
 	SpecialUnits.KiteResultTick(bot)
 	local result = printedWith("result kind=chase")
 	T.ok(result ~= nil and string.find(result, "no-step=tower:1", 1, true) ~= nil, "result line: " .. tostring(result))
+end)
+
+T.test("chase: extrapolation horizon and outnumbered gate", function()
+	local R = rules()
+	T.eq(R.ChaseHorizon(4.83), 1.0, "game 064 t=2444: about 5s ahead capped at 1s")
+	T.near(R.ChaseHorizon(0.4), 0.4, 1e-9, "the next attack comes first")
+	T.eq(R.ChaseHorizon(-1), 0, "never negative")
+	T.ok(R.ChaseOutnumbered(2, 1), "two enemies, alone")
+	T.ok(R.ChaseOutnumbered(3, 2), "three against two")
+	T.ok(not R.ChaseOutnumbered(2, 2), "allies match")
+	T.ok(not R.ChaseOutnumbered(1, 1), "the target alone")
+	T.ok(R.NOT_BASELINE.fast and not R.NOT_BASELINE.tower, "fast is not a baseline sample, a gate is")
+end)
+
+T.test("chase hook: no step toward a group, counted as a gated baseline sample", function()
+	local bot, SpecialUnits, runner, moves = chaseScene()
+	-- A second enemy hero next to the runner; the bot alone (the stub's allies stand 100 apart: move them away).
+	for _, member in ipairs(T.stub.teams[bot:GetTeam()]) do
+		if member ~= bot then
+			member._loc = Vector(-7000, -7000, 0)
+		end
+	end
+	local other = T.stub.teams[TEAM_DIRE][3]
+	other._loc = runner:GetLocation() + Vector(100, 0, 0)
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase")
+	T.eq(#moves, 0, "no move order")
+	T.ok(printedWith("chase-skip why=outnumbered") ~= nil, "chase-skip line")
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local result = printedWith("result kind=chase")
+	T.ok(result ~= nil and string.find(result, "base=1", 1, true) ~= nil, "a baseline sample: " .. tostring(result))
+	T.ok(string.find(result or "", "no-step=outnumbered:1", 1, true) ~= nil, "reason: " .. tostring(result))
+end)
+
+T.test("chase hook: too-fast attacks are a no-step reason, not a baseline sample", function()
+	local bot, SpecialUnits, _, moves = chaseScene()
+	bot.GetSecondsPerAttack = function()
+		return 0.5
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase")
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase again, same attack cycle")
+	T.eq(#moves, 0)
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local result = printedWith("result kind=chase")
+	T.ok(result ~= nil and string.find(result, "base=0", 1, true) ~= nil, "not in base=: " .. tostring(result))
+	T.ok(string.find(result or "", "no-step=fast:1", 1, true) ~= nil, "counted once: " .. tostring(result))
+end)
+
+T.test("kite result: from-hit names a hit by the creep we stepped from", function()
+	local bot, SpecialUnits, attacker, _, moves = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
+	bot.GetNearbyNeutralCreeps = function()
+		return { attacker }
+	end
+	local attackerLast = -50
+	attacker.GetLastAttackTime = function()
+		return attackerLast
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "stepped")
+	T.eq(#moves, 1)
+	-- The neutral releases an attack on the bot after the step.
+	attackerLast = GameTime() + 0.1
+	T.stub.time = T.stub.time + 0.2
+	SpecialUnits.KiteResultTick(bot)
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local result = printedWith("result kind=jungle")
+	T.ok(result ~= nil and string.find(result, "from-hit=1", 1, true) ~= nil, "from-hit counted: " .. tostring(result))
 end)

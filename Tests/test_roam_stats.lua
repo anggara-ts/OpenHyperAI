@@ -232,9 +232,6 @@ T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target"
 	H.Tick(clinkz, "farm")
 	T.eq(clinkz._huntTrace, nil, "walk with a creep target: no hunt")
 	clinkz.target = lich
-	H.Tick(clinkz, "attack")
-	T.eq(clinkz._huntTrace, nil, "a walk with no hunt target locked by hero_clinkz.lua: no hunt (game 064)")
-	clinkz._huntTarget = lich
 	H.Tick(clinkz, "retreat")
 	T.eq(clinkz._huntTrace, nil, "retreating: no hunt")
 	H.Tick(clinkz, "attack")

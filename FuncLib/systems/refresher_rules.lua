@@ -19,4 +19,67 @@ function RefresherRules.ManaOk(mana, refresherCost, recastCosts)
 	return (mana or 0) >= RefresherRules.ManaNeeded(refresherCost, recastCosts)
 end
 
+-- Which spells a refresh is for (maintainer, 2026-11-21, #47): learned, not passive, not a toggle, a cooldown of
+-- MIN_COOLDOWN seconds or more, and not the refresher itself. Hidden slots and talents are not spells.
+-- spell: { name, learned, passive, toggle, hidden, talent, cooldown, ultimate, ready, onCooldown, cost }
+--   ready: castable now (off cooldown, enough mana); onCooldown: cooling down; cost: mana cost.
+RefresherRules.MIN_COOLDOWN = 8
+local REFRESHERS = { item_refresher = true, item_refresher_shard = true }
+function RefresherRules.IsUseful(spell)
+	return spell ~= nil
+		and spell.learned == true
+		and not spell.passive
+		and not spell.toggle
+		and not spell.hidden
+		and not spell.talent
+		and (spell.cooldown or 0) >= RefresherRules.MIN_COOLDOWN
+		and not REFRESHERS[spell.name or ""]
+end
+
+-- The combo a refresh pays for: the useful spells (besides the ultimate) still ready, and the mana needed: the
+-- refresher, the ultimate once, and every useful spell on cooldown (each cast again after the refresh). A ready
+-- spell is not refreshed, so its mana is not counted. Returns othersReady (count), needed (mana), the names of the
+-- ready spells and the names of the spells in the combo (ultimate first).
+function RefresherRules.Combo(refresherCost, ultimateName, ultimateCost, spells)
+	local othersReady, readyNames = 0, {}
+	local recastCosts, comboNames = { ultimateCost or 0 }, { ultimateName or "ult" }
+	for _, spell in ipairs(spells or {}) do
+		if RefresherRules.IsUseful(spell) and not spell.ultimate and spell.name ~= ultimateName then
+			if spell.ready then
+				othersReady = othersReady + 1
+				readyNames[#readyNames + 1] = spell.name
+			elseif spell.onCooldown then
+				recastCosts[#recastCosts + 1] = spell.cost or 0
+				comboNames[#comboNames + 1] = spell.name
+			end
+		end
+	end
+	return othersReady, RefresherRules.ManaNeeded(refresherCost, recastCosts), readyNames, comboNames
+end
+
+-- Hold the refresh up to HOLD_FOR seconds while a useful spell is still ready, so the hero's own rules can cast it
+-- first. state: per bot ({ holdAt }); a hold older than HOLD_STALE (a new fight) starts again. "hold" or "go";
+-- also true when this step started the hold (for a once-per-hold log line).
+RefresherRules.HOLD_FOR = 1.0
+RefresherRules.HOLD_STALE = 5
+function RefresherRules.HoldStep(state, now, othersReady)
+	if othersReady <= 0 then
+		return "go", false
+	end
+	local started = false
+	if state.holdAt == nil or now - state.holdAt > RefresherRules.HOLD_STALE then
+		state.holdAt = now
+		started = true
+	end
+	if now - state.holdAt < RefresherRules.HOLD_FOR then
+		return "hold", started
+	end
+	return "go", false
+end
+
+-- The refresh went out, or its conditions (enemies, fight, the ultimate's cooldown) lapsed: the next one holds again.
+function RefresherRules.ResetHold(state)
+	state.holdAt = nil
+end
+
 return RefresherRules

@@ -22,3 +22,62 @@ T.test("refresher: the old 2x-ultimate check let a refresh through that left no 
 	T.eq(R.ManaOk(475, 325, { 150 }), true, "475 mana is exactly enough")
 	T.eq(R.ManaOk(400, 200, { 150 }), true, "the Shard is cheaper")
 end)
+
+local function spell(name, fields)
+	local s = { name = name, learned = true, passive = false, toggle = false, cooldown = 12, cost = 100 }
+	for k, v in pairs(fields or {}) do
+		s[k] = v
+	end
+	return s
+end
+
+T.test("refresher: which spells count as useful (maintainer, 2026-11-21)", function()
+	local R = rules()
+	T.eq(R.IsUseful(spell("lion_impale")), true, "learned, active, 12s cooldown")
+	T.eq(R.IsUseful(spell("lion_impale", { learned = false })), false, "not learned")
+	T.eq(R.IsUseful(spell("x", { passive = true })), false, "passive")
+	T.eq(R.IsUseful(spell("x", { toggle = true })), false, "toggle")
+	T.eq(R.IsUseful(spell("x", { cooldown = 7 })), false, "cooldown under 8s")
+	T.eq(R.IsUseful(spell("x", { cooldown = 8 })), true, "8s counts")
+	T.eq(R.IsUseful(spell("item_refresher")), false, "the refresher itself")
+	T.eq(R.IsUseful(spell("special_bonus_x", { talent = true })), false, "talent")
+	T.eq(R.IsUseful(spell("x", { hidden = true })), false, "hidden slot")
+end)
+
+T.test("refresher: the combo mana counts the spells on cooldown, the ultimate once", function()
+	local R = rules()
+	local spells = {
+		spell("ult", { ultimate = true, onCooldown = true, cost = 150 }),
+		spell("stun", { onCooldown = true, cost = 100 }),
+		spell("nuke", { ready = true, cost = 120 }),
+		spell("aura", { passive = true, onCooldown = true, cost = 0 }),
+		spell("short", { cooldown = 5, onCooldown = true, cost = 50 }),
+	}
+	local othersReady, needed, readyNames, comboNames = R.Combo(325, "ult", 150, spells)
+	T.eq(othersReady, 1, "the nuke is still ready")
+	T.eq(needed, 325 + 150 + 100, "Orb + ultimate + the stun on cooldown (the ready nuke is not refreshed)")
+	T.eq(readyNames[1], "nuke", "ready names")
+	T.eq(table.concat(comboNames, "+"), "ult+stun", "combo names")
+	local none, onlyUlt = R.Combo(200, "ult", 150, {})
+	T.eq(none, 0, "no other spells")
+	T.eq(onlyUlt, 350, "Shard + ultimate")
+end)
+
+T.test("refresher: a ready spell holds the refresh up to 1s", function()
+	local R = rules()
+	local state = {}
+	T.eq(R.HoldStep(state, 100, 0), "go", "nothing ready: refresh now")
+	local step, started = R.HoldStep(state, 100, 1)
+	T.eq(step, "hold", "a spell is ready: hold")
+	T.eq(started, true, "the hold starts (log once)")
+	local _, again = R.HoldStep(state, 100.5, 1)
+	T.eq(again, false, "the same hold")
+	T.eq(R.HoldStep(state, 100.5, 1), "hold", "0.5s: still holding")
+	T.eq(R.HoldStep(state, 101.1, 1), "go", "after 1s: refresh even with the spell unused")
+	T.eq(R.HoldStep(state, 100.6, 0), "go", "the spell went out: refresh")
+	-- A later fight: an old hold doesn't skip the wait.
+	T.eq(R.HoldStep(state, 110, 1), "hold", "a hold older than 5s starts again")
+	R.ResetHold(state)
+	T.eq(state.holdAt, nil, "reset after the refresh / when the fight ends")
+	T.eq(R.HoldStep(state, 111, 1), "hold", "after a reset the next refresh holds again")
+end)

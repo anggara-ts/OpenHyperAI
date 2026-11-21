@@ -4,14 +4,34 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 -- Eye cliffs pinged in the current map. Ground point under the cliff, used after that lane's T1 falls.
 local UBER_WALK = 7000
 local OBS_GAP = 1500
--- Removed (#15): (4612, 767) and (-4348, -1008). Neither is walkable, so both were moved ((4439, 667) and
--- (-4348, -1108)). Games 018-062: 39 and 36 give-ups `[OHA-WARD] give-up why=in-range-no-plant` (the next-worst
--- spot: 5), with plant-try lines from 88-172 away showing spotPassable=true; none of the 156 plants logged with
--- their spot (games 018-019) was at either.
--- A replacement needs the maintainer's ping in a game.
+-- Maintainer's pings, game 063 (#15): Radiant bottom (-1288, -4340) and Dire top (1028, 3581) are the spots already
+-- here. Radiant top (-4365, -1012, by the Radiant outpost) and Dire bottom (4610, 770, by the Dire outpost) are back:
+-- they are the right spots. As (-4348, -1008) and (4612, 767) they were not walkable, so ValidateSpot moved them to
+-- (-4348, -1108) and (4439, 667), where the plant order did nothing (games 018-062: 36 and 39 give-ups
+-- `why=in-range-no-plant`). keep = true: the ping stays the target (no move), and the plant retry in
+-- mode_ward_generic.lua tries points around it when the order does not plant. label (the game 063 pings): a bare word
+-- the [OHA-WARD] give-up, plant-retry and dispenser lines print, so a game check can name the spot.
 local UberWardSpots = {
 	{ location = Vector(1015, 3593, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "dire" },
+	{
+		location = Vector(4610, 770, 0),
+		label = "uber-dire-bottom",
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "uber",
+		side = "dire",
+		keep = true,
+	},
 	{ location = Vector(-1287, -4329, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "radiant" },
+	{
+		location = Vector(-4365, -1012, 0),
+		label = "uber-radiant-top",
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "uber",
+		side = "radiant",
+		keep = true,
+	},
 }
 local RoshSpots = {
 	{ location = Vector(-3379, 743, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "contest", side = "radiant" },
@@ -32,6 +52,12 @@ local HuntSpots = {
 	{ location = Vector(-4876, 624, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "hunt", side = "radiant" },
 }
 -- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
+-- The first two are the lotus pools (pools at -7548,4209 and 7504,-4405 in [OHA-LOTUS] lines). Twin Gates (#15,
+-- maintainer's pings, game 063): top (-2808, 8257) and bottom (2780, -8151) watch the gate ambush; the old gate
+-- spots (-6244, 7147) and (6206, -6958) are "less effective for guarding twin gate ambush" and only stay as a
+-- fallback (fallbackFor): used once the new spot of that gate has been given up, not while it is warded. Side of the
+-- new spots by fountain distance, as LaneSpots does: top 10091 from the Dire base (-> dire), 15535 from the
+-- Radiant one; bottom 10064 from the Radiant base (-> radiant), 15331 from the Dire one.
 local GateSpots = {
 	{
 		location = Vector(-7421, 4238, 0),
@@ -50,12 +76,35 @@ local GateSpots = {
 		deep = true,
 	},
 	{
+		location = Vector(-2808, 8257, 0),
+		label = "gate-top",
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "dire",
+		deep = true,
+		gate = "top",
+		keep = true,
+	},
+	{
+		location = Vector(2780, -8151, 0),
+		label = "gate-bottom",
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "contest",
+		side = "radiant",
+		deep = true,
+		gate = "bottom",
+		keep = true,
+	},
+	{
 		location = Vector(-6244, 7147, 0),
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "contest",
 		side = "radiant",
 		deep = true,
+		fallbackFor = "top",
 	},
 	{
 		location = Vector(6206, -6958, 0),
@@ -64,28 +113,49 @@ local GateSpots = {
 		role = "contest",
 		side = "dire",
 		deep = true,
+		fallbackFor = "bottom",
 	},
 }
+-- A gate's old spot only after its new one was given up (`give-up` sets the plant time but plants nothing) and
+-- before that mark runs out; a planted new spot is a warded gate.
+local function GateFallbackOpen(spot)
+	if spot.fallbackFor == nil then
+		return true
+	end
+	for i = 1, #GateSpots do
+		local main = GateSpots[i]
+		if main.gate == spot.fallbackFor then
+			return main.gaveUpAt ~= nil and DotaTime() < main.gaveUpAt + 360
+		end
+	end
+	return true
+end
 local radiantEarlyWardSpots = {
 	-- Radiant mid: the user's safe spots, pinged in game 022 (2026-11-16), on Radiant's side of the
 	-- river so the support does not cross it. Replace the Dire bank of the top rune (-627, 850),
 	-- where Mirana was killed walking back (game 020 and 021), and (-245, -996). safe = true lets
 	-- them through the "early wards go on the enemy side" filter.
+	-- Game 063 pings (#15): by the top river rune (-1223, -1) replaces (-1386, -171), and "option 1" (-300, -909)
+	-- replaces (-303, -1001). (-882, -1000) was not pinged again and stays.
 	[1] = {
-		location = Vector(-1386, -171, 0),
+		location = Vector(-1223, -1, 0),
+		label = "mid-radiant-rune",
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "early",
 		side = "radiant",
 		safe = true,
+		keep = true,
 	},
 	[2] = {
-		location = Vector(-303, -1001, 0),
+		location = Vector(-300, -909, 0),
+		label = "mid-radiant-1",
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "early",
 		side = "radiant",
 		safe = true,
+		keep = true,
 	},
 	[3] = {
 		location = Vector(-882, -1000, 0),
@@ -115,13 +185,18 @@ local direEarlyWardSpots = {
 	-- (632, -281), on Dire's side of the river. Replace the Radiant bank of the bottom rune
 	-- (44, -1232; it planted, but across the river) and (-627, 850). safe = true lets them through
 	-- the "early wards go on the enemy side" filter.
+	-- Game 063 pings (#15; game 052: the Dire mid ward stood too close to the Dire mid T1): "option 1" (-533, 737)
+	-- replaces (-501, 696), "option 2" (488, -100) replaces (632, -281), and the spot by the top river rune
+	-- (-521, 901) is new ([6]). (12, 257) was not pinged again and stays.
 	[1] = {
-		location = Vector(-501, 696, 0),
+		location = Vector(-533, 737, 0),
+		label = "mid-dire-1",
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "early",
 		side = "dire",
 		safe = true,
+		keep = true,
 	},
 	[2] = {
 		location = Vector(12, 257, 0),
@@ -132,12 +207,14 @@ local direEarlyWardSpots = {
 		safe = true,
 	},
 	[3] = {
-		location = Vector(632, -281, 0),
+		location = Vector(488, -100, 0),
+		label = "mid-dire-2",
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "early",
 		side = "dire",
 		safe = true,
+		keep = true,
 	},
 	[4] = {
 		location = Vector(-5305, 4281, 0),
@@ -152,6 +229,16 @@ local direEarlyWardSpots = {
 		plant_time_sentry = 0,
 		role = "early",
 		side = "radiant",
+	},
+	[6] = {
+		location = Vector(-521, 901, 0),
+		label = "mid-dire-rune",
+		plant_time_obs = 0,
+		plant_time_sentry = 0,
+		role = "early",
+		side = "dire",
+		safe = true,
+		keep = true,
 	},
 }
 function Ward.GetEarlyGameWardSpots()
@@ -242,6 +329,18 @@ local function HomeWardTooEarly(loc)
 		end
 	end
 	return not sawTower or not laneOpen
+end
+-- Plant retry points around a spot (#15, mode_ward_generic.lua PlantRetry): 8 directions at 50, then at 100, as
+-- { x, y } pairs, nearest first.
+function Ward.RetryPoints(center)
+	local points = {}
+	for _, radius in ipairs({ 50, 100 }) do
+		for step = 0, 7 do
+			local angle = step * math.pi / 4
+			points[#points + 1] = { center.x + math.cos(angle) * radius, center.y + math.sin(angle) * radius }
+		end
+	end
+	return points
 end
 function Ward.WalkLimit(spot)
 	if spot and spot.role == "uber" then
@@ -502,7 +601,9 @@ function Ward.GetAvailabeObserverWardSpots(bot)
 		end
 	end
 	for i = 1, #GateSpots do
-		consider(GateSpots[i])
+		if GateFallbackOpen(GateSpots[i]) then
+			consider(GateSpots[i])
+		end
 	end
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])
@@ -637,7 +738,9 @@ function Ward.GetPossibleSentryWardSpots(bot)
 		consider(RoshSpots[i])
 	end
 	for i = 1, #GateSpots do
-		consider(GateSpots[i])
+		if GateFallbackOpen(GateSpots[i]) then
+			consider(GateSpots[i])
+		end
 	end
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])

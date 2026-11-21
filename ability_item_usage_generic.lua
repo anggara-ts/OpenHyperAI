@@ -10140,7 +10140,8 @@ function ItemUsageThink()
 	if okDeaggro and deaggroed then
 		return
 	end
-	-- Kiting for heroes on Valve's attack mode (the override attack mode kites from its own Think).
+	-- Kiting for ranged heroes in every mode: a step away from a melee hero, lane creep or neutral hitting them, between
+	-- attacks (#72; the override attack mode kites from its own Think).
 	local okKite, kited = pcall(SpecialUnits.TryKiteInAttack, bot)
 	if okKite and kited then
 		return

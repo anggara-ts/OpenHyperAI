@@ -189,8 +189,14 @@ function X.Arm(bot, creep, info)
 	end
 	st.armedAt = now
 	st.damage = info.damage
-	st.allowEarly = info.allowEarly
-	if st.phase == "hold" or st.phase == "windup" or st.phase == "attack" and not info.walk then
+	st.allowEarly = info.allowEarly and X.EarlyAllowed(bot)
+	-- "decided": the release is decided and the swing still plays; it stays until the release is seen.
+	if
+		st.phase == "hold"
+		or st.phase == "windup"
+		or st.phase == "decided"
+		or st.phase == "attack" and not info.walk
+	then
 		return st
 	end
 	st.phase = info.walk and "walk" or "attack"
@@ -205,13 +211,23 @@ function X.Holding(bot, creep)
 		return false
 	end
 	-- An attack order counts only while the engine still has it (another order may have replaced it).
-	return st.phase == "hold" or st.phase == "windup" or st.phase == "attack" and bot:GetAttackTarget() == creep
+	return st.phase == "hold"
+		or st.phase == "windup"
+		or st.phase == "decided"
+		or st.phase == "attack" and bot:GetAttackTarget() == creep
+end
+
+-- Early swings for this bot: off after the stop orders failed again and again (every early swing would then land
+-- on a creep that survives).
+local EARLY_OFF_AFTER = 4
+function X.EarlyAllowed(bot)
+	return not bot._lhtNoEarly
 end
 
 -- For other per-frame code: a last hit is being timed now (do not move or re-target the bot).
 function X.IsTiming(bot)
 	local st = bot._lhTiming
-	return st ~= nil and (st.phase == "hold" or st.phase == "windup")
+	return st ~= nil and (st.phase == "hold" or st.phase == "windup" or st.phase == "decided")
 end
 
 function X.Clear(bot)
@@ -243,7 +259,7 @@ local function cancelSwing(bot, st, now, pointAt, predictedHp, ourHit, remaining
 	throttledLog(
 		bot,
 		"cancel",
-		"[OHA-LH] t=%.0f %s cancel creep-hp=%d predicted=%.0f hit=%.0f remaining=%.2f cycle=%.3f n=%d method=%s why=survives",
+		"[OHA-LH] t=%.0f %s cancel creep-hp=%d predicted=%.0f hit=%.0f remaining=%.2f cycle=%.3f since=%.2f n=%d method=%s why=survives",
 		DotaTime(),
 		heroName(bot),
 		st.creep:GetHealth(),
@@ -251,6 +267,7 @@ local function cancelSwing(bot, st, now, pointAt, predictedHp, ourHit, remaining
 		ourHit,
 		remaining,
 		bot:GetAnimCycle(),
+		now - bot:GetLastAttackTime(),
 		st.cancels,
 		method
 	)
@@ -284,7 +301,7 @@ local function watchWindup(bot, st, now)
 		return
 	end
 	if decision == "release" then
-		st.phase = "released"
+		st.phase = "decided"
 		local stats = X.Stats(bot)
 		stats.released = stats.released + 1
 		if why == "sure" then
@@ -402,17 +419,42 @@ function X.Tick(bot)
 				st.stopPending
 			)
 			st.stopPending = nil
+			if bot._lhtStopFail >= EARLY_OFF_AFTER and (bot._lhtStopOk or 0) == 0 and not bot._lhtNoEarly then
+				bot._lhtNoEarly = true
+				pcall(
+					print,
+					string.format(
+						"[OHA-LH] t=%.0f %s early-off stop-fail=%d stop-ok=0",
+						DotaTime(),
+						heroName(bot),
+						bot._lhtStopFail
+					)
+				)
+			end
 		end
 		st.phase = "released"
 		st.windupAt = nil
 		return false
 	end
 	local phase = st.phase
+	local swinging = bot:GetAnimActivity() == ATTACK_ACTIVITY and bot:GetAttackTarget() == creep
+	if phase == "decided" then
+		if swinging then
+			return true
+		end
+		-- The swing stopped before the release (another order, a disable): wait for the next one.
+		st.phase = "attack"
+		return false
+	end
 	if phase == "attack" or phase == "windup" then
-		if bot:GetAnimActivity() == ATTACK_ACTIVITY and bot:GetAttackTarget() == creep then
+		-- A new wind-up only once the previous attack's backswing is over: activity 1503 also covers the backswing
+		-- (GetLastAttackTime is the release; the next swing can start at release + seconds per attack - wind-up).
+		local pointTime = bot:GetAttackPoint() / math.max(0.1, bot:GetAttackSpeed())
+		local cooledDown = now - lastAttack >= bot:GetSecondsPerAttack() - pointTime - 0.05
+		if swinging and (phase == "windup" or cooledDown) then
 			st.phase = "windup"
 			watchWindup(bot, st, now)
-			return st.phase ~= "released"
+			return st.phase == "windup" or st.phase == "hold" or st.phase == "decided"
 		end
 		if phase == "windup" then
 			-- The swing stopped without a release (another order, a disable): wait for the next one.

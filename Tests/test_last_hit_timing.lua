@@ -30,6 +30,9 @@ local function setup(creepHp)
 	bot.Action_ClearActions = function()
 		state.orders[#state.orders + 1] = "clear"
 	end
+	bot.Action_MoveToLocation = function()
+		state.orders[#state.orders + 1] = "move"
+	end
 	bot.Action_AttackUnit = function()
 		state.orders[#state.orders + 1] = "attack"
 	end
@@ -103,7 +106,12 @@ T.test("wind-up: a swing that kills is released, never cancelled", function()
 	state.activity = 1503
 	frames(Timing, bot, creep, 20, 45)
 	T.eq(#state.orders, 0, "no cancel")
-	T.eq(bot._lhTiming.phase, "released")
+	T.eq(bot._lhTiming.phase, "decided", "release decided, kept until the release is seen")
+	T.eq(bot._lhtStats.released, 1, "counted once, not again at every re-arm")
+	T.ok(Timing.Holding(bot, creep), "the laning Think gives no order meanwhile")
+	state.lastAttack = GameTime()
+	frames(Timing, bot, creep, 1, 45)
+	T.eq(bot._lhTiming.phase, "released", "release seen")
 end)
 
 T.test("wind-up: a swing that was sure when it started is never cancelled", function()
@@ -142,4 +150,41 @@ T.test("the laning Think dropping the hit clears the timing", function()
 	Timing.Tick(bot)
 	T.eq(bot._lhTiming, nil, "a think without Arm drops it")
 	T.ok(not Timing.IsTiming(bot))
+end)
+
+T.test("the previous attack's backswing (also activity 1503) does not start the wind-up clock", function()
+	local _, Timing, bot, creep, state = setup(60)
+	Stub.time = 600
+	-- Released 0.1s ago; seconds per attack 1.7 (stub), wind-up 0.5: the next swing can start 1.2s after the release.
+	state.lastAttack = GameTime() - 0.1
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = true })
+	state.activity = 1503
+	frames(Timing, bot, creep, 20, 45)
+	T.eq(bot._lhTiming.phase, "attack", "no wind-up clock in the backswing")
+	T.eq(#state.orders, 0, "no cancel in the backswing")
+	frames(Timing, bot, creep, 25, 45)
+	T.ok(bot._lhTiming.phase == "windup" or bot._lhTiming.phase == "hold", "a real wind-up after the cooldown")
+end)
+
+T.test("early swings switch off for a bot whose stops never hold", function()
+	local _, Timing, bot, creep, state = setup(60)
+	Stub.time = 700
+	for round = 1, 4 do
+		Timing.Arm(bot, creep, { damage = 45, allowEarly = true })
+		bot._lhTiming.phase = "attack"
+		state.orders = {}
+		state.activity = 1503
+		untilOrder(Timing, bot, creep, state, 45)
+		T.ok(state.orders[1] == "clear" or state.orders[1] == "move", "round " .. round .. " stopped")
+		-- The attack releases anyway, then the backswing ends.
+		state.lastAttack = GameTime()
+		frames(Timing, bot, creep, 1, 45)
+		state.activity = 0
+		Stub.time = Stub.time + 2
+	end
+	T.eq(bot._lhtStopFail, 4)
+	T.eq(state.orders[1], "move", "the last rounds used the move-order fallback")
+	T.ok(not Timing.EarlyAllowed(bot), "early swings off")
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = true })
+	T.eq(bot._lhTiming.allowEarly, false, "Arm drops early for this bot")
 end)

@@ -391,9 +391,10 @@ function GetFurthestEnemyAttackRange(enemies)
 	end
 	return furthestRange
 end
--- Early starts (#71, game 063): a support leaves last hits to a core near it, so it only starts early alone.
+-- Early starts (#71, game 063): a support leaves last hits to a core near it, so it only starts early alone. Off for
+-- a bot whose stop orders keep failing (LastHitTiming.EarlyAllowed, [OHA-LH] early-off).
 local function AllowEarlyStart()
-	return not IsSupportRole() or not Fu.IsThereNonSelfCoreNearby(1000)
+	return LastHitTiming.EarlyAllowed(bot) and (not IsSupportRole() or not Fu.IsThereNonSelfCoreNearby(1000))
 end
 -- The last-hit pick (#71). Every creep is classified for the moment our hit would land (turn, walk, wind-up, flight;
 -- attacks in flight, creeps and towers mid-swing, our tower's next shot): "sure" (our hit kills it) or "early" (within

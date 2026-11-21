@@ -337,7 +337,11 @@ local function AncientDead(team)
 end
 
 function MatchTrace.Markers()
-	MatchTrace.MatchMarker("game", string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE)))
+	-- The lineup text only while the marker is unsent (#52): it was built on every item think of every bot (ten hero
+	-- names, ten string replacements) and then dropped. MatchTrace.Tick was 11.2s of game 059's detail= totals.
+	if not markerSent["game"] then
+		MatchTrace.MatchMarker("game", string.format("radiant=%s dire=%s", Lineup(TEAM_RADIANT), Lineup(TEAM_DIRE)))
+	end
 	if markerSent["end"] or DotaTime() < nextEndCheck then
 		return
 	end

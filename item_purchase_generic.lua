@@ -1721,6 +1721,9 @@ function ItemPurchaseThink()
 		and GetItemStockCount("item_clarity") > 1
 		and Item.GetItemCharges(bot, "item_clarity") <= 0
 		and gold >= GetItemCost("item_clarity")
+		-- Not right after a full-inventory sale of a Clarity (game 067: Undying sold one at 42:29 and bought one at
+		-- 42:30, a 25-gold loop also seen on Zeus and Death Prophet).
+		and now >= (bot._claritySoldAt or -999) + 60
 	then
 		bot.hasBuyClarity = true
 		Purchase(bot, "item_clarity", "low-mana", "item_clarity")
@@ -2180,6 +2183,9 @@ function ItemPurchaseThink()
 		end
 		if sellSlot ~= nil then
 			-- This sale printed nothing, so a part that went missing could not be traced (#15, game 065).
+			if bot:GetItemInSlot(sellSlot):GetName() == "item_clarity" then
+				bot._claritySoldAt = now
+			end
 			BuyLog(
 				"sell-full %s slot=%d empty=%d",
 				ShortItem(bot:GetItemInSlot(sellSlot):GetName()),

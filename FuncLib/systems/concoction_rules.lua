@@ -229,6 +229,52 @@ function ConcoctionRules.DisableRisk(brewed, disableReady, hpLost)
 	return nil
 end
 
+-- #34, game 067: the bot API reads an enemy's cooldowns as 0 (FuncLib/systems/enemy_spell_tracker.lua), so a disable's
+-- state is "ready" (seen used and its cooldown passed), "cooldown" (seen used, not passed) or "unknown" (never seen
+-- used). A ready one counts within its risk range; an unknown one only when that hero is within DISABLE_UNKNOWN_NEAR or
+-- faces him (it is coming at him); one on cooldown never.
+-- Risk range: DISABLE_RISK_RANGE, wider for the disables that reached him from farther in game 067 (t=2329-2331: Death
+-- Prophet walked from about 1340 to 551 in 3s and cast Wind Waker on him 2.5s into a brew; DP was then silencing too):
+--   item_cyclone, item_wind_waker  AbilityCastRange 550 (7.42 items.txt) plus her walk-in: 1350
+--   death_prophet_silence          cast range 900 + radius 450 (datafeed hero 43): 1350
+ConcoctionRules.DISABLE_UNKNOWN_NEAR = 600
+ConcoctionRules.DISABLE_RISK_FAR = 1350
+local riskRangeByName = {
+	item_cyclone = ConcoctionRules.DISABLE_RISK_FAR,
+	item_wind_waker = ConcoctionRules.DISABLE_RISK_FAR,
+	death_prophet_silence = ConcoctionRules.DISABLE_RISK_FAR,
+}
+function ConcoctionRules.DisableRiskRange(name)
+	return riskRangeByName[name] or ConcoctionRules.DISABLE_RISK_RANGE
+end
+function ConcoctionRules.DisableCounts(state, distance, facing, range)
+	if state == "cooldown" or distance > range then
+		return false
+	end
+	if state == "ready" then
+		return true
+	end
+	return distance <= ConcoctionRules.DISABLE_UNKNOWN_NEAR or facing == true
+end
+
+-- #34, game 067 t=813: an engage brew on Dark Willow; she turned and ran (hard retreat about 2s into the brew),
+-- and no throw went out before she was out of range and then out of sight at 4.7s. The last-target rule only looks
+-- at the nearest hero in the outer fifth of the range. The brew target itself, running away (moving, not facing him)
+-- from RUNNER_MIN_BREWED seconds brewed and beyond RUNNER_MIN_SHARE of the range, is thrown at when it leaves the
+-- range within RUNNER_LEAVE_SECONDS at the measured rate (distance units per second, positive: the gap grows).
+ConcoctionRules.RUNNER_MIN_BREWED = 1.0
+ConcoctionRules.RUNNER_MIN_SHARE = 0.6
+ConcoctionRules.RUNNER_LEAVE_SECONDS = 1.5
+function ConcoctionRules.RunnerThrowNow(brewed, distance, rate, castRange, runningAway)
+	if not runningAway or brewed < ConcoctionRules.RUNNER_MIN_BREWED or rate == nil or rate <= 0 then
+		return false
+	end
+	if distance < castRange * ConcoctionRules.RUNNER_MIN_SHARE or distance > castRange then
+		return false
+	end
+	return (castRange - distance) / rate < ConcoctionRules.RUNNER_LEAVE_SECONDS
+end
+
 -- #34, game 065 t=1198: retreat said 0.51 and blocked an engage brew for one think; the next think (t=1199) an
 -- engage brew started at his 31% HP and blew up on him once he was stunned. The block holds RETREAT_HOLD seconds
 -- after the retreat mode last wanted him out.

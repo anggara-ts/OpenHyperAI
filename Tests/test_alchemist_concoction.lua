@@ -638,14 +638,30 @@ local function giveSpell(enemy, slot, name)
 	return ability
 end
 
-T.test("alchemist: no brew on a hero with Skeleton Walk ready, unless it is stunned or on cooldown", function()
+local function enemySpells()
+	return require(GetScriptDirectory() .. "/FuncLib/systems/enemy_spell_tracker")
+end
+
+T.test("alchemist: Skeleton Walk blocks a brew only once it was seen used and its cooldown passed", function()
+	-- Game 067: the API reads an enemy's cooldown as 0, so a walk never seen used is unknown and does not block.
 	local X = load()
 	local state = startBrew(X, 1300, true)
 	giveSpell(state.enemy, 5, "clinkz_wind_walk")
 	X.SkillsComplement()
-	T.eq(state.brewing, false, "Skeleton Walk ready: no kill brew")
+	T.eq(state.brewing, true, "never seen used (unknown): the kill brew starts")
+	T.ok(printedLine("concoction start why=kill .* escape=clinkz_wind_walk:unknown"), "start line names the escape")
+	-- Seen used 30s ago (game data: cooldown 24 at level 1): ready again, no brew.
+	X = load()
+	state = startBrew(X, 1300, true)
+	giveSpell(state.enemy, 5, "clinkz_wind_walk")
+	enemySpells().Record(state.enemy:GetUnitName(), "clinkz_wind_walk", 1270, 1, nil, "modifier")
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "seen 30s ago, cooldown 24: ready, no kill brew")
 	T.ok(
-		printedLine("concoction no%-brew why=escape%-ready rule=kill target=npc_dota_hero_%S+ escape=clinkz_wind_walk"),
+		printedLine(
+			"concoction no%-brew why=escape%-ready rule=kill target=npc_dota_hero_%S+ escape=clinkz_wind_walk .*"
+				.. "state=ready since=30 cd=24 via=modifier"
+		),
 		"line"
 	)
 	local stunned = true
@@ -655,18 +671,251 @@ T.test("alchemist: no brew on a hero with Skeleton Walk ready, unless it is stun
 	Stub.time = 1300.5
 	X.SkillsComplement()
 	T.eq(state.brewing, true, "stunned: it can't walk away, the brew starts")
-	-- A fresh setup with the walk on cooldown.
+	-- Seen used 10s ago: on cooldown, the brew starts.
+	X = load()
+	state = startBrew(X, 1400, true)
+	giveSpell(state.enemy, 5, "clinkz_wind_walk")
+	enemySpells().Record(state.enemy:GetUnitName(), "clinkz_wind_walk", 1390, 1, nil, "vanish")
+	X.SkillsComplement()
+	T.eq(state.brewing, true, "seen 10s ago: on cooldown, the brew starts")
+	T.ok(printedLine("concoction start why=kill .* escape=clinkz_wind_walk:cooldown"), "start line")
+	-- A cooldown the API does read (above 0) is on cooldown whatever was seen.
 	X = load()
 	state = startBrew(X, 1400, true)
 	local walk = giveSpell(state.enemy, 5, "clinkz_wind_walk")
 	walk.cooldown = 12
+	enemySpells().Record(state.enemy:GetUnitName(), "clinkz_wind_walk", 1300, 1, nil, "modifier")
 	X.SkillsComplement()
-	T.eq(state.brewing, true, "on cooldown: the brew starts")
+	T.eq(state.brewing, true, "read on cooldown: the brew starts")
 	T.ok(
-		printedLine("enemy%-spell%-cd hero=npc_dota_hero_%S+ spell=clinkz_wind_walk cd=12.0 level=1"),
+		printedLine("enemy%-spell%-cd hero=npc_dota_hero_%S+ spell=clinkz_wind_walk cd=12.0 level=1 item=false"),
 		"cooldown read logged"
 	)
 	T.ok((state.bot._noTpUntil or -1) > Stub.time, "no Town Portal while brewing")
+end)
+
+T.test("enemy spells: state from a seen use and the game-data cooldown", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local E = enemySpells()
+	T.eq(E.StateAt(nil, 24, 100), "unknown", "never seen")
+	T.eq(E.StateAt(90, nil, 100), "unknown", "cooldown not known")
+	T.eq(E.StateAt(90, 24, 100), "cooldown", "10s after, cooldown 24")
+	T.eq(E.StateAt(70, 24, 100), "ready", "30s after")
+	T.eq(E.DataCooldown("nyx_assassin_vendetta", 2), 70, "Vendetta level 2 (datafeed hero 88)")
+	T.eq(E.DataCooldown("nyx_assassin_vendetta", 5), 60, "past the last level: the last value")
+	T.eq(E.DataCooldown("item_wind_waker", 1), 19, "Wind Waker (items.txt)")
+	T.eq(E.DataCooldown("no_such_spell", 1), nil, "not listed")
+	local cooldown, source = E.CooldownFor("clinkz_wind_walk", 2, 0)
+	T.eq(cooldown, 21, "API 0: the data")
+	T.eq(source, "data", "source data")
+	cooldown, source = E.CooldownFor("clinkz_wind_walk", 2, 15.75)
+	T.eq(cooldown, 15.75, "API above 0 (it counts reductions)")
+	T.eq(source, "api", "source api")
+	T.eq(select(2, E.CooldownFor("no_such_spell", 1, 0)), "none", "nothing known")
+	-- One cast seen over several thinks (a modifier read while it lasts) is one cast.
+	T.eq(E.Record("npc_dota_hero_clinkz", "clinkz_wind_walk", 100, 1, nil, "modifier"), true, "first sighting")
+	T.eq(E.Record("npc_dota_hero_clinkz", "clinkz_wind_walk", 101.5, 1, nil, "modifier"), false, "same cast")
+	T.eq(
+		E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 123.9),
+		"cooldown",
+		"cooldown runs from the first sighting"
+	)
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 124), "ready", "24s after the first sighting")
+	T.eq(E.Record("npc_dota_hero_clinkz", "clinkz_wind_walk", 130, 1, nil, "vanish"), true, "a new cast after a gap")
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 140), "cooldown", "the new cast counts")
+	T.eq(E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 140), "unknown", "another hero: never seen")
+end)
+
+-- A fake enemy for EnemySpells.Observe: modifiers by name, one vanish spell, visibility switched by the test.
+local function observedEnemy(name, spell)
+	local enemy = {
+		mods = {},
+		seen = true,
+		loc = Vector(100, 0, 0),
+	}
+	local ability = {
+		GetName = function()
+			return spell
+		end,
+		GetLevel = function()
+			return 2
+		end,
+		GetCooldown = function()
+			return 0
+		end,
+		IsNull = function()
+			return false
+		end,
+		IsHidden = function()
+			return false
+		end,
+	}
+	function enemy.GetUnitName()
+		return name
+	end
+	function enemy.HasModifier(_, modifier)
+		return enemy.mods[modifier] == true
+	end
+	function enemy.GetLocation()
+		return enemy.loc
+	end
+	function enemy.GetPlayerID()
+		return Stub.PLAYER_IDS[GetOpposingTeam()][1]
+	end
+	function enemy.GetAbilityInSlot(_, slot)
+		return slot == 2 and ability or nil
+	end
+	function enemy.GetAbilityByName(_, abilityName)
+		return abilityName == spell and ability or nil
+	end
+	function enemy.GetItemInSlot()
+		return nil
+	end
+	function enemy.IsNull()
+		return false
+	end
+	function enemy.CanBeSeen()
+		return enemy.seen
+	end
+	return enemy
+end
+
+T.test("enemy spells: a modifier or a vanish in our vision is a seen use, fog and TP are not", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local E = enemySpells()
+	local nyx = observedEnemy("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta")
+	Stub.time = 100
+	E.Observe("alchemist", { nyx })
+	T.eq(E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 100), "unknown", "seen, not used")
+	-- She vanishes with her spot still in vision: Vendetta used (level 2: 70s, datafeed hero 88).
+	nyx.seen = false
+	Stub.time = 100.2
+	E.Observe("alchemist", {})
+	local state, entry = E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 100.2)
+	T.eq(state, "cooldown", "vanish recorded")
+	T.eq(entry.via, "vanish", "via vanish")
+	T.eq(entry.cooldown, 70, "level 2 cooldown")
+	T.ok(
+		printedLine(
+			"%[OHA%-ENEMYCD%] t=100 alchemist seen hero=npc_dota_hero_nyx_assassin spell=nyx_assassin_vendetta via=vanish"
+				.. " level=2 cd=70.0 cdSrc=data"
+		),
+		"seen line"
+	)
+	T.eq(E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 170.3), "ready", "70s later: ready")
+	-- Walking into fog (her spot not visible) is no use.
+	E.Reset()
+	local clinkz = observedEnemy("npc_dota_hero_clinkz", "clinkz_wind_walk")
+	Stub.time = 200
+	E.Observe("alchemist", { clinkz })
+	clinkz.seen = false
+	local visible = _G.IsRadiusVisible
+	_G.IsRadiusVisible = function()
+		return false
+	end
+	Stub.time = 200.2
+	E.Observe("alchemist", {})
+	_G.IsRadiusVisible = visible
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 200.2), "unknown", "fog: not a use")
+	-- Gone in a Town Portal: no use either.
+	clinkz.seen = true
+	clinkz.mods.modifier_teleporting = true
+	Stub.time = 201
+	E.Observe("alchemist", { clinkz })
+	clinkz.seen = false
+	Stub.time = 201.2
+	E.Observe("alchemist", {})
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 201.2), "unknown", "TP: not a use")
+	-- Seen too long ago (more than 0.5s): no use.
+	clinkz.mods.modifier_teleporting = nil
+	clinkz.seen = true
+	Stub.time = 202
+	E.Observe("alchemist", { clinkz })
+	clinkz.seen = false
+	Stub.time = 203
+	E.Observe("alchemist", {})
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 203), "unknown", "last seen 1s before: not a use")
+	-- The Skeleton Walk modifier on a visible Clinkz is a use.
+	clinkz.seen = true
+	clinkz.mods.modifier_clinkz_wind_walk = true
+	Stub.time = 204
+	E.Observe("alchemist", { clinkz })
+	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 204), "cooldown", "modifier recorded")
+end)
+
+T.test("concoction rules: disable risk by state and range, runner throw", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local R = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
+	T.eq(R.DisableRiskRange("nyx_assassin_impale"), 900, "default")
+	T.eq(R.DisableRiskRange("item_wind_waker"), 1350, "Wind Waker (game 067 t=2331)")
+	T.eq(R.DisableRiskRange("death_prophet_silence"), 1350, "Silence: 900 range + 450 radius")
+	T.eq(R.DisableCounts("ready", 850, false, 900), true, "ready within range")
+	T.eq(R.DisableCounts("ready", 950, true, 900), false, "beyond range")
+	T.eq(R.DisableCounts("cooldown", 300, true, 900), false, "seen used, on cooldown")
+	T.eq(R.DisableCounts("unknown", 550, false, 900), true, "unknown within 600")
+	T.eq(R.DisableCounts("unknown", 800, false, 900), false, "unknown at 800, not facing him")
+	T.eq(R.DisableCounts("unknown", 1200, true, 1350), true, "unknown, coming at him with Wind Waker")
+	-- Runner: 775 range; from 1.0s, beyond 465, leaving within 1.5s.
+	T.eq(R.RunnerThrowNow(0.9, 700, 200, 775, true), false, "before 1.0s")
+	T.eq(R.RunnerThrowNow(1.5, 700, 100, 775, true), true, "700 at 100/s: out in 0.75s")
+	T.eq(R.RunnerThrowNow(1.5, 500, 100, 775, true), false, "500 at 100/s: 2.75s left")
+	T.eq(R.RunnerThrowNow(1.5, 500, 250, 775, true), true, "500 at 250/s: 1.1s left")
+	T.eq(R.RunnerThrowNow(1.5, 400, 400, 775, true), false, "inside 0.6 of the range")
+	T.eq(R.RunnerThrowNow(1.5, 700, 300, 775, false), false, "facing him: not running away")
+	T.eq(R.RunnerThrowNow(1.5, 700, -50, 775, true), false, "the gap is closing")
+end)
+
+T.test("alchemist: the brew target turning to run gets the throw (runner)", function()
+	local X = load()
+	local state = startBrew(X, 1800)
+	state.enemy._hp = 1000 -- not a kill
+	state.enemy._loc = state.bot._loc + Vector(560, 0, 0)
+	state.enemy.IsFacingLocation = function()
+		return false
+	end
+	state.enemy.GetAnimActivity = function()
+		return ACTIVITY_RUN
+	end
+	Stub.time = 1801.0
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "first sample")
+	state.enemy._loc = state.bot._loc + Vector(600, 0, 0)
+	Stub.time = 1801.2
+	X.SkillsComplement()
+	T.eq(#state.orders, 1, "600 and 200/s away: out of range in 0.9s, thrown")
+	T.ok(printedLine("concoction throw why=runner target=npc_dota_hero_%S+ dist=600 brewed=1.2s"), "throw line")
+end)
+
+T.test("alchemist: no engage brew on a hero his attacks kill first (game 067 t=3835)", function()
+	local X = load()
+	local state = startBrew(X, 1900, true)
+	local bot = state.bot
+	-- 200 HP: max damage does not kill it fast (lethalAfter 5.0 * 200 / 60 = 16.7s), his second hit (0.8s) does.
+	state.enemy._hp = 200
+	state.enemy.GetActualIncomingDamage = function(_, damage)
+		return damage == 360 and 60 or damage
+	end
+	state.enemy._loc = bot._loc + Vector(150, 0, 0)
+	bot.GetAttackRange = function()
+		return 150
+	end
+	bot.GetAttackDamage = function()
+		return 130
+	end
+	bot.GetSecondsPerAttack = function()
+		return 0.8
+	end
+	local context = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+	local build = context.Build
+	context.Build = function(...)
+		local c = build(...)
+		c.isEngaging = true
+		return c
+	end
+	X.SkillsComplement()
+	context.Build = build
+	T.eq(state.brewing, false, "no engage brew")
+	T.ok(printedLine("concoction no%-brew why=attack%-kill target=npc_dota_hero_%S+ .*rule=engage"), "line")
 end)
 
 T.test("alchemist: a stun ready near him throws the brew at 2s (disable-risk)", function()
@@ -726,3 +975,32 @@ T.test("alchemist: a retreat that wanted him out holds the brew for 2s", functio
 	X.SkillsComplement()
 	T.eq(state.brewing, true, "2.5s after the last want: the brew starts")
 end)
+
+T.test(
+	"alchemist: brew target lost while retreating: plan=none for a hero out of range, any hero in range takes it",
+	function()
+		-- Game 067 t=1346: target-lost said plan=chase in retreat, but keep-range does not walk him while retreating.
+		local X = load()
+		local state = startBrew(X, 2000)
+		state.enemy._hp = 1000
+		state.enemy._alive = false
+		state.bot.GetActiveMode = function()
+			return BOT_MODE_RETREAT
+		end
+		local other = Stub.teams[GetOpposingTeam()][2]
+		other._loc = state.bot._loc + Vector(1000, 0, 0)
+		other._hp = 1000
+		Stub.time = 2000.5
+		X.SkillsComplement()
+		T.ok(printedLine("concoction target%-lost brewed=0.5s .*plan=none mode=%d+ retreating=true"), "plan=none")
+		-- At 720 (beyond 0.9 of the range, which keep-range would close) it takes the throw from 1.0s.
+		other._loc = state.bot._loc + Vector(720, 0, 0)
+		Stub.time = 2001.0
+		X.SkillsComplement()
+		T.eq(#state.orders, 1, "thrown")
+		T.ok(
+			printedLine("concoction throw why=target%-lost target=npc_dota_hero_%S+ dist=720 brewed=1.0s"),
+			"throw line"
+		)
+	end
+)

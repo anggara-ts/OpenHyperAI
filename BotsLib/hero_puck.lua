@@ -332,13 +332,18 @@ function X.SkillsComplement()
 	-- their Think replaced the cast order. The outpost mode's hold (desire 1.5, Think gives no order) is asked for
 	-- first; the cast goes out once it is the active mode, or after 0.2s at most.
 	local outpostMode = BOT_MODE_OUTPOST or 26
+	-- Game 064: two casts went out after the 0.2s wait in attack mode and broke at 0.1s; the outpost GetDesire had
+	-- last run 0.27-0.3s earlier (hold-left age=0.30/0.33, hold-desire=0.00), so the hold had not been asked yet.
+	-- A dodge can't wait (the disjoint on cast is the point); any other shift waits up to 0.4s for the hold.
+	local isDodge = string.sub(tostring(X.phaseWhy), 1, 5) == "dodge"
+	local maxWait = isDodge and 0.2 or 0.4
 	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode then
-		if bot._phaseWantAt == nil or DotaTime() - bot._phaseWantAt > 0.5 then
+		if bot._phaseWantAt == nil or DotaTime() - bot._phaseWantAt > maxWait + 0.3 then
 			bot._phaseWantAt = DotaTime()
 			bot._phaseWantMode = bot:GetActiveMode()
 			return
 		end
-		if DotaTime() - bot._phaseWantAt < 0.2 then
+		if DotaTime() - bot._phaseWantAt < maxWait then
 			return
 		end
 	end
@@ -346,7 +351,7 @@ function X.SkillsComplement()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s why=%s from-mode=%s mode=%d waited=%.2f",
+				"[OHA-PUCK] t=%.0f phase cast hp=%.2f enemies=%d retreating=%s why=%s from-mode=%s mode=%d waited=%.2f outpost-age=%.2f",
 				DotaTime(),
 				Fu.GetHP(bot),
 				#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000),
@@ -354,7 +359,9 @@ function X.SkillsComplement()
 				tostring(X.phaseWhy),
 				tostring(bot._phaseWantMode),
 				bot:GetActiveMode(),
-				bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt or -1
+				bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt or -1,
+				-- How long ago the outpost GetDesire last ran to its end (what the hold had seen).
+				DotaTime() - (bot._outpostLastDesireAt or -99)
 			)
 		)
 		bot._phaseWantAt = nil

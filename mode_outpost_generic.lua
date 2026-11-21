@@ -200,7 +200,34 @@ local function EnemyFountainEscape()
 	local dest = fountain + away:Normalized() * 1800
 	return dest
 end
+-- Holds that must outlast the hero's own invulnerability: Puck's Phase Shift makes her invulnerable, and the gate in
+-- GetDesire (like every other mode's) skips invulnerable bots. Puck only: the other holds read this mode's target and
+-- enemy lists, which are not refreshed while the hero is invulnerable.
+local invulnerableHolds = { npc_dota_hero_puck = true }
+local function InvulnerableHoldDesire()
+	if not invulnerableHolds[botName] or not bot:IsAlive() or bot:IsIllusion() then
+		return nil
+	end
+	local holdFunc = heroSpecificDesire[botName]
+	if holdFunc == nil then
+		return nil
+	end
+	local okHold, holdDesire = pcall(holdFunc)
+	if okHold and holdDesire ~= nil and holdDesire > 1 then
+		return holdDesire
+	end
+	return nil
+end
 function GetDesire()
+	-- Before the invulnerable gate (game 064: the gate returned 0 as soon as the shift made Puck invulnerable, so the
+	-- hold never ran inside the shift; 6 of 10 shifts broke at 0.1-1.2s, and hold-left age= equalled after=).
+	if bot:IsInvulnerable() then
+		local holdDesire = InvulnerableHoldDesire()
+		if holdDesire ~= nil then
+			bot._outpostLastDesire, bot._outpostLastDesireAt = holdDesire, DotaTime()
+			return holdDesire
+		end
+	end
 	if ShouldSkipBotThink(GetBot()) then
 		return 0
 	end
@@ -235,19 +262,8 @@ function GetDesire()
 end
 function GetDesireHelper()
 	botName = bot:GetUnitName()
-	-- A hero hold (Puck's Phase Shift, Tinker's Rearm, ...) above 1 keeps its mode while the hero is invulnerable:
-	-- the shift itself makes Puck invulnerable, so the gate below dropped the hold the moment the shift started and
-	-- Valve's mode ended the channel (game 058: [OHA-PUCK] phase hold-left after 0.03-0.33s, to modes with desire
-	-- 0.00-0.61 while 2.2-2.5s of the hold were left).
-	if bot:IsInvulnerable() and bot:IsAlive() and bot:IsHero() and not bot:IsIllusion() then
-		local holdFunc = heroSpecificDesire[botName]
-		if holdFunc ~= nil then
-			local okHold, holdDesire = pcall(holdFunc)
-			if okHold and holdDesire ~= nil and holdDesire > 1 then
-				return holdDesire
-			end
-		end
-	end
+	-- An invulnerable hero's hold (Puck's Phase Shift) is checked in GetDesire, before its invulnerable gate (game 058:
+	-- [OHA-PUCK] phase hold-left after 0.03-0.33s, to modes with desire 0.00-0.61 while 2.2-2.5s of the hold were left).
 	if
 		bot:IsInvulnerable()
 		or not bot:IsHero()
@@ -2125,7 +2141,7 @@ heroSpecificDesire["npc_dota_hero_puck"] = function()
 			and bot:WasRecentlyDamagedByAnyHero(DotaTime() - orderAt - 0.1)
 		-- hero_puck.lua asks for the hold before it casts (bot._phaseWantAt): the cast goes out once this mode is
 		-- active, so Valve's retreat / attack Think can no longer replace the order (game 055).
-		local wanted = bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt < 0.3
+		local wanted = bot._phaseWantAt ~= nil and DotaTime() - bot._phaseWantAt < 0.5
 		if
 			wanted
 			or not hurt and orderAt ~= nil and DotaTime() - orderAt < holdFor

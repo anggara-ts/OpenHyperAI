@@ -1753,7 +1753,7 @@ function ItemPurchaseThink()
 							and gold >= GetItemCost("item_flask")
 							and GetItemStockCount("item_flask") > 1
 						then
-							Purchase(bot, "item_flask", "lane-heal", "item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					else
 						if
@@ -1765,7 +1765,7 @@ function ItemPurchaseThink()
 								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							Purchase(bot, "item_flask", "lane-heal", "item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					end
 				else
@@ -1774,7 +1774,7 @@ function ItemPurchaseThink()
 						and gold >= GetItemCost("item_flask")
 						and GetItemStockCount("item_flask") > 1
 					then
-						Purchase(bot, "item_flask", "lane-heal", "item_flask")
+						bot:ActionImmediate_PurchaseItem("item_flask")
 					end
 				end
 			else
@@ -1788,7 +1788,7 @@ function ItemPurchaseThink()
 							and gold >= GetItemCost("item_tango")
 							and GetItemStockCount("item_flask") > 1
 						then
-							Purchase(bot, "item_tango", "lane-heal", "item_tango")
+							bot:ActionImmediate_PurchaseItem("item_tango")
 						end
 					else
 						if
@@ -1800,12 +1800,12 @@ function ItemPurchaseThink()
 								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							Purchase(bot, "item_flask", "lane-heal", "item_flask")
+							bot:ActionImmediate_PurchaseItem("item_flask")
 						end
 					end
 				else
 					if Item.GetItemCharges(bot, "item_tango") <= 0 and gold >= GetItemCost("item_tango") then
-						Purchase(bot, "item_tango", "lane-heal", "item_tango")
+						bot:ActionImmediate_PurchaseItem("item_tango")
 					end
 				end
 			end

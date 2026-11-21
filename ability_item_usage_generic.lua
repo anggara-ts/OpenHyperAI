@@ -21,6 +21,7 @@ end
 local team = GetTeam()
 local alwaysTrue = 10 == 10
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local LastHitOverlay = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
 -- Logs switched off once their feature works (the TP diag lines, game 029).
 local function NoLog() end
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
@@ -10431,6 +10432,14 @@ function ItemUsageThink()
 		_perfDone()
 		return
 	end
+	-- Team roam's last hit (snipe, or a hunt on a creep) without a mode change (#165). No return: items below may
+	-- still replace the order, as they could while team roam ran as a mode.
+	local okLH, errLH = pcall(LastHitOverlay.Think, bot)
+	if not okLH and not bot._lhOverlayErr then
+		-- Once per bot: a broken hook would silently remove every last hit.
+		bot._lhOverlayErr = true
+		pcall(print, string.format("[OHA-ROAM] t=%.0f %s overlay error=%s", DotaTime(), botName, tostring(errLH)))
+	end
 	-- Keep attack orders; only throttle expensive item/ability rescans when target is locked.
 	if ShouldThrottleHeavyThink() then
 		_perfDone()
@@ -10810,6 +10819,7 @@ do
 	Perf.WrapDetailIn(MatchTrace, "Tick", "MatchTrace.Tick")
 	Perf.WrapDetailIn(ChargeTracker, "Tick", "ChargeTracker.Tick")
 	Perf.WrapDetailIn(SpecialUnits, "TryKiteInAttack", "TryKiteInAttack")
+	Perf.WrapDetailIn(LastHitOverlay, "Think", "LastHitOverlay")
 	Perf.WrapDetailIn(AbilityContext, "IsCornered", "IsCornered")
 	Perf.WrapDetailIn(Dispel, "ShouldMantaDodge", "Dispel.Manta")
 	Perf.WrapDetailIn(Dispel, "ShouldUseSelfDispelItem", "Dispel.Self")

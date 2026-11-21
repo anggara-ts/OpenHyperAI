@@ -11,7 +11,11 @@
 // [OHA-ROAMSTAT] (mode_team_roam_generic.lua, FuncLib/systems/roam_stats.lua): once per game minute per bot, every
 // time team roam became the active mode: by rule, previous / next mode, how long it lasted, the hunt switching
 // itself off (huntSelfOff), the cap lifting once team roam runs (capLift) and whether a snipe got a last hit.
+// Since #165's fix the snipe and the hunt on a creep are last-hit overlay hits (no team roam activation): snipeLH
+// counts the snipes, creepLH the creep hunts.
 // [OHA-HUNT] (FuncLib/systems/hunt_trace.lua): Clinkz / Nyx Assassin / Spirit Breaker from the spell to the hit.
+// End reasons: kill (the target died within 3s of the reveal or of the hunter's hit), hit, cancel, lost, died,
+// timeout. Builds before the kill reason counted a reveal that killed as "lost".
 // Prints Markdown. Util/after-game.js puts summary() into the review skeleton.
 "use strict";
 const fs = require("fs");
@@ -86,6 +90,8 @@ function parse(lines) {
 			const f = fields(m[3]);
 			const num = (k) => Number(f[k] || 0);
 			const lh = (f.snipeLH || "0/0").split("/").map(Number);
+			// creepLH: the hunt's creep hits by the last-hit overlay (#165's fix); absent in older builds.
+			const clh = (f.creepLH || "0/0").split("/").map(Number);
 			out.roamstats.push({
 				t: Number(m[1]),
 				hero: m[2],
@@ -103,6 +109,8 @@ function parse(lines) {
 				snipeGot: lh[0] || 0,
 				snipeTries: lh[1] || 0,
 				snipeByPrev: countMap(f.snipeLHbyPrev),
+				creepGot: clh[0] || 0,
+				creepTries: clh[1] || 0,
 			});
 			out.heroes.add(m[2]);
 			continue;
@@ -184,6 +192,8 @@ function aggregate(p) {
 			snipeGot: 0,
 			snipeTries: 0,
 			snipeByPrev: {},
+			creepGot: 0,
+			creepTries: 0,
 		};
 		for (const s of p.roamstats) {
 			r.acts += s.acts;
@@ -194,7 +204,7 @@ function aggregate(p) {
 			for (const [k, v] of Object.entries(s.prevMode)) add(r.prevMode, k, v);
 			for (const [k, v] of Object.entries(s.nextMode)) add(r.nextMode, k, v);
 			s.dwell.forEach((v, i) => (r.dwell[i] += v));
-			for (const k of ["huntToAttack", "huntSelfOff", "huntGateOff", "huntGone", "capLift", "snipeGot", "snipeTries"]) r[k] += s[k];
+			for (const k of ["huntToAttack", "huntSelfOff", "huntGateOff", "huntGone", "capLift", "snipeGot", "snipeTries", "creepGot", "creepTries"]) r[k] += s[k];
 			for (const [k, [got, tries]] of Object.entries(s.snipeByPrev)) {
 				const b = (r.snipeByPrev[k] = r.snipeByPrev[k] || [0, 0]);
 				b[0] += got;
@@ -296,6 +306,7 @@ function render(a) {
 			.map(([k, [got, tries]]) => `${k} ${got}/${tries}`)
 			.join(", ");
 		out.push(`- snipe got a last hit within 1.5s: ${r.snipeGot}/${r.snipeTries} (${pct(r.snipeGot, r.snipeTries)}); by previous mode: ${byPrev || "-"}`);
+		if (r.creepTries) out.push(`- hunt on a creep by the last-hit overlay (no mode change) got a last hit within 1.5s: ${r.creepGot}/${r.creepTries} (${pct(r.creepGot, r.creepTries)})`);
 	} else {
 		out.push("", "No [OHA-ROAMSTAT] lines (build before #165's diagnostics).");
 	}
@@ -304,12 +315,13 @@ function render(a) {
 		out.push("", "[OHA-HUNT] by hero:", "");
 		out.push(
 			table(
-				["hero", "hunts", "ended", "why", "avg lasted", "mode changes", "with snipe", "with other attack"],
+				["hero", "hunts", "ended", "landed (kill+hit)", "why", "avg lasted", "mode changes", "with snipe", "with other attack"],
 				Object.entries(h.byHero).map(([k, s]) => [
 					k,
 					s.starts,
 					s.ended,
-					top(s.ends, 5),
+					(s.ends.kill || 0) + (s.ends.hit || 0),
+					top(s.ends, 6),
 					s.ended ? (s.lasted / s.ended).toFixed(1) + "s" : "-",
 					s.changes,
 					s.snipe,
@@ -354,10 +366,13 @@ function selfTest() {
 		["snipe tries", a.roam && a.roam.snipeTries, 4],
 		["snipe got", a.roam && a.roam.snipeGot, 3],
 		["snipe from farm", a.roam && a.roam.snipeByPrev.farm.join("/"), "2/2"],
+		["creep hunt tries", a.roam && a.roam.creepTries, 1],
+		["creep hunt got", a.roam && a.roam.creepGot, 1],
 		["hunts by nyx", a.hunts && a.hunts.byHero.nyx_assassin.starts, 1],
 		["nyx end hit", a.hunts && a.hunts.byHero.nyx_assassin.ends.hit, 1],
 		["nyx with snipe", a.hunts && a.hunts.byHero.nyx_assassin.snipe, 1],
-		["traces", a.hunts && a.hunts.traces.length, 2],
+		["clinkz end kill", a.hunts && a.hunts.byHero.clinkz && a.hunts.byHero.clinkz.ends.kill, 1],
+		["traces", a.hunts && a.hunts.traces.length, 3],
 	];
 	let failed = 0;
 	for (const [name, got, want] of checks) {

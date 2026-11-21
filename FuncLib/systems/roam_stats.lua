@@ -72,6 +72,8 @@ local function newCounters()
 		snipeGot = 0,
 		snipeTries = 0,
 		snipeByPrev = {},
+		creepGot = 0,
+		creepTries = 0,
 	}
 end
 
@@ -125,7 +127,7 @@ end
 -- The [OHA-ROAMSTAT] fields after "t=<t> <hero> ".
 function RoamStats.Format(minute, c)
 	return string.format(
-		"min=%d acts=%d byRule=%s prevMode=%s nextMode=%s dwell0=%d dwell1=%d dwell2_3=%d dwell4p=%d huntToAttack=%d huntSelfOff=%d huntGateOff=%d huntGone=%d capLift=%d snipeLH=%d/%d snipeLHbyPrev=%s",
+		"min=%d acts=%d byRule=%s prevMode=%s nextMode=%s dwell0=%d dwell1=%d dwell2_3=%d dwell4p=%d huntToAttack=%d huntSelfOff=%d huntGateOff=%d huntGone=%d capLift=%d snipeLH=%d/%d snipeLHbyPrev=%s creepLH=%d/%d",
 		minute,
 		c.acts,
 		mapText(c.byRule),
@@ -144,14 +146,133 @@ function RoamStats.Format(minute, c)
 		c.snipeTries,
 		mapText(c.snipeByPrev, function(v)
 			return v.got .. "/" .. v.tries
-		end)
+		end),
+		c.creepGot,
+		c.creepTries
 	)
+end
+
+-- A snipe that won team roam as a mode (a Valve-run mode, see RoamRules.SnipePath) resolves once a last hit follows
+-- (true) or after 1.5s (false), or when a new one starts before it resolved (force: no last hit). nil: pending.
+local function resolvePending(pending, now, lastHits, force)
+	if pending == nil then
+		return nil
+	end
+	local got = lastHits ~= nil and pending.lh ~= nil and lastHits > pending.lh
+	if got or now - pending.t > 1.5 or force then
+		return got
+	end
+	return nil
+end
+
+local function resolveSnipe(s, now, lastHits, force)
+	local snipe = s.snipe
+	local got = resolvePending(snipe, now, lastHits, force)
+	if got == nil then
+		return
+	end
+	local c = s.c
+	local byPrev = c.snipeByPrev[snipe.prev] or { got = 0, tries = 0 }
+	c.snipeByPrev[snipe.prev] = byPrev
+	byPrev.tries = byPrev.tries + 1
+	c.snipeTries = c.snipeTries + 1
+	if got then
+		byPrev.got = byPrev.got + 1
+		c.snipeGot = c.snipeGot + 1
+	end
+	s.snipe = nil
+end
+
+-- The last-hit overlay's tries (FuncLib/systems/last_hit_overlay.lua): a try is the overlay ordering hits on one
+-- unit, without a mode change. Game 064 counted an open try as a miss as soon as the overlay moved to another unit,
+-- and a deny never counted (only GetLastHits was read). Now a try stays open until its unit dies or the overlay has
+-- not ordered it for TRY_DROP seconds:
+--   got   the unit died and our score (last hits + denies) went up since the try started; each point is claimed
+--         by one try only (two open tries, one hit: one got, one miss)
+--   miss  the unit died, no new point
+--   drop  the unit lived and the overlay stopped ordering it (another mode or a newer offer took the bot)
+-- A snipe counts in snipeLH (as the snipe activations did before), a hunt on a creep in creepLH; a drop is a try
+-- without a hit, as an activation without a last hit in 1.5s was.
+local TRY_DROP = 3
+RoamStats.TRY_DROP = TRY_DROP
+
+-- The overlay ordered a hit on key (the unit handle) this think. Returns the try (the overlay keeps notes on it:
+-- held, release, capped) and whether it is new.
+--   why    "snipe" (team roam's snipe) or the hunt's rule ("hunt-carry/lane", ...)
+--   mode   the active mode's name (the snipe's previous mode in snipeLHbyPrev)
+--   score  bot:GetLastHits() + bot:GetDenies() now
+function RoamStats.OverlayTry(s, now, key, why, mode, score)
+	s.tries = s.tries or {}
+	for _, try in ipairs(s.tries) do
+		if try.key == key then
+			try.last = now
+			return try, false
+		end
+	end
+	local try = { key = key, why = why, mode = mode or "?", t = now, last = now, score = score, held = 0 }
+	s.tries[#s.tries + 1] = try
+	return try, true
+end
+
+local function countTry(s, try, got)
+	local c = s.c
+	if try.why == "snipe" then
+		local byPrev = c.snipeByPrev[try.mode] or { got = 0, tries = 0 }
+		c.snipeByPrev[try.mode] = byPrev
+		byPrev.tries = byPrev.tries + 1
+		c.snipeTries = c.snipeTries + 1
+		if got then
+			byPrev.got = byPrev.got + 1
+			c.snipeGot = c.snipeGot + 1
+		end
+	else
+		c.creepTries = c.creepTries + 1
+		if got then
+			c.creepGot = c.creepGot + 1
+		end
+	end
+end
+
+-- Every overlay think. isDead(key): the try's unit is dead (or gone). Returns the tries that resolved this think,
+-- each with .result ("got" / "miss" / "drop"), or nil.
+function RoamStats.OverlayResolve(s, now, score, isDead)
+	local tries = s.tries
+	if tries == nil or #tries == 0 then
+		return nil
+	end
+	local done = nil
+	local i = 1
+	while i <= #tries do
+		local try = tries[i]
+		local result = nil
+		if isDead(try.key) then
+			local base = math.max(try.score or 0, s.claimed or -1)
+			if score ~= nil and score > base then
+				result = "got"
+				s.claimed = base + 1
+			else
+				result = "miss"
+			end
+		elseif now - try.last > TRY_DROP then
+			result = "drop"
+		end
+		if result ~= nil then
+			try.result = result
+			countTry(s, try, result == "got")
+			table.remove(tries, i)
+			done = done or {}
+			done[#done + 1] = try
+		else
+			i = i + 1
+		end
+	end
+	return done
 end
 
 -- Once per team roam GetDesire (every think, whatever mode is active).
 --   mode         the active mode's name this think ("team_roam" while team roam runs)
 --   why, cap     the rule team roam's desire came from this think, and adjustDesire's cut (CapLabel)
---   lastHits     bot:GetLastHits()
+--   lastHits     bot:GetLastHits() + bot:GetDenies() (a deny snipe counts too)
 --   targetValid  team roam's engage target still alive, visible and attackable (only read while team roam runs)
 -- Activation = the active mode turns into team_roam; the rule that won it is the one from the think before.
 -- Returns the fields of a finished minute's [OHA-ROAMSTAT] line once per game minute, else nil.
@@ -166,24 +287,10 @@ function RoamStats.Step(s, now, mode, why, cap, lastHits, targetValid)
 		s.c = newCounters()
 	end
 	local c = s.c
-	-- A snipe is worth it when a last hit follows within 1.5s.
-	local snipe = s.snipe
+	-- A snipe is worth it when a last hit follows within 1.5s. Before #165's fix a snipe was a team roam activation
+	-- (kept for the Valve-run modes); otherwise it is an overlay try (OverlayTry / OverlayResolve).
 	local newSnipe = mode == "team_roam" and s.prevMode ~= "team_roam" and s.winWhy == "snipe"
-	if snipe ~= nil then
-		local got = lastHits ~= nil and snipe.lh ~= nil and lastHits > snipe.lh
-		-- A new snipe before this one resolved: this one counts as a try without a last hit.
-		if got or now - snipe.t > 1.5 or newSnipe then
-			local byPrev = c.snipeByPrev[snipe.prev] or { got = 0, tries = 0 }
-			c.snipeByPrev[snipe.prev] = byPrev
-			byPrev.tries = byPrev.tries + 1
-			c.snipeTries = c.snipeTries + 1
-			if got then
-				byPrev.got = byPrev.got + 1
-				c.snipeGot = c.snipeGot + 1
-			end
-			s.snipe = nil
-		end
-	end
+	resolveSnipe(s, now, lastHits, newSnipe)
 	local roam = "team_roam"
 	if mode == roam and s.prevMode ~= roam then
 		local winWhy = s.winWhy or "?"

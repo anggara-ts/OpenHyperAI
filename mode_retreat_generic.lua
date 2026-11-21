@@ -1362,4 +1362,21 @@ do
 	GetDesire = Perf.Wrap("retreat.GetDesire", GetDesire)
 	Think = Perf.Wrap("retreat.Think", Think)
 end
+-- Retreat's final desire (after the hold) for team roam's special-unit cap (#165): a special unit never goes above
+-- retreat while the enemy outnumbers us.
+do
+	local retreatGetDesire = GetDesire
+	GetDesire = function(...)
+		local desire = retreatGetDesire(...)
+		if type(desire) == "number" then
+			local last = bot._retreatFinalDesire
+			if last == nil then
+				last = {}
+				bot._retreatFinalDesire = last
+			end
+			last.d, last.t = desire, DotaTime()
+		end
+		return desire
+	end
+end
 return Retreat

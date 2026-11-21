@@ -295,7 +295,24 @@ end
 -- 27:48: Techies' escape Blast Off (1s cast point) was cancelled while he was in a defend mode.
 -- Every mode Think wrapped here (name ending in _Think) is skipped while the bot casts or
 -- channels; farm, ward, Roshan and lotus Thinks call OhaCastGuard themselves.
+-- Also skipped while the last-hit overlay owns a hit (#165, game 064: the mode's own move / push / attack order
+-- replaced the overlay's swing; FuncLib/systems/last_hit_overlay.lua HoldModeThink). Loaded on first use.
+local LastHitOverlay = nil
+local function LastHitHold(bot)
+	if bot._lhOwn == nil then
+		return false
+	end
+	if LastHitOverlay == nil then
+		local ok, overlay = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
+		LastHitOverlay = ok and overlay or false
+	end
+	return LastHitOverlay ~= false and LastHitOverlay.HoldModeThink(bot)
+end
 function OhaCastGuard(bot)
+	-- The last-hit overlay holds its hit (#165); checked first so it sits apart from other guard edits (#36).
+	if bot ~= nil and bot:IsAlive() and LastHitHold(bot) then
+		return true
+	end
 	if bot == nil or not bot:IsAlive() then
 		return false
 	end

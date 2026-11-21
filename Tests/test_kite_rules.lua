@@ -398,3 +398,31 @@ T.test("kite result: fromHit names a hit by the creep we stepped from", function
 	local result = printedWith("result kind=jungle")
 	T.ok(result ~= nil and string.find(result, "fromHit=1", 1, true) ~= nil, "fromHit counted: " .. tostring(result))
 end)
+
+T.test("kite hook: no step while team roam's overlay owns a hit (#171 bot._lhOwn), one skip line", function()
+	local bot, SpecialUnits, attacker, _, moves = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
+	bot.GetNearbyNeutralCreeps = function()
+		return { attacker }
+	end
+	bot._lhOwn = { unit = attacker, t = GameTime() }
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no kite step")
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "still none")
+	T.eq(#moves, 0, "no move order over the overlay's swing")
+	local lines = 0
+	for _, line in ipairs(T.stub.printed) do
+		if string.find(line, "kite-skip why=overlay-owns", 1, true) then
+			lines = lines + 1
+		end
+	end
+	T.eq(lines, 1, "logged once per hold")
+	bot._lhOwn = nil
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "kites again once the overlay let go")
+end)
+
+T.test("chase hook: no chase step while the overlay owns a hit", function()
+	local bot, SpecialUnits, _, moves = chaseScene()
+	bot._lhOwn = { t = GameTime() }
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase")
+	T.eq(#moves, 0)
+	T.ok(printedWith("kite-skip why=overlay-owns kind=chase") ~= nil, "skip line names the chase")
+end)

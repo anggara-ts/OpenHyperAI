@@ -962,8 +962,36 @@ function X.KiteLastHitDue(unit, step)
 	end
 	return false
 end
+-- Team roam's last-hit overlay (#171, FuncLib/systems/last_hit_overlay.lua, not on main yet) owns a hit while
+-- unit._lhOwn is set: from its attack order until the attack is released, the unit dies or 1s passes. It runs after
+-- this hook in ItemUsageThink, so a kite or chase step would replace its swing: none meanwhile. A plain field read,
+-- so this works with or without #171. [OHA-KITE] kite-skip why=overlay-owns once per hold (and at most every 3s).
+local function OverlayOwns(unit, kind)
+	local own = unit._lhOwn
+	if own == nil then
+		return false
+	end
+	if unit._kiteOverlaySeen ~= own and DotaTime() >= (unit._kiteOverlayLogAt or -99) + 3 then
+		unit._kiteOverlaySeen = own
+		unit._kiteOverlayLogAt = DotaTime()
+		pcall(
+			print,
+			string.format(
+				"[OHA-KITE] t=%.0f %s kite-skip why=overlay-owns kind=%s mode=%d",
+				DotaTime(),
+				ShortName(unit),
+				kind,
+				unit:GetActiveMode()
+			)
+		)
+	end
+	return true
+end
 -- One kite step from attacker while target stays in range. Returns true when it issued the step.
 function X.KiteStep(unit, attacker, target, kind)
+	if OverlayOwns(unit, kind) then
+		return false
+	end
 	if Fu.IsDisabled(attacker) or attacker:IsRooted() or unit:IsRooted() then
 		return false
 	end
@@ -1121,6 +1149,9 @@ end
 -- Chase step toward an enemy hero target that runs out of range (kind=chase). The caller made sure no melee unit
 -- is hitting the bot (stepping away wins). Returns true when it issued the step.
 function X.ChaseStep(unit, target)
+	if OverlayOwns(unit, "chase") then
+		return false
+	end
 	if target:GetTeam() == unit:GetTeam() or Fu.IsSuspiciousIllusion(target) or unit:IsRooted() then
 		return false
 	end

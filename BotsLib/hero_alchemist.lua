@@ -256,17 +256,20 @@ end
 function X.ConcoctionKillPointless(targetHp, alliesOnTarget, otherEnemiesInRange, targetRetreating)
 	return not targetRetreating and targetHp < 0.4 and alliesOnTarget >= 1 and otherEnemiesInRange == 0
 end
--- #34, game 063: a kill brew whose damage is lethal within this many seconds of brewing is not started; his
--- attacks kill the target as fast, and a target that dies in the throw's cast point leaves the brew on him
--- (3721: Lina at 8%, thrown at 0.3s, she died before it went out and it blew up 5s later).
+-- #34, game 063: a kill brew is not started when its damage is lethal within KILL_BREW_MIN_SECONDS of brewing,
+-- or when his own attacks kill the target within KILL_BREW_ATTACK_SECONDS (attackKillSeconds: nil when it is
+-- out of his attack range). A target that dies in the throw's cast point leaves the brew on him (3721: Lina at
+-- 8%, thrown at 0.3s, she died before it went out and it blew up 5s later).
 X.KILL_BREW_MIN_SECONDS = 0.5
+X.KILL_BREW_ATTACK_SECONDS = 1.0
 -- (f) target-lost throws: the share of the throw range a target must be within before X.TARGET_LOST_ANY_AFTER
 -- seconds brewed, and the seconds after which a throw order whose cast has not gone out may take another hero.
 X.TARGET_LOST_INNER = 0.9
 X.TARGET_LOST_ANY_AFTER = 3.0
 X.THROW_REPICK_AFTER = 0.4
-function X.ConcoctionKillTooEasy(lethalAfter)
+function X.ConcoctionKillTooEasy(lethalAfter, attackKillSeconds)
 	return lethalAfter <= X.KILL_BREW_MIN_SECONDS
+		or attackKillSeconds ~= nil and attackKillSeconds <= X.KILL_BREW_ATTACK_SECONDS
 end
 -- #34, game 063: no kill or engage brew while the retreat mode wants him out (desire 0.5 or more, or its run
 -- lines 374 / 383: Retreat.ShouldRun), read from mode_retreat_generic.lua's bot._retreatDesireNow /
@@ -463,9 +466,11 @@ function X.TrackConcoctionBrew()
 		brewLastThinkAt = now
 		brewSeen = true
 		brewSeenAt = brewed
-		-- Read by ability_item_usage_generic.lua: no retreat blink while a brew is in hand (game 063, 34:20: the
-		-- blink at 0.7s brewed carried it away from every target). Refreshed every run, so it lapses by itself.
-		bot._alchBrewingUntil = now + 0.3
+		-- Read by ability_item_usage_generic.lua: no retreat blink while a brew is in hand and a hero is in throw
+		-- range (game 063, 34:20: the blink at 0.7s brewed carried it away from every target). With nobody in range
+		-- the brew blows up on him anyway, so the blink is free. Refreshed every run, so it lapses by itself.
+		local inRange, _, inRangeIllusion = NearestThrowTargets(unstableConcoctionThrowAbility:GetCastRange())
+		bot._alchBrewingUntil = (inRange ~= nil or inRangeIllusion ~= nil) and now + 0.3 or nil
 		return true, brewed
 	end
 	bot._alchBrewingUntil = nil
@@ -627,9 +632,10 @@ function X.ConcoctionKeepRange(brewed)
 			chaseTarget, chaseDist = brewTarget, brewTargetDist
 		end
 	end
-	-- Not under an enemy tower (7.42 npc_units.txt: tower AttackRange 700; 850 leaves a margin) unless the
-	-- attack mode already took him there or our team is pushing that tower.
-	local tower = not isEngaging and EnemyTowerAt(chaseTarget:GetLocation(), 850) or nil
+	-- Not under an enemy tower (7.42 npc_units.txt: tower AttackRange 700; 850 leaves a margin) unless our team
+	-- is pushing that tower. No exemption by his mode any more: under the chase hold his mode is the hold's, so a
+	-- mode test would flip between chase and no chase from one think to the next.
+	local tower = EnemyTowerAt(chaseTarget:GetLocation(), 850)
 	local towerPushed, towerCreeps, towerAllies = false, 0, 0
 	if tower ~= nil then
 		towerPushed, towerCreeps, towerAllies = TowerPushedByTeam(tower)
@@ -1031,18 +1037,27 @@ function X.ConsiderUnstableConcoction()
 				local lethalAfter = brewTime
 					* enemyHero:GetHealth()
 					/ math.max(1, enemyHero:GetActualIncomingDamage(maxDamage, DAMAGE_TYPE_PHYSICAL))
-				if X.ConcoctionKillTooEasy(lethalAfter) then
+				-- His attacks: the first hit lands about at once, every next one a full attack later.
+				local attackKillSeconds = nil
+				if GetUnitToUnitDistance(bot, enemyHero) <= bot:GetAttackRange() + 150 then
+					local perHit = enemyHero:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+					local hits = math.ceil(enemyHero:GetHealth() / math.max(1, perHit))
+					attackKillSeconds = (hits - 1) * bot:GetSecondsPerAttack()
+				end
+				if X.ConcoctionKillTooEasy(lethalAfter, attackKillSeconds) then
 					-- (b): his attacks kill it as fast; [OHA-ALCHEMIST] no-brew why=attack-kill, at most every 5s.
 					if DotaTime() >= (bot._alchEasyKillLogAt or -999) then
 						bot._alchEasyKillLogAt = DotaTime() + 5
 						pcall(
 							print,
 							string.format(
-								"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=attack-kill target=%s hp=%.2f lethalAfter=%.2fs",
+								"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=attack-kill target=%s hp=%.2f lethalAfter=%.2fs"
+									.. " attackKill=%.2fs",
 								DotaTime(),
 								enemyHero:GetUnitName(),
 								Fu.GetHP(enemyHero),
-								lethalAfter
+								lethalAfter,
+								attackKillSeconds or -1
 							)
 						)
 					end

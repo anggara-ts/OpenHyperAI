@@ -261,7 +261,9 @@ T.test("alchemist: no kill brew a hit finishes, no brew while retreat wants him 
 	-- Game 063, 3721: Lina at 8%, the kill throw at 0.3s, she died in its cast point.
 	T.eq(X.ConcoctionKillTooEasy(0.3), true, "lethal at 0.3s brewed: attack instead")
 	T.eq(X.ConcoctionKillTooEasy(0.5), true, "at the 0.5s edge")
-	T.eq(X.ConcoctionKillTooEasy(2.6), false, "needs 2.6s of brewing: brew")
+	T.eq(X.ConcoctionKillTooEasy(2.6), false, "needs 2.6s of brewing, out of attack range: brew")
+	T.eq(X.ConcoctionKillTooEasy(2.6, 0.7), true, "two hits 0.7s apart kill it: attack")
+	T.eq(X.ConcoctionKillTooEasy(2.6, 1.8), false, "his attacks need 1.8s: brew")
 	-- Game 063, t=2060: retreat 1.10 (line 383, Retreat.ShouldRun) in the start second.
 	T.eq(X.ConcoctionRetreatWanted(1.10, 383, 0.0), true, "run line")
 	T.eq(X.ConcoctionRetreatWanted(0.55, 210, 0.1), true, "desire 0.5 or more")

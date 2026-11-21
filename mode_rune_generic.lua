@@ -2,6 +2,7 @@
 local RuneMode = {}
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local RuneRules = require(GetScriptDirectory() .. "/FuncLib/systems/rune_rules")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local bot = GetBot()
 local currentMinute = 0
@@ -709,11 +710,18 @@ end
 -- is gone, the item mode was never active in between and no other hero stood within 300 of it; worked=unsure when
 -- one of those happened.
 -- 0.92: above the item mode's 0.90 (game 031 log); ended early by a hero hit or an enemy hero at the spot.
+-- Stops for the rest of the game after its first worked=no (game 063: worked=no in all 4 tries, 0:01-4:19), so the
+-- probe doesn't keep the item mode off the spot for 1.5s every spawn.
 local RIVER_PICKUP_TRY_DESIRE = 0.92
 function RuneMode.RiverPickupTry(id, spawn)
 	bot._riverPickupTried = bot._riverPickupTried or {}
 	local key = spawn .. ":" .. id
-	if bot._riverPickupTried[key] or bot._riverPickup ~= nil or GetRuneStatus(id) ~= RUNE_STATUS_AVAILABLE then
+	if
+		bot._riverPickupNo
+		or bot._riverPickupTried[key]
+		or bot._riverPickup ~= nil
+		or GetRuneStatus(id) ~= RUNE_STATUS_AVAILABLE
+	then
 		return false
 	end
 	bot._riverPickupTried[key] = true
@@ -762,10 +770,13 @@ function RuneMode.RiverPickupCheck()
 	bot._riverPickup = nil
 	local gone = RawGetRuneStatus(pickup.id) ~= RUNE_STATUS_AVAILABLE
 	local worked = not gone and "no" or (pickup.itemMode or pickup.others) and "unsure" or "yes"
+	if worked == "no" then
+		bot._riverPickupNo = true
+	end
 	pcall(
 		print,
 		string.format(
-			"[OHA-RUNE] t=%.1f %s river-pickup-try id=%d worked=%s type=%s gold+=%d mode=%s itemMode=%s others=%s now=%s",
+			"[OHA-RUNE] t=%.1f %s river-pickup-try id=%d worked=%s type=%s gold+=%d mode=%s itemMode=%s others=%s now=%s stop=%s",
 			DotaTime(),
 			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 			pickup.id,
@@ -775,9 +786,117 @@ function RuneMode.RiverPickupCheck()
 			ModeTag(pickup.mode),
 			tostring(pickup.itemMode),
 			tostring(pickup.others),
-			ModeTag(bot:GetActiveMode())
+			ModeTag(bot:GetActiveMode()),
+			worked == "no" and "yes" or "no"
 		)
 	)
+end
+-- Leftover rune (RuneRules.IsLeftover: available, type -1, spot in vision, 10s+ into its cycle; river or jungle).
+-- One pick-up order (game 062: it took the rune every time), then stand on the spot with no orders for up to 3s so
+-- Valve's item mode can take it (maintainer, game 063: "type -1 probably horn bounty rune (it's still there) so let
+-- valve's item mode take it"), then give up on the spot for this spawn cycle. Driven from GetDesire, not Think:
+-- once the item mode takes over, this mode's Think stops running, and the timer and result line must still run.
+-- Desire 0.70 for the order and the walk onto the spot (clears an active farm mode, as river-bounty-return does),
+-- 0.60 on the spot (below Valve's item mode's 0.90, as the horn hold). [OHA-RUNE] leftover-hold / leftover-result.
+local LEFTOVER_TRY_DESIRE = 0.70
+local LEFTOVER_HOLD_DESIRE = 0.60
+local function EndLeftover(why)
+	local hold = bot._leftover
+	bot._leftover = nil
+	if hold == nil then
+		return
+	end
+	local now = DotaTime()
+	-- The raw status, before the give-up mark: the wrapper reads missing once it is set (game 063, 30:49: a
+	-- `pickup-result taken=yes status=2` 0.2s after `stale-status` was the wrapper, not a pick-up).
+	local taken = RawGetRuneStatus(hold.id) ~= RUNE_STATUS_AVAILABLE
+	bot._leftoverDone = bot._leftoverDone or {}
+	if why ~= "typed" then
+		bot._leftoverDone[hold.id] = hold.cycle
+	end
+	if not taken and (why == "held" or why == "timeout") then
+		-- Reads missing for every rule in this file until the next spawn (GetRuneStatus above).
+		bot._staleCycle = bot._staleCycle or {}
+		bot._staleCycle[hold.id] = hold.cycle
+	elseif not taken and why == "fight" then
+		RuneMode.SkipRune(hold.id, 20)
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.0f %s leftover-result spot=%d taken=%s why=%s held=%.1f itemMode=%s gold=%d dist=%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			hold.id,
+			taken and "yes" or "no",
+			why,
+			RuneRules.HeldFor(hold, now),
+			hold.itemMode and "yes" or "no",
+			bot:GetGold() - hold.gold,
+			GetUnitToLocationDistance(bot, hold.loc)
+		)
+	)
+end
+-- From the pick-up branch of Think, on the spot (within 130) of a rune RuneRules.IsLeftover says is a leftover.
+function RuneMode.LeftoverStart(id, loc, runeType, dist)
+	local now = DotaTime()
+	local cycle = RuneCycle(id)
+	bot._leftover = {
+		id = id,
+		loc = loc,
+		t0 = now,
+		cycle = math.floor(now / cycle),
+		gold = bot:GetGold(),
+		phase = "try",
+		itemMode = false,
+	}
+	bot._runePickTry = nil
+	bot._runePickupAt = now
+	bot:Action_PickUpRune(id)
+	local okS, seen = pcall(GetRuneTimeSinceSeen, id)
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.0f %s leftover-hold spot=%d type=%s since=%.0f dist=%d seen=%s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			id,
+			tostring(runeType),
+			now % cycle,
+			dist,
+			okS and type(seen) == "number" and string.format("%.0f", seen) or "?"
+		)
+	)
+end
+-- The hold's desire while it is on, nil once it ended (the end writes the result line).
+function RuneMode.LeftoverDesire()
+	local hold = bot._leftover
+	if hold == nil then
+		return nil
+	end
+	if not bot:IsAlive() then
+		EndLeftover("dead")
+		return nil
+	end
+	if bot:GetActiveMode() == BOT_MODE_ITEM then
+		hold.itemMode = true
+	end
+	local okT, runeType = pcall(GetRuneType, hold.id)
+	local typed = okT and runeType ~= nil and runeType ~= -1 and not (RUNE_INVALID ~= nil and runeType == RUNE_INVALID)
+	local phase, why = RuneRules.LeftoverStep(
+		hold,
+		DotaTime(),
+		GetUnitToLocationDistance(bot, hold.loc),
+		RawGetRuneStatus(hold.id) == RUNE_STATUS_AVAILABLE,
+		typed,
+		RiverSpotContested(hold.loc) or Fu.GetHP(bot) < 0.3
+	)
+	if phase == "end" then
+		EndLeftover(why)
+		return nil
+	end
+	hold.phase = phase
+	return phase == "hold" and LEFTOVER_HOLD_DESIRE or LEFTOVER_TRY_DESIRE
 end
 function RuneMode.RuneWatch()
 	local now = DotaTime()
@@ -929,6 +1048,18 @@ function GetDesire()
 			runeWhy = "river-pickup-try"
 			RuneMode.RuneDbg(RIVER_PICKUP_TRY_DESIRE)
 			return RIVER_PICKUP_TRY_DESIRE
+		end
+	end
+	-- A leftover-rune hold (RuneMode.LeftoverDesire): before GetDesireRaw, so no other rune rule (the bounty
+	-- passing's 0.97 from #99 included) lifts the bot above the item mode while it stands on the spot.
+	if bot._leftover ~= nil then
+		local okL, leftoverDesire = pcall(RuneMode.LeftoverDesire)
+		if not okL then
+			bot._leftover = nil
+		elseif leftoverDesire ~= nil then
+			runeWhy = "leftover-" .. tostring(bot._leftover and bot._leftover.phase)
+			RuneMode.RuneDbg(leftoverDesire)
+			return leftoverDesire
 		end
 	end
 	local desire = GetDesireRaw()
@@ -1435,6 +1566,27 @@ function Think()
 		doing("river-return-hold")
 		return
 	end
+	-- A leftover-rune hold (RuneMode.LeftoverStart gave the one pick-up order): wait for it, walk onto the spot,
+	-- then stand there with no orders for Valve's item mode.
+	local leftover = bot._leftover
+	if leftover ~= nil then
+		if leftover.phase == "try" then
+			doing("leftover-try")
+			return
+		end
+		if GetUnitToLocationDistance(bot, leftover.loc) > RuneRules.ON_SPOT then
+			leftover.stopped = nil
+			bot:Action_MoveToLocation(leftover.loc)
+			doing("leftover-walk")
+			return
+		end
+		if not leftover.stopped then
+			leftover.stopped = true
+			bot:Action_ClearActions(true)
+		end
+		doing("leftover-hold")
+		return
+	end
 	if bot._goldCycle ~= nil then
 		local okG, held = pcall(RuneMode.GoldCycleStep)
 		if okG and held then
@@ -1817,23 +1969,27 @@ function Think()
 				return
 			end
 			local typeUnknown = rType == -1 or (RUNE_INVALID ~= nil and rType == RUNE_INVALID)
-			local blindTry = typeUnknown
-				and IsRiverRune(runeInfo.location)
-				and RawGetRuneStatus(runeInfo.location) == RUNE_STATUS_AVAILABLE
-			if blindTry and bot._blindTryLogged ~= runeInfo.location .. ":" .. math.floor(now0 / 120) then
-				bot._blindTryLogged = runeInfo.location .. ":" .. math.floor(now0 / 120)
-				pcall(
-					print,
-					string.format(
-						"[OHA-RUNE] %s t=%.1f blind-pickup rune=%s dist=%.0f",
-						HeroTag(),
-						now0,
-						tostring(runeInfo.location),
-						liveDist
+			if typeUnknown then
+				-- Status available, no type, spot in vision: a leftover rune (RuneRules.IsLeftover). One pick-up order,
+				-- then hold the spot for Valve's item mode (RuneMode.LeftoverStart); once per spot and spawn cycle. It
+				-- replaces the blind pick-up loop (game 063: 14-20 orders per visit at distance 0, every one failed).
+				local cycle = RuneCycle(runeInfo.location)
+				local okV, visible = pcall(IsLocationVisible, runeLocation)
+				bot._leftoverDone = bot._leftoverDone or {}
+				if
+					bot._leftoverDone[runeInfo.location] ~= math.floor(now0 / cycle)
+					and RuneRules.IsLeftover(
+						RawGetRuneStatus(runeInfo.location) == RUNE_STATUS_AVAILABLE,
+						rType,
+						RUNE_INVALID,
+						okV and visible,
+						now0 % cycle
 					)
-				)
-			end
-			if typeUnknown and not blindTry then
+				then
+					RuneMode.LeftoverStart(runeInfo.location, runeLocation, rType, liveDist)
+					doing("leftover-try")
+					return
+				end
 				pcall(
 					print,
 					string.format(
@@ -1850,41 +2006,29 @@ function Think()
 				doing("no-rune")
 				return
 			end
-			-- A real rune (game 016: water rune) and the pick-up from ~110 away kept failing: step
-			-- onto the spawn spot first, then pick up.
-			if
-				liveDist > 60
-				and bot._runePickTry ~= nil
-				and bot._runePickTry.id == runeInfo.location
-				and bot._runePickTry.n >= 2
-				and now0 - bot._runePickTry.first < 3
-			then
-				-- Stamped like the other pick-ups, so the item think holds its orders (RunePickupLock).
-				bot._runePickupAt = now0
-				bot:Action_MoveToLocation(runeLocation)
-				bot:ActionQueue_PickUpRune(runeInfo.location)
-				doing("step-pickup")
-				bot._runePickTry.n = bot._runePickTry.n + 1
-				return
-			end
-			-- On the rune and the pick-up keeps not happening (game 015, 2:28: Medusa went back
-			-- and forth on the bottom water rune, pick-up action, 64 moved in 10s). Four orders
-			-- over 3s+ on the same rune that is still up (3 orders, each now waited on for up to 3s): skip
-			-- it for 30s and say so.
+			-- On the rune and the pick-up keeps not happening (game 015, 2:28: Medusa went back and forth on the
+			-- bottom water rune, pick-up action, 64 moved in 10s): at most 3 orders, 1s apart (RuneRules.PickupStep; it
+			-- counted thinks before, 19 orders in 3s), then skip it for 30s and say so.
 			local now = DotaTime()
 			if
 				bot._runePickTry == nil
 				or bot._runePickTry.id ~= runeInfo.location
-				or now - bot._runePickTry.first > 8
+				-- 8s since the last order (not the first): a pick-up in progress waits up to 3s per order (pickup-wait
+				-- above), so 3 orders can take 9s and a reset from the first order would never let it fail.
+				or now - (bot._runePickTry.last or bot._runePickTry.first) > 8
 			then
 				bot._runePickTry = { id = runeInfo.location, first = now, n = 0 }
 			end
-			bot._runePickTry.n = bot._runePickTry.n + 1
-			if bot._runePickTry.n >= 3 and now - bot._runePickTry.first >= 3 and canSweep then
+			local pickStep = RuneRules.PickupStep(bot._runePickTry, now)
+			if pickStep == "wait" then
+				doing("pickup-wait")
+				return
+			end
+			if pickStep == "fail" and canSweep then
 				StartSweep("pickup-failed")
 				return
 			end
-			if bot._runePickTry.n >= 3 and now - bot._runePickTry.first >= 3 then
+			if pickStep == "fail" then
 				pcall(
 					print,
 					string.format(
@@ -1927,9 +2071,19 @@ function Think()
 				doing("pickup-failed")
 				return
 			end
+			bot._runePickTry.n = bot._runePickTry.n + 1
+			bot._runePickTry.last = now
 			bot._runePickupAt = now
 			RuneMode.NoteBountyGrab(runeInfo.location)
 			RuneMode.NoteLaneRuneTake(runeInfo.location)
+			-- A real rune (game 016: water rune) and the pick-up from ~110 away kept failing: from the second order on,
+			-- step onto the spawn spot first, then pick up.
+			if liveDist > 60 and bot._runePickTry.n >= 2 then
+				bot:Action_MoveToLocation(runeLocation)
+				bot:ActionQueue_PickUpRune(runeInfo.location)
+				doing("step-pickup")
+				return
+			end
 			bot:Action_PickUpRune(runeInfo.location)
 			if bot._pickupResult == nil then
 				bot._pickupResult = { id = runeInfo.location, at = DotaTime() }

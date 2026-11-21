@@ -452,6 +452,10 @@ return {
 			{ "item_kaya", 10000, done = { "item_kaya_and_sange" } },
 			{ "item_ultimate_scepter", 17000, done = { "item_ultimate_scepter_2" } },
 		},
+		[3] = {
+			{ "item_spirit_vessel", 7500 },
+			{ "item_ultimate_scepter", 18000, done = { "item_ultimate_scepter_2" } },
+		},
 	},
 	enchantress = {
 		[1] = {

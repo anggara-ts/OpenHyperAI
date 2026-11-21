@@ -5,7 +5,7 @@ Runtime dump from the game itself, not from the online docs. Taken on 2026-11-16
 The online references ([Valve Developer Wiki](https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting), [ModDota](https://docs.moddota.com/lua_bots/)) carry no date and describe an older API. Where they disagree with this file, this file wins.
 
 The list of known limitations (what bots can't do, why, and the workaround) is kept in the main post of
-[discussion #50](https://github.com/anggara-ts/OpenHyperAI-too/discussions/50); update it when a limitation is
+[discussion #50](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions/50); update it when a limitation is
 confirmed or disproved.
 
 ## Key findings
@@ -16,6 +16,13 @@ confirmed or disproved.
 - `GetToggleState`, `IsInAbilityPhase`, `GetDamageType`, `GetTargetType/Team/Flags` are available on abilities.
 - Item management beyond buy/sell: `ActionImmediate_DisassembleItem`, `ActionImmediate_SetItemCombineLock`, `ActionImmediate_SwapItems`.
 - Shrines and runes have their own orders: `Action_UseShrine`, `Action_PickUpRune` (plus Push/Queue). `GetOutpost`, `GetShrine`, `GetShrineCooldown`, `IsShrineHealing`, `GetNearbyShrines` are available.
+- **Tested in 7.42 games (063-064):**
+  - `Action_ClearActions(true)` stops an attack wind-up: 70 of 70 stops held (`[OHA-LH] cancel-result stopped=yes method=clear`, #157).
+  - The time left on an enemy hero's `modifier_teleporting` counts down with the clock (`[OHA-ALCHEMIST] tp-left ... real=yes`, 4 of 4, #122/#166), so it is the real remaining TP time.
+  - `Action_PickUpRune` on a river rune spot: a water rune (type 7) was taken (`river-pickup-try worked=yes type=7`, 1 sample); the river bounty (type 5) was not, 0 of 4 (games 063-064). Valve's own item mode takes both (#149).
+  - A mode file that defines only `GetDesire` still replaces that Valve mode entirely: Valve's `Think` does not run behind it (the item-mode trial, #141, game 063).
+  - No hidden item or extra ability gives outpost capture or watcher use: every bot's slots 17-25 are empty and there is no `capture` / `lamp` / `watcher` ability beyond the normal slots (`[OHA-API] slots`, #172, game 064).
+  - Unconfirmed: `IsAlive()` on an enemy hero handle may read false after it TPs out, turns invisible or leaves vision (seen 5 times in game 064's hunt trace).
 
 ## 7.42 check (2026-11-19)
 

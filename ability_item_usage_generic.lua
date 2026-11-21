@@ -1615,6 +1615,10 @@ function Usage.WillBreakInvisible(unit)
 	if unit:HasModifier("modifier_smoke_of_deceit") then
 		return true
 	end
+	-- Weaver's escape Shukuchi (BotsLib/hero_weaver.lua sets _shukuchiEscape): no item until it ends (#161).
+	if unit._shukuchiEscape ~= nil and unit:HasModifier("modifier_weaver_shukuchi") then
+		return true
+	end
 	return false
 end
 Usage.ConsiderItemDesire = {}

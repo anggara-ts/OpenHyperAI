@@ -1334,6 +1334,19 @@ function Retreat.ConsiderCompleteItem()
 	end
 	return 0
 end
+-- Weaver's escape Shukuchi (#161, BotsLib/hero_weaver.lua sets _shukuchiEscape): while the invisibility lasts,
+-- retreat sits above every other mode (team roam reads up to 1.50 in game 063) so no mode orders an attack, and the
+-- rooted fight-back and the low-HP creep rules (which can hand her to attack mode) do not run. Game 063: 7 of 9
+-- escapes ended 1-2s after the cast.
+do
+	local baseGetDesire = GetDesire
+	GetDesire = function(...)
+		if bot._shukuchiEscape ~= nil and bot:IsAlive() and bot:HasModifier("modifier_weaver_shukuchi") then
+			return BOT_DESIRE_OVERRIDE * 2
+		end
+		return baseGetDesire(...)
+	end
+end
 -- Retreat is held only below 60% HP. Game 030: held at any HP it kept healthy bots running 2s after
 -- the danger was gone. Game 031, 1:20-1:37: without it Earthshaker (30-57% HP, no enemy near)
 -- flipped retreat 0.70 / laning 0.30 27 times and stood in place.

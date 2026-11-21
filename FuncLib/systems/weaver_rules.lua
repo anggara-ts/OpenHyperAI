@@ -23,4 +23,26 @@ function WeaverRules.EscapeBlocked(cooldownLeft, mana, manaCost)
 	return "other"
 end
 
+-- The disable that keeps every cast off while an escape is wanted (SkillsComplement's early return), or nil when
+-- nothing disables her (queued or casting: her own orders, not a block). Game 063: 9 of her 15 deaths had no escape or
+-- skip line in the 10s before.
+function WeaverRules.DisabledReason(stunned, hexed, silenced, nightmared, doomed)
+	if stunned then
+		return "stunned"
+	end
+	if hexed then
+		return "hexed"
+	end
+	if silenced then
+		return "silenced"
+	end
+	if nightmared then
+		return "nightmared"
+	end
+	if doomed then
+		return "doomed"
+	end
+	return nil
+end
+
 return WeaverRules

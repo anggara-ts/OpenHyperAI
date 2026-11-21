@@ -7737,7 +7737,8 @@ end
 -- Roshan's Banner (datafeed: placed within 1200, 120s, buffs our lane creeps in a 600/900/1200
 -- radius by level; can be destroyed, melee heroes hit it twice as hard). Bots had no rule for it.
 -- Pushing (user call): planted behind our wave once the wave is at an enemy tower, barracks or
--- the ancient, so the creeps fighting the building get the buff. One banner per push.
+-- the ancient, so the creeps fighting the building get the buff. One banner per push. Since #15 (game 063) also
+-- right after a won fight at an enemy building and while defending our base, in any mode (rules below).
 -- 7.42: it is used straight from the backpack, like Smoke of Deceit (game file: AllowedInBackpack 1;
 -- maintainer, 2026-11-20), so the item loop reads the backpack slots for it. The swap into a main slot that
 -- stood here is gone: bot swaps never took (game 036: 6 swaps, none; game 029: 9 tries).
@@ -7762,61 +7763,197 @@ function Usage.BannerFromBackpack()
 		)
 	)
 end
-Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
-	if not Fu.IsPushing(bot) or bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.4 then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local building = nil
-	local bestDist = 99999
-	local candidates = {}
-	for _, tower in pairs(bot:GetNearbyTowers(1600, true) or {}) do
-		table.insert(candidates, tower)
-	end
-	for _, barracks in pairs(bot:GetNearbyBarracks(1600, true) or {}) do
-		table.insert(candidates, barracks)
-	end
-	local enemyAncient = GetAncient(GetOpposingTeam())
-	if enemyAncient ~= nil and GetUnitToUnitDistance(bot, enemyAncient) <= 1600 then
-		table.insert(candidates, enemyAncient)
-	end
-	for _, candidate in ipairs(candidates) do
-		if Fu.IsValidBuilding(candidate) and not candidate:IsInvulnerable() then
-			local dist = GetUnitToUnitDistance(bot, candidate)
-			if dist < bestDist then
-				building, bestDist = candidate, dist
-			end
+-- Plant rules (#15, game 063): FuncLib/systems/banner_rules.lua. Push: an enemy building within 1600 and 5+ of our creeps
+-- in the Banner's radius around a point 250 behind the wave, in a push mode, or in attack / team roam with no more enemy
+-- heroes near than ours (right after a won fight). Defend: our T2, T3, barracks or Ancient within 1600 with enemy
+-- creeps or heroes at it, and 4+ of our creeps in the radius around a point 200 behind our creeps toward the building
+-- (between it and the enemy wave). Any mode. In game 063 Weaver (Dire) held a Banner in the backpack from 46:34 while
+-- Radiant sieged Dire's bottom T3 and barracks (defend_tower_bot / attack / team_roam) and never planted it: the rule
+-- only ran in a push mode.
+local function BannerCreepsNear(creeps, loc, radius)
+	local n = 0
+	for _, creep in ipairs(creeps) do
+		if GetUnitToLocationDistance(creep, loc) <= radius then
+			n = n + 1
 		end
 	end
-	if building == nil then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	-- Our creeps at the building (within 900 of it).
-	local wave = {}
-	for _, creep in pairs(bot:GetNearbyLaneCreeps(1600, false) or {}) do
-		if Fu.IsValid(creep) and GetUnitToUnitDistance(creep, building) <= 900 then
-			table.insert(wave, creep)
-		end
-	end
-	-- 5+ creeps (user call: 3 is too few to be worth it).
-	if #wave < 5 then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	-- Not on top of another of our banners.
+	return n
+end
+local function OwnBannerNear(loc)
 	for _, allyUnit in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
 		if
 			allyUnit ~= nil
 			and not allyUnit:IsNull()
 			and allyUnit:IsAlive()
 			and string.find(allyUnit:GetUnitName(), "roshans_banner")
-			and GetUnitToUnitDistance(allyUnit, building) <= 1500
+			and GetUnitToLocationDistance(allyUnit, loc) <= 1500
 		then
-			return BOT_ACTION_DESIRE_NONE
+			return true
 		end
 	end
-	-- Behind the wave, 250 toward our fountain from its center: the creeps stay in the radius,
-	-- and the banner is not the first thing the building shoots.
-	local loc = Fu.GetXUnitsTowardsLocation2(Fu.GetCenterOfUnits(wave), Fu.GetTeamFountain(), 250)
-	if GetUnitToLocationDistance(bot, loc) > 1150 or not IsLocationPassable(loc) then
+	return false
+end
+-- Our base buildings worth a Banner: T2, T3, the Ancient's towers, barracks, the Ancient. Enemy lane creeps within 900
+-- of it or enemy heroes within 1200 count as "under attack".
+local function BannerDefendBuilding(enemyCreeps, enemyHeroes)
+	local team = GetTeam()
+	local candidates = {}
+	for _, id in ipairs({
+		TOWER_TOP_2,
+		TOWER_MID_2,
+		TOWER_BOT_2,
+		TOWER_TOP_3,
+		TOWER_MID_3,
+		TOWER_BOT_3,
+		TOWER_BASE_1,
+		TOWER_BASE_2,
+	}) do
+		local tower = GetTower(team, id)
+		if tower ~= nil and GetUnitToUnitDistance(bot, tower) <= 1600 then
+			candidates[#candidates + 1] = tower
+		end
+	end
+	for _, barracks in pairs(bot:GetNearbyBarracks(1600, false) or {}) do
+		candidates[#candidates + 1] = barracks
+	end
+	local ancient = GetAncient(team)
+	if ancient ~= nil and GetUnitToUnitDistance(bot, ancient) <= 1600 then
+		candidates[#candidates + 1] = ancient
+	end
+	local best, bestDist = nil, 99999
+	for _, building in ipairs(candidates) do
+		if Fu.IsValidBuilding(building) then
+			local attacked = false
+			for _, creep in ipairs(enemyCreeps) do
+				if GetUnitToUnitDistance(creep, building) <= 900 then
+					attacked = true
+					break
+				end
+			end
+			if not attacked then
+				for _, enemy in ipairs(enemyHeroes) do
+					if GetUnitToUnitDistance(enemy, building) <= 1200 then
+						attacked = true
+						break
+					end
+				end
+			end
+			local dist = GetUnitToUnitDistance(bot, building)
+			if attacked and dist < bestDist then
+				best, bestDist = building, dist
+			end
+		end
+	end
+	return best, bestDist
+end
+Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
+	if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.4 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local BannerRules = require(GetScriptDirectory() .. "/FuncLib/systems/banner_rules")
+	-- Radius by the Banner's level (game file: 600 900 1200); 600 when the value can't be read.
+	local okR, radius = pcall(function()
+		return item:GetSpecialValueInt("radius")
+	end)
+	if not okR or type(radius) ~= "number" or radius <= 0 then
+		radius = 600
+	end
+	local ourCreeps = {}
+	for _, creep in pairs(bot:GetNearbyLaneCreeps(1600, false) or {}) do
+		if Fu.IsValid(creep) then
+			ourCreeps[#ourCreeps + 1] = creep
+		end
+	end
+	if #ourCreeps < BannerRules.DEFEND_CREEPS then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local fountain = Fu.GetTeamFountain()
+	-- Push side: the nearest enemy building within 1600 and the point 250 behind our creeps at it.
+	local enemyBuilding, enemyDist = nil, 99999
+	local candidates = {}
+	for _, tower in pairs(bot:GetNearbyTowers(1600, true) or {}) do
+		candidates[#candidates + 1] = tower
+	end
+	for _, barracks in pairs(bot:GetNearbyBarracks(1600, true) or {}) do
+		candidates[#candidates + 1] = barracks
+	end
+	local enemyAncient = GetAncient(GetOpposingTeam())
+	if enemyAncient ~= nil and GetUnitToUnitDistance(bot, enemyAncient) <= 1600 then
+		candidates[#candidates + 1] = enemyAncient
+	end
+	for _, candidate in ipairs(candidates) do
+		if Fu.IsValidBuilding(candidate) and not candidate:IsInvulnerable() then
+			local dist = GetUnitToUnitDistance(bot, candidate)
+			if dist < enemyDist then
+				enemyBuilding, enemyDist = candidate, dist
+			end
+		end
+	end
+	local pushLoc, pushCreeps = nil, 0
+	if enemyBuilding ~= nil then
+		local wave = {}
+		for _, creep in ipairs(ourCreeps) do
+			if GetUnitToUnitDistance(creep, enemyBuilding) <= 900 then
+				wave[#wave + 1] = creep
+			end
+		end
+		if #wave > 0 then
+			pushLoc = Fu.GetXUnitsTowardsLocation2(Fu.GetCenterOfUnits(wave), fountain, 250)
+			pushCreeps = BannerCreepsNear(ourCreeps, pushLoc, radius)
+		end
+	end
+	-- Defend side: our building under attack and the point 200 behind our creeps at it, toward the building.
+	local enemyHeroes = {}
+	for _, enemy in pairs(bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemy) and not enemy:IsIllusion() then
+			enemyHeroes[#enemyHeroes + 1] = enemy
+		end
+	end
+	local enemyCreeps = {}
+	for _, creep in pairs(bot:GetNearbyLaneCreeps(1600, true) or {}) do
+		if Fu.IsValid(creep) then
+			enemyCreeps[#enemyCreeps + 1] = creep
+		end
+	end
+	local ownBuilding, ownDist = BannerDefendBuilding(enemyCreeps, enemyHeroes)
+	local defendLoc, defendCreeps = nil, 0
+	if ownBuilding ~= nil then
+		local guards = {}
+		for _, creep in ipairs(ourCreeps) do
+			if GetUnitToUnitDistance(creep, ownBuilding) <= 1200 then
+				guards[#guards + 1] = creep
+			end
+		end
+		if #guards > 0 then
+			defendLoc = Fu.GetXUnitsTowardsLocation2(Fu.GetCenterOfUnits(guards), ownBuilding:GetLocation(), 200)
+			defendCreeps = BannerCreepsNear(ourCreeps, defendLoc, radius)
+		end
+	end
+	local botMode = bot:GetActiveMode()
+	local why = BannerRules.Why({
+		pushing = Fu.IsPushing(bot),
+		fightMode = botMode == BOT_MODE_ATTACK or botMode == BOT_MODE_TEAM_ROAM,
+		enemyBuilding = pushLoc ~= nil,
+		pushCreeps = pushCreeps,
+		alliesNear = math.max(1, #(Fu.GetAllyList(bot, 1600) or {})),
+		enemiesNear = #enemyHeroes,
+		ownBuilding = defendLoc ~= nil,
+		defendCreeps = defendCreeps,
+	})
+	if why == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local loc, building, buildingDist, creeps = pushLoc, enemyBuilding, enemyDist, pushCreeps
+	if why == "defend" then
+		loc, building, buildingDist, creeps = defendLoc, ownBuilding, ownDist, defendCreeps
+	end
+	-- Not on top of another of our banners; within cast range (1200) on walkable ground.
+	if
+		OwnBannerNear(loc)
+		or OwnBannerNear(building:GetLocation())
+		or GetUnitToLocationDistance(bot, loc) > 1150
+		or not IsLocationPassable(loc)
+	then
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if bot._bannerPlantAt == nil then
@@ -7825,14 +7962,17 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 		pcall(
 			print,
 			string.format(
-				"[OHA-BANNER] t=%.0f %s plant at=%.0f,%.0f building=%s dist=%.0f creeps=%d slot=%d from=%s",
+				"[OHA-BANNER] t=%.0f %s plant why=%s building=%s creeps=%d radius=%d at=%.0f,%.0f dist=%.0f mode=%d slot=%d from=%s",
 				DotaTime(),
 				(string.gsub(botName, "npc_dota_hero_", "")),
+				why,
+				(string.gsub(building:GetUnitName(), "npc_dota_", "")),
+				creeps,
+				radius,
 				loc.x,
 				loc.y,
-				(string.gsub(building:GetUnitName(), "npc_dota_", "")),
-				bestDist,
-				#wave,
+				buildingDist,
+				botMode,
 				bot._bannerPlantSlot,
 				bot._bannerPlantSlot >= 6 and "backpack" or "main"
 			)

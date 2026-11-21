@@ -1404,6 +1404,27 @@ local function BuyBasicItemTurbo()
 		end
 	end
 end
+-- true when the build still uses this item (the item itself or a part of one still to buy); defined with the sell
+-- marks below.
+local NeededLater
+-- A sell rule skips an item the build still uses (#15, game 065: Dark Willow's Circlets for her Urn were sold at the
+-- fountain right after each buy, 5 times from 33:59 and twice at 42:36). One line per item every 60s.
+local function KeepForBuild(itemName, rule)
+	if not NeededLater(itemName) then
+		return false
+	end
+	bot._sellKeepLogAt = bot._sellKeepLogAt or {}
+	if DotaTime() >= (bot._sellKeepLogAt[itemName] or -999) then
+		bot._sellKeepLogAt[itemName] = DotaTime() + 60
+		BuyLog(
+			"sell-keep %s why=%s for=%s",
+			ShortItem(itemName),
+			rule,
+			ShortItem(bot.currBuyingItemInPurchaseList or "-")
+		)
+	end
+	return true
+end
 function ItemPurchaseThink()
 	now = DotaTime()
 	local isStale, currentHero, currentName = Fu.IsStaleARDMHero(bot, botName)
@@ -2120,7 +2141,7 @@ function ItemPurchaseThink()
 			for i = 1, #Item["tEarlyItem"] do
 				local itemName = Item["tEarlyItem"][i]
 				local itemSlot = bot:FindItemSlot(itemName)
-				if itemSlot >= 0 and itemSlot <= 8 then
+				if itemSlot >= 0 and itemSlot <= 8 and not KeepForBuild(itemName, "full") then
 					sellSlot = itemSlot
 					break
 				end
@@ -2129,7 +2150,7 @@ function ItemPurchaseThink()
 				for i = 1, #Item["tSupportSellWhenFull"] do
 					local itemName = Item["tSupportSellWhenFull"][i]
 					local itemSlot = bot:FindItemSlot(itemName)
-					if itemSlot >= 0 and itemSlot <= 8 then
+					if itemSlot >= 0 and itemSlot <= 8 and not KeepForBuild(itemName, "full") then
 						sellSlot = itemSlot
 						break
 					end
@@ -2148,11 +2169,23 @@ function ItemPurchaseThink()
 			if cheapSlot < 0 then
 				cheapSlot = bot:FindItemSlot("item_wraith_band")
 			end
-			if cheapSlot >= 0 and wandSlot >= 6 and wandSlot <= 8 then
+			if
+				cheapSlot >= 0
+				and wandSlot >= 6
+				and wandSlot <= 8
+				and not KeepForBuild(bot:GetItemInSlot(cheapSlot):GetName(), "full-wand")
+			then
 				sellSlot = cheapSlot
 			end
 		end
 		if sellSlot ~= nil then
+			-- This sale printed nothing, so a part that went missing could not be traced (#15, game 065).
+			BuyLog(
+				"sell-full %s slot=%d empty=%d",
+				ShortItem(bot:GetItemInSlot(sellSlot):GetName()),
+				sellSlot,
+				emptyInventory
+			)
 			bot:ActionImmediate_SellItem(bot:GetItemInSlot(sellSlot))
 		end
 		bot.fullInvCheck = now
@@ -2679,12 +2712,34 @@ function ItemPurchaseThink()
 						end
 					end
 				end
-				local reducedList = Item.GetReducedPurchaseList(bot, bot.currBuyingBasicItemRefList)
-				for _, itemName in pairs(reducedList) do
-					if not Item.IsItemInHero(itemName) then
-						bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList + 1] = itemName
+				-- Then what the whole item still needs, less what the step above queued (#15, game 065, 40:45: the old
+				-- step appended the ref list less held items, so Dark Willow's four Urn parts were queued twice,
+				-- left=7). GetBasicItems counts held copies (a held Urn is not broken into parts again, a held
+				-- Branch covers one of two).
+				local okW, wanted = pcall(Item.GetBasicItems, { bot.currBuyingItemInPurchaseList })
+				local added = BuyRules.BeyondQueued(bot.currBuyingBasicItemList, okW and wanted or {})
+				for _, part in ipairs(added) do
+					table.insert(bot.currBuyingBasicItemList, 1, part)
+				end
+				local queuedShort, inv = {}, {}
+				for i, part in ipairs(bot.currBuyingBasicItemList) do
+					queuedShort[i] = ShortItem(part)
+				end
+				for slot = 0, 14 do
+					local held = bot:GetItemInSlot(slot)
+					if held ~= nil then
+						inv[#inv + 1] = ShortItem(held:GetName())
 					end
 				end
+				-- At most 5 rebuilds per item, so no throttle. inv= shows what the hero held (slots 0-14).
+				BuyLog(
+					"rebuild for=%s n=%d added=%d queued=%s inv=%s",
+					ShortItem(bot.currBuyingItemInPurchaseList),
+					bot.rebuildCount,
+					#added,
+					#queuedShort > 0 and table.concat(queuedShort, ",") or "-",
+					#inv > 0 and table.concat(inv, ",") or "-"
+				)
 				bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 				NextBasicItem()
 			else
@@ -2744,7 +2799,12 @@ end
 -- starting stat item in many builds that is never turned into a Wraith Band / Null Talisman / Bracer
 -- (game 033, 20:00: Death Prophet still carried hers; 20 build lists across 17 heroes do this).
 local UNUSED_SELL = { item_helm_of_iron_will = 0, item_circlet = 15 * 60 }
-local function NeededLater(name)
+-- partsOf for BuyRules.IsPartOf: an item's direct parts from the Item tables, nil for a basic item.
+local function DirectParts(name)
+	local parts = Item[name]
+	return type(parts) == "table" and parts or nil
+end
+function NeededLater(name)
 	local list = {}
 	for _, it in ipairs(bot.purchaseListInReverseOrder or {}) do
 		list[#list + 1] = it
@@ -2753,25 +2813,13 @@ local function NeededLater(name)
 		list[#list + 1] = bot.currBuyingItemInPurchaseList
 	end
 	for _, it in ipairs(list) do
-		if it == name then
-			return true
-		end
 		-- Owned items must still count as parts: GetBasicItems leaves out what the hero holds, so a
 		-- held Helm of Iron Will was not seen as a Crimson Guard part, marked unused and sold, then
-		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). An owned-count
-		-- table that is always 0 makes it list every basic part.
-		local none = setmetatable({}, {
-			__index = function()
-				return 0
-			end,
-		})
-		local ok, parts = pcall(Item.GetBasicItems, { it }, none)
-		if ok and type(parts) == "table" then
-			for _, part in ipairs(parts) do
-				if part == name then
-					return true
-				end
-			end
+		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). The walk goes through
+		-- the item tables with nothing taken off, built parts included: the Urn of Shadows inside an
+		-- Essence Distiller counts, not only its Circlet (#15, game 065).
+		if BuyRules.IsPartOf(it, name, DirectParts) then
+			return true
 		end
 	end
 	-- Parts still to buy for the item being built right now.
@@ -2794,7 +2842,13 @@ local function MarkedForSale()
 			return
 		end
 		for i = 2, #list, 2 do
-			if bot:FindItemSlot(list[i - 1]) >= 0 then
+			-- Not while the build still uses it: the Wizard Hat / Circlet pair sold the Circlets Dark Willow bought
+			-- for the Urn of her Essence Distiller (#15, game 065, 42:36).
+			if
+				bot:FindItemSlot(list[i - 1]) >= 0
+				and bot:FindItemSlot(list[i]) >= 0
+				and not KeepForBuild(list[i], "pair:" .. ShortItem(list[i - 1]))
+			then
 				marks[list[i]] = "pair:" .. list[i - 1]
 			end
 		end
@@ -2928,7 +2982,11 @@ function SetPairedItems(sellPairs)
 	for i = 2, #sellPairs, 2 do
 		local firstSlot = bot:FindItemSlot(sellPairs[i - 1])
 		local secondSlot = bot:FindItemSlot(sellPairs[i])
-		if firstSlot >= 0 and secondSlot >= 0 then
+		if
+			firstSlot >= 0
+			and secondSlot >= 0
+			and not KeepForBuild(sellPairs[i], "pair:" .. ShortItem(sellPairs[i - 1]))
+		then
 			bot:ActionImmediate_SellItem(bot:GetItemInSlot(secondSlot))
 		end
 	end

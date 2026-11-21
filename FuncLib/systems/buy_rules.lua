@@ -28,4 +28,46 @@ function BuyRules.ExtraBoots(held, planItems, partsOf)
 	return math.max(0, (held or 0) - math.max(1, needed)), needed
 end
 
+-- The entries of wanted that queued does not cover yet, counted per name (#15). The rebuild of a stuck buy first
+-- queues the missing parts of a held recipe, then adds the parts the whole item still needs. Game 065, 40:45: Dark
+-- Willow held the Essence Distiller recipe, Chainmail and Wizard Hat but no Urn; the recipe step queued the Urn's four
+-- parts and the second step appended the same four again (left=7), so she bought two Sobi Masks, two Rings of
+-- Protection and two Urn recipes. queued: the parts already in the buy list. wanted: every part the item still needs
+-- (Item.GetBasicItems of the item, the hero's own items taken off). Returns the parts to add, in wanted's order.
+function BuyRules.BeyondQueued(queued, wanted)
+	local have = {}
+	for _, name in ipairs(queued or {}) do
+		have[name] = (have[name] or 0) + 1
+	end
+	local add = {}
+	for _, name in ipairs(wanted or {}) do
+		if (have[name] or 0) > 0 then
+			have[name] = have[name] - 1
+		else
+			add[#add + 1] = name
+		end
+	end
+	return add
+end
+
+-- true when name is the item itself or any part of it at any depth, built parts included (#15). partsOf(item) gives
+-- the item's direct parts or nil for a basic item. The old check walked basic parts only, so an Urn of Shadows held
+-- for an Essence Distiller did not count as "still needed".
+function BuyRules.IsPartOf(item, name, partsOf, depth)
+	if item == name then
+		return true
+	end
+	depth = depth or 0
+	local parts = depth < 8 and partsOf(item) or nil
+	if type(parts) ~= "table" then
+		return false
+	end
+	for _, part in ipairs(parts) do
+		if BuyRules.IsPartOf(part, name, partsOf, depth + 1) then
+			return true
+		end
+	end
+	return false
+end
+
 return BuyRules

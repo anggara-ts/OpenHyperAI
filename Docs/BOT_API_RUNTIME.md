@@ -15,6 +15,7 @@ confirmed or disproved.
 - `GetToggleState`, `IsInAbilityPhase`, `GetDamageType`, `GetTargetType/Team/Flags` are available on abilities.
 - Item management beyond buy/sell: `ActionImmediate_DisassembleItem`, `ActionImmediate_SetItemCombineLock`, `ActionImmediate_SwapItems`.
 - Shrines and runes have their own orders: `Action_UseShrine`, `Action_PickUpRune` (plus Push/Queue). `GetOutpost`, `GetShrine`, `GetShrineCooldown`, `IsShrineHealing`, `GetNearbyShrines` are available.
+- **A mode file replaces Valve's mode whole, even without `Think`.** Game 063 (#141): a `mode_item_generic.lua` that defined only `GetDesire` won the item mode 3.5-5.3s at a time on the river bounties and water runes, and nothing was picked up (`[OHA-ITEMMODE] result ... picked=no`); Valve's item `Think` did not run behind it. The file was removed.
 
 ## 7.42 check (2026-11-19)
 

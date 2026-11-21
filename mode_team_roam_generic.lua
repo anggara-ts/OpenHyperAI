@@ -584,6 +584,33 @@ function TeamRoam.LastHitWithdrawWhy(creep)
 	end
 	return nil
 end
+-- #185: no last-hit snipe on an Undying zombie while a priority Tombstone is within 1600 (SpecialUnits.PriorityTombstone):
+-- the Tombstone first, the zombies stop with it. Game 067, t=1423-1426: Primal Beast and Puck had the Tombstone at
+-- prio=yes 0.98 and the snipe hit zombies instead. [OHA-ROAM] snipe-skip why=tombstone-first (once per 5s per bot).
+function TeamRoam.ZombieWhileTombstone(creep)
+	if string.find(creep:GetUnitName(), "undying_zombie", 1, true) == nil then
+		return false
+	end
+	local tombstone, dist, hitsLeft = SpecialUnits.PriorityTombstone(bot, Fu.IsRetreating(bot), Fu.GetHP(bot))
+	if tombstone == nil then
+		return false
+	end
+	if DotaTime() >= (bot._zombieSnipeSkipLogAt or -999) then
+		bot._zombieSnipeSkipLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-ROAM] t=%.0f %s snipe-skip why=tombstone-first unit=%s tombstone-dist=%d hits-left=%d",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				creep:GetUnitName(),
+				dist,
+				hitsLeft
+			)
+		)
+	end
+	return true
+end
 function TeamRoam.GetLastHitCreep()
 	if Fu.IsRetreating(bot) or not Fu.IsCore(bot) and Fu.IsThereCoreNearby(800) or Fu.IsInTeamFight(bot, 1200) then
 		return nil
@@ -597,6 +624,7 @@ function TeamRoam.GetLastHitCreep()
 			and Fu.IsInRange(bot, creep, bot:GetAttackRange() + 300)
 			and not Fu.IsRoshan(creep)
 			and not Fu.IsTormentor(creep)
+			and not TeamRoam.ZombieWhileTombstone(creep)
 		then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
 			if

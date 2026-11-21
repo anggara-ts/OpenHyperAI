@@ -441,6 +441,19 @@ function X.GetTombstonePriorityDesire(unit, isRetreating, hpRatio, attackRange)
 	end
 	return 0
 end
+-- The Tombstone within 1600 when it is the priority case (SpecialUnitRules.TombstonePriority), its distance and hits
+-- left, or nil. Read fresh (no log, no bot field): team roam's last-hit snipe asks before SpecialUnits.GetDesire runs.
+function X.PriorityTombstone(unit, isRetreating, hpRatio)
+	local tombstone, dist, hitsLeft = X.NearestTombstone(unit, 1600)
+	if tombstone == nil then
+		return nil
+	end
+	local alliesInRadius = #(Fu.GetAlliesNearLoc(tombstone:GetLocation(), SpecialUnitRules.TOMBSTONE_RADIUS) or {})
+	if SpecialUnitRules.TombstonePriority(dist, hitsLeft, alliesInRadius, isRetreating, hpRatio) then
+		return tombstone, dist, hitsLeft
+	end
+	return nil
+end
 -- A zombie-slowed bot (mode_outpost_generic.lua) hits a nearly dead Tombstone close by instead of running: the
 -- Tombstone, its distance and hits left, or nil.
 function X.TombstoneToHitWhenSlowed(unit)

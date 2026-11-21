@@ -128,3 +128,16 @@ T.test("the heroes whose boots changed name one pair of boots, with its upgrade 
 		T.eq(table.concat(families, ","), case[3], case[1] .. " pos " .. case[2] .. " boots")
 	end
 end)
+
+-- #94 (maintainer, 2026-11-21): Burning Barrage comes from Aghanim's Shard in 7.42, so the Shard comes first.
+T.test("Clinkz: Aghanim's Shard before the Scepter and the Blessing in every position", function()
+	for slot = 1, 5 do
+		local list = buyList("hero_clinkz", slot)
+		local shard = indexOf(list, "item_aghanims_shard")
+		T.ok(shard ~= nil, "pos " .. slot .. " has the Shard")
+		for _, later in ipairs({ "item_ultimate_scepter", "item_ultimate_scepter_2" }) do
+			local at = indexOf(list, later)
+			T.ok(at == nil or shard < at, "pos " .. slot .. " Shard before " .. later)
+		end
+	end
+end)

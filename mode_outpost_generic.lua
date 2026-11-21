@@ -1965,6 +1965,27 @@ heroSpecificDesire["npc_dota_hero_shadow_shaman"] = function()
 	return CheckHighPriorityChannelAbility("shadow_shaman_shackles")
 end
 heroSpecificDesire["npc_dota_hero_clinkz"] = function()
+	-- Invisible hunt (#94): hero_clinkz.lua walks him to the target's escape path; no other mode's orders meanwhile
+	-- (game 048: the attack mode shot from max range and ended the invisibility).
+	if bot._clinkzHuntUntil ~= nil and DotaTime() < bot._clinkzHuntUntil then
+		bot._outpostHoldUntil = DotaTime() + 0.15
+		return BOT_DESIRE_OVERRIDE * 1.5
+	end
+	-- And for the whole walk: Skeleton Walk up, a live hunt target, the hunt step ran in the last 1.5 s, HP 35%+.
+	-- Game 064: the 0.2-0.6 s timer above lapsed whenever a think skipped the hunt step, 86 mode changes in 27 hunts.
+	-- A null handle (the target out of vision, game 065) holds while the hunt step waits for it (bot._huntWaitUntil).
+	local huntTarget = bot._huntTarget
+	if
+		huntTarget ~= nil
+		and ((not huntTarget:IsNull() and huntTarget:IsAlive()) or DotaTime() < (bot._huntWaitUntil or -999))
+		and bot:HasModifier("modifier_clinkz_wind_walk")
+		and DotaTime() < (bot._huntBeatAt or -999) + 1.5
+		and DotaTime() >= (bot._huntOffUntil or -999)
+		and Fu.GetHP(bot) >= 0.35
+	then
+		bot._outpostHoldUntil = DotaTime() + 0.15
+		return BOT_DESIRE_OVERRIDE * 1.5
+	end
 	return CheckHighPriorityChannelAbility("clinkz_burning_barrage")
 end
 heroSpecificDesire["npc_dota_hero_tiny"] = function()

@@ -171,3 +171,7 @@ The dump reads the live tables, so it also lists what OpenHyperAI defines or rep
 `IsNull`
 
 The bot handle (`GetBot()`) exposes the same 220 functions as `CDOTA_Bot_Script`.
+
+## Enemy hero handles
+
+- An enemy hero's handle can read `IsNull()` once the hero leaves vision, while the hero is alive: game 065, Clinkz's hunt ended at once with `hunt end why=target-gone target=-` (the name read needs a live handle) right after Zeus' Heavenly Jump (t=2001) and Alchemist's Blink (t=2353); both lived. So a script that keeps an enemy hero should also keep its player ID (`IsHeroAlive`, `GetHeroDeaths`, `GetHeroLastSeenInfo`) and look the hero up again in `GetUnitList` (#97 does this for the hunt; whether the new handle is found has not been confirmed yet, `[OHA-CLINKZ] hunt step=refind`).

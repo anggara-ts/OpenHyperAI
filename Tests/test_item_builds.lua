@@ -106,6 +106,26 @@ local BOOTS = {
 	item_phase_boots = "phase",
 	item_power_treads = "treads",
 }
+-- #9: Io's item table had only pos 1, 4 and 5, so a pos 2 or pos 3 Io got whichever list pairs() met first
+-- (FuncLib/hero/hero_builder.lua). Each position now has its own list from the Stratz data.
+T.test("Io has its own buy list in every position", function()
+	local own = {
+		[1] = { has = "item_helm_of_the_dominator", lacks = "item_mekansm" },
+		[2] = { has = "item_octarine_core", lacks = "item_helm_of_the_dominator" },
+		[3] = { has = "item_heart", lacks = "item_helm_of_the_dominator" },
+		[4] = { has = "item_mekansm", lacks = "item_black_king_bar" },
+		[5] = { has = "item_mekansm", lacks = "item_black_king_bar" },
+	}
+	for slot = 1, 5 do
+		local list = buyList("hero_wisp", slot)
+		T.ok(indexOf(list, own[slot].has) ~= nil, "Io pos " .. slot .. " has " .. own[slot].has)
+		T.eq(indexOf(list, own[slot].lacks), nil, "Io pos " .. slot .. " " .. own[slot].lacks)
+		if slot == 2 or slot == 3 then
+			T.eq(indexOf(list, "item_mekansm"), nil, "Io pos " .. slot .. " is not the support list")
+		end
+	end
+end)
+
 T.test("the heroes whose boots changed name one pair of boots, with its upgrade or Boots of Travel at most", function()
 	local changed = {
 		{ "hero_grimstroke", 5, "arcane" },
@@ -126,25 +146,5 @@ T.test("the heroes whose boots changed name one pair of boots, with its upgrade 
 			end
 		end
 		T.eq(table.concat(families, ","), case[3], case[1] .. " pos " .. case[2] .. " boots")
-	end
-end)
-
--- #9: Io's item table had only pos 1, 4 and 5, so a pos 2 or pos 3 Io got whichever list pairs() met first
--- (FuncLib/hero/hero_builder.lua). Each position now has its own list from the Stratz data.
-T.test("Io has its own buy list in every position", function()
-	local own = {
-		[1] = { has = "item_helm_of_the_dominator", lacks = "item_mekansm" },
-		[2] = { has = "item_octarine_core", lacks = "item_helm_of_the_dominator" },
-		[3] = { has = "item_heart", lacks = "item_helm_of_the_dominator" },
-		[4] = { has = "item_mekansm", lacks = "item_black_king_bar" },
-		[5] = { has = "item_mekansm", lacks = "item_black_king_bar" },
-	}
-	for slot = 1, 5 do
-		local list = buyList("hero_wisp", slot)
-		T.ok(indexOf(list, own[slot].has) ~= nil, "Io pos " .. slot .. " has " .. own[slot].has)
-		T.eq(indexOf(list, own[slot].lacks), nil, "Io pos " .. slot .. " " .. own[slot].lacks)
-		if slot == 2 or slot == 3 then
-			T.eq(indexOf(list, "item_mekansm"), nil, "Io pos " .. slot .. " is not the support list")
-		end
 	end
 end)

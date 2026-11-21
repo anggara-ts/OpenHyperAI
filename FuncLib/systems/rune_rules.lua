@@ -86,4 +86,24 @@ function RuneRules.SpawnHold(sinceSpawn, dist)
 		and dist <= RuneRules.SPAWN_HOLD_RADIUS
 end
 
+-- Walk to a river spot for a water rune (#32, game 065): Puck (mid) walked to the top spot before the 2:00 and 4:00
+-- spawns at 0.53 (BOT_MODE_DESIRE_HIGH, `why=water-walk` t=112.7 and t=232.3, 1846-2188 from the spot) and laning
+-- (0.56) won, so she stayed in lane; after the spawn the walk was 0.35 (`river-item-walk`, 2211 away at t=120.3).
+-- Death Prophet took both top water runes. Maintainer (2026-11-21): raise it only for heroes near the spot (the mid
+-- laner or a support roaming to mid), by distance. So a bot whose distance to the spot is the smallest on its team
+-- (rank 1), or within RIVER_WALK_NEAR of it, walks at RIVER_WALK_DESIRE (above laning, as the spawn hold; below
+-- fights, retreat and Valve's item mode, which does the pickup); others keep oldDesire.
+-- rank: 1 + the number of living team heroes closer to the spot than the bot.
+RuneRules.RIVER_WALK_NEAR = 2000
+RuneRules.RIVER_WALK_DESIRE = 0.6
+function RuneRules.RiverWalkNear(dist, rank)
+	return rank == 1 or dist <= RuneRules.RIVER_WALK_NEAR
+end
+function RuneRules.RiverWalkDesire(dist, rank, oldDesire)
+	if RuneRules.RiverWalkNear(dist, rank) then
+		return math.max(RuneRules.RIVER_WALK_DESIRE, oldDesire)
+	end
+	return oldDesire
+end
+
 return RuneRules

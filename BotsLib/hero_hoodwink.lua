@@ -156,6 +156,8 @@ local ACORN_COMBO_WINDOW = 3
 -- An Acorn Shot or Bushwhack order that another order (a mode's move) replaced before it left is given again for
 -- this long; after it the cast is logged as lost.
 local CAST_REISSUE_WINDOW = 1.0
+-- A pending cast is still waited for while she walks into range or casts it, up to this long after the order.
+local CAST_HOLD_CAP = 3.0
 -- No acorn-tree combo with an enemy hero this close to her: it takes two casts (0.2s cast point each, datafeed
 -- hero_id=123) from Acorn range (675-750), and a hero that close hits her first. The acorn bounces instead.
 local ACORN_COMBO_MIN_ENEMY_DIST = 500
@@ -309,8 +311,9 @@ function X.ConsiderAcornShot()
 	if isGoingOnSomeone then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 100, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-		-- Only a target in range. Game 064: 12 of 25 tree-mode acorns never left; most came right after attack mode
-		-- picked a target 2100-6900 away to follow an ally, so she walked toward it until another order replaced it.
+		-- Only a target in range. Game 064: 12 of 25 tree-mode acorns never left; 6 of them came in the same second as
+		-- attack mode picking that target 2100-6900 away from her to follow an ally, so she walked toward it until
+		-- another order replaced the cast.
 		if
 			Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
@@ -503,12 +506,12 @@ function X.CastAcornShot(location, target, why)
 	local mode
 	local nearCount = 0
 	local netCount = 0
+	local enemyClose = false
 	if target == nil then
 		mode = "tree"
 	else
 		local trapRadius = bushwhackAbility:GetSpecialValueInt("trap_radius")
 		local trees = target:GetNearbyTrees(trapRadius - 25)
-		local enemyClose = false
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, ACORN_COMBO_MIN_ENEMY_DIST, true, BOT_MODE_NONE) or {}) do
 			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
 				enemyClose = true
@@ -562,13 +565,14 @@ function X.CastAcornShot(location, target, why)
 		lastAcornLogAt = DotaTime()
 		print(
 			string.format(
-				"[OHA-HOODWINK] t=%.0f hoodwink acorn mode=%s why=%s target=%s near=%d net=%d dist=%d",
+				"[OHA-HOODWINK] t=%.0f hoodwink acorn mode=%s why=%s target=%s near=%d net=%d close=%s dist=%d",
 				DotaTime(),
 				mode,
 				tostring(why),
 				target ~= nil and ShortName(target) or "ground",
 				nearCount,
 				netCount,
+				tostring(enemyClose),
 				math.floor(
 					target ~= nil and GetUnitToUnitDistance(bot, target) or GetUnitToLocationDistance(bot, location)
 				)
@@ -662,7 +666,12 @@ function X.ThinkCastResults()
 				acornTreeProbe = { location = acorn.location, castAt = now }
 			end
 			acornPending = nil
-		elseif now - acorn.orderedAt > CAST_REISSUE_WINDOW and not acornShotAbility:IsInAbilityPhase() then
+		elseif
+			now - acorn.orderedAt > CAST_REISSUE_WINDOW
+				and not acornShotAbility:IsInAbilityPhase()
+				and not (bot:IsUsingAbility() or bot:IsCastingAbility())
+			or now - acorn.orderedAt > CAST_HOLD_CAP
+		then
 			if now - lastAcornLostLogAt >= 3 then
 				lastAcornLostLogAt = now
 				print(
@@ -692,10 +701,15 @@ function X.ThinkCastResults()
 				-- 0.4s after it lands.
 				local speed = math.max(1, bushwhackAbility:GetSpecialValueInt("projectile_speed"))
 				net.checkAt = now + GetUnitToLocationDistance(bot, net.center) / speed + 0.4
-			elseif now - net.orderedAt > CAST_REISSUE_WINDOW and not bushwhackAbility:IsInAbilityPhase() then
+			elseif
+				now - net.orderedAt > CAST_REISSUE_WINDOW
+					and not bushwhackAbility:IsInAbilityPhase()
+					and not (bot:IsUsingAbility() or bot:IsCastingAbility())
+				or now - net.orderedAt > CAST_HOLD_CAP
+			then
 				print(
 					string.format(
-						"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result why=%s cast=false lost=%s netted=0 expect=%d target=%s",
+						"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result kind=%s cast=false lost=%s netted=0 expect=%d target=%s",
 						now,
 						net.why,
 						LostReason(nil, net.center, Fu.GetProperCastRange(false, bot, bushwhackAbility:GetCastRange())),
@@ -726,7 +740,7 @@ function X.ThinkCastResults()
 			end
 			print(
 				string.format(
-					"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result why=%s cast=true netted=%d expect=%d target=%s targetStunned=%s mods=%s late=%.1f",
+					"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result kind=%s cast=true netted=%d expect=%d target=%s targetStunned=%s mods=%s late=%.1f",
 					now,
 					net.why,
 					netted,
@@ -757,7 +771,7 @@ function X.ThinkCastResults()
 			local died = GetHeroDeaths(bot:GetPlayerID()) > run.deaths
 			print(
 				string.format(
-					"[OHA-HOODWINK] t=%.0f hoodwink scurry-result why=%s target=%s reached=%s startDist=%d minDist=%d reach=%d spell=%s cast=%s died=%s hp=%.2f->%.2f late=%.1f",
+					"[OHA-HOODWINK] t=%.0f hoodwink scurry-result kind=%s target=%s reached=%s startDist=%d minDist=%d reach=%d spell=%s cast=%s died=%s hp=%.2f->%.2f late=%.1f",
 					now,
 					run.why,
 					ShortName(run.target),

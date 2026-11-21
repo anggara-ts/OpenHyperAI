@@ -527,17 +527,17 @@ function RuneMode.WaterWalk()
 	return nil
 end
 -- Spawn hold (RuneRules.SpawnHold, #32 game 064): one start line and one end line per spawn and bot.
---   [OHA-RUNE] river-spawn-hold spot= dist= since= status=
---   [OHA-RUNE] river-spawn-hold-end why=on-spot|empty|contested|timeout|far|walk-end spot= dist= held= status=
+--   [OHA-RUNE] river-spawn-hold spot= dist= since= status= mode=
+--   [OHA-RUNE] river-spawn-hold-end why=on-spot|empty|contested|timeout|far|walk-end spot= dist= held= status= mode=
 -- on-spot: within 300 after the spawn, where the 5s on-spot stay (river-item-stay) takes over; empty: the spot reads
 -- missing (taken); contested: enemy heroes at the spot; timeout: not on the spot 3s after the spawn; far: more than
--- 600 from the spot inside the window; walk-end: the water walk ended (death, 8s after the spawn). The desire does
+-- 600 from the spot inside the window (mode= names what took the bot); walk-end: the water walk ended (death, 8s after the spawn). The desire does
 -- not depend on these lines: SpawnHold decides it on every think, the lines print once per spawn.
 local function SpawnHoldLog(what, why, hold, dist)
 	pcall(
 		print,
 		string.format(
-			"[OHA-RUNE] t=%.0f %s %s%s spot=%d dist=%d %s=%.1f status=%s",
+			"[OHA-RUNE] t=%.0f %s %s%s spot=%d dist=%d %s=%.1f status=%s mode=%s",
 			DotaTime(),
 			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 			what,
@@ -546,7 +546,8 @@ local function SpawnHoldLog(what, why, hold, dist)
 			dist,
 			why ~= nil and "held" or "since",
 			why ~= nil and DotaTime() - hold.at or DotaTime() - hold.t0,
-			StatusTag(GetRuneStatus(hold.id))
+			StatusTag(GetRuneStatus(hold.id)),
+			ModeTag(bot:GetActiveMode())
 		)
 	)
 end

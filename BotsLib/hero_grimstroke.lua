@@ -158,48 +158,6 @@ local botTarget
 local isEngaging
 local isRetreating
 local isAttacking
--- Stroke of Fate on alt-cast goes straight (7.41), easier to aim than the curve. The bot API
--- has no alt-cast call; the autocast switch is the closest, so it is turned on once Stroke is
--- learned and the state is logged before and after, to confirm in game that the path is straight.
--- Checked every 5s: if the switch is found off again (e.g. reset by a death), it is logged with
--- the gap since the last check (a long gap means he was dead) and turned back on.
-local function StrokeStraight()
-	if not strokeOfFateAbility:IsTrained() then
-		return
-	end
-	local now = DotaTime()
-	if bot._strokeAltCheckAt ~= nil and now - bot._strokeAltCheckAt < 5 then
-		return
-	end
-	local gap = bot._strokeAltCheckAt ~= nil and now - bot._strokeAltCheckAt or 0
-	local first = bot._strokeAltCheckAt == nil
-	bot._strokeAltCheckAt = now
-	local okB, before = pcall(function()
-		return strokeOfFateAbility:GetAutoCastState()
-	end)
-	if not okB or before ~= false then
-		if first then
-			pcall(print, string.format("[OHA-GRIM] t=%.0f stroke-altcast already=%s", now, tostring(okB and before)))
-		end
-		return
-	end
-	pcall(function()
-		strokeOfFateAbility:ToggleAutoCast()
-	end)
-	local okA, after = pcall(function()
-		return strokeOfFateAbility:GetAutoCastState()
-	end)
-	pcall(
-		print,
-		string.format(
-			"[OHA-GRIM] t=%.0f stroke-altcast %s gap=%.0f after=%s",
-			now,
-			first and "set" or "reset-found",
-			gap,
-			tostring(okA and after)
-		)
-	)
-end
 -- Stroke of Fate on creeps keeps mana for Ink Swell + Phantom's Embrace (+ Soulbind when it is
 -- up within 20s), and at least 25% of the pool. It was spammed on waves down to low mana.
 function X.StrokeOnCreepsOk()
@@ -217,7 +175,6 @@ function X.StrokeOnCreepsOk()
 	return left >= reserve and Fu.GetManaAfter(strokeOfFateAbility:GetManaCost()) >= 0.25
 end
 function X.SkillsComplement()
-	pcall(StrokeStraight)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -260,43 +217,7 @@ function X.SkillsComplement()
 	end
 	strokeOfFateDesire, strokeOfFateLocation = X.ConsiderStrokeOfFate()
 	if strokeOfFateDesire > 0 then
-		-- EXPERIMENT: Stroke of Fate is ALT_CASTABLE (game files): the plain cast curves from where
-		-- Grimstroke faces, the alt-cast goes straight. The bot API has no alt-cast order; try
-		-- whether the alt state is the autocast toggle. Toggled once; every cast logs the state.
-		if not bot._grimAltTried then
-			bot._grimAltTried = true
-			local okB, before = pcall(function()
-				return strokeOfFateAbility:GetAutoCastState()
-			end)
-			local okT = pcall(function()
-				strokeOfFateAbility:ToggleAutoCast()
-			end)
-			local okA, after = pcall(function()
-				return strokeOfFateAbility:GetAutoCastState()
-			end)
-			pcall(
-				print,
-				string.format(
-					"[OHA-GRIM] t=%.0f stroke-altcast-toggle ok=%s before=%s after=%s",
-					DotaTime(),
-					tostring(okT),
-					okB and tostring(before) or "error",
-					okA and tostring(after) or "error"
-				)
-			)
-		end
-		local okS, state = pcall(function()
-			return strokeOfFateAbility:GetAutoCastState()
-		end)
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRIM] t=%.0f stroke cast alt=%s dist=%d",
-				DotaTime(),
-				okS and tostring(state) or "error",
-				math.floor(GetUnitToLocationDistance(bot, strokeOfFateLocation))
-			)
-		)
+		-- Bots can't make Stroke of Fate straight (no alt-cast; full range and facing both tried, discussion #50).
 		bot:Action_UseAbilityOnLocation(strokeOfFateAbility, strokeOfFateLocation)
 		return
 	end

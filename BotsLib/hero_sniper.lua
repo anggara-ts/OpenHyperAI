@@ -401,6 +401,56 @@ function X.ConsiderE()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- What one Assassinate does to this target: the magical bonus damage and Sniper's own attack, after resistances.
+-- Datafeed 7.42: the shot "deals Sniper's attack damage ... and bonus damage". Game files: "damage" 300/400/500
+-- (magical) and attack_factor 0, an offset from a full attack (Stifling Dagger's -70 is its 30%).
+function X.AssassinateDamage(enemyHero, bonusDamage)
+	local bonusTaken = enemyHero:GetActualIncomingDamage(bonusDamage * (1 + bot:GetSpellAmp()), DAMAGE_TYPE_MAGICAL)
+	local attackTaken = 0
+	if not enemyHero:IsAttackImmune() then
+		attackTaken = enemyHero:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+	end
+	return bonusTaken, attackTaken
+end
+-- The kill check counted only the bonus damage. Now the attack counts too, at 90% (damage spread), except on
+-- targets whose defence only the magic check models (Mana Shield, Refraction, Bristleback, Ghost Ship rum).
+function X.AssassinateKills(enemyHero, bonusDamage, hitDelay)
+	if Fu.WillMagicKillTarget(bot, enemyHero, bonusDamage, hitDelay) then
+		return true
+	end
+	if
+		enemyHero:HasModifier("modifier_medusa_mana_shield")
+		or enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
+		or enemyHero:HasModifier("modifier_kunkka_ghost_ship_damage_delay")
+		or enemyHero:GetUnitName() == "npc_dota_hero_bristleback"
+	then
+		return false
+	end
+	local bonusTaken, attackTaken = X.AssassinateDamage(enemyHero, bonusDamage)
+	local healthAtHit = enemyHero:GetHealth() + enemyHero:GetHealthRegen() * hitDelay
+	return bonusTaken + attackTaken * 0.9 >= healthAtHit
+end
+-- [OHA-SNIPER] assassinate-kill: a shot fired because it should kill, at most once per 3s. bonus= and attack= are
+-- the two parts of the shot after the target's resistances; hp above bonus means the kill counts on the attack.
+function X.LogAssassinateKill(enemyHero, bonusDamage)
+	if DotaTime() < (bot._assassinateLogAt or -999) then
+		return
+	end
+	bot._assassinateLogAt = DotaTime() + 3
+	local bonusTaken, attackTaken = X.AssassinateDamage(enemyHero, bonusDamage)
+	pcall(
+		print,
+		string.format(
+			"[OHA-SNIPER] t=%.0f assassinate-kill target=%s hp=%.0f bonus=%.0f attack=%.0f dist=%.0f",
+			DotaTime(),
+			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+			enemyHero:GetHealth(),
+			bonusTaken,
+			attackTaken,
+			GetUnitToUnitDistance(bot, enemyHero)
+		)
+	)
+end
 function X.ConsiderR()
 	if not assassinateAbility:IsFullyCastable() then
 		return 0
@@ -434,11 +484,12 @@ function X.ConsiderR()
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
 			and Fu.IsInRange(bot, enemyHero, castRange)
 			and not Fu.IsInRange(bot, enemyHero, attackRange)
-			and Fu.WillMagicKillTarget(bot, enemyHero, damage, hitDelay)
+			and X.AssassinateKills(enemyHero, damage, hitDelay)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 			and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
 		then
+			X.LogAssassinateKill(enemyHero, damage)
 			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end

@@ -182,7 +182,14 @@ function X.ConsiderQ()
 	local castPoint = hellfireBlastAbility:GetCastPoint()
 	local manaCost = hellfireBlastAbility:GetManaCost()
 	local abilityLevel = hellfireBlastAbility:GetLevel()
-	local damage = 40 * (abilityLevel - 1) + 100
+	-- Game files 7.42: impact "damage" 80/100/120/140, then "blast_dot_damage" 20/40/60/80 per second (datafeed
+	-- heading "DAMAGE PER SECOND") for "blast_dot_duration" 2s: 120/180/240/300 in total. Was 100/140/180/220.
+	local damage = hellfireBlastAbility:GetSpecialValueInt("damage")
+		+ hellfireBlastAbility:GetSpecialValueInt("blast_dot_damage")
+			* hellfireBlastAbility:GetSpecialValueFloat("blast_dot_duration")
+	if damage <= 0 then
+		damage = 40 * (abilityLevel - 1) + 100
+	end
 	local damageType = DAMAGE_TYPE_MAGICAL
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
@@ -211,6 +218,21 @@ function X.ConsiderQ()
 				GetUnitToUnitDistance(bot, enemyHero) <= castRange + 80
 				and Fu.CanKillTarget(enemyHero, damage * 1.68, damageType)
 			then
+				-- [OHA-WK] blast-kill: the kill estimate with the game-data damage, at most once per 3s.
+				if DotaTime() >= (bot._blastKillLogAt or -999) then
+					bot._blastKillLogAt = DotaTime() + 3
+					pcall(
+						print,
+						string.format(
+							"[OHA-WK] t=%.0f blast-kill target=%s hp=%.0f dmg=%.0f level=%d",
+							DotaTime(),
+							(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
+							enemyHero:GetHealth(),
+							damage,
+							abilityLevel
+						)
+					)
+				end
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 		end

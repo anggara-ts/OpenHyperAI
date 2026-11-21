@@ -178,6 +178,21 @@ function X.SkillsComplement()
 	warpFlareAbility = SafeAbility(bot:GetAbilityByName("tinker_warp_grenade"), "tinker_warp_grenade", "tinker")
 	keenConveyanceAbility = SafeAbility(bot:GetAbilityByName("tinker_keen_teleport"), "tinker_keen_teleport", "tinker")
 	rearmAbility = SafeAbility(bot:GetAbilityByName("tinker_rearm"), "tinker_rearm", "tinker")
+	-- A Rearm channel under fire (#48, game 050: 4 of his 9 deaths came while channelling, 9:45, 14:14, 17:02, 20:11).
+	-- Hit by a hero in the last 0.5s under 45% HP with an enemy hero within 700: stop the channel so he can move.
+	if
+		bot:HasModifier("modifier_tinker_rearm")
+		and Fu.GetHP(bot) < 0.45
+		and bot:WasRecentlyDamagedByAnyHero(0.5)
+		and #(bot:GetNearbyHeroes(700, true, BOT_MODE_NONE) or {}) >= 1
+	then
+		if DotaTime() >= (bot._rearmBreakLogAt or -999) then
+			bot._rearmBreakLogAt = DotaTime() + 3
+			pcall(print, string.format("[OHA-TINKER] t=%.0f rearm-break hp=%.2f", DotaTime(), Fu.GetHP(bot)))
+		end
+		bot:Action_ClearActions(true)
+		return
+	end
 	if
 		Fu.CanNotUseAbility(bot)
 		or rearmAbility ~= nil and rearmAbility:IsInAbilityPhase()
@@ -809,14 +824,42 @@ function X.ConsiderRearm()
 		and nearbyEnemies ~= nil
 		and #nearbyEnemies >= 1
 	then
+		-- Only when the channel is safe (#48, game 050: 4 deaths mid-channel). Game files (7.42): 2.75/2.0/1.25s
+		-- channel. Above 50% HP, not hit by a hero in the last 1.5s, and no enemy hero can walk into attack range
+		-- before the channel ends.
+		local soonest = 99
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and not Fu.IsDisabled(enemyHero)
+			then
+				local reach = math.max(0, GetUnitToUnitDistance(bot, enemyHero) - enemyHero:GetAttackRange())
+					/ math.max(1, enemyHero:GetCurrentMovementSpeed())
+				soonest = math.min(soonest, reach)
+			end
+		end
+		local safe = Fu.GetHP(bot) >= 0.5 and not bot:WasRecentlyDamagedByAnyHero(1.5) and soonest > channelTime
 		if DotaTime() - (X.lastRearmLog or -99) > 10 then
 			X.lastRearmLog = DotaTime()
 			pcall(
 				print,
-				string.format("[OHA-TINKER] t=%.0f rearm-fight enemies=%d mp=%.2f", DotaTime(), #nearbyEnemies, mpRatio)
+				string.format(
+					"[OHA-TINKER] t=%.0f %s enemies=%d mp=%.2f hp=%.2f reach=%.1f channel=%.2f",
+					DotaTime(),
+					safe and "rearm-fight" or "rearm-skip why=unsafe",
+					#nearbyEnemies,
+					mpRatio,
+					Fu.GetHP(bot),
+					soonest,
+					channelTime
+				)
 			)
 		end
-		return BOT_ACTION_DESIRE_HIGH
+		if safe then
+			return BOT_ACTION_DESIRE_HIGH
+		end
+		return BOT_ACTION_DESIRE_NONE
 	end
 	local laneCreeps = bot:GetNearbyLaneCreeps(1600, true)
 	if Fu.IsPushing(bot) or Fu.IsDefending(bot) then

@@ -172,6 +172,24 @@ function X.SkillsComplement()
 		return
 	end
 end
+-- [OHA-PA] dagger-lasthit: a lane last hit with the dagger and the damage it counted on, at most once per 5s.
+function X.LogDaggerLastHit(creep, damage, attackDamageFactor)
+	if DotaTime() < (bot._daggerLastHitLogAt or -999) then
+		return
+	end
+	bot._daggerLastHitLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-PA] t=%.0f dagger-lasthit creep-hp=%.0f dmg=%.0f factor=%.2f dist=%.0f",
+			DotaTime(),
+			creep:GetHealth(),
+			damage,
+			attackDamageFactor,
+			GetUnitToUnitDistance(bot, creep)
+		)
+	)
+end
 function X.ConsiderQ()
 	if not stiflingDaggerAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
@@ -184,8 +202,19 @@ function X.ConsiderQ()
 	local castPoint = stiflingDaggerAbility:GetCastPoint()
 	local manaCost = stiflingDaggerAbility:GetManaCost()
 	local abilityLevel = stiflingDaggerAbility:GetLevel()
-	local attackDamageFactor = 0.1 + 0.15 * abilityLevel
-	local damage = 65 + attackDamage * attackDamageFactor
+	-- Game files 7.42: "base_damage" 65/70/75/80 plus (100 + "attack_factor")% of her attack damage;
+	-- attack_factor is -70/-55/-40/-25, so 30/45/60/75% (the tooltip's attack_factor_tooltip).
+	-- Was a constant 65 and 25/40/55/70%.
+	local baseDamage = stiflingDaggerAbility:GetSpecialValueInt("base_damage")
+	if baseDamage <= 0 then
+		baseDamage = 60 + 5 * abilityLevel
+	end
+	local attackFactor = stiflingDaggerAbility:GetSpecialValueInt("attack_factor")
+	local attackDamageFactor = 0.15 + 0.15 * abilityLevel
+	if attackFactor < 0 and attackFactor > -100 then
+		attackDamageFactor = (100 + attackFactor) / 100
+	end
+	local damage = baseDamage + attackDamage * attackDamageFactor
 	local extraDamage = 8 * attackDamageFactor
 	local damageType = DAMAGE_TYPE_PHYSICAL
 	local alliesNearby = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
@@ -278,6 +307,7 @@ function X.ConsiderQ()
 				local hitTime = castPoint + GetUnitToUnitDistance(bot, creep) / 1250
 				if Fu.WillKillTarget(creep, damage + extraDamage, damageType, hitTime * 0.94) then
 					lastDaggerCreep = creep
+					X.LogDaggerLastHit(creep, damage + extraDamage, attackDamageFactor)
 					return BOT_ACTION_DESIRE_HIGH, creep
 				end
 			end
@@ -294,6 +324,7 @@ function X.ConsiderQ()
 					local hitTime = castPoint + GetUnitToUnitDistance(bot, creep) / 1250
 					if Fu.WillKillTarget(creep, damage + extraDamage, damageType, hitTime * 0.9) then
 						lastDaggerCreep = creep
+						X.LogDaggerLastHit(creep, damage + extraDamage, attackDamageFactor)
 						return BOT_ACTION_DESIRE_HIGH, creep
 					end
 				end

@@ -841,6 +841,10 @@ function X.KiteResultTick(unit)
 			pending.fromHit = true
 		end
 	end
+	-- A chase step: attack at once when the target is back in range before the step ends (X.ChaseReattack).
+	if pending ~= nil and pending.kind == "chase" and pending.stepped and GameTime() < pending.checkAt then
+		X.ChaseReattack(unit, pending)
+	end
 	if pending ~= nil and GameTime() >= pending.checkAt then
 		unit._kitePending = nil
 		local kindStats = KiteStats(unit).kinds[pending.kind]
@@ -870,8 +874,27 @@ function X.KiteResultTick(unit)
 			if inRange then
 				kindStats.inRange = kindStats.inRange + 1
 			end
-			if unit:GetLastAttackTime() < pending.at then
+			local attacked = unit:GetLastAttackTime() >= pending.at
+			if not attacked then
 				kindStats.late = kindStats.late + 1
+			end
+			if pending.kind == "chase" then
+				-- One line per chase step (about 20-40 a game): did our attack follow it (the same test as late-attack),
+				-- was the target in range at the check, and which order attacked (queue: the attack queued behind the
+				-- step; frame: X.ChaseReattack once the target was back in range).
+				pcall(
+					print,
+					string.format(
+						"[OHA-KITE] t=%.0f %s chase-result result=%s inRange=%d reattack=%s target=%s step=%d",
+						DotaTime(),
+						ShortName(unit),
+						attacked and "attacked" or "no-attack",
+						inRange and 1 or 0,
+						pending.reattack or "queue",
+						Fu.IsValid(pending.enemy) and ShortName(pending.enemy) or "-",
+						pending.step or 0
+					)
+				)
 			end
 			if pending.stepLeft ~= nil and pending.stepLeft - pending.closest >= 40 then
 				kindStats.moved = kindStats.moved + 1
@@ -1146,6 +1169,57 @@ local function KiteHeld(unit)
 		or now < (unit._clinkzHuntUntil or -1)
 		or now < (unit._madHoldUntil or -1)
 end
+-- After a chase step (#72, game 065: in 9 of 23 steps no attack of ours came before the check, and the target was in
+-- range at the next check in only 5): the target is back in attack range while the step still runs, so attack now
+-- instead of walking on to the step's end. Once per step, and only while nothing else holds the bot: the same
+-- target, alive and attackable, no team roam overlay hit (_lhOwn), no hold, no mode without kiting, not invisible,
+-- not already attacking it.
+function X.ChaseReattack(unit, pending)
+	local target = pending.enemy
+	if pending.reattack ~= nil or not Fu.IsValidHero(target) or not target:IsAlive() then
+		return false
+	end
+	if unit:GetAttackTarget() == target or unit._lhOwn ~= nil or KiteHeld(unit) then
+		return false
+	end
+	if NO_KITE_MODES[unit:GetActiveMode()] or unit:IsInvisible() or Fu.CanNotUseAction(unit) then
+		return false
+	end
+	-- The mode moved on to another target: not ours to attack.
+	local modeTarget = unit:GetTarget()
+	if not Fu.CanBeAttacked(target) or Fu.IsValid(modeTarget) and modeTarget ~= target then
+		return false
+	end
+	if
+		not KiteRules.InAttackRange(
+			GetUnitToUnitDistance(unit, target),
+			unit:GetAttackRange(),
+			unit:GetBoundingRadius(),
+			target:GetBoundingRadius()
+		)
+	then
+		return false
+	end
+	pending.reattack = "frame"
+	unit:Action_AttackUnit(target, false)
+	return true
+end
+-- Enemy heroes near the chase target or near us (the most of the two) and our heroes near us, kept for 0.3s per bot
+-- (the chase gate asks on every frame with a step to give; #52 perf).
+local function ChaseGroupCounts(unit, here, targetAt)
+	local cache = unit._kiteGroup
+	local now = GameTime()
+	if cache ~= nil and now < cache.untilTime then
+		return cache.enemies, cache.allies
+	end
+	local enemies = math.max(
+		#Fu.GetEnemiesNearLoc(targetAt, KiteRules.CHASE_GROUP_RADIUS),
+		#Fu.GetEnemiesNearLoc(here, KiteRules.CHASE_GROUP_RADIUS)
+	)
+	local allies = #Fu.GetAlliesNearLoc(here, KiteRules.CHASE_ALLY_RADIUS)
+	unit._kiteGroup = { untilTime = now + 0.3, enemies = enemies, allies = allies }
+	return enemies, allies
+end
 -- Chase step toward an enemy hero target that runs out of range (kind=chase). The caller made sure no melee unit
 -- is hitting the bot (stepping away wins). Returns true when it issued the step.
 function X.ChaseStep(unit, target)
@@ -1169,22 +1243,10 @@ function X.ChaseStep(unit, target)
 		return false
 	end
 	local checkIn = nextIn + 0.1
-	if KiteRules.TooFast(from, to, unit:GetCurrentMovementSpeed()) then
-		KiteSample(unit, target, "chase", false, "fast", nil, checkIn)
-		return false
-	end
-	if not KiteRules.InWindow(since, from, to) then
-		return false
-	end
-	if unit:GetAnimActivity() == 1503 and unit:GetAnimCycle() < unit:GetAttackPoint() + 0.05 then
-		return false
-	end
 	-- Not toward a group: 2+ enemy heroes near the target or near us, and fewer of us (KiteRules.ChaseOutnumbered).
-	local enemies = math.max(
-		#Fu.GetEnemiesNearLoc(targetAt, KiteRules.CHASE_GROUP_RADIUS),
-		#Fu.GetEnemiesNearLoc(here, KiteRules.CHASE_GROUP_RADIUS)
-	)
-	local allies = #Fu.GetAlliesNearLoc(here, KiteRules.CHASE_ALLY_RADIUS)
+	-- First of the gates (game 065: after the fast / window checks it never came up, 0 lines in 168 fast skips). It
+	-- runs on every frame with a chase step to give, so the counts are kept for 0.3s.
+	local enemies, allies = ChaseGroupCounts(unit, here, targetAt)
 	if KiteRules.ChaseOutnumbered(enemies, allies) then
 		KiteSample(unit, target, "chase", false, "outnumbered", nil, checkIn)
 		unit._kiteLogAt = unit._kiteLogAt or {}
@@ -1205,6 +1267,27 @@ function X.ChaseStep(unit, target)
 		end
 		return false
 	end
+	if KiteRules.TooFast(from, to, unit:GetCurrentMovementSpeed()) then
+		KiteSample(unit, target, "chase", false, "fast", nil, checkIn)
+		return false
+	end
+	if not KiteRules.InWindow(since, from, to) then
+		return false
+	end
+	if unit:GetAnimActivity() == 1503 and unit:GetAnimCycle() < unit:GetAttackPoint() + 0.05 then
+		return false
+	end
+	-- The step ends before our next wind-up can start (game 065: 9 of 23 steps had no attack before the check).
+	local fitted = KiteRules.FitChaseStep(step, unit:GetCurrentMovementSpeed(), to - since)
+	if fitted == nil then
+		KiteSample(unit, target, "chase", false, "no-time", nil, checkIn)
+		return false
+	end
+	if fitted < step then
+		endX = here.x + (endX - here.x) * fitted / step
+		endY = here.y + (endY - here.y) * fitted / step
+		step = fitted
+	end
 	local stepEnd = Vector(endX, endY, here.z)
 	-- Not into an enemy tower's range (+100): #159's chase-stop rule is not on this branch.
 	for _, tower in pairs(unit:GetNearbyTowers(1600, true) or {}) do
@@ -1221,8 +1304,14 @@ function X.ChaseStep(unit, target)
 		KiteSample(unit, target, "chase", false, "blocked", nil, checkIn)
 		return false
 	end
+	-- The attack follows the step (game 065: a bare move left the next attack to the mode's next order); the
+	-- per-frame check in X.KiteResultTick attacks at once when the target is back in range before the step ends.
 	unit:Action_MoveToLocation(stepEnd)
+	unit:ActionQueue_AttackUnit(target, false)
 	KiteSample(unit, target, "chase", true, nil, stepEnd, checkIn)
+	if unit._kitePending ~= nil and unit._kitePending.kind == "chase" and unit._kitePending.step == nil then
+		unit._kitePending.step = step
+	end
 	unit._kiteLogAt = unit._kiteLogAt or {}
 	if DotaTime() >= (unit._kiteLogAt.chase or -99) + 2 then
 		unit._kiteLogAt.chase = DotaTime()

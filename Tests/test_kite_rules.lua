@@ -341,9 +341,10 @@ T.test("chase: extrapolation horizon and outnumbered gate", function()
 	T.ok(not R.ChaseOutnumbered(2, 2), "allies match")
 	T.ok(not R.ChaseOutnumbered(1, 1), "the target alone")
 	T.ok(R.NOT_BASELINE.fast and not R.NOT_BASELINE.tower, "fast is not a baseline sample, a gate is")
+	T.ok(R.NOT_BASELINE.outnumbered, "outnumbered runs outside the window: no baseline")
 end)
 
-T.test("chase hook: no step toward a group, counted as a gated baseline sample", function()
+T.test("chase hook: no step toward a group, counted as a no-step reason only", function()
 	local bot, SpecialUnits, runner, moves = chaseScene()
 	-- A second enemy hero next to the runner; the bot alone (the stub's allies stand 100 apart: move them away).
 	for _, member in ipairs(T.stub.teams[bot:GetTeam()]) do
@@ -359,8 +360,71 @@ T.test("chase hook: no step toward a group, counted as a gated baseline sample",
 	T.stub.time = T.stub.time + 61
 	SpecialUnits.KiteResultTick(bot)
 	local result = printedWith("result kind=chase")
-	T.ok(result ~= nil and string.find(result, "base=1", 1, true) ~= nil, "a baseline sample: " .. tostring(result))
+	-- The gate runs before the window check now, so it is no like-for-like baseline (KiteRules.NOT_BASELINE).
+	T.ok(result ~= nil and string.find(result, "base=0", 1, true) ~= nil, "not a baseline sample: " .. tostring(result))
 	T.ok(string.find(result or "", "no-step=outnumbered:1", 1, true) ~= nil, "reason: " .. tostring(result))
+end)
+
+T.test("chase: the step ends before the next wind-up can start", function()
+	local R = rules()
+	-- Game 065 t=229 Dark Willow: window 0.35-0.73, since 0.37, a 250 step at about 300 speed takes 0.83s.
+	T.near(R.FitChaseStep(250, 300, 0.73 - 0.37), 108, 1e-6, "cut to 0.36s of walking")
+	T.eq(R.FitChaseStep(250, 300, 1.0), 250, "fits")
+	T.eq(R.FitChaseStep(250, 300, 0.1), nil, "30 units: not worth an order")
+	T.eq(R.FitChaseStep(250, 300, -0.2), nil, "window over")
+end)
+
+T.test("chase hook: the attack follows the step, at once when the target is back in range", function()
+	local bot, SpecialUnits, runner, moves = chaseScene()
+	local attacks, queued = {}, {}
+	bot.Action_AttackUnit = function(_, unit)
+		attacks[#attacks + 1] = unit
+	end
+	bot.ActionQueue_AttackUnit = function(_, unit)
+		queued[#queued + 1] = unit
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "stepped")
+	T.eq(#moves, 1, "one move order")
+	T.eq(queued[1], runner, "the attack is queued behind the step")
+	-- Mid-step the runner is back in range and the bot is walking (no attack target): attack now.
+	bot.GetAttackTarget = function()
+		return nil
+	end
+	bot.GetTarget = function()
+		return runner
+	end
+	runner._loc = bot:GetLocation() + Vector(580, 0, 0)
+	T.stub.time = T.stub.time + 0.1
+	SpecialUnits.KiteResultTick(bot)
+	T.eq(attacks[1], runner, "re-attacked once in range")
+	SpecialUnits.KiteResultTick(bot)
+	T.eq(#attacks, 1, "once per step")
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local line = printedWith("chase-result")
+	T.ok(line ~= nil and string.find(line, "result=attacked", 1, true) ~= nil, "result: " .. tostring(line))
+	T.ok(string.find(line or "", "reattack=frame", 1, true) ~= nil, "which order: " .. tostring(line))
+end)
+
+T.test("chase hook: no re-attack on a target the mode left", function()
+	local bot, SpecialUnits, runner = chaseScene()
+	local attacks = {}
+	bot.Action_AttackUnit = function(_, unit)
+		attacks[#attacks + 1] = unit
+	end
+	bot.ActionQueue_AttackUnit = function() end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "stepped")
+	local other = T.stub.teams[TEAM_DIRE][3]
+	bot.GetAttackTarget = function()
+		return nil
+	end
+	bot.GetTarget = function()
+		return other
+	end
+	runner._loc = bot:GetLocation() + Vector(580, 0, 0)
+	T.stub.time = T.stub.time + 0.1
+	SpecialUnits.KiteResultTick(bot)
+	T.eq(#attacks, 0, "the mode targets another hero")
 end)
 
 T.test("chase hook: too-fast attacks are a no-step reason, not a baseline sample", function()

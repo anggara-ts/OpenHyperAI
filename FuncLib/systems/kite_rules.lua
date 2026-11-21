@@ -115,6 +115,18 @@ function KiteRules.ChaseStep(bx, by, tx, ty, px, py, range)
 	return step, bx + nextX / distNext * step, by + nextY / distNext * step
 end
 
+-- A chase step that ends before our next wind-up can start (#72, game 065: in 9 of 23 chase steps no attack of ours came
+-- before the check; a 250 step takes about 0.8s at 300 movement speed, longer than the 0.3-0.5s left in Dark Willow's
+-- and Clinkz's windows). timeLeft: seconds until the next wind-up may start (the window's end less the time since the
+-- last attack). Returns the step cut to what the bot walks in that time, or nil when that is under MIN_STEP.
+function KiteRules.FitChaseStep(step, moveSpeed, timeLeft)
+	local reach = math.max(0, timeLeft) * math.max(100, moveSpeed)
+	if reach < KiteRules.MIN_STEP then
+		return nil
+	end
+	return math.min(step, reach)
+end
+
 -- Seconds from now until our next attack is released: the rest of this attack's cycle plus the wind-up. from is
 -- KiteRules.Window's first value (wind-up + BUF).
 function KiteRules.NextAttackIn(secondsPerAttack, since, from)
@@ -143,7 +155,9 @@ end
 -- No-step reasons that are not a like-for-like baseline (#72, game 064: 135 of 152 chase base samples were "fast"):
 -- a hero with attacks too fast to kite is in a different situation from one a gate (tower, last hit, blocked spot,
 -- no room, outnumbered) stopped. They still count in no-step=, not in base=.
-KiteRules.NOT_BASELINE = { fast = true }
+-- Outnumbered (#72, game 065 review): the gate now runs before the attack window is checked, so it comes up outside
+-- the window too; it counts in no-step= only.
+KiteRules.NOT_BASELINE = { fast = true, outnumbered = true }
 
 -- Within attack range at the next attack: Dota measures attack range between the two hulls.
 function KiteRules.InAttackRange(dist, range, botRadius, targetRadius)

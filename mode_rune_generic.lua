@@ -572,6 +572,37 @@ local function SpawnHoldEnd(why)
 	bot._spawnHold = nil
 	SpawnHoldLog("river-spawn-hold-end", why, hold, GetUnitToLocationDistance(bot, hold.loc))
 end
+-- The water walk's desire outside the spawn hold (RuneRules.RiverWalkDesire, #32 game 065): 0.6 for the team's
+-- closest hero to the spot or one within 2000, else oldDesire. One line per walk, and again when the result changes:
+--   [OHA-RUNE] river-walk-near spot= dist= rank= des= old=
+local function RiverWalkDesire(waterWalk, dist, oldDesire)
+	local rank = 1
+	for slot = 1, 5 do
+		local member = GetTeamMember(slot)
+		if member ~= bot and Fu.IsValidHero(member) and GetUnitToLocationDistance(member, waterWalk.loc) < dist then
+			rank = rank + 1
+		end
+	end
+	local desire = RuneRules.RiverWalkDesire(dist, rank, oldDesire)
+	local key = waterWalk.t0 .. ":" .. waterWalk.id .. ":" .. string.format("%.2f", desire)
+	if bot._riverWalkNearKey ~= key then
+		bot._riverWalkNearKey = key
+		pcall(
+			print,
+			string.format(
+				"[OHA-RUNE] t=%.0f %s river-walk-near spot=%d dist=%d rank=%d des=%.2f old=%.2f",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				waterWalk.id,
+				dist,
+				rank,
+				desire,
+				oldDesire
+			)
+		)
+	end
+	return desire
+end
 -- River gold / water rune left at a river spot after the hold ended (#32, game 062, 0:00): a fight started at the
 -- top spot at the horn, Nature's Prophet stood 15 from the rune in attack mode (0.95), the water-walk hold ran out
 -- 8s after the spawn, everyone left (no-best) and the rune lay there until 0:35-0:55. Bots can't pick it up
@@ -1212,7 +1243,8 @@ function GetDesireRaw()
 					return give(RuneRules.SPAWN_HOLD_DESIRE, "river-spawn-hold")
 				end
 				SpawnHoldEnd("far")
-				return give(BOT_MODE_DESIRE_HIGH, "water-" .. waterState)
+				-- Game 065 (t=112.7, 232.3): Puck's pre-spawn walk at 0.53 lost to laning (0.56), 1846-2188 away.
+				return give(RiverWalkDesire(bot._waterWalk, spotDist, BOT_MODE_DESIRE_HIGH), "water-" .. waterState)
 			end
 			-- Bots can't pick a water rune up themselves (see UnpickableRiverRune: every pickup order failed);
 			-- Valve's item mode does it while the bot stands there. Game 040, 4:00: the item mode took over for 1s,
@@ -1259,6 +1291,11 @@ function GetDesireRaw()
 				return give(RuneRules.SPAWN_HOLD_DESIRE, "river-spawn-hold")
 			end
 			SpawnHoldEnd(sinceSpawnNow > RuneRules.SPAWN_HOLD_FOR and "timeout" or "far")
+			-- Still walking to the spot after the spawn (game 065, t=120.3: Puck 2211 away at 0.35): the team's
+			-- closest hero, or one within 2000, keeps walking at 0.6. On the spot after the 5s stay: the old 0.35.
+			if spotDist > 300 then
+				return give(RiverWalkDesire(bot._waterWalk, spotDist, RIVER_HOLD_DESIRE), "river-item-" .. waterState)
+			end
 			return give(RIVER_HOLD_DESIRE, "river-item-" .. waterState)
 		end
 	end

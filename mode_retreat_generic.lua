@@ -880,11 +880,73 @@ function GetDesireHelper()
 			return RetreatTag(211, BOT_MODE_DESIRE_MODERATE)
 		end
 	end
-	if Fu.ShouldLeaveRoshanFight(bot) then
-		local roshanPit = Fu.GetCurrentRoshanLocation()
-		if roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < 2500 then
-			return RetreatTag(217, BOT_MODE_DESIRE_ABSOLUTE)
+	-- Pit leave (tag 217) only for a bot in a Roshan fight: in Roshan mode, hitting Roshan or hit by him in the last
+	-- 5s, or already sent out of this fight (RetreatRules.RoshanLeaveApplies; game 065: it fired for lane bots near
+	-- the pit and for Primal Beast after Roshan died, cutting their creep-low holds). In the fight the creep-low rule
+	-- runs first, so its 0.98 (and the src=roshan hold near the pit) is not cut to 0.70.
+	local roshanPit = Fu.GetCurrentRoshanLocation()
+	local nearPit = roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < 2500
+	if nearPit then
+		local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+		local attackTarget = bot:GetAttackTarget()
+		if
+			activeMode == BOT_MODE_ROSHAN
+			or attackTarget ~= nil and Fu.IsRoshan(attackTarget)
+			or Fu.IsUnitValid(roshanHandle) and roshanHandle:IsAlive() and roshanHandle:GetAttackTarget() == bot
+		then
+			bot._roshanFightAt = DotaTime()
 		end
+	end
+	if Fu.ShouldLeaveRoshanFight(bot) then
+		local roshanAlive = Fu.IsRoshanAlive()
+		local applies, leaveWhy = RetreatRules.RoshanLeaveApplies(
+			nearPit,
+			roshanAlive,
+			DotaTime() - (bot._roshanFightAt or -999),
+			bot._roshLeaveLatched == true
+		)
+		if not roshanAlive then
+			bot._roshLeaveLatched = nil
+		end
+		if applies then
+			local roshanLow = CreepLowDesire(true)
+			local leaveDesire = math.max(BOT_MODE_DESIRE_ABSOLUTE, roshanLow)
+			if not bot._roshLeaveLatched or DotaTime() >= (bot._roshLeaveLogAt or -999) then
+				bot._roshLeaveLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-RETREAT] t=%.0f %s rosh-leave why=%s hp=%.2f desire=%.2f creepLow=%.2f mode=%d",
+						DotaTime(),
+						HeroName(),
+						leaveWhy,
+						hpRatio,
+						leaveDesire,
+						roshanLow,
+						activeMode or -1
+					)
+				)
+			end
+			bot._roshLeaveLatched = true
+			return RetreatTag(217, leaveDesire)
+		end
+		if leaveWhy ~= "far" and DotaTime() >= (bot._roshLeaveSkipLogAt or -999) then
+			bot._roshLeaveSkipLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s rosh-leave-skip why=%s hp=%.2f dist=%d mode=%d",
+					DotaTime(),
+					HeroName(),
+					leaveWhy,
+					hpRatio,
+					math.floor(GetUnitToLocationDistance(bot, roshanPit)),
+					activeMode or -1
+				)
+			)
+		end
+	else
+		bot._roshLeaveLatched = nil
 	end
 	if
 		Fu.IsDoingRoshan(bot)

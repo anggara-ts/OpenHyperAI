@@ -109,3 +109,25 @@ T.test("hard retreat: still breaks off when it should", function()
 	-- Hurt but our side is stronger (Fu.WeAreStronger): keep fighting unless alone.
 	T.eq(R.HardRetreatOutnumbered(2, 3, 3, 0.50, false, true), false, "2 vs 3 at 50%, stronger")
 end)
+
+T.test("pit leave: only for a bot in a Roshan fight (game 065, tag 217)", function()
+	local R = rules()
+	-- Clinkz t=126 / Dark Willow t=398: low in a lane near the pit, never in the Roshan fight: other rules decide.
+	local applies, why = R.RoshanLeaveApplies(true, true, 999, false)
+	T.eq(applies, false, "lane bot near the pit")
+	T.eq(why, "not-in-fight", "lane bot near the pit: why")
+	-- Primal Beast t=2609: hit Roshan a second before, but Roshan just died: no pit leave, creep-low keeps its 0.98.
+	applies, why = R.RoshanLeaveApplies(true, false, 1, false)
+	T.eq(applies, false, "Roshan dead")
+	T.eq(why, "rosh-dead", "Roshan dead: why")
+	-- In the fight (hit by Roshan 1s ago), or already sent out and not healed yet: leave.
+	T.eq(R.RoshanLeaveApplies(true, true, 1, false), true, "in the fight")
+	T.eq(R.RoshanLeaveApplies(true, true, 30, true), true, "sent out, still under 60%")
+	-- Far from the pit: never.
+	T.eq(R.RoshanLeaveApplies(false, true, 0, true), false, "far from the pit")
+	-- The retreat file asks the creep-low rule first inside the pit leave (0.98 is not cut to 0.70).
+	local src = T.read("mode_retreat_generic.lua")
+	local creepAt = string.find(src, "local roshanLow = CreepLowDesire(true)", 1, true)
+	local tagAt = string.find(src, "RetreatTag(217, leaveDesire)", 1, true)
+	T.ok(creepAt ~= nil and tagAt ~= nil and creepAt < tagAt, "creep-low before the pit-leave return")
+end)

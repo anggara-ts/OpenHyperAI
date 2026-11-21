@@ -148,7 +148,9 @@ function X.MinionThink(minion)
 end
 local shrapnelAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "sniper")
 local takeAimAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "sniper")
-local concussiveGrenadeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "sniper")
+-- Shard: Concussive Grenade (#184), by name: the slot list only lines up while the granted spell sits in slot 3.
+local concussiveGrenadeAbility =
+	SafeAbility(bot:GetAbilityByName("sniper_concussive_grenade"), "sniper_concussive_grenade", "sniper")
 local assassinateAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "sniper")
 local shrapnelDesire, shrapnelLocation
 local takeAimDesire
@@ -191,8 +193,20 @@ function X.SkillsComplement()
 		lastShrapnelLocation = shrapnelLocation
 		return
 	end
-	concussiveGrenadeDesire, concussiveGrenadeLocation = X.ConsiderAS()
+	local grenadeWhy
+	concussiveGrenadeDesire, concussiveGrenadeLocation, grenadeWhy = X.ConsiderAS()
 	if concussiveGrenadeDesire > 0 then
+		-- [OHA-GRANTED] every cast (10 s cooldown, so no throttle); the retreat branch also prints [OHA-SNIPER].
+		pcall(
+			print,
+			string.format(
+				"[OHA-GRANTED] t=%.0f sniper cast=sniper_concussive_grenade why=%s dist=%d hp=%.2f",
+				DotaTime(),
+				grenadeWhy or "-",
+				math.floor(GetUnitToLocationDistance(bot, concussiveGrenadeLocation)),
+				Fu.GetHP(bot)
+			)
+		)
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnLocation(concussiveGrenadeAbility, concussiveGrenadeLocation)
 		return
@@ -608,13 +622,14 @@ function X.ConsiderAS()
 					bot,
 					nearestEnemy,
 					math.min(150, GetUnitToUnitDistance(bot, nearestEnemy))
-				)
+				),
+				"retreat"
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1400) then
 		local aoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
 		if aoeLocation ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, aoeLocation
+			return BOT_ACTION_DESIRE_HIGH, aoeLocation, "teamfight"
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
@@ -623,7 +638,7 @@ function X.ConsiderAS()
 			and Fu.IsInRange(bot, botTarget, castRange)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "engage"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

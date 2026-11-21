@@ -144,6 +144,10 @@ local shadowWaveDesire, shadowWaveTarget
 local ultimateDesire, ultimateTarget
 local unusedDesire, unusedTarget
 local nothlProjectionDesire, nothlProjectionLocation, nothlProjectionEndDesire
+-- Shard: Through the Realm (#184). Datafeed 7.42 (hero_id 50): only during Nothl Projection, no target, no cost;
+-- pulls his body to the spirit and ends the projection there (a normal end sends the spirit back to the body).
+-- Not castable while the body is rooted or leashed.
+local throughTheRealmAbility
 local aetherRange = 0
 local shadowWaveBonusDamage = 0
 local mpRatio, hpRatio, nearbyEnemies, nearbyAllies
@@ -167,6 +171,8 @@ function X.SkillsComplement()
 		SafeAbility(bot:GetAbilityByName("dazzle_nothl_projection"), "dazzle_nothl_projection", "dazzle")
 	nothlProjectionEndAbility =
 		SafeAbility(bot:GetAbilityByName("dazzle_nothl_projection_end"), "dazzle_nothl_projection_end", "dazzle")
+	throughTheRealmAbility =
+		SafeAbility(bot:GetAbilityByName("dazzle_through_the_realm"), "dazzle_through_the_realm", "dazzle")
 	local context = AbilityContext.Build(bot)
 	aetherRange = context.aetherRange
 	mpRatio = context.mp
@@ -198,6 +204,11 @@ function X.SkillsComplement()
 	if nothlProjectionDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnLocation(nothlProjectionAbility, nothlProjectionLocation)
+		return
+	end
+	local throughTheRealmWhy = X.ConsiderThroughTheRealm()
+	if throughTheRealmWhy ~= nil then
+		bot:ActionQueue_UseAbility(throughTheRealmAbility)
 		return
 	end
 	nothlProjectionEndDesire = X.ConsiderNothlProjectionEnd()
@@ -271,6 +282,73 @@ function X.ConsiderNothlProjection()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- The body left behind by Nothl Projection: the allied Dazzle unit with the body debuff (nil if the engine does not
+-- list it; the [OHA-GRANTED] line says body=missing then).
+function X.FindNothlBody()
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
+		if
+			unit ~= nil
+			and unit ~= bot
+			and not unit:IsNull()
+			and unit:IsAlive()
+			and unit:HasModifier("modifier_dazzle_nothl_projection_physical_body_debuff")
+		then
+			return unit
+		end
+	end
+	return nil
+end
+-- Rescue: the body is hurt or hit and more enemies stand at the body than at the spirit, so pull it out. Stay: the
+-- projection ends within 1 s while the spirit fights a hero within 700 and is not outnumbered, so Dazzle stays in
+-- the fight instead of flying back to the body. Returns the reason, or nil.
+function X.ConsiderThroughTheRealm()
+	local soulModifier = bot:GetModifierByName("modifier_dazzle_nothl_projection_soul_debuff")
+	if soulModifier == nil or soulModifier < 0 or not Fu.CanCastAbility(throughTheRealmAbility) then
+		return nil
+	end
+	local body = X.FindNothlBody()
+	if body ~= nil and (body:IsRooted() or GetUnitToUnitDistance(bot, body) < 600) then
+		return nil
+	end
+	local enemiesAtSoul = #Fu.GetEnemiesNearLoc(bot:GetLocation(), 900)
+	local why = nil
+	if body ~= nil then
+		local enemiesAtBody = #Fu.GetEnemiesNearLoc(body:GetLocation(), 900)
+		if
+			(Fu.GetHP(body) < 0.5 or body:WasRecentlyDamagedByAnyHero(1.5))
+			and enemiesAtBody >= 1
+			and enemiesAtSoul < enemiesAtBody
+		then
+			why = "rescue"
+		end
+	end
+	if
+		why == nil
+		and bot:GetModifierRemainingDuration(soulModifier) <= 1.0
+		and (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot, 1200))
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, 700)
+		and (body == nil or Fu.GetHP(body) > 0.4)
+		and enemiesAtSoul <= #Fu.GetAlliesNearLoc(bot:GetLocation(), 900) + 1
+	then
+		why = "stay"
+	end
+	if why ~= nil then
+		pcall(
+			print,
+			string.format(
+				"[OHA-GRANTED] t=%.0f dazzle cast=dazzle_through_the_realm why=%s body=%s dist=%d bodyHp=%.2f enemiesAtSoul=%d",
+				DotaTime(),
+				why,
+				body ~= nil and "found" or "missing",
+				body ~= nil and math.floor(GetUnitToUnitDistance(bot, body)) or -1,
+				body ~= nil and Fu.GetHP(body) or -1,
+				enemiesAtSoul
+			)
+		)
+	end
+	return why
 end
 function X.ConsiderNothlProjectionEnd()
 	if not Fu.CanCastAbility(nothlProjectionEndAbility) then

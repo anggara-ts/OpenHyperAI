@@ -140,6 +140,12 @@ local decayAbility = SafeAbility(bot:GetAbilityByName("undying_decay"), "undying
 local soulRipAbility = SafeAbility(bot:GetAbilityByName("undying_soul_rip"), "undying_soul_rip", "undying")
 local tombstoneAbility = SafeAbility(bot:GetAbilityByName("undying_tombstone"), "undying_tombstone", "undying")
 local fleshGolemAbility = SafeAbility(bot:GetAbilityByName("undying_flesh_golem"), "undying_flesh_golem", "undying")
+-- Shard: Bite (#184). Datafeed 7.42 (hero_id 85): enemy unit target, range 400, his attack damage + 250 physical,
+-- heals him for the damage dealt; a bitten hero becomes a zombie for 3 s (melee, silenced, 25% slow, 40% less
+-- damage). Hidden until the Shard is bought (Fu.CanCastAbility checks IsHidden and IsTrained).
+local biteAbility = SafeAbility(bot:GetAbilityByName("undying_bite"), "undying_bite", "undying")
+local BITE_BONUS_DAMAGE = 250
+local biteDesire, biteTarget, biteWhy
 local decayDesire, decayLocation
 local soulRipDesire, soulRipTarget
 local tombstoneDesire, tombstoneLocation
@@ -179,6 +185,76 @@ function X.SkillsComplement()
 		bot:Action_UseAbilityOnEntity(soulRipAbility, soulRipTarget)
 		return
 	end
+	biteDesire, biteTarget, biteWhy = X.ConsiderBite()
+	if biteDesire > 0 then
+		X.LogGranted("undying_bite", biteWhy, biteTarget)
+		bot:Action_UseAbilityOnEntity(biteAbility, biteTarget)
+		return
+	end
+end
+-- [OHA-GRANTED] a Scepter / Shard ability cast (#184), at most once per 3 s.
+function X.LogGranted(abilityName, why, target)
+	if DotaTime() < (bot._grantedLogAt or -999) then
+		return
+	end
+	bot._grantedLogAt = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-GRANTED] t=%.0f undying cast=%s why=%s target=%s dist=%d hp=%.2f",
+			DotaTime(),
+			abilityName,
+			why or "-",
+			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			target ~= nil and math.floor(GetUnitToUnitDistance(bot, target)) or -1,
+			hpRatio or 0
+		)
+	)
+end
+-- Bite an enemy hero in range: to finish a hero the bite kills, to heal when hurt and hit by a hero, or on the
+-- hero he is fighting. Not while disarmed (the bite is his attack) or on a target that cannot be attacked.
+function X.ConsiderBite()
+	if not Fu.CanCastAbility(biteAbility) or bot:IsDisarmed() then
+		return BOT_ACTION_DESIRE_NONE, nil, nil
+	end
+	local castRange = Fu.GetProperCastRange(false, bot, biteAbility:GetCastRange())
+	local damage = bot:GetAttackDamage() + BITE_BONUS_DAMAGE
+	local inRange = {}
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanBeAttacked(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
+			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
+			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+		then
+			inRange[#inRange + 1] = enemyHero
+		end
+	end
+	if #inRange == 0 then
+		return BOT_ACTION_DESIRE_NONE, nil, nil
+	end
+	for _, enemyHero in pairs(inRange) do
+		if Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_PHYSICAL) then
+			return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
+		end
+	end
+	if (hpRatio or 1) < 0.5 and bot:WasRecentlyDamagedByAnyHero(2.0) then
+		return BOT_ACTION_DESIRE_HIGH, inRange[1], "heal"
+	end
+	if Fu.IsGoingOnSomeone(bot) or isInTeamFight then
+		for _, enemyHero in pairs(inRange) do
+			if enemyHero == botTarget then
+				return BOT_ACTION_DESIRE_HIGH, enemyHero, "fight"
+			end
+		end
+		if isInTeamFight then
+			return BOT_ACTION_DESIRE_HIGH, inRange[1], "teamfight"
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE, nil, nil
 end
 function X.ConsiderDecay()
 	if not decayAbility:IsFullyCastable() then

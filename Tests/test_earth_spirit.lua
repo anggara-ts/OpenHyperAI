@@ -106,7 +106,7 @@ end)
 
 T.test("earth spirit: a retreating ally at high HP needs a hero hitting it before a save", function()
 	local X = earthSpirit()
-	-- Game 063, 1:15: Weaver at 97% HP, retreating, enemies near but not hit by a hero.
+	-- Game 063, 1:15: Weaver at 96-97% HP, retreating, enemies near (her HP did not drop, so likely not hit).
 	T.eq(X.AllyNeedsSave(0.97, true, false, 2), false, "retreating, high HP, not hit")
 	T.eq(X.AllyNeedsSave(0.97, true, true, 2), true, "retreating, high HP, hit by a hero")
 	T.eq(X.AllyNeedsSave(0.97, false, true, 2), false, "not retreating, high HP")

@@ -1349,6 +1349,7 @@ function X.TryChase(unit, target)
 		or unit:IsInvisible()
 		or X.MeleeThreat(unit, target)
 		or X.FindMeleeAttacker(unit) ~= nil
+		or not KiteRules.CHASE_STEP_ON
 	then
 		return false
 	end
@@ -1384,7 +1385,7 @@ local function KiteHook(unit)
 		return X.KiteStep(unit, attacker, target, kind)
 	end
 	-- No melee unit on us: chase a hero target that runs out of range.
-	if Fu.IsValidHero(heroTarget) then
+	if Fu.IsValidHero(heroTarget) and KiteRules.CHASE_STEP_ON then
 		return X.ChaseStep(unit, heroTarget)
 	end
 	return false

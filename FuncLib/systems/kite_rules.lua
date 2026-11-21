@@ -11,6 +11,11 @@ KiteRules.MAX_STEP = 250
 KiteRules.MIN_STEP = 60
 -- The step ends at least this far inside our attack range of the target, so the next attack needs no walk back.
 KiteRules.RANGE_MARGIN = 30
+-- The chase step (a step toward a hero running out of range) is off: in games 065 and 067 the target was in range at
+-- the next attack after 5 of 23 and 4 of 19 steps, against 2 of 6 and 4 of 12 without a step, so stepping did not
+-- help (#72 tracker item 8, decided in advance: "if it still does not beat no-step, drop the chase step"). The
+-- outnumbered skip, stepping away from melee units and the kite steps stay. true turns it back on.
+KiteRules.CHASE_STEP_ON = false
 
 -- The safe window between two attacks, in seconds since the last attack. It is not known whether
 -- GetLastAttackTime is the start of the attack or the moment it is released, so the window assumes the worst

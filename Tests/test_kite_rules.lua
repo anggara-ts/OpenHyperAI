@@ -252,6 +252,8 @@ end)
 -- A ranged bot attacking an enemy hero that runs east.
 local function chaseScene()
 	local bot, SpecialUnits, _, _, moves = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
+	-- The chase step is off in the game (KiteRules.CHASE_STEP_ON); these tests keep its code working.
+	require(GetScriptDirectory() .. "/FuncLib/systems/kite_rules").CHASE_STEP_ON = true
 	local here = bot:GetLocation()
 	-- A real enemy hero of the stub game (a made-up one has no player and reads as an illusion).
 	local runner = T.stub.teams[TEAM_DIRE][2]
@@ -496,4 +498,11 @@ T.test("chase hook: no chase step while the overlay owns a hit", function()
 	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase")
 	T.eq(#moves, 0)
 	T.ok(printedWith("kite-skip why=overlay-owns kind=chase") ~= nil, "skip line names the chase")
+end)
+
+T.test("chase step is off in the game: no chase step toward a running hero", function()
+	local bot, SpecialUnits, _, moves = chaseScene()
+	require(GetScriptDirectory() .. "/FuncLib/systems/kite_rules").CHASE_STEP_ON = false
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase step")
+	T.eq(#moves, 0, "no move order")
 end)

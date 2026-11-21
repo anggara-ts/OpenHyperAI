@@ -36,7 +36,7 @@ T.test("clinkz: two charges restore one at a time", function()
 	n, nextAt = step(n, nextAt, 2, 40, 141, false)
 	T.eq(n, 1, "one back")
 	T.eq(nextAt, 180, "second 40 s later")
-	n, nextAt = step(n, nextAt, 2, 40, 200, false)
+	n = step(n, nextAt, 2, 40, 200, false)
 	T.eq(n, 2, "full")
 end)
 

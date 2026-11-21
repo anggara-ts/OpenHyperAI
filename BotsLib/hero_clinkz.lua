@@ -214,7 +214,33 @@ function X.PactCharges()
 	local max = PACT_CHARGES[math.min(level, #PACT_CHARGES)]
 	pactState.n, pactState.nextAt =
 		X.PactChargeStep(pactState.n, pactState.nextAt, max, PACT_RESTORE, DotaTime(), spent)
+	-- An order that never became a pact (game 063, 7:56: three escape orders, no HP gained): say so once.
+	local order = pactState.order
+	if spent then
+		pactState.order = nil
+	elseif order ~= nil and DotaTime() > order.at + 1 then
+		pactState.order = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f death-pact-unspent why=%s mode=%d rooted=%s charges=%d max=%d",
+				DotaTime(),
+				order.why,
+				bot:GetActiveMode(),
+				tostring(bot:IsRooted()),
+				pactState.n,
+				max
+			)
+		)
+	end
 	return pactState.n
+end
+-- Every Death Pact order goes through here (death-pact-unspent when no pact follows within 1 s).
+function X.OrderPact(creep, why)
+	if pactState.order == nil then
+		pactState.order = { at = DotaTime(), why = why }
+	end
+	bot:Action_UseAbilityOnEntity(deathPactAbility, creep)
 end
 function X.HasPactCharge()
 	return (pactState.n or 1) >= 1 and deathPactAbility:IsFullyCastable()
@@ -228,7 +254,8 @@ local function CheckHuntResult()
 	local reveal = huntReveal
 	huntReveal = nil
 	local target = reveal.target
-	local result, dmg = "miss", 0
+	local result
+	local dmg = 0
 	if target == nil or target:IsNull() or not target:IsAlive() then
 		result = "kill"
 	elseif target:CanBeSeen() then
@@ -263,7 +290,7 @@ function X.SkillsComplement()
 	-- Escape pact first: it doesn't break Skeleton Walk, and the hunt or the attack spells must not hold it back.
 	local escapePactDesire, escapePactTarget = X.ConsiderEscapePact()
 	if escapePactDesire > 0 then
-		bot:Action_UseAbilityOnEntity(deathPactAbility, escapePactTarget)
+		X.OrderPact(escapePactTarget, "escape")
 		return
 	end
 	local okH, hunted = pcall(X.HuntStep)
@@ -319,7 +346,7 @@ function X.SkillsComplement()
 	end
 	deathPactDesire, deathPactTarget = X.ConsiderDeathPact()
 	if deathPactDesire > 0 then
-		bot:Action_UseAbilityOnEntity(deathPactAbility, deathPactTarget)
+		X.OrderPact(deathPactTarget, "other")
 		return
 	end
 	burningArmyDesire, burningArmyLocation = X.ConsiderBurningArmy()
@@ -451,7 +478,14 @@ function X.HuntTarget()
 		return nil
 	end
 	local best, bestHp = nil, 2
-	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and not Fu.IsSuspiciousIllusion(botTarget) then
+	-- Not farther than 2600, so the lock below (distance + 600, at most 3200) keeps it: game 063, 7 of the 24
+	-- walks started 4000-14000 from the target and flipped up to 12 times.
+	if
+		isGoingOnSomeone
+		and Fu.IsValidHero(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+		and GetUnitToUnitDistance(bot, botTarget) <= 2600
+	then
 		best = botTarget
 	else
 		local alliesNear = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
@@ -497,6 +531,10 @@ function X.HuntStep()
 			and reveal.target:GetHealth() >= reveal.hp
 		then
 			bot._clinkzHuntUntil = DotaTime() + 0.2
+			-- Only when the attack order was replaced: a repeat of the same order keeps the swing going.
+			if bot:GetAttackTarget() ~= reveal.target then
+				bot:Action_AttackUnit(reveal.target, true)
+			end
 			return true
 		end
 		X.EndHunt("invis-gone")
@@ -515,7 +553,7 @@ function X.HuntStep()
 			if bot._huntTarget ~= nil then
 				bot._clinkzHuntUntil = DotaTime() + 0.6
 			end
-			bot:Action_UseAbilityOnEntity(deathPactAbility, creep)
+			X.OrderPact(creep, "hunt")
 			return true
 		end
 	end

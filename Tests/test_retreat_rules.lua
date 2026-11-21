@@ -32,10 +32,46 @@ T.test("creep-low: hold after it fired", function()
 	local R = rules()
 	-- Stepped away: the creep hit flag lapsed, creeps still in reach, 28%: keep retreating.
 	T.eq(R.CreepLowRetreat(0.28, false, false, false, false, true, true), true, "held at 28%, creeps near")
-	-- Out of creep reach: let go.
-	T.eq(R.CreepLowRetreat(0.28, false, false, false, false, true, false), false, "held, nothing in reach")
+	-- Out of creep reach: keep the rest of the window (game 064, push walked Death Prophet back in), don't renew it.
+	local fire, renew = R.CreepLowRetreat(0.28, false, false, false, false, true, false)
+	T.eq(fire, true, "held, nothing in reach: rest of the window")
+	T.eq(renew, false, "held, nothing in reach: window not renewed")
+	local _, renewNear = R.CreepLowRetreat(0.28, false, false, false, false, true, true)
+	T.eq(renewNear, true, "held, creeps near: window renewed")
+	-- Window over (holding false) and nothing hitting: let go.
+	T.eq(R.CreepLowRetreat(0.28, false, false, false, false, false, false), false, "window over")
 	-- Healed past the release line (35%): let go.
 	T.eq(R.CreepLowRetreat(0.40, true, false, false, false, true, true), false, "held, healed to 40%")
+end)
+
+T.test("creep-low: a TP home keeps retreat up (game 064, Death Prophet 42:05)", function()
+	local R = rules()
+	-- t=2525: 24% HP, the rule fired at t=2524 (holding), TP channel started, tower still near: keep, renew.
+	local fire, renew = R.CreepLowRetreat(0.24, false, true, false, true, true, true, true)
+	T.eq(fire, true, "TP channel while held: keep retreat")
+	T.eq(renew, true, "TP channel while held: renew the window")
+	-- The same channel with no hold (the rule never fired): other rules decide.
+	T.eq(R.CreepLowRetreat(0.24, false, true, false, true, false, true, true), false, "TP, rule not fired")
+	-- A channel that is not a TP (a channelled spell): drop the rule, as before.
+	T.eq(R.CreepLowRetreat(0.24, true, false, false, true, true, true, false), false, "other channel")
+end)
+
+T.test("finish exemption: no finish when the bot dies first (game 064, Alchemist 22:23)", function()
+	local R = rules()
+	-- t=1343: 18% HP, 5 enemy heroes hitting him: no exemption, whatever the damage estimate says.
+	T.eq(R.DiesBeforeFinish(0.18, 400, 5, 0), true, "18%, 5 heroes on him")
+	T.eq(select(2, R.DiesBeforeFinish(0.18, 400, 5, 0)), "low-hp", "why=low-hp")
+	-- One hero on him at 18% with a small estimate: the finish can go ahead.
+	T.eq(R.DiesBeforeFinish(0.18, 400, 1, 150), false, "18%, one hero, 150 incoming")
+	-- Healthier, but the heroes on him deal more than his HP before his hit lands: no exemption.
+	T.eq(R.DiesBeforeFinish(0.40, 900, 2, 950), true, "40%, 950 incoming vs 900 HP")
+	T.eq(select(2, R.DiesBeforeFinish(0.40, 900, 2, 950)), "burst", "why=burst")
+	-- Nobody hitting him: finish it.
+	T.eq(R.DiesBeforeFinish(0.10, 200, 0, 0), false, "10%, nobody hitting")
+	-- The retreat file uses the target-only check, not Fu.ShouldFinishCommittedKill, for both exemptions.
+	local src = T.read("mode_retreat_generic.lua")
+	T.ok(string.find(src, 'local freeKill = FinishKillExempt("hard-retreat")', 1, true) ~= nil, "hard retreat")
+	T.ok(string.find(src, 'FinishKillExempt("creep-low")', 1, true) ~= nil, "creep-low")
 end)
 
 T.test("creep-low: Roshan counts as a creep (game 063, Earth Spirit and Alchemist died in Roshan mode)", function()

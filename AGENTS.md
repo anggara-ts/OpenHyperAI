@@ -44,6 +44,8 @@ Adding `mode_<name>_generic.lua` replaces Valve's built-in mode **entirely**: th
   (`mode_rune_generic.lua` walks a bot to the river spot and holds it for the item mode). Our own item mode
   (own drops, Gem, Rapier, tokens only) stopped the river gold being taken, so it was removed (2026-11-17).
   The cost: bots may still pick up another hero's dropped item.
+  A GetDesire-only `mode_item_generic.lua` was tried (#141, game 063): Valve's item Think did not run behind it
+  and no river rune was picked up.
 - **Evasive maneuvers (`mode_evasive_maneuvers_generic.lua`)** - Valve's projectile/AoE dodging. Overriding
   it would drop the dodging. Where it gets bots killed (low HP, outnumbered), `mode_retreat_generic.lua`
   returns a desire above it instead (`[OHA-RETREAT] over-evasive`).

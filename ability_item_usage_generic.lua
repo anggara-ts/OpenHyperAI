@@ -32,6 +32,7 @@ local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
+local ForeignItems = require(GetScriptDirectory() .. "/FuncLib/systems/foreign_items")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()
@@ -1404,6 +1405,10 @@ local function ConsiderItems()
 	for forageSlot = 0, 5 do
 		local forage = bot:GetItemInSlot(forageSlot)
 		local forageName = forage ~= nil and not forage:IsNull() and forage:GetName() or nil
+		-- Another player's mushroom can't be eaten (#141): DropForeignItems drops it instead.
+		if ForeignItems.FORAGE[forageName] and ForeignItems.Check(bot, forage) then
+			forageName = nil
+		end
 		if
 			forageName == "item_foragers_stats"
 			or forageName == "item_foragers_health"
@@ -1451,6 +1456,10 @@ local function ConsiderItems()
 			ready = not (type(cooldown) == "number" and cooldown > 0)
 		end
 		if ready and itemName ~= nil and Usage.IsDoomed(bot) and DoomWastes(itemName) then
+			ready = false
+		end
+		-- Another player's item can't be used from this inventory (#141).
+		if ready and itemName ~= nil and ForeignItems.Check(bot, item) then
 			ready = false
 		end
 		if ready and itemName ~= nil then
@@ -9277,10 +9286,16 @@ function Usage.LogStuck()
 	if moved < 300 and not attacking then
 		bot._stuckLogAt = now + 10
 		local loc = bot:GetLocation()
+		-- Why the mode can't act (#141; game 062, 44:57-49:30: Medusa idle and Nyx Assassin "use ability" stood
+		-- still through farm, team roam and defend). Fu.CanNotUseAction skips a mode's orders on any of these.
+		-- casting/channel are always false here (the check above returns first); kept so the line is complete.
+		local activeAbility = bot:GetCurrentActiveAbility()
+		local activeName = activeAbility ~= nil and not activeAbility:IsNull() and activeAbility:GetName() or "-"
 		pcall(
 			print,
 			string.format(
-				"[OHA-STUCK] t=%.0f %s mode=%s/%.2f action=%s moved=%d path=%d at=%.0f,%.0f hp=%.2f enemies=%d",
+				"[OHA-STUCK] t=%.0f %s mode=%s/%.2f action=%s moved=%d path=%d at=%.0f,%.0f hp=%.2f enemies=%d"
+					.. " queued=%d using=%s casting=%s channel=%s active=%s",
 				now,
 				(string.gsub(botName, "npc_dota_hero_", "")),
 				StuckModeName(bot:GetActiveMode()),
@@ -9291,7 +9306,12 @@ function Usage.LogStuck()
 				loc.x,
 				loc.y,
 				Fu.GetHP(bot),
-				#(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {})
+				#(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}),
+				bot:NumQueuedActions(),
+				tostring(bot:IsUsingAbility()),
+				tostring(bot:IsCastingAbility()),
+				tostring(bot:IsChanneling()),
+				activeName
 			)
 		)
 	end
@@ -9584,6 +9604,11 @@ function Usage.EatForage()
 						pending.name
 					)
 				)
+				-- The 60s backoff alone kept the eat orders coming for the rest of the game (game 062: Medusa and
+				-- Nyx Assassin, Nature's Prophet's mushrooms, every 60s from 29:05). Treat the mushroom as another
+				-- player's: no more eats or swaps, and DropForeignItems drops it once. Its result line reads the
+				-- owner off the ground and clears the mark if the mushroom turns out to be this bot's (#141).
+				ForeignItems.MarkName(bot, pending.name, "unknown", "not-consumed")
 			end
 			bot._forageFail[pending.name] = fail
 		else
@@ -9600,6 +9625,7 @@ function Usage.EatForage()
 				and Fu.CanCastAbility(item)
 				and not backedOff
 				and bot._foragePending == nil
+				and not ForeignItems.Check(bot, item)
 			then
 				bot._foragePending =
 					{ name = name, slot = slot, charges = item:GetCurrentCharges() or 0, at = DotaTime() }
@@ -9622,6 +9648,98 @@ function Usage.EatForage()
 				else
 					bot:Action_UseAbilityOnEntity(item, bot)
 				end
+				return true
+			end
+		end
+	end
+	return false
+end
+-- Another player's item in the inventory (#141; FuncLib/systems/foreign_items.lua says how it is known): drop it,
+-- once per item name, where it costs nothing (no enemy hero within 1600, not hit by a hero in 3s, not retreating
+-- or fighting, no spell going). Game 062: Medusa and Nyx Assassin carried Nature's Prophet's mushrooms for 15+
+-- minutes and stood still at the end (44:57-49:30) while the base was sieged. 1.5s later a result line says
+-- whether it left the bag and whose the ground says it is. Checks once per second.
+function Usage.DropForeignItems()
+	-- Heroes only: this runs before the item think's hero gate (a bear's player ID against its owner's is unverified).
+	if not bot:IsAlive() or not bot:IsHero() or bot:IsIllusion() then
+		bot._foreignDropPending = nil
+		return false
+	end
+	local now = DotaTime()
+	local heroName = (string.gsub(botName, "npc_dota_hero_", ""))
+	local pending = bot._foreignDropPending
+	if pending ~= nil and now >= pending.at + 1.5 then
+		bot._foreignDropPending = nil
+		local groundOwner = "-"
+		for _, drop in ipairs(ForeignItems.DropList()) do
+			if drop.name == pending.name and GetUnitToLocationDistance(bot, drop.location) <= 400 then
+				groundOwner = drop.ownerPid ~= nil and drop.ownerPid == bot:GetPlayerID() and "self" or drop.ownerName
+				break
+			end
+		end
+		-- The ground says it is ours (the not-consumed guess was wrong, or the list names whoever dropped it): eat
+		-- that name again. The dropped one stays where it is (own-drop pick-ups skip names dropped here).
+		if groundOwner == "self" and bot._foreignNames ~= nil then
+			bot._foreignNames[pending.name] = nil
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s drop-foreign-result item=%s inBag=%s ground=%s",
+				now,
+				heroName,
+				pending.name,
+				bot:FindItemSlot(pending.name) >= 0 and "yes" or "no",
+				groundOwner
+			)
+		)
+	end
+	if now < (bot._foreignScanAt or -999) then
+		return false
+	end
+	bot._foreignScanAt = now + 1
+	-- Refreshes the owner records of items on the ground.
+	ForeignItems.DropList()
+	bot._foreignDropped = bot._foreignDropped or {}
+	for slot = 0, 8 do
+		local item = bot:GetItemInSlot(slot)
+		if item ~= nil and not item:IsNull() and bot._foreignDropped[item:GetName()] == nil then
+			local foreign, owner, how = ForeignItems.Check(bot, item)
+			if foreign then
+				local mode = bot:GetActiveMode()
+				-- Not in rune or item mode: the order would replace the river hold or Valve's pick-up.
+				if mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM then
+					return false
+				end
+				local attackTarget = bot:GetAttackTarget()
+				local safe = ForeignItems.SafeToDrop(
+					#(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}),
+					bot:WasRecentlyDamagedByAnyHero(3.0),
+					mode == BOT_MODE_RETREAT or mode == BOT_MODE_EVASIVE_MANEUVERS,
+					mode == BOT_MODE_ATTACK
+						or (attackTarget ~= nil and not attackTarget:IsNull() and attackTarget:IsHero()),
+					bot:IsChanneling() or bot:IsCastingAbility() or bot:IsUsingAbility()
+				)
+				if not safe then
+					return false
+				end
+				local name = item:GetName()
+				bot._foreignDropped[name] = now
+				bot._foreignDropPending = { name = name, at = now }
+				pcall(
+					print,
+					string.format(
+						"[OHA-ITEM] t=%.0f %s drop-foreign item=%s owner=%s how=%s slot=%d mode=%s",
+						now,
+						heroName,
+						name,
+						tostring(owner),
+						tostring(how),
+						slot,
+						StuckModeName(mode)
+					)
+				)
+				bot:Action_DropItem(item, bot:GetLocation())
 				return true
 			end
 		end
@@ -10188,6 +10306,11 @@ function ItemUsageThink()
 		return
 	end
 	do
+		local okX, dropped = pcall(Usage.DropForeignItems)
+		if okX and dropped then
+			_perfDone()
+			return
+		end
 		local okF, ate = pcall(Usage.EatForage)
 		if okF and ate then
 			_perfDone()

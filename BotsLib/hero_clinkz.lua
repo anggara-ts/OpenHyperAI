@@ -907,11 +907,12 @@ function X.ConsiderDeathPact()
 				pcall(
 					print,
 					string.format(
-						"[OHA-CLINKZ] t=%.0f death-pact why=heal hp=%.2f gain=%d creep=%s",
+						"[OHA-CLINKZ] t=%.0f death-pact why=heal hp=%.2f gain=%d creep=%s charges=%s",
 						DotaTime(),
 						Fu.GetHP(bot),
 						gain,
-						creep:GetUnitName()
+						creep:GetUnitName(),
+						tostring(pactState.n)
 					)
 				)
 				return BOT_ACTION_DESIRE_HIGH, creep

@@ -1365,10 +1365,10 @@ do
 	GetDesire = function(...)
 		local desire = retreatGetDesire(...)
 		if type(desire) == "number" then
-			local last = bot._retreatDesireNow
+			local last = bot._retreatFinalDesire
 			if last == nil then
 				last = {}
-				bot._retreatDesireNow = last
+				bot._retreatFinalDesire = last
 			end
 			last.d, last.t = desire, DotaTime()
 		end

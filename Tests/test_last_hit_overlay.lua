@@ -102,7 +102,7 @@ T.test("team roam and retreat load and think; retreat publishes its desire", fun
 	if ok then
 		local desire = GetDesire()
 		T.eq(type(desire), "number", "retreat desire")
-		T.ok(bot._retreatDesireNow ~= nil and bot._retreatDesireNow.d == desire, "published")
-		T.eq(bot._retreatDesireNow and bot._retreatDesireNow.t, 600, "with the time")
+		T.ok(bot._retreatFinalDesire ~= nil and bot._retreatFinalDesire.d == desire, "published")
+		T.eq(bot._retreatFinalDesire and bot._retreatFinalDesire.t, 600, "with the time")
 	end
 end)

@@ -255,7 +255,7 @@ local function EndHunt(why, target)
 end
 -- Retreat's desire from its last think (mode_retreat_generic.lua publishes it), or nil.
 local function RetreatDesireNow()
-	local last = bot._retreatDesireNow
+	local last = bot._retreatFinalDesire
 	if last == nil or DotaTime() - last.t > 1 then
 		return nil
 	end

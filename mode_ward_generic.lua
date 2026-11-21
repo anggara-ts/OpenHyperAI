@@ -558,7 +558,6 @@ local function GiveUpWardSpot(why)
 	if wardSpot ~= nil then
 		wardSpot.plant_time_obs = now
 		wardSpot.plant_time_sentry = now
-		wardSpot.gaveUpAt = now
 	end
 	wardModeOffUntil = now + 15
 	bot._wardAtSpotSince = nil
@@ -659,8 +658,8 @@ local function ValidateSpot(spot)
 	local loc = spot.location
 	-- The ping the plant retry circles (#15): the spot as written, before any move.
 	spot.ping = spot.ping or loc
-	-- A pinged spot stays where it was pinged (#15): moving the old Radiant top and Dire bottom eye-cliff spots to
-	-- walkable ground put them where no ward ever planted. The plant retry handles a ping the order can't plant on.
+	-- The Radiant top and Dire bottom eye cliffs stay where they were pinged (keep, #15): moving them to walkable
+	-- ground put them where no ward ever planted. The plant retry handles a ping the order can't plant on.
 	if spot.keep or IsLocationPassable(loc) then
 		return
 	end

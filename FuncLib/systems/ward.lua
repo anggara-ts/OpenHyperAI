@@ -8,8 +8,8 @@ local OBS_GAP = 1500
 -- here. Radiant top (-4365, -1012, by the Radiant outpost) and Dire bottom (4610, 770, by the Dire outpost) are back:
 -- they are the right spots. As (-4348, -1008) and (4612, 767) they were not walkable, so ValidateSpot moved them to
 -- (-4348, -1108) and (4439, 667), where the plant order did nothing (games 018-062: 36 and 39 give-ups
--- `why=in-range-no-plant`). keep = true: the ping stays the target (no move), and the plant retry in
--- mode_ward_generic.lua tries points around it when the order does not plant. label (the game 063 pings): a bare word
+-- `why=in-range-no-plant`). keep = true (these two only): the ping stays the target (no move), and the plant retry
+-- in mode_ward_generic.lua tries points around it when the order does not plant. label (the game 063 pings): a bare word
 -- the [OHA-WARD] give-up, plant-retry and dispenser lines print, so a game check can name the spot.
 local UberWardSpots = {
 	{ location = Vector(1015, 3593, 0), plant_time_obs = 0, plant_time_sentry = 0, role = "uber", side = "dire" },
@@ -55,7 +55,7 @@ local HuntSpots = {
 -- The first two are the lotus pools (pools at -7548,4209 and 7504,-4405 in [OHA-LOTUS] lines). Twin Gates (#15,
 -- maintainer's pings, game 063): top (-2808, 8257) and bottom (2780, -8151) watch the gate ambush; the old gate
 -- spots (-6244, 7147) and (6206, -6958) are "less effective for guarding twin gate ambush" and only stay as a
--- fallback (fallbackFor): used once the new spot of that gate has been given up, not while it is warded. Side of the
+-- fallback (fallbackFor, see ConsiderGates). Side of the
 -- new spots by fountain distance, as LaneSpots does: top 10091 from the Dire base (-> dire), 15535 from the
 -- Radiant one; bottom 10064 from the Radiant base (-> radiant), 15331 from the Dire one.
 local GateSpots = {
@@ -84,7 +84,6 @@ local GateSpots = {
 		side = "dire",
 		deep = true,
 		gate = "top",
-		keep = true,
 	},
 	{
 		location = Vector(2780, -8151, 0),
@@ -95,7 +94,6 @@ local GateSpots = {
 		side = "radiant",
 		deep = true,
 		gate = "bottom",
-		keep = true,
 	},
 	{
 		location = Vector(-6244, 7147, 0),
@@ -116,20 +114,7 @@ local GateSpots = {
 		fallbackFor = "bottom",
 	},
 }
--- A gate's old spot only after its new one was given up (`give-up` sets the plant time but plants nothing) and
--- before that mark runs out; a planted new spot is a warded gate.
-local function GateFallbackOpen(spot)
-	if spot.fallbackFor == nil then
-		return true
-	end
-	for i = 1, #GateSpots do
-		local main = GateSpots[i]
-		if main.gate == spot.fallbackFor then
-			return main.gaveUpAt ~= nil and DotaTime() < main.gaveUpAt + 360
-		end
-	end
-	return true
-end
+
 local radiantEarlyWardSpots = {
 	-- Radiant mid: the user's safe spots, pinged in game 022 (2026-11-16), on Radiant's side of the
 	-- river so the support does not cross it. Replace the Dire bank of the top rune (-627, 850),
@@ -145,7 +130,6 @@ local radiantEarlyWardSpots = {
 		role = "early",
 		side = "radiant",
 		safe = true,
-		keep = true,
 	},
 	[2] = {
 		location = Vector(-300, -909, 0),
@@ -155,7 +139,6 @@ local radiantEarlyWardSpots = {
 		role = "early",
 		side = "radiant",
 		safe = true,
-		keep = true,
 	},
 	[3] = {
 		location = Vector(-882, -1000, 0),
@@ -196,7 +179,6 @@ local direEarlyWardSpots = {
 		role = "early",
 		side = "dire",
 		safe = true,
-		keep = true,
 	},
 	[2] = {
 		location = Vector(12, 257, 0),
@@ -214,7 +196,6 @@ local direEarlyWardSpots = {
 		role = "early",
 		side = "dire",
 		safe = true,
-		keep = true,
 	},
 	[4] = {
 		location = Vector(-5305, 4281, 0),
@@ -238,7 +219,6 @@ local direEarlyWardSpots = {
 		role = "early",
 		side = "dire",
 		safe = true,
-		keep = true,
 	},
 }
 function Ward.GetEarlyGameWardSpots()
@@ -303,6 +283,32 @@ local function DropDeepEnemySpots(list)
 		end
 	end
 	return kept
+end
+-- Twin Gates: the new spot of each gate first. Its old spot only when the new one is not on this bot's list (taken,
+-- given up, no cover on the enemy side, too deep) and none of our observers watches it. Not only after a give-up: for
+-- Radiant the new top spot is on Dire's side, so it is often off the list, and the own-side old spot must stay open.
+local function ConsiderGates(spots, consider)
+	local covered = {}
+	for i = 1, #GateSpots do
+		local spot = GateSpots[i]
+		if spot.fallbackFor == nil then
+			local before = #spots
+			consider(spot)
+			local added = #spots > before and not EnemyWardTooDeep(spot.location)
+			if
+				spot.gate ~= nil
+				and (added or Ward.IsOtherWardClose(spot.location, "npc_dota_observer_wards", OBS_GAP, true, false))
+			then
+				covered[spot.gate] = true
+			end
+		end
+	end
+	for i = 1, #GateSpots do
+		local spot = GateSpots[i]
+		if spot.fallbackFor ~= nil and not covered[spot.fallbackFor] then
+			consider(spot)
+		end
+	end
 end
 -- Home/defend ground spots sit on our T3. Skip them until that lane's T1 is gone,
 -- unless enemies are already on the high ground (handled by the caller).
@@ -600,11 +606,7 @@ function Ward.GetAvailabeObserverWardSpots(bot)
 			consider(spot)
 		end
 	end
-	for i = 1, #GateSpots do
-		if GateFallbackOpen(GateSpots[i]) then
-			consider(GateSpots[i])
-		end
-	end
+	ConsiderGates(spots, consider)
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])
 	end
@@ -737,11 +739,7 @@ function Ward.GetPossibleSentryWardSpots(bot)
 	for i = 1, #RoshSpots do
 		consider(RoshSpots[i])
 	end
-	for i = 1, #GateSpots do
-		if GateFallbackOpen(GateSpots[i]) then
-			consider(GateSpots[i])
-		end
-	end
+	ConsiderGates(spots, consider)
 	for i = 1, #HuntSpots do
 		consider(HuntSpots[i])
 	end

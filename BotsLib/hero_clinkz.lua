@@ -178,7 +178,80 @@ local botTarget
 local isGoingOnSomeone
 local isAttacking
 local mpRatio
+-- Death Pact charges (#94). Datafeed hero 56 (7.42): AbilityCharges 1/1/2/2, AbilityChargeRestoreTime 40. Game 063,
+-- 7:56: three escape orders 18 s after a pact (HP up 0.52 -> 0.59 at 7:38), none cast: the API reports the spell
+-- castable with no charge left, and ChargeTracker skips one-charge spells. A pact shows as the 45 s
+-- modifier_clinkz_death_pact appearing or being refreshed.
+local PACT_CHARGES = { 1, 1, 2, 2 }
+local PACT_RESTORE = 40
+local pactState = { n = nil, nextAt = nil, lastLeft = 0 }
+-- Pure: one step of the charge count. n: charges before (nil = full), spent: a pact was seen this step.
+-- Returns the new n and the time the next charge comes back (nil when full).
+function X.PactChargeStep(n, nextAt, max, restore, now, spent)
+	n = math.min(n or max, max)
+	while nextAt ~= nil and now >= nextAt and n < max do
+		n = n + 1
+		nextAt = n < max and nextAt + restore or nil
+	end
+	if n >= max then
+		nextAt = nil
+	end
+	if spent then
+		n = math.max(0, n - 1)
+		nextAt = nextAt or now + restore
+	end
+	return n, nextAt
+end
+-- Once per think, before any early return: charges left now.
+function X.PactCharges()
+	local level = deathPactAbility:GetLevel()
+	if level < 1 then
+		return 0
+	end
+	local left = Fu.GetModifierTime(bot, "modifier_clinkz_death_pact") or 0
+	local spent = left > pactState.lastLeft + 1
+	pactState.lastLeft = left
+	local max = PACT_CHARGES[math.min(level, #PACT_CHARGES)]
+	pactState.n, pactState.nextAt =
+		X.PactChargeStep(pactState.n, pactState.nextAt, max, PACT_RESTORE, DotaTime(), spent)
+	return pactState.n
+end
+function X.HasPactCharge()
+	return (pactState.n or 1) >= 1 and deathPactAbility:IsFullyCastable()
+end
+-- The reveal of an invisible hunt, measured 2.5 s later: did the target lose HP (hunt result=).
+local huntReveal = nil
+local function CheckHuntResult()
+	if huntReveal == nil or DotaTime() < huntReveal.at + 2.5 then
+		return
+	end
+	local reveal = huntReveal
+	huntReveal = nil
+	local target = reveal.target
+	local result, dmg = "miss", 0
+	if target == nil or target:IsNull() or not target:IsAlive() then
+		result = "kill"
+	elseif target:CanBeSeen() then
+		dmg = reveal.hp - target:GetHealth()
+		result = dmg > 0 and "hit" or "miss"
+	else
+		result = "lost"
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-CLINKZ] t=%.0f hunt result=%s target=%s dmg=%d by=%s",
+			DotaTime(),
+			result,
+			reveal.name,
+			math.max(0, math.floor(dmg)),
+			reveal.by
+		)
+	)
+end
 function X.SkillsComplement()
+	pcall(X.PactCharges)
+	pcall(CheckHuntResult)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -187,6 +260,12 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	mpRatio = context.mp
 	botTarget = context.target
+	-- Escape pact first: it doesn't break Skeleton Walk, and the hunt or the attack spells must not hold it back.
+	local escapePactDesire, escapePactTarget = X.ConsiderEscapePact()
+	if escapePactDesire > 0 then
+		bot:Action_UseAbilityOnEntity(deathPactAbility, escapePactTarget)
+		return
+	end
 	local okH, hunted = pcall(X.HuntStep)
 	if okH and hunted then
 		return
@@ -348,7 +427,7 @@ function X.HuntTarget()
 	then
 		return locked
 	end
-	if bot._huntPrey ~= nil then
+	if locked ~= nil then
 		local why = "timeout"
 		if not Fu.IsValidHero(locked) then
 			why = "target-gone"
@@ -359,7 +438,12 @@ function X.HuntTarget()
 		elseif GetUnitToUnitDistance(bot, locked) >= (bot._huntRange or 1600) then
 			why = "too-far"
 		end
-		X.EndHunt(why)
+		if bot._huntPrey ~= nil then
+			X.EndHunt(why)
+		else
+			-- A hunt on the engage target (no hunt start line): say why the hold ends.
+			X.LogHunt("drop-" .. why, Fu.IsValidHero(locked) and locked or nil)
+		end
 	end
 	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
 	-- No new target for 15s after a cancelled hunt (else the same hero is picked again next think).
@@ -386,6 +470,11 @@ function X.HuntTarget()
 	if best ~= nil then
 		bot._huntTarget = best
 		bot._huntLockAt = DotaTime()
+		-- Keep the target for the walk (game 063, t=925: picked at 1837, the 1600 lock range dropped it at once; with
+		-- the outpost hold on he is not "going on someone", so no re-pick until the attack mode took over again, four
+		-- mode flips on the way in). 20 s and 600 more than the distance now, at most 3200.
+		bot._huntLockFor = 20
+		bot._huntRange = math.min(3200, math.max(1600, GetUnitToUnitDistance(bot, best) + 600))
 	end
 	return best
 end
@@ -395,18 +484,37 @@ end
 -- point blank. bot._clinkzHuntUntil keeps the outpost mode holding the other modes' orders meanwhile.
 function X.HuntStep()
 	if not bot:HasModifier("modifier_clinkz_wind_walk") then
+		-- Just revealed: keep the other modes out until the first hit takes HP off the target (at most 1.2 s).
+		-- Game 063: the 0.5 s hold ran out during the attack, the attack mode took over and the walk was gone
+		-- with no hit (t=869, reveal at 194, no damage).
+		local reveal = huntReveal
+		if
+			reveal ~= nil
+			and DotaTime() < reveal.at + 1.2
+			and reveal.target ~= nil
+			and not reveal.target:IsNull()
+			and reveal.target:IsAlive()
+			and reveal.target:GetHealth() >= reveal.hp
+		then
+			bot._clinkzHuntUntil = DotaTime() + 0.2
+			return true
+		end
 		X.EndHunt("invis-gone")
 		bot._huntTarget = nil
 		return false
 	end
 	-- Invisible: a pact on the biggest creep in range first (heal + max HP, keeps him invisible).
-	if Fu.CanCastAbility(deathPactAbility) and not bot:HasModifier("modifier_clinkz_death_pact") then
+	if X.HasPactCharge() and not bot:HasModifier("modifier_clinkz_death_pact") then
 		local creep = GetMostHPCreepLevel(
 			bot:GetNearbyCreeps(deathPactAbility:GetCastRange(), true),
 			deathPactAbility:GetSpecialValueInt("creep_level")
 		)
 		if creep ~= nil and not creep:IsAncientCreep() then
 			X.LogHunt("pact", nil)
+			-- The cast must not drop the hunt hold (the attack mode took over during it).
+			if bot._huntTarget ~= nil then
+				bot._clinkzHuntUntil = DotaTime() + 0.6
+			end
 			bot:Action_UseAbilityOnEntity(deathPactAbility, creep)
 			return true
 		end
@@ -434,9 +542,15 @@ function X.HuntStep()
 		return false
 	end
 	-- Outnumbered around Clinkz (the ally list includes him): no hunt.
+	-- A real cancel: no new hunt for 5 s (game 063: this check ended the hunt with no pause, the attack mode
+	-- picked the same target next think and the hunt started again, flipping outpost <-> attack).
 	if #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200) then
+		if bot._huntPrey == nil then
+			X.LogHunt("cancel-outnumbered", target)
+		end
 		X.EndHunt("outnumbered")
 		bot._huntTarget = nil
+		bot._huntOffUntil = DotaTime() + 5
 		bot._clinkzHuntUntil = nil
 		return false
 	end
@@ -454,7 +568,8 @@ function X.HuntStep()
 				return false
 			end
 		end
-		bot._clinkzHuntUntil = DotaTime() + 0.3
+		-- 0.6 s: a think skipped by a cast or the heavy-think throttle must not let the other modes in.
+		bot._clinkzHuntUntil = DotaTime() + 0.6
 		X.LogHunt("approach", target)
 		bot:Action_MoveToLocation(ambush)
 		return true
@@ -493,7 +608,18 @@ function X.HuntStep()
 		)
 	end
 	X.EndHunt("revealed", true)
-	-- Keep the other modes out until the first hit lands.
+	-- The target stays locked for the first hits (after Strafe he is still invisible and comes back here).
+	bot._huntLockAt, bot._huntLockFor = DotaTime(), 3
+	if huntReveal == nil then
+		huntReveal = {
+			target = target,
+			name = (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+			hp = target:GetHealth(),
+			at = DotaTime(),
+			by = step,
+		}
+	end
+	-- Keep the other modes out until the first hit lands (renewed above while the hit is pending).
 	bot._clinkzHuntUntil = DotaTime() + 0.5
 	return true
 end
@@ -577,8 +703,75 @@ function X.ConsiderStrafe()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Escape (#94, game 050 10:47-10:53: he ran with Skeleton Walk from Lich and Tinker and died with no pact). Game
+-- files (7.42): charges 1/1/2/2, no cooldown, 700 range, +175-400 HP; it doesn't end Skeleton Walk. Hurt under
+-- 60% with an enemy hero within 900 while retreating, just hit or rooted: eat the biggest creep in range, pact up or
+-- not. Checked before his other spells: game 063, 8:18-8:25, rooted at 17% HP he fought back with Searing Arrows
+-- (checked first) and died with the charge back. A unit-target spell, so a root doesn't stop it.
+function X.ConsiderEscapePact()
+	if deathPactAbility:GetLevel() < 1 or Fu.GetHP(bot) >= 0.6 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	if not (Fu.IsRetreating(bot) or bot:WasRecentlyDamagedByAnyHero(2.0) or bot:IsRooted()) then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local enemiesNear = math.max(
+		#(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}),
+		#(Fu.GetEnemiesNearLoc(bot:GetLocation(), 900) or {})
+	)
+	if enemiesNear < 1 then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	local why = nil
+	local creep = nil
+	if not X.HasPactCharge() then
+		why = "no-charge"
+	else
+		creep = GetMostHPCreepLevel(
+			bot:GetNearbyCreeps(deathPactAbility:GetCastRange(), true),
+			deathPactAbility:GetSpecialValueInt("creep_level")
+		)
+		if creep == nil or creep:IsAncientCreep() then
+			why = "no-creep"
+		end
+	end
+	local logKey = why or "escape"
+	if DotaTime() >= (bot._pactLogAt or -999) or logKey ~= bot._pactLogKey then
+		bot._pactLogAt, bot._pactLogKey = DotaTime() + 3, logKey
+		if why ~= nil then
+			pcall(
+				print,
+				string.format(
+					"[OHA-CLINKZ] t=%.0f death-pact-skip why=%s hp=%.2f enemies=%d rooted=%s charges=%s",
+					DotaTime(),
+					why,
+					Fu.GetHP(bot),
+					enemiesNear,
+					tostring(bot:IsRooted()),
+					tostring(pactState.n)
+				)
+			)
+		else
+			pcall(
+				print,
+				string.format(
+					"[OHA-CLINKZ] t=%.0f death-pact why=escape hp=%.2f creep=%s rooted=%s charges=%s",
+					DotaTime(),
+					Fu.GetHP(bot),
+					creep:GetUnitName(),
+					tostring(bot:IsRooted()),
+					tostring(pactState.n)
+				)
+			)
+		end
+	end
+	if why ~= nil then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+	return BOT_ACTION_DESIRE_HIGH, creep
+end
 function X.ConsiderDeathPact()
-	if not deathPactAbility:IsFullyCastable() then
+	if not X.HasPactCharge() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	local castRange = deathPactAbility:GetCastRange()
@@ -606,28 +799,6 @@ function X.ConsiderDeathPact()
 				)
 				return BOT_ACTION_DESIRE_HIGH, creep
 			end
-		end
-	end
-	-- Escape (#94, game 050 10:47-10:53: he ran with Skeleton Walk from Lich and Tinker and died with no pact). Game
-	-- files (7.42): charges 1/1/2/2, no cooldown, 700 range, +175-400 HP; it doesn't end Skeleton Walk. Hurt under
-	-- 60% with an enemy hero within 900 while retreating or just hit: eat the biggest creep in range, pact up or not.
-	if
-		Fu.GetHP(bot) < 0.6
-		and (Fu.IsRetreating(bot) or bot:WasRecentlyDamagedByAnyHero(2.0))
-		and #(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {}) >= 1
-	then
-		local creep = GetMostHPCreepLevel(nearbyCreeps, maxCreepLevel)
-		if creep ~= nil and not creep:IsAncientCreep() then
-			pcall(
-				print,
-				string.format(
-					"[OHA-CLINKZ] t=%.0f death-pact why=escape hp=%.2f creep=%s",
-					DotaTime(),
-					Fu.GetHP(bot),
-					creep:GetUnitName()
-				)
-			)
-			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end
 	if Fu.IsInLaningPhase() then

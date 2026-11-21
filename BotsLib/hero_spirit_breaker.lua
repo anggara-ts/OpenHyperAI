@@ -181,6 +181,8 @@ function X.SkillsComplement()
 		then
 			bot:Action_UseAbility(bulldozeAbility)
 		end
+		-- Read only by the [OHA-HUNT] trace (FuncLib/systems/hunt_trace.lua, #165).
+		bot._chargeTarget = chargeOfDarknessTarget
 		bot:Action_UseAbilityOnEntity(chargeOfDarknessAbility, chargeOfDarknessTarget)
 		return
 	end

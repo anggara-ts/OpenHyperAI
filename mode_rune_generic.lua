@@ -1195,10 +1195,13 @@ function GetDesireRaw()
 						runeInfo.distance = mine
 						runeInfo.status = RUNE_STATUS_AVAILABLE
 						runeInfo.type = GetRuneType(id)
-						return give(
-							mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH,
-							IsRiverRune(id) and "power-passing" or "bounty-passing"
-						)
+						-- No enemy hero near: above a walking push or defend (0.95). Game 048 18:10: Night
+						-- Stalker walked past the top jungle bounty 885 away on a push (passing gave 0.75).
+						local passDesire = mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH
+						if #(Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}) == 0 then
+							passDesire = math.max(passDesire, 0.97)
+						end
+						return give(passDesire, IsRiverRune(id) and "power-passing" or "bounty-passing")
 					end
 				end
 			end

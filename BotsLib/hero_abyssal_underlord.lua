@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local ObjectiveTravel = require(GetScriptDirectory() .. "/FuncLib/systems/objective_travel")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -361,6 +362,25 @@ function X.ConsiderPitOfMalice()
 end
 function X.ConsiderFiendsGate()
 	if not fiendsGateAbility:IsFullyCastable() then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- 7.42: heroes have no abyssal_underlord_portal_warp any more, so no bot (Underlord included) can walk
+	-- through the portals (#53). Open them only for a human ally, or with Scepter (Pit of Malice at the far
+	-- portal, ability tooltip).
+	local humans = Fu.NumHumanBotPlayersInTeam()
+	local hasWarp = bot:GetAbilityByName("abyssal_underlord_portal_warp") ~= nil
+	if not ObjectiveTravel.PortalWorthCasting(hasWarp, humans, bot:HasScepter()) then
+		if not Fu.IsInLaningPhase() and DotaTime() >= (bot._fiendsGateOffLogAt or -999) then
+			bot._fiendsGateOffLogAt = DotaTime() + 60
+			pcall(
+				print,
+				string.format(
+					"[OHA-TRAVEL] t=%.0f abyssal_underlord fiends-gate-off why=no-warp humans=%d scepter=false",
+					DotaTime(),
+					humans
+				)
+			)
+		end
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local teamFightLocation = Fu.GetTeamFightLocation(bot)

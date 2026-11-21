@@ -44,6 +44,14 @@ since #110. Issue #109.
 - **Abilities.** `[OHA-API] abilities <hero>` lists each bot's slots 0-35 as the engine has them, (t) talent,
   (h) hidden. Souvenirs and similar granted abilities (Ringmaster's Weighted Pie, Crystal Ball) are not in the slots
   at the start of the game.
+- **No map abilities on heroes (#53, #111).** Before 7.42 every hero carried `ability_capture`,
+  `abyssal_underlord_portal_warp`, `twin_gate_portal_warp` and `ability_lamp_use` (hidden, slots 23-26 in the
+  engine's own ability list printed when Rubick steals a spell, game 043). Since 7.42 none of them is in the
+  `[OHA-API] abilities` dump (games 049-062, slots 0-35), and `GetAbilityByName("ability_capture")` /
+  `("ability_lamp_use")` return nil. The game files still define all four. So bots can't capture outposts,
+  light watchers, or use Twin Gates or Underlord's Fiend's Gate with an ability. `[OHA-TRAVEL] warp-abilities`
+  checks the two warp names directly, and `[OHA-TRAVEL] gate-try` tries `Action_MoveToUnit`, `Action_UseShrine`
+  and `Action_AttackUnit` on a Twin Gate once per game.
 
 ### Constants by group (game-mode, hero-pick and animation activity constants left out)
 

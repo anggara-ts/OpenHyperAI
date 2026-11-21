@@ -309,10 +309,14 @@ local function LastHitHold(bot)
 	return LastHitOverlay ~= false and LastHitOverlay.HoldModeThink(bot)
 end
 function OhaCastGuard(bot)
+	-- The last-hit overlay holds its hit (#165); checked first so it sits apart from other guard edits (#36).
+	if bot ~= nil and bot:IsAlive() and LastHitHold(bot) then
+		return true
+	end
 	if bot == nil or not bot:IsAlive() then
 		return false
 	end
-	return bot:IsCastingAbility() or bot:IsChanneling() or LastHitHold(bot)
+	return bot:IsCastingAbility() or bot:IsChanneling()
 end
 function SafeCall(fn, fallback, name)
 	local isThink = type(name) == "string" and string.sub(name, -6) == "_Think"

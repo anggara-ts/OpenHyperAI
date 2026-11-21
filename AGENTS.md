@@ -150,8 +150,12 @@ needs `PRE_COMMIT_ALLOW_NO_CONFIG=1` to commit.
 
 ## Testing in a game
 
-1. The local dev setup links `dota 2 beta/game/dota/scripts/vscripts/bots` to this repo, so the game runs the
-   checked-out branch. Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script** (Valve
+1. The game runs a copy of the build in `dota 2 beta/game/dota/scripts/vscripts/bots`, made by
+   `node Util/export-bots.js --test-game` (`/prepare-game` runs it): the bot scripts of `HEAD`, the uncommitted
+   test lineup and a `Customize/build_info.lua` for that commit, nothing else. Editing or switching branches in
+   the clone during a game changes nothing in it; run the export again after a change. (An old dev setup links
+   `vscripts/bots` to the clone; the tool refuses to write through a link, so rename it, e.g. `bots-dev`.)
+   Start a Custom Lobby, server **Local Host**, bots set to **Local Dev Script** (Valve
    only offers bot scripts in lobbies, and third-party scripts only load on a Local Host server).
 2. Launch Dota with `-condebug` so the console is written to `game/dota/console*.log`.
 3. The game prints `[OHA-BUILD]` (exact commit) at the start. After the game, `node Util/after-game.js` splits
@@ -210,7 +214,9 @@ Tools: `gh` (GitHub CLI, logged in), `Util/issue-prs.js`, `Util/verify.js`, `Uti
    lists PRs that conflict (fix the conflict in that PR, not in test/next), writes `Util/verify/test-build.json`
    and switches the working tree to it, carrying `Customize/general.lua` (other modified files make it refuse;
    `--dry-run` only reports, `--no-switch` builds without switching). Never push `test/next`. Then run
-   `node Util/build-info.js` (a reset fires no hook) so `[OHA-BUILD]` names the build, and play. PRs no longer
+   `node Util/build-info.js` (a reset fires no hook) and, once the lineup is final,
+   `node Util/export-bots.js --test-game`, which copies the build into `vscripts/bots` with a `build_info.lua`
+   so `[OHA-BUILD]` names it, and play. PRs no longer
    need to be stacked to be tested together: branch each one from `main`.
 7. **During the game** the maintainer may post observations with game times ("2:50 kez and tusk won't hit
    dawnbreaker trapped in ice shards"). Check each against the running log (newest `console*.log`, grep a
@@ -286,7 +292,8 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 |---|---|
 | `/start-issue` | file findings or requests as grouped issue cards with task items and a priority |
 | `/create-pr` | code done: checks, signed commit, CI, change-log description, tracker entry |
-| `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, what the game tests |
+| `/prepare-game` | before playing: tracker status, `test-build.js`, lineup, copy into `vscripts/bots`, what the game tests |
+| `/prepare-workshop` | a Workshop upload: clean copy of `origin/main` or a release tag (no lineup, git, env, tests, logs) in `vscripts/bots` |
 | `/check-live-event` | the maintainer reports an event during a live game |
 | `/review-game` | the game ended: `after-game.js`, tracker, PR comments, findings, issues, next lineup |
 | `/merge-pr` | a PR is READY TO MERGE: mute proven logs, tick checks, squash-merge, tick issue items |
@@ -296,6 +303,8 @@ game, an outdated mechanic, or an idea that has a better alternative. Not every 
 ## Things not to do
 
 - Do not commit `Customize/general.lua` test lineups, match logs, or anything with the Steam ID.
+- Do not upload the clone or a link to it to the Workshop (it has `.git`, `.env`, match logs, the test lineup):
+  upload the clean copy from `/prepare-workshop` (`node Util/export-bots.js`).
 - Do not commit `.env` or print, log or paste its values (API tokens; template and docs: `.env.example`,
   CONTRIBUTING.md step 6).
 - Do not force-push, rewrite published history, or skip signing.

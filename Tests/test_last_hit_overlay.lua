@@ -199,22 +199,23 @@ T.test("last-hit overlay: the try line says the walk, the allies near and replac
 		return 150
 	end
 	creep._loc = bot:GetLocation() + Vector(400, 0, 0)
+	-- A hunt-* hit: a snipe here would go to the stub's allied cores (RoamRules.NewHitSkipWhy, tested below).
 	local action = BOT_ACTION_TYPE_ATTACK
 	function bot:GetCurrentActionType()
 		return action
 	end
-	O.Offer(bot, creep, 1.5, "snipe")
+	O.Offer(bot, creep, 1.5, "hunt-carry/lane")
 	T.eq(O.Think(bot), true, "first order")
 	local try = bot._lhOwn.try
 	T.eq(try.gap, 250, "400 away, range 150")
 	T.eq(try.allies, 4, "the stub's other four heroes stand within 700, the bot not counted")
 	-- A move ordered after the overlay's attack: the next think starts with it; the overlay orders the attack again.
 	action = BOT_ACTION_TYPE_MOVE_TO
-	O.Offer(bot, creep, 1.5, "snipe")
+	O.Offer(bot, creep, 1.5, "hunt-carry/lane")
 	T.eq(O.Think(bot), true, "attack ordered again")
 	-- A spell: counted, and the bot is busy with it, so the overlay lets go (release=skip-busy).
 	action = BOT_ACTION_TYPE_USE_ABILITY
-	O.Offer(bot, creep, 1.5, "snipe")
+	O.Offer(bot, creep, 1.5, "hunt-carry/lane")
 	T.eq(O.Think(bot), false, "busy with the spell")
 	T.eq(try.replaced, 2, "two thinks began with another order")
 	T.eq(try.cast, 1, "one of them a spell")
@@ -222,6 +223,24 @@ T.test("last-hit overlay: the try line says the walk, the allies near and replac
 	T.stub.time = 600.5
 	O.Think(bot)
 	T.eq(printed("release=skip-busy gap=250 allies=4 replaced=2 cast=1"), 1, "fields on the try line")
+end)
+
+T.test("last-hit overlay: a snipe an allied core reaches first is left to it (game 067 review)", function()
+	local bot, O, creep = setup()
+	function bot:GetAttackRange()
+		return 150
+	end
+	-- The stub's other four heroes stand on the bot; with a longer attack range they reach their swing first.
+	creep._loc = bot:GetLocation() + Vector(400, 0, 0)
+	O.Offer(bot, creep, 1.5, "snipe")
+	T.eq(O.Think(bot), false, "left to the ally")
+	T.eq(bot._lhOwn, nil, "no hold")
+	T.eq(printed("overlay-skip why=ally-first rule=snipe"), 1, "skip line")
+	-- A hunt-* hit 400 + 150 = 550 away: gap 400, above the 300 cap.
+	creep._loc = bot:GetLocation() + Vector(550, 0, 0)
+	O.Offer(bot, creep, 1.5, "hunt-carry/lane")
+	T.eq(O.Think(bot), false, "too long a walk for a hunt-* hit")
+	T.eq(printed("overlay-skip why=far rule=hunt-carry/lane"), 1, "far line")
 end)
 
 T.test("team roam and retreat load and think; retreat publishes its desire", function()

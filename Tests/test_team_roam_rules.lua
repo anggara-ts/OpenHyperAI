@@ -165,3 +165,14 @@ T.test("team roam rules: courier hunt in the laning phase (#165, game 067)", fun
 		"after laning: no enemy check"
 	)
 end)
+
+T.test("team roam rules: a new overlay hit skips long hunt walks and snipes an allied core reaches first", function()
+	local R = rules()
+	T.eq(R.NewHitSkipWhy("hunt-carry/lane", 453, {}), "far", "a hunt-* walk of 453 (game 067 push misses)")
+	T.eq(R.NewHitSkipWhy("hunt-support/lane", 72, {}), nil, "a short hunt-* walk")
+	T.eq(R.NewHitSkipWhy("snipe", 453, {}), nil, "the walk cap is for hunt-* only")
+	T.eq(R.NewHitSkipWhy("snipe", 200, { 50 }), "ally-first", "an allied core closer to its swing")
+	T.eq(R.NewHitSkipWhy("snipe", 200, { 250, 300 }), nil, "allied cores farther from their swing")
+	T.eq(R.NewHitSkipWhy("snipe", 0, { -100 }), nil, "already in range: still swings")
+	T.eq(R.NewHitSkipWhy("hunt-carry/lane", 100, { -100 }), nil, "ally-first is for the snipe only")
+end)

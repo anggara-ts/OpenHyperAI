@@ -309,6 +309,18 @@ local function alliesNear(bot, unit)
 	return n
 end
 
+-- Each allied core hero's walk to its swing (distance minus attack range) within ALLY_FIRST_RADIUS of the unit, for
+-- RoamRules.NewHitSkipWhy.
+local function allyCoreGaps(bot, unit)
+	local gaps = {}
+	for _, ally in ipairs(Fu.GetAlliesNearLoc(unit:GetLocation(), Rules.ALLY_FIRST_RADIUS) or {}) do
+		if ally ~= bot and not ally:IsIllusion() and Fu.IsCore(ally) then
+			gaps[#gaps + 1] = GetUnitToUnitDistance(ally, unit) - ally:GetAttackRange()
+		end
+	end
+	return gaps
+end
+
 -- While the overlay owns a hit, the bot's current order at the start of a think is still the attack, unless an order
 -- after the overlay's (an item, a spell) replaced it last think (overlay-try replaced= / cast=).
 local function noteReplaced(bot)
@@ -366,6 +378,15 @@ function X.Think(bot)
 		for _, try in ipairs(s.tries or {}) do
 			if try.key == unit and try.capped then
 				skip = "capped"
+			end
+		end
+		-- A long walk for a hunt-* hit, or a snipe an allied core reaches first (RoamRules.NewHitSkipWhy).
+		if skip == nil then
+			local gap = GetUnitToUnitDistance(bot, unit) - bot:GetAttackRange()
+			skip = Rules.NewHitSkipWhy(why, gap, allyCoreGaps(bot, unit))
+			if skip ~= nil then
+				logSkip(bot, skip, why, unit, string.format("gap=%d", math.floor(gap)))
+				return false
 			end
 		end
 	end

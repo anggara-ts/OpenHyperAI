@@ -218,4 +218,29 @@ function Rules.CourierSkipWhy(c)
 	return nil
 end
 
+-- A new overlay hit (the overlay doesn't own this unit yet): why it isn't started, or nil to start it.
+--   rule      the offer's rule ("snipe", "hunt-carry/lane", ...)
+--   gap       distance to the unit minus the bot's attack range (the walk before the swing)
+--   allyGaps  the same gap for each allied core hero within ALLY_FIRST_RADIUS of the unit
+-- far: a hunt-* hit more than HUNT_GAP_MAX away. Game 067 review: hunt-* misses walked avg 453 in push modes, drops
+--   590 (up to 1345), hits 72.
+-- ally-first: a snipe the bot has to walk to while an allied core is closer to its swing. Games 063-067: 37 of 41
+--   snipe misses in push modes had an allied hero within 700 of the creep (hits: 20 of 30); in farm, tries with an
+--   ally went 11 hit / 19 miss against 261 / 24 alone. In range already (gap <= 0) it still swings.
+Rules.HUNT_GAP_MAX = 300
+Rules.ALLY_FIRST_RADIUS = 700
+function Rules.NewHitSkipWhy(rule, gap, allyGaps)
+	if type(rule) == "string" and string.sub(rule, 1, 5) == "hunt-" and gap > Rules.HUNT_GAP_MAX then
+		return "far"
+	end
+	if rule == "snipe" and gap > 0 then
+		for _, allyGap in ipairs(allyGaps or {}) do
+			if allyGap < gap then
+				return "ally-first"
+			end
+		end
+	end
+	return nil
+end
+
 return Rules

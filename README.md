@@ -1,155 +1,106 @@
-# OpenHyperAI
+# Supercharged OpenHyperAI
 
-Custom Dota 2 bot scripts based on **Open Hyper AI (OHA)**.
+Dota 2 bot scripts for patch **7.42**: smarter laning, fights, retreats, runes and objectives, with up-to-date item
+and skill builds for every hero.
 
-This repository is a fork / continued work of the original project by **forest0xia**:
-
-- Original author & upstream: [https://github.com/forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI)
-- Steam Workshop (upstream): [Open Hyper AI](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298)
-
-> Create a **Custom Lobby** and set the server location to **Local Host**. When the scripts load correctly, bot names usually end with **`.OHA`** / **`OHA-DEV`**.
+- **Steam Workshop:** [Supercharged OpenHyperAI for 7.42](https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501)
+- **What's new:** [releases](https://github.com/anggara-ts/Supercharged-OpenHyperAI/releases)
+- **Known limitations** (what bots can't do because of the bot API): [discussion #50](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions/50)
+- **Questions and feedback:** [discussions](https://github.com/anggara-ts/Supercharged-OpenHyperAI/discussions) or [issues](https://github.com/anggara-ts/Supercharged-OpenHyperAI/issues)
 
 ---
 
-## Setup (from this GitHub repo)
+## Play
 
-Dota only loads bot scripts from:
+1. Subscribe to [Supercharged OpenHyperAI for 7.42](https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501)
+   on the Steam Workshop and let Steam finish the download.
+2. In Dota 2: **Play** → **Custom Lobbies** → **+ Create**, then **Edit Lobby Settings**:
+   - Server location: **Local Host** (third-party bot scripts only run on a local server; the "Play vs Bots" menu
+     can't use them).
+   - Bot Settings: choose the subscribed script for both Radiant and Dire.
+3. Join a team. The slot you take is your role: 1 carry (safe lane), 2 mid, 3 offlane, 4 soft support, 5 hard
+   support. The bots fill the other roles.
+4. Start the game. When the script loaded, the bots' names end with **`.OHA-DEV`**.
 
-```text
-<Steam>/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots
-```
+If the bots play with Valve's default names, the script didn't load: see
+[Run from this repository](#run-from-this-repository), or link the Workshop folder the same way (step 2 there,
+with the Workshop folder `<Steam>/steamapps/workshop/content/570/3843444501` as the source).
 
-### 1. Get the code
+## Settings
 
-**With git** (easy updates with `git pull`):
-
-```bash
-git clone https://github.com/anggara-ts/Supercharged-OpenHyperAI.git
-```
-
-Put the clone wherever you like (for example `Documents\Supercharged-OpenHyperAI`), then link it in step 2.
-
-**Without git (manual download):**
-
-1. Download the zip of the `main` branch: <https://github.com/anggara-ts/Supercharged-OpenHyperAI/archive/refs/heads/main.zip>
-2. Extract it. You get a folder `Supercharged-OpenHyperAI-main`, which holds `bot_generic.lua`, `hero_selection.lua`, `BotsLib`, `FuncLib` and so on.
-3. If `dota 2 beta/game/dota/scripts/vscripts/bots` already exists, rename it (for example `bots_old`). Then move the extracted folder there and rename it to `bots`. The files must sit directly inside `bots`:
-
-   ```text
-   .../scripts/vscripts/bots/bot_generic.lua      correct
-   .../scripts/vscripts/bots/Supercharged-OpenHyperAI-main/bot_generic.lua   wrong: Dota won't find it
-   ```
-4. Skip step 2 and go to step 3. To update later, download the zip again and replace the `bots` folder; keep your settings in the permanent Customize folder (step 3) so an update doesn't reset them.
-
-The install scripts in `Install-to-vscript/` don't cover this: they link the **Steam Workshop** copy, not a download.
-
-### 2. Link a git clone into Dota’s `vscripts/bots` folder
-
-**Option A — symlink (recommended for development)**
-
-Point Dota’s `bots` folder at this repo so edits apply immediately.
-
-**Windows** (run Command Prompt / PowerShell **as Administrator**):
-
-```bat
-mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\Users\<YOU>\Documents\Supercharged-OpenHyperAI"
-```
-
-Adjust both paths if your Steam library or clone location differs. If a `bots` folder already exists, rename or remove it first.
-
-**macOS / Linux:**
-
-```bash
-ln -s "/path/to/Supercharged-OpenHyperAI" "$HOME/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
-```
-
-**Option B — the Workshop copy**
-
-If you play the Steam Workshop copy instead of this repo, see [`Install-to-vscript/README.md`](Install-to-vscript/README.md) for Windows / macOS / Linux helper scripts that symlink Workshop → `vscripts/bots`.
-
-For a git clone, Option A is enough. For a manual download, see step 1.
-
-### 3. (Optional) Permanent Customize folder
-
-To keep settings across updates/copies, copy `Customize/` to:
+Picks, bans, the bot language, chat and other options are in `Customize/general.lua` (comments explain each one).
+A Workshop update replaces that file. To keep your settings, copy the whole `Customize` folder to
 
 ```text
 <Steam>/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/game/Customize
 ```
 
-Edit picks, bans, language, and related options in `Customize/general.lua`.
+and edit the copy there; it wins over the one in the script. Per-hero overrides go in `Customize/hero/`
+(see `Customize/hero/viper.lua` for an example).
 
-### 4. Play
+## In-game chat commands
 
-You can not use the "Play vs Bots" menu, but instead we have to play in a Custom Lobby.
-
-1. Open Dota 2  
-2. **Play** → **Custom Lobbies** → **+ Create**  
-3. Edit Lobby Settings:
-- Server location: **Local Host**
-- Bot Settings → Select  **Local Dev Script** for both Radiant and Dire Bots
-4. Human can join the Radiant or Dire team, with the slot number assign your role:
-- 1. Carry (Safe lane)
-- 2. Mid-laner
-- 3. Off-laner
-- 4. Soft Support (Off lane Support)
-- 5. Hard Support (Safe lane Support)
-5. Start the game
-
----
-
-## Alternative: Steam Workshop (upstream)
-
-You can still install the upstream Workshop build:
-
-1. Subscribe to [Open Hyper AI on Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298)  
-2. Run the installer under `Install-to-vscript` (see [`Install-to-vscript/README.md`](Install-to-vscript/README.md))  
-3. Use a **Local Host** custom lobby  
-
-This GitHub repo is for local development and changes on top of that work.
-
----
-
-## Useful in-game commands
-
-| Command | Description |
+| Command | What it does |
 |---|---|
-| `!pos X` | Swap your role with a bot (e.g. `!pos 2` for mid) |
-| `!Xpos Y` | Reassign bot positions (e.g. `!3pos 5`) |
-| `!pick HERO` | Force-pick a hero |
-| `!ban HERO` | Ban a hero from bot picks |
-| `!sp XX` | Bot language (`en`, `zh`, `ru`, `ja`) |
+| `!pos X` | Swap your role with a bot (e.g. `!pos 2` for mid); before the horn |
+| `!Xpos Y` | Move bot X to position Y (e.g. `!3pos 5`); before the horn |
+| `!pick HERO` | Force a bot pick |
+| `!ban HERO` | Ban a hero from bot picks; during the draft |
+| `!sp XX` | Bot language: `en`, `zh`, `ru`, `ja` |
 
 ---
 
-## Project layout (short)
+## Run from this repository
 
-| Path | Role |
+For the newest changes before they reach the Workshop, or to work on the scripts.
+
+1. **Get the code**: `git clone https://github.com/anggara-ts/Supercharged-OpenHyperAI.git`, or download
+   [the `main` zip](https://github.com/anggara-ts/Supercharged-OpenHyperAI/archive/refs/heads/main.zip) and extract it.
+2. **Put it where Dota loads bot scripts**: `<Steam>/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots`.
+   The files must sit directly in `bots` (`.../vscripts/bots/bot_generic.lua`, not `.../bots/<folder>/bot_generic.lua`).
+   Rename an existing `bots` folder first (e.g. `bots_old`). Either move the extracted folder there and name it
+   `bots`, or link it so updates apply at once:
+   - Windows (Command Prompt as Administrator):
+     ```bat
+     mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\path\to\Supercharged-OpenHyperAI"
+     ```
+   - macOS / Linux:
+     ```bash
+     ln -s "/path/to/Supercharged-OpenHyperAI" "<Steam>/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+     ```
+   Contributors use `node Util/export-bots.js` instead, which copies only the bot scripts (see
+   [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+3. **Play** as above, but choose **Local Dev Script** in Bot Settings.
+
+The helper scripts in [`Install-to-vscript/`](Install-to-vscript/README.md) do step 2 for the Workshop folder.
+
+## Project layout
+
+| Path | What it is |
 |---|---|
-| `BotsLib/` | Per-hero builds & ability logic |
-| `FuncLib/` | Shared bot libraries & systems |
-| `Customize/` | User settings (picks, bans, locale) |
-| `Install-to-vscript/` | Symlink install helpers |
-| `mode_*_generic.lua` | Mode scripts (farm, push, defend, roam, …) |
-| `Util/` | Developer tools (log splitter, game review, test tracker) |
-| `Tests/` | LuaJIT tests with a stub bot API |
-| `Docs/` | Notes (what the bot API really exposes) |
+| `BotsLib/` | One file per hero: skill build, item build, ability use |
+| `FuncLib/` | Shared libraries and systems (push, defend, wards, items, roles, ...) |
+| `Customize/` | Player settings (picks, bans, language) |
+| `mode_*_generic.lua` | Bot modes (laning, farm, retreat, push, defend, roshan, runes, ...) |
+| `Util/` | Developer tools (log splitter, game review, test tracker, bot-script export) |
+| `Tests/` | LuaJIT tests against a stub bot API |
+| `Docs/` | Notes, e.g. what the bot API really exposes |
+| `Install-to-vscript/` | Link helpers for the Workshop folder |
 
-More detail on libraries: [`FuncLib/README.md`](FuncLib/README.md).
-
-Optional Fretbots / Buff plugin (extra gold, XP and neutral items for bots): branch [`plugin-fretbots`](../../tree/plugin-fretbots), with its own install script and README.
-
----
+More on the libraries: [`FuncLib/README.md`](FuncLib/README.md). The optional Fretbots / Buff plugin (extra gold,
+XP and neutral items for bots) lives on the [`plugin-fretbots`](../../tree/plugin-fretbots) branch.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md): setup (git hooks, signed commits, linking Dota to your clone), test games, and the issue -> PR -> game test -> merge flow. Rules for code and PRs are in [`AGENTS.md`](AGENTS.md).
-
----
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup (git hooks, signed commits, getting the scripts into Dota),
+test games and the issue → PR → game test → merge flow. The rules for code and PRs are in
+[`AGENTS.md`](AGENTS.md).
 
 ## Credits
 
-- **Original Open Hyper AI** — [forest0xia / dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI)  
-- Built on Valve’s default bots and earlier community scripts (jmz / New Beginner AI, ryndrb, adamqqq, fretmute / fretbots, and others — see the upstream README for the full list)
-
-If you improve something here that belongs upstream, consider contributing back to [forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI).
+Supercharged OpenHyperAI continues **Open Hyper AI (OHA)** by **forest0xia**
+([dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI)), which itself builds on Valve's
+default bots and earlier community scripts: jmz / New Beginner AI, ryndrb, adamqqq, fretmute (Fretbots) and others.
+The Linux install script is based on ashoktamang's
+[dota2bot-OpenHyperAI-linux-patcher](https://github.com/ashoktamang/dota2bot-OpenHyperAI-linux-patcher).
+Thanks to all of them.

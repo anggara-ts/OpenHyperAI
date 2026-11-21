@@ -556,13 +556,30 @@ function GetDesireHelper()
 		end
 		-- Outnumbered: never above retreat (game 063, 15:38: Zeus left a hard retreat for a special unit at 0.96).
 		local retreatDesire = RetreatDesireNow()
-		local capped, cut = RoamRules.SpecialUnitCap(
-			desire,
-			#alliesNear,
-			#enemiesNear,
-			retreatDesire,
-			bot._specialUnitWhy == "serpent-escape"
-		)
+		-- Exempt: the serpent ward escape, and a priority Tombstone while the bot is healthy (RoamRules).
+		local exemptWhy =
+			RoamRules.SpecialUnitCapExempt(bot._specialUnitWhy, bot._tombstonePriority, hpRatio, retreatDesire)
+		local capped, cut = RoamRules.SpecialUnitCap(desire, #alliesNear, #enemiesNear, retreatDesire, exemptWhy ~= nil)
+		if
+			exemptWhy == "tombstone"
+			and #alliesNear < #enemiesNear
+			and DotaTime() >= (bot._specialExemptLogAt or -99)
+		then
+			bot._specialExemptLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-ROAM] t=%.0f %s special-unit-cap-exempt why=tombstone desire=%.2f retreat=%.2f allies=%d enemies=%d hp=%.2f",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					desire,
+					retreatDesire or -1,
+					#alliesNear,
+					#enemiesNear,
+					hpRatio
+				)
+			)
+		end
 		if cut then
 			roamWhy = "special-unit-capped"
 			roamNoHold = true

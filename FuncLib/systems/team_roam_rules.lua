@@ -180,6 +180,30 @@ function Rules.SpecialUnitCap(desire, allies, enemies, retreatDesire, exempt)
 	return desire, false
 end
 
+-- Which special units the outnumbered cap above leaves alone, or nil to cap. specialWhy: bot._specialUnitWhy;
+-- tombstonePriority: bot._tombstonePriority (#185 / PR #188: Undying's Tombstone close, nearly dead or with our heroes
+-- in it; nil without that PR); hp: the bot's HP ratio; retreatDesire: retreat's last desire (nil when unknown).
+--   "serpent-escape"  the serpent ward escape (itself an escape)
+--   "tombstone"       a priority Tombstone while the bot is above TOMBSTONE_EXEMPT_HP and retreat wants it under
+--                     TOMBSTONE_EXEMPT_RETREAT. Game 067: 11 of 12 cap lines cut a Tombstone's 0.98 to 0.12-0.65,
+--                     e.g. t=2185 Zeus (hp 0.98, retreat 0.39, 3 allies vs 4 enemies), and those Tombstones were
+--                     never hit; where it was not cut (t=3342-3347) it went from 8 hits left to 1 in 5s.
+Rules.TOMBSTONE_EXEMPT_HP = 0.25
+Rules.TOMBSTONE_EXEMPT_RETREAT = 0.5
+function Rules.SpecialUnitCapExempt(specialWhy, tombstonePriority, hp, retreatDesire)
+	if specialWhy == "serpent-escape" then
+		return "serpent-escape"
+	end
+	if
+		tombstonePriority == true
+		and (hp or 0) > Rules.TOMBSTONE_EXEMPT_HP
+		and (retreatDesire or 0) < Rules.TOMBSTONE_EXEMPT_RETREAT
+	then
+		return "tombstone"
+	end
+	return nil
+end
+
 -- Courier hunt (#165, game 067: Vengeful Spirit walked to the top power-rune spot past a visible enemy courier). Before,
 -- the hunt was off in the laning phase and only looked within attack range + 2x level + 20 (680 for an attack range of
 -- 650 at level 5). In the laning phase it now looks within attack range + COURIER_LANE_EXTRA when no enemy hero is within

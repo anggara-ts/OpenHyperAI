@@ -79,12 +79,15 @@ nAbilityBuildList, nTalentBuildList, X["sBuyList"], X["sSellList"] =
 X["sSkillList"] = Fu.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 X["bDeafaultAbility"] = false
 X["bDeafaultItem"] = false
+bot._taTraps = bot._taTraps or {}
 function X.MinionThink(minion)
 	if Minion.IsValidUnit(minion) then
 		if minion:GetUnitName() ~= "npc_dota_templar_assassin_psionic_trap" then
 			Minion.IllusionThink(minion)
 			return
 		else
+			-- Remember the trap for Psionic Projection (X.ConsiderTrapTeleport): the engine hands every trap here.
+			bot._taTraps[minion] = true
 			-- Safe proxy: the datafeed does not list templar_assassin_self_trap (a trap-unit ability), so if
 			-- it is gone a nil here would error on p:IsFullyCastable() every MinionThink.
 			local selfTrapAbility = SafeAbility(
@@ -176,8 +179,18 @@ local runeLocations = {}
 local neutralCamps = {}
 local mpRatio, hpRatio, botLevel
 local botTarget
+-- Scepter: Psionic Projection (templar_assassin_trap_teleport, #184). Datafeed 7.42 (hero_id 46): channelled 2 s,
+-- point order, teleports her to a Psionic Trap and detonates it as if fully charged with 400 extra damage; cd 10,
+-- mana 50. Hidden without the Scepter (Fu.CanCastAbility checks IsHidden).
+local trapTeleportAbility = SafeAbility(
+	bot:GetAbilityByName("templar_assassin_trap_teleport"),
+	"templar_assassin_trap_teleport",
+	"templar_assassin"
+)
+local trapTeleportDesire, trapTeleportLocation, trapTeleportWhy
 function X.SkillsComplement()
 	X.TAConsiderTarget()
+	X.CheckTrapTeleport()
 	if Fu.CanNotUseAbility(bot) or bot:HasModifier("modifier_templar_assassin_meld") then
 		return
 	end
@@ -192,6 +205,24 @@ function X.SkillsComplement()
 		midTrapLocation = Fu.GetUnitTowardDistanceLocation(bot, allyMidTower, 928)
 		topTowerLocation = GetTower(GetTeam(), TOWER_TOP_1):GetLocation()
 		bottomTowerLocation = GetTower(GetTeam(), TOWER_BOT_1):GetLocation()
+	end
+	trapTeleportDesire, trapTeleportLocation, trapTeleportWhy = X.ConsiderTrapTeleport()
+	if trapTeleportDesire > 0 then
+		bot._trapTeleport =
+			{ at = DotaTime(), to = trapTeleportLocation, why = trapTeleportWhy, from = bot:GetLocation() }
+		pcall(
+			print,
+			string.format(
+				"[OHA-GRANTED] t=%.0f templar_assassin cast=templar_assassin_trap_teleport why=%s dist=%d hp=%.2f",
+				DotaTime(),
+				trapTeleportWhy,
+				math.floor(GetUnitToLocationDistance(bot, trapTeleportLocation)),
+				hpRatio or 0
+			)
+		)
+		bot:Action_ClearActions(false)
+		bot:ActionQueue_UseAbilityOnLocation(trapTeleportAbility, trapTeleportLocation)
+		return
 	end
 	psionicTrapDesire, psionicTrapLocation = X.ConsiderR()
 	if psionicTrapDesire > 0 then
@@ -211,6 +242,101 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbility(meldAbility)
 		return
 	end
+end
+-- Her live traps (MinionThink records each one), dead ones dropped.
+function X.LiveTraps()
+	local traps = {}
+	for trap in pairs(bot._taTraps) do
+		if trap:IsNull() or not trap:IsAlive() then
+			bot._taTraps[trap] = nil
+		else
+			traps[#traps + 1] = trap
+		end
+	end
+	return traps
+end
+-- Escape: retreating with no enemy hero within 900 (the 2 s channel would be stopped), to the trap that saves at
+-- least 2000 of the walk home and has no enemy seen near it. Engage: fighting a hero 1200+ away that stands within
+-- 350 of a trap, not outnumbered there; she lands on the trap and it detonates under the target.
+function X.ConsiderTrapTeleport()
+	if
+		not Fu.CanCastAbility(trapTeleportAbility)
+		or bot:IsRooted()
+		or bot._trapTeleport ~= nil
+		or DotaTime() < (bot._trapTeleportRetryAt or -999)
+	then
+		return BOT_ACTION_DESIRE_NONE, nil, nil
+	end
+	local traps = X.LiveTraps()
+	if #traps == 0 or #Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) > 0 then
+		return BOT_ACTION_DESIRE_NONE, nil, nil
+	end
+	if Fu.IsRetreating(bot) then
+		local fountain = Fu.GetTeamFountain()
+		local bestTrap, bestDistance = nil, Fu.GetDistanceFromAllyFountain(bot) - 2000
+		for _, trap in pairs(traps) do
+			local trapDistance = Fu.GetDistance(trap:GetLocation(), fountain)
+			if trapDistance < bestDistance and #Fu.GetLastSeenEnemiesNearLoc(trap:GetLocation(), 1200) == 0 then
+				bestTrap, bestDistance = trap, trapDistance
+			end
+		end
+		if bestTrap ~= nil then
+			return BOT_ACTION_DESIRE_HIGH, bestTrap:GetLocation(), "escape"
+		end
+	end
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+		and GetUnitToUnitDistance(bot, botTarget) > 1200
+		and (hpRatio or 0) > 0.5
+	then
+		for _, trap in pairs(traps) do
+			if GetUnitToUnitDistance(trap, botTarget) <= 350 then
+				local targetLocation = botTarget:GetLocation()
+				local alliesThere = #Fu.GetAlliesNearLoc(targetLocation, 1200)
+				local enemiesThere = #Fu.GetEnemiesNearLoc(targetLocation, 1200)
+				if enemiesThere <= alliesThere + 1 then
+					return BOT_ACTION_DESIRE_HIGH, trap:GetLocation(), "engage"
+				end
+			end
+		end
+	end
+	return BOT_ACTION_DESIRE_NONE, nil, nil
+end
+-- [OHA-GRANTED] trap-teleport result, 3 s after the order: channelled= (she was seen channelling) and arrived=
+-- (channelled and now within 500 of the trap; walking there does not count). Not arrived (channel broken, trap gone,
+-- or the order refused, which starts no cooldown): no new try for 15 s, so a refused order is not repeated.
+function X.CheckTrapTeleport()
+	local pending = bot._trapTeleport
+	if pending == nil then
+		return
+	end
+	if bot:IsChanneling() then
+		pending.channelled = true
+		return
+	end
+	if DotaTime() - pending.at < 3 then
+		return
+	end
+	bot._trapTeleport = nil
+	local distance = GetUnitToLocationDistance(bot, pending.to)
+	local arrived = pending.channelled == true and distance <= 500
+	if not arrived then
+		bot._trapTeleportRetryAt = DotaTime() + 15
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-GRANTED] t=%.0f templar_assassin trap-teleport-result why=%s channelled=%s arrived=%s dist=%d moved=%d",
+			DotaTime(),
+			pending.why,
+			tostring(pending.channelled == true),
+			tostring(arrived),
+			math.floor(distance),
+			math.floor(GetUnitToLocationDistance(bot, pending.from))
+		)
+	)
 end
 function X.ConsiderQ()
 	if not refractionAbility:IsFullyCastable() then

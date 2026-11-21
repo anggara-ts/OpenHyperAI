@@ -146,7 +146,9 @@ function X.MinionThink(minionUnit)
 end
 local deathPulseAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "necrolyte")
 local ghostShroudAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "necrolyte")
-local deathSeekerAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "necrolyte")
+-- Shard: Death Seeker (#184), by name: the slot list only lines up while the granted spell sits in slot 3.
+local deathSeekerAbility =
+	SafeAbility(bot:GetAbilityByName("necrolyte_death_seeker"), "necrolyte_death_seeker", "necrolyte")
 local reapersScytheAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "necrolyte")
 local deathPulseDesire
 local ghostShroudDesire
@@ -174,8 +176,24 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbility(ghostShroudAbility)
 		return
 	end
-	deathSeekerDesire, deathSeekerTarget = X.ConsiderAS()
+	local deathSeekerWhy
+	deathSeekerDesire, deathSeekerTarget, deathSeekerWhy = X.ConsiderAS()
 	if deathSeekerDesire > 0 then
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f necrolyte cast=necrolyte_death_seeker why=%s target=%s dist=%d hp=%.2f",
+					DotaTime(),
+					deathSeekerWhy or "-",
+					(string.gsub(deathSeekerTarget:GetUnitName(), "npc_dota_hero_", "")),
+					math.floor(GetUnitToUnitDistance(bot, deathSeekerTarget)),
+					hpRatio or 0
+				)
+			)
+		end
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnEntity(deathSeekerAbility, deathSeekerTarget)
 		return
@@ -522,7 +540,7 @@ function X.ConsiderAS()
 					)
 				)
 			end
-			return BOT_ACTION_DESIRE_HIGH, bestUnit
+			return BOT_ACTION_DESIRE_HIGH, bestUnit, "escape"
 		end
 	end
 	if Fu.IsInTeamFight(bot, 1400) and #nearbyEnemies >= 3 then
@@ -550,7 +568,7 @@ function X.ConsiderAS()
 			end
 		end
 		if bestTarget ~= nil then
-			return BOT_ACTION_DESIRE_HIGH, bestTarget, "AS-团战AOE"
+			return BOT_ACTION_DESIRE_HIGH, bestTarget, "teamfight"
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
@@ -560,7 +578,7 @@ function X.ConsiderAS()
 			and Fu.CanCastOnNonMagicImmune(botTarget)
 			and Fu.CanCastOnTargetAdvanced(botTarget)
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "engage"
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

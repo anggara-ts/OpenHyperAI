@@ -147,6 +147,12 @@ local summonRaptorAbility = SafeAbility(
 ) or sAbilityList[3] and SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "beastmaster")
 local primalRoarAbility =
 	SafeAbility(bot:GetAbilityByName("beastmaster_primal_roar"), "beastmaster_primal_roar", "beastmaster")
+-- Scepter: Summon Ancient Thunderhide (#184). Datafeed 7.42 (hero_id 38): no target, cd 60, mana 100; a 2200 HP
+-- unit with Slam and the Thunderhide Drum (more damage and max health for Beastmaster and his units while they
+-- attack). The unit is run by FuncLib/hero/minion.lua (big_thunder_lizard_slam / _frenzy have rules there).
+-- Hidden without the Scepter (Fu.CanCastAbility checks IsHidden).
+local summonThunderhideAbility =
+	SafeAbility(bot:GetAbilityByName("beastmaster_summon_thunderhide"), "beastmaster_summon_thunderhide", "beastmaster")
 local wildAxesDesire, wildAxesLocation
 local summonRazorbackDesire
 local summonRaptorDesire
@@ -211,6 +217,25 @@ function X.SkillsComplement()
 	summonRazorbackDesire = X.ConsiderCallOfTheWildBoar()
 	if summonRazorbackDesire > 0 then
 		bot:Action_UseAbility(summonRazorbackAbility)
+		return
+	end
+	local thunderhideWhy = X.ConsiderSummonThunderhide()
+	if thunderhideWhy ~= nil then
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f beastmaster cast=beastmaster_summon_thunderhide why=%s target=%s hp=%.2f",
+					DotaTime(),
+					thunderhideWhy,
+					Fu.IsValid(botTarget) and (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
+					hpRatio or 0
+				)
+			)
+		end
+		bot:Action_UseAbility(summonThunderhideAbility)
 		return
 	end
 	summonRaptorDesire = X.ConsiderCallOfTheWildHawk()
@@ -437,6 +462,30 @@ function X.ConsiderCallOfTheWildBoar()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- The Thunderhide in a fight (an engage on a hero within 900, or a team fight), against a tower he is hitting,
+-- and on Roshan or the Tormentor. Not on lane or jungle creeps: the 60 s cooldown is kept for fights. Returns the
+-- reason, or nil.
+function X.ConsiderSummonThunderhide()
+	if not Fu.CanCastAbility(summonThunderhideAbility) then
+		return nil
+	end
+	if isInTeamFight and #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) >= 2 then
+		return "teamfight"
+	end
+	if isGoingOnSomeone and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, 900) then
+		return "fight"
+	end
+	if Fu.IsPushing(bot) and isAttacking and #bot:GetNearbyTowers(700, true) > 0 then
+		return "tower"
+	end
+	if Fu.IsDoingRoshan(bot) and Fu.IsRoshan(botTarget) and Fu.IsInRange(bot, botTarget, 600) and isAttacking then
+		return "roshan"
+	end
+	if Fu.IsDoingTormentor(bot) and Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 600) and isAttacking then
+		return "tormentor"
+	end
+	return nil
 end
 function X.ConsiderCallOfTheWildHawk()
 	if not summonRaptorAbility:IsFullyCastable() then

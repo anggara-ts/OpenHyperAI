@@ -128,7 +128,12 @@ end
 local stiflingDaggerAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "phantom_assassin")
 local phantomStrikeAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "phantom_assassin")
 local blurAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[3]), "sAbilityList[3]", "phantom_assassin")
-local fanOfKnivesAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[4]), "sAbilityList[4]", "phantom_assassin")
+-- Scepter: Fan of Knives (#184), by name: the slot list only lines up while the granted spell sits in slot 3.
+local fanOfKnivesAbility = SafeAbility(
+	bot:GetAbilityByName("phantom_assassin_fan_of_knives"),
+	"phantom_assassin_fan_of_knives",
+	"phantom_assassin"
+)
 local immaterialAbility =
 	SafeAbility(bot:GetAbilityByName("phantom_assassin_immaterial"), "phantom_assassin_immaterial", "phantom_assassin")
 local stiflingDaggerDesire, stiflingDaggerTarget
@@ -153,8 +158,25 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbility(blurAbility)
 		return
 	end
-	fanOfKnivesDesire = X.ConsiderAS()
+	local fanOfKnivesWhy, fanOfKnivesTarget
+	fanOfKnivesDesire, fanOfKnivesWhy, fanOfKnivesTarget = X.ConsiderAS()
 	if fanOfKnivesDesire > 0 then
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f phantom_assassin cast=phantom_assassin_fan_of_knives why=%s target=%s dist=%d hp=%.2f",
+					DotaTime(),
+					fanOfKnivesWhy or "-",
+					fanOfKnivesTarget ~= nil and (string.gsub(fanOfKnivesTarget:GetUnitName(), "npc_dota_hero_", ""))
+						or "-",
+					fanOfKnivesTarget ~= nil and math.floor(GetUnitToUnitDistance(bot, fanOfKnivesTarget)) or -1,
+					hpRatio or 0
+				)
+			)
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbility(fanOfKnivesAbility)
 		return
@@ -630,14 +652,14 @@ function X.ConsiderAS()
 	if Fu.IsRetreating(bot) or Fu.IsInTeamFight(bot, 800) then
 		for _, enemyHero in pairs(enemiesInRadius) do
 			if Fu.CanCastOnMagicImmune(enemyHero) then
-				return BOT_ACTION_DESIRE_MODERATE
+				return BOT_ACTION_DESIRE_MODERATE, Fu.IsRetreating(bot) and "retreat" or "teamfight", enemyHero
 			end
 		end
 	end
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = Fu.GetProperTarget(bot)
 		if Fu.IsValidHero(target) and Fu.CanCastOnMagicImmune(target) and Fu.IsInRange(bot, target, radius - 160) then
-			return BOT_ACTION_DESIRE_MODERATE
+			return BOT_ACTION_DESIRE_MODERATE, "engage", target
 		end
 	end
 	return 0

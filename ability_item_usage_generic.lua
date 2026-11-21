@@ -1464,6 +1464,15 @@ local function ConsiderItems()
 		if ready and itemName ~= nil and Usage.IsDoomed(bot) and DoomWastes(itemName) then
 			ready = false
 		end
+		if itemName == "item_roshans_banner" and not ready then
+			Usage.BannerSkip(
+				Usage.IsDoomed(bot) and "doomed" or "not-ready",
+				nil,
+				string.format("cd=%.1f", item:GetCooldownTimeRemaining() or -1)
+			)
+		elseif itemName == "item_roshans_banner" and Usage.IsItemInStash(itemName) then
+			Usage.BannerSkip("stash", nil)
+		end
 		-- Another player's item can't be used from this inventory (#141).
 		if ready and itemName ~= nil and ForeignItems.Check(bot, item) then
 			ready = false
@@ -7817,6 +7826,30 @@ end
 -- radius around a point 200 behind our creeps toward the building (between it and the enemy wave). Any mode. In game 063 Weaver (Dire) held a Banner in the backpack from 46:34 while
 -- Radiant sieged Dire's bottom T3 and barracks (defend_tower_bot / attack / team_roam) and never planted it: the rule
 -- only ran in a push mode.
+-- [OHA-BANNER] t= <hero> plant-skip why=<gate> creeps= mode= slot= <detail>: why a held Banner was not planted, once
+-- per 10s per bot. Game 067: Death Prophet held one in the backpack (slot 7) from t=3548, pushed the barracks and
+-- the base, and no Banner line was printed: every gate returned silently. Gates: hurt, creeps (under
+-- BannerRules.DEFEND_CREEPS of ours within 1600), no-rule (BannerRules.Why: detail names the counts), own-banner,
+-- far, not-passable, and in the item loop cooldown / stash / doomed.
+function Usage.BannerSkip(why, creeps, detail)
+	if DotaTime() < (bot._bannerSkipLogAt or -999) then
+		return
+	end
+	bot._bannerSkipLogAt = DotaTime() + 10
+	pcall(
+		print,
+		string.format(
+			"[OHA-BANNER] t=%.0f %s plant-skip why=%s creeps=%d mode=%d slot=%d%s",
+			DotaTime(),
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			why,
+			creeps or -1,
+			bot:GetActiveMode(),
+			bot:FindItemSlot("item_roshans_banner"),
+			detail and (" " .. detail) or ""
+		)
+	)
+end
 local function BannerCreepsNear(creeps, loc, radius)
 	local n = 0
 	for _, creep in ipairs(creeps) do
@@ -7897,6 +7930,7 @@ local function BannerDefendBuilding(enemyCreeps, enemyHeroes)
 end
 Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 	if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.4 then
+		Usage.BannerSkip("hurt", nil)
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local BannerRules = require(GetScriptDirectory() .. "/FuncLib/systems/banner_rules")
@@ -7914,6 +7948,7 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 		end
 	end
 	if #ourCreeps < BannerRules.DEFEND_CREEPS then
+		Usage.BannerSkip("creeps", #ourCreeps)
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local fountain = Fu.GetTeamFountain()
@@ -7992,6 +8027,23 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 		heroHitBuilding = heroHitBuilding,
 	})
 	if why == nil then
+		Usage.BannerSkip(
+			"no-rule",
+			#ourCreeps,
+			string.format(
+				"enemyBuilding=%s pushCreeps=%d pushing=%s fight=%s allies=%d enemies=%d ownBuilding=%s defendCreeps=%d heroesAt=%d radius=%d",
+				enemyBuilding ~= nil and (string.gsub(enemyBuilding:GetUnitName(), "npc_dota_", "")) or "none",
+				pushCreeps,
+				tostring(Fu.IsPushing(bot)),
+				tostring(botMode == BOT_MODE_ATTACK or botMode == BOT_MODE_TEAM_ROAM),
+				math.max(1, #(Fu.GetAllyList(bot, 1600) or {})),
+				#enemyHeroes,
+				ownBuilding ~= nil and (string.gsub(ownBuilding:GetUnitName(), "npc_dota_", "")) or "none",
+				defendCreeps,
+				heroesAtBuilding,
+				radius
+			)
+		)
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local loc, building, buildingDist, creeps = pushLoc, enemyBuilding, enemyDist, pushCreeps
@@ -7999,12 +8051,20 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 		loc, building, buildingDist, creeps = defendLoc, ownBuilding, ownDist, defendCreeps
 	end
 	-- Not on top of another of our banners; within cast range (1200) on walkable ground.
-	if
-		OwnBannerNear(loc)
-		or OwnBannerNear(building:GetLocation())
-		or GetUnitToLocationDistance(bot, loc) > 1150
-		or not IsLocationPassable(loc)
-	then
+	local placeSkip = nil
+	if OwnBannerNear(loc) or OwnBannerNear(building:GetLocation()) then
+		placeSkip = "own-banner"
+	elseif GetUnitToLocationDistance(bot, loc) > 1150 then
+		placeSkip = "far"
+	elseif not IsLocationPassable(loc) then
+		placeSkip = "not-passable"
+	end
+	if placeSkip ~= nil then
+		Usage.BannerSkip(
+			placeSkip,
+			creeps,
+			string.format("rule=%s dist=%.0f", why, GetUnitToLocationDistance(bot, loc))
+		)
 		return BOT_ACTION_DESIRE_NONE
 	end
 	if bot._bannerPlantAt == nil then

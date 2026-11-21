@@ -1138,6 +1138,26 @@ function Utils.HighGroundCreepWaveNear(bot, range)
 	end
 	return nil
 end
+-- Our base is under creeps: 2+ enemy creeps within 1600 of our Ancient, or a creep wave at one of our high-ground
+-- buildings (HighGroundCreepWaveNear, any distance). The fountain TP rule (item_tpscroll) holds its TP out while this
+-- is true. It reads every enemy creep once, then again for each of up to 9 high-ground buildings, and the rule ran it on
+-- every item think of every bot wherever the bot was (#52: item_tpscroll was the biggest detail= entry in games 059
+-- and 062, 25.2s and 24.5s per game). The rule now asks it last, only near the fountain. Same answer as before.
+function Utils.BaseUnderCreeps(bot)
+	local ancient = GetAncient(GetTeam())
+	if ancient ~= nil then
+		local count = 0
+		for _, creep in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+			if creep ~= nil and creep:IsAlive() and GetUnitToUnitDistance(creep, ancient) <= 1600 then
+				count = count + 1
+				if count >= 2 then
+					return true
+				end
+			end
+		end
+	end
+	return Utils.HighGroundCreepWaveNear(bot, 30000) ~= nil
+end
 function Utils.GetDistanceFromAncient(bot, isEnemy)
 	local ancient = GetAncient(isEnemy and GetOpposingTeam() or GetTeam())
 	return GetUnitToUnitDistance(bot, ancient)

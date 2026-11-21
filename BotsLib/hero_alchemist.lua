@@ -690,6 +690,7 @@ local function ReadContext()
 end
 function X.SkillsComplement()
 	local brewing, brewed = X.TrackConcoctionBrew()
+	X.TrackEnemyTeleports()
 	if Fu.CanNotUseAbility(bot) then
 		if not brewing then
 			return
@@ -1210,6 +1211,86 @@ function X.ConsiderUnstableConcoction()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Enemy Town Portals in sight (#34): is the modifier's time left real? Game 063 (t=1834) read 3.00 left on a Zeus
+-- TP, the full channel. On the first think an enemy hero within 1600 has modifier_teleporting, its time left is
+-- read; 0.2s or more later it is read again (ConcoctionRules.TpReadIsReal). One line per TP:
+--   [OHA-ALCHEMIST] tp-left target= first= second= dt= real=yes|no|unknown channel=
+-- (unknown: the TP ended or went out of sight before the second read). Keyed by player ID.
+local tpSeen = {}
+local function TpChannelOf(enemyHero)
+	local okBoots, hasBoots2 = pcall(function()
+		for slot = 0, 5 do
+			local item = enemyHero:GetItemInSlot(slot)
+			if item ~= nil and item:GetName() == "item_travel_boots_2" then
+				return true
+			end
+		end
+		return false
+	end)
+	if okBoots and hasBoots2 then
+		return ConcoctionRules.TP_CHANNEL_BOOTS2
+	end
+	return ConcoctionRules.TP_CHANNEL
+end
+local function LogTpLeft(entry)
+	entry.logged = true
+	local real = entry.real == true and "yes" or entry.real == false and "no" or "unknown"
+	pcall(
+		print,
+		string.format(
+			"[OHA-ALCHEMIST] t=%.0f tp-left target=%s first=%.2f second=%.2f dt=%.2f real=%s channel=%.1f",
+			DotaTime(),
+			entry.name,
+			entry.first,
+			entry.second or -1,
+			entry.dt or -1,
+			real,
+			entry.channel
+		)
+	)
+end
+function X.TrackEnemyTeleports()
+	local now = DotaTime()
+	local seenNow = {}
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and enemyHero:HasModifier("modifier_teleporting") then
+			local id = enemyHero:GetPlayerID()
+			seenNow[id] = true
+			local read = Fu.GetModifierTime(enemyHero, "modifier_teleporting")
+			local entry = tpSeen[id]
+			if entry == nil then
+				tpSeen[id] = {
+					seenAt = now,
+					first = read,
+					channel = TpChannelOf(enemyHero),
+					name = enemyHero:GetUnitName(),
+				}
+			elseif entry.second == nil and now - entry.seenAt >= 0.2 then
+				entry.second, entry.dt = read, now - entry.seenAt
+				entry.real = ConcoctionRules.TpReadIsReal(entry.first, entry.second, entry.dt)
+				LogTpLeft(entry)
+			end
+		end
+	end
+	for id, entry in pairs(tpSeen) do
+		if not seenNow[id] then
+			if not entry.logged then
+				LogTpLeft(entry)
+			end
+			tpSeen[id] = nil
+		end
+	end
+end
+-- Seconds left of a target's teleport for the help throw (ConcoctionRules.TpTimeLeft): the read when it proved
+-- real, else the time since it was first seen, with the read as an upper bound. 0 when nothing is known.
+function X.TpTimeLeft(target)
+	local read = Fu.GetModifierTime(target, "modifier_teleporting")
+	local entry = tpSeen[target:GetPlayerID()]
+	if entry == nil then
+		return read
+	end
+	return ConcoctionRules.TpTimeLeft(entry.seenAt, DotaTime(), entry.channel, read, entry.real)
+end
 -- A help brew (FinishingCase) goes out early, as soon as ConcoctionRules.HelpThrowNow says: the stun of the brew
 -- so far (linear from min_stun at 0s to max_stun at brew_time, read from the ability) covers about 1s for a runner
 -- or a Blink, the stun lands before a Town Portal or channel ends (throw cast point and projectile_speed from the
@@ -1251,7 +1332,7 @@ function X.ConsiderHelpThrow(brewed, castRange)
 	)
 	local tpLeft = nil
 	if brewHelp.kind == "tp" then
-		tpLeft = Fu.GetModifierTime(target, "modifier_teleporting")
+		tpLeft = X.TpTimeLeft(target)
 	end
 	if not ConcoctionRules.HelpThrowNow(brewHelp.kind, brewed, stun, tpLeft, landTime) then
 		return nil

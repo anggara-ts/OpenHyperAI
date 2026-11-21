@@ -464,3 +464,21 @@ T.test("alchemist: a held hero the allies are finishing, nobody else near: help 
 		"line"
 	)
 end)
+
+-- Game 063 (t=1834): a Zeus TP read 3.00 left, the full channel; is the read the time left?
+T.test("concoction rules: an enemy TP's time left, from a read that drops or from when it was seen", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local R = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
+	T.eq(R.TpReadIsReal(2.8, 2.5, 0.3), true, "dropped by the time between the reads: real")
+	T.eq(R.TpReadIsReal(3.0, 3.0, 0.3), false, "stayed at 3.0: the full duration, not the time left")
+	T.eq(R.TpReadIsReal(3.0, nil, nil), nil, "no second read yet")
+	-- 7.42 items.txt: item_tpscroll AbilityChannelTime 3.0, item_travel_boots_2 tp_channel_time 2.
+	T.eq(R.TP_CHANNEL, 3.0, "scroll channel")
+	T.eq(R.TP_CHANNEL_BOOTS2, 2.0, "Boots of Travel 2 channel")
+	T.near(R.TpTimeLeft(100, 101, 3.0, 1.9, true), 1.9, 1e-9, "a real read is used")
+	T.near(R.TpTimeLeft(100, 101, 3.0, 3.0, false), 2.0, 1e-9, "a read that does not drop: time since seen")
+	T.near(R.TpTimeLeft(100, 100.1, 3.0, 3.0, nil), 2.9, 1e-9, "not proven yet: time since seen")
+	T.near(R.TpTimeLeft(100, 100.5, 3.0, 1.0, nil), 1.0, 1e-9, "the read is an upper bound (seen late)")
+	T.near(R.TpTimeLeft(100, 101.5, 2.0, 0, nil), 0.5, 1e-9, "Boots 2, no read")
+	T.near(R.TpTimeLeft(100, 104, 3.0, 0, nil), 0, 1e-9, "never below 0")
+end)

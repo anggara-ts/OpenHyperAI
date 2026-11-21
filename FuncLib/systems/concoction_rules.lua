@@ -76,4 +76,33 @@ function ConcoctionRules.HelpThrowNow(kind, brewed, stun, tpLeft, landTime)
 	return brewed >= ConcoctionRules.HELD_MIN_BREWED
 end
 
+-- Time left of an enemy Town Portal. Game 063 (t=1834) read 3.00 left on a Zeus TP, the full channel, so it is not
+-- known whether the modifier read is the time left or the full duration. The hero file reads it twice, 0.2-0.5s
+-- apart: TpReadIsReal says whether the read dropped (by at least half the time between the reads); nil when it
+-- can't tell yet.
+--   first, second  the two reads; dt the seconds between them
+function ConcoctionRules.TpReadIsReal(first, second, dt)
+	if first == nil or second == nil or dt == nil or dt <= 0 then
+		return nil
+	end
+	return first - second >= dt * 0.5
+end
+-- Channel times (7.42 items.txt in pak01_dir.vpk): item_tpscroll AbilityChannelTime 3.0; item_travel_boots_2
+-- tp_channel_time 2 (item_travel_boots lists none: the scroll's 3.0).
+ConcoctionRules.TP_CHANNEL = 3.0
+ConcoctionRules.TP_CHANNEL_BOOTS2 = 2.0
+-- Seconds left of a teleport first seen at seenAt (channelTime: the target's channel). A read that proved real
+-- (readIsReal true) is used as it is; otherwise (not proven yet, or not dropping) the time since it was first seen
+-- decides, with the read only as an upper bound.
+function ConcoctionRules.TpTimeLeft(seenAt, now, channelTime, read, readIsReal)
+	local fromSeen = math.max(0, (channelTime or ConcoctionRules.TP_CHANNEL) - (now - seenAt))
+	if read ~= nil and read > 0 then
+		if readIsReal == true then
+			return read
+		end
+		return math.min(fromSeen, read)
+	end
+	return fromSeen
+end
+
 return ConcoctionRules

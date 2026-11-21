@@ -393,12 +393,19 @@ T.test("chase hook: the attack follows the step, at once when the target is back
 	bot.GetTarget = function()
 		return runner
 	end
-	runner._loc = bot:GetLocation() + Vector(580, 0, 0)
+	runner._loc = bot:GetLocation() + Vector(560, 0, 0)
 	T.stub.time = T.stub.time + 0.1
 	SpecialUnits.KiteResultTick(bot)
 	T.eq(attacks[1], runner, "re-attacked once in range")
 	SpecialUnits.KiteResultTick(bot)
 	T.eq(#attacks, 1, "once per step")
+	-- The next frame through the whole hook: the runner still flees, no new step over the attack.
+	runner.GetExtrapolatedLocation = function()
+		return bot:GetLocation() + Vector(700, 0, 0)
+	end
+	T.stub.time = T.stub.time + 1 / 30
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no step after the attack")
+	T.eq(#moves, 1, "still the one move order")
 	T.stub.time = T.stub.time + 61
 	SpecialUnits.KiteResultTick(bot)
 	local line = printedWith("chase-result")
@@ -421,7 +428,7 @@ T.test("chase hook: no re-attack on a target the mode left", function()
 	bot.GetTarget = function()
 		return other
 	end
-	runner._loc = bot:GetLocation() + Vector(580, 0, 0)
+	runner._loc = bot:GetLocation() + Vector(560, 0, 0)
 	T.stub.time = T.stub.time + 0.1
 	SpecialUnits.KiteResultTick(bot)
 	T.eq(#attacks, 0, "the mode targets another hero")

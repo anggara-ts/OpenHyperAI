@@ -1190,14 +1190,9 @@ function X.ChaseReattack(unit, pending)
 	if not Fu.CanBeAttacked(target) or Fu.IsValid(modeTarget) and modeTarget ~= target then
 		return false
 	end
-	if
-		not KiteRules.InAttackRange(
-			GetUnitToUnitDistance(unit, target),
-			unit:GetAttackRange(),
-			unit:GetBoundingRadius(),
-			target:GetBoundingRadius()
-		)
-	then
+	-- Back in range by the chase step's own test (KiteRules.ChaseStep "in-range": range less RANGE_MARGIN, centre to
+	-- centre), so X.ChaseStep gives no new step after this attack in the same frame.
+	if GetUnitToUnitDistance(unit, target) > unit:GetAttackRange() - KiteRules.RANGE_MARGIN then
 		return false
 	end
 	pending.reattack = "frame"
@@ -1224,6 +1219,11 @@ end
 -- is hitting the bot (stepping away wins). Returns true when it issued the step.
 function X.ChaseStep(unit, target)
 	if OverlayOwns(unit, "chase") then
+		return false
+	end
+	-- This step's attack is already given (X.ChaseReattack): no new move over it.
+	local pending = unit._kitePending
+	if pending ~= nil and pending.kind == "chase" and pending.reattack ~= nil then
 		return false
 	end
 	if target:GetTeam() == unit:GetTeam() or Fu.IsSuspiciousIllusion(target) or unit:IsRooted() then

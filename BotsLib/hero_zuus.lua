@@ -177,7 +177,11 @@ local nimbusDesire, nimbusLocation
 -- Nimbus help, Valve datafeed hero_id=22 (zuus_cloud): cloud_radius 450, cloud_bolt_interval 2.5, AbilityCastPoint
 -- 0.2. Fallbacks for when the API reads 0.
 local NIMBUS_RADIUS_FALLBACK = 450
-local NIMBUS_INTERVAL_FALLBACK = 2.5
+-- The chaser must stay inside the cloud this long after it forms (cast point 0.2 plus a margin). Not a full 2.5s
+-- bolt interval: whether the cloud strikes as soon as it forms is not in the game data, and a full interval
+-- skipped every chaser over 360 speed (game 064: Abaddon at 380). nimbus-result stunnedAfter= shows when a bolt
+-- really lands.
+local NIMBUS_MIN_STAY = 1.0
 -- A fleeing ally is helped while the chaser is at most this many seconds from reaching him (or already hitting
 -- him), and not once he is this low: bolts come every 2.5s, too late then (game 064: Alchemist at 1% HP died 4s
 -- after the cast, Puck 1s after one).
@@ -185,7 +189,7 @@ local NIMBUS_HELP_CATCH_TIME = 4
 local NIMBUS_HELP_MIN_HP = 0.15
 -- How far from a fleeing ally a chaser is looked for.
 local NIMBUS_HELP_CHASER_RANGE = 1200
-local nimbusHelpCast = nil -- { why, ally, allyHp, deaths, chaser, at }
+local nimbusHelpCast = nil -- { why, ally, allyHp, deaths, chaser, chaserHp, at, castAt, stunnedAfter, stuns, wasStunned }
 local nextNimbusHelpCheckAt = -100
 local fleeingAllyCache = { at = -100, list = {} }
 local wrathDesire
@@ -526,11 +530,11 @@ end
 --   chaser, ally: positions; chaserSpeed; allyHp; allyFleeing (the ally moves away from the chaser); catchTime
 --   (seconds until the chaser reaches the ally); hitting (he hit the ally lately); inBoltRange, boltReady (Zeus's own Lightning Bolt
 --   reaches him now); units: the other enemy units that a bolt could hit instead (creeps, summons, illusions; no
---   heroes, wards or buildings); radius, interval, castPoint (Nimbus).
+--   heroes, wards or buildings); radius, castPoint (Nimbus); minStay (seconds he must stay inside).
 -- The cloud goes on the chaser's path toward the ally, at the point he reaches having walked one radius past where
 -- he stands when the cloud forms, so he crosses all of it while he follows a fleeing ally: inside for 2 x radius /
 -- speed seconds. An ally who is not moving away is where the chaser stops to fight: the cloud goes on the ally's
--- spot then (or the chaser's, if nearer), and the chaser stays in it. He must stay in for one bolt interval. The Dota 2 wiki (not the game files) says a Nimbus bolt strikes the closest enemy unit,
+-- spot then (or the chaser's, if nearer), and the chaser stays in it. He must stay in for minStay. The Dota 2 wiki (not the game files) says a Nimbus bolt strikes the closest enemy unit,
 -- creeps and summons included, with no hero priority, so any other enemy unit inside the cloud (nearer the centre
 -- than the chaser for most of his walk) can take the bolt: then no cast.
 -- Returns plan { aim = {x, y}, crowd, stay }, or nil, why, plan.
@@ -562,7 +566,7 @@ function X.NimbusHelpPlan(c)
 			plan.crowd = plan.crowd + 1
 		end
 	end
-	if plan.stay < c.interval then
+	if plan.stay < c.minStay then
 		return nil, "too-fast", plan
 	end
 	if plan.crowd > 0 then
@@ -639,9 +643,7 @@ end
 -- The NimbusHelpPlan input for a fleeing ally's chaser.
 local function NimbusHelpInput(chased, chaser, catchTime, hitting, fleeing)
 	local radius = nimbusAbility:GetSpecialValueInt("cloud_radius")
-	local interval = nimbusAbility:GetSpecialValueFloat("cloud_bolt_interval")
 	radius = radius > 0 and radius or NIMBUS_RADIUS_FALLBACK
-	interval = interval > 0 and interval or NIMBUS_INTERVAL_FALLBACK
 	local chaserLocation, chasedLocation = chaser:GetLocation(), chased:GetLocation()
 	return {
 		chaser = { x = chaserLocation.x, y = chaserLocation.y },
@@ -655,7 +657,7 @@ local function NimbusHelpInput(chased, chaser, catchTime, hitting, fleeing)
 		boltReady = lightningBoltAbility:IsFullyCastable(),
 		units = NimbusCrowdUnits(chaserLocation, radius),
 		radius = radius,
-		interval = interval,
+		minStay = NIMBUS_MIN_STAY,
 		castPoint = nimbusAbility:GetCastPoint(),
 	}
 end
@@ -688,20 +690,38 @@ local function RecordNimbusHelp(why, chased, chaser)
 		allyHp = Fu.GetHP(chased),
 		deaths = GetHeroDeaths(chased:GetPlayerID()),
 		chaser = chaser,
+		chaserHp = Fu.GetHP(chaser),
 		at = DotaTime(),
+		stuns = 0,
 	}
 end
 -- Five seconds after a help cast: is the ally alive (his death count, so it holds while Zeus is dead too)?
+-- Until then, every think: when the chaser is stunned after the cloud formed (its bolt mini-stuns for 0.35s,
+-- datafeed; another ally's stun would count too), to learn whether the cloud strikes at once.
 function X.ThinkNimbusResult()
 	local cast = nimbusHelpCast
-	if cast == nil or DotaTime() < cast.at + 5 then
+	if cast == nil then
+		return
+	end
+	if cast.castAt == nil and not nimbusAbility:IsCooldownReady() then
+		cast.castAt = DotaTime()
+	end
+	if cast.castAt ~= nil and Fu.IsValid(cast.chaser) then
+		local stunned = cast.chaser:IsStunned()
+		if stunned and not cast.wasStunned then
+			cast.stuns = cast.stuns + 1
+			cast.stunnedAfter = cast.stunnedAfter or DotaTime() - cast.castAt
+		end
+		cast.wasStunned = stunned
+	end
+	if DotaTime() < cast.at + 5 then
 		return
 	end
 	nimbusHelpCast = nil
 	local died = Fu.IsValid(cast.ally) and GetHeroDeaths(cast.ally:GetPlayerID()) > cast.deaths
 	print(
 		string.format(
-			"[OHA-ZEUS] t=%.0f zuus nimbus-result why=%s ally=%s alive=%s allyHp=%.2f->%.2f chaser=%s chaserHp=%.2f cast=%s late=%.0f",
+			"[OHA-ZEUS] t=%.0f zuus nimbus-result why=%s ally=%s alive=%s allyHp=%.2f->%.2f chaser=%s chaserHp=%.2f->%.2f stuns=%d stunnedAfter=%.1f cast=%s late=%.0f",
 			DotaTime(),
 			cast.why,
 			Fu.IsValid(cast.ally) and cast.ally:GetUnitName() or "none",
@@ -709,8 +729,11 @@ function X.ThinkNimbusResult()
 			cast.allyHp,
 			Fu.IsValid(cast.ally) and Fu.GetHP(cast.ally) or 0,
 			Fu.IsValid(cast.chaser) and cast.chaser:GetUnitName() or "none",
+			cast.chaserHp,
 			Fu.IsValid(cast.chaser) and Fu.GetHP(cast.chaser) or 0,
-			tostring(not nimbusAbility:IsCooldownReady()),
+			cast.stuns,
+			cast.stunnedAfter or -1,
+			tostring(cast.castAt ~= nil),
 			DotaTime() - cast.at - 5
 		)
 	)

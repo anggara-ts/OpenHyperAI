@@ -21,7 +21,7 @@ T.test("zeus: chaser catch time", function()
 	T.eq(X.CatchTime(500, 300, 320), 99, "ally faster: never")
 end)
 
--- Datafeed hero_id=22 (zuus_cloud): radius 450, a bolt every 2.5s, cast point 0.2.
+-- Datafeed hero_id=22 (zuus_cloud): radius 450, cast point 0.2; the chaser must stay inside 1s.
 local function input(overrides)
 	local c = {
 		chaser = { x = 0, y = 0 },
@@ -35,7 +35,7 @@ local function input(overrides)
 		boltReady = true,
 		units = {},
 		radius = 450,
-		interval = 2.5,
+		minStay = 1.0,
 		castPoint = 0.2,
 	}
 	for key, value in pairs(overrides or {}) do
@@ -72,8 +72,12 @@ T.test("zeus: Nimbus help plan", function()
 	plan, why = X.NimbusHelpPlan(input({ units = { { x = 1200, y = 0 } } }))
 	T.ok(plan ~= nil, "a creep 684 from the centre is outside")
 
-	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 420 }))
-	T.eq(why, "too-fast", "420 speed crosses 900 in 2.1s, under one bolt interval")
+	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 450 }))
+	T.ok(plan ~= nil, "450 speed crosses 900 in 2s: over the 1s minimum")
+	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 380, minStay = 2.5 }))
+	T.eq(why, "too-fast", "with a 2.5s minimum, 380 speed (2.4s inside) is skipped")
+	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 1000 }))
+	T.eq(why, "too-fast", "1000 speed (a blink or a dash) crosses it in 0.9s")
 	-- Derived from one geometry (game 064 numbers): chaser 350, ally fleeing at 300, melee reach 150, gap 350 so
 	-- catch = (350 - 150) / 50 = 4s. The chaser follows the ally through the cloud: 900 / 350 = 2.57s inside.
 	local gap, reach = 350, 150

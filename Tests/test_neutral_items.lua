@@ -260,6 +260,14 @@ T.test(
 			end
 			return { { item = bundle, location = bot:GetLocation() + Vector(400, 0, 0) } }
 		end
+		-- Every other stub hero far away, so the bot is the hero nearest the bundle.
+		for _, team in pairs(Stub.teams) do
+			for _, hero in pairs(team) do
+				if hero ~= bot then
+					hero._loc = Vector(7000, 7000, 0)
+				end
+			end
+		end
 		local ok, err = Stub.load("item_purchase_generic")
 		T.ok(ok, "item_purchase_generic loads: " .. tostring(err))
 		for step = 1, 12 do
@@ -280,5 +288,21 @@ T.test(
 		T.ok(seen ~= nil and string.find(seen, "dist=400", 1, true), "seen: " .. tostring(seen))
 		T.ok(gone ~= nil and string.find(gone, "fate=taken", 1, true), "gone: " .. tostring(gone))
 		T.ok(waiting ~= nil and string.find(waiting, "bundlesSeen=", 1, true), "summary: " .. tostring(waiting))
+		-- #116: the bot was the hero nearest the bundle, so it counts as its own; the first neutral item says so.
+		T.ok(gone ~= nil and string.find(gone, "by=weaver", 1, true), "gone names the nearest hero: " .. tostring(gone))
+		T.ok(gone ~= nil and string.find(gone, "own=1", 1, true), "own count: " .. tostring(gone))
+		bot._items[16] = Stub.newAbility("item_kobold_cup", bot)
+		for step = 13, 15 do
+			Stub.time = 300 + step
+			pcall(_G.ItemPurchaseThink)
+		end
+		local first, firstCount = nil, 0
+		for _, line in ipairs(Stub.printed) do
+			if string.find(line, "first-neutral", 1, true) then
+				first, firstCount = line, firstCount + 1
+			end
+		end
+		T.ok(first ~= nil and string.find(first, "item=item_kobold_cup own=1", 1, true), "first: " .. tostring(first))
+		T.eq(firstCount, 1, "printed once")
 	end
 )

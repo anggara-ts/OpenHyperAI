@@ -662,6 +662,10 @@ T.test("alchemist: no brew on a hero with Skeleton Walk ready, unless it is stun
 	walk.cooldown = 12
 	X.SkillsComplement()
 	T.eq(state.brewing, true, "on cooldown: the brew starts")
+	T.ok(
+		printedLine("enemy%-spell%-cd hero=npc_dota_hero_%S+ spell=clinkz_wind_walk cd=12.0 level=1"),
+		"cooldown read logged"
+	)
 	T.ok((state.bot._noTpUntil or -1) > Stub.time, "no Town Portal while brewing")
 end)
 

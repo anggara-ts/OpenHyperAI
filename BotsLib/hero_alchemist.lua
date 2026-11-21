@@ -432,26 +432,50 @@ local function RetreatWanted()
 	local wanted = X.ConcoctionRetreatWanted(desire, line, at ~= nil and DotaTime() - at or nil)
 	return wanted, desire or 0, line or 0
 end
+-- Whether the bot API shows an enemy's cooldowns is unverified. Evidence lines, each at most every 30s per hero:
+--   [OHA-ALCHEMIST] enemy-spell-cd hero= spell= cd= level=   a listed spell read on cooldown (cd= above 0 proves
+--                                                            the API shows enemy cooldowns; none in a whole game
+--                                                            with such heroes suggests it always reads 0)
+--   [OHA-ALCHEMIST] enemy-spell-read error= hero=            the read failed
+local spellReadLogAt = {}
+local function LogSpellRead(key, line)
+	if DotaTime() < (spellReadLogAt[key] or -999) then
+		return
+	end
+	spellReadLogAt[key] = DotaTime() + 30
+	pcall(print, line)
+end
 -- The first spell or item of an enemy hero that is in `names` (a ConcoctionRules name set) and ready
--- (ConcoctionRules.SpellReady), or nil. Ability slots 0-9 (basic, ultimate, shard / scepter and invoked spells)
--- and item slots 0-5. Whether the bot API shows an enemy's cooldown and level this way is unverified; the callers
--- log the name it found. In pcall: a handle that went out of sight may refuse a call.
+-- (ConcoctionRules.SpellReady), or nil. Ability slots 0-9 (basic, ultimate, shard / scepter and invoked spells; not
+-- a hidden one, e.g. the other stance of Kez) and item slots 0-5. In pcall: a handle that went out of sight may
+-- refuse a call.
 local function ReadySpellOf(enemyHero, names)
 	local ok, found = pcall(function()
 		local mana = enemyHero:GetMana()
+		local function check(name, level, cooldownLeft, manaCost)
+			if not names[name] then
+				return false
+			end
+			if (level or 0) > 0 and (cooldownLeft or 0) > 0 then
+				LogSpellRead(
+					enemyHero:GetUnitName() .. "/cd",
+					string.format(
+						"[OHA-ALCHEMIST] t=%.0f enemy-spell-cd hero=%s spell=%s cd=%.1f level=%d",
+						DotaTime(),
+						enemyHero:GetUnitName(),
+						name,
+						cooldownLeft,
+						level
+					)
+				)
+			end
+			return ConcoctionRules.SpellReady(level, cooldownLeft, manaCost, mana)
+		end
 		for slot = 0, 9 do
 			local ability = enemyHero:GetAbilityInSlot(slot)
-			if ability ~= nil and not ability:IsNull() then
+			if ability ~= nil and not ability:IsNull() and not ability:IsHidden() then
 				local name = ability:GetName()
-				if
-					names[name]
-					and ConcoctionRules.SpellReady(
-						ability:GetLevel(),
-						ability:GetCooldownTimeRemaining(),
-						ability:GetManaCost(),
-						mana
-					)
-				then
+				if check(name, ability:GetLevel(), ability:GetCooldownTimeRemaining(), ability:GetManaCost()) then
 					return name
 				end
 			end
@@ -460,10 +484,7 @@ local function ReadySpellOf(enemyHero, names)
 			local item = enemyHero:GetItemInSlot(slot)
 			if item ~= nil and not item:IsNull() then
 				local name = item:GetName()
-				if
-					names[name]
-					and ConcoctionRules.SpellReady(1, item:GetCooldownTimeRemaining(), item:GetManaCost(), mana)
-				then
+				if check(name, 1, item:GetCooldownTimeRemaining(), item:GetManaCost()) then
 					return name
 				end
 			end
@@ -473,6 +494,15 @@ local function ReadySpellOf(enemyHero, names)
 	if ok then
 		return found
 	end
+	LogSpellRead(
+		"error",
+		string.format(
+			"[OHA-ALCHEMIST] t=%.0f enemy-spell-read error=%s hero=%s",
+			DotaTime(),
+			tostring(found),
+			UnitNameOrNone(enemyHero)
+		)
+	)
 	return nil
 end
 -- An enemy hero that can't cast now (stunned, hexed, nightmared or silenced). Not Fu.IsDisabled: a root does not

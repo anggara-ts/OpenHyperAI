@@ -46,6 +46,10 @@ Customize.MatchTraceWriteFile = false
 -- RealTime() CPU profiler: prints [OHA-PERF spike] / [OHA-PERF top] to console.
 -- Does not need MatchTrace=true. Use to find which bot Think paths tank FPS.
 Customize.MatchTracePerf = false
+-- Meepo freeze trace (#139): true prints [OHA-MTRACE] start/end lines around every call the game makes into the
+-- scripts for a bot Meepo's bodies (thousands of lines per second), so after a freeze the end of the console log
+-- names the call that hung. Only for a test game; leave false.
+Customize.Debug_Meepo_Trace = false
 
 -- Set the localization code to make bots speak the specific language when possible (not guaranteed to 100% localized).
 -- Currently supprot: "en" for "English", "zh" for "中文", "ru" for Russian, "ja" for Japanese

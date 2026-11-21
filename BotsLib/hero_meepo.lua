@@ -12,6 +12,9 @@ local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 
 local tAllAbilityBuildList = { { 2, 3, 6, 1, 2, 2, 2, 3, 3, 6, 3, 1, 1, 1, 6, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
+-- [OHA-MTRACE] (#139): true only with Customize.Debug_Meepo_Trace; then a mark goes out before every order below.
+local traceOn = MeepoTrace.IsOn()
 -- Blink Dagger (#9) is in every list. Stratz 7.41f (week of 5-11 Nov 2026, all ranks): Blink in 86% of pos 1
 -- matches (3,626), over 95% of pos 2 (17,191) and 90% of pos 3 (1,061). It is bought right after Sange and Yasha
 -- and before the Shard: by minute 24, 61% of pos 2 Meepos have Blink and 16% the Shard (Shard 38% in all).
@@ -148,17 +151,26 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	poofDesire, poofTarget = X.ConsiderPoof()
 	if poofDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-poof")
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnEntity(poofAbility, poofTarget)
 		return
 	end
 	digDesire = X.ConsiderDig()
 	if digDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-dig")
+		end
 		bot:ActionQueue_UseAbility(digAbility)
 		return
 	end
 	earthbindDesire, earthbindLocation = X.ConsiderEarthBind()
 	if earthbindDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-earthbind")
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(earthbindAbility, earthbindLocation)
 		rememberEarthbindCast(earthbindLocation)
@@ -166,6 +178,9 @@ function X.SkillsComplement()
 	end
 	local regroupBody = X.ConsiderRegroup()
 	if regroupBody ~= nil then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-regroup-move")
+		end
 		bot:Action_MoveToLocation(regroupBody:GetLocation())
 		return
 	end
@@ -393,6 +408,9 @@ function X.ConsiderPoofRaw()
 	if hpRatio < 0.5 and isRetreating then
 		for _, meepo in pairs(meepos) do
 			if meepo ~= bot and meepo:DistanceFromFountain() < 800 and not Fu.IsStunProjectileIncoming(bot, 400) then
+				if traceOn then
+					MeepoTrace.Mark("meepo.poof-out")
+				end
 				return BOT_ACTION_DESIRE_ABSOLUTE, meepo
 			end
 		end
@@ -723,4 +741,13 @@ function X.ConsiderDig()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-MTRACE] (#139): start/end lines around the hero code and each spell decision; the functions themselves when
+-- the trace is off. Last, so the engine-facing callers (ability_item_usage_generic, bot_generic) get the wrapped ones.
+X.SkillsComplement = MeepoTrace.Wrap("meepo.SkillsComplement", X.SkillsComplement)
+X.MinionThink = MeepoTrace.Wrap("meepo.MinionThink", X.MinionThink)
+X.ConsiderPoof = MeepoTrace.Wrap("meepo.ConsiderPoof", X.ConsiderPoof)
+X.ConsiderPoofRaw = MeepoTrace.Wrap("meepo.ConsiderPoofRaw", X.ConsiderPoofRaw)
+X.ConsiderDig = MeepoTrace.Wrap("meepo.ConsiderDig", X.ConsiderDig)
+X.ConsiderEarthBind = MeepoTrace.Wrap("meepo.ConsiderEarthBind", X.ConsiderEarthBind)
+X.ConsiderRegroup = MeepoTrace.Wrap("meepo.ConsiderRegroup", X.ConsiderRegroup)
 return X

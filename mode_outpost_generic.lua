@@ -2823,3 +2823,12 @@ do
 	GetDesire = Perf.Wrap("outpost.GetDesire", GetDesire)
 	Think = Perf.Wrap("outpost.Think", Think)
 end
+-- [OHA-MTRACE] Meepo call trace (#139): FuncLib/systems/meepo_trace.lua. Off unless Customize.Debug_Meepo_Trace;
+-- last, so it is the outermost wrapper and its lines bracket everything the engine calls.
+do
+	local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
+	GetDesire = MeepoTrace.Wrap("outpost.GetDesire", GetDesire)
+	Think = MeepoTrace.Wrap("outpost.Think", Think)
+	OnStart = MeepoTrace.Wrap("outpost.OnStart", OnStart)
+	OnEnd = MeepoTrace.Wrap("outpost.OnEnd", OnEnd)
+end

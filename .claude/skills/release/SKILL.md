@@ -64,5 +64,11 @@ in one line each. Stop here unless publishing was asked for.
   `git push origin vX.Y`.
 - `gh release create vX.Y --title "vX.Y" --notes-file <notes.md> --verify-tag`.
 
-## 8. Report
-The release URL, the version, and what is not in it (open PRs that wait for the next release).
+## 8. Workshop copy
+Ask the maintainer whether to put the release into `vscripts/bots` for the Workshop upload now; on yes, run the
+`/prepare-workshop` skill with the new tag (`--ref vX.Y`). It stops first if a test game is prepared or running.
+Never upload: the maintainer does that in the Workshop Tools.
+
+## 9. Report
+The release URL, the version, what is not in it (open PRs that wait for the next release), and the Workshop
+copy's `READY TO UPLOAD` line when step 8 ran.

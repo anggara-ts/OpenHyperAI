@@ -15,6 +15,9 @@
 // What is a bot script: tracked .lua files at the repo root and under BotsLib/, FuncLib/ and Customize/, read
 // from git (never the working tree, so .git, .env, match logs, tests, tools, docs and uncommitted edits never get
 // in). Before writing, every literal require / dofile target must be in the copy.
+// Workshop copies (no --test-game): the committed Customize/general.lua must hold release defaults (no TEST #N
+// comments, no forced picks, Weak_Hero_Cap 1, no Debug_* = true) or the export stops; after writing, the folder must
+// hold exactly the copied files (no build_info.lua, nothing edited or added), then it prints READY TO UPLOAD.
 // Folder rules: never write through a symlink or junction (the dev setup may link vscripts/bots to the clone),
 // never write inside a worktree of this repo or into a folder with .git, and only delete files this tool wrote
 // there before. That list lives outside the folder (in .git, so it is never uploaded or committed).
@@ -398,6 +401,63 @@ function uncommittedChanges() {
 		.map((c) => (c.isNew ? `${c.file} (new)` : c.file));
 }
 
+// ---------------------------------------------------------------- Workshop checks
+
+// Lua source with its comments blanked out (line comments and --[[ ]] blocks), so commented examples don't count.
+function stripLuaComments(source) {
+	return source.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, "").replace(/--[^\n]*/g, "");
+}
+
+// The body of `Customize.<name> = { ... }` (no nested tables in these lists), or null.
+function luaTable(source, name) {
+	const match = new RegExp(`Customize\\.${name}\\s*=\\s*\\{([^}]*)\\}`).exec(source);
+	return match ? match[1] : null;
+}
+
+// What in a Workshop copy's Customize/general.lua is a local test setting rather than a release default (#177):
+// test-lineup comments, forced hero picks, a raised weak-hero cap, a Debug_* switch turned on. [] when clean.
+function workshopProblems(source) {
+	const problems = [];
+	if (/TEST #\d+/.test(source)) problems.push("test-lineup comments (TEST #N)");
+	const code = stripLuaComments(source);
+	for (const name of ["Radiant_Heros", "Dire_Heros", "Debug_Ally_Heros", "Debug_Enemy_Heros"]) {
+		const body = luaTable(code, name);
+		const picks = body ? body.match(/"npc_dota_hero_[a-z_]+"/g) : null;
+		if (picks) problems.push(`forced picks in ${name}: ${picks.join(", ")}`);
+	}
+	const cap = /Customize\.Weak_Hero_Cap\s*=\s*(\d+)/.exec(code);
+	if (cap && cap[1] !== "1") problems.push(`Weak_Hero_Cap = ${cap[1]} (release default 1)`);
+	for (const match of code.matchAll(/Customize\.(Debug_[A-Za-z_]+)\s*=\s*true\b/g)) problems.push(`${match[1]} = true`);
+	return problems;
+}
+
+// The version a copy shows in game: Customize/version.lua's number and FuncLib/systems/version.lua's.
+function versionOf(files) {
+	const read = (file, pattern) => {
+		const content = files.get(file);
+		const match = content ? pattern.exec(content.toString("utf8")) : null;
+		return match ? match[1] : "?";
+	};
+	return `${read("Customize/version.lua", /number\s*=\s*"([^"]+)"/)} / ${read("FuncLib/systems/version.lua", /Version\.number\s*=\s*"([^"]+)"/)}`;
+}
+
+// After a Workshop export: the folder must hold exactly the copied bot scripts and nothing else (no build_info,
+// no lineup edits, no file another tool or a person put there). Returns the problems, [] when clean.
+function folderProblems(dest, files) {
+	const problems = [];
+	const onDisk = listFiles(dest);
+	const extra = onDisk.filter((file) => !files.has(file));
+	if (extra.length > 0) problems.push(`files not in the export: ${extra.slice(0, 10).join(", ")}`);
+	const notScripts = onDisk.filter((file) => !isBotScript(file));
+	if (notScripts.length > 0) problems.push(`not bot scripts: ${notScripts.slice(0, 10).join(", ")}`);
+	if (onDisk.includes(BUILD_INFO_FILE)) problems.push(`${BUILD_INFO_FILE} (a test-game file)`);
+	const changed = onDisk.filter((file) => files.has(file) && !fs.readFileSync(path.join(dest, file)).equals(files.get(file)));
+	if (changed.length > 0) problems.push(`files that differ from the commit: ${changed.slice(0, 10).join(", ")}`);
+	const missing = [...files.keys()].filter((file) => !onDisk.includes(file));
+	if (missing.length > 0) problems.push(`files missing: ${missing.slice(0, 10).join(", ")}`);
+	return problems;
+}
+
 function resolveDest(args) {
 	if (args.dest) return path.resolve(args.dest);
 	const dota = args.dota ? path.resolve(args.dota) : findDota();
@@ -442,6 +502,17 @@ function main(args) {
 			}
 		}
 	}
+	if (!args.testGame) {
+		const lineup = files.get(LINEUP_FILE);
+		const problems = lineup ? workshopProblems(lineup.toString("utf8")) : [`${LINEUP_FILE} missing`];
+		if (problems.length > 0) {
+			throw new Error(
+				`${ref} ${short} is not a clean Workshop copy, its committed ${LINEUP_FILE} has local test settings:\n` +
+					problems.map((p) => `  ${p}`).join("\n") +
+					"\nCommit the release defaults (Random picks, Weak_Hero_Cap 1, Debug_* off) and export that commit."
+			);
+		}
+	}
 	const missing = missingRequires(files);
 	if (missing.length > 0) {
 		throw new Error(
@@ -468,6 +539,15 @@ function main(args) {
 	if (!args.dryRun) {
 		apply(dest, files, steps, manifest, { ref, commit, at: new Date().toISOString(), testGame: args.testGame });
 	}
+	if (args.testGame) return;
+	console.log(`  lineup: committed defaults (no forced picks, Weak_Hero_Cap 1, Debug_* off); version ${versionOf(files)}`);
+	if (args.dryRun) return;
+	const problems = folderProblems(dest, files);
+	if (problems.length > 0) {
+		throw new Error(`${dest} is not ready to upload:\n${problems.map((p) => `  ${p}`).join("\n")}`);
+	}
+	console.log(`  READY TO UPLOAD: ${dest} holds exactly the bot scripts of ${ref} ${short} (${files.size} files), ` +
+		`version ${versionOf(files)}. After the upload, /prepare-game re-exports the test build.`);
 }
 
 // ---------------------------------------------------------------- self-test
@@ -510,6 +590,26 @@ function selfTest() {
 	sources.set("Customize/general.lua", Buffer.from("return {}"));
 	check("requires: nothing missing once the file is there", missingRequires(sources).length === 0);
 
+	const cleanLineup = [
+		"--[[ Examples:", '  Customize.Debug_Ally_Heros = { "npc_dota_hero_phoenix" }', "--]]",
+		"Customize.Debug_Ally_Heros = {", '\t-- "npc_dota_hero_phoenix",', "}",
+		"Customize.Debug_Enemy_Heros = {", "}",
+		'Customize.Radiant_Heros = {', '\t"Random",', "}",
+		'Customize.Dire_Heros = {', '\t"Random", -- pos 1', "}",
+		"Customize.Weak_Hero_Cap = 1",
+	].join("\n");
+	check("workshop: release defaults are clean (commented examples ignored)", workshopProblems(cleanLineup).length === 0);
+	const testLineup = cleanLineup
+		.replace('\t"Random", -- pos 1', '\t"npc_dota_hero_clinkz", -- pos 1 -- TEST #97: hunt hold')
+		.replace("Weak_Hero_Cap = 1", "Weak_Hero_Cap = 5") + "\nCustomize.Debug_Meepo_Trace = true";
+	const found = workshopProblems(testLineup).join(" | ");
+	check("workshop: test comments, forced picks, raised cap and a Debug switch are all found",
+		/TEST #N/.test(found) && /Dire_Heros: "npc_dota_hero_clinkz"/.test(found) && /Weak_Hero_Cap = 5/.test(found) &&
+			/Debug_Meepo_Trace = true/.test(found));
+	check("workshop: a forced debug ally pick is found",
+		workshopProblems(cleanLineup.replace("Customize.Debug_Enemy_Heros = {", 'Customize.Debug_Enemy_Heros = {\n\t"npc_dota_hero_axe",'))
+			.some((p) => /Debug_Enemy_Heros/.test(p)));
+
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "oha-export-test-"));
 	try {
 		const target = path.join(tmp, "target");
@@ -545,6 +645,15 @@ function selfTest() {
 		check("export: stale files are deleted and empty folders pruned",
 			s3.remove.join() === "BotsLib/b.lua" && !fs.existsSync(path.join(dest, "BotsLib")) &&
 			listFiles(dest).join() === "FuncLib/c.lua,a.lua");
+		check("folder check: an exact copy is clean", folderProblems(dest, second).length === 0);
+		fs.writeFileSync(path.join(dest, "a.lua"), "edited");
+		fs.mkdirSync(path.join(dest, "Customize"), { recursive: true });
+		fs.writeFileSync(path.join(dest, BUILD_INFO_FILE), "return {}");
+		const folderFound = folderProblems(dest, second).join(" | ");
+		check("folder check: an edited file and a build_info are found",
+			/differ from the commit: a\.lua/.test(folderFound) && /build_info\.lua \(a test-game file\)/.test(folderFound));
+		fs.writeFileSync(path.join(dest, "a.lua"), "changed");
+		fs.rmSync(path.join(dest, "Customize"), { recursive: true, force: true });
 		fs.writeFileSync(path.join(dest, "notes.txt"), "mine");
 		exportFiles(second, true);
 		check("export: --force takes over the folder", !fs.existsSync(path.join(dest, "notes.txt")));
@@ -576,4 +685,4 @@ if (require.main === module) {
 	}
 }
 
-module.exports = { isBotScript, missingRequires, assertDestSafe, plan, apply, removeExport };
+module.exports = { isBotScript, missingRequires, assertDestSafe, plan, apply, removeExport, workshopProblems, folderProblems };

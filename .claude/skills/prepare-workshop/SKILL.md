@@ -22,8 +22,16 @@ host's Steam ID and server IPs) and the local test lineup.
      `bots-dev`);
    - `has files this tool did not write`: show them to the maintainer; `--force` (deletes them) only after they
      agree.
+   - `is not a clean Workshop copy`: the committed `Customize/general.lua` of that ref has test settings (`TEST #N`
+     comments, forced picks in `Radiant_Heros` / `Dire_Heros` / `Debug_*_Heros`, `Weak_Hero_Cap` other than 1, a
+     `Debug_* = true`). Never edit the copy by hand: put the release defaults back in `general.lua` in a PR, merge,
+     and release / export that commit. The local, uncommitted lineup never reaches a Workshop copy (the export
+     reads git, not the working tree).
 4. **Export:** the same command without `--dry-run`. A copy left by `/prepare-game` is updated in place (the tool
    deletes only files it wrote; the lineup and `build_info.lua` go away).
+   After writing, the tool checks that the folder holds exactly the copied files (nothing added or edited, no
+   `build_info.lua`) and prints `READY TO UPLOAD: ... version <number> / <patch version>`. Only that line means
+   the folder can be uploaded; any error stops it. Show the line to the maintainer.
 5. **Optional smoke test:** a Local Host lobby with Local Dev Script; `[OHA-BUILD]` shows `commit=release` and the
    release number, the default lineup drafts.
 6. **Upload (the maintainer does it; publishing is outward-facing, never do it yourself):** Dota 2 Workshop Tools →

@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local EscapeRules = require(GetScriptDirectory() .. "/FuncLib/systems/escape_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -209,7 +210,29 @@ function X.DangerJaunt()
 	local alliesHere = #Fu.GetAlliesNearLoc(bot:GetLocation(), 900)
 	local danger = bot:WasRecentlyDamagedByAnyHero(1.5) and (enemiesHere > alliesHere or Fu.GetHP(bot) < 0.5)
 		or Fu.IsStunProjectileIncoming(bot, 800)
+	-- Only to an orb on the escape side (away from the nearest enemies, toward our fountain). Game 064, t=2600: a
+	-- danger Jaunt took her to an orb flying away from base, and she died at 43:23 farther from the fountain.
+	local here = bot:GetLocation()
+	local _, dirX, dirY = X.EscapePoint(1)
+	local escapeSide = EscapeRules.IsOnEscapeSide(here.x, here.y, orbAt.x, orbAt.y, dirX, dirY)
+	if danger and enemiesThere < enemiesHere and not escapeSide then
+		if DotaTime() >= (bot._jauntSideLogAt or -999) then
+			bot._jauntSideLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-PUCK] t=%.0f escape-order skip=jaunt why=wrong-side enemies=%d->%d hp=%.2f",
+					DotaTime(),
+					enemiesHere,
+					enemiesThere,
+					Fu.GetHP(bot)
+				)
+			)
+		end
+		return false
+	end
 	if danger and enemiesThere < enemiesHere then
+		X.LogEscapeAction("jaunt", "danger", orbAt)
 		pcall(
 			print,
 			string.format(
@@ -237,17 +260,12 @@ function X.LogEscapeCheck(orbOut, canCast)
 		return
 	end
 	bot._escapeCheckLogAt = DotaTime() + 3
-	local blinkCd = -1
-	for _, name in ipairs({ "item_blink", "item_overwhelming_blink" }) do
-		local slot = bot:FindItemSlot(name)
-		if slot >= 0 and slot <= 5 then
-			blinkCd = bot:GetItemInSlot(slot):GetCooldownTimeRemaining()
-		end
-	end
+	local blinkItem = X.BlinkItem()
+	local blinkCd = blinkItem ~= nil and blinkItem:GetCooldownTimeRemaining() or -1
 	pcall(
 		print,
 		string.format(
-			"[OHA-PUCK] t=%.0f escape-check hp=%.2f silenced=%s canCast=%s phaseCd=%.1f orbOut=%s jauntOk=%s rooted=%s blinkCd=%.1f ready=%s enemies=%d",
+			"[OHA-PUCK] t=%.0f escape-check hp=%.2f silenced=%s canCast=%s phaseCd=%.1f orbOut=%s jauntOk=%s rooted=%s blinkCd=%.1f blink=%s siphoned=%s ready=%s enemies=%d",
 			DotaTime(),
 			Fu.GetHP(bot),
 			tostring(bot:IsSilenced()),
@@ -257,10 +275,224 @@ function X.LogEscapeCheck(orbOut, canCast)
 			tostring(etherealJauntAbility:IsFullyCastable()),
 			tostring(bot:IsRooted()),
 			blinkCd,
+			X.BlinkState(blinkItem),
+			tostring(bot:HasModifier("modifier_death_prophet_spirit_siphon_slow")),
 			tostring(bot._puckEscapeReady),
 			#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
 		)
 	)
+end
+-- Her Blink Dagger (or an upgrade) in the main slots, or nil.
+function X.BlinkItem()
+	for _, name in ipairs({ "item_blink", "item_overwhelming_blink", "item_swift_blink", "item_arcane_blink" }) do
+		local slot = bot:FindItemSlot(name)
+		if slot >= 0 and slot <= 5 then
+			local item = bot:GetItemInSlot(slot)
+			if item ~= nil and not item:IsNull() then
+				return item
+			end
+		end
+	end
+	return nil
+end
+-- ready | damage-block (hero damage puts Blink on cooldown for blink_damage_cooldown 3.0s, 7.42 items) | cooldown
+-- | none. Game 064, 43:18-43:23: blinkCd=3.0 twice, the block renewed by every hit.
+function X.BlinkState(blinkItem)
+	if blinkItem == nil then
+		return "none"
+	end
+	local cd = blinkItem:GetCooldownTimeRemaining()
+	if cd <= 0 then
+		return "ready"
+	end
+	if cd <= 3.0 and bot:WasRecentlyDamagedByAnyHero(3.0) then
+		return "damage-block"
+	end
+	return "cooldown"
+end
+-- The point for an escape jump of `distance`: away from the visible enemy heroes within 1600 (the nearest counts
+-- most) and toward our fountain (EscapeRules.Direction). Replaces Fu.GetEscapeLoc() (our Ancient once 2500 from the
+-- fountain) for her escapes: game 064, 43:23, she died moving away from base.
+function X.EscapePoint(distance)
+	local here = bot:GetLocation()
+	local enemies = {}
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			local at = enemyHero:GetLocation()
+			enemies[#enemies + 1] = { x = at.x, y = at.y }
+		end
+	end
+	local home = Fu.GetTeamFountain()
+	local dx, dy = EscapeRules.Direction(here.x, here.y, enemies, home.x, home.y)
+	return Vector(here.x + dx * distance, here.y + dy * distance, here.z), dx, dy
+end
+-- One line per escape action (#36, game 064: no line named the escape action or where it went).
+-- jump: how far the point is; home: distance to our fountain now -> from the point; nearest: the nearest enemy
+-- hero and its distance now -> to the point.
+function X.LogEscapeAction(spell, why, point)
+	local here = bot:GetLocation()
+	local fountain = Fu.GetTeamFountain()
+	local nearest, nearestDist = nil, math.huge
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) then
+			local dist = GetUnitToUnitDistance(bot, enemyHero)
+			if dist < nearestDist then
+				nearest, nearestDist = enemyHero, dist
+			end
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f escape-action spell=%s why=%s to=%.0f,%.0f jump=%.0f home=%.0f->%.0f nearest=%s:%.0f->%.0f enemies=%d hp=%.2f blink=%s",
+			DotaTime(),
+			spell,
+			why,
+			point.x,
+			point.y,
+			(point - here):Length2D(),
+			(fountain - here):Length2D(),
+			(fountain - point):Length2D(),
+			nearest ~= nil and (string.gsub(nearest:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			nearest ~= nil and nearestDist or -1,
+			nearest ~= nil and GetUnitToLocationDistance(nearest, point) or -1,
+			#Fu.GetEnemiesNearLoc(here, 1200),
+			Fu.GetHP(bot),
+			X.BlinkState(X.BlinkItem())
+		)
+	)
+end
+-- The enemy Death Prophet whose Spirit Siphon is on her (the slow modifier is on Puck: game 064 phase-probe mods=
+-- ...modifier_death_prophet_spirit_siphon_slow), or nil. Within 1200 so a far one doesn't count.
+function X.SiphonSource()
+	if not bot:HasModifier("modifier_death_prophet_spirit_siphon_slow") then
+		return nil
+	end
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and enemyHero:GetUnitName() == "npc_dota_hero_death_prophet" then
+			return enemyHero
+		end
+	end
+	return nil
+end
+-- Under Spirit Siphon (game 064, 4:00: siphoned at 42% HP with Phase Shift ready, she used Waning Rift and TP'd home
+-- at 29%, drained during the channel). The link breaks past EscapeRules.SIPHON_BREAK (750) from Death Prophet; a Rift
+-- (350) doesn't get there. In danger: Orb away first (Orb and Rift can't be cast inside the shift), then Phase Shift
+-- (ConsiderPhaseShift why=siphon) blocks the drain, and the Jaunt goes once the orb is past the break distance
+-- (X.ShiftExit inside the shift, here otherwise). No TP while she has one of these escapes up (bot._noTpUntil, read
+-- by the TP rule in ability_item_usage_generic.lua). Returns true when it gave an order.
+function X.ConsiderSiphonEscape()
+	local siphoner = X.SiphonSource()
+	if siphoner == nil or not (Fu.GetHP(bot) < 0.7 or Fu.IsRetreating(bot)) then
+		bot._siphonEscapeFrom = nil
+		return false
+	end
+	local mana = bot:GetMana()
+	local jauntReady = etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
+	local orbReady = illusoryOrbAbility:IsFullyCastable() and jauntReady and mana >= illusoryOrbAbility:GetManaCost()
+	local phaseReady = phaseShiftAbility:IsFullyCastable()
+	if orbReady or phaseReady or bot._siphonEscapeFrom ~= nil then
+		bot._noTpUntil = DotaTime() + 0.5
+	end
+	if DotaTime() >= (bot._siphonLogAt or -999) then
+		bot._siphonLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f siphoned dist=%d hp=%.2f orb=%s phase=%s jaunt=%s tp-held=%s",
+				DotaTime(),
+				GetUnitToUnitDistance(bot, siphoner),
+				Fu.GetHP(bot),
+				tostring(orbReady),
+				tostring(phaseReady),
+				tostring(jauntReady),
+				tostring(DotaTime() < (bot._noTpUntil or -999))
+			)
+		)
+	end
+	-- The orb is past the break distance: Jaunt to it.
+	local orbAt = X.OrbInFlight()
+	if
+		bot._siphonEscapeFrom ~= nil
+		and orbAt ~= nil
+		and jauntReady
+		and DotaTime() - (bot._siphonOrbAt or -999) < 3
+		and GetUnitToLocationDistance(siphoner, orbAt) > EscapeRules.SIPHON_BREAK + 50
+	then
+		bot._siphonEscapeFrom = nil
+		X.LogEscapeAction("jaunt", "siphon", orbAt)
+		bot:Action_UseAbility(etherealJauntAbility)
+		return true
+	end
+	if orbReady and DotaTime() - (bot._siphonOrbAt or -999) > 3 then
+		local castRange = Fu.GetProperCastRange(false, bot, illusoryOrbAbility:GetCastRange())
+		local point = X.EscapePoint(castRange)
+		bot._siphonOrbAt = DotaTime()
+		bot._siphonEscapeFrom = siphoner
+		X.LogEscapeAction("orb", "siphon", point)
+		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, point)
+		return true
+	end
+	return false
+end
+-- A Phase Shift's hold ends early (she jumped out of it): free the item think, this script and the outpost hold.
+function X.ReleasePhaseHold()
+	bot._castHoldUntil = nil
+	bot._phaseOrderAt = nil
+	bot._phaseWantAt = nil
+	bot._phaseProbeAt = nil
+end
+-- Inside the shift (only CastHoldTick runs then). Two ways out, each once per shift:
+-- 1. Spirit Siphon: the orb she threw before the shift is past the break distance from Death Prophet: Jaunt to it.
+-- 2. The shift's last 0.2s with an enemy on her: Blink away first, before a projectile that waited for the shift's
+--    end lands and renews Blink's damage block (game 064, 43:16: Death Coil landed as the shift ended, tti=0.04,
+--    and Blink read 3.0 for the rest of the fight).
+function X.ShiftExit()
+	local orderAt = bot._phaseOrderAt
+	if orderAt == nil or bot._phaseExitFor == orderAt then
+		return
+	end
+	local since = DotaTime() - orderAt
+	if since < 0.15 then
+		return
+	end
+	local siphoner = bot._siphonEscapeFrom
+	if
+		siphoner ~= nil
+		and not siphoner:IsNull()
+		and etherealJauntAbility:IsFullyCastable()
+		and not bot:IsRooted()
+		and DotaTime() - (bot._siphonOrbAt or -999) < 3
+	then
+		local orbAt = X.OrbInFlight()
+		if orbAt ~= nil and GetUnitToLocationDistance(siphoner, orbAt) > EscapeRules.SIPHON_BREAK + 50 then
+			bot._phaseExitFor = orderAt
+			bot._siphonEscapeFrom = nil
+			X.LogEscapeAction("jaunt", "siphon", orbAt)
+			X.ReleasePhaseHold()
+			bot:Action_UseAbility(etherealJauntAbility)
+			return true
+		end
+	end
+	local duration = phaseShiftAbility:GetSpecialValueFloat("duration")
+	if since < duration - 0.2 or since > duration + 0.1 then
+		return
+	end
+	local blinkItem = X.BlinkItem()
+	if blinkItem == nil or not blinkItem:IsFullyCastable() then
+		return
+	end
+	local enemies = #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+	local allies = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
+	if enemies < 1 or (Fu.GetHP(bot) >= 0.6 and enemies <= allies) then
+		return
+	end
+	bot._phaseExitFor = orderAt
+	local point = X.EscapePoint(1150)
+	X.LogEscapeAction("blink", "phase-end", point)
+	X.ReleasePhaseHold()
+	bot:Action_UseAbilityOnLocation(blinkItem, point)
+	return true
 end
 -- Hit by a hero after the Phase Shift order (0.1s for the cast): the shift is not on, so stop holding
 -- (game 048, t=752: Puck died at 31% HP within a second of the order, under the hold).
@@ -276,12 +508,17 @@ end
 -- (game 051: every probe printed only after the hold, 1.1s to 3.3s after the order).
 function X.CastHoldTick()
 	pcall(X.TrackPhaseShift)
+	pcall(X.ShiftExit)
 	if bot._castHoldUntil ~= nil and X.HurtSincePhaseOrder() then
 		bot._castHoldUntil = nil
 	end
 end
 function X.SkillsComplement()
 	pcall(X.TrackPhaseShift)
+	local okExit, exited = pcall(X.ShiftExit)
+	if okExit and exited then
+		return
+	end
 	-- Hit after the order: the shift is not on, so nothing is held any more.
 	if bot._castHoldUntil ~= nil and X.HurtSincePhaseOrder() then
 		bot._castHoldUntil = nil
@@ -319,6 +556,10 @@ function X.SkillsComplement()
 	end
 	local okJ, jaunted = pcall(X.DangerJaunt)
 	if okJ and jaunted then
+		return
+	end
+	local okS, siphonOrder = pcall(X.ConsiderSiphonEscape)
+	if okS and siphonOrder then
 		return
 	end
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
@@ -473,8 +714,9 @@ function X.ConsiderIllusoryOrb()
 			local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1000, false, BOT_MODE_NONE)
 			if enemyAllies ~= nil and #enemyAllies > #nearbyAllies then
 				isOrbEscaping = true
-				local escapeLocation = Fu.GetEscapeLoc()
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange)
+				local escapePoint = X.EscapePoint(castRange)
+				X.LogEscapeAction("orb", "retreat", escapePoint)
+				return BOT_ACTION_DESIRE_HIGH, escapePoint
 			else
 				isOrbEscaping = false
 			end
@@ -523,6 +765,59 @@ function X.ConsiderIllusoryOrb()
 		end
 		if killableCreepCount >= 2 and mpRatio > 0.25 and nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes >= 1 then
 			return BOT_ACTION_DESIRE_HIGH, Fu.GetCenterOfUnits(killableCreeps)
+		end
+		-- Harass on spare mana (game 064: 3 orbs in 5 minutes of lane; the rule above needs 2 killable creeps): mana
+		-- for Rift stays after the orb, and the pool is nearly full or the regen pays the orb back over its cooldown
+		-- (datafeed hero 13: Orb 90-120 mana, 12-9s; Phase Shift costs none). Aimed at the nearest enemy hero within
+		-- 1100 where it will be when the orb arrives (orb_speed 750); through= counts killable creeps on the way.
+		local okSpare, spare = pcall(
+			EscapeRules.SpareManaOrb,
+			bot:GetMana(),
+			bot:GetMaxMana(),
+			bot:GetManaRegen(),
+			illusoryOrbAbility:GetManaCost(),
+			waningRiftAbility:GetManaCost(),
+			illusoryOrbAbility:GetCooldown()
+		)
+		if okSpare and spare and not Fu.IsRetreating(bot) then
+			local target, targetDist = nil, 1100
+			for _, enemyHero in pairs(nearbyEnemyHeroes or {}) do
+				if
+					Fu.IsValidHero(enemyHero)
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+					and GetUnitToUnitDistance(bot, enemyHero) < targetDist
+				then
+					target, targetDist = enemyHero, GetUnitToUnitDistance(bot, enemyHero)
+				end
+			end
+			if target ~= nil and #(target:GetNearbyTowers(700, false) or {}) == 0 then
+				local orbSpeed = illusoryOrbAbility:GetSpecialValueInt("orb_speed")
+				if orbSpeed == nil or orbSpeed <= 0 then
+					orbSpeed = 750
+				end
+				local aim = target:GetExtrapolatedLocation(castPoint + targetDist / orbSpeed)
+				local through = 0
+				for _, creep in pairs(killableCreeps) do
+					local lineInfo = PointToLineDistance(bot:GetLocation(), aim, creep:GetLocation())
+					if lineInfo ~= nil and lineInfo.within and lineInfo.distance <= radius then
+						through = through + 1
+					end
+				end
+				pcall(
+					print,
+					string.format(
+						"[OHA-PUCK] t=%.0f orb-harass target=%s dist=%d mana=%.2f regen=%.1f through=%d",
+						DotaTime(),
+						(string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+						targetDist,
+						Fu.GetMP(bot),
+						bot:GetManaRegen(),
+						through
+					)
+				)
+				return BOT_ACTION_DESIRE_HIGH, aim
+			end
 		end
 	end
 	if Fu.IsDoingRoshan(bot) then
@@ -628,8 +923,9 @@ function X.ConsiderWaningRift()
 				and not Fu.IsDisabled(enemyHero)
 				and Fu.IsChasingTarget(enemyHero, bot)
 			then
-				local escapeLocation = Fu.GetEscapeLoc()
-				return BOT_ACTION_DESIRE_HIGH, Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, moveDistance)
+				local escapePoint = X.EscapePoint(moveDistance)
+				X.LogEscapeAction("rift", "escape", escapePoint)
+				return BOT_ACTION_DESIRE_HIGH, escapePoint
 			end
 		end
 	end
@@ -708,6 +1004,16 @@ function X.ConsiderPhaseShift()
 	local duration = phaseShiftAbility:GetSpecialValueFloat("duration")
 	if Fu.IsStunProjectileIncoming(bot, 600) then
 		X.phaseWhy = "dodge-stun"
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Spirit Siphon draining her (X.ConsiderSiphonEscape threw the orb first when it could): the shift blocks the
+	-- drain, then the Jaunt or a walk breaks the link.
+	if
+		X.SiphonSource() ~= nil
+		and bot:WasRecentlyDamagedByAnyHero(1.0)
+		and (Fu.GetHP(bot) < 0.7 or Fu.IsRetreating(bot))
+	then
+		X.phaseWhy = "siphon"
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if Fu.IsUnitTargetProjectileIncoming(bot, 400) then
@@ -988,10 +1294,9 @@ function X.ConsiderPhaseOrb()
 			and #nearbyEnemies >= #nearbyAllies
 			and (isRetreating or Fu.GetHP(bot) < 0.4 and bot:WasRecentlyDamagedByAnyHero(2))
 		then
-			local escapeLocation = Fu.GetEscapeLoc()
-			return BOT_ACTION_DESIRE_HIGH,
-				Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange),
-				phaseDuration
+			local escapePoint = X.EscapePoint(castRange)
+			X.LogEscapeAction("phase-orb", "outnumbered", escapePoint)
+			return BOT_ACTION_DESIRE_HIGH, escapePoint, phaseDuration
 		end
 		if isRetreating then
 			local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE)
@@ -1003,10 +1308,9 @@ function X.ConsiderPhaseOrb()
 			then
 				local enemyAllies = Fu.GetNearbyHeroes(nearbyEnemyHeroes[1], 1000, false, BOT_MODE_NONE)
 				if enemyAllies ~= nil and #enemyAllies > #nearbyAllies then
-					local escapeLocation = Fu.GetEscapeLoc()
-					return BOT_ACTION_DESIRE_HIGH,
-						Fu.Site.GetXUnitsTowardsLocation(bot, escapeLocation, castRange),
-						phaseDuration
+					local escapePoint = X.EscapePoint(castRange)
+					X.LogEscapeAction("phase-orb", "retreat", escapePoint)
+					return BOT_ACTION_DESIRE_HIGH, escapePoint, phaseDuration
 				end
 			end
 		end

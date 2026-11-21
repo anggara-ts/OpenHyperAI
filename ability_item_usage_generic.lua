@@ -5444,6 +5444,8 @@ end
 Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	if
 		botMode == BOT_MODE_RUNE
+		-- A hero script's own escape comes first (Puck under Spirit Siphon, hero_puck.lua ConsiderSiphonEscape).
+		or DotaTime() < (bot._noTpUntil or -999)
 		or bot:IsRooted()
 		or bot:HasModifier("modifier_item_armlet_unholy_strength")
 		or bot:HasModifier("modifier_kunkka_x_marks_the_spot")

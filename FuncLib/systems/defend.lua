@@ -1,4 +1,5 @@
 -- Tower defense desire, and the team chat that asks allies to come defend.
+local SafetyRules = require(GetScriptDirectory() .. "/FuncLib/systems/safety_rules")
 local function arrayFilter(self, callback, thisArg)
 	local result = {}
 	local count = 0
@@ -1000,6 +1001,40 @@ function Defend.GetDefendDesireHelper(bot, lane)
 			)
 		)
 	end
+	-- #12, game 067 50:49-50:53: Primal Beast (43% at the group-up, 29% at defend 0.77) was held at his base while Death
+	-- Prophet and Nyx hit him, and died 732 from the fountain. A hurt bot that heroes are hitting is let go by every
+	-- defend rule below (group-up, base floors; the last stand only under 35%), so retreat takes it; it comes back when
+	-- healed (SafetyRules.DefendLowHpRelease). Not when the Ancient is under 40%.
+	if not ancientLow then
+		local heroHit = bot:WasRecentlyDamagedByAnyHero(2.0)
+		local releaseWhy = nil
+		if heroHit then
+			local enemiesNear = #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {})
+			local alliesNear = math.max(0, #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) - 1)
+			releaseWhy =
+				SafetyRules.DefendLowHpRelease(Fu.GetHP(bot), heroHit, enemiesNear, alliesNear, lastStand == true)
+			if releaseWhy ~= nil and DotaTime() >= (bot._defendLowHpLogAt or -999) then
+				bot._defendLowHpLogAt = DotaTime() + 3
+				pcall(
+					print,
+					string.format(
+						"[OHA-DEFEND] t=%.0f %s group-up-skip why=%s hp=%.2f hitBy=%d allies=%d siege=%s fountainDist=%d",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						releaseWhy,
+						Fu.GetHP(bot),
+						enemiesNear,
+						alliesNear,
+						tostring(Defend.GetBaseSiege() ~= nil),
+						math.floor(bot:DistanceFromFountain())
+					)
+				)
+			end
+		end
+		if releaseWhy ~= nil then
+			return DefNone(bot, "low-hp-hit")
+		end
+	end
 	-- Group up before taking on a base siege (SiegeGroupUp). 0.7: above the 0.65 attack "follow ally"
 	-- that pulled heroes in from 2000-4000 away, and above farm's usual 0.6.
 	local siege = Defend.GetBaseSiege()
@@ -1717,6 +1752,39 @@ function Defend.GetDefendDesire(bot, lane)
 	LogBaseDefense(bot, lane, desire, why, gameState)
 	return desire
 end
+-- #12: which branch of DefendThink ran while the lane is defended for a high-ground wave (why hg-*) or the base
+-- defence is on. Games 063-065 printed no hg-wave line although the Dire base was sieged: the hg-wave line sits in
+-- the walk-out branch, and earlier branches (base defence, the creep within 1200) returned first. Printed when the
+-- step changes (at most every 2s), else every 5s.
+local function LogDefendStep(bot, lane, step, unit)
+	local now = DotaTime()
+	if now < (bot._defendStepAnyAt or -999) or step == bot._defendStepLast and now < (bot._defendStepLogAt or -999) then
+		return
+	end
+	local laneWhy = bot._defendLaneWhy and bot._defendLaneWhy[lane] or "-"
+	if not isBaseDefenseActive() and not stringIncludes(tostring(laneWhy), "hg") then
+		return
+	end
+	bot._defendStepLast = step
+	bot._defendStepAnyAt = now + 2
+	bot._defendStepLogAt = now + 5
+	local ancient = GetAncient(ourTeam)
+	pcall(
+		print,
+		string.format(
+			"[OHA-DEFEND] t=%.0f %s hg-step step=%s lane=%s why=%s base=%s target=%s dist=%d ancDist=%d",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			step,
+			tostring(laneNames[lane]),
+			tostring(laneWhy),
+			tostring(isBaseDefenseActive()),
+			unit ~= nil and (string.gsub(unit:GetUnitName(), "npc_dota_", "")) or "none",
+			unit ~= nil and math.floor(GetUnitToUnitDistance(bot, unit)) or -1,
+			ancient ~= nil and math.floor(GetUnitToUnitDistance(bot, ancient)) or -1
+		)
+	)
+end
 function Defend.DefendThink(bot, lane)
 	if Fu.CanNotUseAction(bot) then
 		return
@@ -1741,9 +1809,11 @@ function Defend.DefendThink(bot, lane)
 			and Fu.CanBeAttacked(closeEnemies[1])
 			and GetUnitToLocationDistance(bot, point) <= 1200
 		then
+			LogDefendStep(bot, lane, "group-up-hit", closeEnemies[1])
 			bot:Action_AttackUnit(closeEnemies[1], true)
 			return
 		end
+		LogDefendStep(bot, lane, "group-up", nil)
 		if GetUnitToLocationDistance(bot, point) > 300 then
 			bot:Action_MoveToLocation(vectorAdd(point, Fu.RandomForwardVector(150)))
 		end
@@ -1784,6 +1854,7 @@ function Defend.DefendThink(bot, lane)
 		end
 	end
 	if isOwnLane and not tpHold and not bot._roshDipActive and considerTPToTarget(bot, defendState.defendLoc, true) then
+		LogDefendStep(bot, lane, "tp", nil)
 		return
 	end
 	local distanceToDefendLoc = GetUnitToLocationDistance(bot, defendState.defendLoc)
@@ -1819,12 +1890,14 @@ function Defend.DefendThink(bot, lane)
 					fraction = fraction - 0.2
 				end
 			end
+			LogDefendStep(bot, lane, "detour", nil)
 			bot:Action_MoveToLocation(detourLocation)
 			return
 		end
 	end
 	local nearbyEnemies = Fu.GetLastSeenEnemiesNearLoc(botLocation, 1600)
 	if bot:WasRecentlyDamagedByAnyHero(5) and #nearbyEnemies > #defendState.nInRangeEnemy then
+		LogDefendStep(bot, lane, "back-off", nil)
 		bot:Action_MoveToLocation(vectorAdd(safeDefendLoc, Fu.RandomForwardVector(100)))
 		return
 	end
@@ -1836,14 +1909,17 @@ function Defend.DefendThink(bot, lane)
 		local safeLocation = Fu.AdjustLocationWithOffsetTowardsFountain(anchorLocation, 200)
 		local enemiesNearAnchor = Fu.GetEnemiesNearLoc(anchorLocation, 1600)
 		if Fu.IsValidHero(enemiesNearAnchor[1]) and Fu.IsInRange(bot, enemiesNearAnchor[1], 1600) then
+			LogDefendStep(bot, lane, "base-hit-hero", enemiesNearAnchor[1])
 			bot:Action_AttackUnit(enemiesNearAnchor[1], true)
 			return
 		end
 		local distanceToAnchor = GetUnitToLocationDistance(bot, anchorLocation)
 		if distanceToAnchor > 1200 then
+			LogDefendStep(bot, lane, "base-to-anchor", anchorBuilding)
 			bot:Action_MoveToLocation(vectorAdd(safeLocation, Fu.RandomForwardVector(200)))
 			return
 		end
+		LogDefendStep(bot, lane, "base-attack-move", anchorBuilding)
 		bot:Action_AttackMove(vectorAdd(anchorLocation, Fu.RandomForwardVector(300)))
 		return
 	end
@@ -1947,11 +2023,13 @@ function Defend.DefendThink(bot, lane)
 							)
 						)
 					end
+					LogDefendStep(bot, lane, "hg-pull-walk", nil)
 					bot:Action_MoveToLocation(Fu.GetTeamFountain())
 					return
 				end
 				if now - (bot._hgPullTriedAt or -99) > 6 then
 					bot._hgPullTriedAt = now
+					LogDefendStep(bot, lane, "hg-pull-aggro", nearest)
 					bot:Action_AttackUnit(nearest, true)
 					return
 				end
@@ -1970,6 +2048,7 @@ function Defend.DefendThink(bot, lane)
 				end
 			end
 			if best ~= nil then
+				LogDefendStep(bot, lane, "hg-near", best)
 				bot:Action_AttackUnit(best, true)
 				return
 			end
@@ -1997,6 +2076,24 @@ function Defend.DefendThink(bot, lane)
 				end
 			end
 			if waveCreep ~= nil then
+				-- #12 (game 038, 49:36): which wave the defender walks out to, and how far.
+				if DotaTime() >= (bot._hgWaveLogAt or -999) then
+					bot._hgWaveLogAt = DotaTime() + 5
+					local waveCreepTarget = waveCreep:GetAttackTarget()
+					pcall(
+						print,
+						string.format(
+							"[OHA-DEFEND] t=%.0f %s hg-wave target=%s dist=%d toHgSpot=%d creepHits=%s",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							tostring(waveCreep:GetUnitName()),
+							math.floor(waveCreepDistance),
+							math.floor(GetUnitToLocationDistance(waveCreep, highGroundSpot)),
+							waveCreepTarget ~= nil and tostring(waveCreepTarget:GetUnitName()) or "none"
+						)
+					)
+				end
+				LogDefendStep(bot, lane, "hg-wave", waveCreep)
 				bot:Action_AttackUnit(waveCreep, true)
 				return
 			end
@@ -2029,6 +2126,8 @@ function Defend.DefendThink(bot, lane)
 				)
 			end
 		end
+		-- Attack-move at (or behind) the high-ground spot: the "hugging" step.
+		LogDefendStep(bot, lane, "hg-spot", nil)
 		if enemiesOnHG == 0 and #enemiesAtHighGround > 0 and #alliesAtHighGround >= #enemiesAtHighGround + 1 then
 			local attackMoveLocation = vectorAdd(highGroundSpot, Fu.RandomForwardVector(120))
 			bot:Action_AttackMove(attackMoveLocation)
@@ -2039,6 +2138,8 @@ function Defend.DefendThink(bot, lane)
 		end
 		return
 	end
+	-- None of the steps above ran (tier under 3, enemy heroes at our high ground, ...): the lane defence below.
+	LogDefendStep(bot, lane, "lane-defend", nil)
 	local enemiesNearDefendLoc = Fu.GetEnemiesNearLoc(defendLocation, defendRadius)
 	local enemyCount = #enemiesNearDefendLoc
 	local distanceToDefendLoc = GetUnitToLocationDistance(bot, defendLocation)

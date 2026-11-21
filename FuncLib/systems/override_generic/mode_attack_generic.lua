@@ -640,10 +640,25 @@ function AttackHelpers.IsRecklesslyDivingTower()
 					end
 				end
 			end
-			if
-				attackTarget.unit:GetActualIncomingDamage(incomingDamage, DAMAGE_TYPE_PHYSICAL)
-				< attackTarget.unit:GetHealth() + attackTarget.unit:GetHealthRegen() * 3
-			then
+			local actualDamage = attackTarget.unit:GetActualIncomingDamage(incomingDamage, DAMAGE_TYPE_PHYSICAL)
+			local targetHealth = attackTarget.unit:GetHealth() + attackTarget.unit:GetHealthRegen() * 3
+			-- #12 (game 050): which dives this check skipped, at any game time, so a game shows them.
+			if actualDamage < targetHealth and DotaTime() >= (bot._diveSkipLogAt or -999) then
+				bot._diveSkipLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-ATTACK] t=%.0f %s dive-skip why=reckless target=%s dmg3s=%d targetHp=%d tower=%s",
+						DotaTime(),
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						(string.gsub(attackTarget.unit:GetUnitName(), "npc_dota_hero_", "")),
+						math.floor(actualDamage),
+						math.floor(targetHealth),
+						enemyTowers[1]:GetUnitName()
+					)
+				)
+			end
+			if actualDamage < targetHealth then
 				return 2.5
 			end
 		end

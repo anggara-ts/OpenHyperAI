@@ -69,6 +69,52 @@ local function LogInEnemyTower()
 		end
 	end
 end
+-- #12, game 064 0:32: laning mode walked Dire's Abaddon (level 1) to 393 from Radiant's mid T2 on his way to the lane,
+-- and he died 3.5s later; the engine's path ignores towers. A long walk whose straight line crosses an enemy T2/T3's
+-- range (+200) goes round it instead (FuncLib/systems/safety_rules.lua). T1s are left to the lane rules: the lane is
+-- fought at them.
+local SafetyRules = require(GetScriptDirectory() .. "/FuncLib/systems/safety_rules")
+local function LaningTowerDetour(goal)
+	if GetUnitToLocationDistance(bot, goal) < 800 then
+		return nil
+	end
+	local here = bot:GetLocation()
+	for _, tower in pairs(bot:GetNearbyTowers(1600, true) or {}) do
+		local name = Fu.IsValidBuilding(tower) and tower:GetUnitName() or ""
+		if string.find(name, "tower[23]_") ~= nil then
+			local towerLocation = tower:GetLocation()
+			local ring = (tower:GetAttackRange() or 700) + 200
+			local x, y = SafetyRules.TowerDetour(here.x, here.y, goal.x, goal.y, towerLocation.x, towerLocation.y, ring)
+			if x ~= nil then
+				local point = Vector(x, y, here.z)
+				if IsLocationPassable(point) then
+					if DotaTime() >= (bot._towerDetourLogAt or -999) then
+						bot._towerDetourLogAt = DotaTime() + 3
+						pcall(
+							print,
+							string.format(
+								"[OHA-LANE] t=%.0f %s tower-detour tower=%s dist=%d ring=%d to=%.0f,%.0f goal=%.0f,%.0f hp=%.2f lvl=%d",
+								DotaTime(),
+								(string.gsub(botName, "npc_dota_hero_", "")),
+								(string.gsub(name, "npc_dota_", "")),
+								math.floor(GetUnitToUnitDistance(bot, tower)),
+								ring,
+								x,
+								y,
+								goal.x,
+								goal.y,
+								Fu.GetHP(bot),
+								bot:GetLevel()
+							)
+						)
+					end
+					return point
+				end
+			end
+		end
+	end
+	return nil
+end
 -- Creep score (#71, maintainer game 050: "check all heroes' creep stats"). Last hits and denies every minute
 -- until 15:00, then every 5 minutes. (Finished games also have the engine's end-of-match numbers.)
 local function LogCreepScore()
@@ -1114,7 +1160,7 @@ do
 			waitLocation = GetLaneFrontLocation(GetOpposingTeam(), botLane, -standOff)
 		end
 		if DotaTime() >= nextMoveTime then
-			bot:Action_MoveToLocation(waitLocation + RandomVector(100))
+			bot:Action_MoveToLocation(LaningTowerDetour(waitLocation) or (waitLocation + RandomVector(100)))
 			nextMoveTime = DotaTime() + RandomFloat(0.3, 0.9)
 		end
 	end

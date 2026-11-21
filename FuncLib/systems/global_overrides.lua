@@ -1059,5 +1059,8 @@ if ChatGuard.originalChat == nil and CDOTA_Bot_Script.ActionImmediate_Chat ~= ni
 		return ChatGuard.originalChat(self, text, allChat)
 	end
 end
+-- Aeon Disk hold (#47): IsFullyCastable and the cast orders hold pure damage spells while the caster or the
+-- enemy they are aimed at has the Aeon Disk buff (FuncLib/systems/aeon_hold.lua). After the cast guards above.
+require(GetScriptDirectory() .. "/FuncLib/systems/aeon_hold").Install()
 local GlobalOverrides = { orig_GetTeamPlayers = originalGetTeamPlayers, GetTeamPlayers = GetTeamPlayers }
 return GlobalOverrides

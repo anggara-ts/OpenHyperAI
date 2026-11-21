@@ -184,6 +184,7 @@ local helpStun = nil -- the stun of the last help-early throw, for its log line
 local brewLostAt = -1 -- seconds brewed when the brew target was first seen dead or out of sight, -1: not lost
 local brewRisk = nil -- the disable-risk throw's cause once it fired in this brew (latched: the order repeats)
 local brewChaseGateLogged = false -- the chase-gate line printed in this brew
+local brewDisableNoneLogged = false -- the disable-none line printed in this brew
 local retreatWantedAt = nil -- DotaTime() the retreat mode last wanted him out (ConcoctionRules.RetreatHeld)
 local botTarget
 local isEngaging
@@ -459,8 +460,9 @@ end
 -- { name=, state=, entry= }: state from EnemySpells (ready: seen used and its cooldown passed since; cooldown: seen
 -- used, not passed; unknown: never seen used), entry the sighting (nil when never seen). Ability slots 0-9 (basic,
 -- ultimate, shard / scepter and invoked spells; not a hidden one, e.g. the other stance of Kez) and item slots 0-5. In
--- pcall: a handle that went out of sight may refuse a call.
-local function ListedSpellsOf(enemyHero, names)
+-- pcall: a handle that went out of sight may refuse a call. includeAll: also the learned ones the API shows as not
+-- castable (apiReady=false: not enough mana, or read on cooldown), for the disable-none line.
+local function ListedSpellsOf(enemyHero, names, includeAll)
 	local ok, found = pcall(function()
 		local list = {}
 		local mana = enemyHero:GetMana()
@@ -484,9 +486,11 @@ local function ListedSpellsOf(enemyHero, names)
 					)
 				)
 			end
-			if ConcoctionRules.SpellReady(level, cooldownLeft, manaCost, mana) then
+			local apiReady = ConcoctionRules.SpellReady(level, cooldownLeft, manaCost, mana)
+			if apiReady or (includeAll and (level or 0) > 0) then
 				local state, entry = EnemySpells.State(heroName, name, now)
-				list[#list + 1] = { name = name, state = state, entry = entry }
+				list[#list + 1] =
+					{ name = name, state = state, entry = entry, apiReady = apiReady, mana = mana, cost = manaCost }
 			end
 		end
 		for slot = 0, 9 do
@@ -533,22 +537,28 @@ local function EnemyLocked(enemyHero)
 end
 -- #34 (games 065, 067): a disable of an enemy hero that counts as a risk now (ConcoctionRules.DisableCounts: ready
 -- within its risk range, or unknown and that hero within 600 or facing him). Returns the spell name, the hero, the
--- state and the distance, or nil.
+-- state and the distance, or nil; when nil, also the nearest learned disable that did not count (for the disable-none
+-- line): { spell=, hero=, distance=, facing=, range= }.
 local function NearDisableReady()
 	local botLocation = bot:GetLocation()
+	local nearestMiss = nil
 	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, ConcoctionRules.DISABLE_RISK_FAR, true, BOT_MODE_NONE) or {}) do
 		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and not EnemyLocked(enemyHero) then
 			local distance = GetUnitToUnitDistance(bot, enemyHero)
 			local facing = enemyHero:IsFacingLocation(botLocation, 30)
-			for _, spell in ipairs(ListedSpellsOf(enemyHero, ConcoctionRules.DISABLE_NAMES)) do
+			for _, spell in ipairs(ListedSpellsOf(enemyHero, ConcoctionRules.DISABLE_NAMES, true)) do
 				local range = ConcoctionRules.DisableRiskRange(spell.name)
-				if ConcoctionRules.DisableCounts(spell.state, distance, facing, range) then
-					return spell.name, enemyHero, spell.state, distance
+				if spell.apiReady and ConcoctionRules.DisableCounts(spell.state, distance, facing, range) then
+					return spell.name, enemyHero, spell.state, distance, nil
+				end
+				if nearestMiss == nil or distance < nearestMiss.distance then
+					nearestMiss =
+						{ spell = spell, hero = enemyHero, distance = distance, facing = facing, range = range }
 				end
 			end
 		end
 	end
-	return nil, nil, nil, nil
+	return nil, nil, nil, nil, nearestMiss
 end
 -- #34, game 067: what the team has seen of the enemy heroes' escapes and disables
 -- (FuncLib/systems/enemy_spell_tracker.lua): the real enemy heroes in sight, at most every 0.1s. [OHA-ENEMYCD] seen
@@ -988,7 +998,7 @@ function X.SkillsComplement()
 		runnerSampleDist, runnerSampleAt, brewTargetDist, brewGateTotal = 0, -1, -1, 0
 		throwOrderUnit, throwOrderAt = nil, 0
 		brewLostAt = -1
-		brewRisk, brewChaseGateLogged = nil, false
+		brewRisk, brewChaseGateLogged, brewDisableNoneLogged = nil, false, false
 		-- No Town Portal from the start order on (TrackConcoctionBrew refreshes it while brewing).
 		bot._noTpUntil = math.max(bot._noTpUntil or -999, DotaTime() + 0.5)
 		-- [OHA-ALCHEMIST]: the brew start with its rule and target, throttled to 10s (the order repeats until
@@ -1443,7 +1453,8 @@ end
 -- kill and no engage brew on it. Game 067 t=3835: the kill rule skipped Death Prophet at 14% (attackKill=0.80s) and the
 -- engage rule then started a brew on her in the same think. A runner, a Blink or a Town Portal still gets the brew
 -- (EscapeKind): it needs the stun. Returns attackInstead and lethalAfter (seconds of brewing the kill needs).
--- [OHA-ALCHEMIST] concoction no-brew why=attack-kill rule= ..., at most every 5s.
+-- [OHA-ALCHEMIST] concoction no-brew why=attack-kill rule= ..., at most every 5s per rule.
+local easyKillLogAt = {}
 local function AttackKillsFirst(enemyHero, brewTime, maxDamage, rule)
 	local lethalAfter = brewTime
 		* enemyHero:GetHealth()
@@ -1456,8 +1467,8 @@ local function AttackKillsFirst(enemyHero, brewTime, maxDamage, rule)
 		attackKillSeconds = (hits - 1) * bot:GetSecondsPerAttack()
 	end
 	local attackInstead = X.ConcoctionKillTooEasy(lethalAfter, attackKillSeconds) and EscapeKind(enemyHero) == nil
-	if attackInstead and DotaTime() >= (bot._alchEasyKillLogAt or -999) then
-		bot._alchEasyKillLogAt = DotaTime() + 5
+	if attackInstead and DotaTime() >= (easyKillLogAt[rule] or -999) then
+		easyKillLogAt[rule] = DotaTime() + 5
 		pcall(
 			print,
 			string.format(
@@ -1825,8 +1836,31 @@ function X.ConsiderUnstableConcoctionThrow()
 		-- is repeated until it goes out. threat= on the throw line: disable-ready:<spell>@<hero>/<state>/d=<distance>
 		-- or hit:<share>.
 		if brewRisk == nil and brewed >= ConcoctionRules.DISABLE_RISK_AFTER then
-			local disableName, disableHero, disableState, disableDist = NearDisableReady()
+			local disableName, disableHero, disableState, disableDist, nearestMiss = NearDisableReady()
 			local risk = ConcoctionRules.DisableRisk(brewed, disableName, threatInfo.hpLost)
+			-- Game 067 t=2334: why no disable counted (Death Prophet's Wind Waker 2.5s into the brew), once per brew:
+			--   [OHA-ALCHEMIST] concoction disable-none brewed= hero= spell= dist= range= facing= state= apiReady= mp= cost=
+			if risk == nil and nearestMiss ~= nil and not brewDisableNoneLogged then
+				brewDisableNoneLogged = true
+				pcall(
+					print,
+					string.format(
+						"[OHA-ALCHEMIST] t=%.0f concoction disable-none brewed=%.1fs hero=%s spell=%s dist=%.0f range=%.0f"
+							.. " facing=%s state=%s apiReady=%s mp=%.0f cost=%.0f",
+						DotaTime(),
+						brewed,
+						UnitNameOrNone(nearestMiss.hero),
+						nearestMiss.spell.name,
+						nearestMiss.distance,
+						nearestMiss.range,
+						tostring(nearestMiss.facing),
+						nearestMiss.spell.state,
+						tostring(nearestMiss.spell.apiReady),
+						nearestMiss.spell.mana or -1,
+						nearestMiss.spell.cost or -1
+					)
+				)
+			end
 			if risk == "disable-ready" then
 				brewRisk = string.format(
 					"disable-ready:%s@%s/%s/d=%.0f",

@@ -87,14 +87,18 @@ EnemySpells.NEW_CAST_GAP = 2.0
 EnemySpells.VANISH_SEEN_WITHIN = 0.5
 EnemySpells.VANISH_VISIBLE_RADIUS = 250
 
--- Game-data cooldown of a spell at a level (the last listed level for higher ones), or nil.
+-- Game-data cooldown of a spell at a level (the last listed level for higher ones), or nil. Level unknown (nil or 0):
+-- the shortest listed cooldown, so the spell reads ready again early rather than late (a brew held back once too often
+-- costs less than one that blows up on him).
 function EnemySpells.DataCooldown(name, level)
 	local values = EnemySpells.COOLDOWNS[name]
 	if values == nil then
 		return nil
 	end
-	local index = math.max(1, math.min(#values, level or 1))
-	return values[index]
+	if level == nil or level <= 0 then
+		return values[#values]
+	end
+	return values[math.min(#values, level)]
 end
 
 -- The cooldown to assume: the API's own GetCooldown() when it reads above 0 (it counts cooldown reduction), else
@@ -151,11 +155,6 @@ function EnemySpells.State(heroName, spell, now)
 	return EnemySpells.StateAt(entry.at, entry.cooldown, now), entry
 end
 
--- For the tests: forget every cast.
-function EnemySpells.Reset()
-	casts = {}
-end
-
 local function HeroName(unit)
 	local ok, name = pcall(function()
 		return unit:GetUnitName()
@@ -198,31 +197,35 @@ local function SpellOf(hero, spell)
 	return ability:GetLevel(), ability:GetCooldown()
 end
 
-local function RecordAndLog(observer, hero, heroName, spell, via, now)
-	local okSpell, level, apiCooldown = pcall(SpellOf, hero, spell)
-	if not okSpell then
-		level, apiCooldown = nil, nil
+-- level / apiCooldown: read while the hero was visible (a vanish), else read from the hero now.
+local function RecordAndLog(observer, hero, heroName, spell, via, now, level, apiCooldown)
+	if level == nil then
+		local okSpell, readLevel, readCooldown = pcall(SpellOf, hero, spell)
+		if okSpell then
+			level, apiCooldown = readLevel, readCooldown
+		end
 	end
 	if EnemySpells.Record(heroName, spell, now, level, apiCooldown, via) then
 		LogSeen(observer, heroName, spell, via, casts[heroName][spell])
 	end
 end
 
--- The vanish spell a visible enemy hero could use now: the first learned one (items: carried), or nil.
+-- The vanish spell a visible enemy hero could use now: the first learned one (items: carried) with its level and
+-- GetCooldown(), or nil. Read while it is visible: a handle out of vision may not answer (discussion #50, item 10).
 local function VanishSpellOf(hero)
 	for slot = 0, 9 do
 		local ability = hero:GetAbilityInSlot(slot)
 		if ability ~= nil and not ability:IsNull() and not ability:IsHidden() then
 			local name = ability:GetName()
 			if EnemySpells.VANISH[name] and ability:GetLevel() > 0 then
-				return name
+				return name, ability:GetLevel(), ability:GetCooldown()
 			end
 		end
 	end
 	for slot = 0, 5 do
 		local item = hero:GetItemInSlot(slot)
 		if item ~= nil and not item:IsNull() and EnemySpells.VANISH[item:GetName()] then
-			return item:GetName()
+			return item:GetName(), 1, item:GetCooldown()
 		end
 	end
 	return nil
@@ -230,6 +233,11 @@ end
 
 local sightings = {} -- sightings[heroName] = { hero=, at=, loc=, pid=, tp=, vanish=, vanishAt= }
 local observeAt = -999
+
+-- For the tests: forget every cast and sighting.
+function EnemySpells.Reset()
+	casts, sightings, observeAt = {}, {}, -999
+end
 
 -- Runs from a bot's think. `enemies`: the real (not illusion) enemy heroes it sees, already filtered by the caller.
 -- At most every 0.1s. `observer` names the bot in the log lines:
@@ -260,7 +268,8 @@ function EnemySpells.Observe(observer, enemies)
 			sighting.tp = hero:HasModifier("modifier_teleporting")
 			-- The learned vanish spell changes rarely: re-read once per second.
 			if now - sighting.vanishAt >= 1.0 then
-				sighting.vanish, sighting.vanishAt = VanishSpellOf(hero), now
+				sighting.vanish, sighting.vanishLevel, sighting.vanishCooldown = VanishSpellOf(hero)
+				sighting.vanishAt = now
 			end
 		end)
 	end
@@ -276,15 +285,25 @@ function EnemySpells.Observe(observer, enemies)
 				if sighting.hero ~= nil and not sighting.hero:IsNull() and sighting.hero:CanBeSeen() then
 					return
 				end
-				-- Dead: no vanish. IsHeroAlive on an enemy player ID is not proven to read; an error does not block.
+				-- Dead: no vanish (IsHeroAlive on an enemy player ID: FuncLib/systems/kill_window.lua relies on it too).
+				-- A failed read records nothing.
 				local okAlive, alive = pcall(IsHeroAlive, sighting.pid)
-				if okAlive and alive == false then
+				if not okAlive or not alive then
 					return
 				end
 				if not IsRadiusVisible(sighting.loc, EnemySpells.VANISH_VISIBLE_RADIUS) then
 					return
 				end
-				RecordAndLog(observer, sighting.hero, heroName, sighting.vanish, "vanish", now)
+				RecordAndLog(
+					observer,
+					sighting.hero,
+					heroName,
+					sighting.vanish,
+					"vanish",
+					now,
+					sighting.vanishLevel,
+					sighting.vanishCooldown
+				)
 			end)
 			-- One check per disappearance.
 			sighting.at = -999
@@ -294,10 +313,12 @@ end
 
 -- Probe: does InstallCastCallback report enemy casts? Installed once per team's Lua state. Lines:
 --   [OHA-ENEMYCD] t= cast-probe installed=yes|no error=
---   [OHA-ENEMYCD] t= cast-callback n= arg=<type> keys=<fields> caster= spell= team=ally|enemy   the first 5 calls
+--   [OHA-ENEMYCD] t= cast-callback n= enemyN= arg=<type> keys=<fields> caster= spell= team=ally|enemy
+--                                                         the first 5 calls, and the first 5 calls for an enemy caster
 -- An enemy hero's cast of a spell in COOLDOWNS or in the caller's `interest` name set is recorded with via=callback.
 local probeInstalled = false
 local callbackCount = 0
+local enemyCallbackCount = 0
 local probeInterest = {}
 local function OnCast(info)
 	callbackCount = callbackCount + 1
@@ -322,7 +343,10 @@ local function OnCast(info)
 		end)
 		enemy = okTeam and team ~= GetTeam()
 	end
-	if callbackCount <= 5 then
+	if enemy then
+		enemyCallbackCount = enemyCallbackCount + 1
+	end
+	if callbackCount <= 5 or (enemy and enemyCallbackCount <= 5) then
 		local keys = {}
 		if type(info) == "table" then
 			for key in pairs(info) do
@@ -333,9 +357,10 @@ local function OnCast(info)
 		pcall(
 			print,
 			string.format(
-				"[OHA-ENEMYCD] t=%.0f cast-callback n=%d arg=%s keys=%s caster=%s spell=%s team=%s",
+				"[OHA-ENEMYCD] t=%.0f cast-callback n=%d enemyN=%d arg=%s keys=%s caster=%s spell=%s team=%s",
 				DotaTime(),
 				callbackCount,
+				enemyCallbackCount,
 				type(info),
 				table.concat(keys, ","),
 				caster ~= nil and type(caster) ~= "number" and HeroName(caster) or tostring(caster),

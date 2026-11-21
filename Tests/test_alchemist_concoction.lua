@@ -705,6 +705,7 @@ T.test("enemy spells: state from a seen use and the game-data cooldown", functio
 	T.eq(E.DataCooldown("nyx_assassin_vendetta", 5), 60, "past the last level: the last value")
 	T.eq(E.DataCooldown("item_wind_waker", 1), 19, "Wind Waker (items.txt)")
 	T.eq(E.DataCooldown("no_such_spell", 1), nil, "not listed")
+	T.eq(E.DataCooldown("nyx_assassin_vendetta", nil), 60, "level unknown: the shortest")
 	local cooldown, source = E.CooldownFor("clinkz_wind_walk", 2, 0)
 	T.eq(cooldown, 21, "API 0: the data")
 	T.eq(source, "data", "source data")
@@ -762,10 +763,13 @@ local function observedEnemy(name, spell)
 	function enemy.GetPlayerID()
 		return Stub.PLAYER_IDS[GetOpposingTeam()][1]
 	end
+	-- Out of vision the handle answers nothing (discussion #50, item 10): reads error once it is not seen.
 	function enemy.GetAbilityInSlot(_, slot)
+		assert(enemy.seen, "read out of vision")
 		return slot == 2 and ability or nil
 	end
 	function enemy.GetAbilityByName(_, abilityName)
+		assert(enemy.seen, "read out of vision")
 		return abilityName == spell and ability or nil
 	end
 	function enemy.GetItemInSlot()
@@ -803,6 +807,20 @@ T.test("enemy spells: a modifier or a vanish in our vision is a seen use, fog an
 		"seen line"
 	)
 	T.eq(E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 170.3), "ready", "70s later: ready")
+	-- Gone because she died: no use.
+	E.Reset()
+	nyx.seen = true
+	Stub.time = 300
+	E.Observe("alchemist", { nyx })
+	nyx.seen = false
+	local alive = _G.IsHeroAlive
+	_G.IsHeroAlive = function()
+		return false
+	end
+	Stub.time = 300.2
+	E.Observe("alchemist", {})
+	_G.IsHeroAlive = alive
+	T.eq(E.State("npc_dota_hero_nyx_assassin", "nyx_assassin_vendetta", 300.2), "unknown", "dead: not a use")
 	-- Walking into fog (her spot not visible) is no use.
 	E.Reset()
 	local clinkz = observedEnemy("npc_dota_hero_clinkz", "clinkz_wind_walk")
@@ -1001,6 +1019,36 @@ T.test(
 		T.ok(
 			printedLine("concoction throw why=target%-lost target=npc_dota_hero_%S+ dist=720 brewed=1.0s"),
 			"throw line"
+		)
+	end
+)
+
+T.test(
+	"alchemist: an unknown disable at 800 on a hero not facing him does not throw; the disable-none line says why",
+	function()
+		local X = load()
+		local state = startBrew(X, 2100)
+		state.enemy._hp = 1000 -- not a kill
+		state.enemy._loc = state.bot._loc + Vector(700, 0, 0)
+		state.enemy.IsFacingLocation = function()
+			return true -- facing him: no leaving / runner throw
+		end
+		local other = Stub.teams[GetOpposingTeam()][2]
+		other._loc = state.bot._loc + Vector(-800, 0, 0)
+		other._hp = 1000
+		other.IsFacingLocation = function()
+			return false
+		end
+		giveSpell(other, 0, "nyx_assassin_impale")
+		Stub.time = 2102.0
+		X.SkillsComplement()
+		T.eq(#state.orders, 0, "2.0s: no disable-risk throw")
+		T.ok(
+			printedLine(
+				"concoction disable%-none brewed=2.0s hero=npc_dota_hero_%S+ spell=nyx_assassin_impale dist=800 range=900"
+					.. " facing=false state=unknown apiReady=true"
+			),
+			"disable-none line"
 		)
 	end
 )

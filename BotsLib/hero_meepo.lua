@@ -4,9 +4,6 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
-local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
--- [OHA-MTRACE] (#139): true only with Customize.Debug_Meepo_Trace; then a mark goes out before every order below.
-local traceOn = MeepoTrace.IsOn()
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -15,6 +12,9 @@ local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 
 local tAllAbilityBuildList = { { 2, 3, 6, 1, 2, 2, 2, 3, 3, 6, 3, 1, 1, 1, 6, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
+local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
+-- [OHA-MTRACE] (#139): true only with Customize.Debug_Meepo_Trace; then a mark goes out before every order below.
+local traceOn = MeepoTrace.IsOn()
 -- Blink Dagger (#9) is in every list. Stratz 7.41f (week of 5-11 Nov 2026, all ranks): Blink in 86% of pos 1
 -- matches (3,626), over 95% of pos 2 (17,191) and 90% of pos 3 (1,061). It is bought right after Sange and Yasha
 -- and before the Shard: by minute 24, 61% of pos 2 Meepos have Blink and 16% the Shard (Shard 38% in all).

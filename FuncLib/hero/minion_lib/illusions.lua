@@ -46,7 +46,8 @@ function X.Think(ownerBot, minion)
 	end
 end
 function X.ConfuseEnemyWithIllusions(bot, minion)
-	if Fu.GetHP(bot) < 0.4 and Fu.IsRetreating(bot) and not Fu.WeAreStronger(bot, 1200) then
+	-- Not for a dead hero (#48): its retreat mode and 0 HP stay, and the illusion would walk away all the time.
+	if bot:IsAlive() and Fu.GetHP(bot) < 0.4 and Fu.IsRetreating(bot) and not Fu.WeAreStronger(bot, 1200) then
 		local botFacing = bot:GetFacing()
 		local awayAngle = (botFacing + 180) % 360
 		local moveDistance = 800
@@ -131,7 +132,9 @@ function X.GetAttackTarget(minion)
 			end
 		end
 	end
-	if GetUnitToUnitDistance(bot, minion) < 1600 then
+	-- The hero's own target only while it is alive: a dead hero's spot is its corpse, so the illusion picks around
+	-- itself (#48, game 066: Vengeful Spirit's death illusion).
+	if bot:IsAlive() and GetUnitToUnitDistance(bot, minion) < 1600 then
 		local enemiesNearBot = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
 		if #enemiesNearBot > 0 then
 			target = bot:GetAttackTarget()

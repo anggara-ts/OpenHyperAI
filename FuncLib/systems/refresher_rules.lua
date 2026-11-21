@@ -26,8 +26,9 @@ end
 RefresherRules.MIN_COOLDOWN = 8
 local REFRESHERS = { item_refresher = true, item_refresher_shard = true }
 -- Movement spells are not what a refresh is for (#47, game 067 t=3818: Zeus held his Refresher 1s for a ready
--- Heavenly Jump). Spells whose main effect is moving the caster (names from the 7.42 hero files; Heavenly Jump also
--- shocks one enemy per the Valve datafeed, hero_id=22, but it is a jump). Neither waited for nor paid for.
+-- Heavenly Jump). Spells whose main effect is moving the caster; every name has a DOTA_Tooltip_ability_<name> entry in
+-- the 7.42 resource/localization/abilities_english.txt (pak01_dir.vpk). Heavenly Jump also shocks one enemy (Valve
+-- datafeed, hero_id=22), but it is a jump. Neither waited for nor paid for.
 RefresherRules.MOVEMENT = {
 	antimage_blink = true,
 	queenofpain_blink = true,

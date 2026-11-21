@@ -1487,6 +1487,10 @@ local function ConsiderItems()
 					)
 					if string.find(itemName, "tpscroll", 1, true) or string.find(itemName, "travel_boots", 1, true) then
 						Usage.LogTeleport(itemName, target, castReason, botMode)
+						-- #53: the last defend TP (lane, time) for DefendLaneRules.DefendTpBlock, stamped at the cast.
+						if string.find(tostring(castReason), "前往守塔", 1, true) ~= nil then
+							bot._defendTpLane, bot._defendTpAt = bot._defendTpCandidateLane, DotaTime()
+						end
 					end
 					Usage.SetUseItem(item, target, castType)
 				end
@@ -5751,7 +5755,66 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 		if laneAmount.distance > tpDistance or laneAmount.amount < laneFrontAmount / 5 then
 			tpLocation = Usage.GetDefendTPLocation(defendLane)
 		end
+		-- #53, game 066 81:55 / 82:35: Elder Titan TP'd to mid's far end, walked 10,000 back to his high ground and TP'd
+		-- out the same way again. No repeat to the same lane within 20s, and no TP away from our base while enemy creeps
+		-- or heroes are at it (DefendLaneRules.DefendTpBlock). The TP target itself is #87's.
+		local blockWhy = nil
 		if tpLocation ~= nil and GetUnitToLocationDistance(bot, tpLocation) > tpDistance - 500 then
+			local DefendLaneRules = require(GetScriptDirectory() .. "/FuncLib/systems/defend_lane_rules")
+			local ancient = GetAncient(team)
+			local botToAncient = ancient ~= nil and GetUnitToUnitDistance(bot, ancient) or 0
+			local targetToAncient = ancient ~= nil
+					and Fu.GetLocationToLocationDistance(tpLocation, ancient:GetLocation())
+				or 0
+			local baseThreat = false
+			if ancient ~= nil and targetToAncient > botToAncient + 1500 then
+				local creepsAtBase = 0
+				for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
+					if unit ~= nil and unit:IsAlive() and GetUnitToUnitDistance(unit, ancient) <= 4000 then
+						creepsAtBase = creepsAtBase + 1
+					end
+				end
+				baseThreat = creepsAtBase >= 2 or #Fu.GetLastSeenEnemiesNearLoc(ancient:GetLocation(), 4000) >= 1
+			end
+			blockWhy = DefendLaneRules.DefendTpBlock(
+				DotaTime(),
+				bot._defendTpLane,
+				bot._defendTpAt,
+				defendLane,
+				baseThreat,
+				botToAncient,
+				targetToAncient
+			)
+			local enemyFront = GetLaneFrontLocation(GetOpposingTeam(), defendLane, 0)
+			local ourFront = GetLaneFrontLocation(team, defendLane, 0)
+			local logKey = blockWhy ~= nil and "_defendTpSkipLogAt" or "_defendTpLogAt"
+			if DotaTime() >= (bot[logKey] or -999) then
+				bot[logKey] = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-TP] t=%.0f %s %s lane=%s to=%.0f,%.0f ourFront=%.0f,%.0f enemyFront=%.0f,%.0f botAnc=%d toAnc=%d base=%s last=%s ago=%s",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						blockWhy ~= nil and ("defend-tp-skip why=" .. blockWhy) or "defend-tp-try",
+						towerLabel,
+						tpLocation.x,
+						tpLocation.y,
+						ourFront.x,
+						ourFront.y,
+						enemyFront.x,
+						enemyFront.y,
+						math.floor(botToAncient),
+						math.floor(targetToAncient),
+						tostring(baseThreat),
+						tostring(bot._defendTpLane),
+						bot._defendTpAt ~= nil and string.format("%.0f", DotaTime() - bot._defendTpAt) or "-"
+					)
+				)
+			end
+			bot._defendTpCandidateLane = defendLane
+		end
+		if blockWhy == nil and tpLocation ~= nil and GetUnitToLocationDistance(bot, tpLocation) > tpDistance - 500 then
 			hEffectTarget = tpLocation
 			castReason = "前往守塔:" .. towerLabel
 			if botName == "npc_dota_hero_furion" then

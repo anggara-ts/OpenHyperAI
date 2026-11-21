@@ -5439,13 +5439,15 @@ end
 if bot.ProphetTPLocation == nil then
 	bot.ProphetTPLocation = bot:GetLocation()
 end
--- [OHA-PERFSUM] detail markers inside the TP rule (#52). Game 063: item_tpscroll still took 23.8s of detail time
--- (24.5s in game 062) after the fountain check moved BaseUnderCreeps last, so the costly part is elsewhere.
--- Usage.TpTimed(name, fn, ...) calls fn(...) and adds its time to detail=<name> ("tp:" names). The markers sit
--- inside item_tpscroll's own time, so their sum is at most it; what is left is the rule's own code. Timing
--- only: same calls, arguments and returns.
+-- Markers inside the TP rule (#52). Game 063: item_tpscroll still took 23.8s of [OHA-PERFSUM] detail time (24.5s
+-- in game 062) after the fountain check moved BaseUnderCreeps last, so the costly part is elsewhere.
+-- Usage.TpTimed(name, fn, ...) calls fn(...) and adds its time to tpParts[name] ("tp:" names), printed by the
+-- [OHA-TP] tp-throttle line below (not in detail=: PERFSUM lists only its top 10 there, and 16 more names would
+-- push out the ones other checks read). The parts sit inside the rule's own time (rule= on that line), so their
+-- sum is at most it; what is left is the rule's own code. Timing only: same calls, arguments and returns.
+local tpParts = {}
 local function TpTimedEnd(name, startedAt, ...)
-	PerfParts.Detail(name, RealTime() - startedAt)
+	tpParts[name] = (tpParts[name] or 0) + (RealTime() - startedAt)
 	return ...
 end
 function Usage.TpTimed(name, fn, ...)
@@ -5490,7 +5492,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 	if bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") or bot.healInBase then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local enemyTowers = Usage.TpTimed("tp:towers", bot.GetNearbyTowers, bot, 888, true)
+	local enemyTowers = bot:GetNearbyTowers(888, true)
 	if #enemyTowers > 0 then
 		return BOT_ACTION_DESIRE_NONE
 	end
@@ -10482,11 +10484,12 @@ Usage.ItemUsageThink = ItemUsageThink
 -- Placed after every wrapper of the rule (hold, worth, heal trip) so it covers all of them. A "no TP" answer is
 -- kept for TP_RECHECK seconds per bot: TP decisions do not need every think. The rule runs every think while
 -- the bot is in danger (hit by an enemy hero in the last 2s, HP under 40%, or Rupture on it), and a "TP"
--- answer is never kept. [OHA-TP] tp-throttle prints how many calls were skipped, at most once per 120s per bot.
+-- answer is never kept. [OHA-TP] tp-throttle prints how many calls were skipped, the rule's own time (rule=,
+-- ms since the last line) and its biggest timed parts (parts=, see Usage.TpTimed), once per 120s per bot.
 do
 	local TP_RECHECK = 0.3
 	local tpRule = Usage.ConsiderItemDesire["item_tpscroll"]
-	local nextRunAt, skipped, ran, dangerRuns, logAt = -999, 0, 0, 0, nil
+	local nextRunAt, skipped, ran, dangerRuns, logAt, ruleSeconds = -999, 0, 0, 0, nil, 0
 	if tpRule ~= nil then
 		Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 			local now = DotaTime()
@@ -10504,21 +10507,41 @@ do
 			logAt = logAt or now + 120
 			if now >= logAt then
 				logAt = now + 120
+				local list = {}
+				for name, seconds in pairs(tpParts) do
+					list[#list + 1] = { name, seconds }
+				end
+				table.sort(list, function(a, b)
+					return a[2] > b[2]
+				end)
+				local parts = {}
+				for i = 1, math.min(8, #list) do
+					parts[#parts + 1] = string.format("%s=%.0fms", list[i][1], list[i][2] * 1000)
+				end
 				pcall(
 					print,
 					string.format(
-						"[OHA-TP] t=%.0f %s tp-throttle skipped=%d ran=%d danger=%d recheck=%.2f",
+						"[OHA-TP] t=%.0f %s tp-throttle skipped=%d ran=%d danger=%d recheck=%.2f rule=%.0fms parts=%s",
 						now,
 						(string.gsub(botName, "npc_dota_hero_", "")),
 						skipped,
 						ran,
 						dangerRuns,
-						TP_RECHECK
+						TP_RECHECK,
+						ruleSeconds * 1000,
+						#parts > 0 and table.concat(parts, ",") or "-"
 					)
 				)
-				skipped, ran, dangerRuns = 0, 0, 0
+				skipped, ran, dangerRuns, ruleSeconds = 0, 0, 0, 0
+				for name in pairs(tpParts) do
+					tpParts[name] = nil
+				end
 			end
+			local startedAt = RealTime ~= nil and RealTime() or nil
 			local desire, target, castType, castReason = tpRule(item)
+			if startedAt ~= nil then
+				ruleSeconds = ruleSeconds + (RealTime() - startedAt)
+			end
 			if desire == nil or desire <= 0 then
 				nextRunAt = now + TP_RECHECK
 			else

@@ -373,6 +373,8 @@ function X.Tick(bot)
 	local creep = st.creep
 	if
 		bot:GetActiveMode() ~= BOT_MODE_LANING
+		-- An enemy tower on us: the tower-aggro step after this hook comes first.
+		or bot:WasRecentlyDamagedByTower(1.0)
 		or (st.thinkAt == now and st.armedAt ~= now)
 		or now - (st.armedAt or -99) > ARM_MAX_AGE
 		or creep == nil

@@ -10136,13 +10136,9 @@ function ItemUsageThink()
 			return
 		end
 	end
-	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
-	local okDeaggro, deaggroed = pcall(Usage.DeflectTowerAggro)
-	if okDeaggro and deaggroed then
-		return
-	end
 	-- Laning last hits every frame (#71): the attack on the right frame, the wind-up release / cancel. While it owns
-	-- the hit, no kiting step, item or spell order replaces it.
+	-- the hit, no kiting step, item or spell order replaces it. It lets go while an enemy tower hits the bot, so the
+	-- tower-aggro step below still runs.
 	local okLastHit, timingLastHit = pcall(LastHitTiming.Tick, bot)
 	if not okLastHit and not bot._lhTimingErr then
 		-- Once per bot: a broken hook would silently drop every timed last hit.
@@ -10152,7 +10148,11 @@ function ItemUsageThink()
 		_perfDone()
 		return
 	end
-
+	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
+	local okDeaggro, deaggroed = pcall(Usage.DeflectTowerAggro)
+	if okDeaggro and deaggroed then
+		return
+	end
 	-- Kiting for heroes on Valve's attack mode (the override attack mode kites from its own Think).
 	local okKite, kited = pcall(SpecialUnits.TryKiteInAttack, bot)
 	if okKite and kited then

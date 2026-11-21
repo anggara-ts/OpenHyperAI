@@ -9707,8 +9707,7 @@ function Usage.DropForeignItems()
 			local foreign, owner, how = ForeignItems.Check(bot, item)
 			if foreign then
 				local mode = bot:GetActiveMode()
-				-- Not in rune or item mode: the order would replace the river hold or a pick-up, and a mushroom
-				-- dropped on a river spot would keep the item mode off that spot.
+				-- Not in rune or item mode: the order would replace the river hold or Valve's pick-up.
 				if mode == BOT_MODE_RUNE or mode == BOT_MODE_ITEM then
 					return false
 				end

@@ -28,6 +28,7 @@ local function input(overrides)
 		ally = { x = 1000, y = 0 },
 		chaserSpeed = 330,
 		allyHp = 0.45,
+		allyFleeing = true,
 		catchTime = 3,
 		hitting = false,
 		inBoltRange = false,
@@ -55,8 +56,6 @@ T.test("zeus: Nimbus help plan", function()
 
 	plan, why = X.NimbusHelpPlan(input({ allyHp = 0.1 }))
 	T.eq(why, "too-late", "ally nearly dead (game 064 Alchemist at 1%)")
-	plan, why = X.NimbusHelpPlan(input({ allyHp = 0.1, minHp = 0 }))
-	T.ok(plan ~= nil, "Zeus's own flee has no HP floor")
 	plan, why = X.NimbusHelpPlan(input({ catchTime = 8 }))
 	T.eq(why, "not-yet", "chaser far from catching him")
 	plan, why = X.NimbusHelpPlan(input({ catchTime = 8, hitting = true }))
@@ -75,9 +74,22 @@ T.test("zeus: Nimbus help plan", function()
 
 	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 420 }))
 	T.eq(why, "too-fast", "420 speed crosses 900 in 2.1s, under one bolt interval")
-	plan, why = X.NimbusHelpPlan(input({ ally = { x = 300, y = 0 }, chaserSpeed = 420 }))
-	T.eq(plan, nil, "ally close: aim at the ally, chaser still leaves before a bolt")
-	T.eq(why, "too-fast", "stay (300 + 450 - 84) / 420 = 1.6s")
+	-- Derived from one geometry (game 064 numbers): chaser 350, ally fleeing at 300, melee reach 150, gap 350 so
+	-- catch = (350 - 150) / 50 = 4s. The chaser follows the ally through the cloud: 900 / 350 = 2.57s inside.
+	local gap, reach = 350, 150
+	plan, why = X.NimbusHelpPlan(input({
+		ally = { x = gap, y = 0 },
+		chaserSpeed = 350,
+		catchTime = X.CatchTime(gap - reach, 350, 300),
+	}))
+	T.ok(plan ~= nil, "fleeing ally 350 ahead of a 350-speed chaser: " .. tostring(why))
+	T.near(plan.stay, 900 / 350, 1e-6, "he crosses the whole cloud behind the ally")
+	plan, why = X.NimbusHelpPlan(input({ ally = { x = 200, y = 0 }, chaserSpeed = 350, hitting = true }))
+	T.ok(plan ~= nil, "melee chaser already hitting a fleeing ally: " .. tostring(why))
+	plan, why = X.NimbusHelpPlan(input({ ally = { x = 300, y = 0 }, chaserSpeed = 420, allyFleeing = false }))
+	T.ok(plan ~= nil, "ally standing: the chaser stops at him inside the cloud")
+	T.near(plan.aim.x, 300, 1e-6, "aim at the ally")
+	T.eq(plan.stay, math.huge, "stays while he fights there")
 	plan, why = X.NimbusHelpPlan(input({ chaserSpeed = 0 }))
 	T.ok(plan ~= nil, "standing chaser")
 	T.near(plan.aim.x, 0, 1e-6, "aim on him")

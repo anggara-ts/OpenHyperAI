@@ -523,18 +523,19 @@ function X.CatchTime(gap, chaserSpeed, awaySpeed)
 	return gap / closing
 end
 -- Pure: where Nimbus goes to slow a chaser, or nil and why not. c holds plain numbers and points ({x, y}):
---   chaser, ally: positions; chaserSpeed; allyHp; minHp (nil: NIMBUS_HELP_MIN_HP); catchTime (seconds until the
---   chaser reaches the ally); hitting (he hit the ally lately); inBoltRange, boltReady (Zeus's own Lightning Bolt
+--   chaser, ally: positions; chaserSpeed; allyHp; allyFleeing (the ally moves away from the chaser); catchTime
+--   (seconds until the chaser reaches the ally); hitting (he hit the ally lately); inBoltRange, boltReady (Zeus's own Lightning Bolt
 --   reaches him now); units: the other enemy units that a bolt could hit instead (creeps, summons, illusions; no
 --   heroes, wards or buildings); radius, interval, castPoint (Nimbus).
 -- The cloud goes on the chaser's path toward the ally, at the point he reaches having walked one radius past where
--- he stands when the cloud forms, so he crosses all of it: inside for 2 x radius / speed seconds. He must stay in
--- for one bolt interval. The Dota 2 wiki (not the game files) says a Nimbus bolt strikes the closest enemy unit,
+-- he stands when the cloud forms, so he crosses all of it while he follows a fleeing ally: inside for 2 x radius /
+-- speed seconds. An ally who is not moving away is where the chaser stops to fight: the cloud goes on the ally's
+-- spot then (or the chaser's, if nearer), and the chaser stays in it. He must stay in for one bolt interval. The Dota 2 wiki (not the game files) says a Nimbus bolt strikes the closest enemy unit,
 -- creeps and summons included, with no hero priority, so any other enemy unit inside the cloud (nearer the centre
 -- than the chaser for most of his walk) can take the bolt: then no cast.
 -- Returns plan { aim = {x, y}, crowd, stay }, or nil, why, plan.
 function X.NimbusHelpPlan(c)
-	if c.allyHp < (c.minHp or NIMBUS_HELP_MIN_HP) then
+	if c.allyHp < NIMBUS_HELP_MIN_HP then
 		return nil, "too-late"
 	end
 	if not c.hitting and c.catchTime > NIMBUS_HELP_CATCH_TIME then
@@ -548,9 +549,12 @@ function X.NimbusHelpPlan(c)
 	local plan = { aim = { x = c.chaser.x, y = c.chaser.y }, crowd = 0, stay = math.huge }
 	if c.chaserSpeed >= 50 and gap >= 1 then
 		local formWalk = c.chaserSpeed * c.castPoint
-		local along = math.min(formWalk + c.radius, gap)
+		local along = formWalk + c.radius
+		if not c.allyFleeing then
+			along = math.min(along, gap)
+		end
 		plan.aim = { x = c.chaser.x + dx / gap * along, y = c.chaser.y + dy / gap * along }
-		plan.stay = (along + c.radius - formWalk) / c.chaserSpeed
+		plan.stay = c.allyFleeing and (along + c.radius - formWalk) / c.chaserSpeed or math.huge
 	end
 	for _, unit in ipairs(c.units or {}) do
 		local ux, uy = unit.x - plan.aim.x, unit.y - plan.aim.y
@@ -600,6 +604,7 @@ function X.FleeingAllyChasers()
 						ally = ally,
 						chaser = chaser,
 						hitting = hitting,
+						fleeing = awaySpeed > 50,
 						catchTime = X.CatchTime(
 							gap - chaser:GetAttackRange(),
 							chaser:GetCurrentMovementSpeed(),
@@ -631,8 +636,8 @@ local function NimbusCrowdUnits(location, radius)
 	end
 	return units
 end
--- The NimbusHelpPlan input for a chaser of one unit (an ally or Zeus himself).
-local function NimbusHelpInput(chased, chaser, catchTime, hitting, minHp)
+-- The NimbusHelpPlan input for a fleeing ally's chaser.
+local function NimbusHelpInput(chased, chaser, catchTime, hitting, fleeing)
 	local radius = nimbusAbility:GetSpecialValueInt("cloud_radius")
 	local interval = nimbusAbility:GetSpecialValueFloat("cloud_bolt_interval")
 	radius = radius > 0 and radius or NIMBUS_RADIUS_FALLBACK
@@ -643,7 +648,7 @@ local function NimbusHelpInput(chased, chaser, catchTime, hitting, minHp)
 		ally = { x = chasedLocation.x, y = chasedLocation.y },
 		chaserSpeed = chaser:GetCurrentMovementSpeed(),
 		allyHp = Fu.GetHP(chased),
-		minHp = minHp,
+		allyFleeing = fleeing,
 		catchTime = catchTime,
 		hitting = hitting,
 		inBoltRange = GetUnitToUnitDistance(bot, chaser) <= lightningBoltAbility:GetCastRange(),
@@ -712,35 +717,27 @@ function X.ThinkNimbusResult()
 end
 -- Nimbus (zuus_cloud, Scepter-granted), npc_abilities 7.42: AbilityCastRange 0 (global), AbilityCastPoint 0.2,
 -- cloud_radius 450, cloud_bolt_interval 2.5, cloud_duration 30, cooldown 45, mana 275. The file has no
--- separate cloud-forming delay. The flee cases aim with NimbusHelpPlan; the finish and the fight lead the target by
--- 1 s (cast point plus the first bolt's wait).
+-- separate cloud-forming delay. The ally-flee case aims with NimbusHelpPlan; Zeus's own retreat, the finish and the
+-- fight lead the target by 1 s (cast point plus the first bolt's wait).
 -- Returns desire, location, why, target, note (extra log fields).
 function X.ConsiderD()
 	if not bot:HasScepter() or not nimbusAbility:IsFullyCastable() or bot:IsInvisible() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
 	-- Order: the flee cases first, then the finish, then an ally's fight. An ally going on someone matches in
-	-- almost any fight, so checked first it left no 45 s cooldown for the flee cases. The flee cases read every
-	-- enemy unit near the chaser, so they run a few times a second, not every think.
+	-- almost any fight, so checked first it left no 45 s cooldown for the flee cases. The ally-flee case reads every
+	-- enemy unit near the chaser, so it runs a few times a second, not every think.
 	local fleeCheck = DotaTime() >= nextNimbusHelpCheckAt
 	if fleeCheck then
 		nextNimbusHelpCheckAt = DotaTime() + 0.3
 	end
-	if fleeCheck and Fu.IsRetreating(bot) then
+	if Fu.IsRetreating(bot) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
 		for _, enemy in pairs(nearbyEnemies) do
 			if Fu.IsValid(enemy) and bot:WasRecentlyDamagedByHero(enemy, 1.0) and Fu.CanCastOnNonMagicImmune(enemy) then
 				-- The bolt strikes an enemy within cloud_radius (450) of the cloud and mini-stuns it. On Zeus's
-				-- own spot it misses a chaser more than 450 away, so the cloud goes on the chaser's path.
-				local plan, why, skipped = X.NimbusHelpPlan(NimbusHelpInput(bot, enemy, 0, true, 0))
-				if plan ~= nil then
-					return BOT_ACTION_DESIRE_HIGH,
-						Vector(plan.aim.x, plan.aim.y, enemy:GetLocation().z),
-						"retreat",
-						enemy,
-						string.format(" units=%d stay=%.1f", plan.crowd, math.min(plan.stay, 99))
-				end
-				LogNimbusSkip(why, bot, enemy, skipped)
+				-- own spot it misses a chaser more than 450 away, so the cloud goes where the chaser will be.
+				return BOT_ACTION_DESIRE_HIGH, enemy:GetExtrapolatedLocation(1.0), "retreat", enemy
 			end
 		end
 	end
@@ -750,7 +747,7 @@ function X.ConsiderD()
 	if fleeCheck then
 		for _, flee in ipairs(X.FleeingAllyChasers()) do
 			local plan, why, skipped =
-				X.NimbusHelpPlan(NimbusHelpInput(flee.ally, flee.chaser, flee.catchTime, flee.hitting, nil))
+				X.NimbusHelpPlan(NimbusHelpInput(flee.ally, flee.chaser, flee.catchTime, flee.hitting, flee.fleeing))
 			if plan ~= nil then
 				RecordNimbusHelp("ally-flee", flee.ally, flee.chaser)
 				if DotaTime() >= (bot._zeusNimbusHelpLogAt or -999) then

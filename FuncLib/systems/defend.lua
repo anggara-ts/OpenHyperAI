@@ -1,5 +1,4 @@
 -- Tower defense desire, and the team chat that asks allies to come defend.
-local DefendLaneRules = require(GetScriptDirectory() .. "/FuncLib/systems/defend_lane_rules")
 local function arrayFilter(self, callback, thisArg)
 	local result = {}
 	local count = 0
@@ -1612,6 +1611,7 @@ local function LogBaseDefense(bot, defendLane, desire, why, gameState)
 		)
 	)
 end
+local DefendLaneRules = require(GetScriptDirectory() .. "/FuncLib/systems/defend_lane_rules")
 -- #53: enemy creeps at a lane's threat (its enemy lane front), counted once a second per lane for the team.
 local laneThreatCache = {}
 local function LaneThreatCreeps(lane)

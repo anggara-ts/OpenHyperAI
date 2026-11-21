@@ -647,6 +647,39 @@ function X.TombstoneDistance()
 	end
 	return best
 end
+-- Time to impact and spell of the skillshot a dodge Phase Shift is for: the linear-projectile finder of the
+-- skillshot dodge (#134) when the build has it (pcall: absent on builds without it), else nil, "-" (the tracking
+-- projectile rules on main have no speed, so no time to impact).
+function X.PhaseDodgeThreat()
+	if Fu.FindLinearProjectileIncoming == nil then
+		return nil, "-"
+	end
+	local ok, threat = pcall(Fu.FindLinearProjectileIncoming, bot, phaseShiftAbility:GetCastPoint(), "cyclone")
+	if not ok or type(threat) ~= "table" or type(threat.tti) ~= "number" then
+		return nil, "-"
+	end
+	return threat.tti, tostring(threat.name or "-")
+end
+-- [OHA-PUCK] phase dodge spell= tti= waited= result=cast|late how=now|waited|cant-cast|expired why=, one per dodge.
+-- result=late: the cast went out after the hit time, or never (stunned first: cant-cast; threat gone: expired).
+function X.LogPhaseDodge(want, result, how)
+	bot._phaseDodgeWant = nil
+	local waited = DotaTime() - want.at
+	result = result or EscapeRules.PhaseDodgeResult(waited, want.tti)
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f phase dodge spell=%s tti=%.2f waited=%.2f result=%s how=%s why=%s",
+			DotaTime(),
+			tostring(want.spell),
+			want.tti or -1,
+			waited,
+			result,
+			tostring(how),
+			tostring(want.why)
+		)
+	)
+end
 function X.SkillsComplement()
 	pcall(X.SampleHp)
 	pcall(X.HoldTpInDanger)
@@ -687,6 +720,11 @@ function X.SkillsComplement()
 			or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
 		)
 	pcall(X.LogEscapeCheck, okReady and orbOut ~= nil, canCast)
+	-- A dodge that waited for the hold and never went out: stunned first, or the threat passed.
+	local dodgeWant = bot._phaseDodgeWant
+	if dodgeWant ~= nil and (not canCast or DotaTime() - dodgeWant.at > 0.6) then
+		pcall(X.LogPhaseDodge, dodgeWant, "late", canCast and "expired" or "cant-cast")
+	end
 	if not canCast then
 		return
 	end
@@ -715,7 +753,18 @@ function X.SkillsComplement()
 	-- Under 20% HP (low-hp-units) the units' next hits can't wait either.
 	local isDodge = string.sub(tostring(X.phaseWhy), 1, 5) == "dodge" or X.phaseWhy == "low-hp-units"
 	local maxWait = isDodge and 0.2 or 0.4
-	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode then
+	-- A dodge whose hit is closer than the wait: cast in this think (game 067, t=3039: Impale tti=0.20, the 0.2s
+	-- wait let the stun land first, canCast=false the next think; she died at 3041). Phase Shift's cast point is
+	-- 0.01 (datafeed hero 13). The cast hold below still starts with the order.
+	local dodgeTti, dodgeSpell = nil, "-"
+	if phaseShiftDesire > 0 and string.sub(tostring(X.phaseWhy), 1, 5) == "dodge" then
+		dodgeTti, dodgeSpell = X.PhaseDodgeThreat()
+		if bot._phaseDodgeWant == nil then
+			bot._phaseDodgeWant = { at = DotaTime(), spell = dodgeSpell, tti = dodgeTti, why = X.phaseWhy }
+		end
+	end
+	local castNow = EscapeRules.PhaseDodgeNow(dodgeTti)
+	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode and not castNow then
 		if bot._phaseWantAt == nil or DotaTime() - bot._phaseWantAt > maxWait + 0.3 then
 			bot._phaseWantAt = DotaTime()
 			bot._phaseWantMode = bot:GetActiveMode()
@@ -742,6 +791,9 @@ function X.SkillsComplement()
 				DotaTime() - (bot._outpostLastDesireAt or -99)
 			)
 		)
+		if bot._phaseDodgeWant ~= nil then
+			pcall(X.LogPhaseDodge, bot._phaseDodgeWant, nil, castNow and "now" or "waited")
+		end
 		bot._phaseWantAt = nil
 		bot._phaseWantMode = nil
 		bot._phaseProbeAt = DotaTime() + 0.3

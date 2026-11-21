@@ -66,6 +66,16 @@ T.test("escape rules: Phase Shift at low HP against units (game 067, 42:07)", fu
 	T.eq(R.LowHpUnitsPhase(0.3, 0.1, true, 4), false, "over 20%")
 end)
 
+T.test("escape rules: a close dodge Phase Shift goes out at once (game 067, t=3039)", function()
+	local R = load()
+	T.eq(R.PhaseDodgeNow(0.20), true, "game 067: Impale tti=0.20")
+	T.eq(R.PhaseDodgeNow(0.5), false, "time for the hold")
+	T.eq(R.PhaseDodgeNow(nil), false, "unknown time: keep the wait")
+	T.eq(R.PhaseDodgeResult(0.0, 0.20), "cast", "cast in the same think")
+	T.eq(R.PhaseDodgeResult(0.21, 0.20), "late", "game 067: waited 0.2s, hit at 0.20")
+	T.eq(R.PhaseDodgeResult(0.2, nil), "cast", "unknown time")
+end)
+
 T.test("puck: the escape helpers run on the stub", function()
 	T.stub.reset({ hero = "npc_dota_hero_puck", slot = 2 })
 	local ok, X = T.stub.load("BotsLib/hero_puck")
@@ -81,6 +91,7 @@ T.test("puck: the escape helpers run on the stub", function()
 		"HpLoss",
 		"UnitAttackers",
 		"TombstoneDistance",
+		"PhaseDodgeThreat",
 		"CastHoldTick",
 		"SkillsComplement",
 	}) do

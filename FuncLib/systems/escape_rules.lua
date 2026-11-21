@@ -104,4 +104,19 @@ function EscapeRules.LowHpUnitsPhase(hp, hpLoss, hitByCreep, attackers)
 	return hitByCreep == true or (attackers or 0) >= 1 or (hpLoss or 0) >= 0.02
 end
 
+-- A dodge Phase Shift goes out in the same think, without waiting for the outpost hold (up to 0.2s), when the hit
+-- is due sooner than PHASE_NOW_TTI (#36, game 067 t=3039: Impale tti=0.20, the wait let the stun land first).
+-- Phase Shift's cast point is 0.01 (datafeed hero 13). tti nil (unknown): keep the wait.
+EscapeRules.PHASE_NOW_TTI = 0.35
+function EscapeRules.PhaseDodgeNow(tti)
+	return tti ~= nil and tti < EscapeRules.PHASE_NOW_TTI
+end
+-- cast: the order went out before the hit time (or the time was unknown); late: after it.
+function EscapeRules.PhaseDodgeResult(waited, tti)
+	if tti == nil or waited < tti then
+		return "cast"
+	end
+	return "late"
+end
+
 return EscapeRules

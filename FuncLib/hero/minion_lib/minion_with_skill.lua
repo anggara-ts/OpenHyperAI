@@ -21,8 +21,9 @@ function X.Think(ownerBot, minion)
 		return
 	end
 	for i = 1, #minion.abilities do
-		local ability = minion:GetAbilityByName(minion.abilities[i]:GetName())
-		if Fu.CanCastAbility(ability) then
+		local stored = minion.abilities[i]
+		local ability = stored ~= nil and not stored:IsNull() and minion:GetAbilityByName(stored:GetName()) or nil
+		if ability ~= nil and Fu.CanCastAbility(ability) then
 			botTarget = Fu.GetProperTarget(bot)
 			nearbyAllies = minion:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 			nearbyEnemies = minion:GetNearbyHeroes(1600, true, BOT_MODE_NONE)

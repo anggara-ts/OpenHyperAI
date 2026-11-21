@@ -34,49 +34,69 @@ if sRole == "pos_5" then
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 37,557 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
-	"item_faerie_fire",
-	"item_mantle",
-	"item_circlet",
-	"item_double_branches",
 	"item_tango",
-	"item_null_talisman",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_ring_of_protection",
 	"item_boots",
-	"item_magic_wand",
-	"item_spirit_vessel",
 	"item_dagon_2",
 	"item_travel_boots",
-	"item_ethereal_blade",
-	"item_octarine_core",
 	"item_dagon_5",
-	"item_kaya_and_sange",
-	"item_sheepstick",
+	"item_octarine_core",
 	"item_ultimate_scepter",
+	"item_aghanims_shard",
+	"item_sheepstick",
 	"item_ultimate_scepter_2",
+	"item_orchid",
+	"item_force_staff",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_aghanims_shard",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
-sRoleItemsBuyList["pos_4"] = {
-	"item_double_tango",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 1,799 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_circlet",
 	"item_faerie_fire",
-	"item_clarity",
-	"item_blood_grenade",
+	"item_ring_of_protection",
 	"item_boots",
 	"item_urn_of_shadows",
-	"item_tranquil_boots",
 	"item_magic_wand",
 	"item_spirit_vessel",
-	"item_force_staff",
-	"item_glimmer_cape",
+	"item_travel_boots",
+	"item_soul_booster",
 	"item_ultimate_scepter",
-	"item_boots_of_bearing",
 	"item_octarine_core",
-	"item_sheepstick",
 	"item_aghanims_shard",
+	"item_sheepstick",
 	"item_ultimate_scepter_2",
+	"item_glimmer_cape",
+	"item_wind_waker",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 572 matches, built from pos 2 (37,557) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_2"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 17,487 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_wind_lace",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_urn_of_shadows",
+	"item_spirit_vessel",
+	"item_force_staff",
+	"item_ultimate_scepter",
+	"item_aghanims_shard",
+	"item_sheepstick",
+	"item_ultimate_scepter_2",
+	"item_dagon_5",
+	"item_wind_waker",
 	"item_moon_shard",
 }
 -- Pos 5 (#9, game 039): no Solar Crest rush. Stratz 7.41f (week of 5-11 Nov 2026, all ranks), pos 5, 8,183
@@ -84,24 +104,23 @@ sRoleItemsBuyList["pos_4"] = {
 -- Urn of Shadows 47%, Force Staff 40%, Spirit Vessel 37%, Glimmer Cape 35%. Order by when they are bought:
 -- Wand and Urn by minute 10, Vessel ~17, Force Staff and Glimmer ~24, Scepter ~29. Pos 4 (12,985 matches)
 -- reads the same: Scepter 81%, Urn 55%, Wand 54%, Vessel 41%, Force Staff 41%; Kaya and Sange 0.5%.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 10,732 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
-	"item_double_tango",
-	"item_faerie_fire",
+	"item_tango",
 	"item_blood_grenade",
-	"item_tranquil_boots",
+	"item_double_branches",
+	"item_wind_lace",
 	"item_magic_wand",
+	"item_tranquil_boots",
 	"item_urn_of_shadows",
 	"item_spirit_vessel",
 	"item_force_staff",
-	"item_glimmer_cape",
 	"item_ultimate_scepter",
-	"item_cyclone",
-	"item_boots_of_bearing",
-	"item_lotus_orb",
-	"item_sheepstick",
-	"item_wind_waker",
-	"item_ultimate_scepter_2",
 	"item_aghanims_shard",
+	"item_sheepstick",
+	"item_ultimate_scepter_2",
+	"item_dagon_5",
+	"item_lotus_orb",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]

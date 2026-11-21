@@ -2,6 +2,29 @@
 -- the bot API.
 local RuneRules = {}
 
+-- Passing-by grab (#32): does this bot leave a rune to an ally closer to it? The old rule left it to any closer ally,
+-- whether or not that ally went for it. Game 066, 78:01: an invisibility rune (type 3) lay 357 from Elder Titan and
+-- 382 from Earthshaker while they chased Omniknight, both said `powerrune-near-skip`, and nobody took it.
+-- A closer human always has it. A closer bot has it while its active mode is the rune mode, and for the first
+-- PASS_WAIT seconds this bot sees it closer (its rune mode needs a think to win). After that, a closer bot that still
+-- isn't in the rune mode has given it up, and this bot takes it. waited: seconds this bot has seen that ally closer.
+RuneRules.PASS_WAIT = 1.0
+-- Seconds a bot that took a rune over stays its picker (renewed every think the passing grab still wants it).
+RuneRules.PASS_TAKE_FOR = 3
+function RuneRules.PassingYield(allyCloser, allyIsHuman, allyInRuneMode, waited)
+	if not allyCloser then
+		return false
+	end
+	if allyIsHuman or allyInRuneMode then
+		return true
+	end
+	return waited < RuneRules.PASS_WAIT
+end
+-- The passing grab's desire with no enemy hero within 1200 (above a walking push or defend at 0.95, #99), and for a
+-- power rune within PASS_POWER_STEP even with enemy heroes near, unless one hit the bot in the last 1.5s.
+RuneRules.PASS_DESIRE = 0.97
+RuneRules.PASS_POWER_STEP = 400
+
 -- Leftover rune: a spot (river or jungle) whose status reads available while GetRuneType says -1 (no type), with
 -- the spot in our vision, after the first 10s of its spawn cycle (the type reads -1 just after a spawn too: game
 -- 017, the horn). Game 063: the bottom river bounty from 0:00 was never taken and read `type=-1` all game; bots

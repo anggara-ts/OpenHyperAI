@@ -18,6 +18,16 @@ T.test("rune rules: what counts as a leftover rune", function()
 	T.eq(R.IsLeftover(true, -1, nil, true, 3), false, "first 10s of the cycle")
 end)
 
+T.test("rune rules: passing grab leaves a rune to a closer ally only while it goes for it", function()
+	local R = load()
+	T.eq(R.PassingYield(false, false, false, 0), false, "no closer ally: take it")
+	T.eq(R.PassingYield(true, true, false, 5), true, "a closer human always has it")
+	T.eq(R.PassingYield(true, false, true, 5), true, "a closer bot in the rune mode has it")
+	T.eq(R.PassingYield(true, false, false, 0.4), true, "a closer bot gets a second to switch to the rune mode")
+	-- Game 066, 78:01: the closer allies kept chasing and nobody took the invisibility rune 357 away.
+	T.eq(R.PassingYield(true, false, false, 1.2), false, "a closer bot still not in the rune mode after 1s gave it up")
+end)
+
 T.test("rune rules: leftover hold steps", function()
 	local R = load()
 	local hold = { t0 = 100 }

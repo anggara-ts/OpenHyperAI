@@ -130,6 +130,39 @@ function MapObjectives.GetWisdomShrineLocations()
 	}, nil
 end
 
+-- The shrine nearest loc and its ability_xp_fountain state (#32, game 039: does the XP wait at the shrine after the
+-- mark until someone takes it?). Game data (7.42 pak01 npc_abilities.txt): ability_xp_fountain has AbilityCharges 1,
+-- radius 300, countdown_time 3. Whether the bot API reads the charge has not been tested: "?" when it can't.
+-- Returns "charges=<n|?> cd=<s|?>".
+function MapObjectives.WisdomShrineState(loc)
+	local best, bestDist = nil, 1200
+	for _, unit in ipairs(ScanUnits(cachedWisdom, "npc_dota_xp_fountain")) do
+		if unit ~= nil and not unit:IsNull() then
+			local d = GetUnitToLocationDistance(unit, loc)
+			if d < bestDist then
+				best, bestDist = unit, d
+			end
+		end
+	end
+	local charges, cooldown = "?", "?"
+	if best ~= nil then
+		local okA, ability = pcall(function()
+			return best:GetAbilityByName("ability_xp_fountain")
+		end)
+		if okA and ability ~= nil then
+			local okC, c = pcall(function()
+				return ability:GetCurrentCharges()
+			end)
+			local okD, cd = pcall(function()
+				return ability:GetCooldownTimeRemaining()
+			end)
+			charges = okC and tostring(c) or "?"
+			cooldown = okD and type(cd) == "number" and string.format("%.0f", cd) or "?"
+		end
+	end
+	return string.format("charges=%s cd=%s", charges, cooldown)
+end
+
 function MapObjectives.PickClosestLocation(bot, locations)
 	local best = nil
 	local bestDist = 99999
@@ -857,7 +890,7 @@ local function ProbeObjectives(bot)
 		ProbeUnit("wisdom", unit)
 	end
 end
-function MapObjectives.ConsiderObjectiveDesire(bot)
+function MapObjectives.ConsiderObjectiveDesireRaw(bot)
 	-- The pool / shrine probe answered it (game 020): pools show no modifiers with lotuses in
 	-- them, shrines only modifier_invulnerable, so neither can be read when passing by. Removed.
 	if bot == nil or not bot:IsAlive() or bot:IsIllusion() then
@@ -888,6 +921,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 		local maxWalk = MapObjectives.MaxWalk(bot, true)
 		local arrive = MapObjectives.ArriveEarlyForDistance(dist, bot)
 		local inWisdom, etaW = MapObjectives.InMarkWindow(wInterval, arrive, 8)
+		local cantArrive = false
 		-- Only go when the walk fits the window (it closes 8s after the mark). Game 039, 21:00: Tusk said
 		-- "Grabbing the XP shrine" from far away at 20:59, then gave up at 21:08 and went farming (#32).
 		if inWisdom and loc ~= nil and type(etaW) == "number" then
@@ -895,6 +929,7 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			local markKey = math.floor(DotaTime() / wInterval + (etaW > 0 and 1 or 0))
 			if travel > etaW + 8 then
 				inWisdom = false
+				cantArrive = true
 				if bot._wisdomSkipLogged ~= markKey then
 					bot._wisdomSkipLogged = markKey
 					pcall(
@@ -925,15 +960,25 @@ function MapObjectives.ConsiderObjectiveDesire(bot)
 			end
 		end
 		local hp = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
-		if
-			inWisdom
-			and loc ~= nil
-			and dist <= maxWalk
-			and hp >= 0.45
-			and not (bot:WasRecentlyDamagedByAnyHero(3.0) and hp < 0.65)
-			and not (MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700)
-			and MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.WisdomScore)
-		then
+		-- Why there is no shrine trip now, for the give-up line (MapObjectives.NoteWisdomTrip).
+		local noWhy = nil
+		if cantArrive then
+			noWhy = "cant-arrive"
+		elseif not inWisdom then
+			noWhy = "window"
+		elseif loc == nil then
+			noWhy = "no-shrine"
+		elseif dist > maxWalk then
+			noWhy = "far"
+		elseif hp < 0.45 or bot:WasRecentlyDamagedByAnyHero(3.0) and hp < 0.65 then
+			noWhy = "hp"
+		elseif MapObjectives.DangerousObjective(bot, loc, 1500) and dist > 700 then
+			noWhy = "danger"
+		elseif not MapObjectives.IsBestAllyForLocation(bot, loc, MapObjectives.WisdomScore) then
+			noWhy = "not-best"
+		end
+		bot._wisdomNoWhy = noWhy
+		if noWhy == nil then
 			local desire = RemapValClamped(dist, maxWalk, 0, BOT_MODE_DESIRE_MODERATE, BOT_MODE_DESIRE_ABSOLUTE)
 			-- Don't go hard until travel time is actually needed.
 			if type(etaW) == "number" and etaW > arrive * 0.55 then
@@ -1314,6 +1359,20 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 			local mark = math.floor(math.max(0, now) / interval) * interval
 			if mark >= interval and now >= mark and (gotXp or covered) then
 				bot._wisdomClaimedMark = mark
+				pcall(
+					print,
+					string.format(
+						"[OHA-WISDOM] t=%.0f %s %s xp=+%d stood=%.1f late=%.0f %s",
+						now,
+						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						-- covered: stood 3.5s on it with no XP seen (the old claim rule counts it as done)
+						gotXp and "taken" or "covered",
+						gotXp and (xp - bot._wisdomXpAtStand) or 0,
+						now - bot._wisdomStandSince,
+						now - mark,
+						MapObjectives.WisdomShrineState(loc)
+					)
+				)
 				bot._wisdomStandSince = nil
 				bot._wisdomXpAtStand = nil
 			end
@@ -1379,6 +1438,61 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 		return true
 	end
 	return false
+end
+
+-- Shrine trip lines (#32, game 039: Tusk announced the shrine after respawning and was farming 14s later; no line said
+-- why). One go line per mark is printed above; this adds the end of a trip:
+--   [OHA-WISDOM] t= <hero> give-up why=<cant-arrive|window|far|hp|danger|not-best|dead|crisis|defending> dist= late=
+--   [OHA-WISDOM] t= <hero> taken|covered xp=+N stood= late= charges= cd=   (from ThinkObjective; covered: 3.5s on
+--   the shrine and no XP seen)
+-- late: seconds since the 7:00 mark (negative before it).
+local function HeroName(bot)
+	return (string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
+end
+function MapObjectives.NoteWisdomTrip(bot, kind, loc)
+	local now = DotaTime()
+	local interval = MapObjectives.WisdomInterval()
+	if kind == "wisdom" and loc ~= nil then
+		if bot._wisdomTrip == nil then
+			bot._wisdomTrip = { loc = loc, at = now }
+		end
+		bot._wisdomTrip.seen = now
+		return
+	end
+	local trip = bot._wisdomTrip
+	if trip == nil then
+		return
+	end
+	bot._wisdomTrip = nil
+	local mark = math.floor((now + 40) / interval) * interval
+	if bot._wisdomClaimedMark == mark or bot._wisdomClaimedMark == mark - interval then
+		return
+	end
+	-- One give-up line per bot and mark (a go / skip can flip within one mark: game 067, Puck go t=397, skip t=404).
+	if bot._wisdomGiveUpMark == mark then
+		return
+	end
+	bot._wisdomGiveUpMark = mark
+	local why = bot._wisdomNoWhy or bot._lotusWhy or "?"
+	pcall(
+		print,
+		string.format(
+			"[OHA-WISDOM] t=%.0f %s give-up why=%s dist=%d late=%.0f trip=%.0fs",
+			now,
+			HeroName(bot),
+			tostring(why),
+			bot:IsAlive() and GetUnitToLocationDistance(bot, trip.loc) or -1,
+			now - mark,
+			now - trip.at
+		)
+	)
+end
+function MapObjectives.ConsiderObjectiveDesire(bot)
+	local desire, loc, kind, eta = MapObjectives.ConsiderObjectiveDesireRaw(bot)
+	if bot ~= nil then
+		pcall(MapObjectives.NoteWisdomTrip, bot, desire ~= nil and desire > 0 and kind or nil, loc)
+	end
+	return desire, loc, kind, eta
 end
 
 return MapObjectives

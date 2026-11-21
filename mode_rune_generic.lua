@@ -117,13 +117,14 @@ local function LogPowerRuneSkip(why)
 				pcall(
 					print,
 					string.format(
-						"[OHA-RUNE] t=%.0f %s powerrune-near-skip spot=%d type=%s dist=%d why=%s",
+						"[OHA-RUNE] t=%.0f %s powerrune-near-skip spot=%d type=%s dist=%d why=%s pass=%s",
 						DotaTime(),
 						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
 						id,
 						tostring(runeType),
 						dist,
-						tostring(why)
+						tostring(why),
+						tostring(bot._passWhy)
 					)
 				)
 				return
@@ -1160,6 +1161,7 @@ function RuneMode.MeepoBodyInFight()
 end
 function GetDesireRaw()
 	pcall(CheckPickupResult)
+	bot._passWhy = "not-reached"
 	RuneMode.InitRune()
 	bot._mapObjKind = nil
 	bot._mapObjLoc = nil
@@ -1401,11 +1403,14 @@ function GetDesireRaw()
 	-- and no enemy is closer or about to take it. Laning used to need it within 500, and after
 	-- laning it had to be the "best" rune and the bot not pushing or defending.
 	-- Not while enemy heroes are at our Ancient (that exit now comes after this grab).
-	if
-		not dying
-		and hpRatio >= 0.35
-		and Fu.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200) == 0
-	then
+	-- bot._passWhy: why the grab didn't fire, for the powerrune-near-skip line (game 066 printed `why=too-far` for a
+	-- rune 357 away: that was the last rule below, not the reason).
+	bot._passWhy = "-"
+	if dying or hpRatio < 0.35 then
+		bot._passWhy = "hp"
+	elseif Fu.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(), 3200) > 0 then
+		bot._passWhy = "ancient"
+	else
 		-- Power runes too (user call), with the laning rules for who takes the river runes.
 		for _, id in ipairs({ RUNE_BOUNTY_1, RUNE_BOUNTY_2, RUNE_POWERUP_1, RUNE_POWERUP_2 }) do
 			if GetRuneStatus(id) == RUNE_STATUS_AVAILABLE then
@@ -1413,20 +1418,41 @@ function GetDesireRaw()
 				local mine = GetUnitToLocationDistance(bot, loc)
 				local riverOk = not IsRiverRune(id)
 					or not (RuneMode.SidelaneSkipsRiver(id, mine) or RuneMode.SkipSecondLaningRune(id))
-				if mine <= 1000 and riverOk and not RuneMode.RuneSkipped(id) and not RuneMode.IsEnemyPickRune(id) then
-					local allyCloser = false
+				if mine > 1000 then
+					-- not passing
+				elseif not riverOk then
+					bot._passWhy = "river-rule"
+				elseif RuneMode.RuneSkipped(id) then
+					bot._passWhy = "skipped"
+				elseif RuneMode.IsEnemyPickRune(id) then
+					bot._passWhy = "enemy-closer"
+				else
+					local closer, closerDist = nil, mine
 					for _, ally in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES) or {}) do
-						if
-							ally ~= bot
-							and ally:IsAlive()
-							and not ally:IsIllusion()
-							and GetUnitToLocationDistance(ally, loc) < mine
-						then
-							allyCloser = true
-							break
+						if ally ~= bot and ally:IsAlive() and not ally:IsIllusion() then
+							local allyDist = GetUnitToLocationDistance(ally, loc)
+							if allyDist < closerDist then
+								closer, closerDist = ally, allyDist
+							end
 						end
 					end
-					if not allyCloser then
+					-- A closer bot that doesn't go for it within 1s gives it up (RuneRules.PassingYield).
+					bot._passWait = bot._passWait or {}
+					local wait = bot._passWait[id]
+					if closer == nil or wait == nil or wait.ally ~= closer then
+						wait = closer ~= nil and { ally = closer, since = DotaTime() } or nil
+						bot._passWait[id] = wait
+					end
+					local waited = wait ~= nil and DotaTime() - wait.since or 0
+					local yield = RuneRules.PassingYield(
+						closer ~= nil,
+						closer ~= nil and not closer:IsBot(),
+						closer ~= nil and closer:GetActiveMode() == BOT_MODE_RUNE,
+						waited
+					)
+					if yield then
+						bot._passWhy = "ally:" .. (string.gsub(closer:GetUnitName(), "npc_dota_hero_", ""))
+					else
 						local runeInfo = bot.rune.normal
 						runeInfo.location = id
 						runeInfo.distance = mine
@@ -1435,8 +1461,44 @@ function GetDesireRaw()
 						-- No enemy hero near: above a walking push or defend (0.95). Game 048 18:10: Night
 						-- Stalker walked past the top jungle bounty 885 away on a push (passing gave 0.75).
 						local passDesire = mine <= 600 and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH
-						if #(Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}) == 0 then
-							passDesire = math.max(passDesire, 0.97)
+						local enemyNear = #(Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}) > 0
+						-- A power rune a short step away beats a chase too (maintainer, game 038: above every mode
+						-- but a real retreat), unless heroes are hitting the bot. Game 066, 78:01: an invisibility
+						-- rune 357 from Elder Titan, who kept chasing Omniknight (attack 0.65-0.95). Not a type -1 spot (the
+						-- leftover hold in Think handles those).
+						local powerStep = IsRiverRune(id)
+							and runeInfo.type ~= -1
+							and runeInfo.type ~= RUNE_INVALID
+							and mine <= RuneRules.PASS_POWER_STEP
+							and not bot:WasRecentlyDamagedByAnyHero(1.5)
+						if not enemyNear or powerStep then
+							passDesire = math.max(passDesire, RuneRules.PASS_DESIRE)
+						end
+						-- Taking it over from a closer ally: the picker rules (IsTheClosestAlly, so PickerSpot and
+						-- BackUpPicker in Think) treat this bot as the picker for a few seconds, or it would hold the
+						-- backup spot 450 off the rune.
+						if closer ~= nil then
+							bot._passTake = { id = id, untilAt = DotaTime() + RuneRules.PASS_TAKE_FOR }
+						end
+						-- One line per rune and spawn cycle when the old rule would not have taken it.
+						local logKey = id .. ":" .. math.floor(DotaTime() / RuneCycle(id))
+						if (closer ~= nil or powerStep and enemyNear) and bot._passLogKey ~= logKey then
+							bot._passLogKey = logKey
+							pcall(
+								print,
+								string.format(
+									"[OHA-RUNE] t=%.0f %s passing-take spot=%d type=%s dist=%d over=%s waited=%.1f des=%.2f mode=%s",
+									DotaTime(),
+									(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+									id,
+									tostring(runeInfo.type),
+									mine,
+									closer ~= nil and (string.gsub(closer:GetUnitName(), "npc_dota_hero_", "")) or "-",
+									waited,
+									passDesire,
+									ModeTag(bot:GetActiveMode())
+								)
+							)
 						end
 						return give(passDesire, IsRiverRune(id) and "power-passing" or "bounty-passing")
 					end
@@ -2597,6 +2659,14 @@ function RuneMode.BackUpPicker(id)
 	return true
 end
 function RuneMode.IsTheClosestAlly(unit, location)
+	-- A passing grab took this rune over from a closer ally that ignored it (RuneRules.PassingYield).
+	local take = unit._passTake
+	if take ~= nil and DotaTime() < take.untilAt then
+		local spot = GetRuneSpawnLocation(take.id)
+		if math.abs(spot.x - location.x) < 1 and math.abs(spot.y - location.y) < 1 then
+			return true
+		end
+	end
 	local closestAlly = unit
 	local closestDistance = GetUnitToLocationDistance(unit, location)
 	for playerIndex = 1, 5 do

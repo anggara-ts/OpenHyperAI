@@ -4428,13 +4428,65 @@ Usage.ConsiderItemDesire["item_refresher"] = function(item)
 	local hEffectTarget = nil
 	local castReason = "刷新技能"
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if BotBuild ~= nil and BotBuild.CanUseRefresherShard ~= nil and BotBuild.CanUseRefresherShard() then
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+	local heroName = string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")
+	if BotBuild ~= nil and BotBuild.CanUseRefresherShard ~= nil then
+		if BotBuild.CanUseRefresherShard() then
+			Usage.LogRefresher(item, "hero-rule", heroName, -1)
+			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+		end
+		return BOT_ACTION_DESIRE_NONE
 	end
-	if #enemyHeroes > 0 and (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot)) and Fu.CanUseRefresherShard(bot) then
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+	if #enemyHeroes > 0 and (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot)) then
+		local ok, needed = Fu.CanUseRefresherShard(bot, item)
+		if ok then
+			Usage.LogRefresher(item, "ult", heroName, needed)
+			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+		end
+		local ultimate = Fu.GetUltimateAbility(bot)
+		-- Only the mana is short (the ultimate is on the cooldown the rule wants): say so, every 10s at most.
+		if
+			ultimate ~= nil
+			and not ultimate:IsPassive()
+			and ultimate:GetCooldownTimeRemaining() >= ultimate:GetCooldown() / 2
+			and bot:GetMana() < (needed or 0)
+			and DotaTime() >= (bot._refresherSkipLogAt or -999)
+		then
+			bot._refresherSkipLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s refresher-skip why=mana item=%s mana=%d needed=%d itemCost=%d ultCost=%d",
+					DotaTime(),
+					heroName,
+					item:GetName(),
+					bot:GetMana(),
+					needed or 0,
+					item:GetManaCost(),
+					ultimate:GetManaCost()
+				)
+			)
+		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- One line per refresh: which rule, the mana before it and what it needed (-1: a hero file's own rule).
+function Usage.LogRefresher(item, why, heroName, needed)
+	local ultimate = Fu.GetUltimateAbility(bot)
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s refresher why=%s item=%s mana=%d needed=%d itemCost=%d ult=%s ultCd=%.0f",
+			DotaTime(),
+			heroName,
+			why,
+			item:GetName(),
+			bot:GetMana(),
+			needed,
+			item:GetManaCost(),
+			ultimate ~= nil and ultimate:GetName() or "-",
+			ultimate ~= nil and ultimate:GetCooldownTimeRemaining() or -1
+		)
+	)
 end
 Usage.ConsiderItemDesire["item_refresher_shard"] = function(item)
 	return Usage.ConsiderItemDesire["item_refresher"](item)

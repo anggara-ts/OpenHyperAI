@@ -1,25 +1,42 @@
 -- Shared helper: item ability.
+local RefresherRules = require(GetScriptDirectory() .. "/FuncLib/systems/refresher_rules")
 local function installItemAbility(Fu)
 	local isDebugLogEnabled = 1 == 10
 	local spamManaThreshold = 0.39
 	function Fu.GetUltimateAbility(unit)
 		return unit:GetAbilityInSlot(5)
 	end
-	function Fu.CanUseRefresherShard(bot)
-		local ultimate = Fu.GetUltimateAbility(bot)
-		if ultimate ~= nil and ultimate:IsPassive() == false then
-			local cooldown = ultimate:GetCooldown()
-			local manaCost = ultimate:GetManaCost()
-			local minElapsed = 2
-			if
-				bot:GetMana() >= manaCost * 2
-				and ultimate:GetCooldownTimeRemaining() >= cooldown / 2
-				and cooldown - ultimate:GetCooldownTimeRemaining() >= minElapsed
-			then
-				return true
+	-- The refresher in the main inventory (Orb first, then Shard), or nil.
+	function Fu.GetRefresherItem(bot)
+		for _, name in ipairs({ "item_refresher", "item_refresher_shard" }) do
+			local slot = bot:FindItemSlot(name)
+			if slot >= 0 and slot <= 5 then
+				return bot:GetItemInSlot(slot)
 			end
 		end
-		return false
+		return nil
+	end
+	-- Ultimate cast 2s+ ago with half its cooldown or more left, and mana for the refresher plus one more cast
+	-- of the ultimate (FuncLib/systems/refresher_rules.lua, #47). refresher: the item (found when nil).
+	-- Returns ok, then the mana it needs (for the log line).
+	function Fu.CanUseRefresherShard(bot, refresher)
+		local ultimate = Fu.GetUltimateAbility(bot)
+		if ultimate == nil or ultimate:IsPassive() then
+			return false
+		end
+		refresher = refresher or Fu.GetRefresherItem(bot)
+		local refresherCost = refresher ~= nil and refresher:GetManaCost() or 0
+		local cooldown = ultimate:GetCooldown()
+		local minElapsed = 2
+		local needed = RefresherRules.ManaNeeded(refresherCost, { ultimate:GetManaCost() })
+		if
+			bot:GetMana() >= needed
+			and ultimate:GetCooldownTimeRemaining() >= cooldown / 2
+			and cooldown - ultimate:GetCooldownTimeRemaining() >= minElapsed
+		then
+			return true, needed
+		end
+		return false, needed
 	end
 	function Fu.GetMostUltimateCDUnit()
 		local bestUnit = nil

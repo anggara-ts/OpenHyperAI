@@ -684,13 +684,16 @@ end
 function X.CanUseRefresherShard()
 	local chaosMeteorManaCost = chaosMeteorAbility:GetManaCost()
 	local sunstrikeManaCost = sunstrikeAbility:GetManaCost()
+	-- The refresher's own mana (Orb 325, Shard 200 in 7.42) plus one more cast of the spell (#47).
+	local refresher = Fu.GetRefresherItem(bot)
+	local refresherCost = refresher ~= nil and refresher:GetManaCost() or 0
 	if
 		sunstrikeAbility:GetCooldownTimeRemaining() >= 10
 		and (sunstrikeAbility:GetCooldownTimeRemaining() / sunstrikeAbility:GetCooldown() <= 0.7 or X.CanAbilityPossiblyBeCasted(
 			cataclysmName
 		))
 		and X.IsAbilityAvailableOnSlots(sunstrikeAbility)
-		and bot:GetMana() >= sunstrikeManaCost * 2 + sunstrikeManaCost
+		and bot:GetMana() >= refresherCost + sunstrikeManaCost
 	then
 		local cataclysmDesire, _ = X.GoodTimeToUseCataclysmGlobally()
 		if cataclysmDesire > 0 then
@@ -703,7 +706,7 @@ function X.CanUseRefresherShard()
 		and X.IsAbilityAvailableOnSlots(chaosMeteorAbility)
 		and #nearbyEnemies > 0
 		and (isEngaging or Fu.IsInTeamFight(bot))
-		and bot:GetMana() >= chaosMeteorManaCost * 2 + chaosMeteorManaCost
+		and bot:GetMana() >= refresherCost + chaosMeteorManaCost
 	then
 		return true
 	end

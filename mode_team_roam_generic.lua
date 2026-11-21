@@ -22,6 +22,8 @@ local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
 local RoamStats = require(GetScriptDirectory() .. "/FuncLib/systems/roam_stats")
 local HuntTrace = require(GetScriptDirectory() .. "/FuncLib/systems/hunt_trace")
+local RoamRules = require(GetScriptDirectory() .. "/FuncLib/systems/team_roam_rules")
+local LastHitOverlay = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
 local TeamRoam = {}
 local team = GetTeam()
 local engageTarget = nil
@@ -52,7 +54,13 @@ local isEscapingTower = false
 local towerEscapeUntil = 0
 local towerEscapeDuration = 2
 local towerEscapeLocation = nil
-local lastHitCreep = nil
+-- The hit team roam offers the last-hit overlay this think (#165): the snipe, or a hunt on a creep.
+local offerUnit, offerDesire, offerWhy = nil, 0, nil
+-- The hero / courier hunt that set team roam's desire last think, and when it started (exit rules while team roam
+-- runs: RoamRules.HuntExitWhy). roamNoHold: this think's desire must not be bridged by mode_hold (a hunt that ended
+-- on purpose, a special unit cut below retreat).
+local huntTarget, huntStartAt = nil, -90
+local roamNoHold = false
 local engageTargetHoldTime = 1.2
 local engageTargetLockedUntil = -90
 local function setEngageTarget(target)
@@ -93,17 +101,7 @@ local function ClearEngageTarget()
 	bot:SetTarget(nil)
 end
 local function adjustDesire(desire)
-	if Fu.IsPushing(bot) then
-		if desire > 0.6 then
-			return 0.5
-		end
-	end
-	if Fu.IsInLaningPhase() then
-		if desire > 0.9 then
-			return 0.72
-		end
-	end
-	return desire
+	return RoamRules.AdjustDesire(desire, Fu.IsPushing(bot), Fu.IsInLaningPhase())
 end
 -- Diagnostics (#165, mode flip-flops): the rule that set this think's desire. Assigned before each return of
 -- GetDesire / GetDesireHelper; read only by RoamTrace, never by a decision.
@@ -176,6 +174,9 @@ local function RoamDone(raw, final)
 end
 function GetDesire()
 	roamWhy = "none"
+	roamNoHold = false
+	offerUnit, offerDesire, offerWhy = nil, 0, nil
+	LastHitOverlay.Offer(bot, nil)
 	local botMode = bot:GetActiveMode()
 	if
 		DotaTime() > 0
@@ -223,12 +224,49 @@ function GetDesire()
 		end
 	end
 	local desire = GetDesireHelper()
+	if offerUnit ~= nil then
+		LastHitOverlay.Offer(bot, offerUnit, adjustDesire(offerDesire), offerWhy)
+	end
 	return RoamDone(desire, adjustDesire(desire))
+end
+-- [OHA-ROAM] hunt-end: a hero / courier hunt that ran as team roam stopped (RoamRules.HuntExitWhy, or the hunt found
+-- nothing / only a creep). Its desire drops at once (no mode_hold bridge: Think would have nothing to do).
+local function EndHunt(why, target)
+	roamWhy = "hunt-end/" .. why
+	roamNoHold = true
+	engageTarget = nil
+	if DotaTime() >= (bot._huntEndLogAt or -99) then
+		bot._huntEndLogAt = DotaTime() + 5
+		local okN, targetName = pcall(function()
+			return target:GetUnitName()
+		end)
+		pcall(
+			print,
+			string.format(
+				"[OHA-ROAM] t=%.0f %s hunt-end why=%s target=%s lasted=%.1f",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				why,
+				okN and tostring(targetName) or "?",
+				DotaTime() - huntStartAt
+			)
+		)
+	end
+end
+-- Retreat's desire from its last think (mode_retreat_generic.lua publishes it), or nil.
+local function RetreatDesireNow()
+	local last = bot._retreatDesireNow
+	if last == nil or DotaTime() - last.t > 1 then
+		return nil
+	end
+	return last.d
 end
 function GetDesireHelper()
 	local hpRatio = Fu.GetHP(bot)
 	isAvoidingTower = false
 	hasSpecialUnitTarget = false
+	local runningHunt = huntTarget
+	huntTarget = nil
 	if
 		bot:IsInvulnerable()
 		or not bot:IsHero()
@@ -333,15 +371,16 @@ function GetDesireHelper()
 			end
 		end
 	end
+	-- The snipe no longer wins team roam as a mode (#165): it is offered to the last-hit overlay at its old desire
+	-- (1.50, cut like team roam's own), which hits only where that desire beats the active mode. Team roam's other
+	-- rules below still decide its own desire.
 	if hpRatio > 0.3 then
-		lastHitCreep = TeamRoam.GetLastHitCreep()
+		local lastHitCreep = TeamRoam.GetLastHitCreep()
 		if Fu.IsValid(lastHitCreep) and Fu.CanBeAttacked(lastHitCreep) then
 			local why = TeamRoam.LastHitWithdrawWhy(lastHitCreep)
 			if why == nil then
-				roamWhy = "snipe"
-				return BOT_DESIRE_OVERRIDE * 1.5
-			end
-			if DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
+				offerUnit, offerDesire, offerWhy = lastHitCreep, BOT_DESIRE_OVERRIDE * 1.5, "snipe"
+			elseif DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
 				bot._roamLastHitSkipLogAt = DotaTime() + 5
 				pcall(
 					print,
@@ -355,8 +394,6 @@ function GetDesireHelper()
 					)
 				)
 			end
-			-- Think attacks lastHitCreep whenever it is set, under any desire.
-			lastHitCreep = nil
 		end
 	end
 	if not bot:IsAlive() or bot:GetCurrentActionType() == BOT_ACTION_TYPE_DELAY then
@@ -473,10 +510,43 @@ function GetDesireHelper()
 		hasSpecialUnitTarget = true
 		roamWhy = "special-unit"
 		-- Deward / serpent-escape / high-priority specials: keep desire even if HP isn't full.
-		if specialUnitDesire >= 0.95 then
-			return specialUnitDesire
+		local desire = specialUnitDesire
+		if specialUnitDesire < 0.95 then
+			desire = RemapValClamped(hpRatio, 0.1, 0.8, BOT_MODE_DESIRE_NONE, specialUnitDesire)
 		end
-		return RemapValClamped(hpRatio, 0.1, 0.8, BOT_MODE_DESIRE_NONE, specialUnitDesire)
+		-- Outnumbered: never above retreat (game 063, 15:38: Zeus left a hard retreat for a special unit at 0.96).
+		local retreatDesire = RetreatDesireNow()
+		local capped, cut = RoamRules.SpecialUnitCap(
+			desire,
+			#alliesNear,
+			#enemiesNear,
+			retreatDesire,
+			bot._specialUnitWhy == "serpent-escape"
+		)
+		if cut then
+			roamWhy = "special-unit-capped"
+			roamNoHold = true
+			if DotaTime() >= (bot._specialCapLogAt or -99) then
+				bot._specialCapLogAt = DotaTime() + 5
+				local unit = bot.special_unit_target
+				pcall(
+					print,
+					string.format(
+						"[OHA-ROAM] t=%.0f %s special-unit-capped why=outnumbered desire=%.2f cap=%.2f retreat=%.2f allies=%d enemies=%d unit=%s hp=%.2f",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						desire,
+						capped,
+						retreatDesire,
+						#alliesNear,
+						#enemiesNear,
+						Fu.IsValid(unit) and unit:GetUnitName() or "?",
+						hpRatio
+					)
+				)
+			end
+		end
+		return capped
 	end
 	if Fu.IsInLaningPhase() and bot:HasModifier("modifier_warlock_upheaval") then
 		shouldAvoidEffects = true
@@ -488,8 +558,27 @@ function GetDesireHelper()
 		roamWhy = "avoid-effects"
 		return RemapValClamped(hpRatio, 0.3, 1, BOT_ACTION_DESIRE_VERYHIGH, BOT_ACTION_DESIRE_NONE)
 	end
+	-- A hero / courier hunt that won team roam keeps running while team roam is the active mode, until an exit rule
+	-- (#165: the gate below does not list team roam, so it used to switch the hunt off on its first think).
+	local keepHunt = false
+	if runningHunt ~= nil and bot:GetActiveMode() == BOT_MODE_TEAM_ROAM then
+		local valid = Fu.IsValid(runningHunt) and TeamRoam.CanBeAttacked(runningHunt)
+		local exitWhy = RoamRules.HuntExitWhy(
+			valid,
+			valid and GetUnitToUnitDistance(bot, runningHunt) or 0,
+			RoamRules.HuntKeepRange(bot:GetAttackRange()),
+			#alliesNear,
+			#enemiesNear
+		)
+		if exitWhy ~= nil then
+			EndHunt(exitWhy, runningHunt)
+			return BOT_ACTION_DESIRE_NONE
+		end
+		keepHunt = true
+	end
 	if
-		not Fu.IsFarming(bot)
+		not keepHunt
+		and not Fu.IsFarming(bot)
 		and not Fu.IsPushing(bot)
 		and not Fu.IsDefending(bot)
 		and not Fu.IsDoingRoshan(bot)
@@ -502,30 +591,48 @@ function GetDesireHelper()
 		and bot:GetActiveMode() ~= BOT_MODE_DEFEND_ALLY
 		and bot:GetActiveMode() ~= BOT_MODE_ROAM
 	then
-		-- Team roam itself is not in this list: on its first think as the active mode the hunt is off (#165).
+		-- Team roam itself is not in this list: only a running hero / courier hunt passes while it is active (above).
 		roamWhy = "gate-off"
 		return BOT_ACTION_DESIRE_NONE
 	elseif #alliesNear >= #enemiesNear then
 		local maxDesire = BOT_MODE_DESIRE_VERYHIGH + 0.04
+		local attackTarget, targetDesire, prefix = nil, 0, nil
 		if isCore then
-			local attackTarget, targetDesire = TeamRoam.CarryFindTarget()
-			if attackTarget ~= nil then
-				engageTarget = attackTarget
-				bot:SetTarget(attackTarget)
-				roamWhy = HuntWhy("hunt-carry", attackTarget)
-				local clampedDesire = RemapValClamped(hpRatio, 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
-				return Clamp(clampedDesire, 0, maxDesire)
-			end
+			attackTarget, targetDesire = TeamRoam.CarryFindTarget()
+			prefix = "hunt-carry"
 		end
-		if isSupport then
-			local attackTarget, targetDesire = TeamRoam.SupportFindTarget()
-			if attackTarget ~= nil then
+		if attackTarget == nil and isSupport then
+			attackTarget, targetDesire = TeamRoam.SupportFindTarget()
+			prefix = "hunt-support"
+		end
+		if attackTarget ~= nil then
+			local clampedDesire =
+				Clamp(RemapValClamped(hpRatio, 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire), 0, maxDesire)
+			local okK, kind = pcall(HuntKind, attackTarget)
+			if okK and RoamRules.HuntNeedsMode(kind) then
 				engageTarget = attackTarget
 				bot:SetTarget(attackTarget)
-				roamWhy = HuntWhy("hunt-support", attackTarget)
-				local clampedDesire = RemapValClamped(hpRatio, 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
-				return Clamp(clampedDesire, 0, maxDesire)
+				roamWhy = HuntWhy(prefix, attackTarget)
+				if attackTarget ~= runningHunt then
+					huntStartAt = DotaTime()
+				end
+				huntTarget = attackTarget
+				return clampedDesire
 			end
+			-- A creep, a deny, a tower: one hit next to the bot, by the last-hit overlay, without a mode change. The
+			-- snipe (checked above) goes first.
+			if offerUnit == nil then
+				offerUnit, offerDesire, offerWhy = attackTarget, clampedDesire, HuntWhy(prefix, attackTarget)
+			end
+			roamWhy = "overlay-" .. HuntWhy(prefix, attackTarget)
+			if keepHunt then
+				EndHunt("to-creep", runningHunt)
+			end
+			return BOT_ACTION_DESIRE_NONE
+		end
+		if keepHunt then
+			EndHunt("no-target", runningHunt)
+			return BOT_ACTION_DESIRE_NONE
 		end
 		if bot:IsAlive() and bot:DistanceFromFountain() > 4600 then
 			if
@@ -703,13 +810,7 @@ function Think()
 		end
 	end
 	ItemOpsThink()
-	if Fu.IsValid(lastHitCreep) then
-		if bot._huntTrace ~= nil then
-			pcall(HuntTrace.NoteSnipe, bot, lastHitCreep)
-		end
-		bot:Action_AttackUnit(lastHitCreep, true)
-		return
-	end
+	-- The snipe's hit is the last-hit overlay's now (FuncLib/systems/last_hit_overlay.lua, from ItemUsageThink).
 	if engageTarget ~= nil then
 		if not Fu.Utils.IsValidUnit(engageTarget) or not TeamRoam.CanBeAttacked(engageTarget) then
 			engageTarget = nil
@@ -2187,8 +2288,15 @@ function Fu.FindLeastExpensiveItemSlot()
 	return cheapestSlot
 end
 -- Hold the desire through short dips while this mode is active (FuncLib/systems/mode_hold.lua).
-GetDesire =
-	require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(GetDesire, "team_roam", BOT_MODE_TEAM_ROAM)
+GetDesire = require(GetScriptDirectory() .. "/FuncLib/systems/mode_hold").Wrap(
+	GetDesire,
+	"team_roam",
+	BOT_MODE_TEAM_ROAM,
+	function()
+		-- No bridge when the drop is on purpose (a hunt that ended, a special unit cut below retreat).
+		return not roamNoHold
+	end
+)
 if SafeCall then
 	local originalGetDesire = GetDesire
 	local originalThink = Think

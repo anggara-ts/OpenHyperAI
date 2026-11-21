@@ -36,10 +36,15 @@ T.test("roam stats: FLIP annotation", function()
 	inSample("team_roam:0.64@20" .. R.FlipNote("hunt-carry/lane", 0.64, 0.64, "none", 0.64), "sample FLIP")
 end)
 
--- One think: mode, rule, cap, last hits, engage target valid.
+-- One think: mode, rule, cap, last hits, engage target valid, and (7th) the rule of a last-hit overlay hit that
+-- started this think (NoteOverlay, called before the think's Step as in the game: the hook runs after GetDesire,
+-- the next Step resolves it).
 local function run(R, s, steps)
 	local lines = {}
 	for _, step in ipairs(steps) do
+		if step[7] ~= nil then
+			R.NoteOverlay(s, step[1], step[7], step[2], step[5] or 0)
+		end
 		local line = R.Step(s, step[1], step[2], step[3] or "none", step[4] or "none", step[5] or 0, step[6] or false)
 		if line ~= nil then
 			lines[#lines + 1] = string.format("[OHA-ROAMSTAT] t=%.0f %s %s", step[1], "medusa", line)
@@ -84,11 +89,38 @@ T.test("roam stats: activations, the hunt switching itself off, cap lift, snipe 
 		{ 100.1, "team_roam", "snipe", "lane", 7 },
 		{ 100.4, "team_roam", "snipe", "lane", 8 },
 		{ 100.9, "laning", "none", "none", 8 },
-		{ 120.0, "farm", "none", "none", 8 },
+		-- 8. a hunt on a lane creep by the last-hit overlay (no mode change), last hit 0.4s later
+		{ 110.0, "farm", "overlay-hunt-carry/lane", "none", 8, false, "hunt-carry/lane" },
+		{ 110.4, "farm", "none", "none", 9 },
+		{ 120.0, "farm", "none", "none", 9 },
 	})
 	T.eq(#lines, 2, "one line per finished minute")
 	inSample(lines[1] or "?", "minute 0")
 	inSample(lines[2] or "?", "minute 1")
+end)
+
+T.test("roam stats: snipes by the last-hit overlay count in snipeLH, creep hunts in creepLH", function()
+	local R = load()
+	local s = R.New()
+	local lines = run(R, s, {
+		-- a snipe from farm with a last hit, one from laning without (1.5s pass), one replaced by a new one at once
+		{ 1.0, "farm", "none", "none", 0, false, "snipe" },
+		{ 1.3, "farm", "none", "none", 1 },
+		{ 5.0, "laning", "none", "none", 1, false, "snipe" },
+		{ 6.6, "laning", "none", "none", 1 },
+		{ 8.0, "farm", "none", "none", 1, false, "snipe" },
+		{ 8.1, "farm", "none", "none", 1, false, "snipe" },
+		{ 8.5, "farm", "none", "none", 2 },
+		-- creep hunts: one with a last hit, one without
+		{ 20.0, "push_tower_mid", "none", "none", 2, false, "hunt-carry/lane" },
+		{ 20.2, "push_tower_mid", "none", "none", 3 },
+		{ 30.0, "farm", "none", "none", 3, false, "hunt-support/deny" },
+		{ 32.0, "farm", "none", "none", 3 },
+		{ 60.0, "farm", "none", "none", 3 },
+	})
+	local line = lines[1] or "?"
+	T.ok(string.find(line, "acts=0 ", 1, true) ~= nil, "no team roam activation: " .. line)
+	T.ok(string.find(line, "snipeLH=2/4 snipeLHbyPrev=farm:2/3,laning:0/1 creepLH=1/2", 1, true) ~= nil, line)
 end)
 
 T.test("roam stats: a hunt whose target died is not a self-off", function()

@@ -5,6 +5,8 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 function X.GetDesire(thinkingBot)
 	-- bot was set after these four reads, so they described the previous caller (nil at first).
 	bot = thinkingBot
+	-- Which rule set the desire, for team roam's outnumbered cap (the serpent ward escape is exempt: it is an escape).
+	bot._specialUnitWhy = nil
 	local hpRatio = Fu.GetHP(bot)
 	local isRetreating = Fu.IsRetreating(bot)
 	local isRealInvisible = Fu.IsRealInvisible(bot)
@@ -29,6 +31,7 @@ function X.GetDesire(thinkingBot)
 		local snakeDesire, snakeTarget = X.GetSerpentWardEscapeDesire(bot, attackRange, nearbyEnemies)
 		if snakeDesire > 0 and Fu.IsValid(snakeTarget) then
 			bot.special_unit_target = snakeTarget
+			bot._specialUnitWhy = "serpent-escape"
 			return snakeDesire
 		end
 	end

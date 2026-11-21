@@ -72,6 +72,8 @@ local function newCounters()
 		snipeGot = 0,
 		snipeTries = 0,
 		snipeByPrev = {},
+		creepGot = 0,
+		creepTries = 0,
 	}
 end
 
@@ -125,7 +127,7 @@ end
 -- The [OHA-ROAMSTAT] fields after "t=<t> <hero> ".
 function RoamStats.Format(minute, c)
 	return string.format(
-		"min=%d acts=%d byRule=%s prevMode=%s nextMode=%s dwell0=%d dwell1=%d dwell2_3=%d dwell4p=%d huntToAttack=%d huntSelfOff=%d huntGateOff=%d huntGone=%d capLift=%d snipeLH=%d/%d snipeLHbyPrev=%s",
+		"min=%d acts=%d byRule=%s prevMode=%s nextMode=%s dwell0=%d dwell1=%d dwell2_3=%d dwell4p=%d huntToAttack=%d huntSelfOff=%d huntGateOff=%d huntGone=%d capLift=%d snipeLH=%d/%d snipeLHbyPrev=%s creepLH=%d/%d",
 		minute,
 		c.acts,
 		mapText(c.byRule),
@@ -144,8 +146,69 @@ function RoamStats.Format(minute, c)
 		c.snipeTries,
 		mapText(c.snipeByPrev, function(v)
 			return v.got .. "/" .. v.tries
-		end)
+		end),
+		c.creepGot,
+		c.creepTries
 	)
+end
+
+-- A pending last-hit try (a snipe, or a hunt on a creep) resolves once a last hit follows (true) or after 1.5s
+-- (false), or when a new try starts before it resolved (force: a try without a last hit). nil: still pending.
+local function resolvePending(pending, now, lastHits, force)
+	if pending == nil then
+		return nil
+	end
+	local got = lastHits ~= nil and pending.lh ~= nil and lastHits > pending.lh
+	if got or now - pending.t > 1.5 or force then
+		return got
+	end
+	return nil
+end
+
+local function resolveSnipe(s, now, lastHits, force)
+	local snipe = s.snipe
+	local got = resolvePending(snipe, now, lastHits, force)
+	if got == nil then
+		return
+	end
+	local c = s.c
+	local byPrev = c.snipeByPrev[snipe.prev] or { got = 0, tries = 0 }
+	c.snipeByPrev[snipe.prev] = byPrev
+	byPrev.tries = byPrev.tries + 1
+	c.snipeTries = c.snipeTries + 1
+	if got then
+		byPrev.got = byPrev.got + 1
+		c.snipeGot = c.snipeGot + 1
+	end
+	s.snipe = nil
+end
+
+local function resolveCreep(s, now, lastHits, force)
+	local got = resolvePending(s.creep, now, lastHits, force)
+	if got == nil then
+		return
+	end
+	local c = s.c
+	c.creepTries = c.creepTries + 1
+	if got then
+		c.creepGot = c.creepGot + 1
+	end
+	s.creep = nil
+end
+
+-- The last-hit overlay (FuncLib/systems/last_hit_overlay.lua) started a hit on a new unit, without a mode change.
+--   why       "snipe" (team roam's snipe) or the hunt's rule ("hunt-carry/lane", ...)
+--   mode      the active mode's name (the snipe's previous mode in snipeLHbyPrev)
+--   lastHits  bot:GetLastHits() now
+-- A snipe counts in snipeLH (as the snipe activations did before), a hunt on a creep in creepLH.
+function RoamStats.NoteOverlay(s, now, why, mode, lastHits)
+	if why == "snipe" then
+		resolveSnipe(s, now, lastHits, true)
+		s.snipe = { t = now, lh = lastHits, prev = mode or "?" }
+	else
+		resolveCreep(s, now, lastHits, true)
+		s.creep = { t = now, lh = lastHits }
+	end
 end
 
 -- Once per team roam GetDesire (every think, whatever mode is active).
@@ -166,24 +229,11 @@ function RoamStats.Step(s, now, mode, why, cap, lastHits, targetValid)
 		s.c = newCounters()
 	end
 	local c = s.c
-	-- A snipe is worth it when a last hit follows within 1.5s.
-	local snipe = s.snipe
+	-- A snipe is worth it when a last hit follows within 1.5s. Before #165's fix a snipe was a team roam activation
+	-- (kept for that path); now it is an overlay hit (NoteOverlay), counted the same way.
 	local newSnipe = mode == "team_roam" and s.prevMode ~= "team_roam" and s.winWhy == "snipe"
-	if snipe ~= nil then
-		local got = lastHits ~= nil and snipe.lh ~= nil and lastHits > snipe.lh
-		-- A new snipe before this one resolved: this one counts as a try without a last hit.
-		if got or now - snipe.t > 1.5 or newSnipe then
-			local byPrev = c.snipeByPrev[snipe.prev] or { got = 0, tries = 0 }
-			c.snipeByPrev[snipe.prev] = byPrev
-			byPrev.tries = byPrev.tries + 1
-			c.snipeTries = c.snipeTries + 1
-			if got then
-				byPrev.got = byPrev.got + 1
-				c.snipeGot = c.snipeGot + 1
-			end
-			s.snipe = nil
-		end
-	end
+	resolveSnipe(s, now, lastHits, newSnipe)
+	resolveCreep(s, now, lastHits, false)
 	local roam = "team_roam"
 	if mode == roam and s.prevMode ~= roam then
 		local winWhy = s.winWhy or "?"

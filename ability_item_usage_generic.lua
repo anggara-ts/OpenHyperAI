@@ -32,6 +32,7 @@ local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
+local LastHitOverlay = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()
@@ -10184,6 +10185,9 @@ function ItemUsageThink()
 		_perfDone()
 		return
 	end
+	-- Team roam's last hit (snipe, or a hunt on a creep) without a mode change (#165). No return: items below may
+	-- still replace the order, as they could while team roam ran as a mode.
+	pcall(LastHitOverlay.Think, bot)
 	-- Keep attack orders; only throttle expensive item/ability rescans when target is locked.
 	if ShouldThrottleHeavyThink() then
 		_perfDone()
@@ -10492,6 +10496,7 @@ do
 	Perf.WrapDetailIn(MatchTrace, "Tick", "MatchTrace.Tick")
 	Perf.WrapDetailIn(ChargeTracker, "Tick", "ChargeTracker.Tick")
 	Perf.WrapDetailIn(SpecialUnits, "TryKiteInAttack", "TryKiteInAttack")
+	Perf.WrapDetailIn(LastHitOverlay, "Think", "LastHitOverlay")
 	Perf.WrapDetailIn(AbilityContext, "IsCornered", "IsCornered")
 	Perf.WrapDetailIn(Dispel, "ShouldMantaDodge", "Dispel.Manta")
 	Perf.WrapDetailIn(Dispel, "ShouldUseSelfDispelItem", "Dispel.Self")

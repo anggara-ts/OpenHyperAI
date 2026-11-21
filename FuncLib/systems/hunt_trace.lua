@@ -128,10 +128,31 @@ function HuntTrace.KeepRead(last, now)
 	return last
 end
 
+-- Did the hunter hit its target this tick, and how it was seen. Games 063-067: 0 of 143 hunt ends said why=hit, so
+-- the longer window for a hunter still hitting never opened (game 067 t=2465: Clinkz ended "cancel" on Primal Beast
+-- 199 away while attacking him, he died at 2466; t=3417 Nyx "cancel" on Alchemist 72 away, dead at 3421):
+-- target:WasRecentlyDamagedByHero(bot, 1.0) seems never to read true on an enemy handle. Now also:
+--   attack  the hunter's attack target is the hunt's target and its last attack time moved since the last tick
+--   hp      the target's HP dropped since the last tick while the hunter attacks it
+-- Returns "dmg" / "attack" / "hp", or nil.
+function HuntTrace.HitSource(damagedByHero, attackingTarget, attackTimeMoved, hpDropped)
+	if damagedByHero then
+		return "dmg"
+	end
+	if attackingTarget and attackTimeMoved then
+		return "attack"
+	end
+	if attackingTarget and hpDropped then
+		return "hp"
+	end
+	return nil
+end
+
 -- refound= how many times the target's handle was replaced by a newer one for the same player (findTarget).
+-- hitSrc= how the last hit was seen (HuntTrace.HitSource), "-" for none.
 function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 	return string.format(
-		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d death=%s refound=%d",
+		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d death=%s refound=%d hitSrc=%s",
 		now,
 		hero,
 		why,
@@ -143,7 +164,8 @@ function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 		h.snipe,
 		h.other,
 		h.deathCheck or "unread",
-		h.refound or 0
+		h.refound or 0,
+		h.hitSrc or "-"
 	)
 end
 
@@ -344,11 +366,26 @@ function HuntTrace.Tick(bot, modeName)
 	end
 	local target = h.target
 	local seen = not dead and target ~= nil and not target:IsNull() and target:IsAlive() and target:CanBeSeen()
+	-- The hunter's attack: its last attack time (GetLastAttackTime, read as a number) and the target's HP, kept
+	-- every tick so a change between two ticks is a hit (HuntTrace.HitSource).
+	local attackTime = bot.GetLastAttackTime ~= nil and bot:GetLastAttackTime() or nil
+	local attackMoved = type(attackTime) == "number" and h.attackTime ~= nil and attackTime > h.attackTime
+	h.attackTime = type(attackTime) == "number" and attackTime or h.attackTime
 	if seen then
 		h.dist = math.floor(GetUnitToUnitDistance(bot, target))
-		if target:WasRecentlyDamagedByHero(bot, 1.0) then
+		local attackTarget = bot:GetAttackTarget()
+		local attacking = attackTarget ~= nil
+			and (attackTarget == target or h.pid ~= nil and isTargetHero(attackTarget, h.pid))
+		local health = target.GetHealth ~= nil and target:GetHealth() or nil
+		local hpDropped = type(health) == "number" and h.targetHp ~= nil and health < h.targetHp
+		h.targetHp = type(health) == "number" and health or nil
+		local src = HuntTrace.HitSource(target:WasRecentlyDamagedByHero(bot, 1.0), attacking, attackMoved, hpDropped)
+		if src ~= nil then
 			h.hitAt = now
+			h.hitSrc = src
 		end
+	else
+		h.targetHp = nil
 	end
 	if not alive and h.deadAt == nil then
 		h.deadAt = now

@@ -284,6 +284,48 @@ T.test("hunt trace: Vendetta from the cast to the hit, with a mode change and a 
 	T.eq(#ends, 1, "end line: " .. table.concat(printed("end why"), " / "))
 end)
 
+T.test("hunt trace: a hit seen from the hunter's attack, not the damage flag (game 067)", function()
+	local _, H = load()
+	T.eq(H.HitSource(true, false, false, false), "dmg", "the damage flag")
+	T.eq(H.HitSource(false, true, true, false), "attack", "attacking it and the attack time moved")
+	T.eq(H.HitSource(false, true, false, true), "hp", "attacking it and its HP dropped")
+	T.eq(H.HitSource(false, false, true, true), nil, "attacking something else")
+	T.eq(H.HitSource(false, true, false, false), nil, "attacking it, no swing landed yet")
+	-- Game 067 t=2465: Clinkz revealed on Primal Beast 199 away and kept attacking; the damage flag never read true.
+	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
+	local beast = fakeUnit("npc_dota_hero_primal_beast", 3, 199)
+	clinkz.lastAttack = 10
+	function clinkz:GetLastAttackTime()
+		return self.lastAttack
+	end
+	T.stub.time = 2460
+	clinkz.modifiers.modifier_clinkz_wind_walk = true
+	clinkz._huntTarget = beast
+	H.Tick(clinkz, "team_roam")
+	T.ok(clinkz._huntTrace ~= nil, "hunt started")
+	T.stub.time = 2462
+	clinkz.modifiers.modifier_clinkz_wind_walk = nil
+	clinkz.attackTarget = beast
+	H.Tick(clinkz, "attack")
+	clinkz.lastAttack = 12
+	T.stub.time = 2462.5
+	H.Tick(clinkz, "attack")
+	T.eq(clinkz._huntTrace.hitSrc, "attack", "the swing counts as a hit")
+	-- Still swinging at 3s after the reveal: the window stays open.
+	for _, t in ipairs({ 2464, 2465.2 }) do
+		T.stub.time = t
+		clinkz.lastAttack = clinkz.lastAttack + 1.2
+		H.Tick(clinkz, "attack")
+	end
+	T.ok(clinkz._huntTrace ~= nil, "a hunter still hitting keeps the window open")
+	T.stub.time = 2467
+	H.Tick(clinkz, "attack")
+	T.stub.time = 2468.6
+	H.Tick(clinkz, "attack")
+	T.eq(#printed("end why=hit"), 1, "end why=hit: " .. table.concat(printed("end why"), " / "))
+	T.eq(#printed("hitSrc=attack"), 1, "hitSrc on the end line")
+end)
+
 T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target", function()
 	local _, H = load()
 	local sb = fakeUnit("npc_dota_hero_spirit_breaker", 2, 0)

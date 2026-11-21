@@ -279,21 +279,28 @@ function X.TrackEnemyTeleports()
 end
 -- Time left of an enemy's channel: the TP modifier's remaining time, else the channelled ability's channel time
 -- counted from the first think this bot saw it (an upper bound if she saw it late). src: tp|channel|unknown.
+-- Third value: the enemy's active ability name ("-" when the API gives none), for the log (#48, game 065: the
+-- t=3155 interrupt on Primal Beast said src=channel but not which channel).
 local channelMemory = {}
 function X.EnemyChannelLeft(enemy)
-	if enemy:HasModifier("modifier_teleporting") then
-		return X.TeleportLeft(enemy), "tp"
-	end
 	local active = enemy:GetCurrentActiveAbility()
+	local name = "-"
+	if active ~= nil and not active:IsNull() then
+		name = active:GetName() or "-"
+	end
+	if enemy:HasModifier("modifier_teleporting") then
+		return X.TeleportLeft(enemy), "tp", name ~= "-" and name or "item_tpscroll"
+	end
 	if active == nil or active:IsNull() then
-		return 0, "unknown"
+		return 0, "unknown", name
 	end
 	local channelTime = active:GetChannelTime() or 0
 	if channelTime <= 0 then
-		return 0, "unknown"
+		return 0, "unknown", name
 	end
-	return InterruptRules.TrackChannel(channelMemory, enemy:GetUnitName(), active:GetName(), channelTime, DotaTime()),
-		"channel"
+	return InterruptRules.TrackChannel(channelMemory, enemy:GetUnitName(), name, channelTime, DotaTime()),
+		"channel",
+		name
 end
 -- A channel or cast phase a root cancels (InterruptRules.ROOT_CANCELS, from the game files): time left, the
 -- ability name and src tp|channel|cast; src "none" when the enemy is doing nothing a root cancels.
@@ -753,16 +760,16 @@ function X.ConsiderTerrorize()
 			end
 			local distance = GetUnitToLocationDistance(bot, location)
 			if distance <= castRange then
-				local left, src = X.EnemyChannelLeft(enemy)
+				local left, src, channel = X.EnemyChannelLeft(enemy)
 				local arrive = InterruptRules.ArrivalTime(castPoint, distance, travelSpeed, 0)
 				if InterruptRules.LandsBeforeChannelEnds(arrive, left) then
-					X.LogTerrorize("interrupt", enemy, arrive, left, src)
+					X.LogTerrorize("interrupt", enemy, arrive, left, src, channel)
 					-- arrive has no turning time; the fear lasts 2.8s+, so look 0.5s after the landing.
 					X.StartInterruptProbe("terrorize", enemy, arrive + 0.5)
 					return BOT_ACTION_DESIRE_HIGH, location
 				end
 				-- src=unknown: the channel time could not be read from the enemy's ability (bot API check).
-				X.LogTerrorize(src == "unknown" and "unreadable" or "too-late", enemy, arrive, left, src)
+				X.LogTerrorize(src == "unknown" and "unreadable" or "too-late", enemy, arrive, left, src, channel)
 			end
 		end
 	end
@@ -790,7 +797,7 @@ end
 -- [OHA-DARK_WILLOW] terrorize why=interrupt ... / terrorize-skip why=too-late|unreadable ... / terrorize why=save-ally,
 -- each at most once per 3s. arrive: seconds until the fear lands; left: channel time left; margin = left - arrive.
 local terrorizeLogAt = {}
-function X.LogTerrorize(why, unit, arrive, left, src)
+function X.LogTerrorize(why, unit, arrive, left, src, channel)
 	if DotaTime() < (terrorizeLogAt[why] or -999) then
 		return
 	end
@@ -814,11 +821,12 @@ function X.LogTerrorize(why, unit, arrive, left, src)
 	pcall(
 		print,
 		string.format(
-			"[OHA-DARK_WILLOW] t=%.0f %s why=%s target=%s arrive=%.2f left=%.2f margin=%.2f src=%s",
+			"[OHA-DARK_WILLOW] t=%.0f %s why=%s target=%s channel=%s arrive=%.2f left=%.2f margin=%.2f src=%s",
 			DotaTime(),
 			what,
 			why,
 			unit:GetUnitName(),
+			tostring(channel or "-"),
 			arrive,
 			left,
 			left - arrive,

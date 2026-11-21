@@ -37,6 +37,38 @@ local function AdjustDesireForHealth(desire)
 		bot._roshDipActive = false
 		return 0
 	end
+	-- Tank steps out (#12, game 048 29:07: Sniper stayed at 18% HP with Roshan on him and died to Roshan; under
+	-- 50% Roshan HP nobody leaves). Roshan's next 3s would kill him, and Roshan isn't about to die: 3s out, so
+	-- Roshan turns to someone else.
+	if DotaTime() < (bot._roshStepOutUntil or -999) then
+		return 0
+	end
+	if desire > 0 and Fu.Utils.IsValidUnit(roshan) and roshan:GetAttackTarget() == bot then
+		-- Untested on Roshan: fall back to his attack damage over 3s if the estimate fails or reads 0.
+		local okD, estimate = pcall(function()
+			return roshan:GetEstimatedDamageToTarget(true, bot, 3.0, DAMAGE_TYPE_PHYSICAL)
+		end)
+		local roshDmg = okD and type(estimate) == "number" and estimate or 0
+		if roshDmg <= 0 then
+			local secondsPerAttack = roshan:GetSecondsPerAttack() or 1
+			roshDmg = (roshan:GetAttackDamage() or 0) * 3 / math.max(0.5, secondsPerAttack)
+		end
+		if bot:GetHealth() <= roshDmg and Fu.GetHP(roshan) > 0.08 then
+			bot._roshStepOutUntil = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-ROSH] t=%.0f %s step-out hp=%d roshDmg3s=%d roshHp=%.2f",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					bot:GetHealth(),
+					math.floor(roshDmg),
+					Fu.GetHP(roshan)
+				)
+			)
+			return 0
+		end
+	end
 	if desire <= 0 then
 		return desire
 	end
@@ -139,6 +171,9 @@ function GetDesire()
 		)
 	end
 	LogDesireChange(final)
+	-- Read by Push.GetPushDesire (FuncLib/systems/push.lua): a push stays under a live Roshan call (#12).
+	bot._roshDesireNow = final
+	bot._roshDesireAt = DotaTime()
 	-- Do not shout here — desire alone is not a commit (caused "Let's Rosh" then nothing).
 	return final
 end
@@ -519,6 +554,13 @@ function GetDesireHelper()
 				and bot:GetAttackDamage() / secondsPerAttack * 0.5
 			or 0
 		local soloFinish = Fu.Utils.IsValidUnit(roshan) and roshan:GetHealth() <= myDps * 5
+		-- Two hitters at least (#12, game 048 29:10: two allies TP'd out and Sniper and Ringmaster were left to
+		-- finish it): allies next to Roshan, not only somewhere in the pit.
+		local alliesAtRoshan = Fu.Utils.IsValidUnit(roshan) and #(Fu.GetAlliesNearLoc(roshan:GetLocation(), 900) or {})
+			or alliesInPit
+		if safeFinish and alliesAtRoshan < 2 and alliesInPit >= 2 and not soloFinish then
+			return Ret(BOT_MODE_DESIRE_NONE, "few-hitters")
+		end
 		if safeFinish and (alliesInPit >= 2 or soloFinish) then
 			local roshanHpRatio = roshan:GetHealth() / roshan:GetMaxHealth()
 			return Ret(RemapValClamped(roshanHpRatio, 0.8, 0.0, 0.9, 1.0), "finishing")
@@ -691,6 +733,21 @@ function GetDesireHelper()
 				desire = floor
 			end
 			why = "kill-window"
+			-- A take that fits the kill's window (checked above) is a call the team should answer (#12, game 067
+			-- 32:11: the four callers sat at 0.60 under a 0.99 kill push and nobody walked; game 066: 7 calls dropped
+			-- nobody-acked). Out of a fight it goes in as a gather call (0.96, above the 0.91 kill push; the push
+			-- yields to it in push.lua). Not while the team pushes the T2 / high ground away from the pit, not with every
+			-- enemy dead (#87's wipe push stays above Roshan: game 045, Dire left a 3-vs-0 push for Roshan), and not while
+			-- this bot finishes a tower (push.lua sets _finishTowerAt).
+			if
+				not (isPushingHighGround and #alliesNearPit < 3)
+				and Fu.GetNumOfAliveHeroes(true) > 0
+				and DotaTime() - (bot._finishTowerAt or -999) > 2
+				and not bot:WasRecentlyDamagedByAnyHero(2.0)
+				and #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
+			then
+				return Ret(0.92, why, true)
+			end
 		end
 		return Ret(Clamp(desire, 0, BOT_MODE_DESIRE_VERYHIGH), why)
 	end

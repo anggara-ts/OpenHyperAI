@@ -1372,6 +1372,23 @@ local function BuyBasicItemTurbo()
 		end
 	end
 end
+-- The laning-phase emergency Salve / Tango (below 50% HP, nothing to heal with): logged, and remembered for the heal-
+-- trip check in ability_item_usage_generic.lua (BagHeal), which reads the bag before the item lands (game 053).
+local function EmergencyHealBuy(itemName)
+	bot:ActionImmediate_PurchaseItem(itemName)
+	bot._emergencyHealAt = DotaTime()
+	bot._emergencyHealName = itemName
+	pcall(
+		print,
+		string.format(
+			"[OHA-BUY] t=%.0f %s emergency %s hp=%.2f",
+			DotaTime(),
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			(string.gsub(itemName, "^item_", "")),
+			bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+		)
+	)
+end
 function ItemPurchaseThink()
 	now = DotaTime()
 	local isStale, currentHero, currentName = Fu.IsStaleARDMHero(bot, botName)
@@ -1725,7 +1742,7 @@ function ItemPurchaseThink()
 							and gold >= GetItemCost("item_flask")
 							and GetItemStockCount("item_flask") > 1
 						then
-							bot:ActionImmediate_PurchaseItem("item_flask")
+							EmergencyHealBuy("item_flask")
 						end
 					else
 						if
@@ -1737,7 +1754,7 @@ function ItemPurchaseThink()
 								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							bot:ActionImmediate_PurchaseItem("item_flask")
+							EmergencyHealBuy("item_flask")
 						end
 					end
 				else
@@ -1746,7 +1763,7 @@ function ItemPurchaseThink()
 						and gold >= GetItemCost("item_flask")
 						and GetItemStockCount("item_flask") > 1
 					then
-						bot:ActionImmediate_PurchaseItem("item_flask")
+						EmergencyHealBuy("item_flask")
 					end
 				end
 			else
@@ -1760,7 +1777,7 @@ function ItemPurchaseThink()
 							and gold >= GetItemCost("item_tango")
 							and GetItemStockCount("item_flask") > 1
 						then
-							bot:ActionImmediate_PurchaseItem("item_tango")
+							EmergencyHealBuy("item_tango")
 						end
 					else
 						if
@@ -1772,12 +1789,12 @@ function ItemPurchaseThink()
 								or Fu.HasItem(bot, "item_bottle") and Item.GetItemCharges(bot, "item_bottle") <= 0
 							)
 						then
-							bot:ActionImmediate_PurchaseItem("item_flask")
+							EmergencyHealBuy("item_flask")
 						end
 					end
 				else
 					if Item.GetItemCharges(bot, "item_tango") <= 0 and gold >= GetItemCost("item_tango") then
-						bot:ActionImmediate_PurchaseItem("item_tango")
+						EmergencyHealBuy("item_tango")
 					end
 				end
 			end

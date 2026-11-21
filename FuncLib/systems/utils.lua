@@ -1076,33 +1076,74 @@ end
 Utils.HG_WAVE_RADIUS = 2600
 -- Enemy creeps within `radius` of loc, counting only those closer to loc than to another of
 -- our T3 towers (mid and top T3 are close enough that one wave would count for both).
+-- Where each lane's T3 stands, remembered after it falls (#12, game 048 52:40: with the bottom T3 down, a
+-- 16-creep bottom wave counted for mid too, and the team called "defend mid").
+local highGroundTowerLocations = {}
+local function Dist2(a, b)
+	return (a.x - b.x) ^ 2 + (a.y - b.y) ^ 2
+end
+-- Does a creep at creepLoc count for the high-ground building at `location`? spots: one entry per lane,
+-- { loc = its T3 location (alive or remembered), open = T3 and both barracks gone }. The building's lane is the
+-- T3 spot within 1200 of it (the T3 or a barracks behind it); the creep belongs to the lane whose T3 spot is
+-- nearest. A building with no T3 spot that close (a T4, the Ancient) takes only creeps of an open lane: the
+-- others are that lane's T3 or barracks' to call.
+function Utils.HighGroundCreepOwned(creepLoc, location, spots)
+	local own, ownDist = nil, 1200 * 1200
+	for _, spot in pairs(spots) do
+		local d = Dist2(spot.loc, location)
+		if d <= ownDist then
+			own, ownDist = spot, d
+		end
+	end
+	local nearest, best = nil, math.huge
+	for _, spot in pairs(spots) do
+		local d = Dist2(spot.loc, creepLoc)
+		if d < best then
+			nearest, best = spot, d
+		end
+	end
+	if nearest == nil then
+		return true
+	end
+	if own == nil then
+		return nearest.open == true
+	end
+	return nearest == own
+end
+-- Lane of each high-ground tower, and its barracks.
+local laneBarracks = {
+	{ Barracks.TopMelee, Barracks.TopRanged },
+	{ Barracks.MidMelee, Barracks.MidRanged },
+	{ Barracks.BotMelee, Barracks.BotRanged },
+}
 function Utils.CountHighGroundWave(team, location, radius)
-	local others = {}
-	for _, id in ipairs(highGroundTowers) do
+	highGroundTowerLocations[team] = highGroundTowerLocations[team] or {}
+	local spots = {}
+	for i, id in ipairs(highGroundTowers) do
 		local tower = GetTower(team, id)
-		if Utils.IsValidBuilding(tower) then
-			local towerLocation = tower:GetLocation()
-			if (towerLocation.x - location.x) ^ 2 + (towerLocation.y - location.y) ^ 2 > 300 * 300 then
-				others[#others + 1] = towerLocation
+		local towerUp = Utils.IsValidBuilding(tower)
+		if towerUp then
+			highGroundTowerLocations[team][id] = tower:GetLocation()
+		end
+		if highGroundTowerLocations[team][id] ~= nil then
+			local raxUp = false
+			for _, raxId in ipairs(laneBarracks[i]) do
+				if Utils.IsValidBuilding(GetBarracks(team, raxId)) then
+					raxUp = true
+				end
 			end
+			spots[#spots + 1] = { loc = highGroundTowerLocations[team][id], open = not towerUp and not raxUp }
 		end
 	end
 	local count = 0
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMY_CREEPS) or {}) do
-		if unit ~= nil and unit:IsAlive() then
-			local distance = GetUnitToLocationDistance(unit, location)
-			if distance <= radius then
-				local mine = true
-				for _, towerLocation in ipairs(others) do
-					if GetUnitToLocationDistance(unit, towerLocation) < distance then
-						mine = false
-						break
-					end
-				end
-				if mine then
-					count = count + 1
-				end
-			end
+		if
+			unit ~= nil
+			and unit:IsAlive()
+			and GetUnitToLocationDistance(unit, location) <= radius
+			and Utils.HighGroundCreepOwned(unit:GetLocation(), location, spots)
+		then
+			count = count + 1
 		end
 	end
 	return count

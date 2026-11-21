@@ -196,17 +196,21 @@ function X.SkillsComplement()
 	local grenadeWhy
 	concussiveGrenadeDesire, concussiveGrenadeLocation, grenadeWhy = X.ConsiderAS()
 	if concussiveGrenadeDesire > 0 then
-		-- [OHA-GRANTED] every cast (10 s cooldown, so no throttle); the retreat branch also prints [OHA-SNIPER].
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRANTED] t=%.0f sniper cast=sniper_concussive_grenade why=%s dist=%d hp=%.2f",
-				DotaTime(),
-				grenadeWhy or "-",
-				math.floor(GetUnitToLocationDistance(bot, concussiveGrenadeLocation)),
-				Fu.GetHP(bot)
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think); the retreat branch
+		-- also prints [OHA-SNIPER].
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f sniper cast=sniper_concussive_grenade why=%s dist=%d hp=%.2f",
+					DotaTime(),
+					grenadeWhy or "-",
+					math.floor(GetUnitToLocationDistance(bot, concussiveGrenadeLocation)),
+					Fu.GetHP(bot)
+				)
 			)
-		)
+		end
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnLocation(concussiveGrenadeAbility, concussiveGrenadeLocation)
 		return

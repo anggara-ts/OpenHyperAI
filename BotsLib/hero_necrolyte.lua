@@ -179,18 +179,21 @@ function X.SkillsComplement()
 	local deathSeekerWhy
 	deathSeekerDesire, deathSeekerTarget, deathSeekerWhy = X.ConsiderAS()
 	if deathSeekerDesire > 0 then
-		-- [OHA-GRANTED] every cast (20 s cooldown, so no throttle).
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRANTED] t=%.0f necrolyte cast=necrolyte_death_seeker why=%s target=%s dist=%d hp=%.2f",
-				DotaTime(),
-				deathSeekerWhy or "-",
-				(string.gsub(deathSeekerTarget:GetUnitName(), "npc_dota_hero_", "")),
-				math.floor(GetUnitToUnitDistance(bot, deathSeekerTarget)),
-				hpRatio or 0
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f necrolyte cast=necrolyte_death_seeker why=%s target=%s dist=%d hp=%.2f",
+					DotaTime(),
+					deathSeekerWhy or "-",
+					(string.gsub(deathSeekerTarget:GetUnitName(), "npc_dota_hero_", "")),
+					math.floor(GetUnitToUnitDistance(bot, deathSeekerTarget)),
+					hpRatio or 0
+				)
 			)
-		)
+		end
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnEntity(deathSeekerAbility, deathSeekerTarget)
 		return

@@ -221,16 +221,20 @@ function X.SkillsComplement()
 	end
 	local thunderhideWhy = X.ConsiderSummonThunderhide()
 	if thunderhideWhy ~= nil then
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRANTED] t=%.0f beastmaster cast=beastmaster_summon_thunderhide why=%s target=%s hp=%.2f",
-				DotaTime(),
-				thunderhideWhy,
-				Fu.IsValid(botTarget) and (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
-				hpRatio or 0
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f beastmaster cast=beastmaster_summon_thunderhide why=%s target=%s hp=%.2f",
+					DotaTime(),
+					thunderhideWhy,
+					Fu.IsValid(botTarget) and (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
+					hpRatio or 0
+				)
 			)
-		)
+		end
 		bot:Action_UseAbility(summonThunderhideAbility)
 		return
 	end
@@ -461,7 +465,7 @@ function X.ConsiderCallOfTheWildBoar()
 end
 -- The Thunderhide in a fight (an engage on a hero within 900, or a team fight), against a tower he is hitting,
 -- and on Roshan or the Tormentor. Not on lane or jungle creeps: the 60 s cooldown is kept for fights. Returns the
--- reason, or nil (cast once per cooldown, so the caller's log needs no throttle).
+-- reason, or nil.
 function X.ConsiderSummonThunderhide()
 	if not Fu.CanCastAbility(summonThunderhideAbility) then
 		return nil

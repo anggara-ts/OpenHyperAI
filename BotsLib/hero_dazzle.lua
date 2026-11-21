@@ -284,8 +284,23 @@ function X.ConsiderNothlProjection()
 	return BOT_ACTION_DESIRE_NONE, nil
 end
 -- The body left behind by Nothl Projection: the allied Dazzle unit with the body debuff (nil if the engine does not
--- list it; the [OHA-GRANTED] line says body=missing then).
+-- list it; the [OHA-GRANTED] line says body=missing then). The unit found is kept while it has the debuff; the
+-- ally list is scanned at most once per 2 s.
 function X.FindNothlBody()
+	local body = bot._nothlBody
+	if
+		body ~= nil
+		and not body:IsNull()
+		and body:IsAlive()
+		and body:HasModifier("modifier_dazzle_nothl_projection_physical_body_debuff")
+	then
+		return body
+	end
+	bot._nothlBody = nil
+	if DotaTime() < (bot._nothlBodyScanAt or -999) then
+		return nil
+	end
+	bot._nothlBodyScanAt = DotaTime() + 2
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ALLIES) or {}) do
 		if
 			unit ~= nil
@@ -294,6 +309,7 @@ function X.FindNothlBody()
 			and unit:IsAlive()
 			and unit:HasModifier("modifier_dazzle_nothl_projection_physical_body_debuff")
 		then
+			bot._nothlBody = unit
 			return unit
 		end
 	end
@@ -301,8 +317,14 @@ function X.FindNothlBody()
 end
 -- Rescue: the body is hurt or hit and more enemies stand at the body than at the spirit, so pull it out. Stay: the
 -- projection ends within 1 s while the spirit fights a hero within 700 and is not outnumbered, so Dazzle stays in
--- the fight instead of flying back to the body. Returns the reason, or nil.
+-- the fight instead of flying back to the body. Returns the reason, or nil. The spell has no cooldown, so after an
+-- order the next try waits 3 s (a refused order, e.g. a leashed body, would repeat every think).
 function X.ConsiderThroughTheRealm()
+	if
+		DotaTime() < (bot._realmRetryAt or -999) or not bot:HasModifier("modifier_dazzle_nothl_projection_soul_debuff")
+	then
+		return nil
+	end
 	local soulModifier = bot:GetModifierByName("modifier_dazzle_nothl_projection_soul_debuff")
 	if soulModifier == nil or soulModifier < 0 or not Fu.CanCastAbility(throughTheRealmAbility) then
 		return nil
@@ -335,6 +357,7 @@ function X.ConsiderThroughTheRealm()
 		why = "stay"
 	end
 	if why ~= nil then
+		bot._realmRetryAt = DotaTime() + 3
 		pcall(
 			print,
 			string.format(

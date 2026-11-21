@@ -259,7 +259,12 @@ end
 -- least 2000 of the walk home and has no enemy seen near it. Engage: fighting a hero 1200+ away that stands within
 -- 350 of a trap, not outnumbered there; she lands on the trap and it detonates under the target.
 function X.ConsiderTrapTeleport()
-	if not Fu.CanCastAbility(trapTeleportAbility) or bot:IsRooted() then
+	if
+		not Fu.CanCastAbility(trapTeleportAbility)
+		or bot:IsRooted()
+		or bot._trapTeleport ~= nil
+		or DotaTime() < (bot._trapTeleportRetryAt or -999)
+	then
 		return BOT_ACTION_DESIRE_NONE, nil, nil
 	end
 	local traps = X.LiveTraps()
@@ -299,22 +304,35 @@ function X.ConsiderTrapTeleport()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil, nil
 end
--- [OHA-GRANTED] trap-teleport result, 3 s after the order: arrived (within 500 of the trap) or not (channel broken,
--- trap gone, or the order refused).
+-- [OHA-GRANTED] trap-teleport result, 3 s after the order: channelled= (she was seen channelling) and arrived=
+-- (channelled and now within 500 of the trap; walking there does not count). Not arrived (channel broken, trap gone,
+-- or the order refused, which starts no cooldown): no new try for 15 s, so a refused order is not repeated.
 function X.CheckTrapTeleport()
 	local pending = bot._trapTeleport
-	if pending == nil or DotaTime() - pending.at < 3 or bot:IsChanneling() then
+	if pending == nil then
+		return
+	end
+	if bot:IsChanneling() then
+		pending.channelled = true
+		return
+	end
+	if DotaTime() - pending.at < 3 then
 		return
 	end
 	bot._trapTeleport = nil
 	local distance = GetUnitToLocationDistance(bot, pending.to)
+	local arrived = pending.channelled == true and distance <= 500
+	if not arrived then
+		bot._trapTeleportRetryAt = DotaTime() + 15
+	end
 	pcall(
 		print,
 		string.format(
-			"[OHA-GRANTED] t=%.0f templar_assassin trap-teleport-result why=%s arrived=%s dist=%d moved=%d",
+			"[OHA-GRANTED] t=%.0f templar_assassin trap-teleport-result why=%s channelled=%s arrived=%s dist=%d moved=%d",
 			DotaTime(),
 			pending.why,
-			tostring(distance <= 500),
+			tostring(pending.channelled == true),
+			tostring(arrived),
 			math.floor(distance),
 			math.floor(GetUnitToLocationDistance(bot, pending.from))
 		)

@@ -161,18 +161,22 @@ function X.SkillsComplement()
 	local fanOfKnivesWhy, fanOfKnivesTarget
 	fanOfKnivesDesire, fanOfKnivesWhy, fanOfKnivesTarget = X.ConsiderAS()
 	if fanOfKnivesDesire > 0 then
-		-- [OHA-GRANTED] every cast (14 s cooldown, so no throttle).
-		pcall(
-			print,
-			string.format(
-				"[OHA-GRANTED] t=%.0f phantom_assassin cast=phantom_assassin_fan_of_knives why=%s target=%s dist=%d hp=%.2f",
-				DotaTime(),
-				fanOfKnivesWhy or "-",
-				fanOfKnivesTarget ~= nil and (string.gsub(fanOfKnivesTarget:GetUnitName(), "npc_dota_hero_", "")) or "-",
-				fanOfKnivesTarget ~= nil and math.floor(GetUnitToUnitDistance(bot, fanOfKnivesTarget)) or -1,
-				hpRatio or 0
+		-- [OHA-GRANTED] the order, at most once per 3 s (a refused order repeats every think).
+		if DotaTime() >= (bot._grantedLogAt or -999) then
+			bot._grantedLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-GRANTED] t=%.0f phantom_assassin cast=phantom_assassin_fan_of_knives why=%s target=%s dist=%d hp=%.2f",
+					DotaTime(),
+					fanOfKnivesWhy or "-",
+					fanOfKnivesTarget ~= nil and (string.gsub(fanOfKnivesTarget:GetUnitName(), "npc_dota_hero_", ""))
+						or "-",
+					fanOfKnivesTarget ~= nil and math.floor(GetUnitToUnitDistance(bot, fanOfKnivesTarget)) or -1,
+					hpRatio or 0
+				)
 			)
-		)
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbility(fanOfKnivesAbility)
 		return

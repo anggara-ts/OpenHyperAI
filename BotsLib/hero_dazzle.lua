@@ -29,74 +29,89 @@ if sRole == "pos_2" then
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[1])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 391 matches, built from pos 2 (1,539) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
-	"item_crystal_maiden_outfit",
-	"item_force_staff",
-	"item_hand_of_midas",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_magic_wand",
+	"item_power_treads",
 	"item_ultimate_scepter",
-	"item_aghanims_shard",
-	"item_orchid",
-	"item_black_king_bar",
-	"item_hurricane_pike",
-	"item_bloodthorn",
-	"item_mystic_staff",
+	"item_blink",
+	"item_desolator",
+	"item_hydras_breath",
 	"item_ultimate_scepter_2",
-	"item_sheepstick",
+	"item_overwhelming_blink",
+	"item_devastator",
+	"item_skadi",
+	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_wind_waker",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 1,539 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_double_circlet",
-	"item_bottle",
+	"item_faerie_fire",
+	"item_circlet",
 	"item_magic_wand",
-	"item_arcane_boots",
-	"item_orchid",
+	"item_power_treads",
 	"item_ultimate_scepter",
-	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_octarine_core",
-	"item_force_staff",
-	"item_bloodthorn",
+	"item_blink",
+	"item_desolator",
+	"item_hydras_breath",
 	"item_ultimate_scepter_2",
-	"item_travel_boots",
-	"item_hurricane_pike",
-	"item_wind_waker",
-	"item_travel_boots_2",
+	"item_overwhelming_blink",
+	"item_devastator",
+	"item_skadi",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 22,950 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
-	"item_priest_outfit",
-	"item_mekansm",
-	"item_essence_distiller",
-	"item_glimmer_cape",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_ring_of_basilius",
+	"item_arcane_boots",
 	"item_holy_locket",
-	"item_aghanims_shard",
+	"item_headdress",
+	"item_glimmer_cape",
 	"item_guardian_greaves",
-	"item_spirit_vessel",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_sheepstick",
-	"item_mystic_staff",
-	"item_ultimate_scepter_2",
+	"item_aeon_disk",
+	"item_octarine_core",
 	"item_moon_shard",
-	"item_wind_waker",
+	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 77,280 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_ring_of_basilius",
+	"item_arcane_boots",
 	"item_holy_locket",
+	"item_headdress",
 	"item_glimmer_cape",
 	"item_guardian_greaves",
 	"item_aghanims_shard",
-	"item_spirit_vessel",
-	"item_aether_lens",
+	"item_aeon_disk",
 	"item_ultimate_scepter",
-	"item_sheepstick",
-	"item_ultimate_scepter_2",
-	"item_moon_shard",
+	"item_cyclone",
 	"item_wind_waker",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 632 matches, built from pos 2 (1,539) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_ultimate_scepter", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
@@ -298,8 +313,9 @@ function X.ConsiderQ()
 	local castPoint = poisonTouchAbility:GetCastPoint()
 	local manaCost = poisonTouchAbility:GetManaCost()
 	local damagePerSecond = poisonTouchAbility:GetSpecialValueInt("damage")
-	if talent6:IsTrained() then
-		damagePerSecond = damagePerSecond + talent6:GetSpecialValueInt("value")
+	-- Level 15 talent T3 "+50 Poison Touch DPS" (7.42; the old DPS talent was T6, now -15s Nothl Projection cooldown).
+	if talent3:IsTrained() then
+		damagePerSecond = damagePerSecond + talent3:GetSpecialValueInt("value")
 	end
 	local duration = poisonTouchAbility:GetSpecialValueInt("duration")
 	local nDamage = damagePerSecond * duration

@@ -24,20 +24,20 @@ Dota only loads bot scripts from:
 **With git** (easy updates with `git pull`):
 
 ```bash
-git clone https://github.com/anggara-ts/OpenHyperAI-too.git
+git clone https://github.com/anggara-ts/Supercharged-OpenHyperAI.git
 ```
 
-Put the clone wherever you like (for example `Documents\OpenHyperAI-too`), then link it in step 2.
+Put the clone wherever you like (for example `Documents\Supercharged-OpenHyperAI`), then link it in step 2.
 
 **Without git (manual download):**
 
-1. Download the zip of the `main` branch: <https://github.com/anggara-ts/OpenHyperAI-too/archive/refs/heads/main.zip>
-2. Extract it. You get a folder `OpenHyperAI-too-main`, which holds `bot_generic.lua`, `hero_selection.lua`, `BotsLib`, `FuncLib` and so on.
+1. Download the zip of the `main` branch: <https://github.com/anggara-ts/Supercharged-OpenHyperAI/archive/refs/heads/main.zip>
+2. Extract it. You get a folder `Supercharged-OpenHyperAI-main`, which holds `bot_generic.lua`, `hero_selection.lua`, `BotsLib`, `FuncLib` and so on.
 3. If `dota 2 beta/game/dota/scripts/vscripts/bots` already exists, rename it (for example `bots_old`). Then move the extracted folder there and rename it to `bots`. The files must sit directly inside `bots`:
 
    ```text
    .../scripts/vscripts/bots/bot_generic.lua      correct
-   .../scripts/vscripts/bots/OpenHyperAI-too-main/bot_generic.lua   wrong: Dota won't find it
+   .../scripts/vscripts/bots/Supercharged-OpenHyperAI-main/bot_generic.lua   wrong: Dota won't find it
    ```
 4. Skip step 2 and go to step 3. To update later, download the zip again and replace the `bots` folder; keep your settings in the permanent Customize folder (step 3) so an update doesn't reset them.
 
@@ -52,7 +52,7 @@ Point Dota’s `bots` folder at this repo so edits apply immediately.
 **Windows** (run Command Prompt / PowerShell **as Administrator**):
 
 ```bat
-mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\Users\<YOU>\Documents\OpenHyperAI-too"
+mklink /d "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\Users\<YOU>\Documents\Supercharged-OpenHyperAI"
 ```
 
 Adjust both paths if your Steam library or clone location differs. If a `bots` folder already exists, rename or remove it first.
@@ -60,7 +60,7 @@ Adjust both paths if your Steam library or clone location differs. If a `bots` f
 **macOS / Linux:**
 
 ```bash
-ln -s "/path/to/OpenHyperAI-too" "$HOME/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+ln -s "/path/to/Supercharged-OpenHyperAI" "$HOME/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
 ```
 
 **Option B — the Workshop copy**

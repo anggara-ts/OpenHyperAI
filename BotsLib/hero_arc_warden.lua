@@ -7,7 +7,6 @@ local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
-local sMidItemsBuyList = {}
 local sMidBuildType = RandomInt(1, 2) == 1 and "Physical" or "Magical"
 local tTalentTreeList = {
 	{ ["t25"] = { 10, 0 }, ["t20"] = { 10, 0 }, ["t15"] = { 10, 0 }, ["t10"] = { 10, 0 } },
@@ -59,84 +58,103 @@ if sRole == "pos_2" then
 		nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[3])
 	end
 end
+-- Item check for #9, Stratz 7.41f (week of 5-11 Nov 2026, all ranks). Dropped: Diffusal Blade and Disperser from
+-- the pos 1 list (pos 1, 3,870 matches: 2.4% and 1.8%, no Diffusal before minute 25; it was the first item
+-- after Midas) and Spirit Vessel from both mid lists (32 of 60,560 pos 2 matches). Hydra's Breath is not added:
+-- 32% of pos 1 and 26% of pos 2 matches, at ~33 min, under the ~35% bar used for adding an item.
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 5,012 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
+	"item_double_circlet",
 	"item_faerie_fire",
-	"item_slippers",
-	"item_circlet",
 	"item_magic_wand",
-	"item_wraith_band",
-	"item_boots",
 	"item_hand_of_midas",
-	"item_diffusal_blade",
-	"item_maelstrom",
+	"item_boots",
 	"item_mjollnir",
 	"item_travel_boots",
-	"item_manta",
 	"item_orchid",
-	"item_black_king_bar",
+	"item_manta",
 	"item_bloodthorn",
-	"item_moon_shard",
-	"item_sheepstick",
-	"item_disperser",
-	"item_travel_boots_2",
 	"item_aghanims_shard",
+	"item_skadi",
+	"item_sheepstick",
+	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
 }
-if sMidBuildType == "Magical" then
-	sMidItemsBuyList = {
-		"item_tango",
-		"item_double_branches",
-		"item_circlet",
-		"item_faerie_fire",
-		"item_bottle",
-		"item_magic_wand",
-		"item_spirit_vessel",
-		"item_boots",
-		"item_hand_of_midas",
-		"item_mjollnir",
-		"item_travel_boots",
-		"item_blink",
-		"item_manta",
-		"item_ultimate_scepter",
-		"item_orchid",
-		"item_sheepstick",
-		"item_overwhelming_blink",
-		"item_bloodthorn",
-		"item_moon_shard",
-		"item_travel_boots_2",
-		"item_ultimate_scepter_2",
-		"item_aghanims_shard",
-	}
-else
-	sMidItemsBuyList = {
-		"item_tango",
-		"item_double_branches",
-		"item_faerie_fire",
-		"item_bottle",
-		"item_spirit_vessel",
-		"item_magic_wand",
-		"item_boots",
-		"item_hand_of_midas",
-		"item_mjollnir",
-		"item_travel_boots",
-		"item_orchid",
-		"item_manta",
-		"item_skadi",
-		"item_bloodthorn",
-		"item_moon_shard",
-		"item_sheepstick",
-		"item_travel_boots_2",
-		"item_aghanims_shard",
-		"item_ultimate_scepter_2",
-	}
-end
-sRoleItemsBuyList["pos_2"] = sMidItemsBuyList
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
+-- One list for pos 2 (maintainer, 2026-11-20: the data's list, not a Magical or Physical list picked at random;
+-- items by enemy lineup may come later). The talent tree still follows sMidBuildType.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 82,550 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_double_circlet",
+	"item_faerie_fire",
+	"item_hand_of_midas",
+	"item_boots",
+	"item_mjollnir",
+	"item_orchid",
+	"item_travel_boots",
+	"item_manta",
+	"item_aghanims_shard",
+	"item_bloodthorn",
+	"item_skadi",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 621 matches, built from pos 2 (82,550) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_2"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 1,223 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_boots",
+	"item_hand_of_midas",
+	"item_maelstrom",
+	"item_orchid",
+	"item_ultimate_scepter",
+	"item_mjollnir",
+	"item_travel_boots",
+	"item_aghanims_shard",
+	"item_bloodthorn",
+	"item_sheepstick",
+	"item_ultimate_scepter_2",
+	"item_moon_shard",
+	"item_skadi",
+	"item_force_staff",
+	"item_hurricane_pike",
+	"item_travel_boots_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,031 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_boots",
+	"item_hand_of_midas",
+	"item_maelstrom",
+	"item_orchid",
+	"item_mjollnir",
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_aghanims_shard",
+	"item_bloodthorn",
+	"item_skadi",
+	"item_ultimate_scepter_2",
+	"item_force_staff",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_travel_boots", "item_magic_wand", "item_sheepstick", "item_hand_of_midas" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

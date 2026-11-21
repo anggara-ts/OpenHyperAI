@@ -24,47 +24,118 @@ else
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 38,631 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_quelling_blade",
+	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_desolator",
-	"item_orchid",
 	"item_dragon_lance",
-	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_bloodthorn",
-	"item_force_staff",
-	"item_hurricane_pike",
 	"item_greater_crit",
-	"item_moon_shard",
-	"item_butterfly",
+	"item_black_king_bar",
 	"item_ultimate_scepter",
+	"item_travel_boots",
 	"item_ultimate_scepter_2",
+	"item_hydras_breath",
+	"item_moon_shard",
+	"item_sphere",
+	"item_aghanims_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 34,387 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
-	"item_mid_outfit",
-	"item_dragon_lance",
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_oblivion_staff",
 	"item_desolator",
 	"item_orchid",
+	"item_lesser_crit",
+	"item_bloodthorn",
+	"item_greater_crit",
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_hydras_breath",
+	"item_nullifier",
 	-- removed a second item_dragon_lance here: one lance already listed above, and Hurricane Pike takes only one
 	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_bloodthorn",
-	"item_force_staff",
-	"item_hurricane_pike",
-	"item_sheepstick",
 	"item_moon_shard",
-	"item_butterfly",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,106 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_sobi_mask",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_oblivion_staff",
+	"item_desolator",
+	"item_orchid",
+	"item_aghanims_shard",
+	"item_lesser_crit",
+	"item_bloodthorn",
+	"item_greater_crit",
 	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_hydras_breath",
+	"item_sphere",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 4,261 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_blight_stone",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_orchid",
+	"item_desolator",
+	"item_bloodthorn",
+	"item_greater_crit",
+	"item_travel_boots",
+	"item_monkey_king_bar",
+	"item_ultimate_scepter_2",
+	"item_hydras_breath",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,731 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_falcon_blade",
+	"item_power_treads",
+	"item_orchid",
+	"item_dragon_lance",
+	"item_lesser_crit",
+	"item_bloodthorn",
+	"item_greater_crit",
+	"item_travel_boots",
+	"item_ultimate_scepter",
+	"item_sheepstick",
+	"item_hydras_breath",
+	"item_aghanims_shard",
+	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = {
 	"item_hurricane_pike",
@@ -706,6 +777,38 @@ function X.ConsiderSearingArrows()
 		{ strafeAbility, deathPactAbility, burningBarrageAbility, burningArmyAbility, skeletonWalkAbility }
 	)
 	local isAutoCastOn = searingArrowsAbility:GetAutoCastState()
+	-- Last hits with Searing Arrows (#48, maintainer): in lane, offer the arrow's bonus to the last-hit prediction while
+	-- mana stays 20% above the reserve for his spells (game files: damage_bonus 20/35/50/65, mana 10). When a last
+	-- hit needs it and Clinkz is on that creep, turn autocast on for the hit.
+	bot._lastHitBonus = 0
+	if Fu.IsLaning(bot) and manaAfter > manaThreshold + 0.2 then
+		bot._lastHitBonus = searingArrowsAbility:GetSpecialValueInt("damage_bonus")
+		local need = bot._lastHitNeedsBonus
+		if
+			need ~= nil
+			and DotaTime() - need.at < 1.5
+			and Fu.IsValid(need.creep)
+			and botTarget == need.creep
+			and Fu.IsInRange(bot, need.creep, attackRange + 100)
+		then
+			if not isAutoCastOn then
+				searingArrowsAbility:ToggleAutoCast()
+			end
+			if DotaTime() >= (bot._searingLhLogAt or -999) then
+				bot._searingLhLogAt = DotaTime() + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-CLINKZ] t=%.0f searing-lasthit creep-hp=%d bonus=%d",
+						DotaTime(),
+						need.creep:GetHealth(),
+						bot._lastHitBonus
+					)
+				)
+			end
+			return BOT_ACTION_DESIRE_NONE
+		end
+	end
 	if isGoingOnSomeone then
 		if
 			Fu.IsValidHero(botTarget)

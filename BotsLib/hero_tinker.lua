@@ -8,85 +8,110 @@ local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
 local tTalentTreeList = { ["t25"] = { 10, 0 }, ["t20"] = { 0, 10 }, ["t15"] = { 0, 10 }, ["t10"] = { 10, 0 } }
-local tAllAbilityBuildList = { { 1, 2, 2, 2, 2, 6, 1, 1, 1, 3, 6, 3, 3, 3, 6 } }
+-- A basic ability's ranks need hero level 1/3/5/7: four March points by level 5 held every point back to
+-- level 7, Rearm too. March is still maxed at 7 (82% of mid Tinkers), with one Deploy Turrets point at 4
+-- (58% have it by then), then Laser. Stratz, week of 12-18 Nov 2026 (7.41f), pos 2, 93,044 matches.
+local tAllAbilityBuildList = { { 1, 2, 2, 3, 2, 6, 2, 1, 1, 1, 6, 3, 3, 3, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 92,973 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_double_circlet",
 	"item_bottle",
-	"item_soul_ring",
-	"item_magic_wand",
+	"item_kaya",
 	"item_blink",
 	"item_aether_lens",
-	"item_aghanims_shard",
-	"item_kaya_and_sange",
 	"item_ultimate_scepter",
-	"item_shivas_guard",
+	"item_kaya_and_sange",
+	"item_black_king_bar",
+	"item_wind_waker",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
+	"item_arcane_blink",
 	"item_sheepstick",
-	"item_overwhelming_blink",
+	"item_aghanims_shard",
+	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 991 matches, built from pos 2 (92,973) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_double_circlet",
-	"item_magic_wand",
-	"item_soul_ring",
+	"item_kaya",
 	"item_blink",
-	"item_kaya_and_sange",
-	"item_shivas_guard",
+	"item_aether_lens",
 	"item_ultimate_scepter",
+	"item_kaya_and_sange",
+	"item_black_king_bar",
+	"item_wind_waker",
 	"item_ultimate_scepter_2",
-	"item_moon_shard",
+	"item_arcane_blink",
 	"item_sheepstick",
-	"item_overwhelming_blink",
 	"item_aghanims_shard",
+	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_4"] = {
-	"item_tango",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 1,050 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_faerie_fire",
-	"item_blood_grenade",
-	"item_magic_wand",
-	"item_arcane_boots",
-	"item_rod_of_atos",
-	"item_glimmer_cape",
+	"item_circlet",
+	"item_null_talisman",
+	"item_kaya",
+	"item_blink",
+	"item_kaya_and_sange",
 	"item_aether_lens",
-	"item_aghanims_shard",
-	"item_guardian_greaves",
 	"item_ultimate_scepter",
-	"item_octarine_core",
-	"item_gungir",
-	"item_shivas_guard",
+	"item_black_king_bar",
+	"item_wind_waker",
+	"item_arcane_blink",
 	"item_ultimate_scepter_2",
+	"item_glimmer_cape",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_5"] = {
-	"item_double_tango",
-	"item_faerie_fire",
-	"item_clarity",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 2,935 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
 	"item_blood_grenade",
-	"item_boots",
-	"item_urn_of_shadows",
-	"item_tranquil_boots",
-	"item_pipe",
-	"item_spirit_vessel",
-	"item_glimmer_cape",
-	"item_pavise",
-	"item_solar_crest",
-	"item_boots_of_bearing",
-	"item_octarine_core",
-	"item_sheepstick",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_kaya",
+	"item_arcane_boots",
+	"item_blink",
+	"item_aether_lens",
 	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_kaya_and_sange",
+	"item_cyclone",
+	"item_wind_waker",
 	"item_ultimate_scepter_2",
+	"item_ethereal_blade",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,115 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_blink",
+	"item_aether_lens",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_cyclone",
+	"item_wind_waker",
+	"item_arcane_blink",
+	"item_ultimate_scepter_2",
+	"item_meteor_hammer",
+	"item_ethereal_blade",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]

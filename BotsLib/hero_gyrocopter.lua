@@ -17,58 +17,121 @@ end
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 18,900 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_quelling_blade",
-	"item_enchanted_mango",
 	"item_double_branches",
+	"item_faerie_fire",
+	"item_magic_stick",
+	"item_quelling_blade",
 	"item_magic_wand",
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_lesser_crit",
 	"item_ultimate_scepter",
 	"item_black_king_bar",
-	"item_aghanims_shard",
-	"item_satanic",
 	"item_greater_crit",
-	"item_skadi",
-	"item_moon_shard",
-	"item_monkey_king_bar",
+	"item_satanic",
+	"item_butterfly",
 	"item_ultimate_scepter_2",
+	"item_travel_boots",
+	"item_moon_shard",
+	"item_manta",
+	"item_aghanims_shard",
 	"item_travel_boots_2",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
--- Support builds: Dotabuff 7-day meta has Gyrocopter mostly at support-off (pos 4).
-sRoleItemsBuyList["pos_4"] = {
-	"item_priest_outfit",
-	"item_arcane_boots",
-	"item_glimmer_cape",
-	"item_rod_of_atos",
-	"item_aghanims_shard",
-	"item_force_staff",
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 7,035 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_slippers",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_dragon_lance",
+	"item_lesser_crit",
 	"item_ultimate_scepter",
-	"item_gungir",
+	"item_travel_boots",
 	"item_black_king_bar",
-	"item_sheepstick",
+	"item_greater_crit",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_maelstrom",
+	"item_hurricane_pike",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
+-- Support builds: Dotabuff 7-day meta has Gyrocopter mostly at support-off (pos 4).
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 36,979 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_phylactery",
+	"item_glimmer_cape",
+	"item_force_staff",
+	"item_cyclone",
+	"item_soul_booster",
+	"item_octarine_core",
+	"item_wind_waker",
+	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
 -- One pair of boots in this build (user rule; Util/boots-check.js).
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 19,972 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
-	"item_crystal_maiden_outfit",
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_arcane_boots",
 	"item_glimmer_cape",
 	"item_force_staff",
+	"item_cyclone",
+	"item_soul_booster",
+	"item_spirit_vessel",
+	"item_octarine_core",
 	"item_aghanims_shard",
-	"item_guardian_greaves",
-	"item_rod_of_atos",
-	"item_ultimate_scepter",
-	"item_sheepstick",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,083 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_circlet",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_lesser_crit",
+	"item_dragon_lance",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_greater_crit",
+	"item_satanic",
+	"item_ultimate_scepter_2",
+	"item_phylactery",
+	"item_hurricane_pike",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
+X["sSellList"] = {
+	"item_black_king_bar",
+	"item_quelling_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_butterfly",
+	"item_falcon_blade",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

@@ -332,10 +332,13 @@ function AbilityImpl:IsItem()
 	return string.find(self._name, "^item_") ~= nil
 end
 function AbilityImpl:IsHidden()
-	return self._name == "generic_hidden"
+	return self._hidden == true or self._name == "generic_hidden"
+end
+function AbilityImpl:GetBehavior()
+	return self._behavior or 0
 end
 function AbilityImpl:GetMaxLevel()
-	return self._ultimate and 3 or 4
+	return self._maxLevel or (self._ultimate and 3 or 4)
 end
 function AbilityImpl:GetHeroLevelRequiredToUpgrade()
 	return 1
@@ -640,6 +643,21 @@ local function heroSlots(unit)
 		slots[slot] = newAbility("special_bonus_" .. short .. "_" .. (slot - 9), unit, false)
 	end
 	return slots
+end
+
+-- Gives a unit real ability slots (slot 0 first) in place of the usual layout. Each entry is a table:
+-- name, ultimate, hidden, behavior (ABILITY_BEHAVIOR_* bits), maxLevel.
+function Stub.setSlots(unit, entries)
+	local slots = {}
+	for index, entry in ipairs(entries) do
+		local ability = newAbility(entry.name, unit, entry.ultimate == true)
+		ability._hidden = entry.hidden
+		ability._behavior = entry.behavior
+		ability._maxLevel = entry.maxLevel
+		slots[index - 1] = ability
+	end
+	unit._slots = slots
+	unit._byName = {}
 end
 
 -- props: name, team, pid, loc, hp, maxHp, mana, maxMana, level, alive, hero, lane.
@@ -965,8 +983,17 @@ end
 function api.GetItemCost()
 	return 500
 end
-function api.GetItemComponents()
-	return {}
+-- Recipes as the engine reports them: one set of parts per item, from the game file (Tests/data/item_recipes_742.lua).
+local itemRecipes = nil
+function api.GetItemComponents(itemName)
+	if itemRecipes == nil then
+		itemRecipes = assert(realLoadfile(Stub.root .. "/Tests/data/item_recipes_742.lua"))()
+	end
+	local recipe = itemRecipes[itemName]
+	if recipe == nil or recipe.parts == nil then
+		return {}
+	end
+	return { recipe.parts }
 end
 function api.GetItemStockCount()
 	return 1

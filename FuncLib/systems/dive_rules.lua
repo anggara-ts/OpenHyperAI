@@ -48,6 +48,13 @@ function DiveRules.TowerChaseDecision(s)
 	return "leave", "not-killable"
 end
 
+-- Does a chase after a target inside the tower's range take the bot into it? Yes when the bot already stands inside,
+-- or when even the spot on the far side of the target (target distance + the bot's attack range) is inside: a ranged
+-- bot that can hit the target from outside the range is not entering. Distances are to the tower.
+function DiveRules.MustEnterTowerRange(botDist, targetDist, attackRange, towerRange)
+	return botDist <= towerRange or targetDist + attackRange <= towerRange
+end
+
 -- After a stop the bot keeps out of that tower for HOLD_SECONDS. Game 063, 23:44: Earth Spirit's first stop ran him
 -- for the fixed 2.88s, then team roam and farm walked him back past the tower; he was stopped again at 23:50 and died
 -- at 23:52. The hold zone is the tower's range + HOLD_MARGIN; once the bot is inside it, it walks out to

@@ -102,3 +102,15 @@ T.test("tower hold: walk out of range + 200, then on to + 350 before letting go"
 	run = R.TowerHoldRun(960, 700, false)
 	T.eq(run, false, "between + 200 and + 350 coming from outside: free (no flip at the edge)")
 end)
+
+T.test("tower chase: entering only when the bot can't hit the target from outside the tower's range", function()
+	local R = rules()
+	-- Tower range 700. Melee (150) after a target 500 from the tower: has to walk in (500 + 150 = 650).
+	T.eq(R.MustEnterTowerRange(850, 500, 150, 700), true, "melee")
+	-- Melee after a target 600 out: hits him from 750, just outside.
+	T.eq(R.MustEnterTowerRange(850, 600, 150, 700), false, "melee at the edge")
+	-- Ranged (600) after the same target: hits him from 1200 out, no entry.
+	T.eq(R.MustEnterTowerRange(850, 600, 600, 700), false, "ranged from outside")
+	-- Already inside the range: entering whatever the attack range.
+	T.eq(R.MustEnterTowerRange(650, 600, 600, 700), true, "already inside")
+end)

@@ -1080,11 +1080,18 @@ local function TowerChaseRun()
 	local hasTarget = Fu.IsValidHero(botTarget)
 		and Fu.CanBeAttacked(botTarget)
 		and not Fu.IsSuspiciousIllusion(botTarget)
-	-- Not shot yet, but chasing a hero who stands inside the tower's range: decide before walking in.
+	-- Not shot yet, but chasing a hero who stands inside the tower's range, where the bot can't hit him from outside
+	-- it: decide before walking in.
 	local entering = not towerOnBot
 		and hasTarget
 		and Fu.IsGoingOnSomeone(bot)
 		and GetUnitToUnitDistance(botTarget, tower) <= towerRange
+		and DiveRules.MustEnterTowerRange(
+			GetUnitToUnitDistance(bot, tower),
+			GetUnitToUnitDistance(botTarget, tower),
+			bot:GetAttackRange(),
+			towerRange
+		)
 	if not towerOnBot and not entering then
 		return 0
 	end

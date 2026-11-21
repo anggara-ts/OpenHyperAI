@@ -99,3 +99,50 @@ T.test("root-cancellable list: from the game files", function()
 		T.ok(type(entry.source) == "string" and #entry.source > 0, name .. " source")
 	end
 end)
+
+T.test("teleport time left: the modifier read checked against the clock", function()
+	local R = rules()
+	-- The read is the real time left: 3.0, then 2.7 after 0.3s.
+	local memory = {}
+	local left, entry, decided = R.TrackTeleport(memory, "zuus", 3.0, 100.0, 3.0)
+	T.near(left, 3.0, 1e-9, "real: first")
+	T.eq(decided, false, "real: not decided on the first read")
+	left, entry, decided = R.TrackTeleport(memory, "zuus", 2.7, 100.3, 3.0)
+	T.eq(decided, true, "real: decided 0.3s later")
+	T.eq(entry.real, true, "real: dropped by dt")
+	T.near(left, 2.7, 1e-9, "real: left")
+	left, _, decided = R.TrackTeleport(memory, "zuus", 2.4, 100.6, 3.0)
+	T.eq(decided, false, "decided once per TP")
+	T.near(left, 2.4, 1e-9, "real: later")
+	-- The read is the full duration (game 063 read 3.00): the clock counts down instead.
+	memory = {}
+	R.TrackTeleport(memory, "zuus", 3.0, 200.0, 3.0)
+	left, entry, decided = R.TrackTeleport(memory, "zuus", 3.0, 200.4, 3.0)
+	T.eq(decided, true, "full: decided")
+	T.eq(entry.real, false, "full: did not drop")
+	T.near(left, 2.6, 1e-9, "full: clock")
+	-- Thinks keep reading it (a gap over 0.5s would start a new TP).
+	for now = 200.7, 202.4, 0.3 do
+		R.TrackTeleport(memory, "zuus", 3.0, now, 3.0)
+	end
+	left = R.TrackTeleport(memory, "zuus", 3.0, 202.5, 3.0)
+	T.near(left, 0.5, 1e-9, "full: near the end")
+	left = R.TrackTeleport(memory, "zuus", 3.0, 202.9, 3.0)
+	T.near(left, 0.1, 1e-9, "full: last think")
+	-- Boots of Travel 2 (2.0s channel) with a full-duration read of 3.0: capped at 2.0.
+	memory = {}
+	left = R.TrackTeleport(memory, "zuus", 3.0, 300.0, 2.0)
+	T.near(left, 2.0, 1e-9, "BoT2 cap")
+	-- Seen late with a real read (1.2 left): the read, not the channel time.
+	memory = {}
+	left = R.TrackTeleport(memory, "zuus", 1.2, 400.0, 3.0)
+	T.near(left, 1.2, 1e-9, "late real read")
+	-- Not seen for more than 0.5s: a new TP.
+	memory = {}
+	R.TrackTeleport(memory, "zuus", 3.0, 500.0, 3.0)
+	left, entry = R.TrackTeleport(memory, "zuus", 3.0, 501.0, 3.0)
+	T.near(left, 3.0, 1e-9, "new TP after a gap")
+	T.eq(entry.real, nil, "new TP undecided")
+	-- Never below 0.
+	T.eq(R.TrackTeleport({}, "x", 0, 1.0, 3.0), 0, "no time left")
+end)

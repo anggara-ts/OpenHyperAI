@@ -40,6 +40,37 @@ function InterruptRules.TrackChannel(memory, key, abilityName, channelTime, now)
 	return math.max((channelTime or 0) - (now - entry.seenAt), 0)
 end
 
+-- Time left of an enemy's teleport. Game 063: the first read of modifier_teleporting gave 3.00, the TP's full
+-- channel, so it is not known whether the modifier gives the time left or the full duration. Both are kept:
+--   memory       a table owned by the caller (one per bot); key: the teleporting unit
+--   modLeft      the modifier's remaining duration as read now
+--   channelTime  the TP's channel time if known (3.0, or 2.0 with Boots of Travel 2; 7.42 items.txt), else nil
+-- The first read and one 0.2s+ later decide whether the read is real (it dropped by about the time between them).
+-- Time left = the smaller of the read and the TP's duration (first read, capped at channelTime) minus the time
+-- since it was first seen: the read counts only as an upper bound. A gap of more than 0.5s starts a new TP.
+-- Returns time left, the entry (firstLeft, secondLeft, dt, real) and true on the think the check was decided.
+function InterruptRules.TrackTeleport(memory, key, modLeft, now, channelTime)
+	local entry = memory[key]
+	if entry == nil or now - entry.lastSeen > 0.5 then
+		local full = modLeft
+		if channelTime ~= nil and channelTime > 0 then
+			full = math.min(modLeft, channelTime)
+		end
+		entry = { firstAt = now, firstLeft = modLeft, full = full }
+		memory[key] = entry
+	end
+	entry.lastSeen = now
+	local elapsed = now - entry.firstAt
+	local decided = false
+	if entry.real == nil and elapsed >= 0.2 then
+		local drop = entry.firstLeft - modLeft
+		entry.secondLeft, entry.dt = modLeft, elapsed
+		entry.real = drop >= elapsed * 0.5 and drop <= elapsed * 1.5
+		decided = true
+	end
+	return math.max(math.min(modLeft, entry.full - elapsed), 0), entry, decided
+end
+
 -- Channels and cast phases a root cancels (7.42 game files, read from pak01_dir.vpk on 2026-11-21).
 --   kind "channel": the enemy is channelling it (IsChanneling); time left from the TP modifier or the channel time
 --   kind "cast": a long cast point (the enemy is in its ability phase); time left from the cast point

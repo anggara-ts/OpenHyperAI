@@ -153,6 +153,7 @@ function X.SkillsComplement()
 	isRetreating = context.isRetreating
 	hpRatio = context.hp
 	isInTeamFight = context.isTeamFight
+	X.TrackEnemyTeleports()
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -233,12 +234,55 @@ function X.CheckInterruptProbes()
 		end
 	end
 end
+-- Time left of an enemy's TP (InterruptRules.TrackTeleport): the modifier read, checked once per TP against the
+-- clock. [OHA-DARK_WILLOW] tp-left target= first= second= dt= real=yes|no, once per TP. TP channel 3.0, or 2.0
+-- with Boots of Travel 2 (7.42 items.txt: item_tpscroll AbilityChannelTime 3.0, item_travel_boots_2 tp_channel_time 2).
+local teleportMemory = {}
+function X.TeleportLeft(enemy)
+	local modLeft = Fu.GetModifierTime(enemy, "modifier_teleporting")
+	local channelTime = 3.0
+	local ok, hasBoots2 = pcall(Fu.HasItem, enemy, "item_travel_boots_2")
+	if ok and hasBoots2 then
+		channelTime = 2.0
+	end
+	local left, entry, decided =
+		InterruptRules.TrackTeleport(teleportMemory, enemy:GetUnitName(), modLeft, DotaTime(), channelTime)
+	if decided then
+		local real = "no"
+		if entry.real then
+			real = "yes"
+		end
+		pcall(
+			print,
+			string.format(
+				"[OHA-DARK_WILLOW] t=%.0f tp-left target=%s first=%.2f second=%.2f dt=%.2f real=%s channel=%.1f",
+				DotaTime(),
+				enemy:GetUnitName(),
+				entry.firstLeft,
+				entry.secondLeft,
+				entry.dt,
+				real,
+				channelTime
+			)
+		)
+	end
+	return left
+end
+-- Every think: follow the TPs of enemy heroes near her, so the first read is taken when the TP starts, not when
+-- one of her spells comes off cooldown.
+function X.TrackEnemyTeleports()
+	for _, enemy in pairs(Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)) do
+		if Fu.IsValidHero(enemy) and enemy:HasModifier("modifier_teleporting") then
+			X.TeleportLeft(enemy)
+		end
+	end
+end
 -- Time left of an enemy's channel: the TP modifier's remaining time, else the channelled ability's channel time
 -- counted from the first think this bot saw it (an upper bound if she saw it late). src: tp|channel|unknown.
 local channelMemory = {}
 function X.EnemyChannelLeft(enemy)
 	if enemy:HasModifier("modifier_teleporting") then
-		return Fu.GetModifierTime(enemy, "modifier_teleporting"), "tp"
+		return X.TeleportLeft(enemy), "tp"
 	end
 	local active = enemy:GetCurrentActiveAbility()
 	if active == nil or active:IsNull() then
@@ -260,7 +304,7 @@ function X.EnemyRootCancelLeft(enemy)
 		name = active:GetName()
 	end
 	if enemy:HasModifier("modifier_teleporting") then
-		return Fu.GetModifierTime(enemy, "modifier_teleporting"), name or "item_tpscroll", "tp"
+		return X.TeleportLeft(enemy), name or "item_tpscroll", "tp"
 	end
 	local entry = name ~= nil and InterruptRules.ROOT_CANCELS[name] or nil
 	if entry == nil then

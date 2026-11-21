@@ -2026,17 +2026,16 @@ function ItemPurchaseThink()
 			if grisSlot >= 0 then
 				local gris = bot:GetItemInSlot(grisSlot)
 				if gris ~= nil then
-					local locOk, loc = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/localization")
-					local msg = "Consuming Gris-Gris — inventory full!"
-					if locOk and loc and loc.Get then
-						local lines = loc.Get("say_consume_grisgris")
-						if type(lines) == "table" and #lines > 0 then
-							msg = lines[RandomInt(1, #lines)]
-						elseif type(lines) == "string" then
-							msg = lines
-						end
-					end
-					bot:ActionImmediate_Chat(msg, true)
+					-- No all-chat line any more (it was a debug aid); the log line says it.
+					pcall(
+						print,
+						string.format(
+							"[OHA-BUY] t=%.0f %s grisgris-consume why=inventory-full gold=%d",
+							DotaTime(),
+							(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+							bot:GetGold()
+						)
+					)
 					if grisSlot == 16 or grisSlot >= 6 then
 						for slot = 0, 8 do
 							local junk = bot:GetItemInSlot(slot)

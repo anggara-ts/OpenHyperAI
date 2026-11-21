@@ -164,16 +164,19 @@ function X.TrackPhaseShift()
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f phase held=%.2f of=%.2f mode=%d->%d hp=%.2f by=%s",
+				"[OHA-PUCK] t=%.0f phase held=%.2f of=%.2f mode=%d->%d hp=%.2f by=%s exit=%s",
 				DotaTime(),
 				DotaTime() - track.at,
 				track.full or -1,
 				track.mode or -1,
 				bot:GetActiveMode(),
 				Fu.GetHP(bot),
-				track.by or "?"
+				track.by or "?",
+				-- She ended it herself (X.ShiftExit): a short held= then is not a broken hold.
+				bot._phaseExitHow or "-"
 			)
 		)
+		bot._phaseExitHow = nil
 	end
 end
 -- Escape order (#15, game 044, 38:47): Puck Eul'd herself against Pudge's hook while her orb flew away unused,
@@ -467,6 +470,7 @@ function X.ShiftExit()
 		local orbAt = X.OrbInFlight()
 		if orbAt ~= nil and GetUnitToLocationDistance(siphoner, orbAt) > EscapeRules.SIPHON_BREAK + 50 then
 			bot._phaseExitFor = orderAt
+			bot._phaseExitHow = "jaunt"
 			bot._siphonEscapeFrom = nil
 			X.LogEscapeAction("jaunt", "siphon", orbAt)
 			X.ReleasePhaseHold()
@@ -475,7 +479,15 @@ function X.ShiftExit()
 		end
 	end
 	local duration = phaseShiftAbility:GetSpecialValueFloat("duration")
-	if since < duration - 0.2 or since > duration + 0.1 then
+	-- The shift must still be on (TrackPhaseShift keeps bot._phaseTrack while it is), and it must have been an escape
+	-- shift: after a dodge in a fight she is winning, Blink (her initiation item) stays unless she is under 35%.
+	local castWhy = tostring(bot._phaseCastWhy)
+	if
+		since < duration - 0.2
+		or since > duration + 0.1
+		or bot._phaseTrack == nil
+		or string.sub(castWhy, 1, 5) == "dodge" and Fu.GetHP(bot) >= 0.35
+	then
 		return
 	end
 	local blinkItem = X.BlinkItem()
@@ -488,6 +500,8 @@ function X.ShiftExit()
 		return
 	end
 	bot._phaseExitFor = orderAt
+	bot._phaseExitHow = "blink"
+	-- 1150: inside blink_range 1200 (7.42 items_all.txt; a point beyond it lands at blink_range_clamp 960).
 	local point = X.EscapePoint(1150)
 	X.LogEscapeAction("blink", "phase-end", point)
 	X.ReleasePhaseHold()
@@ -609,6 +623,7 @@ function X.SkillsComplement()
 		bot._phaseWantMode = nil
 		bot._phaseProbeAt = DotaTime() + 0.3
 		bot._phaseOrderAt = DotaTime()
+		bot._phaseCastWhy = X.phaseWhy
 		bot._phaseOrderLoc = bot:GetLocation()
 		-- Item orders and every wrapped mode Think wait too (OhaCastGuard, ItemUsageThink).
 		bot._castHoldUntil = DotaTime() + phaseShiftAbility:GetSpecialValueFloat("duration") + 0.05

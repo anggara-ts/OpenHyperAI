@@ -229,8 +229,8 @@ return {
 	clinkz = {
 		[1] = {
 			{ "item_desolator", 9500 },
-			{ "item_dragon_lance", 12000, done = { "item_hydras_breath" } },
-			{ "item_greater_crit", 18500 },
+			{ "item_dragon_lance", 14000, done = { "item_hydras_breath" } },
+			{ "item_greater_crit", 20500 },
 		},
 		[2] = {
 			{ "item_oblivion_staff", 7000, done = { "item_orchid", "item_bloodthorn" } },

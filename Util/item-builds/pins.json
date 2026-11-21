@@ -3,6 +3,7 @@
 	"pins": [
 		{"hero":"night_stalker","require":["item_blink"],"reason":"#9: Blink Dagger in every position (maintainer, game 039)"},
 		{"hero":"night_stalker","pos":[4,5],"require":["item_echo_sabre"],"before":[["item_blink","item_echo_sabre"]],"forbid":["item_mekansm","item_glimmer_cape"],"reason":"#9: a hunting support, Blink before Echo Sabre, no caster-support items"},
+		{"hero":"clinkz","require":["item_aghanims_shard"],"before":[["item_aghanims_shard","item_ultimate_scepter"],["item_aghanims_shard","item_ultimate_scepter_2"]],"reason":"#94: Aghanim's Shard before the Scepter, Burning Barrage comes from the Shard in 7.42 (maintainer, 2026-11-21: \"get shard first for clinks\")"},
 		{"hero":"meepo","require":["item_sange_and_yasha","item_blink","item_aghanims_shard"],"adjacent":[["item_sange_and_yasha","item_blink"]],"before":[["item_blink","item_aghanims_shard"]],"reason":"#9: Blink right after Sange and Yasha and before the Shard, in every position"},
 		{"hero":"keeper_of_the_light","pos":[4,5],"require":["item_magic_wand","item_urn_of_shadows","item_force_staff","item_ultimate_scepter","item_ultimate_scepter_2"],"forbid":["item_solar_crest","item_mekansm","item_kaya_and_sange"],"reason":"#9: Scepter, Urn and Force Staff; no Solar Crest rush (maintainer, game 039)"},
 		{"hero":"arc_warden","forbid":["item_spirit_vessel","item_diffusal_blade","item_disperser"],"reason":"#9: the Tempest Double cannot use them well"},

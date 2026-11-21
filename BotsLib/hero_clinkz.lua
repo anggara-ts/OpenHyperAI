@@ -34,6 +34,7 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_desolator",
+	"item_aghanims_shard",
 	"item_dragon_lance",
 	"item_greater_crit",
 	"item_black_king_bar",
@@ -43,7 +44,6 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_hydras_breath",
 	"item_moon_shard",
 	"item_sphere",
-	"item_aghanims_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 2, 34,387 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
@@ -57,6 +57,7 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_oblivion_staff",
 	"item_desolator",
 	"item_orchid",
+	"item_aghanims_shard",
 	"item_lesser_crit",
 	"item_bloodthorn",
 	"item_greater_crit",
@@ -65,8 +66,6 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_ultimate_scepter_2",
 	"item_hydras_breath",
 	"item_nullifier",
-	-- removed a second item_dragon_lance here: one lance already listed above, and Hurricane Pike takes only one
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,106 matches (Util/item-builds/generate.js).
@@ -104,13 +103,13 @@ sRoleItemsBuyList["pos_4"] = {
 	"item_power_treads",
 	"item_orchid",
 	"item_desolator",
+	"item_aghanims_shard",
 	"item_bloodthorn",
 	"item_greater_crit",
 	"item_travel_boots",
 	"item_monkey_king_bar",
 	"item_ultimate_scepter_2",
 	"item_hydras_breath",
-	"item_aghanims_shard",
 	"item_moon_shard",
 }
 -- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,731 matches (Util/item-builds/generate.js).
@@ -124,6 +123,7 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_falcon_blade",
 	"item_power_treads",
 	"item_orchid",
+	"item_aghanims_shard",
 	"item_dragon_lance",
 	"item_lesser_crit",
 	"item_bloodthorn",
@@ -132,7 +132,6 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_ultimate_scepter",
 	"item_sheepstick",
 	"item_hydras_breath",
-	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }

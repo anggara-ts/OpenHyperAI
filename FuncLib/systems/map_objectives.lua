@@ -1362,9 +1362,11 @@ function MapObjectives.ThinkObjective(bot, loc, kind)
 				pcall(
 					print,
 					string.format(
-						"[OHA-WISDOM] t=%.0f %s taken xp=+%d stood=%.1f late=%.0f %s",
+						"[OHA-WISDOM] t=%.0f %s %s xp=+%d stood=%.1f late=%.0f %s",
 						now,
 						(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+						-- covered: stood 3.5s on it with no XP seen (the old claim rule counts it as done)
+						gotXp and "taken" or "covered",
 						gotXp and (xp - bot._wisdomXpAtStand) or 0,
 						now - bot._wisdomStandSince,
 						now - mark,
@@ -1441,7 +1443,8 @@ end
 -- Shrine trip lines (#32, game 039: Tusk announced the shrine after respawning and was farming 14s later; no line said
 -- why). One go line per mark is printed above; this adds the end of a trip:
 --   [OHA-WISDOM] t= <hero> give-up why=<cant-arrive|window|far|hp|danger|not-best|dead|crisis|defending> dist= late=
---   [OHA-WISDOM] t= <hero> taken xp=+N stood= late= charges= cd=   (from ThinkObjective)
+--   [OHA-WISDOM] t= <hero> taken|covered xp=+N stood= late= charges= cd=   (from ThinkObjective; covered: 3.5s on
+--   the shrine and no XP seen)
 -- late: seconds since the 7:00 mark (negative before it).
 local function HeroName(bot)
 	return (string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))
@@ -1465,6 +1468,11 @@ function MapObjectives.NoteWisdomTrip(bot, kind, loc)
 	if bot._wisdomClaimedMark == mark or bot._wisdomClaimedMark == mark - interval then
 		return
 	end
+	-- One give-up line per bot and mark (a go / skip can flip within one mark: game 067, Puck go t=397, skip t=404).
+	if bot._wisdomGiveUpMark == mark then
+		return
+	end
+	bot._wisdomGiveUpMark = mark
 	local why = bot._wisdomNoWhy or bot._lotusWhy or "?"
 	pcall(
 		print,

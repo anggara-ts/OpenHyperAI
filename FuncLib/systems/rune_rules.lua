@@ -9,6 +9,8 @@ local RuneRules = {}
 -- PASS_WAIT seconds this bot sees it closer (its rune mode needs a think to win). After that, a closer bot that still
 -- isn't in the rune mode has given it up, and this bot takes it. waited: seconds this bot has seen that ally closer.
 RuneRules.PASS_WAIT = 1.0
+-- Seconds a bot that took a rune over stays its picker (renewed every think the passing grab still wants it).
+RuneRules.PASS_TAKE_FOR = 3
 function RuneRules.PassingYield(allyCloser, allyIsHuman, allyInRuneMode, waited)
 	if not allyCloser then
 		return false

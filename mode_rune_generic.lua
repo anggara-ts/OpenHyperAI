@@ -1437,6 +1437,12 @@ function GetDesireRaw()
 						if not enemyNear or powerStep then
 							passDesire = math.max(passDesire, RuneRules.PASS_DESIRE)
 						end
+						-- Taking it over from a closer ally: the picker rules (IsTheClosestAlly, so PickerSpot and
+						-- BackUpPicker in Think) treat this bot as the picker for a few seconds, or it would hold the
+						-- backup spot 450 off the rune.
+						if closer ~= nil then
+							bot._passTake = { id = id, untilAt = DotaTime() + RuneRules.PASS_TAKE_FOR }
+						end
 						-- One line per rune and spawn cycle when the old rule would not have taken it.
 						local logKey = id .. ":" .. math.floor(DotaTime() / RuneCycle(id))
 						if (closer ~= nil or powerStep and enemyNear) and bot._passLogKey ~= logKey then
@@ -2616,6 +2622,14 @@ function RuneMode.BackUpPicker(id)
 	return true
 end
 function RuneMode.IsTheClosestAlly(unit, location)
+	-- A passing grab took this rune over from a closer ally that ignored it (RuneRules.PassingYield).
+	local take = unit._passTake
+	if take ~= nil and DotaTime() < take.untilAt then
+		local spot = GetRuneSpawnLocation(take.id)
+		if math.abs(spot.x - location.x) < 1 and math.abs(spot.y - location.y) < 1 then
+			return true
+		end
+	end
 	local closestAlly = unit
 	local closestDistance = GetUnitToLocationDistance(unit, location)
 	for playerIndex = 1, 5 do

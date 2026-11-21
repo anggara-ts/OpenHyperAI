@@ -106,6 +106,36 @@ local BOOTS = {
 	item_phase_boots = "phase",
 	item_power_treads = "treads",
 }
+-- #9 (2026-11-21 review): Ember Spirit had lists only for pos 1 and 2, so a pos 3/4/5 Ember returned a nil buy list
+-- and item_purchase_generic.lua stopped at "[ERROR] Can't load purchase list". Every hero, every position, a list.
+-- The Lone Druid bear is a summoned unit, not a drafted hero: its list is empty on purpose.
+local NO_BUY_LIST = { hero_lone_druid_bear = true }
+T.test("every hero file returns a buy list in every position", function()
+	local missing = {}
+	for _, path in ipairs(T.files("^BotsLib/hero_[%w_]+%.lua$")) do
+		local file = string.match(path, "^BotsLib/(hero_[%w_]+)%.lua$")
+		for slot = 1, NO_BUY_LIST[file] and 0 or 5 do
+			Stub.reset({ hero = "npc_dota_" .. file, slot = slot })
+			local ok, result = Stub.load("BotsLib/" .. file)
+			if not ok then
+				missing[#missing + 1] = file .. " pos " .. slot .. ": " .. tostring(result)
+			elseif type(result.sBuyList) ~= "table" or #result.sBuyList == 0 then
+				missing[#missing + 1] = file .. " pos " .. slot .. ": " .. type(result.sBuyList)
+			end
+		end
+	end
+	T.eq(#missing, 0, table.concat(missing, " | "))
+end)
+
+T.test("Ember Spirit pos 3, 4 and 5 have their own lists", function()
+	T.ok(indexOf(buyList("hero_ember_spirit", 3), "item_mage_slayer") ~= nil, "pos 3 has item_mage_slayer")
+	for slot = 4, 5 do
+		local list = buyList("hero_ember_spirit", slot)
+		T.ok(indexOf(list, "item_cyclone") ~= nil, "pos " .. slot .. " has item_cyclone")
+		T.eq(indexOf(list, "item_bfury"), nil, "pos " .. slot .. " is not the carry list")
+	end
+end)
+
 -- #9: Io's item table had only pos 1, 4 and 5, so a pos 2 or pos 3 Io got whichever list pairs() met first
 -- (FuncLib/hero/hero_builder.lua). Each position now has its own list from the Stratz data.
 T.test("Io has its own buy list in every position", function()
@@ -146,35 +176,5 @@ T.test("the heroes whose boots changed name one pair of boots, with its upgrade 
 			end
 		end
 		T.eq(table.concat(families, ","), case[3], case[1] .. " pos " .. case[2] .. " boots")
-	end
-end)
-
--- #9 (2026-11-21 review): Ember Spirit had lists only for pos 1 and 2, so a pos 3/4/5 Ember returned a nil buy list
--- and item_purchase_generic.lua stopped at "[ERROR] Can't load purchase list". Every hero, every position, a list.
--- The Lone Druid bear is a summoned unit, not a drafted hero: its list is empty on purpose.
-local NO_BUY_LIST = { hero_lone_druid_bear = true }
-T.test("every hero file returns a buy list in every position", function()
-	local missing = {}
-	for _, path in ipairs(T.files("^BotsLib/hero_[%w_]+%.lua$")) do
-		local file = string.match(path, "^BotsLib/(hero_[%w_]+)%.lua$")
-		for slot = 1, NO_BUY_LIST[file] and 0 or 5 do
-			Stub.reset({ hero = "npc_dota_" .. file, slot = slot })
-			local ok, result = Stub.load("BotsLib/" .. file)
-			if not ok then
-				missing[#missing + 1] = file .. " pos " .. slot .. ": " .. tostring(result)
-			elseif type(result.sBuyList) ~= "table" or #result.sBuyList == 0 then
-				missing[#missing + 1] = file .. " pos " .. slot .. ": " .. type(result.sBuyList)
-			end
-		end
-	end
-	T.eq(#missing, 0, table.concat(missing, " | "))
-end)
-
-T.test("Ember Spirit pos 3, 4 and 5 have their own lists", function()
-	T.ok(indexOf(buyList("hero_ember_spirit", 3), "item_mage_slayer") ~= nil, "pos 3 has item_mage_slayer")
-	for slot = 4, 5 do
-		local list = buyList("hero_ember_spirit", slot)
-		T.ok(indexOf(list, "item_cyclone") ~= nil, "pos " .. slot .. " has item_cyclone")
-		T.eq(indexOf(list, "item_bfury"), nil, "pos " .. slot .. " is not the carry list")
 	end
 end)

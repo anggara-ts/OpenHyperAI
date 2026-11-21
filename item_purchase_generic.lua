@@ -16,11 +16,11 @@ if GAMEMODE_ARDM == nil then
 end
 local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local BuyRules = require(GetScriptDirectory() .. "/FuncLib/systems/buy_rules")
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamItems = require(GetScriptDirectory() .. "/FuncLib/systems/item_strategy")
-local BuyRules = require(GetScriptDirectory() .. "/FuncLib/systems/buy_rules")
 -- Observer stock is shared with the human. When a ward lands in the shop, leave it
 -- for 30s. Buy only what is still there after that.
 local OBS_HUMAN_WINDOW = 30

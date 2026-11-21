@@ -12,8 +12,8 @@ This is a place for you to customize the Open Hyper AI bots.
    and then modify the settings in <Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\game\Customize> directory.
 5. Note there is a list of known to-be-improved (aka weak) heroes, check out [Appendix - 2] on the bottom of this file.
 
-- Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298
-- Github: https://github.com/forest0xia/dota2bot-OpenHyperAI
+- Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501
+- Github: https://github.com/anggara-ts/Supercharged-OpenHyperAI
 --]]
 
 -- The variable to hold the settings. Only modify if you know exactly what you are doing.
@@ -53,7 +53,7 @@ Customize.MatchTracePerf = false
 Customize.Localization = "en"
 
 -- To ban some heroes for bots - Set the heroes you DO NOT want the bots to pick. Use hero internal names.
--- Hero name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
+-- Hero name ref: https://github.com/anggara-ts/Supercharged-OpenHyperAI/blob/main/FuncLib/data/hero_names.lua
 -- Please note that it is not 100% guaranteed that the banned hero will not be picked; for example if you banned too many heroes
 -- like near 100% of the heroes, bots will need to randomly pick heroes regardless of the ban list to continue the game.
 Customize.Ban = {
@@ -72,7 +72,7 @@ Empty tables = off (falls back to Radiant_Heros / Dire_Heros below).
 Examples:
   Customize.Debug_Ally_Heros = { "npc_dota_hero_phoenix" }
   Customize.Debug_Enemy_Heros = { "npc_dota_hero_sniper", "npc_dota_hero_axe" }
-Hero name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
+Hero name ref: https://github.com/anggara-ts/Supercharged-OpenHyperAI/blob/main/FuncLib/data/hero_names.lua
 --]]
 Customize.Debug_Ally_Heros = {
 	-- "npc_dota_hero_phoenix",
@@ -83,7 +83,7 @@ Customize.Debug_Enemy_Heros = {
 
 --[[
 1. To pick heroes for the Radiant bots. You have to use hero's internal name.
-2. Hero internal name ref: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71
+2. Hero internal name ref: https://github.com/anggara-ts/Supercharged-OpenHyperAI/blob/main/FuncLib/data/hero_names.lua
 3. Don't need to provide a value for all 5 bots, any empty/missing value will fallback to a Random value.
 4. The position is ranked by the order of the names you put in the below list, pos 1 - 5, from top to down.
 5. There are sample team picks in Appendix section below.

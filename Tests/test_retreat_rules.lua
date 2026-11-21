@@ -38,6 +38,19 @@ T.test("creep-low: hold after it fired", function()
 	T.eq(R.CreepLowRetreat(0.40, true, false, false, false, true, true), false, "held, healed to 40%")
 end)
 
+T.test("creep-low: Roshan counts as a creep (game 063, Earth Spirit and Alchemist died in Roshan mode)", function()
+	local R = rules()
+	-- Alchemist t=2755: 18% HP, Roshan hitting him (a creep hit), out of the exemption now.
+	T.eq(R.CreepLowRetreat(0.18, true, false, false, false, false, true), true, "Roshan hit at 18%")
+	-- Held near the pit (the caller passes "within 2500 of the pit" as in reach): Roshan mode can't call him back.
+	T.eq(R.CreepLowRetreat(0.20, false, false, false, false, true, true), true, "held near the pit at 20%")
+	-- The retreat file runs the rule inside the Roshan / Tormentor exemption, before its NONE (tag 232).
+	local src = T.read("mode_retreat_generic.lua")
+	local ruleAt = string.find(src, "CreepLowDesire(true)", 1, true)
+	local exemptAt = string.find(src, "RetreatTag(232, BOT_MODE_DESIRE_NONE)", 1, true)
+	T.ok(ruleAt ~= nil and exemptAt ~= nil and ruleAt < exemptAt, "creep-low before the Roshan exemption")
+end)
+
 T.test("hard retreat: healthy cases from game 038 keep fighting", function()
 	local R = rules()
 	-- Mirana t=29: alone, nobody within 1200, two lane opponents last seen within 2000, full HP.

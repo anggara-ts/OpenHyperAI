@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local CastRules = require(GetScriptDirectory() .. "/FuncLib/systems/hero_cast_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -155,6 +156,10 @@ local aetherRange = 0
 local bonusBlastDamage = 0
 local botLevel, mpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
+	if X.ConsiderStopLifeDrainAlly() then
+		bot:Action_ClearActions(true)
+		return
+	end
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
@@ -187,8 +192,25 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnLocation(netherWardAbility, netherWardLocation)
 		return
 	end
-	lifeDrainDesire, lifeDrainTarget = X.ConsiderR()
+	local lifeDrainWhy
+	lifeDrainDesire, lifeDrainTarget, lifeDrainWhy = X.ConsiderR()
 	if lifeDrainDesire > 0 then
+		-- A drain on an enemy or the ward must not be cancelled by an older ally drain left in the handle.
+		bot._ohaDrainAlly = nil
+		if lifeDrainWhy == "ally" then
+			bot._ohaDrainAlly = lifeDrainTarget
+			bot._ohaDrainAllyAt = DotaTime()
+			pcall(
+				print,
+				string.format(
+					"[OHA-PUGNA] t=%.0f pugna drain-ally-start ally=%s allyHp=%.2f hp=%.2f",
+					DotaTime(),
+					(string.gsub(lifeDrainTarget:GetUnitName(), "npc_dota_hero_", "")),
+					Fu.GetHP(lifeDrainTarget),
+					Fu.GetHP(bot)
+				)
+			)
+		end
 		Fu.SetQueuePtToINT(bot, true)
 		bot:ActionQueue_UseAbilityOnEntity(lifeDrainAbility, lifeDrainTarget)
 		return
@@ -528,6 +550,10 @@ function X.ConsiderR()
 			end
 		end
 	end
+	local drainAllyDesire, drainAlly = X.ConsiderLifeDrainAlly(castRange)
+	if drainAllyDesire > 0 then
+		return drainAllyDesire, drainAlly, "ally"
+	end
 	if Fu.IsGoingOnSomeone(bot) then
 		if
 			Fu.IsValidHero(botTarget)
@@ -555,5 +581,78 @@ function X.ConsiderR()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- Life Drain on an ally (#47): 7.42 pugna_life_drain targets BOTH teams; on an ally "Pugna heals his ally and
+-- takes magical damage equal to the amount healed. This damage cannot kill Pugna" (datafeed). It was only
+-- ever cast on enemies. Heal a hurt ally who is being hit, while Pugna is healthy (CastRules.LifeDrainAllyWorth).
+function X.ConsiderLifeDrainAlly(castRange)
+	-- At most one ally drain try every 3s, so a refused cast is not repeated every think.
+	if Fu.GetHP(bot) < CastRules.DRAIN_SELF_MIN_HP or DotaTime() < (bot._ohaDrainAllyAt or -999) + 3 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local best, bestHp = nil, math.huge
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(allyHero)
+			and allyHero ~= bot
+			and not allyHero:IsIllusion()
+			and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+			and not allyHero:HasModifier("modifier_ice_blast")
+		then
+			local allyHp = Fu.GetHP(allyHero)
+			local enemiesNearAlly = Fu.GetEnemiesNearLoc(allyHero:GetLocation(), 900) or {}
+			if
+				allyHp < bestHp
+				and CastRules.LifeDrainAllyWorth(
+					allyHp,
+					Fu.GetHP(bot),
+					allyHero:WasRecentlyDamagedByAnyHero(2),
+					#enemiesNearAlly
+				)
+			then
+				best, bestHp = allyHero, allyHp
+			end
+		end
+	end
+	if best ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, best
+	end
+	return BOT_ACTION_DESIRE_NONE
+end
+-- While draining an ally: stop once the ally is healed, gone or out of range, or Pugna is low.
+function X.ConsiderStopLifeDrainAlly()
+	local ally = bot._ohaDrainAlly
+	if ally == nil then
+		return false
+	end
+	if not bot:IsChanneling() then
+		if DotaTime() > (bot._ohaDrainAllyAt or -999) + 1 then
+			bot._ohaDrainAlly = nil
+		end
+		return false
+	end
+	local why = nil
+	if not Fu.IsValidHero(ally) then
+		why = "ally-gone"
+	elseif not Fu.IsInRange(bot, ally, 1100) then
+		why = "ally-far"
+	elseif CastRules.LifeDrainAllyStop(Fu.GetHP(ally), Fu.GetHP(bot)) then
+		why = "healed-or-low"
+	end
+	if why ~= nil then
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUGNA] t=%.0f pugna drain-ally-stop why=%s allyHp=%.2f hp=%.2f",
+				DotaTime(),
+				why,
+				Fu.IsValidHero(ally) and Fu.GetHP(ally) or -1,
+				Fu.GetHP(bot)
+			)
+		)
+		bot._ohaDrainAlly = nil
+		return true
+	end
+	return false
 end
 return X

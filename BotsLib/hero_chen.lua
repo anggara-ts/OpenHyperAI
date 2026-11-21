@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local CastRules = require(GetScriptDirectory() .. "/FuncLib/systems/hero_cast_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -419,6 +420,32 @@ function X.ConsiderGatherCreeps()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Hand of God heals every allied hero on the map. It went out only for a core under 50% HP; a support (or
+-- Chen) about to die never counted (#47). Supports count under 35% (CastRules.HandOfGodWorth).
+local function HandOfGodCandidate(allyHero)
+	return Fu.IsValidHero(allyHero)
+		and not allyHero:IsIllusion()
+		and not allyHero:IsAttackImmune()
+		and not allyHero:IsInvulnerable()
+		and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
+		and not allyHero:HasModifier("modifier_oracle_false_promise_timer")
+end
+local function LogHandOfGod(allyHero, why)
+	if DotaTime() >= (bot._ohaHandOfGodLogAt or -999) then
+		bot._ohaHandOfGodLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-CHEN] t=%.0f chen hand-of-god ally=%s hp=%.2f core=%s why=%s",
+				DotaTime(),
+				(string.gsub(allyHero:GetUnitName(), "npc_dota_hero_", "")),
+				Fu.GetHP(allyHero),
+				tostring(Fu.IsCore(allyHero)),
+				why
+			)
+		)
+	end
+end
 function X.ConsiderHandOfGod()
 	if not handOfGodAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE
@@ -428,34 +455,23 @@ function X.ConsiderHandOfGod()
 		local alliesNearFight = Fu.GetAlliesNearLoc(teamFightLocation, 1600)
 		for _, allyHero in pairs(alliesNearFight) do
 			if
-				Fu.IsValidHero(allyHero)
-				and Fu.IsCore(allyHero)
-				and Fu.GetHP(allyHero) < 0.5
-				and not allyHero:IsIllusion()
-				and not allyHero:IsAttackImmune()
-				and not allyHero:IsInvulnerable()
-				and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
-				and not allyHero:HasModifier("modifier_oracle_false_promise_timer")
+				HandOfGodCandidate(allyHero)
+				and CastRules.HandOfGodWorth(Fu.GetHP(allyHero), Fu.IsCore(allyHero), true)
 			then
+				LogHandOfGod(allyHero, "teamfight")
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
 	end
 	for _, allyHero in pairs(GetUnitList(UNIT_LIST_ALLIED_HEROES)) do
-		local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
 		if
-			Fu.IsValidHero(allyHero)
+			HandOfGodCandidate(allyHero)
 			and Fu.IsRetreating(allyHero)
 			and allyHero:GetActiveModeDesire() >= 0.65
-			and Fu.IsCore(allyHero)
-			and Fu.GetHP(allyHero) < 0.5
 			and allyHero:WasRecentlyDamagedByAnyHero(1)
-			and not allyHero:IsIllusion()
-			and not allyHero:IsAttackImmune()
-			and not allyHero:IsInvulnerable()
-			and not allyHero:HasModifier("modifier_necrolyte_reapers_scythe")
-			and not allyHero:HasModifier("modifier_oracle_false_promise_timer")
+			and CastRules.HandOfGodWorth(Fu.GetHP(allyHero), Fu.IsCore(allyHero), true)
 		then
+			local enemiesNearAlly = Fu.GetNearbyHeroes(allyHero, 1200, true, BOT_MODE_NONE)
 			if
 				enemiesNearAlly ~= nil
 				and #enemiesNearAlly >= 1
@@ -463,6 +479,7 @@ function X.ConsiderHandOfGod()
 				and Fu.IsChasingTarget(enemiesNearAlly[1], allyHero)
 				and not Fu.IsSuspiciousIllusion(enemiesNearAlly[1])
 			then
+				LogHandOfGod(allyHero, "chased")
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end

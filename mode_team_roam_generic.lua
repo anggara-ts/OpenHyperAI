@@ -93,6 +93,11 @@ local function ClearEngageTarget()
 	bot:SetTarget(nil)
 end
 local function adjustDesire(desire)
+	-- #185: the Tombstone priority (close, nearly dead, or allies in its radius) stays above attack mode (0.95); the
+	-- laning cap (0.72) and the push cap (0.5) would put it under again (game 065: `special-unit,raw=0.95,cap=lane`).
+	if hasSpecialUnitTarget and bot._tombstonePriority then
+		return desire
+	end
 	if Fu.IsPushing(bot) then
 		if desire > 0.6 then
 			return 0.5

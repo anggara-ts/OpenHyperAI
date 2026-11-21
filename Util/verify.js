@@ -25,7 +25,8 @@
 //
 // An item's patterns are the backticked parts of its line, e.g. `[OHA-KITE]` or
 // `[OHA-RETREAT] over-evasive`. A log line matches a pattern when it contains every word of it
-// (words with "=", "...", "/" or "|" are ignored, so `feast result reissues=` matches on the tag and "feast result").
+// (a word with a value like `step=laguna` must match exactly; words ending in "=" and words with "...", "/", "|",
+// "<" or ">" are ignored, so `feast result reissues=` matches on the tag and "feast result").
 // Seeing a tag is evidence, not proof: the reviewer still sets pass/fail after reading the lines, unless the
 // item has `expect` rules. Rules, joined with ";" (in the PR body: an HTML comment at the end of the bullet,
 // `<!-- expect: seen>=1; allyDist<=500 -->`, `<!-- heroes: lion,mirana -->` or `<!-- expect: ...; heroes: ... -->`):
@@ -244,11 +245,14 @@ function parseVerify(body) {
 	return items;
 }
 
+// A word with a concrete value (`step=laguna`, `why=low-hp`) must match exactly. A word with no value, alternatives,
+// a placeholder or a comparison (`reissues=`, `why=a|b`, `dist=...`, `x/y`, `hp<=0.35`) is ignored. Game 063:
+// `[OHA-LINA] combo step=laguna` matched every combo line while every "=" word was ignored.
 function words(pattern) {
 	return pattern
 		.split(/\s+/)
-		.filter((w) => w && !/[=|/]|\.\.\./.test(w))
-		.map((w) => w.replace(/[(),]/g, ""));
+		.map((w) => w.replace(/[(),]/g, ""))
+		.filter((w) => w && !/[|/<>]|\.\.\./.test(w) && !/(^=|=$|==|!=)/.test(w));
 }
 
 function cmdAdd(pr) {

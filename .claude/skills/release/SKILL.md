@@ -39,7 +39,10 @@ Write the notes for players and server hosts, not for us:
   **Heroes**, **Items and builds**, **Team play** (laning, fights, retreat, objectives), **Fixes**,
   **Known limitations** (new entries of the main post of discussion #50 in the range, one line each, with the
   link), **Project** (one line: docs / install changes, if any).
-- Each line ends with the PR links: `(#130, #115)`. Name heroes and items as the game does.
+- Each line ends with the PR links as markdown links, never a bare `#130`: GitHub release pages expand a bare
+  `#N` into the PR's full title, which buries the line. Write
+  `([#130](https://github.com/<owner>/<repo>/pull/130), [#115](https://github.com/<owner>/<repo>/pull/115))`
+  (maintainer, v0.3). Name heroes and items as the game does.
 - End with `**Full changelog**: https://github.com/<owner>/<repo>/compare/<last tag>...<new tag>`.
 
 ## 4. Dry run output
@@ -61,5 +64,11 @@ in one line each. Stop here unless publishing was asked for.
   `git push origin vX.Y`.
 - `gh release create vX.Y --title "vX.Y" --notes-file <notes.md> --verify-tag`.
 
-## 8. Report
-The release URL, the version, and what is not in it (open PRs that wait for the next release).
+## 8. Workshop copy
+Ask the maintainer whether to put the release into `vscripts/bots` for the Workshop upload now; on yes, run the
+`/prepare-workshop` skill with the new tag (`--ref vX.Y`). It stops first if a test game is prepared or running.
+Never upload: the maintainer does that in the Workshop Tools.
+
+## 9. Report
+The release URL, the version, what is not in it (open PRs that wait for the next release), and the Workshop
+copy's `READY TO UPLOAD` line when step 8 ran.

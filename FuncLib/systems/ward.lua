@@ -53,9 +53,8 @@ local HuntSpots = {
 }
 -- Lotus pools and twin gates. Same contest rules as Roshan: after 6:00, still blocked behind a living tier-1.
 -- The first two are the lotus pools (pools at -7548,4209 and 7504,-4405 in [OHA-LOTUS] lines). Twin Gates (#15,
--- maintainer's pings, game 063): top (-2808, 8257) and bottom (2780, -8151) watch the gate ambush; the old gate
--- spots (-6244, 7147) and (6206, -6958) are "less effective for guarding twin gate ambush" and only stay as a
--- fallback (fallbackFor, see ConsiderGates). Side of the
+-- maintainer's pings, game 063): top (-2808, 8257) and bottom (2780, -8151) watch the gate ambush. The old gate
+-- spots (-6244, 7147) and (6206, -6958) were removed (game 067, too risky to reach). Side of the
 -- new spots by fountain distance, as LaneSpots does: top 10091 from the Dire base (-> dire), 15535 from the
 -- Radiant one; bottom 10064 from the Radiant base (-> radiant), 15331 from the Dire one.
 local GateSpots = {
@@ -95,24 +94,6 @@ local GateSpots = {
 		deep = true,
 		gate = "bottom",
 	},
-	{
-		location = Vector(-6244, 7147, 0),
-		plant_time_obs = 0,
-		plant_time_sentry = 0,
-		role = "contest",
-		side = "radiant",
-		deep = true,
-		fallbackFor = "top",
-	},
-	{
-		location = Vector(6206, -6958, 0),
-		plant_time_obs = 0,
-		plant_time_sentry = 0,
-		role = "contest",
-		side = "dire",
-		deep = true,
-		fallbackFor = "bottom",
-	},
 }
 
 local radiantEarlyWardSpots = {
@@ -121,7 +102,7 @@ local radiantEarlyWardSpots = {
 	-- where Mirana was killed walking back (game 020 and 021), and (-245, -996). safe = true lets
 	-- them through the "early wards go on the enemy side" filter.
 	-- Game 063 pings (#15): by the top river rune (-1223, -1) replaces (-1386, -171), and "option 1" (-300, -909)
-	-- replaces (-303, -1001). (-882, -1000) was not pinged again and stays.
+	-- replaces (-303, -1001). (-882, -1000) is gone (game 067, maintainer: too close to our mid T1).
 	[1] = {
 		location = Vector(-1223, -1, 0),
 		label = "mid-radiant-rune",
@@ -141,21 +122,13 @@ local radiantEarlyWardSpots = {
 		safe = true,
 	},
 	[3] = {
-		location = Vector(-882, -1000, 0),
-		plant_time_obs = 0,
-		plant_time_sentry = 0,
-		role = "early",
-		side = "radiant",
-		safe = true,
-	},
-	[4] = {
 		location = Vector(6113, -3427, 0),
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
 		role = "early",
 		side = "dire",
 	},
-	[5] = {
+	[4] = {
 		location = Vector(5308, -4362, 0),
 		plant_time_obs = 0,
 		plant_time_sentry = 0,
@@ -284,30 +257,11 @@ local function DropDeepEnemySpots(list)
 	end
 	return kept
 end
--- Twin Gates: the new spot of each gate first. Its old spot only when the new one is not on this bot's list (taken,
--- given up, no cover on the enemy side, too deep) and none of our observers watches it. Not only after a give-up: for
--- Radiant the new top spot is on Dire's side, so it is often off the list, and the own-side old spot must stay open.
+-- Twin Gates: only the new spots (game 067, maintainer: the old corner spots are too risky - Vengeful Spirit walked past
+-- the enemy wave and heroes at 9:00 to plant a sentry there - so they were removed).
 local function ConsiderGates(spots, consider)
-	local covered = {}
 	for i = 1, #GateSpots do
-		local spot = GateSpots[i]
-		if spot.fallbackFor == nil then
-			local before = #spots
-			consider(spot)
-			local added = #spots > before and not EnemyWardTooDeep(spot.location)
-			if
-				spot.gate ~= nil
-				and (added or Ward.IsOtherWardClose(spot.location, "npc_dota_observer_wards", OBS_GAP, true, false))
-			then
-				covered[spot.gate] = true
-			end
-		end
-	end
-	for i = 1, #GateSpots do
-		local spot = GateSpots[i]
-		if spot.fallbackFor ~= nil and not covered[spot.fallbackFor] then
-			consider(spot)
-		end
+		consider(GateSpots[i])
 	end
 end
 -- Home/defend ground spots sit on our T3. Skip them until that lane's T1 is gone,

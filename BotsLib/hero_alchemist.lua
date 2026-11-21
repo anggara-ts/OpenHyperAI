@@ -174,6 +174,7 @@ local throwOrderUnit, throwOrderAt = nil, 0 -- the hero of the current throw ord
 local brewHelp = nil -- { kind=, target= }: this brew helps the allies finish a hero (FinishingCase), else nil
 local pendingHelp = nil -- set by FinishingCase for the start that returns why=help
 local helpStun = nil -- the stun of the last help-early throw, for its log line
+local brewLostAt = -1 -- seconds brewed when the brew target was first seen dead or out of sight, -1: not lost
 local botTarget
 local isEngaging
 local isRetreating
@@ -466,6 +467,31 @@ function X.TrackConcoctionBrew()
 		-- the brew blows up on him anyway, so the blink is free. Refreshed every run, so it lapses by itself.
 		local inRange, _, inRangeIllusion = NearestThrowTargets(unstableConcoctionThrowAbility:GetCastRange())
 		bot._alchBrewingUntil = (inRange ~= nil or inRangeIllusion ~= nil) and now + 0.3 or nil
+		-- #34, game 064: once per brew, the moment the brew target is gone and who is left for it:
+		--   [OHA-ALCHEMIST] concoction target-lost brewed= target= nearest= nearestDist= plan=throw|chase|none
+		-- throw: a hero within the throw range (the target-lost throw takes it); chase: within 1600 (keep-range walks
+		-- to it); none: nobody in sight, the brew will blow up on him unless a hero shows up.
+		if brewLostAt < 0 and BrewTargetLost() then
+			brewLostAt = brewed
+			pcall(function()
+				local castRange = unstableConcoctionThrowAbility:GetCastRange()
+				local nearest, nearestDist = NearestThrowTargets(1600)
+				local plan = nearest == nil and "none" or nearestDist <= castRange and "throw" or "chase"
+				print(
+					string.format(
+						"[OHA-ALCHEMIST] t=%.0f concoction target-lost brewed=%.1fs target=%s nearest=%s nearestDist=%.0f"
+							.. " plan=%s mode=%s",
+						DotaTime(),
+						brewed,
+						UnitNameOrNone(brewTarget),
+						UnitNameOrNone(nearest),
+						nearest ~= nil and nearestDist or -1,
+						plan,
+						tostring(bot:GetActiveMode())
+					)
+				)
+			end)
+		end
 		return true, brewed
 	end
 	bot._alchBrewingUntil = nil
@@ -491,31 +517,32 @@ function X.TrackConcoctionBrew()
 		end
 		pcall(function()
 			local nearest, nearestDist = NearestThrowTargets(1600)
-			print(
-				string.format(
-					"[OHA-ALCHEMIST] t=%.0f concoction brew-end outcome=%s brewed=%.1fs seen=%.1fs rule=%s target=%s"
-						.. " lastThrow=%s@%.1f gate=%s@%.1f nearest=%s nearestDist=%.0f mode=%s stunned=%s"
-						.. " lateGate=%.1fs cast=%s maxGap=%.1fs targetLost=%s",
-					DotaTime(),
-					outcome,
-					brewed,
-					brewSeenAt,
-					brewWhy,
-					UnitNameOrNone(brewTarget),
-					lastThrowWhy,
-					lastThrowBrewed,
-					lastGateWhy,
-					lastGateBrewed,
-					UnitNameOrNone(nearest),
-					nearest ~= nil and nearestDist or -1,
-					tostring(bot:GetActiveMode()),
-					tostring(bot:IsStunned()),
-					brewLateGate,
-					brewGateCast,
-					brewMaxGap,
-					tostring(BrewTargetLost())
-				)
-			)
+			print(string.format(
+				"[OHA-ALCHEMIST] t=%.0f concoction brew-end outcome=%s brewed=%.1fs seen=%.1fs rule=%s target=%s"
+					.. " lastThrow=%s@%.1f gate=%s@%.1f nearest=%s nearestDist=%.0f mode=%s stunned=%s"
+					.. " lateGate=%.1fs cast=%s maxGap=%.1fs targetLost=%s lostAt=%.1fs lineDelay=%.1fs",
+				DotaTime(),
+				outcome,
+				-- A died brew prints at his respawn: brewed= is the time last seen brewing, lineDelay= the rest.
+				outcome == "died" and brewSeenAt or brewed,
+				brewSeenAt,
+				brewWhy,
+				UnitNameOrNone(brewTarget),
+				lastThrowWhy,
+				lastThrowBrewed,
+				lastGateWhy,
+				lastGateBrewed,
+				UnitNameOrNone(nearest),
+				nearest ~= nil and nearestDist or -1,
+				tostring(bot:GetActiveMode()),
+				tostring(bot:IsStunned()),
+				brewLateGate,
+				brewGateCast,
+				brewMaxGap,
+				tostring(BrewTargetLost()),
+				brewLostAt,
+				brewed - brewSeenAt
+			))
 		end)
 	end
 	return false, brewed
@@ -723,6 +750,16 @@ function X.SkillsComplement()
 				return
 			end
 			OrderConcoctionThrow(brewed, gateWhy .. ":" .. brewGateCast)
+		elseif
+			gateWhy == "queued"
+			and BrewTargetLost()
+			and not brewRetreating
+			and unstableConcoctionThrowAbility:IsFullyCastable()
+		then
+			-- #34, game 064 (t=2062, gate=queued cast=queued:4): a queued order from his mode kept the walk to
+			-- another hero (X.ConcoctionKeepRange) from running once the brew target was gone. The move replaces
+			-- the queued order; not a cast in its cast point (a move would cancel that).
+			X.ConcoctionKeepRange(brewed)
 		end
 		return
 	end
@@ -752,6 +789,7 @@ function X.SkillsComplement()
 		hpMarkAt = -999
 		gapSampleUnit = nil
 		throwOrderUnit, throwOrderAt = nil, 0
+		brewLostAt = -1
 		-- [OHA-ALCHEMIST]: the brew start with its rule and target, throttled to 10s (the order repeats until
 		-- it is carried out; game data: AbilityCooldown 17).
 		if DotaTime() >= (bot._alchBrewLogAt or -999) then
@@ -1044,6 +1082,74 @@ local function RetreatStopsBrew(enemyHero, rule)
 	end
 	return true
 end
+-- Damage of our team already on its way to an enemy hero: our projectiles in flight at it (an attack: the
+-- caster's attack damage; a spell: its AbilityDamage, else the caster's attack damage, as for attack-based shots
+-- like Acorn Shot) and the next hit of every allied hero attacking it from within its attack range (+100).
+-- Not his own. Whether GetIncomingTrackingProjectiles lists our projectiles on an enemy hero is unverified, so it
+-- runs in pcall and the no-brew line prints the sum.
+local function AllyPendingDamage(enemyHero)
+	local total = 0
+	pcall(function()
+		for _, projectile in pairs(enemyHero:GetIncomingTrackingProjectiles() or {}) do
+			local caster = projectile.caster
+			if caster ~= nil and not caster:IsNull() and caster:GetTeam() == GetTeam() and caster ~= bot then
+				local damage, damageType = caster:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL
+				if not projectile.is_attack and projectile.ability ~= nil and not projectile.ability:IsNull() then
+					local abilityDamage = projectile.ability:GetAbilityDamage() or 0
+					if abilityDamage > 0 then
+						damage, damageType = abilityDamage, projectile.ability:GetDamageType()
+					end
+				end
+				total = total + enemyHero:GetActualIncomingDamage(damage, damageType)
+			end
+		end
+	end)
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(allyHero)
+			and allyHero ~= bot
+			and not allyHero:IsIllusion()
+			and allyHero:GetAttackTarget() == enemyHero
+			and GetUnitToUnitDistance(allyHero, enemyHero) <= allyHero:GetAttackRange() + 100
+		then
+			total = total + enemyHero:GetActualIncomingDamage(allyHero:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+		end
+	end
+	return total
+end
+-- #34, game 064 (ConcoctionRules.FinishedWithoutBrew): no kill or engage brew on a hero his next hit or our
+-- team's damage on its way kills, whether or not it is running. [OHA-ALCHEMIST] no-brew why=finish-hit, every 5s.
+local function FinishHitStopsBrew(enemyHero, rule)
+	local health = enemyHero:GetHealth()
+	local ownHit = enemyHero:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+	local ownInReach = GetUnitToUnitDistance(bot, enemyHero) <= bot:GetAttackRange() + 150
+	local allyPending = AllyPendingDamage(enemyHero)
+	local by = ConcoctionRules.FinishedWithoutBrew(health, ownHit, ownInReach, allyPending)
+	if by == nil then
+		return false
+	end
+	if DotaTime() >= (bot._alchFinishHitLogAt or -999) then
+		bot._alchFinishHitLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=finish-hit by=%s rule=%s target=%s hp=%d hit=%d"
+					.. " inReach=%s allyPending=%d dist=%.0f escape=%s",
+				DotaTime(),
+				by,
+				rule,
+				enemyHero:GetUnitName(),
+				health,
+				ownHit,
+				tostring(ownInReach),
+				allyPending,
+				GetUnitToUnitDistance(bot, enemyHero),
+				tostring(EscapeKind(enemyHero))
+			)
+		)
+	end
+	return true
+end
 -- Returns the desire, the hero the brew is for and the rule that fired (kill, channel, engage, retreat).
 function X.ConsiderUnstableConcoction()
 	if not unstableConcoctionAbility:IsFullyCastable() then
@@ -1080,6 +1186,7 @@ function X.ConsiderUnstableConcoction()
 				and not enemyHero:HasModifier("modifier_faceless_void_chronosphere_freeze")
 				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
 				and not enemyHero:HasModifier("modifier_item_solar_crest_armor_addition")
+				and not FinishHitStopsBrew(enemyHero, "kill")
 			then
 				-- #34: the damage grows with the brew time, so the kill needs this many seconds of brewing.
 				-- A target that runs off faster than he follows is out of range by then: no brew for it.
@@ -1149,6 +1256,8 @@ function X.ConsiderUnstableConcoction()
 				and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
 				-- #34: only a target that is still in range at the earliest early throw (2s).
 				and WillStayInThrowRange(enemyHero, retreatThrowDelay, castRange, false)
+				-- #34, game 064: a low hero the next hit kills is not a reason for an engage brew either.
+				and not FinishHitStopsBrew(enemyHero, "engage")
 			then
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1000, false, BOT_MODE_NONE)
 				if nearbyAllies ~= nil and targetAllies ~= nil and #nearbyAllies >= #targetAllies then

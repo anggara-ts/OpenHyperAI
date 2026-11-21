@@ -34,6 +34,27 @@ function ConcoctionRules.AlliesFinishing(targetHp, alliesOnTarget)
 	return targetHp < ConcoctionRules.FINISH_HP and alliesOnTarget >= 1
 end
 
+-- #34, game 064 (t=2056): a kill brew on Tiny at 7% HP, 280 away and running; Hoodwink's Acorn Shot was on its way
+-- and Tiny died that second, so the brew had no target and blew up on him 5.5s later. No kill or engage brew on a
+-- hero that dies before any throw lands, runners included:
+--   health       the target's HP
+--   ownHit       the damage one of his attacks does to it (after armor)
+--   ownInReach   it is within his attack range (+150): his next hit lands about at once
+--   allyPending  damage of our team already on its way to it (projectiles in flight, allies' next hits)
+-- Returns "own-hit", "ally-damage" or nil (brew as usual).
+function ConcoctionRules.FinishedWithoutBrew(health, ownHit, ownInReach, allyPending)
+	if health == nil or health <= 0 then
+		return nil
+	end
+	if ownInReach and (ownHit or 0) >= health then
+		return "own-hit"
+	end
+	if (allyPending or 0) >= health then
+		return "ally-damage"
+	end
+	return nil
+end
+
 -- What to do with a brew for a hero the allies are finishing (maintainer, 2026-11-21):
 --   escapeKind     "runner" (moving, not facing him), "tp" (teleporting or channeling), "blink" (Blink ready and
 --                  moving), or nil (held / not escaping)

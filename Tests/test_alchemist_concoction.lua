@@ -52,7 +52,8 @@ T.test("alchemist: SkillsComplement and the brew tracker run when he is not brew
 end)
 
 -- A brew in the stub: the throw ability shows in the slot (not hidden, castable, range 775) from `startTime`.
-local function startBrew(X, startTime)
+-- noStart: set the stub up without the first think (the test changes the enemy before the brew decision).
+local function startBrew(X, startTime, noStart)
 	local bot = GetBot()
 	local brew = bot:GetAbilityByName("alchemist_unstable_concoction")
 	local throw = bot:GetAbilityByName("alchemist_unstable_concoction_throw")
@@ -99,10 +100,13 @@ local function startBrew(X, startTime)
 			state.brewing = true
 		end
 	end
+	state.enemy = enemy
 	Stub.time = startTime
+	if noStart then
+		return state
+	end
 	X.SkillsComplement()
 	T.eq(state.brewing, true, "the brew started")
-	state.enemy = enemy
 	return state
 end
 
@@ -320,7 +324,98 @@ T.test("alchemist: a brew whose end is seen long after (he died meanwhile) reads
 	state.brewing = false
 	Stub.time = 966
 	X.SkillsComplement()
-	T.ok(printedLine("concoction brew%-end outcome=died brewed=66.0s seen=1.0s"), "died, not unknown")
+	T.ok(printedLine("concoction brew%-end outcome=died brewed=1.0s seen=1.0s"), "died, not unknown")
+	-- Game 064, t=1711: brewed=39.2s counted the time he was dead; that goes to lineDelay= now.
+	T.ok(printedLine("outcome=died .* lineDelay=65.0s"), "the time dead is lineDelay=")
+end)
+
+T.test("concoction rules: no kill brew on a hero that dies before a throw lands", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local R = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
+	-- Game 064, t=2056: Tiny at 7% (about 140 HP), 280 away, Hoodwink's Acorn Shot on its way.
+	T.eq(R.FinishedWithoutBrew(140, 160, true, 0), "own-hit", "his next hit kills it")
+	T.eq(R.FinishedWithoutBrew(140, 160, false, 0), nil, "out of his reach: his hit does not count")
+	T.eq(R.FinishedWithoutBrew(140, 90, true, 150), "ally-damage", "our damage in flight kills it")
+	T.eq(R.FinishedWithoutBrew(140, 90, true, 100), nil, "neither kills it: brew")
+	T.eq(R.FinishedWithoutBrew(0, 90, true, 0), nil, "no HP read: no rule")
+end)
+
+-- A low enemy that runs from him (moving, not facing him): the "runner" escape kind.
+local function makeRunner(enemy)
+	enemy.GetAnimActivity = function()
+		return ACTIVITY_RUN
+	end
+	enemy.IsFacingLocation = function()
+		return false
+	end
+end
+
+T.test("alchemist: no kill brew on a running hero his next hit kills (game 064)", function()
+	local X = load()
+	local state = startBrew(X, 1000, true)
+	state.bot.GetAttackDamage = function()
+		return 160
+	end
+	state.enemy._hp = 140
+	state.enemy._loc = state.bot._loc + Vector(250, 0, 0)
+	makeRunner(state.enemy)
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "no brew")
+	T.ok(
+		printedLine("concoction no%-brew why=finish%-hit by=own%-hit rule=kill target=npc_dota_hero_%S+ hp=140 hit=160"),
+		"line"
+	)
+	T.ok(printedLine("inReach=true allyPending=0 dist=250 escape=runner"), "the runner was not exempt")
+end)
+
+T.test("alchemist: no kill brew on a hero our damage in flight kills", function()
+	local X = load()
+	local state = startBrew(X, 1100, true)
+	state.enemy._hp = 140
+	state.enemy._loc = state.bot._loc + Vector(500, 0, 0)
+	local ally = Stub.teams[GetTeam()][2]
+	ally.GetAttackDamage = function()
+		return 150
+	end
+	state.enemy.GetIncomingTrackingProjectiles = function()
+		return { { is_attack = true, caster = ally, location = state.enemy._loc } }
+	end
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "no brew")
+	T.ok(printedLine("concoction no%-brew why=finish%-hit by=ally%-damage rule=kill"), "line")
+	T.ok(printedLine("allyPending=150"), "the pending damage is printed")
+end)
+
+T.test("alchemist: target lost mid-brew with a queued order: logged once, walks to the next hero", function()
+	local X = load()
+	local state = startBrew(X, 1200)
+	state.enemy._hp = 1000
+	state.enemy._alive = false
+	local other = Stub.teams[GetOpposingTeam()][2]
+	other._loc = state.bot._loc + Vector(1000, 0, 0)
+	other._hp = 1000
+	state.bot.NumQueuedActions = function()
+		return 1
+	end
+	Stub.time = 1201.5
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "nobody in throw range: no throw")
+	T.ok(state.movedTo ~= nil, "keep-range walks him to the other hero through the queued order")
+	T.ok(
+		printedLine(
+			"concoction target%-lost brewed=1.5s target=npc_dota_hero_%S+ nearest=npc_dota_hero_%S+ nearestDist=1000 plan=chase"
+		),
+		"target-lost line"
+	)
+	local count = 0
+	Stub.time = 1202
+	X.SkillsComplement()
+	for _, line in ipairs(Stub.printed) do
+		if string.find(line, "concoction target%-lost") then
+			count = count + 1
+		end
+	end
+	T.eq(count, 1, "once per brew")
 end)
 
 T.test("alchemist: a low hero his allies are finishing: save the brew for another hero, else help", function()

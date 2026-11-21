@@ -124,4 +124,28 @@ function FarmRules.CanSwitchCamp(now, chosenAt, hard)
 	return hard or chosenAt == nil or now - chosenAt >= FarmRules.CAMP_KEEP
 end
 
+-- Camp memory: farm drops its camp whenever the mode ends, the mode does not suit farming or the enemy-half
+-- withdraw fires, and the next pick took the camp nearest to where the bot then stood. A short team_roam
+-- snipe or a mode flip therefore changed the camp (game 063: 1334 camp switches, 92 back-and-forth pairs
+-- within 60s). A camp dropped for one of those soft reasons is picked again for CAMP_REMEMBER seconds if it
+-- is still in the allowed list (not cleared, not banned) and not more than CAMP_REMEMBER_MARGIN farther
+-- than the nearest camp (after a TP across the map the new nearest camp wins).
+--   why          reason of the new pick ("pick" only: cleared / ally-on-camp / uncovered want another camp)
+--   dropWhy      why the remembered camp was dropped
+--   keptAt       when it was dropped
+--   keptDist     distance from the bot to the remembered camp
+--   nearestDist  distance to the camp the plain pick would take (nil: none)
+FarmRules.CAMP_REMEMBER = 30
+FarmRules.CAMP_REMEMBER_MARGIN = 2500
+FarmRules.SOFT_DROP = { ["mode-end"] = true, ["mode-not-suitable"] = true, ["withdraw"] = true }
+function FarmRules.ReuseDroppedCamp(now, why, dropWhy, keptAt, keptDist, nearestDist)
+	if why ~= "pick" or keptAt == nil or keptDist == nil or not FarmRules.SOFT_DROP[dropWhy] then
+		return false
+	end
+	if now - keptAt > FarmRules.CAMP_REMEMBER then
+		return false
+	end
+	return nearestDist == nil or keptDist <= nearestDist + FarmRules.CAMP_REMEMBER_MARGIN
+end
+
 return FarmRules

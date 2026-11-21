@@ -108,6 +108,10 @@ end
 local campChosenAt = nil
 local lastCampKey, lastCampAt, lastDropWhy = nil, -999, nil
 local campSwitchLogAt, campSwitchCount = -999, 0
+-- Camp memory (FarmRules.ReuseDroppedCamp): the camp dropped for a soft reason (mode end, mode-not-suitable,
+-- withdraw), read again by PickCamp.
+local keptCamp = { key = nil, at = nil, why = nil }
+local campKeptLogAt, campKeptCount, campKeptSinceSwitch = -999, 0, 0
 local function SetPreferredCamp(camp, why)
 	local now = DotaTime()
 	local fromKey = preferredCamp ~= nil and CampKey(preferredCamp) or nil
@@ -119,9 +123,15 @@ local function SetPreferredCamp(camp, why)
 	if toKey == nil then
 		lastCampKey, lastCampAt, lastDropWhy = fromKey, now, why
 		campChosenAt = nil
+		if FarmRules.SOFT_DROP[why] then
+			keptCamp.key, keptCamp.at, keptCamp.why = fromKey, now, why
+		else
+			keptCamp.key = nil
+		end
 		return
 	end
 	campChosenAt = now
+	keptCamp.key = nil
 	local prevKey = fromKey
 	local switchWhy = why
 	if prevKey == nil and lastCampKey ~= nil and now - lastCampAt <= 30 then
@@ -138,20 +148,84 @@ local function SetPreferredCamp(camp, why)
 		pcall(
 			print,
 			string.format(
-				"[OHA-FARM] t=%.0f %s camp-switch from=%s to=%s why=%s n=%d",
+				"[OHA-FARM] t=%.0f %s camp-switch from=%s to=%s why=%s n=%d kept=%d",
 				now,
 				ShortName(bot),
 				prevKey,
 				toKey,
 				switchWhy,
-				campSwitchCount
+				campSwitchCount,
+				campKeptSinceSwitch
 			)
 		)
 		campSwitchCount = 0
+		campKeptSinceSwitch = 0
 	end
 end
+-- Camp memory (FarmRules.ReuseDroppedCamp): a camp dropped on mode end, mode-not-suitable or withdraw is
+-- picked again for 30s if it is still allowed and not cleared. [OHA-FARM] camp-kept prints a reuse that
+-- differs from the plain nearest pick (10s throttle, n= reuses since the last line); camp-switch lines carry
+-- kept= (reuses since the last switch line).
+local function FindKeptCamp(camps, why, nearest)
+	if keptCamp.key == nil then
+		return nil
+	end
+	local now = DotaTime()
+	for _, camp in ipairs(camps) do
+		if CampKey(camp) == keptCamp.key then
+			local loc = CampLoc(camp)
+			local keptDist = GetUnitToLocationDistance(bot, loc)
+			local nearestDist = nearest ~= nil and GetUnitToLocationDistance(bot, CampLoc(nearest)) or nil
+			if
+				FarmRules.ReuseDroppedCamp(now, why, keptCamp.why, keptCamp.at, keptDist, nearestDist)
+				and Fu.Site.IsTheClosestOne(bot, loc)
+				and (not Fu.Site.IsAncientCamp(camp) or bot:GetLevel() >= 10 and bot:GetArmor() >= 6)
+			then
+				return camp, keptDist, nearestDist
+			end
+			return nil
+		end
+	end
+	return nil
+end
 local function PickCamp(camps, why)
-	SetPreferredCamp(Fu.Site.GetClosestNeutralSpwan(bot, camps or {}), why)
+	camps = camps or {}
+	local nearest = Fu.Site.GetClosestNeutralSpwan(bot, camps)
+	local kept, keptDist, nearestDist = nil, nil, nil
+	if preferredCamp == nil then
+		kept, keptDist, nearestDist = FindKeptCamp(camps, why, nearest)
+	end
+	if kept ~= nil then
+		local now = DotaTime()
+		-- Counted only where the memory changed the pick (the plain pick would take another camp).
+		local differs = CampKey(kept) ~= CampKey(nearest)
+		if differs then
+			campKeptCount = campKeptCount + 1
+			campKeptSinceSwitch = campKeptSinceSwitch + 1
+		end
+		if differs and now >= campKeptLogAt then
+			campKeptLogAt = now + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-FARM] t=%.0f %s camp-kept camp=%s drop=%s age=%.1f dist=%.0f nearest=%s nearestDist=%.0f n=%d",
+					now,
+					ShortName(bot),
+					keptCamp.key,
+					tostring(keptCamp.why),
+					now - (keptCamp.at or now),
+					keptDist or -1,
+					CampKey(nearest),
+					nearestDist or -1,
+					campKeptCount
+				)
+			)
+			campKeptCount = 0
+		end
+		SetPreferredCamp(kept, "kept")
+	else
+		SetPreferredCamp(nearest, why)
+	end
 	return preferredCamp
 end
 -- Where our wave on a camp's lane is compared with the camp, toward their Ancient: the camp's nearest lane,

@@ -240,3 +240,17 @@ T.test("Site.IsEnemyCamp: side by position (engine team by the river), through f
 	-- Position vs engine: the edge camp and the river camp differ, the corner camp agrees.
 	T.ok(sum ~= nil and string.find(sum, "agree=1 disagree=2", 1, true) ~= nil, "summary: " .. tostring(sum))
 end)
+
+-- Game 063: farm dropped its camp on every mode end and re-picked the nearest camp from where the bot stood
+-- (1334 camp switches, 92 back-and-forth pairs within 60s). A softly dropped camp is picked again for 30s.
+T.test("camp memory: a camp dropped on mode end is picked again within 30s unless far off or a hard reason", function()
+	local R = rules()
+	T.eq(R.ReuseDroppedCamp(110, "pick", "mode-end", 100, 1500, 900), true, "mode end 10s ago, camp near")
+	T.eq(R.ReuseDroppedCamp(110, "pick", "mode-not-suitable", 100, 1500, 900), true, "mode not suitable")
+	T.eq(R.ReuseDroppedCamp(110, "pick", "withdraw", 100, 1500, nil), true, "withdraw, no other camp")
+	T.eq(R.ReuseDroppedCamp(131, "pick", "mode-end", 100, 1500, 900), false, "older than 30s")
+	T.eq(R.ReuseDroppedCamp(110, "pick", "low-hp", 100, 1500, 900), false, "low hp is a hard drop")
+	T.eq(R.ReuseDroppedCamp(110, "cleared", "mode-end", 100, 1500, 900), false, "cleared wants another camp")
+	T.eq(R.ReuseDroppedCamp(110, "pick", "mode-end", 100, 6000, 900), false, "far across the map (TP)")
+	T.eq(R.ReuseDroppedCamp(110, "pick", "mode-end", nil, 1500, 900), false, "nothing remembered")
+end)

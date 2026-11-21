@@ -684,16 +684,29 @@ local function RecordNimbusHelp(why, chased, chaser)
 	if nimbusHelpCast ~= nil and not nimbusAbility:IsCooldownReady() then
 		return
 	end
+	local allyPid = chased:GetPlayerID()
 	nimbusHelpCast = {
 		why = why,
 		ally = chased,
+		-- The ally's player ID and name: a dead ally's handle is not valid, so the result line read alive=true
+		-- for a dead ally (game 065, t=2987: Primal Beast died at t=2984).
+		allyPid = allyPid,
+		allyName = chased:GetUnitName(),
 		allyHp = Fu.GetHP(chased),
-		deaths = GetHeroDeaths(chased:GetPlayerID()),
+		deaths = GetHeroDeaths(allyPid),
 		chaser = chaser,
+		chaserName = chaser:GetUnitName(),
 		chaserHp = Fu.GetHP(chaser),
 		at = DotaTime(),
 		stuns = 0,
 	}
+end
+-- Pure: did the ally die after the cast? Its death count rose, or it is dead now (nil: unknown).
+function X.NimbusAllyDied(deathsAtCast, deathsNow, aliveNow)
+	if deathsAtCast ~= nil and deathsNow ~= nil and deathsNow > deathsAtCast then
+		return true
+	end
+	return aliveNow == false
 end
 -- Five seconds after a help cast: is the ally alive (his death count, so it holds while Zeus is dead too)?
 -- Until then, every think: when the chaser is stunned after the cloud formed (its bolt mini-stuns for 0.35s,
@@ -718,17 +731,29 @@ function X.ThinkNimbusResult()
 		return
 	end
 	nimbusHelpCast = nil
-	local died = Fu.IsValid(cast.ally) and GetHeroDeaths(cast.ally:GetPlayerID()) > cast.deaths
+	-- By player ID, not the handle: Fu.IsValid is false for a dead ally, so the old check never saw a death.
+	local deathsNow, aliveNow = nil, nil
+	if cast.allyPid ~= nil then
+		local okDeaths, deaths = pcall(GetHeroDeaths, cast.allyPid)
+		if okDeaths then
+			deathsNow = deaths
+		end
+		local okAlive, alive = pcall(IsHeroAlive, cast.allyPid)
+		if okAlive then
+			aliveNow = alive
+		end
+	end
+	local died = X.NimbusAllyDied(cast.deaths, deathsNow, aliveNow)
 	print(
 		string.format(
 			"[OHA-ZEUS] t=%.0f zuus nimbus-result why=%s ally=%s alive=%s allyHp=%.2f->%.2f chaser=%s chaserHp=%.2f->%.2f stuns=%d stunnedAfter=%.1f cast=%s late=%.0f",
 			DotaTime(),
 			cast.why,
-			Fu.IsValid(cast.ally) and cast.ally:GetUnitName() or "none",
+			cast.allyName or "none",
 			tostring(not died),
 			cast.allyHp,
 			Fu.IsValid(cast.ally) and Fu.GetHP(cast.ally) or 0,
-			Fu.IsValid(cast.chaser) and cast.chaser:GetUnitName() or "none",
+			cast.chaserName or "none",
 			cast.chaserHp,
 			Fu.IsValid(cast.chaser) and Fu.GetHP(cast.chaser) or 0,
 			cast.stuns,

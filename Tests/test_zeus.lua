@@ -105,3 +105,13 @@ T.test("zeus: fleeing-ally scan and result line run against the stub API", funct
 	X.ThinkNimbusResult()
 	T.ok(true, "no stub missing call")
 end)
+
+T.test("zeus: nimbus-result reads the ally's death from the player ID", function()
+	local X = zeus()
+	-- Game 065, t=2987: Primal Beast died at t=2984 and the line said alive=true (dead handle not valid).
+	T.eq(X.NimbusAllyDied(3, 4, false), true, "death count rose")
+	T.eq(X.NimbusAllyDied(3, 4, true), true, "died and respawned within the 5 s")
+	T.eq(X.NimbusAllyDied(3, 3, false), true, "dead now")
+	T.eq(X.NimbusAllyDied(3, 3, true), false, "alive, no new death")
+	T.eq(X.NimbusAllyDied(3, nil, nil), false, "unknown: alive")
+end)

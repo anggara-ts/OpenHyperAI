@@ -23,26 +23,6 @@ else
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[2])
 end
 local sRoleItemsBuyList = {}
-sRoleItemsBuyList["pos_1"] = {
-	"item_tango",
-	"item_double_branches",
-	"item_faerie_fire",
-	"item_boots",
-	"item_magic_wand",
-	"item_dagon_2",
-	"item_travel_boots",
-	"item_aghanims_shard",
-	"item_cyclone",
-	"item_ultimate_scepter",
-	"item_octarine_core",
-	"item_dagon_5",
-	"item_ultimate_scepter_2",
-	"item_shivas_guard",
-	"item_travel_boots_2",
-	"item_wind_waker",
-	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_3"] = {
 	"item_mage_outfit",
 	"item_ancient_janggo",
@@ -101,6 +81,10 @@ sRoleItemsBuyList["pos_5"] = {
 	"item_sheepstick",
 	"item_ultimate_scepter_2",
 }
+-- Maintainer (2026-11-21): Chen pos 1 and pos 2 follow the pos 4 support list. Stratz has 58 / 126 matches
+-- there, and they build Basilius, Headdress, Mekansm and Drum, not the old Dagon / Octarine list (#9).
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_4"]
+sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_shivas_guard", "item_magic_wand", "item_sheepstick", "item_magic_wand" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

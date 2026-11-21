@@ -226,6 +226,14 @@ return {
 			{ "item_echo_sabre", 11000 },
 		},
 	},
+	chen = {
+		[1] = {
+			{ "item_mekansm", 8000, done = { "item_guardian_greaves" } },
+		},
+		[2] = {
+			{ "item_mekansm", 8000, done = { "item_guardian_greaves" } },
+		},
+	},
 	clinkz = {
 		[1] = {
 			{ "item_desolator", 9500 },

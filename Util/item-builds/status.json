@@ -3,7 +3,7 @@
 	"week": "2026-11-09",
 	"patch": "7.41f",
 	"minMatches": 1000,
-	"totals": {"data":529,"neighbour":74,"alias":14,"kept":15},
+	"totals": {"data":529,"neighbour":74,"alias":16,"kept":13},
 	"heroes": {
 		"abaddon": {
 			"1": {"status":"data","matches":3081,"from":1,"fromMatches":3081,"notes":[],"dropped":["item_black_king_bar (18%): slots at item_black_king_bar","item_skadi (19%): slots at item_skadi","item_ultimate_scepter (21%): slots at item_ultimate_scepter","item_swift_blink (26%): does not fit before item_ultimate_scepter_2 (the list reaches it at minute 70, players buy it at 52)"],"gaps":[],"cost":37705,"mustHave":["item_radiance (78%, until 10500)","item_manta (55%, until 16000)"]},
@@ -125,8 +125,8 @@
 			"5": {"status":"data","matches":1102,"from":5,"fromMatches":1102,"notes":[],"dropped":["item_echo_sabre (34%): does not fit before item_echo_sabre (the list reaches it at minute 28, players buy it at 21)","item_basher (16%): does not fit before item_basher (the list reaches it at minute 46, players buy it at 33)","item_ultimate_scepter (20%): does not fit before item_ultimate_scepter (the list reaches it at minute 50, players buy it at 36)","item_black_king_bar (16%): does not fit before item_black_king_bar (the list reaches it at minute 50, players buy it at 36)","item_blink (23%): does not fit before item_heart (the list reaches it at minute 53, players buy it at 39)","item_assault (17%): does not fit before item_assault (the list reaches it at minute 59, players buy it at 39)"],"gaps":[],"cost":34030}
 		},
 		"chen": {
-			"1": {"status":"kept","matches":58,"reason":"58 matches and no position of its group has 1000"},
-			"2": {"status":"kept","matches":126,"reason":"follows pos 1 as before, and that list is kept"},
+			"1": {"status":"alias","matches":58,"reason":"58 matches and no position of its group has 1000: follows pos 4 as before","to":4,"mustHave":["item_mekansm (62%, until 8000)"]},
+			"2": {"status":"alias","matches":126,"reason":"126 matches and no position of its group has 1000: follows pos 4 as before","to":4,"mustHave":["item_mekansm (62%, until 8000)"]},
 			"3": {"status":"kept","matches":92,"reason":"92 matches and no position of its group has 1000"},
 			"4": {"status":"data","matches":1558,"from":4,"fromMatches":1558,"notes":["tail kept from the old list: item_spirit_vessel, item_shivas_guard"],"dropped":["item_solar_crest (15%): does not fit before item_solar_crest (the list reaches it at minute 36, players buy it at 26)","item_pipe (20%): does not fit before item_pipe (the list reaches it at minute 47, players buy it at 31)","item_vladmir (32%): does not fit before item_ultimate_scepter (the list reaches it at minute 48, players buy it at 36)"],"gaps":[],"cost":29415},
 			"5": {"status":"data","matches":5001,"from":5,"fromMatches":5001,"notes":["tail kept from the old list: item_sheepstick"],"dropped":["item_solar_crest (16%): sold-then-needed at item_vladmir","item_vladmir (30%): sold-then-needed at item_vladmir","item_holy_locket (16%): does not fit before item_pipe (the list reaches it at minute 46, players buy it at 31)","item_pipe (25%): does not fit before item_pipe (the list reaches it at minute 41, players buy it at 31)"],"gaps":[],"cost":21190}

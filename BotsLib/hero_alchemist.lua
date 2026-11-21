@@ -1086,9 +1086,9 @@ end
 -- caster's attack damage; a spell: its AbilityDamage, else the caster's attack damage, as for attack-based shots
 -- like Acorn Shot) and the next hit of every allied hero attacking it from within its attack range (+100).
 -- Not his own. Whether GetIncomingTrackingProjectiles lists our projectiles on an enemy hero is unverified, so it
--- runs in pcall and the no-brew line prints the sum.
+-- runs in pcall and the no-brew line prints both parts (proj= in flight, hits= allies' next hits).
 local function AllyPendingDamage(enemyHero)
-	local total = 0
+	local projectiles, hits = 0, 0
 	pcall(function()
 		for _, projectile in pairs(enemyHero:GetIncomingTrackingProjectiles() or {}) do
 			local caster = projectile.caster
@@ -1100,7 +1100,7 @@ local function AllyPendingDamage(enemyHero)
 						damage, damageType = abilityDamage, projectile.ability:GetDamageType()
 					end
 				end
-				total = total + enemyHero:GetActualIncomingDamage(damage, damageType)
+				projectiles = projectiles + enemyHero:GetActualIncomingDamage(damage, damageType)
 			end
 		end
 	end)
@@ -1112,10 +1112,10 @@ local function AllyPendingDamage(enemyHero)
 			and allyHero:GetAttackTarget() == enemyHero
 			and GetUnitToUnitDistance(allyHero, enemyHero) <= allyHero:GetAttackRange() + 100
 		then
-			total = total + enemyHero:GetActualIncomingDamage(allyHero:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+			hits = hits + enemyHero:GetActualIncomingDamage(allyHero:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 		end
 	end
-	return total
+	return projectiles + hits, projectiles, hits
 end
 -- #34, game 064 (ConcoctionRules.FinishedWithoutBrew): no kill or engage brew on a hero his next hit or our
 -- team's damage on its way kills, whether or not it is running. [OHA-ALCHEMIST] no-brew why=finish-hit, every 5s.
@@ -1123,7 +1123,7 @@ local function FinishHitStopsBrew(enemyHero, rule)
 	local health = enemyHero:GetHealth()
 	local ownHit = enemyHero:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 	local ownInReach = GetUnitToUnitDistance(bot, enemyHero) <= bot:GetAttackRange() + 150
-	local allyPending = AllyPendingDamage(enemyHero)
+	local allyPending, allyProjectiles, allyHits = AllyPendingDamage(enemyHero)
 	local by = ConcoctionRules.FinishedWithoutBrew(health, ownHit, ownInReach, allyPending)
 	if by == nil then
 		return false
@@ -1134,7 +1134,7 @@ local function FinishHitStopsBrew(enemyHero, rule)
 			print,
 			string.format(
 				"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=finish-hit by=%s rule=%s target=%s hp=%d hit=%d"
-					.. " inReach=%s allyPending=%d dist=%.0f escape=%s",
+					.. " inReach=%s allyPending=%d proj=%d hits=%d dist=%.0f escape=%s",
 				DotaTime(),
 				by,
 				rule,
@@ -1143,6 +1143,8 @@ local function FinishHitStopsBrew(enemyHero, rule)
 				ownHit,
 				tostring(ownInReach),
 				allyPending,
+				allyProjectiles,
+				allyHits,
 				GetUnitToUnitDistance(bot, enemyHero),
 				tostring(EscapeKind(enemyHero))
 			)

@@ -365,7 +365,7 @@ T.test("alchemist: no kill brew on a running hero his next hit kills (game 064)"
 		printedLine("concoction no%-brew why=finish%-hit by=own%-hit rule=kill target=npc_dota_hero_%S+ hp=140 hit=160"),
 		"line"
 	)
-	T.ok(printedLine("inReach=true allyPending=0 dist=250 escape=runner"), "the runner was not exempt")
+	T.ok(printedLine("inReach=true allyPending=0 proj=0 hits=0 dist=250 escape=runner"), "the runner was not exempt")
 end)
 
 T.test("alchemist: no kill brew on a hero our damage in flight kills", function()
@@ -383,7 +383,7 @@ T.test("alchemist: no kill brew on a hero our damage in flight kills", function(
 	X.SkillsComplement()
 	T.eq(state.brewing, false, "no brew")
 	T.ok(printedLine("concoction no%-brew why=finish%-hit by=ally%-damage rule=kill"), "line")
-	T.ok(printedLine("allyPending=150"), "the pending damage is printed")
+	T.ok(printedLine("allyPending=150 proj=150 hits=0"), "the pending damage is printed, from the projectile")
 end)
 
 T.test("alchemist: target lost mid-brew with a queued order: logged once, walks to the next hero", function()

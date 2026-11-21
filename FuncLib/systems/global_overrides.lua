@@ -316,6 +316,10 @@ function OhaCastGuard(bot)
 	if bot == nil or not bot:IsAlive() then
 		return false
 	end
+	-- A hero file's own hold (Puck's Phase Shift: the API shows neither the channel nor the modifier, #36).
+	if bot._castHoldUntil ~= nil and DotaTime() < bot._castHoldUntil then
+		return true
+	end
 	return bot:IsCastingAbility() or bot:IsChanneling()
 end
 function SafeCall(fn, fallback, name)

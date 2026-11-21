@@ -526,6 +526,52 @@ function RuneMode.WaterWalk()
 	end
 	return nil
 end
+-- Spawn hold (RuneRules.SpawnHold, #32 game 064): one start line and one end line per spawn and bot.
+--   [OHA-RUNE] river-spawn-hold spot= dist= since= status= mode=
+--   [OHA-RUNE] river-spawn-hold-end why=on-spot|empty|contested|timeout|far|walk-end spot= dist= held= status= mode=
+-- on-spot: within 300 after the spawn, where the 5s on-spot stay (river-item-stay) takes over; empty: the spot reads
+-- missing (taken); contested: enemy heroes at the spot; timeout: not on the spot 3s after the spawn; far: more than
+-- 600 from the spot inside the window (mode= names what took the bot); walk-end: the water walk ended (death, 8s after the spawn). The desire does
+-- not depend on these lines: SpawnHold decides it on every think, the lines print once per spawn.
+local function SpawnHoldLog(what, why, hold, dist)
+	pcall(
+		print,
+		string.format(
+			"[OHA-RUNE] t=%.0f %s %s%s spot=%d dist=%d %s=%.1f status=%s mode=%s",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			why ~= nil and (" why=" .. why) or "",
+			hold.id,
+			dist,
+			why ~= nil and "held" or "since",
+			why ~= nil and DotaTime() - hold.at or DotaTime() - hold.t0,
+			StatusTag(GetRuneStatus(hold.id)),
+			ModeTag(bot:GetActiveMode())
+		)
+	)
+end
+local function SpawnHoldStart(waterWalk, dist)
+	local hold = bot._spawnHold
+	if hold ~= nil and hold.t0 == waterWalk.t0 and hold.id == waterWalk.id then
+		return
+	end
+	if bot._spawnHoldDone == waterWalk.t0 .. ":" .. waterWalk.id then
+		return
+	end
+	hold = { id = waterWalk.id, t0 = waterWalk.t0, loc = waterWalk.loc, at = DotaTime() }
+	bot._spawnHold = hold
+	bot._spawnHoldDone = waterWalk.t0 .. ":" .. waterWalk.id
+	SpawnHoldLog("river-spawn-hold", nil, hold, dist)
+end
+local function SpawnHoldEnd(why)
+	local hold = bot._spawnHold
+	if hold == nil then
+		return
+	end
+	bot._spawnHold = nil
+	SpawnHoldLog("river-spawn-hold-end", why, hold, GetUnitToLocationDistance(bot, hold.loc))
+end
 -- River gold / water rune left at a river spot after the hold ended (#32, game 062, 0:00): a fight started at the
 -- top spot at the horn, Nature's Prophet stood 15 from the rune in attack mode (0.95), the water-walk hold ran out
 -- 8s after the spawn, everyone left (no-best) and the rune lay there until 0:35-0:55. Bots can't pick it up
@@ -1120,6 +1166,9 @@ function GetDesireRaw()
 	end
 	do
 		local okW, waterState = pcall(RuneMode.WaterWalk)
+		if bot._spawnHold ~= nil and (bot._waterWalk == nil or bot._waterWalk.t0 ~= bot._spawnHold.t0) then
+			SpawnHoldEnd("walk-end")
+		end
 		if okW and waterState ~= nil and bot._waterWalk ~= nil then
 			-- Game 043, 0:00: Ringmaster walked onto the top spot where Pudge, Meepo and Rubick stood (n=3/1), lost
 			-- HP before the horn, and the 5s stay held him there (0.69 -> 0.40). Not into more enemy heroes than
@@ -1147,9 +1196,22 @@ function GetDesireRaw()
 						)
 					)
 				end
+				SpawnHoldEnd("contested")
 				return give(BOT_MODE_DESIRE_NONE, "water-contested")
 			end
+			-- #32, game 064 (2:00): the walk desire (BOT_MODE_DESIRE_HIGH before the spawn, 0.35 after it) lost to
+			-- laning (0.54-0.56) with Puck 475 from the spot at the spawn. Within 600 of the spot, from 2s before
+			-- the spawn to 3s after it, the walk holds at 0.6 (RuneRules.SpawnHold); on the spot after the spawn the
+			-- 5s stay below takes over.
+			local spotDist = GetUnitToLocationDistance(bot, spot)
+			local sinceSpawnNow = DotaTime() - bot._waterWalk.t0
+			local spawnHold = RuneRules.SpawnHold(sinceSpawnNow, spotDist)
 			if DotaTime() < bot._waterWalk.t0 then
+				if spawnHold then
+					SpawnHoldStart(bot._waterWalk, spotDist)
+					return give(RuneRules.SPAWN_HOLD_DESIRE, "river-spawn-hold")
+				end
+				SpawnHoldEnd("far")
 				return give(BOT_MODE_DESIRE_HIGH, "water-" .. waterState)
 			end
 			-- Bots can't pick a water rune up themselves (see UnpickableRiverRune: every pickup order failed);
@@ -1173,9 +1235,11 @@ function GetDesireRaw()
 				)
 			end
 			if spotEmpty then
+				SpawnHoldEnd("empty")
 				return give(BOT_MODE_DESIRE_NONE, "water-empty")
 			end
-			if sinceSpawn <= 5 and GetUnitToLocationDistance(bot, bot._waterWalk.loc) <= 300 then
+			if sinceSpawn <= 5 and spotDist <= 300 then
+				SpawnHoldEnd("on-spot")
 				if bot._waterStayLogged ~= bot._waterWalk.t0 then
 					bot._waterStayLogged = bot._waterWalk.t0
 					pcall(
@@ -1190,6 +1254,11 @@ function GetDesireRaw()
 				end
 				return give(0.6, "river-item-stay")
 			end
+			if spawnHold then
+				SpawnHoldStart(bot._waterWalk, spotDist)
+				return give(RuneRules.SPAWN_HOLD_DESIRE, "river-spawn-hold")
+			end
+			SpawnHoldEnd(sinceSpawnNow > RuneRules.SPAWN_HOLD_FOR and "timeout" or "far")
 			return give(RIVER_HOLD_DESIRE, "river-item-" .. waterState)
 		end
 	end

@@ -71,4 +71,19 @@ function RuneRules.PickupStep(try, now)
 	return due and "order" or "wait"
 end
 
+-- Spawn hold at a river spot (#32, game 064, 2:00): Puck was 475 from the top spot when the water rune spawned, the
+-- after-spawn walk desire (0.35) lost to laning (0.54-0.56) and she walked back to mid; the bounty walk-back brought
+-- her there 8s later (2:14). A bot of the water walk (spawns at 0:00, 2:00, 4:00) within SPAWN_HOLD_RADIUS of the
+-- spot from SPAWN_HOLD_BEFORE seconds before the spawn to SPAWN_HOLD_FOR after it keeps SPAWN_HOLD_DESIRE (above
+-- laning, as the 0.6 on-spot stay; below fights and retreat). sinceSpawn: seconds since the spawn (negative before).
+RuneRules.SPAWN_HOLD_RADIUS = 600
+RuneRules.SPAWN_HOLD_BEFORE = 2
+RuneRules.SPAWN_HOLD_FOR = 3
+RuneRules.SPAWN_HOLD_DESIRE = 0.6
+function RuneRules.SpawnHold(sinceSpawn, dist)
+	return sinceSpawn >= -RuneRules.SPAWN_HOLD_BEFORE
+		and sinceSpawn <= RuneRules.SPAWN_HOLD_FOR
+		and dist <= RuneRules.SPAWN_HOLD_RADIUS
+end
+
 return RuneRules

@@ -11,10 +11,12 @@ confirmed or disproved.
 ## Key findings
 
 - **No vector-target order.** Abilities can only be cast with no target, on a unit, on a location or on a tree (plus the Push/Queue variants). A vector-targeted spell such as Muerta's Dead Shot cannot have its direction chosen.
+- **No alt-cast.** Cast orders have no alt flag. `ToggleAutoCast()` on an alt-castable ability flips the button's state (`GetAutoCastState()` reads it back), but bot casts ignore it: Puck's Illusory Orb and Grimstroke's Stroke of Fate still curved with it on (game 043). It works for real autocast abilities (Quill Spray, Frost Arrows). For Illusory Orb and Stroke of Fate, aiming at the full range and turning to face the point first were both tried: the path still curves (#36). Discussion #50 item 2.
 - `GetCurrentCharges`, `GetInitialCharges` and `GetSecondaryCharges` exist on abilities as well as items. On the Ward Dispenser the first is observers and the second sentries (game 032). Whether they return charges for charge-based abilities (Mirana's Leap, Techies' mines, ...) has not been tested; `FuncLib/systems/charge_tracker.lua` still tracks those itself.
 - `GetToggleState`, `IsInAbilityPhase`, `GetDamageType`, `GetTargetType/Team/Flags` are available on abilities.
 - Item management beyond buy/sell: `ActionImmediate_DisassembleItem`, `ActionImmediate_SetItemCombineLock`, `ActionImmediate_SwapItems`.
 - Shrines and runes have their own orders: `Action_UseShrine`, `Action_PickUpRune` (plus Push/Queue). `GetOutpost`, `GetShrine`, `GetShrineCooldown`, `IsShrineHealing`, `GetNearbyShrines` are available.
+- **A mode file replaces Valve's mode whole, even without `Think`.** Game 063 (#141): a `mode_item_generic.lua` that defined only `GetDesire` won the item mode 3.5-5.3s at a time on the river bounties and water runes, and nothing was picked up (`[OHA-ITEMMODE] result ... picked=no`); Valve's item `Think` did not run behind it. The file was removed.
 - **Tested in 7.42 games (063-064):**
   - `Action_ClearActions(true)` stops an attack wind-up: 70 of 70 stops held (`[OHA-LH] cancel-result stopped=yes method=clear`, #157).
   - The time left on an enemy hero's `modifier_teleporting` counts down with the clock (`[OHA-ALCHEMIST] tp-left ... real=yes`, 4 of 4, #122/#166), so it is the real remaining TP time.

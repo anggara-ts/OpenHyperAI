@@ -180,4 +180,42 @@ function Rules.SpecialUnitCap(desire, allies, enemies, retreatDesire, exempt)
 	return desire, false
 end
 
+-- Courier hunt (#165, game 067: Vengeful Spirit walked to the top power-rune spot past a visible enemy courier). Before,
+-- the hunt was off in the laning phase and only looked within attack range + 2x level + 20 (680 for an attack range of
+-- 650 at level 5). In the laning phase it now looks within attack range + COURIER_LANE_EXTRA when no enemy hero is within
+-- COURIER_LANE_SAFE of the courier. Why the bot leaves the courier, or nil to hunt it. c:
+--   dist, attackRange, level   bot to courier, the bot's attack range (team roam's, +50) and level
+--   laning, pushing            in the laning phase / pushing a tower
+--   enemiesNearCourier         enemy heroes within COURIER_LANE_SAFE of the courier (used in the laning phase)
+--   retreating, onRune, hp     retreat mode, rune mode (walking to or holding a rune), HP ratio
+Rules.COURIER_LANE_EXTRA = 400
+Rules.COURIER_LANE_SAFE = 800
+function Rules.CourierRange(attackRange, level, laning)
+	if laning then
+		return attackRange + Rules.COURIER_LANE_EXTRA
+	end
+	return attackRange + level * 2 + 20
+end
+function Rules.CourierSkipWhy(c)
+	if c.pushing then
+		return "pushing"
+	end
+	if c.retreating then
+		return "retreat"
+	end
+	if c.hp <= 0.3 then
+		return "hp"
+	end
+	if c.onRune then
+		return "rune"
+	end
+	if c.dist > Rules.CourierRange(c.attackRange, c.level, c.laning) then
+		return "range"
+	end
+	if c.laning and c.enemiesNearCourier > 0 then
+		return "enemies"
+	end
+	return nil
+end
+
 return Rules

@@ -128,3 +128,40 @@ T.test("team roam rules: the overlay's hold on a hit", function()
 	T.eq(hold({ now = 100.99 }), nil, "just under the cap")
 	T.eq(R.HOLD_CAP, 1.0, "cap")
 end)
+
+T.test("team roam rules: courier hunt in the laning phase (#165, game 067)", function()
+	local R = rules()
+	local function c(over)
+		local base = {
+			dist = 800,
+			attackRange = 650,
+			level = 5,
+			laning = true,
+			pushing = false,
+			enemiesNearCourier = 0,
+			retreating = false,
+			onRune = false,
+			hp = 0.9,
+		}
+		for k, v in pairs(over or {}) do
+			base[k] = v
+		end
+		return base
+	end
+	-- Team roam's attack range 650 (+50 included) at level 5: the old range was 680; lane range is 1050.
+	T.eq(R.CourierRange(650, 5, false), 680, "after laning: attack range + 2x level + 20")
+	T.eq(R.CourierRange(650, 5, true), 1050, "in lane: attack range + 400")
+	T.eq(R.CourierSkipWhy(c()), nil, "a courier 800 away in lane, nobody near it: hunt")
+	T.eq(R.CourierSkipWhy(c({ dist = 1100 })), "range", "beyond attack range + 400")
+	T.eq(R.CourierSkipWhy(c({ enemiesNearCourier = 1 })), "enemies", "an enemy hero by the courier")
+	T.eq(R.CourierSkipWhy(c({ onRune = true })), "rune", "walking to or holding a rune")
+	T.eq(R.CourierSkipWhy(c({ retreating = true })), "retreat", "retreating")
+	T.eq(R.CourierSkipWhy(c({ hp = 0.25 })), "hp", "low HP")
+	T.eq(R.CourierSkipWhy(c({ pushing = true })), "pushing", "pushing")
+	T.eq(R.CourierSkipWhy(c({ laning = false, dist = 800 })), "range", "after laning the old range holds")
+	T.eq(
+		R.CourierSkipWhy(c({ laning = false, dist = 600, enemiesNearCourier = 2 })),
+		nil,
+		"after laning: no enemy check"
+	)
+end)

@@ -1019,17 +1019,10 @@ function TeamRoam.SupportFindTarget()
 		end
 		return target, BOT_DESIRE_OVERRIDE * 0.96
 	end
-	if not Fu.IsInLaningPhase() and not Fu.IsPushing(bot) then
-		local enemyCourier = TeamRoam.GetEnemyCourier(bot, attackRange + botLevel * 2 + 20)
-		if
-			enemyCourier ~= nil
-			and not enemyCourier:IsAttackImmune()
-			and not enemyCourier:IsInvulnerable()
-			and hpRatio > 0.3
-			and not Fu.IsRetreating(bot)
-		then
-			return enemyCourier, BOT_DESIRE_OVERRIDE * 1.2
-		end
+	-- Also in the laning phase now (RoamRules.CourierSkipWhy, #165 game 067).
+	local enemyCourier = TeamRoam.CourierHunt(bot, attackRange, botLevel, hpRatio)
+	if enemyCourier ~= nil then
+		return enemyCourier, BOT_DESIRE_OVERRIDE * 1.2
 	end
 	if
 		botMode == BOT_MODE_RETREAT
@@ -1179,17 +1172,10 @@ function TeamRoam.CarryFindTarget()
 	if bot:HasModifier("modifier_phantom_lancer_phantom_edge_boost") then
 		return nil, 0
 	end
-	if not Fu.IsInLaningPhase() and not Fu.IsPushing(bot) then
-		local enemyCourier = TeamRoam.GetEnemyCourier(bot, attackRange + botLevel * 2 + 20)
-		if
-			enemyCourier ~= nil
-			and not enemyCourier:IsAttackImmune()
-			and not enemyCourier:IsInvulnerable()
-			and hpRatio > 0.3
-			and not Fu.IsRetreating(bot)
-		then
-			return enemyCourier, BOT_DESIRE_OVERRIDE * 1.2
-		end
+	-- Also in the laning phase now (RoamRules.CourierSkipWhy, #165 game 067).
+	local enemyCourier = TeamRoam.CourierHunt(bot, attackRange, botLevel, hpRatio)
+	if enemyCourier ~= nil then
+		return enemyCourier, BOT_DESIRE_OVERRIDE * 1.2
 	end
 	if
 		botMode == BOT_MODE_RETREAT
@@ -1610,31 +1596,99 @@ function TeamRoam.CanBeAttacked(unit)
 				and unit:GetHealth() / unit:GetMaxHealth() < 0.5
 		)
 end
-local courierCheckInterval, lastCourierCheckTime = 0.1, -90
-function TeamRoam.GetEnemyCourier(unit, range)
-	if GetGameMode() == 23 then
+-- Courier hunt (RoamRules.CourierSkipWhy, #165 game 067): the nearest visible enemy courier within COURIER_LOOK, and
+-- whether to hunt it. Lane rules: attack range + 400, no enemy hero within 800 of the courier, not retreating or on a
+-- rune. Lines (per bot):
+--   [OHA-ROAM] t= <hero> courier-hunt start dist= laning= range=      when the hunt picks a courier
+--   [OHA-ROAM] t= <hero> courier-skip why=<pushing|retreat|hp|rune|range|enemies> dist= laning=   on change, or 10s
+local COURIER_LOOK = 1600
+function TeamRoam.NearestEnemyCourier(unit)
+	if GetGameMode() == 23 or Fu.GetDistanceFromEnemyFountain(unit) < 1400 then
 		return nil
 	end
-	if Fu.GetDistanceFromEnemyFountain(unit) < 1400 then
-		return nil
-	end
-	if DotaTime() > lastCourierCheckTime + courierCheckInterval then
-		lastCourierCheckTime = DotaTime()
-		for _, courier in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
-			if
-				courier
-				and courier:IsCourier()
-				and courier:IsAlive()
-				and GetUnitToUnitDistance(unit, courier) <= range
-				and not courier:IsInvulnerable()
-				and not courier:IsAttackImmune()
-				and not courier:HasModifier("modifier_fountain_aura")
-			then
-				return courier
+	local best, bestDist = nil, COURIER_LOOK
+	for _, courier in pairs(GetUnitList(UNIT_LIST_ENEMIES) or {}) do
+		if
+			courier ~= nil
+			and courier:IsCourier()
+			and courier:IsAlive()
+			and not courier:IsInvulnerable()
+			and not courier:IsAttackImmune()
+			and not courier:HasModifier("modifier_fountain_aura")
+		then
+			local dist = GetUnitToUnitDistance(unit, courier)
+			if dist <= bestDist then
+				best, bestDist = courier, dist
 			end
 		end
 	end
-	return nil
+	return best, bestDist
+end
+function TeamRoam.CourierHunt(unit, attackRange, level, hp)
+	-- The enemy list scan at most every 0.3s per bot (GetEnemyCourier's old cadence was 0.1s for all bots).
+	local now = DotaTime()
+	local cache = unit._courierScan
+	if cache == nil or now - cache.at >= 0.3 then
+		local found, foundDist = TeamRoam.NearestEnemyCourier(unit)
+		cache = { at = now, courier = found, dist = foundDist }
+		unit._courierScan = cache
+	end
+	local courier = cache.courier
+	if courier == nil or not courier:IsAlive() or courier:IsInvulnerable() or courier:IsAttackImmune() then
+		unit._courierHunt = nil
+		return nil
+	end
+	local laning = Fu.IsInLaningPhase()
+	local dist = GetUnitToUnitDistance(unit, courier)
+	local why = RoamRules.CourierSkipWhy({
+		dist = dist,
+		attackRange = attackRange,
+		level = level,
+		laning = laning,
+		pushing = Fu.IsPushing(unit),
+		enemiesNearCourier = laning
+				and #(Fu.GetEnemiesNearLoc(courier:GetLocation(), RoamRules.COURIER_LANE_SAFE) or {})
+			or 0,
+		retreating = Fu.IsRetreating(unit),
+		onRune = unit:GetActiveMode() == BOT_MODE_RUNE,
+		hp = hp,
+	})
+	local name = string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")
+	if why ~= nil then
+		unit._courierHunt = nil
+		if why ~= unit._courierSkipWhy or now >= (unit._courierSkipLogAt or -999) then
+			unit._courierSkipWhy = why
+			unit._courierSkipLogAt = now + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-ROAM] t=%.0f %s courier-skip why=%s dist=%d laning=%s",
+					now,
+					name,
+					why,
+					dist,
+					tostring(laning)
+				)
+			)
+		end
+		return nil
+	end
+	if unit._courierHunt ~= courier then
+		unit._courierHunt = courier
+		unit._courierSkipWhy = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-ROAM] t=%.0f %s courier-hunt start dist=%d laning=%s range=%d",
+				now,
+				name,
+				dist,
+				tostring(laning),
+				RoamRules.CourierRange(attackRange, level, laning)
+			)
+		)
+	end
+	return courier
 end
 function TeamRoam.WeakestUnitExceptRangeCanBeAttacked(isHero, isEnemy, minDistance, range, unit)
 	local units = {}

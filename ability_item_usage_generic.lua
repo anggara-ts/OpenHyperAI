@@ -21,6 +21,7 @@ end
 local team = GetTeam()
 local alwaysTrue = 10 == 10
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local LastHitOverlay = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
 -- Logs switched off once their feature works (the TP diag lines, game 029).
 local function NoLog() end
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
@@ -32,7 +33,6 @@ local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
-local LastHitOverlay = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_overlay")
 CustomLoader.ThinkLess = CustomLoader.Enable and CustomLoader.ThinkLess or 1
 local lastHumanPingTime = -1
 local function LogHumanPing()

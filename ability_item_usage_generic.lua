@@ -5796,7 +5796,7 @@ Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
 						"[OHA-TP] t=%.0f %s %s lane=%s to=%.0f,%.0f ourFront=%.0f,%.0f enemyFront=%.0f,%.0f botAnc=%d toAnc=%d base=%s last=%s ago=%s",
 						DotaTime(),
 						(string.gsub(botName, "npc_dota_hero_", "")),
-						blockWhy ~= nil and ("defend-tp-skip why=" .. blockWhy) or "defend-tp",
+						blockWhy ~= nil and ("defend-tp-skip why=" .. blockWhy) or "defend-tp-try",
 						towerLabel,
 						tpLocation.x,
 						tpLocation.y,

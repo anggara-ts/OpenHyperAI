@@ -55,7 +55,10 @@ function X.State(bot, desire)
 		retreat = mode == BOT_MODE_RETREAT,
 		evasive = mode == BOT_MODE_EVASIVE_MANEUVERS,
 		invisible = bot:IsInvisible() and not INVISIBLE_ATTACKERS[bot:GetUnitName()],
-		charging = bot:HasModifier("modifier_spirit_breaker_charge_of_darkness") or bot._huntTrace ~= nil,
+		-- Charge of Darkness, or a traced hunting spell (Skeleton Walk, Vendetta, Charge) and 1s after its reveal, when
+		-- the hit belongs to the hero (hunt_trace.lua: offAt = the reveal).
+		charging = bot:HasModifier("modifier_spirit_breaker_charge_of_darkness")
+			or bot._huntTrace ~= nil and (bot._huntTrace.offAt == nil or DotaTime() - bot._huntTrace.offAt < 1),
 		channeling = bot:IsChanneling(),
 		-- Casting, a queued order, stunned, hexed or disarmed (Fu.CanNotUseAction covers the first ones), or the
 		-- current order is a cast (the mode's Think may have just ordered a TP or a ward: don't replace it).
@@ -67,11 +70,13 @@ function X.State(bot, desire)
 end
 
 local function logSkip(bot, why, offer)
-	-- "mode" is the normal case (the active mode is worth more): not logged.
-	if why == "mode" or DotaTime() < (bot._lhSkipLogAt or -99) then
+	-- "mode" is the normal case (the active mode is worth more): not logged. Throttled per reason, so a frequent one
+	-- (busy) does not hide a rare one (invisible, charging).
+	bot._lhSkipLogAt = bot._lhSkipLogAt or {}
+	if why == "mode" or DotaTime() < (bot._lhSkipLogAt[why] or -99) then
 		return
 	end
-	bot._lhSkipLogAt = DotaTime() + 10
+	bot._lhSkipLogAt[why] = DotaTime() + 10
 	pcall(
 		print,
 		string.format(

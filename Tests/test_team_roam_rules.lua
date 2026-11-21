@@ -37,6 +37,11 @@ T.test("team roam rules: a running hunt keeps the mode until an exit rule", func
 	T.eq(R.HuntExitWhy(true, 1400, ranged, 2, 1), "range", "ran out of 1.5x range")
 	T.eq(R.HuntExitWhy(true, 700, melee, 2, 1), "range", "melee range is shorter")
 	T.eq(R.HuntExitWhy(true, 500, ranged, 1, 2), "outnumbered", "backup arrived")
+	-- The sticky hero hunt starts at up to 1600: a melee hero at 1000 keeps it (1.5x the start distance).
+	local meleeFar = R.HuntKeepRange(150, 1000)
+	T.near(meleeFar, 1500, 0.01, "melee started at 1000")
+	T.eq(R.HuntExitWhy(true, 1000, meleeFar, 2, 1), nil, "not ended on its first think")
+	T.eq(R.HuntExitWhy(true, 1600, meleeFar, 2, 1), "range", "ran away")
 end)
 
 T.test("team roam rules: the last-hit overlay holds back", function()

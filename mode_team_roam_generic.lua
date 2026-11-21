@@ -59,7 +59,7 @@ local offerUnit, offerDesire, offerWhy = nil, 0, nil
 -- The hero / courier hunt that set team roam's desire last think, and when it started (exit rules while team roam
 -- runs: RoamRules.HuntExitWhy). roamNoHold: this think's desire must not be bridged by mode_hold (a hunt that ended
 -- on purpose, a special unit cut below retreat).
-local huntTarget, huntStartAt = nil, -90
+local huntTarget, huntStartAt, huntStartDist = nil, -90, 0
 local roamNoHold = false
 local engageTargetHoldTime = 1.2
 local engageTargetLockedUntil = -90
@@ -566,7 +566,7 @@ function GetDesireHelper()
 		local exitWhy = RoamRules.HuntExitWhy(
 			valid,
 			valid and GetUnitToUnitDistance(bot, runningHunt) or 0,
-			RoamRules.HuntKeepRange(bot:GetAttackRange()),
+			RoamRules.HuntKeepRange(bot:GetAttackRange(), huntStartDist),
 			#alliesNear,
 			#enemiesNear
 		)
@@ -615,6 +615,7 @@ function GetDesireHelper()
 				roamWhy = HuntWhy(prefix, attackTarget)
 				if attackTarget ~= runningHunt then
 					huntStartAt = DotaTime()
+					huntStartDist = GetUnitToUnitDistance(bot, attackTarget)
 				end
 				huntTarget = attackTarget
 				return clampedDesire

@@ -21,9 +21,11 @@ function Rules.HuntNeedsMode(kind)
 	return kind == "hero" or kind == "courier"
 end
 
--- How far a running hunt may drift before it stops: 1.5x the snipe's reach (attack range + 300).
-function Rules.HuntKeepRange(attackRange)
-	return 1.5 * ((attackRange or 0) + 300)
+-- How far a running hunt may drift before it stops: 1.5x the snipe's reach (attack range + 300), or 1.5x the distance
+-- the hunt started at, whichever is longer (the hero hunt starts at up to 1600: a melee hero's 675 would end it on
+-- its first think, the same self-off flip under another name).
+function Rules.HuntKeepRange(attackRange, startDist)
+	return math.max(1.5 * ((attackRange or 0) + 300), 1.5 * (startDist or 0))
 end
 
 -- A hunt that won team roam keeps the mode while team roam is active (the mode gate used to switch it off on its

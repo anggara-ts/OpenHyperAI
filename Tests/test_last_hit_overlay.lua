@@ -75,6 +75,16 @@ T.test("last-hit overlay: never while retreating, invisible or charging", functi
 	T.eq(O.Think(bot), false, "charging")
 	T.eq(printed("overlay-skip why=charging"), 1, "skip line")
 	T.eq(#orders, 1, "only Riki's hit")
+	-- A traced hunting spell: no hit while it runs and for 1s after the reveal, then the overlay is free again.
+	bot.HasModifier = nil
+	bot._huntTrace = { offAt = nil, snipe = 0 }
+	T.stub.time = 633
+	O.Offer(bot, creep, 1.5, "snipe")
+	T.eq(O.Think(bot), false, "hunting spell on")
+	bot._huntTrace.offAt = 632.5
+	T.eq(O.Think(bot), false, "0.5s after the reveal")
+	bot._huntTrace.offAt = 631.5
+	T.eq(O.Think(bot), true, "1.5s after the reveal")
 end)
 
 T.test("team roam and retreat load and think; retreat publishes its desire", function()

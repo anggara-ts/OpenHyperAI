@@ -10187,7 +10187,12 @@ function ItemUsageThink()
 	end
 	-- Team roam's last hit (snipe, or a hunt on a creep) without a mode change (#165). No return: items below may
 	-- still replace the order, as they could while team roam ran as a mode.
-	pcall(LastHitOverlay.Think, bot)
+	local okLH, errLH = pcall(LastHitOverlay.Think, bot)
+	if not okLH and not bot._lhOverlayErr then
+		-- Once per bot: a broken hook would silently remove every last hit.
+		bot._lhOverlayErr = true
+		pcall(print, string.format("[OHA-ROAM] t=%.0f %s overlay error=%s", DotaTime(), botName, tostring(errLH)))
+	end
 	-- Keep attack orders; only throttle expensive item/ability rescans when target is locked.
 	if ShouldThrottleHeavyThink() then
 		_perfDone()

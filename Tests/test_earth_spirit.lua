@@ -103,3 +103,46 @@ T.test("earth spirit and zeus: save scan and nimbus finish pick run", function()
 	local target = Zeus.NimbusFinishTarget()
 	T.ok(target == nil or target._team ~= Stub.bot._team, "finish target is an enemy")
 end)
+
+T.test("earth spirit: a retreating ally at high HP needs a hero hitting it before a save", function()
+	local X = earthSpirit()
+	-- Game 063, 1:15: Weaver at 97% HP, retreating, enemies near but not hit by a hero.
+	T.eq(X.AllyNeedsSave(0.97, true, false, 2), false, "retreating, high HP, not hit")
+	T.eq(X.AllyNeedsSave(0.97, true, true, 2), true, "retreating, high HP, hit by a hero")
+	T.eq(X.AllyNeedsSave(0.97, false, true, 2), false, "not retreating, high HP")
+	T.eq(X.AllyNeedsSave(0.4, false, false, 1), true, "low HP with an enemy on it")
+	T.eq(X.AllyNeedsSave(0.4, false, false, 0), false, "low HP, nobody near")
+end)
+
+T.test("earth spirit: kick bearing is degrees from east, counter-clockwise", function()
+	local X = earthSpirit()
+	T.near(X.Bearing(p(0, 0), p(100, 0)), 0, 0.01, "east")
+	T.near(X.Bearing(p(0, 0), p(0, 100)), 90, 0.01, "north")
+	T.near(X.Bearing(p(0, 0), p(0, -100)), 270, 0.01, "south")
+end)
+
+local function zeus()
+	Stub.reset({ hero = "npc_dota_hero_zuus", slot = 2 })
+	local ok, result = Stub.load("BotsLib/hero_zuus")
+	if not ok then
+		error(tostring(result), 0)
+	end
+	return result
+end
+
+T.test("zeus: Nimbus waits in an ally's fight while Zeus or a hurt ally may need it to flee", function()
+	local X = zeus()
+	T.eq(X.NimbusFightHold(800, 1.0, 0.9), "zeus-near", "Zeus in the fight")
+	T.eq(X.NimbusFightHold(3000, 0.4, 0.9), "ally-low", "an ally there under 50%")
+	T.eq(X.NimbusFightHold(800, 0.4, 0.45), nil, "target under 50%: cast")
+	T.eq(X.NimbusFightHold(3000, 0.9, 0.9), nil, "far fight, healthy allies: cast")
+end)
+
+T.test("zeus: no Heavenly Jump into more enemies than allies or away from the target", function()
+	local X = zeus()
+	T.eq(X.JumpEngageProblem(false, 1, 2, 0, 1), "not-ahead", "target behind")
+	-- Game 063, 15:38: four enemies, Zeus alone.
+	T.eq(X.JumpEngageProblem(true, 4, 1, 1, 1), "outnumbered", "4 v 1")
+	T.eq(X.JumpEngageProblem(true, 2, 2, 2, 1), "landing-crowded", "two enemies at the landing")
+	T.eq(X.JumpEngageProblem(true, 1, 2, 1, 1), nil, "even at the landing")
+end)

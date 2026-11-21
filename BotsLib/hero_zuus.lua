@@ -475,7 +475,7 @@ function X.ConsiderD()
 	if not bot:HasScepter() or not nimbusAbility:IsFullyCastable() or bot:IsInvisible() then
 		return BOT_ACTION_DESIRE_NONE, nil
 	end
-	-- Order: the flee cases first, then an ally's fight, then the finish. An ally going on someone matches in
+	-- Order: the flee cases first, then the finish, then an ally's fight. An ally going on someone matches in
 	-- almost any fight, so checked first it left no 45 s cooldown for the flee cases.
 	if Fu.IsRetreating(bot) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
@@ -504,20 +504,6 @@ function X.ConsiderD()
 			end
 		end
 	end
-	-- Slot loop (GetTeamMember takes a slot 1..5, not a player ID).
-	for i = 1, 5 do
-		local teamMember = GetTeamMember(i)
-		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
-			local target = Fu.GetProperTarget(teamMember)
-			if
-				Fu.IsValidHero(target)
-				and Fu.IsInRange(teamMember, target, 1200)
-				and Fu.CanCastOnNonMagicImmune(target)
-			then
-				return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0), "ally-fight", target
-			end
-		end
-	end
 	-- Finish (#47): the range is global, so also a low or fleeing enemy hero anywhere on the map, while Zeus is
 	-- not in danger himself.
 	local zeusInDanger = bot:WasRecentlyDamagedByAnyHero(2.0)
@@ -528,7 +514,64 @@ function X.ConsiderD()
 			return BOT_ACTION_DESIRE_HIGH, finishTarget:GetExtrapolatedLocation(1.0), "finish", finishTarget
 		end
 	end
+	-- An ally's fight last, and held while Zeus or a hurt ally there may soon need it to flee (NimbusFightHold).
+	-- Slot loop (GetTeamMember takes a slot 1..5, not a player ID).
+	for i = 1, 5 do
+		local teamMember = GetTeamMember(i)
+		if Fu.IsValid(teamMember) and Fu.IsGoingOnSomeone(teamMember) then
+			local target = Fu.GetProperTarget(teamMember)
+			if
+				Fu.IsValidHero(target)
+				and Fu.IsInRange(teamMember, target, 1200)
+				and Fu.CanCastOnNonMagicImmune(target)
+			then
+				local targetLoc = target:GetLocation()
+				local lowestAllyHp = 1
+				for _, ally in pairs(Fu.GetAlliesNearLoc(targetLoc, 1200) or {}) do
+					if ally ~= bot and Fu.IsValidHero(ally) then
+						lowestAllyHp = math.min(lowestAllyHp, Fu.GetHP(ally))
+					end
+				end
+				local zeusDist = GetUnitToLocationDistance(bot, targetLoc)
+				local hold = X.NimbusFightHold(zeusDist, lowestAllyHp, Fu.GetHP(target))
+				if hold == nil then
+					return BOT_ACTION_DESIRE_HIGH, target:GetExtrapolatedLocation(1.0), "ally-fight", target
+				end
+				if DotaTime() >= (bot._zeusNimbusHoldLogAt or -999) then
+					bot._zeusNimbusHoldLogAt = DotaTime() + 10
+					pcall(
+						print,
+						string.format(
+							"[OHA-ZEUS] t=%.0f nimbus-hold why=%s target=%s targetHp=%.2f zeusDist=%d allyHp=%.2f",
+							DotaTime(),
+							hold,
+							target:GetUnitName(),
+							Fu.GetHP(target),
+							math.floor(zeusDist),
+							lowestAllyHp
+						)
+					)
+				end
+			end
+		end
+	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- Pure: why Nimbus is kept for later in an ally's fight, or nil to cast it now. Game 063: 15 of 18 casts were
+-- ally-fight, and every Zeus death after the Scepter came 7-14 s after one, with Nimbus on cooldown as he fled.
+-- So with Zeus himself within 1200 of the fight, or an ally there under 50% HP (both may need the cloud on a
+-- chaser soon), it waits, unless the target is already under 50% (then the bolts may finish it).
+function X.NimbusFightHold(zeusDist, lowestAllyHp, targetHp)
+	if targetHp < 0.5 then
+		return nil
+	end
+	if zeusDist <= 1200 then
+		return "zeus-near"
+	end
+	if lowestAllyHp < 0.5 then
+		return "ally-low"
+	end
+	return nil
 end
 -- A visible enemy hero under 25% HP, or under 50% and fleeing from an allied hero that chases it (a walking
 -- enemy alone is not worth a 275-mana, 45 s spell).
@@ -666,15 +709,66 @@ function X.GetRanged(bot, castRange)
 	end
 	return nil
 end
+-- Heavenly Jump, datafeed hero 22 (7.42): Zeus hops hop_distance 375/450/525/600 forward (the way he faces) and
+-- shocks the closest visible enemy within range 700/800/900/1000 (80% move slow, 1.4 s).
+-- How far around the landing spot heroes count for "outnumbered", and for "next to" the landing spot.
+local JUMP_AREA_RADIUS = 1200
+local JUMP_NEXT_TO_RADIUS = 500
+-- Pure: why an engage jump would be wrong, or nil. Ally counts include Zeus. Game 063, 15:38: he jumped into
+-- four enemies with no ally near and died.
+function X.JumpEngageProblem(targetAhead, enemiesArea, alliesArea, enemiesNextTo, alliesNextTo)
+	if not targetAhead then
+		return "not-ahead"
+	end
+	if enemiesArea > alliesArea then
+		return "outnumbered"
+	end
+	if enemiesNextTo > alliesNextTo then
+		return "landing-crowded"
+	end
+	return nil
+end
+local function CountAlliesNear(location, radius)
+	local count = 1 -- Zeus lands there
+	for _, ally in pairs(Fu.GetAlliesNearLoc(location, radius) or {}) do
+		if ally ~= bot and Fu.IsValidHero(ally) then
+			count = count + 1
+		end
+	end
+	return count
+end
+local function LogJump(kind, why, target, enemies, allies)
+	local key = kind == "jump" and "_zeusJumpLogAt" or "_zeusJumpSkipLogAt"
+	if DotaTime() < (bot[key] or -999) then
+		return
+	end
+	bot[key] = DotaTime() + 5
+	pcall(
+		print,
+		string.format(
+			"[OHA-ZEUS] t=%.0f %s why=%s target=%s enemies=%d allies=%d",
+			DotaTime(),
+			kind,
+			why,
+			target ~= nil and target:GetUnitName() or "none",
+			enemies,
+			allies
+		)
+	)
+end
 function X.ConsiderE()
 	if not heavenlyJumpAbility:IsFullyCastable() or bot:IsRooted() then
 		return BOT_ACTION_DESIRE_NONE
 	end
-	local jumpRadius = 450
 	local abilityLevel = heavenlyJumpAbility:GetLevel()
-	local castRange = 600 + abilityLevel * 100
-	local castPoint = heavenlyJumpAbility:GetCastPoint()
-	local manaCost = heavenlyJumpAbility:GetManaCost()
+	local castRange = heavenlyJumpAbility:GetSpecialValueInt("range")
+	if castRange <= 0 then
+		castRange = 600 + abilityLevel * 100
+	end
+	local hopDistance = heavenlyJumpAbility:GetSpecialValueInt("hop_distance")
+	if hopDistance <= 0 then
+		hopDistance = 300 + abilityLevel * 75
+	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	if Fu.IsRetreating(bot) then
 		if Fu.IsRunning(bot) then
@@ -684,6 +778,7 @@ function X.ConsiderE()
 				and Fu.CanCastOnNonMagicImmune(enemy)
 				and not bot:IsFacingLocation(enemy:GetLocation(), 120)
 			then
+				LogJump("jump", "retreat", enemy, #nearbyEnemies, CountAlliesNear(bot:GetLocation(), JUMP_AREA_RADIUS))
 				return BOT_ACTION_DESIRE_HIGH
 			end
 		end
@@ -691,7 +786,21 @@ function X.ConsiderE()
 	if Fu.IsGoingOnSomeone(bot) then
 		local target = Fu.GetProperTarget(bot)
 		if Fu.IsValidHero(target) and Fu.IsInRange(bot, target, castRange) and Fu.CanCastOnNonMagicImmune(target) then
-			return BOT_ACTION_DESIRE_HIGH
+			local landing = Fu.GetFaceTowardDistanceLocation(bot, hopDistance)
+			local enemiesArea = #(Fu.GetEnemiesNearLoc(landing, JUMP_AREA_RADIUS) or {})
+			local alliesArea = CountAlliesNear(landing, JUMP_AREA_RADIUS)
+			local problem = X.JumpEngageProblem(
+				bot:IsFacingLocation(target:GetLocation(), 45),
+				enemiesArea,
+				alliesArea,
+				#(Fu.GetEnemiesNearLoc(landing, JUMP_NEXT_TO_RADIUS) or {}),
+				CountAlliesNear(landing, JUMP_NEXT_TO_RADIUS)
+			)
+			if problem == nil then
+				LogJump("jump", "engage", target, enemiesArea, alliesArea)
+				return BOT_ACTION_DESIRE_HIGH
+			end
+			LogJump("jump-skip", problem, target, enemiesArea, alliesArea)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE

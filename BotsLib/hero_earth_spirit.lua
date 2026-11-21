@@ -155,6 +155,8 @@ local SAVE_TOWER_GAP = 900
 local SAVE_ES_DANGER = 500
 -- The landing spot must be at least this much farther from the nearest enemy hero than the ally is now.
 local SAVE_MIN_GAIN = 100
+-- A save kick to measure: the ally, where it stood, the kick bearing and when to look (save-kick-land).
+local kickCheck = nil
 -- When the current kick-move attempt started and when it last moved (the 1.5 s step limit).
 local kickMoveSince, kickMoveLast = -999, -999
 local function Dist2D(a, b)
@@ -197,6 +199,10 @@ function X.KickLanding(esLoc, allyLoc, kickDist)
 	end
 	return { x = allyLoc.x + dx / length * kickDist, y = allyLoc.y + dy / length * kickDist }
 end
+-- Pure: direction from a to b in degrees, 0 = east, counter-clockwise (like GetFacing).
+function X.Bearing(a, b)
+	return math.deg((math.atan2 or math.atan)(b.y - a.y, b.x - a.x)) % 360
+end
 -- An enemy hero this close to the ally, ahead of the kick and within this distance of its line, is in the path.
 local KICK_PATH_RANGE = 700
 local KICK_PATH_WIDTH = 350
@@ -232,6 +238,14 @@ local ENEMY_TOWER_IDS = {
 	TOWER_BASE_1,
 	TOWER_BASE_2,
 }
+-- Pure: whether an ally needs a save. Under 50% HP with an enemy hero on it or hit by one, or retreating while
+-- a hero hits it. Retreating alone was enough before: game 063, 1:15, a 97% HP Weaver was kicked.
+function X.AllyNeedsSave(hp, retreating, hitByHero, enemiesNear)
+	if hp < 0.5 then
+		return hitByHero or enemiesNear >= 1
+	end
+	return retreating and hitByHero
+end
 local function EnemyTowerLocations()
 	local locations = {}
 	local enemyTeam = GetOpposingTeam()
@@ -277,8 +291,12 @@ function X.ConsiderAllySave()
 		if allyHero ~= bot and Fu.IsValidHero(allyHero) and not allyHero:IsIllusion() then
 			local allyLoc = allyHero:GetLocation()
 			local enemiesOnAlly = Fu.GetEnemiesNearLoc(allyLoc, 500)
-			local inTrouble = (Fu.GetHP(allyHero) < 0.45 or Fu.IsRetreating(allyHero))
-				and (allyHero:WasRecentlyDamagedByAnyHero(2.0) or #enemiesOnAlly >= 1)
+			local inTrouble = X.AllyNeedsSave(
+				Fu.GetHP(allyHero),
+				Fu.IsRetreating(allyHero),
+				allyHero:WasRecentlyDamagedByAnyHero(2.0),
+				#enemiesOnAlly
+			)
 			if inTrouble then
 				local dist = GetUnitToUnitDistance(bot, allyHero)
 				local enemyLocs = HeroLocations(Fu.GetEnemiesNearLoc(allyLoc, 1600))
@@ -291,19 +309,22 @@ function X.ConsiderAllySave()
 				if miss == nil and smashReady and dist <= smashRange + 100 then
 					local problem = X.KickProblem(botLoc, allyLoc, kickDist, enemyLocs, towerLocs)
 					if problem == nil then
+						-- Direction from him to the ally (0 = east, like GetFacing): the kick should go this way.
+						-- face= was logged here before, but he turns to the ally only during the cast, so it never
+						-- matched; save-kick-land measures where the ally really went.
+						local bearing = X.Bearing(botLoc, allyLoc)
 						LogES(
 							"save-kick",
-							"ally=%s hp=%.2f dist=%d kick=%d face=%d bearing=%d",
+							"ally=%s hp=%.2f dist=%d kick=%d bearing=%d",
 							allyHero:GetUnitName(),
 							Fu.GetHP(allyHero),
 							math.floor(dist),
 							kickDist,
-							math.floor(bot:GetFacing() or 0),
-							-- Direction from him to the ally (0 = east, like GetFacing): the kick should go this way.
-							math.floor(
-								math.deg((math.atan2 or math.atan)(allyLoc.y - botLoc.y, allyLoc.x - botLoc.x)) % 360
-							)
+							math.floor(bearing)
 						)
+						if kickCheck == nil then
+							kickCheck = { ally = allyHero, from = allyLoc, bearing = bearing, at = DotaTime() + 1.5 }
+						end
 						return "kick", allyHero
 					end
 					-- Stand on the enemies' side of the ally, so the next kick sends it away from them.
@@ -396,7 +417,33 @@ function X.ConsiderAllySave()
 	end
 	return nil, nil
 end
+-- 1.5 s after a save kick: how far and which way the ally really moved (dir should be close to bearing).
+local function CheckKickLanding()
+	if kickCheck == nil or DotaTime() < kickCheck.at then
+		return
+	end
+	local check = kickCheck
+	kickCheck = nil
+	if not Fu.IsValidHero(check.ally) then
+		return
+	end
+	local now = check.ally:GetLocation()
+	pcall(
+		print,
+		string.format(
+			"[OHA-EARTHSPIRIT] t=%.0f save-kick-land ally=%s moved=%d dir=%d bearing=%d hp=%.2f enemies=%d",
+			DotaTime(),
+			check.ally:GetUnitName(),
+			math.floor(Dist2D(check.from, now)),
+			math.floor(X.Bearing(check.from, now)),
+			math.floor(check.bearing),
+			Fu.GetHP(check.ally),
+			#Fu.GetEnemiesNearLoc(now, 800)
+		)
+	)
+end
 function X.SkillsComplement()
+	CheckKickLanding()
 	local context = AbilityContext.Build(bot)
 	isGoingOnSomeone = context.isEngaging
 	isRetreating = context.isRetreating

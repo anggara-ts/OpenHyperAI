@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Open Hyper AI (OHA) - Quick Install Script for Linux
+# Supercharged OpenHyperAI - Quick Install Script for Linux
 # Creates a symbolic link from the Workshop download to the vscripts/bots folder.
 # This lets the bot scripts load correctly in Custom Lobbies with Local Host.
 
@@ -41,7 +41,7 @@ echo "Found Steam at: $steam_path"
 
 # Define paths
 dota_path="$steam_path/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
-workshop_path="$steam_path/steamapps/workshop/content/570/3246316298"
+workshop_path="$steam_path/steamapps/workshop/content/570/3843444501"
 
 # Check if Dota 2 is installed
 if [ ! -d "$steam_path/steamapps/common/dota 2 beta" ]; then
@@ -54,7 +54,7 @@ if [ ! -d "$workshop_path" ]; then
   echo "Workshop folder not found at:"
   echo "  $workshop_path"
   echo ""
-  echo "Please subscribe to Open Hyper AI in the Steam Workshop first,"
+  echo "Please subscribe to Supercharged OpenHyperAI in the Steam Workshop first,"
   echo "then wait for the download to complete before running this script."
   exit 1
 fi

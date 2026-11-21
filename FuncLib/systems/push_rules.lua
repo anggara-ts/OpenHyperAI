@@ -107,4 +107,51 @@ function PushRules.PushUnderRosh(pushDesire, roshDesire, roshAge, finishingTower
 	return math.max(0, roshDesire - 0.05), true
 end
 
+-- Push desire in a lane-locked group push (push.lua, the branch that returns before the normal path; game 067:
+-- `lock-capped why=cap desire=0.25 alive=4/0` at t=1376, no wipe push with all five Radiant dead). In order:
+--   raise to s.advantage (advantage window) or s.joinCap (a joiner of an all-alive push);
+--   cap: s.maxPush (own HP, high ground, backdoor and the all-alive cap already folded in);
+--   alone-vs-2: one hero against 2+ near it, 0.2;
+--   fewer-than-alive: fewer allies near than enemies alive at a T2+ (T3+ for a joiner) within 6000 of their
+--     Ancient, 0.4; not in an advantage window;
+--   group-hurt: s.groupHurt (2+ allies under 40%, average under 60%, near their base) while enemies can still
+--     punish it, 0.15; never with every enemy dead.
+-- Returns desire, the last cap that applied (nil when none), "advantage" / "join" when raised.
+function PushRules.LockDesire(s)
+	local desire = s.base or 0
+	local raised = nil
+	if s.advantage ~= nil and desire < s.advantage then
+		desire, raised = s.advantage, "advantage"
+	elseif s.joinCap ~= nil and desire < s.joinCap then
+		desire, raised = s.joinCap, "join"
+	end
+	local cap = nil
+	if s.maxPush ~= nil and s.maxPush < desire then
+		desire, cap = s.maxPush, "cap"
+	end
+	local alliesNear = s.alliesNear or 1
+	local enemiesAlive = s.enemiesAlive or 5
+	if alliesNear <= 1 and (s.enemiesNear or 0) >= 2 and desire > 0.2 then
+		desire, cap = 0.2, "alone-vs-2"
+	end
+	if
+		s.advantage == nil
+		and s.nearAncient
+		and (s.tier or 1) >= (s.joinCap ~= nil and 3 or 2)
+		and alliesNear < enemiesAlive
+		and desire > 0.4
+	then
+		desire, cap = 0.4, "fewer-than-alive"
+	end
+	if s.groupHurt and enemiesAlive > 0 and enemiesAlive >= alliesNear - 2 and desire > 0.15 then
+		desire, cap = 0.15, "group-hurt"
+	end
+	return desire, cap, raised
+end
+
+-- HP under which a bot's push is capped at 0.25: 50%, or 30% with every enemy dead (the wipe push's own floor).
+function PushRules.OwnHpCapBelow(wipe)
+	return wipe and 0.3 or 0.5
+end
+
 return PushRules

@@ -507,7 +507,10 @@ function Push.GetPushDesireHelper(bot, lane)
 	then
 		maxPushDesire = math.min(maxPushDesire, 0.15)
 	end
-	if Fu.GetHP(bot) < 0.5 then
+	-- With every enemy dead (wipe) the own-HP cap starts at 30% (game 067 t=1376: `lock-capped why=cap desire=0.25
+	-- alive=4/0` held the push of a bot at 30-50% HP while nobody could defend).
+	local wipeWindow = advDesire ~= nil and gameState.aliveEnemyCount == 0
+	if Fu.GetHP(bot) < PushRules.OwnHpCapBelow(wipeWindow) then
 		maxPushDesire = math.min(maxPushDesire, 0.25)
 	end
 	if Fu.IsDoingRoshan(bot) and #Fu.GetAlliesNearLoc(locationState.roshanLocation, 2800) >= 3 then
@@ -588,7 +591,8 @@ function Push.GetPushDesireHelper(bot, lane)
 	end
 	local attackTarget = bot:GetAttackTarget()
 	-- Wait for creeps instead of fully dropping push when glyph/backdoor is up.
-	if Fu.IsValidBuilding(attackTarget) and Push.HasBackdoorProtect(attackTarget) then
+	-- Not in a wipe: the group waits out the glyph at the tower instead of leaving it for farm.
+	if Fu.IsValidBuilding(attackTarget) and Push.HasBackdoorProtect(attackTarget) and not wipeWindow then
 		maxPushDesire = math.min(maxPushDesire, 0.25)
 	end
 	local anyLaneBarracksDown = not Fu.Utils.IsAnyBarracksOnLaneAlive(false, Lane.Top)
@@ -748,31 +752,10 @@ function Push.GetPushDesireHelper(bot, lane)
 				-- four bots stayed on the Dire high ground with all 5 Dire alive and got wiped. The
 				-- caps now apply inside the lock: maxPushDesire already holds the HG / own-HP / 5-alive caps.
 				local lockDesire = math.max(0.55, RemapValClamped(GetPushLaneDesire(lane), 0, 1, 0, maxPushDesire))
-				-- Advantage window / a joiner of an all-alive push (#12): the group's desire, so it beats farm (0.6-0.77).
-				local raisedWhy = nil
-				if advDesire ~= nil and lockDesire < advDesire then
-					lockDesire, raisedWhy = advDesire, "advantage:" .. tostring(adv.why)
-				elseif fiveJoiner and lockDesire < fiveCap then
-					lockDesire, raisedWhy = fiveCap, "join:" .. fiveWhy
-				end
-				local capReason = nil
-				if maxPushDesire < lockDesire then
-					lockDesire, capReason = maxPushDesire, "cap"
-				end
-				if #alliesNearBot <= 1 and #enemiesNearBot >= 2 and lockDesire > 0.2 then
-					lockDesire, capReason = 0.2, "alone-vs-2"
-				end
-				-- Lifted in an advantage window; for a joiner of an all-alive push it holds on the high ground (T3+) only.
-				if
-					enemyAncient
-					and advDesire == nil
-					and Push.GetLaneBuildingTier(lane) >= (fiveJoiner and 3 or 2)
-					and GetUnitToUnitDistance(bot, enemyAncient) < 6000
-					and #alliesNearBot < gameState.aliveEnemyCount
-					and lockDesire > 0.4
-				then
-					lockDesire, capReason = 0.4, "fewer-than-alive"
-				end
+				-- Advantage window / a joiner of an all-alive push (#12): raised to the group's desire, then the caps' order
+				-- (PushRules.LockDesire, tested in Tests/test_push_rules.lua). A wipe (no enemy alive) skips group-hurt; the
+				-- advantage window skips fewer-than-alive.
+				local groupHurt = false
 				if isNearEnemyFountain and #alliesNearBot >= 2 then
 					local hurtCount, hpSum = 0, 0
 					for _, allyHero in ipairs(alliesNearBot) do
@@ -784,14 +767,25 @@ function Push.GetPushDesireHelper(bot, lane)
 							end
 						end
 					end
-					if
-						hurtCount >= 2
-						and hpSum / #alliesNearBot < 0.6
-						and gameState.aliveEnemyCount >= #alliesNearBot - 2
-						and lockDesire > 0.15
-					then
-						lockDesire, capReason = 0.15, "group-hurt"
-					end
+					groupHurt = hurtCount >= 2 and hpSum / #alliesNearBot < 0.6
+				end
+				local capReason, raisedWhy
+				lockDesire, capReason, raisedWhy = PushRules.LockDesire({
+					base = lockDesire,
+					advantage = advDesire,
+					joinCap = fiveJoiner and fiveCap or nil,
+					maxPush = maxPushDesire,
+					alliesNear = #alliesNearBot,
+					enemiesNear = #enemiesNearBot,
+					enemiesAlive = gameState.aliveEnemyCount,
+					tier = Push.GetLaneBuildingTier(lane),
+					nearAncient = enemyAncient ~= nil and GetUnitToUnitDistance(bot, enemyAncient) < 6000,
+					groupHurt = groupHurt,
+				})
+				if raisedWhy == "advantage" then
+					raisedWhy = "advantage:" .. tostring(adv.why)
+				elseif raisedWhy == "join" then
+					raisedWhy = "join:" .. fiveWhy
 				end
 				if capReason ~= nil and DotaTime() >= (bot._pushLockCapLogAt or -999) and not Fu.IsMeepoClone(bot) then
 					bot._pushLockCapLogAt = DotaTime() + 5
@@ -956,7 +950,7 @@ function Push.GetPushDesireHelper(bot, lane)
 			end
 		end
 		local averageHp = #alliesNearBot > 0 and hpSum / #alliesNearBot or 1
-		if hurtCount >= 2 and averageHp < 0.6 and aliveEnemyCount >= #alliesNearBot - 2 then
+		if hurtCount >= 2 and averageHp < 0.6 and aliveEnemyCount > 0 and aliveEnemyCount >= #alliesNearBot - 2 then
 			pushDesire = math.min(pushDesire, 0.15)
 			groupHurt = true
 		end
@@ -1453,6 +1447,29 @@ function Push.GetPushDesire(bot, lane)
 	-- Farm stays under a group push this bot was asked into (mode_farm_generic.lua reads it).
 	if bot._pushRaisedAt == now and desire >= 0.5 and not yielded then
 		bot._groupPushJoin = { at = now, desire = desire, why = bot._pushRaisedWhy }
+		-- Every enemy dead and the bot at the push: no TP away to farm or another lane (game 067 50:53-51:27: Clinkz and Death
+		-- Prophet TP'd off Radiant's bottom T3 at 1246 HP with all five Radiant dead). bot._noTpUntil is read by the TP
+		-- rule wrapper in ability_item_usage_generic.lua. A bot far from the lane may still TP to it.
+		if
+			bot._pushRaisedWhy == "advantage:wipe"
+			and GetUnitToLocationDistance(bot, GetLaneFrontLocation(GetTeam(), lane, 0)) < 3000
+		then
+			bot._noTpUntil = math.max(bot._noTpUntil or -999, now + 2)
+			if now >= (bot._wipeTpHoldLogAt or -999) then
+				bot._wipeTpHoldLogAt = now + 10
+				pcall(
+					print,
+					string.format(
+						"[OHA-PUSH] t=%.0f %s wipe-tp-hold lane=%s desire=%.2f hp=%.2f",
+						now,
+						ShortHeroName(bot),
+						tostring(lane),
+						desire,
+						Fu.GetHP(bot)
+					)
+				)
+			end
+		end
 	end
 	bot.pushDesire = desire
 	if desire >= 0.5 and (bot._lastPushChatDesire or 0) < 0.5 and FarmDefend.ClaimDecisionChat("late_push") then

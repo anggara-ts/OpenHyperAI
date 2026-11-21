@@ -72,6 +72,72 @@ T.test("Roshan over push: a live call wins unless the tower is about to fall", f
 	T.eq(R.PushUnderRosh(0.4, 0.6, 0.1, false), 0.4, "push already lower")
 end)
 
+T.test("lock branch with every enemy dead: the wipe push goes at 0.9 through the lock", function()
+	local R = rules()
+	-- Game 067 t=1376: Dire bots in the mid lock, all five Radiant dead, `lock-capped why=cap desire=0.25 alive=4/0`
+	-- and no wipe push. Now the own-HP cap starts at 30% in a wipe, and the lock raises to the window.
+	T.eq(R.OwnHpCapBelow(true), 0.3, "wipe HP floor")
+	T.eq(R.OwnHpCapBelow(false), 0.5, "normal HP floor")
+	local wipe = R.Advantage({ alliesAlive = 4, enemiesAlive = 0, dead = 5, deadLong = 5 })
+	local desire, cap, raised = R.LockDesire({
+		base = 0.55,
+		advantage = wipe,
+		maxPush = wipe,
+		alliesNear = 2,
+		enemiesNear = 0,
+		enemiesAlive = 0,
+		tier = 3,
+		nearAncient = true,
+		groupHurt = true,
+	})
+	T.eq(desire, 0.9, "wipe desire in the lock")
+	T.eq(cap, nil, "no cap: group-hurt and fewer-than-alive skipped")
+	T.eq(raised, "advantage", "raised")
+	-- The same bot under 30%: maxPush holds the 0.25 cap.
+	desire, cap = R.LockDesire({ base = 0.55, advantage = wipe, maxPush = 0.25, alliesNear = 2, enemiesAlive = 0 })
+	T.eq(desire, 0.25, "low HP still capped")
+	T.eq(cap, "cap", "cap reason")
+end)
+
+T.test("lock branch: the old caps still hold without a window", function()
+	local R = rules()
+	-- 5 alive each, 3 bots at a T2 within 6000 of the Ancient, no window: fewer-than-alive 0.4.
+	local desire, cap = R.LockDesire({
+		base = 0.55,
+		maxPush = 0.41,
+		alliesNear = 3,
+		enemiesNear = 0,
+		enemiesAlive = 5,
+		tier = 2,
+		nearAncient = true,
+	})
+	T.eq(desire, 0.4, "fewer-than-alive")
+	T.eq(cap, "fewer-than-alive", "reason")
+	-- A joiner (ahead, T2) is past it below the high ground.
+	desire, cap = R.LockDesire({
+		base = 0.55,
+		joinCap = 0.75,
+		maxPush = 0.75,
+		alliesNear = 3,
+		enemiesAlive = 5,
+		tier = 2,
+		nearAncient = true,
+	})
+	T.eq(desire, 0.75, "joiner at a T2")
+	T.eq(cap, nil, "joiner no cap")
+	-- Alone against two, and a hurt group with enemies alive.
+	T.eq(
+		R.LockDesire({ base = 0.55, advantage = 0.9, maxPush = 0.9, alliesNear = 1, enemiesNear = 2 }),
+		0.2,
+		"alone-vs-2"
+	)
+	T.eq(
+		R.LockDesire({ base = 0.55, maxPush = 0.65, alliesNear = 3, enemiesAlive = 2, groupHurt = true }),
+		0.15,
+		"group-hurt"
+	)
+end)
+
 T.test("respawn estimate: nearest learned level, else the default", function()
 	local R = rules()
 	T.eq(R.RespawnEstimate({}, 14, 30), 30, "nothing learned")

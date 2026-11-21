@@ -3,6 +3,7 @@ local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
+local WeaverRules = require(GetScriptDirectory() .. "/FuncLib/systems/weaver_rules")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
@@ -168,6 +169,10 @@ function X.LogWeaver(reason, format, ...)
 	bot._weaverLogAt[reason] = DotaTime() + 5
 	pcall(print, string.format("[OHA-WEAVER] t=%.0f " .. reason .. " " .. format, DotaTime(), ...))
 end
+-- Once-per-event lines (an escape's end and result, a death), not throttled, at game time t.
+function X.PrintWeaver(t, reason, format, ...)
+	pcall(print, string.format("[OHA-WEAVER] t=%.0f " .. reason .. " " .. format, t, ...))
+end
 -- HP fractions over the last 6s, sampled every 0.5s, for Weaver and every allied hero within 1200 (Time Lapse
 -- gives back the HP of 5s ago; the ally version needs the ally's history).
 function X.TrackHp()
@@ -286,14 +291,17 @@ function X.SkillsComplement()
 		geminateAttackAbility:ToggleAutoCast()
 		X.LogWeaver("geminate-autocast-on", "")
 	end
-	if Fu.CanNotUseAbility(bot) then
-		return
-	end
+	-- Read before the early return: the escape bookkeeping and the skip log below use them.
 	isRetreating = Fu.IsRetreating(bot)
 	isAttacking = Fu.IsAttacking(bot)
 	hpRatio = Fu.GetHP(bot)
 	mpRatio = Fu.GetMP(bot)
 	botTarget = Fu.GetProperTarget(bot)
+	pcall(X.WatchShukuchi)
+	if Fu.CanNotUseAbility(bot) then
+		pcall(X.LogEscapeBlocked)
+		return
+	end
 	-- Grace of 0.5s after the cast so the flag is not cleared before the buff shows up.
 	if not bot:HasModifier("modifier_weaver_shukuchi") and DotaTime() - (bot.ShukuchiKillAt or -99) > 0.5 then
 		bot.tryShukuchiKill = false
@@ -301,6 +309,10 @@ function X.SkillsComplement()
 	local timeLapseTarget
 	timeLapseDesire, timeLapseTarget = X.ConsiderTimeLapse()
 	if timeLapseDesire > 0 then
+		-- Time Lapse stays first (it gives the HP back); an escape-end line says whether it was cast during the escape.
+		if bot._shukuchiEscape ~= nil then
+			bot._shukuchiEscape.lapse = true
+		end
 		if timeLapseTarget == "self" then
 			bot:Action_UseAbility(timeLapseAbility)
 		else
@@ -310,10 +322,16 @@ function X.SkillsComplement()
 		end
 		return
 	end
-	-- Shukuchi kill: the cast set tryShukuchiKill but nothing read it, so the bot cast Shukuchi
-	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
-	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
-	-- once inside that radius (the hit has landed).
+	-- Escape Shukuchi (#48): the first hit ends the invisibility, so while it lasts she only walks to the fountain, in
+	-- every mode. Game 063: 7 of 9 escapes ended 1-2s after the cast, 8 of them cast in retreat mode, where this
+	-- block fell through to the rest of the script: The Swarm's retreat cast has the same trigger as the escape
+	-- (one beetle shows in the log, t=289 after the t=280 escape); what ended the others is not logged. The
+	-- retreat mode holds its desire above every other mode while the escape lasts (mode_retreat_generic.lua) and
+	-- item use waits (ability_item_usage_generic.lua, Usage.WillBreakInvisible). X.WatchShukuchi detects the end.
+	if bot._shukuchiEscape ~= nil and bot:HasModifier("modifier_weaver_shukuchi") then
+		bot:Action_MoveToLocation(Fu.GetTeamFountain())
+		return
+	end
 	-- Chase Shukuchi (#48, maintainer): stopping at attack range left the target at the edge, and the first hit (which
 	-- ends the invisibility) let him walk out again. While it lasts, go through him to a point 150 past (Shukuchi's
 	-- damage lands on the way), then attack. Attack at once when the right-clicks in the time left kill him.
@@ -353,6 +371,10 @@ function X.SkillsComplement()
 			end
 		end
 	end
+	-- Shukuchi kill: the cast set tryShukuchiKill but nothing read it, so the bot cast Shukuchi
+	-- and kept doing what its mode wanted; the damage only lands on enemies Weaver passes
+	-- through (radius 175), so it now walks onto the target, not while retreating, and stops
+	-- once inside that radius (the hit has landed).
 	if bot.tryShukuchiKill and not isRetreating then
 		local killTarget = bot.ShukuchiKillTarget
 		if
@@ -371,8 +393,34 @@ function X.SkillsComplement()
 		end
 		bot.tryShukuchiKill = false
 	end
-	shukuchiDesire = X.ConsiderShukuchi()
+	local shukuchiEscapeWhy
+	shukuchiDesire, shukuchiEscapeWhy = X.ConsiderShukuchi()
 	if shukuchiDesire > 0 then
+		if shukuchiEscapeWhy ~= nil then
+			local enemiesNear = #Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)
+			bot._shukuchiChase = nil
+			bot.tryShukuchiKill = false
+			bot._shukuchiEscape = {
+				why = shukuchiEscapeWhy,
+				hp = hpRatio,
+				castAt = DotaTime(),
+				-- GetLastAttackTime is on the GameTime clock (FuncLib/general_utils/combat.lua reads it so).
+				castGame = GameTime(),
+				untilTime = DotaTime() + shukuchiAbility:GetSpecialValueFloat("duration") + 0.5,
+				deaths = GetHeroDeaths(bot:GetPlayerID()),
+			}
+			bot._shukuchiEscapeAt = DotaTime()
+			-- "-cast": the cast line has its own word, so a check can match it without the -end / -skip lines.
+			X.LogWeaver(
+				"shukuchi-escape-cast",
+				"why=%s hp=%.2f mp=%.2f enemies=%d mode=%d",
+				shukuchiEscapeWhy,
+				hpRatio,
+				mpRatio,
+				enemiesNear,
+				bot:GetActiveMode()
+			)
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbility(shukuchiAbility)
 		return
@@ -467,9 +515,218 @@ function X.ConsiderTheSwarm()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Why Weaver should Shukuchi away now, or nil: "retreat" (chased while retreating), "tower" (hit by a tower while
+-- retreating) or "low-hp" (any mode, retreat included: WeaverRules.EscapeOutOfRetreat).
+function X.ShukuchiEscapeReason()
+	if isRetreating then
+		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+		for _, enemyHero in pairs(nearbyEnemies) do
+			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsDisabled(enemyHero) then
+				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
+				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
+				if
+					alliesNearEnemy ~= nil
+					and enemiesNearEnemy ~= nil
+					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
+				then
+					return "retreat"
+				end
+			end
+		end
+		if bot:WasRecentlyDamagedByTower(2) then
+			return "tower"
+		end
+	end
+	if hpRatio >= WeaverRules.ESCAPE_HP or not bot:WasRecentlyDamagedByAnyHero(1.5) then
+		return nil
+	end
+	local enemiesNear = 0
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) and not Fu.IsDisabled(enemyHero) then
+			enemiesNear = enemiesNear + 1
+		end
+	end
+	local targetDiesSoon = Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100)
+		and (bot:GetEstimatedDamageToTarget(true, botTarget, 1.5, DAMAGE_TYPE_PHYSICAL) or 0)
+			>= botTarget:GetHealth()
+	if WeaverRules.EscapeOutOfRetreat(hpRatio, true, enemiesNear, targetDiesSoon) then
+		return "low-hp"
+	end
+	return nil
+end
+-- Escape bookkeeping, every think, before the early return (game 063, #161): the end of an escape with how long the
+-- invisibility lasted and what she was doing, died-after= 5s after the end, and one line per death with the
+-- Shukuchi state. The think does not run while she is dead, so a death shows as a higher GetHeroDeaths at the next
+-- think after the respawn, and its lines carry t= of the last think alive (as [OHA-DEATH] does).
+function X.WatchShukuchi()
+	local now = DotaTime()
+	local deaths = GetHeroDeaths(bot:GetPlayerID()) or 0
+	local last = bot._shukuchiLast
+	local enemiesNear = #Fu.GetNearbyHeroes(bot, WeaverRules.ESCAPE_ENEMY_RANGE, true, BOT_MODE_NONE)
+	if last ~= nil and deaths > last.deaths then
+		X.PrintWeaver(
+			last.t,
+			"shukuchi-death",
+			"cd=%.1f mana=%d cost=%d level=%d want=%s wantAgo=%s skip=%s escapeAgo=%s hp=%.2f mode=%d",
+			last.cd,
+			last.mana,
+			last.cost,
+			last.level,
+			last.want,
+			last.wantAgo,
+			last.skip,
+			last.escapeAgo,
+			last.hp,
+			last.mode
+		)
+		local escape = bot._shukuchiEscape
+		if escape ~= nil then
+			bot._shukuchiEscape = nil
+			X.PrintWeaver(
+				last.t,
+				"shukuchi-escape-end",
+				"why=%s hp=%.2f->%.2f died=yes lasted=%.1f attacked=%s lapse=%s mode=%d",
+				escape.why,
+				escape.hp,
+				last.hp,
+				last.t - escape.castAt,
+				tostring(escape.attacked == true),
+				tostring(escape.lapse == true),
+				last.mode
+			)
+		end
+		local after = bot._shukuchiAfter
+		if after ~= nil then
+			bot._shukuchiAfter = nil
+			X.PrintWeaver(
+				last.t,
+				"shukuchi-escape-result",
+				"why=%s died-after=%s endAgo=%.1f lasted=%.1f",
+				after.why,
+				last.t <= after.endAt + 5 and "yes" or "no",
+				last.t - after.endAt,
+				after.lasted
+			)
+		end
+	end
+	local escape = bot._shukuchiEscape
+	if escape ~= nil then
+		local invisible = bot:HasModifier("modifier_weaver_shukuchi")
+		if invisible and (bot:GetLastAttackTime() or -999) > escape.castGame then
+			escape.attacked = true
+		end
+		if now > escape.untilTime or not invisible and now > escape.castAt + 0.75 then
+			bot._shukuchiEscape = nil
+			local attackTarget = bot:GetAttackTarget()
+			local lasted = now - escape.castAt
+			X.PrintWeaver(
+				now,
+				"shukuchi-escape-end",
+				"why=%s hp=%.2f->%.2f died=no lasted=%.1f attacked=%s lapse=%s mode=%d action=%d target=%s casting=%s enemies=%d",
+				escape.why,
+				escape.hp,
+				hpRatio,
+				lasted,
+				tostring(escape.attacked == true or (bot:GetLastAttackTime() or -999) > escape.castGame),
+				tostring(escape.lapse == true),
+				bot:GetActiveMode(),
+				bot:GetCurrentActionType() or -1,
+				attackTarget ~= nil and (string.gsub(attackTarget:GetUnitName() or "?", "npc_dota_", "")) or "none",
+				tostring(bot:IsCastingAbility() or bot:IsUsingAbility()),
+				enemiesNear
+			)
+			bot._shukuchiAfter = { why = escape.why, endAt = now, lasted = lasted }
+		end
+	end
+	local after = bot._shukuchiAfter
+	if after ~= nil and now >= after.endAt + 5 then
+		bot._shukuchiAfter = nil
+		X.PrintWeaver(
+			now,
+			"shukuchi-escape-result",
+			"why=%s died-after=no hp=%.2f lasted=%.1f enemies=%d",
+			after.why,
+			hpRatio,
+			after.lasted,
+			enemiesNear
+		)
+	end
+	bot._shukuchiLast = {
+		t = now,
+		deaths = deaths,
+		hp = hpRatio,
+		mode = bot:GetActiveMode(),
+		cd = shukuchiAbility:GetCooldownTimeRemaining(),
+		mana = bot:GetMana(),
+		cost = shukuchiAbility:GetManaCost(),
+		level = shukuchiAbility:GetLevel(),
+		want = bot._shukuchiWant or "none",
+		wantAgo = bot._shukuchiWantAt and string.format("%.1f", now - bot._shukuchiWantAt) or "-",
+		skip = bot._shukuchiSkip or "-",
+		escapeAgo = bot._shukuchiEscapeAt and string.format("%.1f", now - bot._shukuchiEscapeAt) or "-",
+	}
+end
+-- An escape wanted while a disable blocks every cast (the early return in SkillsComplement). Her own orders
+-- (queued, casting) are not a block and print nothing.
+function X.LogEscapeBlocked()
+	if not bot:IsAlive() or bot:HasModifier("modifier_weaver_shukuchi") then
+		return
+	end
+	local blockedBy = WeaverRules.DisabledReason(
+		bot:IsStunned(),
+		bot:IsHexed(),
+		bot:IsSilenced(),
+		bot:IsNightmared(),
+		bot:HasModifier("modifier_doom_bringer_doom")
+	)
+	if blockedBy == nil then
+		return
+	end
+	local escapeWhy = X.ShukuchiEscapeReason()
+	if escapeWhy == nil then
+		return
+	end
+	bot._shukuchiWant = escapeWhy
+	bot._shukuchiWantAt = DotaTime()
+	bot._shukuchiSkip = blockedBy
+	X.LogWeaver(
+		"shukuchi-escape-skip",
+		"why=%s want=%s hp=%.2f mana=%d cd=%.1f",
+		blockedBy,
+		escapeWhy,
+		hpRatio,
+		bot:GetMana(),
+		shukuchiAbility:GetCooldownTimeRemaining()
+	)
+end
 function X.ConsiderShukuchi()
+	local escapeWhy = X.ShukuchiEscapeReason()
+	if escapeWhy ~= nil then
+		bot._shukuchiWant = escapeWhy
+		bot._shukuchiWantAt = DotaTime()
+	end
 	if not shukuchiAbility:IsFullyCastable() then
+		if escapeWhy ~= nil and not bot:HasModifier("modifier_weaver_shukuchi") then
+			bot._shukuchiSkip = WeaverRules.EscapeBlocked(
+				shukuchiAbility:GetCooldownTimeRemaining(),
+				bot:GetMana(),
+				shukuchiAbility:GetManaCost()
+			)
+			X.LogWeaver(
+				"shukuchi-escape-skip",
+				"why=%s want=%s hp=%.2f mana=%d cd=%.1f",
+				bot._shukuchiSkip,
+				escapeWhy,
+				hpRatio,
+				bot:GetMana(),
+				shukuchiAbility:GetCooldownTimeRemaining()
+			)
+		end
 		return BOT_ACTION_DESIRE_NONE
+	end
+	if escapeWhy ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, escapeWhy
 	end
 	local attackRange = bot:GetAttackRange()
 	local shukuchiDamage = shukuchiAbility:GetSpecialValueInt("damage")
@@ -529,23 +786,6 @@ function X.ConsiderShukuchi()
 		end
 	end
 	if isRetreating then
-		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-		for _, enemyHero in pairs(nearbyEnemies) do
-			if Fu.IsValidHero(enemyHero) and Fu.IsChasingTarget(enemyHero, bot) and not Fu.IsDisabled(enemyHero) then
-				local alliesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, true, BOT_MODE_NONE)
-				local enemiesNearEnemy = Fu.GetNearbyHeroes(enemyHero, 1200, false, BOT_MODE_NONE)
-				if
-					alliesNearEnemy ~= nil
-					and enemiesNearEnemy ~= nil
-					and (#enemiesNearEnemy > #alliesNearEnemy or bot:WasRecentlyDamagedByAnyHero(1.5))
-				then
-					return BOT_ACTION_DESIRE_HIGH
-				end
-			end
-		end
-		if bot:WasRecentlyDamagedByTower(2) then
-			return BOT_ACTION_DESIRE_HIGH
-		end
 		if (Fu.IsTormentor(botTarget) or Fu.IsRoshan(botTarget)) and Fu.IsInRange(bot, botTarget, 500) then
 			if hpRatio < 0.4 then
 				return BOT_ACTION_DESIRE_HIGH

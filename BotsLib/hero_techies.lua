@@ -1,6 +1,4 @@
 -- Techies: skill build, item build, and ability use for this hero.
--- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
-local MineLocation, MineLocationDistance
 local X = {}
 local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
@@ -1502,6 +1500,10 @@ function X.ConsiderBlastOff(ignoreMana)
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
+-- Minefield Sign (Scepter). 7.42 game files: cast range 10 (planted where Techies stands), cast point 1.25s,
+-- cooldown 60s, aura_radius 1000 (mines inside deal 15% more damage), lasts 240s. The old code re-rolled a random spot
+-- up to 3100 away every think, so he walked to a new point each think and never planted it (#48). Now the spot is the
+-- middle of the biggest group of his mines (3 or more within the aura) within 1600 of him, kept until planted or 20s.
 function X.ConsiderMineFieldSign()
 	-- Minefield Sign stays hidden without Scepter but still reports castable. Ordering it
 	-- then is refused by the server and freezes Techies in place every think.
@@ -1510,28 +1512,66 @@ function X.ConsiderMineFieldSign()
 		or minefieldSignAbility:IsHidden()
 		or not minefieldSignAbility:IsFullyCastable()
 	then
+		if bot._signSpot ~= nil and minefieldSignAbility:GetCooldownTimeRemaining() > 0 then
+			X.LogTechies("minefield-sign-placed", bot._signSpot.mines, bot:GetLocation())
+			bot._lastSign = { location = bot:GetLocation(), untilTime = DotaTime() + 240 }
+			bot._signSpot = nil
+		end
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
+	-- Not while retreating or with an enemy hero near him: the cast point is 1.25s.
+	local busy = Fu.IsRetreating(bot) or #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > 0
+	local held = bot._signSpot
+	if held ~= nil then
+		if not busy and DotaTime() < held.untilTime and #Fu.GetEnemiesNearLoc(held.location, 1200) == 0 then
+			return BOT_ACTION_DESIRE_HIGH, held.location
+		end
+		X.LogTechies("minefield-sign-drop", held.mines, held.location)
+		bot._signSpot = nil
+	end
+	if busy or DotaTime() < (bot._signSearchAt or -999) then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	bot._signSearchAt = DotaTime() + 2
 	local auraRadius = minefieldSignAbility:GetSpecialValueInt("aura_radius")
-	local availableSpots = Techies.GetAvailableSpot()
-	MineLocation, MineLocationDistance = Techies.GetClosestSpot(bot, availableSpots)
-	if
-		MineLocation ~= nil
-		and GetUnitToLocationDistance(bot, MineLocation) <= bot:GetCurrentVisionRange()
-		and not X.IsEnemyCloserToWardLocation(MineLocation, MineLocationDistance)
-	then
-		for attempt = 0, 50 do
-			local candidateLocation = Fu.GetRandomLocationWithinDist(MineLocation, 0, auraRadius * 3 + 100)
-			if IsLocationPassable(candidateLocation) then
-				local minesNearby = Fu.GetTechiesMinesInLoc(candidateLocation, auraRadius)
-				if #minesNearby >= 3 then
-					return BOT_ACTION_DESIRE_HIGH, candidateLocation
-				end
+	if auraRadius <= 0 then
+		auraRadius = 1000
+	end
+	local mines = Fu.GetTechiesMinesInLoc(bot:GetLocation(), 1600)
+	local best, bestCount = nil, 2
+	for _, mine in ipairs(mines) do
+		local group = {}
+		for _, other in ipairs(mines) do
+			if GetUnitToUnitDistance(mine, other) <= auraRadius then
+				group[#group + 1] = other
 			end
-			attempt = attempt + 1
+		end
+		if #group > bestCount then
+			best, bestCount = group, #group
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE, 0
+	if best == nil then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	local location = Fu.GetCenterOfUnits(best)
+	if not IsLocationPassable(location) then
+		location = best[1]:GetLocation()
+	end
+	if #Fu.GetEnemiesNearLoc(location, 1200) > 0 then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	-- His last sign lasts 240s (game files): no second one over the same mines while it stands.
+	local last = bot._lastSign
+	if
+		last ~= nil
+		and DotaTime() < last.untilTime
+		and Fu.GetLocationToLocationDistance(last.location, location) < auraRadius
+	then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	bot._signSpot = { location = location, mines = bestCount, untilTime = DotaTime() + 20 }
+	X.LogTechies("minefield-sign-spot", bestCount, location)
+	return BOT_ACTION_DESIRE_HIGH, location
 end
 -- Proximity Mines is charge based (3 charges, one every 15s). Charges left from the shared
 -- tracker (the API has no ability-charge read), or 3 before it has a count.

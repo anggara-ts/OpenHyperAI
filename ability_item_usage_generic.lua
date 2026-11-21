@@ -139,12 +139,13 @@ local function ReloadBotBuild(reason)
 		useDefaultItem = BotBuild["bDeafaultItem"]
 		if build["sSkillList"] ~= nil and #build["sSkillList"] > 0 then
 			local fullSkillList = build["sSkillList"]
-			local level = bot:GetLevel()
-			local pointsSpent = level - bot:GetAbilityPoints()
-			local remainingSkills = {}
-			for i = pointsSpent + 1, #fullSkillList do
-				table.insert(remainingSkills, fullSkillList[i])
-			end
+			-- Drop what is already learned, by each ability's own level (#45). "Hero level minus unspent
+			-- points" skipped entries the hero never learned once a level had passed without a point.
+			local remainingSkills = Fu.Skill.GetRemainingSkillList(fullSkillList, function(name)
+				local listed = bot:GetAbilityByName(name)
+				return listed ~= nil and listed:GetLevel() or 0
+			end)
+			local pointsSpent = #fullSkillList - #remainingSkills
 			if #remainingSkills > 0 then
 				abilityLevelUpList = remainingSkills
 			else
@@ -271,6 +272,26 @@ local function LevelUpAbilities()
 		bot.stuckLoc = nil
 	end
 	local level = bot:GetLevel()
+	-- What the script finds on its first look after a level-up, levels 14 to 26 (#45): points= is the unspent
+	-- points, attr= the attribute bonus rank. points=0 with attr= one higher than on the line before means the
+	-- game spent that level's point on the attribute bonus before the script ran.
+	if level ~= bot.ohaLevelSeen then
+		bot.ohaLevelSeen = level
+		if level >= 14 and level <= 26 then
+			local attributeBonus = bot:GetAbilityByName("special_bonus_attributes")
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s level-up level=%d points=%d attr=%d next=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					level,
+					bot:GetAbilityPoints(),
+					attributeBonus ~= nil and attributeBonus:GetLevel() or -1,
+					tostring(abilityLevelUpList[1])
+				)
+			)
+		end
+	end
 	if GetGameMode() == GAMEMODE_ARDM and bot:GetAbilityPoints() > 0 then
 		if #abilityLevelUpList > 0 then
 			log(
@@ -291,9 +312,132 @@ local function LevelUpAbilities()
 			)
 		end
 	end
+	-- The ranks a hero has at hero level 7, 12 and 18, once its points are spent (#45): one line shows which
+	-- ability was maxed first, the early value points and the ultimate's rank, so a game can check a build.
+	local ranksLogged = bot.ohaRanksLogged
+	if ranksLogged == nil then
+		ranksLogged = {}
+		bot.ohaRanksLogged = ranksLogged
+	end
+	for _, rankLevel in ipairs({ 7, 12, 18 }) do
+		if not ranksLogged[rankLevel] and (level > rankLevel or level == rankLevel and bot:GetAbilityPoints() == 0) then
+			ranksLogged[rankLevel] = true
+			local ranks = {}
+			for slot = 0, 10 do
+				local slotAbility = bot:GetAbilityInSlot(slot)
+				if
+					slotAbility ~= nil
+					and not slotAbility:IsNull()
+					and not slotAbility:IsTalent()
+					and not slotAbility:IsHidden()
+					and slotAbility:GetMaxLevel() > 1
+				then
+					ranks[#ranks + 1] = slotAbility:GetName() .. "=" .. slotAbility:GetLevel()
+				end
+			end
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s ranks-%d level=%d points=%d %s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					rankLevel,
+					level,
+					bot:GetAbilityPoints(),
+					table.concat(ranks, " ")
+				)
+			)
+		end
+	end
+	-- Talents (#45): an order sent below is checked here on a later think. The entry leaves the list, and
+	-- [OHA-TALENT] learned= prints, only once the talent really has its level. required= / canUpgrade= are
+	-- what the engine answered when the order went out, points= the unspent points then, attr= the level of
+	-- special_bonus_attributes; late= is how many hero levels after its tier's level a first pick came.
+	local talentOrder = bot.ohaTalentOrder
+	if talentOrder ~= nil then
+		local orderedTalent = bot:GetAbilityByName(talentOrder.name)
+		if orderedTalent == nil or orderedTalent:IsNull() then
+			bot.ohaTalentOrder = nil
+		elseif orderedTalent:GetLevel() >= 1 then
+			bot.ohaTalentOrder = nil
+			if abilityLevelUpList[1] == talentOrder.name then
+				table.remove(abilityLevelUpList, 1)
+			end
+			print(
+				string.format(
+					"[OHA-TALENT] t=%.0f %s learned=%s level=%d%s required=%s canUpgrade=%s points=%d attr=%d",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					talentOrder.name,
+					talentOrder.level,
+					talentOrder.firstPick and string.format(" late=%d", talentOrder.level - talentOrder.talentLevel)
+						or "",
+					tostring(talentOrder.required),
+					tostring(talentOrder.canUpgrade),
+					talentOrder.points,
+					talentOrder.attributes
+				)
+			)
+		elseif not talentOrder.rejected and DotaTime() > talentOrder.time + 3 then
+			talentOrder.rejected = true
+			print(
+				string.format(
+					"[OHA-TALENT] t=%.0f %s rejected talent=%s level=%d required=%s canUpgrade=%s points=%d attr=%d",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					talentOrder.name,
+					talentOrder.level,
+					tostring(talentOrder.required),
+					tostring(talentOrder.canUpgrade),
+					talentOrder.points,
+					talentOrder.attributes
+				)
+			)
+		end
+	end
 	if #abilityLevelUpList >= 1 and bot:GetAbilityPoints() > 0 then
 		if Fu.IsTryingtoUseAbility(bot) then
 			return
+		end
+		-- The game gives a bot no point at levels 15-17 and 19-22 (Skill.GetLatePriorityIndex): the one point
+		-- at 18 goes to the ultimate, and from 23 an open talent goes before a basic rank. Not in ARDM.
+		if level >= Fu.Skill.LATE_ULTIMATE_LEVEL and GetGameMode() ~= GAMEMODE_ARDM then
+			local talentList = nil
+			local lateIndex, lateReason = Fu.Skill.GetLatePriorityIndex(abilityLevelUpList, level, function(name)
+				local listed = name ~= nil and bot:GetAbilityByName(name) or nil
+				return listed ~= nil
+					and not listed:IsNull()
+					and listed:IsUltimate()
+					and not listed:IsHidden()
+					and listed:CanAbilityBeUpgraded()
+					and listed:GetLevel() < listed:GetMaxLevel()
+					and level >= listed:GetHeroLevelRequiredToUpgrade()
+			end, function(name)
+				local listed = name ~= nil and bot:GetAbilityByName(name) or nil
+				if listed == nil or listed:IsNull() or not listed:IsTalent() or listed:GetLevel() >= 1 then
+					return nil
+				end
+				talentList = talentList or Fu.Skill.GetTalentList(bot)
+				return Fu.Skill.GetTalentHeroLevel(talentList, name, function(otherName)
+					local otherTalent = bot:GetAbilityByName(otherName)
+					return otherTalent ~= nil and otherTalent:GetLevel() >= 1
+				end)
+			end)
+			if lateIndex > 1 then
+				local promoted = table.remove(abilityLevelUpList, lateIndex)
+				table.insert(abilityLevelUpList, 1, promoted)
+				print(
+					string.format(
+						"[OHA-SKILL] t=%.0f %s promote entry=%s why=%s from=%d level=%d points=%d",
+						DotaTime(),
+						(string.gsub(botName, "npc_dota_hero_", "")),
+						promoted,
+						lateReason,
+						lateIndex,
+						level,
+						bot:GetAbilityPoints()
+					)
+				)
+			end
 		end
 		local abilityName = abilityLevelUpList[1]
 		if abilityName == nil then
@@ -346,6 +490,79 @@ local function LevelUpAbilities()
 			log("[WARN] Ability %s not found on %s, skipping", abilityName, botName)
 			table.remove(abilityLevelUpList, 1)
 			return
+		end
+		-- An entry that holds the list back for 20s (it needs a higher hero level, or the engine refuses it)
+		-- used to show in debug runs only. Once per entry (#45); the list's length tells two entries of the
+		-- same ability apart.
+		local skillWait = bot.ohaSkillWait
+		if skillWait == nil or skillWait.name ~= abilityName or skillWait.entriesLeft ~= #abilityLevelUpList then
+			bot.ohaSkillWait = { name = abilityName, entriesLeft = #abilityLevelUpList, since = DotaTime() }
+		elseif not skillWait.logged and DotaTime() > skillWait.since + 20 then
+			skillWait.logged = true
+			print(
+				string.format(
+					"[OHA-SKILL] t=%.0f %s waiting ability=%s level=%d points=%d rank=%d required=%s canUpgrade=%s hidden=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					abilityName,
+					level,
+					bot:GetAbilityPoints(),
+					ability:GetLevel(),
+					tostring(ability:GetHeroLevelRequiredToUpgrade()),
+					tostring(ability:CanAbilityBeUpgraded()),
+					tostring(ability:IsHidden())
+				)
+			)
+		end
+		-- Talents (#45). Game 050: every bot learned its level 15 talent at hero level 18 and the level 20 / 25
+		-- ones at 25 / 26, though the list has them as the 15th, 18th and 19th point. The list waited on CanLearn
+		-- below, whose hero-level check asks GetHeroLevelRequiredToUpgrade. For a talent the level now comes
+		-- from its tier (Skill.GetTalentHeroLevel): one order per hero level, confirmed by the check above, with
+		-- the engine's own answers in the log line. An order the engine refuses keeps the entry (as before).
+		-- Not in ARDM, whose list is every talent first: that one keeps the old path.
+		if ability:IsTalent() and abilityName ~= "special_bonus_attributes" and GetGameMode() ~= GAMEMODE_ARDM then
+			local talentLevel = Fu.Skill.GetTalentHeroLevel(Fu.Skill.GetTalentList(bot), abilityName, function(name)
+				local otherTalent = bot:GetAbilityByName(name)
+				return otherTalent ~= nil and otherTalent:GetLevel() >= 1
+			end)
+			if talentLevel ~= nil then
+				local lastOrder = bot.ohaTalentOrder
+				if ability:GetLevel() >= 1 then
+					table.remove(abilityLevelUpList, 1)
+				elseif level < talentLevel then
+					return
+				elseif lastOrder == nil or lastOrder.name ~= abilityName or lastOrder.level ~= level then
+					local attributes = bot:GetAbilityByName("special_bonus_attributes")
+					bot.ohaTalentOrder = {
+						name = abilityName,
+						level = level,
+						time = DotaTime(),
+						talentLevel = talentLevel,
+						-- late= is not printed for Meepo: his hand-made list (skill.lua) takes the first
+						-- talent with the 11th point, behind a Divided We Stand rank.
+						firstPick = talentLevel < 27 and botName ~= "npc_dota_hero_meepo",
+						required = ability:GetHeroLevelRequiredToUpgrade(),
+						canUpgrade = ability:CanAbilityBeUpgraded(),
+						points = bot:GetAbilityPoints(),
+						attributes = attributes ~= nil and attributes:GetLevel() or -1,
+					}
+					bot:ActionImmediate_LevelAbility(abilityName)
+				elseif lastOrder.rejected and level > 25 then
+					-- Refused at this level, and past 25 nothing later changes that: free the list.
+					table.remove(abilityLevelUpList, 1)
+				elseif
+					lastOrder.canUpgrade == true
+					and type(lastOrder.required) == "number"
+					and level >= lastOrder.required
+					and DotaTime() > lastOrder.time + 5
+				then
+					-- The engine said yes and the talent is still not learned: the order was dropped, send it
+					-- again. (An order the engine said no to is sent once per hero level.)
+					lastOrder.time = DotaTime()
+					bot:ActionImmediate_LevelAbility(abilityName)
+				end
+				return
+			end
 		end
 		-- The server rejects a train order for anything the hero cannot learn right now
 		-- ("Ability is not owned by specified unit"). Only send one that will land.
@@ -1122,6 +1339,9 @@ local function DoomWastes(name)
 	end
 	return DOOM_HEAL_AND_MANA[name] == true and bot:GetMana() / math.max(1, bot:GetMaxMana()) >= 0.3
 end
+-- The slots ConsiderItems reads: main, backpack (Smoke only), TP scroll, neutral. Built once instead of on every
+-- item think (#52: one table less per bot per think); same slots in the same order.
+Usage.itemThinkSlots = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
 local function ConsiderItems()
 	Usage.SetStashItemTimeUpdate()
 	-- WD: cash Gris-Gris before other item logic (bypasses CanCastAbility).
@@ -1178,48 +1398,46 @@ local function ConsiderItems()
 	pcall(Usage.BannerFromBackpack)
 	-- Smoke of Deceit is castable from the backpack. Other items stay in the main slots.
 	-- Forage in the main inventory is eaten immediately. A backpack copy is swapped out and eaten.
+	-- The name is read first (#52): this loop asked "can it be cast" twice for each of the six main slots on every
+	-- item think (up to 12 ability reads a slot) and only then looked whether the item is a mushroom at all. Same
+	-- log and same orders; nothing goes stale.
 	for forageSlot = 0, 5 do
 		local forage = bot:GetItemInSlot(forageSlot)
-		if forage ~= nil and not forage:IsNull() and not Fu.CanCastAbility(forage) then
-			local forageItemName = forage:GetName()
-			if
-				(
-					forageItemName == "item_foragers_stats"
-					or forageItemName == "item_foragers_health"
-					or forageItemName == "item_foragers_mana"
-				) and DotaTime() >= (bot._forageStuckLogAt or -999)
-			then
-				bot._forageStuckLogAt = DotaTime() + 20
-				pcall(
-					print,
-					string.format(
-						"[OHA-FORAGE] t=%.0f %s cannot-eat %s slot%d fully=%s cd=%.1f hidden=%s passive=%s mana=%.0f",
-						DotaTime(),
-						(string.gsub(botName, "npc_dota_hero_", "")),
-						forageItemName,
-						forageSlot,
-						tostring(forage:IsFullyCastable()),
-						forage:GetCooldownTimeRemaining(),
-						tostring(forage:IsHidden()),
-						tostring(forage:IsPassive()),
-						bot:GetMana()
+		local forageName = forage ~= nil and not forage:IsNull() and forage:GetName() or nil
+		if
+			forageName == "item_foragers_stats"
+			or forageName == "item_foragers_health"
+			or forageName == "item_foragers_mana"
+		then
+			if not Fu.CanCastAbility(forage) then
+				if DotaTime() >= (bot._forageStuckLogAt or -999) then
+					bot._forageStuckLogAt = DotaTime() + 20
+					pcall(
+						print,
+						string.format(
+							"[OHA-FORAGE] t=%.0f %s cannot-eat %s slot%d fully=%s cd=%.1f hidden=%s passive=%s mana=%.0f",
+							DotaTime(),
+							(string.gsub(botName, "npc_dota_hero_", "")),
+							forageName,
+							forageSlot,
+							tostring(forage:IsFullyCastable()),
+							forage:GetCooldownTimeRemaining(),
+							tostring(forage:IsHidden()),
+							tostring(forage:IsPassive()),
+							bot:GetMana()
+						)
 					)
-				)
-			end
-		end
-		if forage ~= nil and not forage:IsNull() and Fu.CanCastAbility(forage) then
-			local forageName = forage:GetName()
-			if forageName == "item_foragers_stats" or forageName == "item_foragers_mana" then
-				bot:Action_UseAbility(forage)
-				return BOT_ACTION_DESIRE_NONE
+				end
 			elseif forageName == "item_foragers_health" then
 				bot:Action_UseAbilityOnEntity(forage, bot)
+				return BOT_ACTION_DESIRE_NONE
+			else
+				bot:Action_UseAbility(forage)
 				return BOT_ACTION_DESIRE_NONE
 			end
 		end
 	end
-	local itemSlots = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16 }
-	for _, slot in pairs(itemSlots) do
+	for _, slot in pairs(Usage.itemThinkSlots) do
 		local item = bot:GetItemInSlot(slot)
 		local itemName = item ~= nil and item:GetName() or nil
 		local inBackpack = slot >= 6 and slot <= 8
@@ -1613,6 +1831,80 @@ Usage.ConsiderItemDesire["item_armlet"] = function(item)
 	end
 	return TurnOff("not-worth")
 end
+-- [OHA-DODGE] (#134): a defensive item used against an incoming spell (Blink, Eul's / Wind Waker, BKB, Lotus Orb,
+-- Linken's), and 1.5s later whether the target was hit by a hero anyway, so a game shows if the dodge was in time.
+-- projectile: from Fu.Find*ProjectileIncoming; caster / ability: from Fu.FindWillBeCast*Spell.
+function Usage.LogDodge(item, target, why, projectile, caster, ability)
+	local itemName = item:GetName()
+	local now = DotaTime()
+	bot._dodgeLogAt = bot._dodgeLogAt or {}
+	if now < (bot._dodgeLogAt[itemName] or -99) then
+		return
+	end
+	bot._dodgeLogAt[itemName] = now + 2
+	local spell, dist = "will-cast", -1
+	if projectile ~= nil then
+		spell = projectile.ability ~= nil and projectile.ability:GetName() or "?"
+		dist = projectile.location ~= nil and GetUnitToLocationDistance(target, projectile.location) or -1
+		if Fu.IsStunProjectileSpell(spell) then
+			why = "stun"
+		end
+	elseif ability ~= nil then
+		spell = ability:GetName()
+		dist = caster ~= nil and GetUnitToUnitDistance(target, caster) or -1
+	end
+	local targetName = target == bot and "self" or (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
+	print(
+		string.format(
+			"[OHA-DODGE] t=%.0f %s item=%s target=%s spell=%s dist=%.0f why=%s",
+			now,
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			(string.gsub(itemName, "^item_", "")),
+			targetName,
+			spell,
+			dist,
+			why
+		)
+	)
+	bot._dodgePending = bot._dodgePending or {}
+	table.insert(
+		bot._dodgePending,
+		{ at = now, item = itemName, handle = item, target = target, targetName = targetName }
+	)
+end
+function Usage.WatchDodgeResults()
+	local pending = bot._dodgePending
+	if pending == nil or #pending == 0 then
+		return
+	end
+	local now = DotaTime()
+	for i = #pending, 1, -1 do
+		local entry = pending[i]
+		if now - entry.at >= 1.5 then
+			table.remove(pending, i)
+			local target = entry.target
+			local valid = target ~= nil and not target:IsNull()
+			local alive = valid and target:IsAlive()
+			local hit = valid and (not alive or target:WasRecentlyDamagedByAnyHero(now - entry.at))
+			-- cast=false: the order never went out (another item's order replaced it, or the bot was disabled).
+			local handle = entry.handle
+			local cast = handle ~= nil and not handle:IsNull() and handle:GetCooldownTimeRemaining() > 0
+			print(
+				string.format(
+					"[OHA-DODGE] t=%.0f %s result item=%s target=%s hit=%s cast=%s alive=%s after=%.1f",
+					now,
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					(string.gsub(entry.item, "^item_", "")),
+					entry.targetName,
+					valid and tostring(hit) or "unknown",
+					tostring(cast),
+					tostring(alive),
+					now - entry.at
+				)
+			)
+		end
+	end
+end
 Usage.ConsiderItemDesire["item_bfury"] = function(item)
 	return Usage.ConsiderItemDesire["item_quelling_blade"](item)
 end
@@ -1649,14 +1941,17 @@ Usage.ConsiderItemDesire["item_black_king_bar"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsNotAttackProjectileIncoming(bot, 350) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindNotAttackProjectileIncoming(bot, 350))
 			castReason = "防御弹道"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsWillBeCastUnitTargetSpell(bot, radius) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "will-cast", nil, Fu.FindWillBeCastUnitTargetSpell(bot, radius))
 			castReason = "防御指向技能"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
 		if Fu.IsWillBeCastPointSpell(bot, radius) and closeEnemyCount >= 1 then
+			pcall(Usage.LogDodge, item, bot, "will-cast", nil, Fu.FindWillBeCastPointSpell(bot, radius))
 			castReason = "防御地点技能"
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, castReason
 		end
@@ -1691,6 +1986,32 @@ Usage.ConsiderItemDesire["item_blade_mail"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- [OHA-ITEM] blink-initiate / blink-hold (#9): the Blink onto a fight target 500-1200 away, and the times it
+-- was held back (fewer allies than enemies near the target, or the fight looks lost). The next game shows
+-- whether Blink carriers (Meepo, Night Stalker, ...) jump in and their stun / Poof follows. Each kind prints at
+-- most once per `wait` seconds per bot.
+function Usage.LogBlinkInitiate(what, wait, allyCount, enemyCount, stronger)
+	local now = DotaTime()
+	bot._blinkLogAt = bot._blinkLogAt or {}
+	if now < (bot._blinkLogAt[what] or -999) then
+		return
+	end
+	bot._blinkLogAt[what] = now + wait
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s %s target=%s dist=%.0f allies=%d enemies=%d stronger=%s",
+			now,
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			what,
+			(string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")),
+			GetUnitToUnitDistance(bot, botTarget),
+			allyCount,
+			enemyCount,
+			tostring(stronger)
+		)
+	)
 end
 Usage.ConsiderItemDesire["item_blink"] = function(item)
 	local castRange = 1200
@@ -1785,6 +2106,7 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 		Fu.IsProjectileIncoming(bot, 1200)
 		and (botTarget == nil or not botTarget:IsHero() or not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100))
 	then
+		pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindProjectileIncoming(bot, 1200))
 		local retreatLocation = Fu.GetLocationTowardDistanceLocation(bot, GetAncient(GetTeam()):GetLocation(), 1199)
 		return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
 	end
@@ -1843,8 +2165,11 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 				local blinkLocation = Fu.GetUnitTowardDistanceLocation(bot, botTarget, blinkDistance)
 					+ RandomVector(150)
 				if IsLocationPassable(blinkLocation) then
+					Usage.LogBlinkInitiate("blink-initiate", 3, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 					return BOT_ACTION_DESIRE_HIGH, blinkLocation, "ground", nil
 				end
+			else
+				Usage.LogBlinkInitiate("blink-hold", 10, #alliesNearTarget, enemyCountNearTarget, weAreStronger)
 			end
 		end
 	end
@@ -2147,9 +2472,9 @@ Usage.ConsiderItemDesire["item_crimson_guard"] = function(item)
 	return BOT_ACTION_DESIRE_NONE
 end
 -- A silence only matters when it blocks a spell the hero could use now: a learned, non-passive ability that is
--- off cooldown and affordable. The self-dispel rules (Eul's, Stormcrafter) used to require an intelligence hero,
--- so universal, strength and agility heroes never dispelled a silence (#15). Eul's self-cast is a basic dispel
--- (datafeed, item 100).
+-- off cooldown and affordable. The self-dispel rule (Eul's; Stormcrafter's too until 7.42 made it passive) used to
+-- require an intelligence hero, so universal, strength and agility heroes never dispelled a silence (#15). Eul's
+-- self-cast is a basic dispel (datafeed, item 100).
 function Usage.SilenceBlocksASpell(unit)
 	-- Only when a spell is needed now: retreating (escape) or engaging (disable / nuke). A silenced right-clicker
 	-- in a calm moment should not Eul himself out of a fight. The silence's remaining time is not checked: it
@@ -2262,6 +2587,7 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 		if Fu.IsUnitTargetProjectileIncoming(bot, 800) then
+			pcall(Usage.LogDodge, item, bot, "projectile", Fu.FindUnitTargetProjectileIncoming(bot, 800))
 			hEffectTarget = bot
 			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -2616,11 +2942,43 @@ local function ConsiderHealingLotus(item, label, selfHp, selfMp, allyNeed, fount
 				return BOT_ACTION_DESIRE_NONE
 			end
 		end
-		if hp >= 0.9 and mp >= 0.85 then
+		-- At full HP and mana only when an item waits in the stash or on the courier (game 048 42:00: Puck ate
+		-- the lotus she had just taken at full HP and mana).
+		local waiting = bot:GetStashValue() > 0 or bot:GetCourierValue() > 0
+		-- Not while the backpack has room: the waiting item lands there, and the lotus keeps its heal for later.
+		-- Game 058, 27:11: Hoodwink walked to the pool, took a lotus at 90% HP and ate it a second later at 98% HP
+		-- and full mana (`use why=free-slot ... waiting=true`) to make room for a Dust on the courier.
+		if waiting and hp >= 0.8 and mp >= 0.7 then
+			local backpackFree = false
+			for slot = 6, 8 do
+				if bot:GetItemInSlot(slot) == nil then
+					backpackFree = true
+					break
+				end
+			end
+			waiting = not backpackFree
+		end
+		local freeNow = hp >= 0.9 and mp >= 0.85 and waiting or hp < 0.8 or mp < 0.7
+		if freeNow and DotaTime() >= (bot._lotusFreeLogAt or -999) then
+			bot._lotusFreeLogAt = DotaTime() + 10
+			pcall(
+				print,
+				string.format(
+					"[OHA-LOTUS] t=%.0f %s use why=free-slot item=%s hp=%.2f mp=%.2f waiting=%s",
+					DotaTime(),
+					(string.gsub(botName, "npc_dota_hero_", "")),
+					label,
+					hp,
+					mp,
+					tostring(waiting)
+				)
+			)
+		end
+		if hp >= 0.9 and mp >= 0.85 and waiting then
 			return BOT_ACTION_DESIRE_HIGH, bot, castType, "Free slot (" .. label .. ", full)"
 		end
-		-- Still packed but not full resources — use it, then the slot opens.
-		if hp < 0.95 or mp < 0.9 then
+		-- Still packed and missing some HP or mana: use it, then the slot opens.
+		if hp < 0.8 or mp < 0.7 then
 			return BOT_ACTION_DESIRE_MODERATE, bot, castType, "Free slot (" .. label .. ")"
 		end
 	end
@@ -3282,7 +3640,7 @@ Usage.ConsiderItemDesire["item_helm_of_the_dominator"] = function(item)
 				if
 					creepHealth > bestHealth
 					and creep:GetHealth() / creep:GetMaxHealth() > 0.75
-					and (not creep:IsAncientCreep() or item:GetName() == "item_helm_of_the_overlord")
+					and not creep:IsAncientCreep()
 					and not Fu.IsKeyWordUnit("siege", creep)
 				then
 					bestCreep = creep
@@ -3294,25 +3652,6 @@ Usage.ConsiderItemDesire["item_helm_of_the_dominator"] = function(item)
 	if bestCreep ~= nil then
 		hEffectTarget = bestCreep
 		castReason = "支配:" .. hEffectTarget:GetUnitName()
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_helm_of_the_overlord"] = function(item)
-	return Usage.ConsiderItemDesire["item_helm_of_the_dominator"](item)
-end
-Usage.ConsiderItemDesire["item_hood_of_defiance"] = function(item)
-	if bot:HasModifier("modifier_item_pipe_barrier") or Fu.GetHP(bot) > 0.88 then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local radius = 1000
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, radius, true, BOT_MODE_NONE)
-	if #enemyHeroes > 0 then
-		hEffectTarget = bot
-		castReason = "套盾"
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -3462,6 +3801,7 @@ Usage.ConsiderItemDesire["item_lotus_orb"] = function(item)
 			and not ally:HasModifier("modifier_antimage_spell_shield")
 		then
 			if Fu.IsUnitTargetProjectileIncoming(ally, 800) then
+				pcall(Usage.LogDodge, item, ally, "projectile", Fu.FindUnitTargetProjectileIncoming(ally, 800))
 				hEffectTarget = ally
 				castReason = "反弹弹道"
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -3476,6 +3816,7 @@ Usage.ConsiderItemDesire["item_lotus_orb"] = function(item)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
 			if Fu.IsWillBeCastUnitTargetSpell(ally, 1200) then
+				pcall(Usage.LogDodge, item, ally, "will-cast", nil, Fu.FindWillBeCastUnitTargetSpell(ally, 1200))
 				hEffectTarget = ally
 				castReason = "给队友反弹技能:" .. Fu.Chat.GetNormName(hEffectTarget)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -3850,25 +4191,6 @@ Usage.ConsiderItemDesire["item_moon_shard"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_necronomicon"] = function(item)
-	local castRange = 750
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if botTarget ~= nil and botTarget:IsAlive() and Fu.IsInRange(bot, botTarget, 1000) then
-		hEffectTarget = botTarget
-		castReason = "进攻"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_necronomicon_2"] = function(item)
-	return Usage.ConsiderItemDesire["item_necronomicon"](item)
-end
-Usage.ConsiderItemDesire["item_necronomicon_3"] = function(item)
-	return Usage.ConsiderItemDesire["item_necronomicon"](item)
 end
 Usage.ConsiderItemDesire["item_nullifier"] = function(item)
 	local castRange = 800 + castRangeBonus
@@ -4456,6 +4778,12 @@ Usage.ConsiderItemDesire["item_sphere"] = function(item)
 				or bot:GetHealth() < 150
 			)
 		then
+			local projectile = Fu.FindUnitTargetProjectileIncoming(ally, 800)
+			local caster, ability = Fu.FindWillBeCastUnitTargetSpell(ally, 1200)
+			if projectile ~= nil or caster ~= nil then
+				local why = projectile ~= nil and "projectile" or "will-cast"
+				pcall(Usage.LogDodge, item, ally, why, projectile, caster, ability)
+			end
 			hEffectTarget = ally
 			castReason = "帮助队友"
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
@@ -4971,19 +5299,6 @@ Usage.ConsiderItemDesire["item_tango_single"] = function(item)
 				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 			end
 		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_tome_of_knowledge"] = function(item)
-	local castRange = 300
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if item:IsFullyCastable() then
-		hEffectTarget = bot
-		castReason = "读书"
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
@@ -6498,26 +6813,6 @@ Usage.ConsiderItemDesire["item_ex_machina"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-Usage.ConsiderItemDesire["item_stormcrafter"] = function(item)
-	local castRange = 300 + castRangeBonus
-	local castType = "unit"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
-	if Fu.CanCastOnNonMagicImmune(bot) and #enemyHeroes > 0 then
-		if bot:IsRooted() or Usage.SilenceBlocksASpell(bot) and not Usage.IsDoomed(bot) then
-			hEffectTarget = bot
-			castReason = "解缠绕:" .. Fu.Chat.GetNormName(hEffectTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-		end
-		if Fu.IsUnitTargetProjectileIncoming(bot, 400) then
-			hEffectTarget = bot
-			castReason = "防御弹道:" .. Fu.Chat.GetNormName(hEffectTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 Usage.ConsiderItemDesire["item_gungir"] = function(item)
 	local nInRangeEnemy = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1000)
 	for _, enemy in pairs(nInRangeEnemy) do
@@ -6623,76 +6918,93 @@ Usage.ConsiderItemDesire["item_paintball"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- Witchbane (item_heavy_blade, tier 4 neutral). 7.42 scripts/npc/items.txt: AbilityBehavior
+-- "DOTA_ABILITY_BEHAVIOR_POINT | DOTA_ABILITY_BEHAVIOR_AOE", AbilityCastRange 700, radius 300, AbilityCooldown 24,
+-- AbilityManaCost 50, SpellImmunityType SPELL_IMMUNITY_ENEMIES_NO; tooltip (abilities_english.txt): "Dispel all
+-- enemies and allies in a 300 unit radius", a basic dispel. It is a point spell now, so it is cast on a location
+-- (#116): the old rule ordered it on a unit. Allies first (the bot included): one with a debuff a basic dispel
+-- removes, else one hurt in a fight with an enemy hero beside him; then the bot's target, when it carries a buff a
+-- dispel strips or is low. One order every few seconds: a refused order would otherwise repeat on every think.
 Usage.ConsiderItemDesire["item_heavy_blade"] = function(item)
-	local castRange = item:GetCastRange() + castRangeBonus
-	local castType = "unit"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+	if DotaTime() < (bot._heavyBladeTriedAt or -999) + 4 then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local castRange = item:GetCastRange()
+	if castRange == nil or castRange <= 0 then
+		castRange = 700
+	end
+	castRange = castRange + castRangeBonus
+	local radius = item:GetSpecialValueInt("radius")
+	if radius == nil or radius <= 0 then
+		radius = 300
+	end
+	-- The cast point for a unit: its own spot inside the cast range, else the edge of the range toward it (the unit
+	-- is then at most half the radius outside the circle's centre).
+	local function CastPointFor(unit)
+		local unitLoc = unit:GetLocation()
+		local dist = GetUnitToLocationDistance(bot, unitLoc)
+		if dist <= castRange then
+			return unitLoc, dist
+		end
+		local botLoc = bot:GetLocation()
+		return botLoc + (unitLoc - botLoc) * (castRange / dist), dist
+	end
+	local function Cast(why, unit)
+		local loc, dist = CastPointFor(unit)
+		bot._heavyBladeTriedAt = DotaTime()
+		print(
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s use item=item_heavy_blade why=%s target=%s loc=%.0f,%.0f dist=%.0f range=%.0f",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				why,
+				(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+				loc.x,
+				loc.y,
+				dist,
+				castRange
+			)
+		)
+		return BOT_ACTION_DESIRE_HIGH, loc, "ground", why
+	end
+	local reach = castRange + radius / 2
+	local fightAlly = nil
 	for i = 1, #GetTeamPlayers(GetTeam()) do
 		local ally = GetTeamMember(i)
-		if Fu.IsValidHero(ally) and Fu.IsInRange(bot, ally, castRange + 100) then
+		if Fu.IsValidHero(ally) and Fu.IsInRange(bot, ally, reach) then
+			if Dispel ~= nil and not Dispel.IsProtected(ally) then
+				local debuffs = Dispel.AnalyzeDebuffs(ally)
+				if debuffs.canBasicDispel and debuffs.score >= 4 then
+					return Cast("ally-debuff", ally)
+				end
+			end
 			if
-				(Fu.IsGoingOnSomeone(ally) or Fu.IsRetreating(ally))
+				fightAlly == nil
+				and (Fu.IsGoingOnSomeone(ally) or Fu.IsRetreating(ally))
 				and ally:WasRecentlyDamagedByAnyHero(2.0)
 				and Fu.GetHP(ally) < 0.85
 			then
-				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 300, true, BOT_MODE_NONE)
-				local enemyNearAlly = enemiesNearAlly[1]
-				if Fu.IsValidHero(enemyNearAlly) and Fu.CanCastOnMagicImmune(enemyNearAlly) then
-					hEffectTarget = ally
-					castReason = "行巫之祸驱散友军:" .. Fu.Chat.GetNormName(ally)
-					return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, radius, true, BOT_MODE_NONE)
+				if enemiesNearAlly ~= nil and Fu.IsValidHero(enemiesNearAlly[1]) then
+					fightAlly = ally
 				end
 			end
 		end
 	end
-	if Fu.IsGoingOnSomeone(bot) then
-		if
-			Fu.IsValidHero(botTarget)
-			and Fu.IsInRange(bot, botTarget, castRange)
-			and Fu.CanCastOnNonMagicImmune(botTarget)
-		then
-			if botTarget:WasRecentlyDamagedByAnyHero(3.0) and Fu.GetHP(botTarget) < 0.7 then
-				hEffectTarget = botTarget
-				castReason = "行巫之祸驱散敌军:" .. Fu.Chat.GetNormName(botTarget)
-				return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
-			end
-		end
+	if fightAlly ~= nil then
+		return Cast("ally-fight", fightAlly)
 	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_revenants_brooch"] = function(item)
-	local castRange = bot:GetAttackRange() + 100
-	local castType = "none"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, castRange) then
-			hEffectTarget = bot
-			castReason = "亡魂胸针进攻:" .. Fu.Chat.GetNormName(botTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+	if
+		Fu.IsGoingOnSomeone(bot)
+		and Fu.IsValidHero(botTarget)
+		and Fu.IsInRange(bot, botTarget, castRange)
+		and Fu.CanCastOnNonMagicImmune(botTarget)
+	then
+		if Dispel ~= nil and Dispel.HasStrippableBuff(botTarget) then
+			return Cast("enemy-buff", botTarget)
 		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-Usage.ConsiderItemDesire["item_wraith_pact"] = function(item)
-	local castRange = 200 + castRangeBonus
-	local castType = "ground"
-	local hEffectTarget = nil
-	local castReason = nil
-	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if Fu.IsGoingOnSomeone(bot) then
-		if
-			Fu.IsValidHero(botTarget)
-			and botTarget:GetAttackTarget() ~= nil
-			and Fu.IsInRange(bot, botTarget, 900)
-			and Fu.CanCastOnNonMagicImmune(botTarget)
-		then
-			hEffectTarget = Fu.GetFaceTowardDistanceLocation(bot, 200)
-			castReason = "怨灵之契进攻:" .. Fu.Chat.GetNormName(botTarget)
-			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+		if botTarget:WasRecentlyDamagedByAnyHero(3.0) and Fu.GetHP(botTarget) < 0.7 then
+			return Cast("enemy-low", botTarget)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
@@ -7699,20 +8011,6 @@ Usage.ConsiderItemDesire["item_light_collector"] = function(item)
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
-Usage.ConsiderItemDesire["item_iron_talon"] = function(item)
-	local castRange = 350
-	if Fu.IsFarming(bot) then
-		local neutralCreeps = bot:GetNearbyNeutralCreeps(castRange)
-		if #neutralCreeps <= 0 then
-			return 0
-		end
-		local healthiestCreep = Fu.GetMostHpUnit(neutralCreeps)
-		if Fu.CanBeAttacked(healthiestCreep) and Fu.GetHP(healthiestCreep) > 0.5 then
-			return BOT_ACTION_DESIRE_HIGH, healthiestCreep, "unit", nil
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
 Usage.ConsiderItemDesire["item_craggy_coat"] = function(item)
 	local radius = 1200
 	if Fu.IsInTeamFight(bot) then
@@ -8148,7 +8446,88 @@ Usage.ConsiderItemDesire["item_mana_draught"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	return Usage.ConsiderGiveManaDraught(item)
+end
+-- Mana Draught given to an allied hero (#116; numbers and thresholds in FuncLib/systems/neutral_rules.lua). The
+-- effect is lost when an enemy hero attacks the ally, so only an ally with no enemy hero near and not hit lately.
+-- Whether the engine takes a unit order for this optional-target item is not known: the next call after a give
+-- logs give-result (result=refused when the item is still ready well inside its 60 s cooldown).
+function Usage.ConsiderGiveManaDraught(item)
+	local NeutralRules = require(GetScriptDirectory() .. "/FuncLib/systems/neutral_rules")
+	local now = DotaTime()
+	local lastGive = bot._manaDraughtGive
+	if lastGive ~= nil then
+		bot._manaDraughtGive = nil
+		print(
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s give-result item=item_mana_draught target=%s result=%s after=%.0f",
+				now,
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				lastGive.target,
+				now - lastGive.at < 40 and "refused" or "took",
+				now - lastGive.at
+			)
+		)
+		if now - lastGive.at < 40 then
+			-- Refused: wait out a cooldown's worth before ordering it on an ally again.
+			bot._manaDraughtGiveBlockedUntil = now + 60
+		end
+	end
+	if now < (bot._manaDraughtGiveBlockedUntil or -999) then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local castRange = item:GetCastRange()
+	if castRange == nil or castRange <= 0 then
+		castRange = 650
+	end
+	local restore = NeutralRules.ManaDraughtRestore(
+		item:GetSpecialValueInt("mana_restore"),
+		item:GetSpecialValueInt("mana_restore_pct"),
+		bot:GetMaxMana()
+	)
+	if restore <= 0 then
+		restore = NeutralRules.ManaDraughtRestore(90, 3, bot:GetMaxMana())
+	end
+	local myMp = Fu.GetMP(bot)
+	local bestAlly, bestMp = nil, 1
+	for _, ally in pairs(Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE) or {}) do
+		if
+			ally ~= bot
+			and Fu.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and ally:GetMaxMana() > 0
+			and not ally:HasModifier("modifier_mana_draught_regeneration")
+			and not ally:WasRecentlyDamagedByAnyHero(3.0)
+		then
+			local allyMp = ally:GetMana() / ally:GetMaxMana()
+			local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 900, true, BOT_MODE_NONE)
+			if
+				allyMp < bestMp
+				and (enemiesNearAlly == nil or #enemiesNearAlly == 0)
+				and NeutralRules.ManaDraughtGiveWorth(myMp, allyMp, ally:GetMaxMana() - ally:GetMana(), restore)
+			then
+				bestAlly, bestMp = ally, allyMp
+			end
+		end
+	end
+	if bestAlly == nil then
+		return BOT_ACTION_DESIRE_NONE
+	end
+	local allyName = (string.gsub(bestAlly:GetUnitName(), "npc_dota_hero_", ""))
+	bot._manaDraughtGive = { at = now, target = allyName }
+	print(
+		string.format(
+			"[OHA-NEUTRAL] t=%.0f %s use item=item_mana_draught why=give target=%s allyMp=%.2f myMp=%.2f restore=%.0f dist=%.0f",
+			now,
+			(string.gsub(botName, "npc_dota_hero_", "")),
+			allyName,
+			bestMp,
+			myMp,
+			restore,
+			GetUnitToUnitDistance(bot, bestAlly)
+		)
+	)
+	return BOT_ACTION_DESIRE_HIGH, bestAlly, "unit", "give"
 end
 Usage.ConsiderItemDesire["item_polliwog_charm"] = function(item)
 	local castRange = 1000
@@ -8336,6 +8715,253 @@ Usage.ConsiderItemDesire["item_crippling_crossbow"] = function(item)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- 7.42 neutral items whose active had no use rule (#116): Red Ledger, Kobold Cup, Brick. Behaviour and numbers
+-- are from the 7.42 game files: scripts/npc/items.txt (AbilityBehavior, AbilityValues, cooldown, cast range) and
+-- resource/localization/abilities_english.txt (tooltips and notes).
+do
+	-- One attempt per item every few seconds. The neutral slot is ordered last in ConsiderItems, so a rule whose
+	-- order the engine refuses would otherwise replace every other item order on every think. In the log, two
+	-- "use" lines for one item closer together than its cooldown mean the order did not take.
+	local NEUTRAL_RETRY_GAP = 4
+	local lastAttemptAt = {}
+	local function AttemptedLately(itemName)
+		return DotaTime() < (lastAttemptAt[itemName] or -999) + NEUTRAL_RETRY_GAP
+	end
+	local function LogNeutralUse(itemName, why, target, detail)
+		lastAttemptAt[itemName] = DotaTime()
+		local targetName = "-"
+		if target ~= nil and target ~= bot and not target:IsNull() then
+			targetName = (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
+		end
+		print(
+			string.format(
+				"[OHA-NEUTRAL] t=%.0f %s use item=%s why=%s target=%s %s",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				itemName,
+				why,
+				targetName,
+				detail or ""
+			)
+		)
+	end
+
+	-- Red Ledger (tier 1), "Most Wanted": a list of hero bounties, each worth base_gold (50) plus
+	-- gold_per_level_difference (12) per level the target is above the holder; assists pay assist_gold_pct (75%).
+	-- The game makes a new list by itself once every bounty is collected (tooltip Note0); the active only
+	-- replaces the current list (Note1), cooldown 120 s. So it is pressed only on a list that pays nothing: no
+	-- change in the open bounties or in the gold counter for RED_LEDGER_STALE seconds, and no enemy hero near
+	-- (a listed hero may be about to die).
+	-- Game 050: the holder (Weaver) carried two modifier_item_red_ledger_bounty while no enemy held the item
+	-- (min_hit_list_size is 2), so the open bounties are read from the bot's own modifiers. If that reading is
+	-- wrong the count stays 0 and the list is simply replaced every RED_LEDGER_STALE seconds.
+	local RED_LEDGER_STALE = 240
+	local ledgerState = nil
+	local ledgerStateSince = 0
+	Usage.ConsiderItemDesire["item_red_ledger"] = function(item)
+		local openBounties = 0
+		local goldEarned = 0
+		for index = 0, bot:NumModifiers() - 1 do
+			local modifierName = bot:GetModifierName(index)
+			if modifierName == "modifier_item_red_ledger_bounty" then
+				openBounties = openBounties + 1
+			elseif modifierName == "modifier_item_red_ledger_gold" then
+				goldEarned = bot:GetModifierStackCount(index) or 0
+			end
+		end
+		local state = openBounties .. "/" .. goldEarned
+		if state ~= ledgerState then
+			ledgerState = state
+			ledgerStateSince = DotaTime()
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local idleTime = DotaTime() - ledgerStateSince
+		if
+			idleTime < RED_LEDGER_STALE
+			or #nearbyEnemies > 0
+			or Fu.IsRetreating(bot)
+			or AttemptedLately("item_red_ledger")
+		then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		ledgerStateSince = DotaTime()
+		LogNeutralUse(
+			"item_red_ledger",
+			"stale-list",
+			nil,
+			string.format("bounties=%d gold=%d idle=%.0f", openBounties, goldEarned, idleTime)
+		)
+		return BOT_ACTION_DESIRE_HIGH, bot, "none", "stale-list"
+	end
+
+	-- Kobold Cup (tier 1), "One for the Road": movespeed_pct (10%) movement speed for all allied units within
+	-- buff_radius (1000) for buff_duration (8 s); cooldown 40 s, 40 mana. Used to get away, to catch a target
+	-- that is out of attack range, or to help an ally beside the bot get away. Only the bot's own escape may
+	-- take the last mana. No "already buffed" check: the buff is modifier_item_kobold_cup, and whether the
+	-- holder carries a modifier of that name all the time is not known.
+	local KOBOLD_CUP_MANA_FLOOR = 0.2
+	Usage.ConsiderItemDesire["item_kobold_cup"] = function(item)
+		if AttemptedLately("item_kobold_cup") or bot:IsRooted() then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local buffRadius = item:GetSpecialValueInt("buff_radius")
+		if buffRadius <= 0 then
+			buffRadius = 1000
+		end
+		local hpRatio = Fu.GetHP(bot)
+		if Fu.IsRetreating(bot) and not Fu.IsRealInvisible(bot) and bot:DistanceFromFountain() > 600 then
+			for _, enemy in pairs(nearbyEnemies) do
+				if
+					Fu.IsValidHero(enemy)
+					and not Fu.IsSuspiciousIllusion(enemy)
+					and Fu.IsInRange(bot, enemy, 1200)
+					and (bot:WasRecentlyDamagedByHero(enemy, 3.0) or Fu.IsChasingTarget(enemy, bot))
+				then
+					LogNeutralUse(
+						"item_kobold_cup",
+						"retreat",
+						enemy,
+						string.format("hp=%.2f dist=%.0f", hpRatio, GetUnitToUnitDistance(bot, enemy))
+					)
+					return BOT_ACTION_DESIRE_HIGH, bot, "none", "retreat"
+				end
+			end
+		end
+		if bot:GetMana() - item:GetManaCost() < bot:GetMaxMana() * KOBOLD_CUP_MANA_FLOOR then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		if
+			(Fu.IsGoingOnSomeone(bot) or botMode == BOT_MODE_ATTACK)
+			and Fu.IsValidHero(botTarget)
+			and Fu.CanBeAttacked(botTarget)
+			and Fu.IsRunning(bot)
+			and Fu.IsInRange(bot, botTarget, 1600)
+			and not Fu.IsInRange(bot, botTarget, bot:GetAttackRange() + 100)
+			and bot:IsFacingLocation(botTarget:GetLocation(), 30)
+		then
+			LogNeutralUse(
+				"item_kobold_cup",
+				"chase",
+				botTarget,
+				string.format("hp=%.2f dist=%.0f", hpRatio, GetUnitToUnitDistance(bot, botTarget))
+			)
+			return BOT_ACTION_DESIRE_HIGH, bot, "none", "chase"
+		end
+		for _, ally in pairs(Fu.GetNearbyHeroes(bot, buffRadius, false, BOT_MODE_NONE) or {}) do
+			if
+				ally ~= bot
+				and Fu.IsValidHero(ally)
+				and not ally:IsIllusion()
+				and Fu.IsRetreating(ally)
+				and ally:WasRecentlyDamagedByAnyHero(3.0)
+				and not ally:IsRooted()
+				and not ally:IsStunned()
+			then
+				local enemiesNearAlly = Fu.GetNearbyHeroes(ally, 1000, true, BOT_MODE_NONE)
+				if enemiesNearAlly ~= nil and #enemiesNearAlly >= 1 then
+					LogNeutralUse(
+						"item_kobold_cup",
+						"ally-escape",
+						ally,
+						string.format("allyHp=%.2f allyDist=%.0f", Fu.GetHP(ally), GetUnitToUnitDistance(bot, ally))
+					)
+					return BOT_ACTION_DESIRE_HIGH, bot, "none", "ally-escape"
+				end
+			end
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+
+	-- Brick (tier 2): thrown at an enemy within AbilityCastRange (600): `damage` (150) physical damage, and it
+	-- removes `barrier_damage` (200) from any barrier on the target; cooldown 30 s, no mana, projectile speed
+	-- 1400. The item has no SpellImmunityType, so debuff-immune targets are skipped; the damage is physical, so
+	-- attack-immune (ethereal) targets are skipped too (Fu.CanBeAttacked). Only targets inside the real cast
+	-- range: an order that needs a walk first can be replaced before the throw, and the log line would lie.
+	-- botMode is the mode ConsiderItems promotes to attack when the bot fights during a push or a defence.
+	-- Barrier modifiers: the ones whose tooltip in abilities_english.txt (7.42) says they absorb a set amount of
+	-- damage. Percentage reductions, block chances and Refraction's instances are left out.
+	local BRICK_BARRIER_MODIFIERS = {
+		"modifier_abaddon_aphotic_shield",
+		"modifier_bloodseeker_blood_mist_barrier",
+		"modifier_crystal_maiden_crystal_nova_barrier",
+		"modifier_dazzle_nothl_boon_shield",
+		"modifier_furion_teleport_shield",
+		"modifier_legion_commander_overwhelming_odds_shield",
+		"modifier_lina_laguna_blade_barrier",
+		"modifier_marci_bodyguarded",
+		"modifier_obsidian_destroyer_equilibrium_barrier",
+		"modifier_oracle_diviners_deck_the_tower",
+		"modifier_pangolier_shield_crash_buff",
+		"modifier_skywrath_mage_shield_barrier",
+		"modifier_tinker_defense_matrix",
+		"modifier_void_spirit_resonant_pulse_physical_buff",
+		"modifier_item_ash_legion_shield",
+		"modifier_item_consecrated_wraps_auto_barrier",
+		"modifier_item_pavise_shield",
+		"modifier_item_pipe_barrier",
+		"modifier_rune_shield",
+	}
+	local function BarrierOn(unit)
+		for _, modifierName in ipairs(BRICK_BARRIER_MODIFIERS) do
+			if unit:HasModifier(modifierName) then
+				return modifierName
+			end
+		end
+		return nil
+	end
+	Usage.ConsiderItemDesire["item_brick"] = function(item)
+		if AttemptedLately("item_brick") then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		local castRange = item:GetCastRange()
+		if castRange == nil or castRange <= 0 then
+			castRange = 600
+		end
+		local damage = item:GetSpecialValueInt("damage")
+		local function CanBrick(enemy)
+			return Fu.IsValidHero(enemy)
+				and Fu.IsInRange(bot, enemy, castRange)
+				and Fu.CanBeAttacked(enemy)
+				and Fu.CanCastOnNonMagicImmune(enemy)
+				and Fu.CanCastOnTargetAdvanced(enemy)
+		end
+		for _, enemy in pairs(nearbyEnemies) do
+			if
+				CanBrick(enemy)
+				and BarrierOn(enemy) == nil
+				and Fu.CanKillTarget(enemy, damage, DAMAGE_TYPE_PHYSICAL)
+				and not enemy:HasModifier("modifier_abaddon_borrowed_time")
+				and not enemy:HasModifier("modifier_dazzle_shallow_grave")
+				and not enemy:HasModifier("modifier_oracle_false_promise_timer")
+			then
+				LogNeutralUse(
+					"item_brick",
+					"kill",
+					enemy,
+					string.format("hp=%d dist=%.0f", enemy:GetHealth(), GetUnitToUnitDistance(bot, enemy))
+				)
+				return BOT_ACTION_DESIRE_HIGH, enemy, "unit", "kill"
+			end
+		end
+		if (Fu.IsGoingOnSomeone(bot) or botMode == BOT_MODE_ATTACK) and CanBrick(botTarget) then
+			local barrierName = BarrierOn(botTarget)
+			local why = barrierName ~= nil and "barrier" or "fight"
+			LogNeutralUse(
+				"item_brick",
+				why,
+				botTarget,
+				string.format(
+					"hp=%d dist=%.0f barrier=%s",
+					botTarget:GetHealth(),
+					GetUnitToUnitDistance(bot, botTarget),
+					barrierName ~= nil and (string.gsub(barrierName, "^modifier_", "")) or "-"
+				)
+			)
+			return BOT_ACTION_DESIRE_HIGH, botTarget, "unit", why
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
 end
 Usage.ConsiderItemDesire["item_pyrrhic_cloak"] = function(item)
 	local castRange = Fu.GetProperCastRange(false, bot, item:GetCastRange())
@@ -8552,6 +9178,15 @@ function Usage.LogModeFlip()
 		local farmWhy = last ~= nil and last.mode == BOT_MODE_FARM and bot._farmExitReason or nil
 		hist[#hist + 1] =
 			{ t = now, mode = mode, des = bot:GetActiveModeDesire(), loc = bot:GetLocation(), farmWhy = farmWhy }
+		-- Which team roam rule won, before and after its cap (#165): team roam latches bot._roam* while another
+		-- mode runs. "(snipe,raw=1.50,cap=push)"; "(?)" when the latch is not the desire it won with.
+		if mode == BOT_MODE_TEAM_ROAM then
+			local okR, RoamStats = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/roam_stats")
+			if okR then
+				hist[#hist].roamNote =
+					RoamStats.FlipNote(bot._roamWhy, bot._roamRaw, bot._roamDes, bot._roamCap, hist[#hist].des)
+			end
+		end
 	end
 	while #hist > 0 and hist[1].t < now - 20 do
 		table.remove(hist, 1)
@@ -8568,6 +9203,7 @@ function Usage.LogModeFlip()
 	for _, entry in ipairs(hist) do
 		parts[#parts + 1] = string.format("%s:%.2f@%.0f", StuckModeName(entry.mode), entry.des or 0, entry.t)
 			.. (entry.farmWhy and ("(farm-left:" .. tostring(entry.farmWhy) .. ")") or "")
+			.. (entry.roamNote or "")
 	end
 	local loc = bot:GetLocation()
 	pcall(
@@ -9151,8 +9787,6 @@ function Usage.DumpBotApi()
 		"item_crimson_guard",
 		"item_harpoon",
 		"item_heavens_halberd",
-		"item_angels_demise",
-		"item_helm_of_the_overlord",
 	}) do
 		local okC, cost = pcall(GetItemCost, itemName)
 		local okP, parts = pcall(GetItemComponents, itemName)
@@ -9443,6 +10077,7 @@ function ItemUsageThink()
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.DumpHeroAbilities)
 	pcall(Usage.LogHomeWalk)
+	pcall(Usage.WatchDodgeResults)
 	PartEnd("watchers", tWatch)
 	local okQ, cleared = pcall(Usage.WatchStuckQueue)
 	if okQ and cleared then
@@ -9758,7 +10393,11 @@ function AbilityLevelUpThink()
 	if bot.lastLevelUpFrameProcessTime == nil then
 		bot.lastLevelUpFrameProcessTime = DotaTime()
 	end
-	if DotaTime() > 30 and DotaTime() - bot.lastLevelUpFrameProcessTime < 1 then
+	-- Once a second, except on the first call after a level-up: the [OHA-SKILL] level-up line should show the
+	-- points as the game left them.
+	local leveledUp = bot:GetLevel() ~= bot.ohaLevelAtThink
+	bot.ohaLevelAtThink = bot:GetLevel()
+	if DotaTime() > 30 and DotaTime() - bot.lastLevelUpFrameProcessTime < 1 and not leveledUp then
 		return
 	end
 	bot.lastLevelUpFrameProcessTime = DotaTime()
@@ -9810,5 +10449,32 @@ do
 	BuybackUsageThink = Perf.Wrap("BuybackUsageThink", BuybackUsageThink)
 	CourierUsageThink = Perf.Wrap("CourierUsageThink", CourierUsageThink)
 	AbilityLevelUpThink = Perf.Wrap("AbilityLevelUpThink", AbilityLevelUpThink)
+	-- detail= (#52, games 048-050): "items" is the biggest part of ItemUsageThink (57-60ms of 128-160ms per 10s
+	-- window) and 33-50ms is in no part at all. Time each item's use rule and the gates that run on every item
+	-- think before the item loop, so the next game names the costly ones. Timing only: the rules and gates are
+	-- called through these tables, with the same arguments and returns.
+	for itemName in pairs(Usage.ConsiderItemDesire) do
+		Perf.WrapDetailIn(Usage.ConsiderItemDesire, itemName, itemName)
+	end
+	for _, gateName in ipairs({
+		"WatchStuckQueue",
+		"RunePickupLock",
+		"EatForage",
+		"UseDustNow",
+		"WalkOutOfSnakes",
+		"DeflectTowerAggro",
+		"LogStuck",
+		"LogModeFlip",
+		"BannerFromBackpack",
+	}) do
+		Perf.WrapDetailIn(Usage, gateName, gateName)
+	end
+	Perf.WrapDetailIn(MatchTrace, "Tick", "MatchTrace.Tick")
+	Perf.WrapDetailIn(ChargeTracker, "Tick", "ChargeTracker.Tick")
+	Perf.WrapDetailIn(SpecialUnits, "TryKiteInAttack", "TryKiteInAttack")
+	Perf.WrapDetailIn(AbilityContext, "IsCornered", "IsCornered")
+	Perf.WrapDetailIn(Dispel, "ShouldMantaDodge", "Dispel.Manta")
+	Perf.WrapDetailIn(Dispel, "ShouldUseSelfDispelItem", "Dispel.Self")
+	Perf.WrapDetailIn(Dispel, "ShouldUseAllyDispelItem", "Dispel.Ally")
 end
 return Usage

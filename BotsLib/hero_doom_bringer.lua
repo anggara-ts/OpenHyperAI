@@ -28,54 +28,121 @@ else
 end
 local sUtility = "item_team_aura"
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 4,051 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_magic_stick",
-	"item_bottle",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
 	"item_magic_wand",
-	"item_helm_of_iron_will",
-	"item_boots",
 	"item_phase_boots",
-	"item_shivas_guard",
 	"item_blink",
-	"item_black_king_bar",
-	"item_octarine_core",
-	"item_travel_boots",
 	"item_aghanims_shard",
+	"item_black_king_bar",
+	"item_shivas_guard",
+	"item_ultimate_scepter",
 	"item_overwhelming_blink",
-	"item_refresher",
-	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
+	"item_refresher",
+	"item_ancient_janggo",
 	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 98,625 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_gauntlets",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_ancient_janggo",
+	"item_blink",
+	"item_black_king_bar",
+	sUtility,
+	"item_shivas_guard",
+	"item_ultimate_scepter",
+	"item_overwhelming_blink",
+	"item_ultimate_scepter_2",
+	"item_hand_of_midas",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 2,025 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_magic_stick",
-	"item_enchanted_mango",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
 	"item_magic_wand",
-	"item_helm_of_iron_will",
-	"item_boots",
 	"item_phase_boots",
-	"item_shivas_guard",
+	"item_radiance",
 	"item_blink",
-	"item_black_king_bar",
-	"item_octarine_core",
-	sUtility,
 	"item_aghanims_shard",
-	"item_overwhelming_blink",
+	"item_black_king_bar",
+	sUtility,
 	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_overwhelming_blink",
 	"item_ultimate_scepter_2",
+	"item_refresher",
 	"item_moon_shard",
 }
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 3,401 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_branches",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_blink",
+	"item_aghanims_shard",
+	"item_black_king_bar",
+	sUtility,
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_hand_of_midas",
+	"item_refresher",
+	"item_overwhelming_blink",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 1,580 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_branches",
+	"item_magic_stick",
+	"item_gauntlets",
+	"item_magic_wand",
+	"item_headdress",
+	"item_phase_boots",
+	"item_ancient_janggo",
+	"item_blink",
+	"item_aghanims_shard",
+	sUtility,
+	"item_ultimate_scepter",
+	"item_hand_of_midas",
+	"item_invis_sword",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
-X["sSellList"] = { "item_power_treads", "item_quelling_blade" }
+X["sSellList"] = {
+	"item_power_treads",
+	"item_quelling_blade",
+	-- Sold once the item before it is owned, to keep six slots (Util/item-builds/generate.js):
+	"item_ultimate_scepter",
+	"item_ancient_janggo",
+}
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
 	X["sBuyList"], X["sSellList"] = { "PvN_antimage" }, {}
 end

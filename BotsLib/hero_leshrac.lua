@@ -26,50 +26,114 @@ else
 end
 local sUtility = "item_team_aura"
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 26,088 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_mantle",
-	"item_circlet",
 	"item_faerie_fire",
-	"item_bottle",
-	"item_null_talisman",
 	"item_magic_wand",
+	"item_null_talisman",
 	"item_arcane_boots",
-	"item_cyclone",
-	"item_kaya_and_sange",
 	"item_blink",
-	"item_bloodstone",
-	"item_shivas_guard",
+	"item_kaya_and_sange",
+	"item_veil_of_discord",
 	"item_black_king_bar",
+	"item_bloodstone",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
-	"item_travel_boots",
-	"item_moon_shard",
-	"item_travel_boots_2",
 	"item_ultimate_scepter_2",
+	"item_overwhelming_blink",
+	"item_sheepstick",
+	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 3,495 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_enchanted_mango",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_mantle",
 	"item_null_talisman",
 	"item_magic_wand",
 	"item_arcane_boots",
 	"item_kaya",
-	"item_bloodstone",
 	"item_blink",
-	"item_black_king_bar",
-	sUtility,
 	"item_kaya_and_sange",
+	sUtility,
+	"item_black_king_bar",
+	"item_ultimate_scepter",
 	"item_aghanims_shard",
+	"item_ultimate_scepter_2",
+	"item_overwhelming_blink",
+	"item_consecrated_wraps",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 6,576 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
+	"item_mantle",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_bloodstone",
+	"item_black_king_bar",
 	"item_shivas_guard",
+	sUtility,
+	"item_ultimate_scepter",
+	"item_aghanims_shard",
+	"item_ultimate_scepter_2",
+	"item_yasha_and_kaya",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 3,563 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_blink",
+	"item_kaya",
+	"item_cyclone",
+	"item_aghanims_shard",
+	"item_kaya_and_sange",
+	sUtility,
+	"item_ultimate_scepter",
+	"item_travel_boots",
+	"item_ultimate_scepter_2",
+	"item_glimmer_cape",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 2,230 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_null_talisman",
+	"item_magic_wand",
+	"item_arcane_boots",
+	"item_blink",
+	"item_kaya",
+	"item_cyclone",
+	"item_kaya_and_sange",
+	"item_aghanims_shard",
+	sUtility,
+	"item_travel_boots",
+	"item_wind_waker",
+	"item_glimmer_cape",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+	"item_travel_boots_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then
@@ -721,19 +785,19 @@ function X.ConsiderNihilism()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local radius = nihilismAbility:GetSpecialValueInt("radius")
-	if Fu.IsWithoutTarget(bot) and Fu.GetAttackProjectileDamageByRange(bot, 1200) >= bot:GetHealth() then
-		return BOT_ACTION_DESIRE_HIGH
-	end
+	-- 7.42 (Valve patch notes): Nihilism no longer makes Leshrac ethereal. The old rule "cast when the
+	-- incoming attack projectiles would kill him" relied on that, so it is gone; the cast now disarms
+	-- enemies within the radius (4s) and dispels him, which the retreat and fight rules below use.
 	if isRetreating then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		if bot:WasRecentlyDamagedByAnyHero(2) and enemiesInRadius ~= nil and #enemiesInRadius >= 1 then
 			return BOT_ACTION_DESIRE_HIGH
 		end
 	end
-	-- Fights: Nihilism makes Leshrac and enemies within the radius ethereal (no attacks), slows them
-	-- and they take 30% more magic damage (Valve datafeed). It was only an escape. Now (1) in a
-	-- fight while heroes hit him below 60% HP, and (2) going on a target with no allied hero within
-	-- 1200, so no ally's right-clicks are lost to the ethereal enemies.
+	-- Fights: Nihilism disarms the enemies within the radius for 4s (7.42; it was an ethereal escape
+	-- before, which is why it once waited for "no ally nearby": ethereal enemies could not be hit by
+	-- allies either). A disarm does not block allies, so now (1) in a fight while heroes hit him below
+	-- 60% HP, and (2) going on a target within the radius, with or without allies near.
 	if isGoingOnSomeone or isInTeamFight then
 		local enemiesInRadius = Fu.GetEnemiesNearLoc(bot:GetLocation(), radius)
 		local enemiesHit = 0
@@ -747,12 +811,6 @@ function X.ConsiderNihilism()
 			end
 		end
 		if enemiesHit >= 1 then
-			local nearbyAllyCount = 0
-			for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}) do
-				if allyHero ~= bot and not Fu.IsSuspiciousIllusion(allyHero) then
-					nearbyAllyCount = nearbyAllyCount + 1
-				end
-			end
 			local castReason = nil
 			if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.6 then
 				castReason = "defend"
@@ -761,9 +819,8 @@ function X.ConsiderNihilism()
 				and Fu.IsValidHero(botTarget)
 				and Fu.IsInRange(bot, botTarget, radius)
 				and not botTarget:IsMagicImmune()
-				and nearbyAllyCount == 0
 			then
-				castReason = "solo"
+				castReason = "engage"
 			end
 			if castReason ~= nil then
 				if DotaTime() >= (bot._nihilLogAt or -999) then

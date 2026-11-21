@@ -47,107 +47,101 @@ else
 	nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList[3])
 end
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 44,310 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
-	"item_faerie_fire",
 	"item_double_branches",
+	"item_faerie_fire",
 	"item_circlet",
-	"item_mantle",
-	"item_null_talisman",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_maelstrom",
-	"item_orchid",
-	"item_black_king_bar",
 	"item_mjollnir",
-	"item_aghanims_shard",
 	"item_hurricane_pike",
-	"item_satanic",
-	"item_bloodthorn",
+	"item_black_king_bar",
 	"item_greater_crit",
+	"item_satanic",
+	"item_aghanims_shard",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 37,747 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
+	"item_circlet",
 	"item_faerie_fire",
-	"item_double_circlet",
-	"item_bottle",
-	"item_null_talisman",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_orchid",
+	"item_mjollnir",
+	"item_bloodthorn",
+	"item_black_king_bar",
+	"item_greater_crit",
+	"item_satanic",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+	"item_aghanims_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 10,707 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_faerie_fire",
+	"item_circlet",
 	"item_magic_wand",
 	"item_power_treads",
 	"item_maelstrom",
 	"item_orchid",
-	"item_black_king_bar",
 	"item_mjollnir",
-	"item_aghanims_shard",
-	"item_hurricane_pike",
-	"item_satanic",
+	"item_invis_sword",
 	"item_bloodthorn",
-	"item_greater_crit",
-	"item_moon_shard",
-	"item_ultimate_scepter_2",
-}
-sRoleItemsBuyList["pos_3"] = {
-	"item_blight_stone",
-	"item_tango",
-	"item_faerie_fire",
-	"item_double_branches",
-	"item_magic_wand",
-	"item_power_treads",
-	"item_maelstrom",
-	"item_rod_of_atos",
 	"item_black_king_bar",
-	"item_mjollnir",
-	"item_aghanims_shard",
-	"item_assault",
-	"item_hurricane_pike",
-	"item_sheepstick",
+	"item_satanic",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
+	"item_aghanims_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 46,006 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
-	"item_double_circlet",
-	"item_tranquil_boots",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
 	"item_magic_wand",
-	"item_urn_of_shadows",
-	"item_solar_crest",
-	"item_aghanims_shard",
-	"item_ancient_janggo",
-	"item_spirit_vessel",
-	"item_boots_of_bearing",
-	"item_ultimate_scepter",
+	"item_power_treads",
+	"item_oblivion_staff",
+	"item_maelstrom",
 	"item_orchid",
-	"item_heavens_halberd",
+	"item_ultimate_scepter",
 	"item_bloodthorn",
+	"item_black_king_bar",
 	"item_ultimate_scepter_2",
-	"item_sheepstick",
+	"item_greater_crit",
+	"item_hurricane_pike",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
 -- One pair of boots in this build (user rule; Util/boots-check.js).
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 21,238 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
 	"item_tango",
-	"item_double_branches",
 	"item_blood_grenade",
-	"item_double_circlet",
-	"item_tranquil_boots",
+	"item_double_branches",
+	"item_circlet",
+	"item_faerie_fire",
 	"item_magic_wand",
-	"item_urn_of_shadows",
-	"item_solar_crest",
-	"item_aghanims_shard",
-	"item_mekansm",
-	"item_spirit_vessel",
-	"item_boots_of_bearing",
-	"item_ultimate_scepter",
+	"item_power_treads",
+	"item_oblivion_staff",
+	"item_maelstrom",
 	"item_orchid",
-	"item_heavens_halberd",
+	"item_ultimate_scepter",
 	"item_bloodthorn",
+	"item_black_king_bar",
 	"item_ultimate_scepter_2",
-	"item_sheepstick",
+	"item_greater_crit",
+	"item_hurricane_pike",
+	"item_aghanims_shard",
 	"item_moon_shard",
 }
 X["sBuyList"] = sRoleItemsBuyList[sRole]
@@ -170,13 +164,12 @@ X["bDeafaultItem"] = false
 function X.MinionThink(minionUnit)
 	Minion.MinionThink(minionUnit)
 end
-local sproutAbility, teleportationAbility, naturesCallAbility, curseOfTheOldGrowthAbility, wrathOfNatureAbility
+local sproutAbility, teleportationAbility, naturesCallAbility, wrathOfNatureAbility
 local function refreshAbilities()
 	sproutAbility = SafeAbility(bot:GetAbilityByName("furion_sprout"), "furion_sprout", "furion")
 	teleportationAbility = SafeAbility(bot:GetAbilityByName("furion_teleportation"), "furion_teleportation", "furion")
 	naturesCallAbility = SafeAbility(bot:GetAbilityByName("furion_force_of_nature"), "furion_force_of_nature", "furion")
-	curseOfTheOldGrowthAbility =
-		SafeAbility(bot:GetAbilityByName("furion_curse_of_the_forest"), "furion_curse_of_the_forest", "furion")
+	-- Curse of the Oldgrowth is a passive, breakable debuff since 7.42 (Valve patch notes): nothing to cast.
 	wrathOfNatureAbility =
 		SafeAbility(bot:GetAbilityByName("furion_wrath_of_nature"), "furion_wrath_of_nature", "furion")
 end
@@ -245,12 +238,6 @@ function X.SkillsComplement()
 	if naturesCallDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(naturesCallAbility, GetTreeLocation(naturesCallTree))
-		return
-	end
-	local curseDesire = X.ConsiderCurseOfTheOldGrowth()
-	if curseDesire > 0 then
-		Fu.SetQueuePtToINT(bot, false)
-		bot:ActionQueue_UseAbility(curseOfTheOldGrowthAbility)
 		return
 	end
 	local wrathOfNatureDesire, wrathOfNatureTarget = X.ConsiderWrathOfNature()
@@ -585,17 +572,6 @@ function X.ConsiderWrathOfNature()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
-end
-function X.ConsiderCurseOfTheOldGrowth()
-	if not Fu.CanCastAbility(curseOfTheOldGrowthAbility) then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local curseRange = curseOfTheOldGrowthAbility:GetSpecialValueInt("range")
-	local enemiesInRange = Fu.GetEnemiesNearLoc(bot:GetLocation(), curseRange)
-	if (isInTeamFight or isGoingOnSomeone) and #enemiesInRange >= 2 then
-		return BOT_ACTION_DESIRE_HIGH
-	end
-	return BOT_ACTION_DESIRE_NONE
 end
 function X.CanDoSproutCall()
 	return Fu.CanCastAbility(sproutAbility) and Fu.CanCastAbility(naturesCallAbility) and Fu.GetMP(bot) > 0.5

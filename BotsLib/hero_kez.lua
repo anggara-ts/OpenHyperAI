@@ -14,43 +14,69 @@ local tAllAbilityBuildList = { { 1, 3, 1, 2, 3, 6, 3, 3, 1, 1, 6, 2, 2, 2, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 42,095 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
+	"item_tango",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_tango",
-	"item_wraith_band",
+	"item_faerie_fire",
+	"item_magic_stick",
 	"item_magic_wand",
 	"item_power_treads",
-	"item_desolator",
 	"item_mage_slayer",
-	"item_black_king_bar",
-	"item_lesser_crit",
-	"item_greater_crit",
+	"item_desolator",
 	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_greater_crit",
+	"item_ultimate_scepter_2",
+	"item_swift_blink",
+	"item_travel_boots",
 	"item_aghanims_shard",
 	"item_moon_shard",
-	"item_ultimate_scepter_2",
 	"item_travel_boots_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 25,255 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
+	"item_faerie_fire",
 	"item_quelling_blade",
-	"item_magic_wand",
+	"item_circlet",
 	"item_wraith_band",
+	"item_magic_wand",
 	"item_power_treads",
-	"item_desolator",
 	"item_mage_slayer",
+	"item_desolator",
+	"item_ultimate_scepter",
 	"item_black_king_bar",
 	"item_greater_crit",
-	"item_ultimate_scepter",
+	"item_ultimate_scepter_2",
+	"item_travel_boots",
+	"item_manta",
 	"item_aghanims_shard",
-	"item_monkey_king_bar",
 	"item_moon_shard",
 	"item_travel_boots_2",
-	"item_ultimate_scepter_2",
 }
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 2,937 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_wraith_band",
+	"item_magic_wand",
+	"item_power_treads",
+	"item_mage_slayer",
+	"item_desolator",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_ultimate_scepter_2",
+	"item_manta",
+	"item_monkey_king_bar",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
 -- One pair of boots in this build (user rule; Util/boots-check.js).
 sRoleItemsBuyList["pos_4"] = {
 	"item_tango",
@@ -197,8 +223,67 @@ function X.CheckEchoResult()
 		)
 	)
 end
+-- Did the interrupt stop the channel (#27)? The game files don't say: the impale "prevents moving or turning" for
+-- impale_duration (a stun only with the Shard, from behind) and Talon Toss silences; neither is a plain stun.
+-- Once the spell has gone off (its cooldown runs) and had time to land, one line says whether the target is
+-- still channelling or teleporting. Given up 3s after the order.
+function X.NoteInterrupt(how, ability, target)
+	local pending = bot._kezInterrupt
+	if pending ~= nil and pending.target == target and pending.how == how then
+		return
+	end
+	bot._kezInterrupt = {
+		how = how,
+		ability = ability,
+		target = target,
+		at = DotaTime(),
+		teleporting = target:HasModifier("modifier_teleporting"),
+	}
+end
+function X.CheckInterruptResult()
+	local pending = bot._kezInterrupt
+	if pending == nil then
+		return
+	end
+	local cast = pending.ability ~= nil
+		and not pending.ability:IsNull()
+		and pending.ability:GetCooldownTimeRemaining() > 0
+	if cast and pending.castAt == nil then
+		pending.castAt = DotaTime()
+	end
+	-- Talon Toss flies at 2000 over at most 950 (game files): 0.7s covers it and the impale's attack.
+	local landed = pending.castAt ~= nil and DotaTime() >= pending.castAt + 0.7
+	if not landed and DotaTime() < pending.at + 3 then
+		return
+	end
+	bot._kezInterrupt = nil
+	local target = pending.target
+	local alive = target ~= nil and not target:IsNull() and target:IsAlive()
+	local seen = alive and target:CanBeSeen()
+	pcall(
+		print,
+		string.format(
+			"[OHA-KEZ] t=%.0f interrupt-result how=%s target=%s was=%s cast=%s after=%.1f alive=%s seen=%s"
+				.. " channelling=%s teleporting=%s silenced=%s rooted=%s stunned=%s",
+			DotaTime(),
+			pending.how,
+			alive and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "gone",
+			pending.teleporting and "tp" or "spell",
+			tostring(pending.castAt ~= nil),
+			DotaTime() - pending.at,
+			tostring(alive),
+			tostring(seen),
+			tostring(seen and target:IsChanneling()),
+			tostring(seen and target:HasModifier("modifier_teleporting")),
+			tostring(seen and target:IsSilenced()),
+			tostring(seen and target:IsRooted()),
+			tostring(seen and target:IsStunned())
+		)
+	)
+end
 function X.SkillsComplement()
 	X.CheckCastResult()
+	pcall(X.CheckInterruptResult)
 	pcall(X.CheckEchoResult)
 	isGoingOnSomeone = Fu.IsGoingOnSomeone(bot)
 	isRetreating = Fu.IsRetreating(bot)
@@ -345,7 +430,9 @@ function X.ConsiderEchoSlash()
 	local travelDistance = echoSlashAbility:GetSpecialValueInt("travel_distance")
 	local katanaRadius = echoSlashAbility:GetSpecialValueInt("katana_radius")
 	local echoDamagePct = echoSlashAbility:GetSpecialValueInt("katana_echo_damage") / 100
-	local echoHeroDamage = echoSlashAbility:GetSpecialValueInt("echo_hero_damage")
+	-- 7.42 (Valve datafeed): each echo strike is katana_echo_damage% of attack damage plus echo_base_damage
+	-- (40/70/100/130). The old +20/40/60/80 against heroes (echo_hero_damage) is gone.
+	local echoBaseDamage = echoSlashAbility:GetSpecialValueInt("echo_base_damage")
 	local echoDamage = bot:GetAttackDamage() * echoDamagePct
 	local strikes = echoSlashAbility:GetSpecialValueInt("katana_strikes")
 	local manaAfter = Fu.GetManaAfter(echoSlashAbility:GetManaCost())
@@ -356,7 +443,7 @@ function X.ConsiderEchoSlash()
 			and bot:IsFacingLocation(enemyHero:GetLocation(), 15)
 			and Fu.CanBeAttacked(enemyHero)
 			and not Fu.IsSuspiciousIllusion(enemyHero)
-			and Fu.CanKillTarget(enemyHero, (echoDamage + echoHeroDamage) * strikes, DAMAGE_TYPE_PHYSICAL)
+			and Fu.CanKillTarget(enemyHero, (echoDamage + echoBaseDamage) * strikes, DAMAGE_TYPE_PHYSICAL)
 			and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 			and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 			and not enemyHero:HasModifier("modifier_necrolyte_reapers_scythe")
@@ -604,11 +691,12 @@ function X.ConsiderRaptorDance()
 	end
 	for _, enemyHero in pairs(nearbyEnemies) do
 		if Fu.IsValidHero(enemyHero) and Fu.IsInRange(bot, enemyHero, radius) and Fu.CanBeAttacked(enemyHero) then
-			-- Each strike is base_damage + max_health_damage_pct of max HP, both pure (game KV); no attack
-			-- damage. Adding Kez's attack damage per strike over-counted and cast Raptor Dance on survivors.
+			-- Each strike is base_damage + max_health_damage_pct of max HP, no attack damage added. Since 7.42
+			-- the strikes are fixed-damage attacks and the damage type is physical (Valve datafeed, patch
+			-- notes), so armor reduces them.
 			local totalDamage = (baseDamage + maxHealthDamagePct / 100 * enemyHero:GetMaxHealth()) * strikes
 			if
-				Fu.CanKillTarget(enemyHero, totalDamage, DAMAGE_TYPE_PURE)
+				Fu.CanKillTarget(enemyHero, totalDamage, DAMAGE_TYPE_PHYSICAL)
 				and not enemyHero:HasModifier("modifier_abaddon_borrowed_time")
 				and not enemyHero:HasModifier("modifier_dazzle_shallow_grave")
 				and not enemyHero:HasModifier("modifier_oracle_false_promise_timer")
@@ -745,6 +833,7 @@ function X.ConsiderKazuraiKatana()
 		then
 			if enemyHero:IsChanneling() then
 				X.LogKez("interrupt how=impale target=" .. enemyHero:GetUnitName())
+				X.NoteInterrupt("impale", kazuraiKatanaAbility, enemyHero)
 				return BOT_ACTION_DESIRE_HIGH, enemyHero
 			end
 			-- The Katana bleed is a debuff on the enemy (datafeed: "applies stacking damage over time to
@@ -916,6 +1005,7 @@ function X.ConsiderTalonToss()
 			and not enemyHero:HasModifier("modifier_teleporting")
 		then
 			X.LogKez("toss-channel target=" .. enemyHero:GetUnitName())
+			X.NoteInterrupt("toss", talonTossAbility, enemyHero)
 			return BOT_ACTION_DESIRE_HIGH, enemyHero
 		end
 	end

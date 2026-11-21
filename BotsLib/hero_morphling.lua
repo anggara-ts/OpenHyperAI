@@ -12,8 +12,9 @@ local tTalentTreeList = {
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 	{ ["t25"] = { 0, 10 }, ["t20"] = { 10, 0 }, ["t15"] = { 0, 10 }, ["t10"] = { 0, 10 } },
 }
+-- Replicate at entries 6/11/15 (hero levels 6/12/18, the first levels the game allows).
 local tAllAbilityBuildList =
-	{ { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 2, 6, 4, 2, 6 } }
+	{ { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 6, 2, 4, 2, 6 }, { 4, 2, 1, 1, 1, 6, 1, 4, 4, 2, 6, 2, 4, 2, 6 } }
 local nAbilityBuildList
 local nTalentBuildList
 if sRole == "pos_2" then
@@ -25,11 +26,10 @@ else
 end
 local sRoleItemsBuyList = {}
 -- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 59,094 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_magic_stick",
-	"item_circlet",
 	"item_magic_wand",
 	"item_power_treads",
 	"item_vladmir",
@@ -37,32 +37,31 @@ sRoleItemsBuyList["pos_1"] = {
 	"item_butterfly",
 	"item_black_king_bar",
 	"item_aghanims_shard",
-	"item_greater_crit",
-	"item_skadi",
+	"item_satanic",
+	"item_travel_boots",
 	"item_moon_shard",
-	"item_hydras_breath",
 	"item_ultimate_scepter_2",
 }
 -- Hydra's Breath (user call; Dotabuff 30% of matches): +30 agility, 30% of attacks also hit 3 more enemies in a cone.
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 4,740 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
 	"item_double_branches",
-	"item_magic_stick",
 	"item_circlet",
-	"item_bottle",
+	"item_magic_stick",
+	"item_wraith_band",
 	"item_magic_wand",
 	"item_power_treads",
 	"item_vladmir",
 	"item_manta",
 	"item_butterfly",
-	"item_black_king_bar",
+	"item_skadi",
 	"item_aghanims_shard",
-	"item_greater_crit",
-	"item_hydras_breath",
-	"item_moon_shard",
 	"item_satanic",
+	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3 has 641 matches, built from pos 1 (59,094) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_1"]
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_1"]

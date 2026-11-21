@@ -21,7 +21,7 @@ end
 -- and GetSpecialValueInt("AbilityCharges") next to the tracked count.
 local ChargeTracker = {}
 
--- From Valve's datafeed (2026-11-15). base: charges; shard/scepter: charges with it; talent:
+-- From Valve's datafeed (patch 7.42, 2026-11-19). base: charges; shard/scepter: charges with it; talent:
 -- extra charges once that talent is learned; restore/restoreShard: seconds per charge by level.
 local DATA = {
 	bloodseeker_rupture = { base = 0, scepter = 2 },
@@ -29,7 +29,7 @@ local DATA = {
 	broodmother_sticky_snare = { base = 2, restore = { 30 } },
 	clinkz_death_pact = { base = { 1, 1, 2, 2 }, restore = { 40 } },
 	dark_seer_ion_shell = { base = 0, talent = { "special_bonus_unique_dark_seer_14", 2 } },
-	death_prophet_spirit_siphon = { base = { 1, 2, 3, 4 }, restore = { 40 } },
+	death_prophet_spirit_siphon = { base = { 1, 2, 3, 4 }, restore = { 35 } },
 	disruptor_glimpse = { base = 0, talent = { "special_bonus_unique_disruptor_4", 2 } },
 	doom_bringer_devour = { base = 0, shard = 2, restoreShard = { 66 } },
 	earth_spirit_stone_caller = { base = 7, restore = { 18 } },
@@ -48,7 +48,7 @@ local DATA = {
 	keeper_of_the_light_radiant_bind = { base = 0, shard = 2, restoreShard = { 14 } },
 	kunkka_tidebringer = { base = 0, talent = { "special_bonus_unique_kunkka_tidebringer_charges", 2 } },
 	largo_catchy_lick = { base = 0, talent = { "special_bonus_unique_largo_8", 2 } },
-	lich_death_charge = { base = 2, restore = { 120 }, startEmpty = true },
+	lich_death_charge = { base = 3, restore = { 120 }, startEmpty = true },
 	lich_frost_shield = { base = 0, talent = { "special_bonus_unique_lich_4", 2 }, restore = { 30, 25, 20, 15 } },
 	mirana_celestial_quiver = { base = 2, restore = { 7 } },
 	mirana_leap = { base = 2, restore = { 45, 35, 25, 15 } },
@@ -75,7 +75,7 @@ local DATA = {
 		restore = { 21, 19, 17, 15 },
 	},
 	sniper_shrapnel = { base = 3, restore = { 35 } },
-	techies_land_mines = { base = 3, restore = { 15 } },
+	techies_land_mines = { base = 3, talent = { "special_bonus_unique_techies_6", 1 }, restore = { 14, 13, 12 } },
 	tiny_toss = { base = 0, talent = { "special_bonus_unique_tiny_2", 2 } },
 	treant_eyes_in_the_forest = { base = 2, restore = { 135 } },
 	ursa_earthshock = { base = 0, talent = { "special_bonus_unique_ursa_3", 2 }, restore = { 15, 13, 11, 9 } },

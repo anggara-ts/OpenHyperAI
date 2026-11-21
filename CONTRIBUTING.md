@@ -24,8 +24,8 @@ the VS Code extension **StyLua** (JohnnyMorganz.stylua) formats on save with the
 ### 1. Get the code
 
 ```bash
-git clone git@github.com:anggara-ts/OpenHyperAI-too.git
-cd OpenHyperAI-too
+git clone git@github.com:anggara-ts/Supercharged-OpenHyperAI.git
+cd Supercharged-OpenHyperAI
 ```
 
 Contributors without write access fork the repo on GitHub, clone their fork, and open PRs from it.
@@ -62,15 +62,15 @@ Dota loads bot scripts from `dota 2 beta/game/dota/scripts/vscripts/bots`. Make 
 
 - **Windows** (Command Prompt):
   ```bat
-  mklink /J "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\path\to\OpenHyperAI-too"
+  mklink /J "C:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\dota\scripts\vscripts\bots" "C:\path\to\Supercharged-OpenHyperAI"
   ```
 - **macOS:**
   ```bash
-  ln -s ~/path/to/OpenHyperAI-too "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+  ln -s ~/path/to/Supercharged-OpenHyperAI "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
   ```
 - **Linux:**
   ```bash
-  ln -s ~/path/to/OpenHyperAI-too "$HOME/.local/share/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+  ln -s ~/path/to/Supercharged-OpenHyperAI "$HOME/.local/share/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
   ```
 
 Settings come from `vscripts/game/Customize/general.lua` when that file exists (the Workshop installer creates it), otherwise from the repo's `Customize/general.lua`. While developing, rename `vscripts/game/Customize`, so your edits to the repo copy take effect.

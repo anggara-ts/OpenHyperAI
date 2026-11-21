@@ -42,63 +42,93 @@ else
 end
 local sUtility = "item_team_aura"
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 15,972 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
+	"item_double_gauntlets",
 	"item_double_branches",
 	"item_quelling_blade",
-	"item_gauntlets",
-	"item_circlet",
-	"item_magic_wand",
 	"item_bracer",
-	"item_phase_boots",
+	"item_magic_wand",
 	"item_soul_ring",
-	"item_echo_sabre",
-	"item_aghanims_shard",
-	"item_consecrated_wraps",
+	"item_phase_boots",
 	"item_harpoon",
 	"item_blink",
-	sUtility,
-	"item_black_king_bar",
-	"item_shivas_guard",
-	"item_assault",
-	"item_overwhelming_blink",
-	"item_moon_shard",
-	"item_ultimate_scepter_2",
-}
-sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_3"]
-sRoleItemsBuyList["pos_4"] = {
-	-- Arcane Boots (priest outfit) into Guardian Greaves, plus Holy Locket, instead of a second pair of
-	-- boots (Tranquil -> Boots of Bearing): Arcane 47%, Greaves 46%, Locket 22% of his matches (Dotabuff,
-	-- last patch); Tranquil and Bearing are not in his top 25.
-	"item_priest_outfit",
-	"item_holy_locket",
-	"item_solar_crest",
-	"item_glimmer_cape",
-	"item_blink",
-	"item_guardian_greaves",
 	"item_aghanims_shard",
-	"item_consecrated_wraps",
-	"item_sheepstick",
+	sUtility,
 	"item_ultimate_scepter",
+	"item_ultimate_scepter_2",
 	"item_shivas_guard",
+	"item_overwhelming_blink",
+	"item_assault",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 616 matches, built from pos 3 (15,972) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_1"] = sRoleItemsBuyList["pos_3"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 1,541 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_gauntlets",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_soul_ring",
+	"item_phase_boots",
+	"item_harpoon",
+	"item_blink",
+	"item_aghanims_shard",
+	"item_black_king_bar",
+	sUtility,
+	"item_ultimate_scepter_2",
+	"item_overwhelming_blink",
+	"item_shivas_guard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 9,071 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_ring_of_basilius",
+	"item_arcane_boots",
+	"item_headdress",
+	"item_mekansm",
+	"item_aghanims_shard",
+	"item_guardian_greaves",
+	"item_ultimate_scepter",
+	"item_lotus_orb",
+	"item_glimmer_cape",
+	"item_echo_sabre",
+	"item_aether_lens",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 12,166 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_5"] = {
-	"item_blood_grenade",
-	-- Arcane Boots (crystal_maiden_outfit) into Guardian Greaves and a Blink Dagger instead of Tranquil ->
+	-- Arcane Boots into Guardian Greaves and a Blink Dagger instead of Tranquil ->
 	-- Boots of Bearing (Drum): Arcane 47%, Greaves 46%, Blink 55% of his matches (Dotabuff, last patch).
-	"item_crystal_maiden_outfit",
-	"item_glimmer_cape",
-	"item_blink",
-	"item_consecrated_wraps",
+	"item_tango",
+	"item_blood_grenade",
+	"item_magic_stick",
+	"item_double_branches",
+	"item_enchanted_mango",
+	"item_magic_wand",
+	"item_ring_of_basilius",
+	"item_arcane_boots",
+	"item_headdress",
+	"item_mekansm",
+	"item_aghanims_shard",
 	"item_guardian_greaves",
-	"item_pipe",
 	"item_ultimate_scepter",
-	"item_cyclone",
-	"item_shivas_guard",
-	"item_sheepstick",
+	"item_pipe",
+	"item_glimmer_cape",
+	"item_lotus_orb",
+	"item_aether_lens",
 	"item_moon_shard",
 	"item_ultimate_scepter_2",
 }

@@ -12,66 +12,115 @@ local tAllAbilityBuildList = { { 3, 1, 2, 3, 3, 6, 3, 2, 2, 2, 6, 1, 1, 1, 6 } }
 local nAbilityBuildList = Fu.Skill.GetRandomBuild(tAllAbilityBuildList)
 local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 38,080 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_4"] = {
-	"item_double_tango",
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
 	"item_faerie_fire",
-	"item_wind_lace",
-	"item_magic_wand",
-	"item_arcane_boots",
-	"item_blink",
-	"item_guardian_greaves",
-	"item_cyclone",
-	"item_ultimate_scepter",
-	"item_aghanims_shard",
-	"item_black_king_bar",
-	"item_lotus_orb",
-	"item_gungir",
-	"item_wind_waker",
-	"item_overwhelming_blink",
-	"item_ultimate_scepter_2",
-	"item_moon_shard",
-}
-sRoleItemsBuyList["pos_5"] = {
-	"item_double_tango",
-	"item_faerie_fire",
-	"item_wind_lace",
 	"item_magic_wand",
 	"item_tranquil_boots",
 	"item_blink",
-	"item_boots_of_bearing",
-	"item_pipe",
+	"item_cyclone",
 	"item_ultimate_scepter",
-	"item_aghanims_shard",
-	"item_pavise",
-	"item_solar_crest",
-	"item_heavens_halberd",
 	"item_lotus_orb",
-	"item_gungir",
-	"item_overwhelming_blink",
-	"item_ultimate_scepter_2",
+	"item_black_king_bar",
+	"item_wind_waker",
+	"item_aghanims_shard",
 	"item_moon_shard",
+	"item_ultimate_scepter_2",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5, 33,051 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_tranquil_boots",
+	"item_blink",
+	"item_cyclone",
+	"item_ultimate_scepter",
+	"item_lotus_orb",
+	"item_force_staff",
+	"item_wind_waker",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_ultimate_scepter_2",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1 has 756 matches, built from pos 3 (11,455) (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
-	"item_tank_outfit",
-	"item_echo_sabre",
-	"item_ring_of_health",
-	"item_vanguard",
-	"item_crimson_guard",
 	-- No Aghanim's Scepter on the core: its Walrus Kick often knocked a ganked enemy away
 	-- to safety. Blink to land the snowball/punch, BKB to stay in the fight.
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
 	"item_blink",
+	"item_desolator",
 	"item_black_king_bar",
-	"item_heavens_halberd",
-	"item_assault",
 	"item_travel_boots",
+	"item_echo_sabre",
+	"item_silver_edge",
+	"item_overwhelming_blink",
+	"item_harpoon",
 	"item_aghanims_shard",
-	"item_satanic",
 	"item_moon_shard",
-	"item_heart",
 	"item_travel_boots_2",
 }
-sRoleItemsBuyList["pos_2"] = sRoleItemsBuyList["pos_1"]
-sRoleItemsBuyList["pos_3"] = sRoleItemsBuyList["pos_1"]
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 7,047 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_2"] = {
+	-- No Aghanim's Scepter on the core: its Walrus Kick often knocked a ganked enemy away
+	-- to safety. Blink to land the snowball/punch, BKB to stay in the fight.
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_faerie_fire",
+	"item_gauntlets",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_blink",
+	"item_desolator",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_echo_sabre",
+	"item_ultimate_scepter_2",
+	"item_assault",
+	"item_overwhelming_blink",
+	"item_harpoon",
+	"item_aghanims_shard",
+	"item_moon_shard",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 11,455 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	-- No Aghanim's Scepter on the core: its Walrus Kick often knocked a ganked enemy away
+	-- to safety. Blink to land the snowball/punch, BKB to stay in the fight.
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_gauntlets",
+	"item_circlet",
+	"item_bracer",
+	"item_magic_wand",
+	"item_phase_boots",
+	"item_blink",
+	"item_desolator",
+	"item_black_king_bar",
+	"item_travel_boots",
+	"item_echo_sabre",
+	"item_silver_edge",
+	"item_overwhelming_blink",
+	"item_harpoon",
+	"item_aghanims_shard",
+	"item_moon_shard",
+	"item_travel_boots_2",
+}
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = { "item_black_king_bar", "item_quelling_blade" }
 if Fu.Role.IsPvNMode() or Fu.Role.IsAllShadow() then

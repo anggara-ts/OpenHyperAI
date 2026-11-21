@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local NukerRules = require(GetScriptDirectory() .. "/FuncLib/systems/nuker_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -222,6 +223,21 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnEntity(lagunaBladeAbility, lagunaBladeTarget)
 		return
 	end
+	-- After Laguna's own kill check, before the single-spell rules: the solo combo picks which of the three goes next.
+	local comboStep, comboAim = X.ConsiderSoloCombo()
+	if comboStep == "lsa" then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(lightStrikeArrayAbility, comboAim)
+		return
+	elseif comboStep == "slave" then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnLocation(dragonSlaveAbility, comboAim)
+		return
+	elseif comboStep == "laguna" then
+		Fu.SetQueuePtToINT(bot, true)
+		bot:ActionQueue_UseAbilityOnEntity(lagunaBladeAbility, comboAim)
+		return
+	end
 	dragonSlaveDesire, dragonSlaveLocation = X.ConsiderQ()
 	if dragonSlaveDesire > 0 then
 		Fu.SetQueuePtToINT(bot, true)
@@ -264,7 +280,14 @@ function X.ConsiderQ()
 		castLocation = heroAoe.targetloc
 		return BOT_ACTION_DESIRE_HIGH, castLocation, "Q消耗"
 	end
-	if Fu.IsLaning(bot) and mpRatio > 0.3 and not Fu.IsRetreating(bot) then
+	-- Lane harass keeps the mana for Light Strike Array + Laguna Blade (X.ComboReserve), so the harass never costs
+	-- the kill combo; it fired at 30% mana with no reserve.
+	if
+		Fu.IsLaning(bot)
+		and mpRatio > 0.3
+		and not Fu.IsRetreating(bot)
+		and NukerRules.CanSpend(bot:GetMana(), manaCost, X.ComboReserve())
+	then
 		local nearestEnemy = nil
 		local nearestDistance = 99999
 		for _, enemyHero in pairs(enemyHeroes) do
@@ -281,7 +304,11 @@ function X.ConsiderQ()
 			if creepAoe.count >= 2 and GetUnitToLocationDistance(nearestEnemy, creepAoe.targetloc) < radius + 100 then
 				return BOT_ACTION_DESIRE_HIGH, creepAoe.targetloc, "Q补刀+消耗" .. Fu.Chat.GetNormName(nearestEnemy)
 			end
-			if Fu.GetHP(nearestEnemy) < 0.7 then
+			-- Harass a hero only when it pushes them out of the lane (NukerRules.HarassPushesOut: 60% HP or less after
+			-- the hit, where the retreat mode sends a bot home); it went at any hero under 70% HP.
+			local slaveDamage = damage * X.SpellMultiplier(nearestEnemy)
+			if NukerRules.HarassPushesOut(nearestEnemy:GetHealth(), nearestEnemy:GetMaxHealth(), slaveDamage) then
+				X.LogCombo("slave", "harass", nearestEnemy, "no", slaveDamage)
 				castLocation = nearestEnemy:GetExtrapolatedLocation(castPoint)
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q对线消耗" .. Fu.Chat.GetNormName(nearestEnemy)
 			end
@@ -380,25 +407,138 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), ""
 		end
 	end
-	if
-		(#nearbyEnemies > 0 or bot:WasRecentlyDamagedByAnyHero(3.0))
-		and (bot:GetActiveMode() ~= BOT_MODE_RETREAT or #nearbyAllies >= 2)
-		and #enemyHeroes >= 1
-		and botLevel >= 15
-		and false
-	then
-		for _, enemyHero in pairs(enemyHeroes) do
-			if
-				Fu.IsValid(enemyHero)
-				and Fu.CanCastOnNonMagicImmune(enemyHero)
-				and Fu.IsInRange(bot, enemyHero, castRange - 200)
-			then
-				castLocation = enemyHero:GetLocation()
-				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q通用"
+	return BOT_ACTION_DESIRE_NONE
+end
+-- Mana kept for Light Strike Array + Laguna Blade (datafeed hero_id 25: LSA 100/110/120/130, Laguna 150/300/450 with
+-- a 70/60/50s cooldown): LSA once learned, Laguna while learned and ready within NukerRules.ULT_SOON seconds.
+function X.ComboReserve()
+	local reserve = NukerRules.UltReserve(
+		lagunaBladeAbility:IsTrained(),
+		lagunaBladeAbility:GetManaCost(),
+		lagunaBladeAbility:GetCooldownTimeRemaining(),
+		false
+	)
+	if lightStrikeArrayAbility:IsTrained() then
+		reserve = reserve + lightStrikeArrayAbility:GetManaCost()
+	end
+	return reserve
+end
+-- Her magical damage on this target per point of spell damage: her spell amp, the target's magic resistance.
+function X.SpellMultiplier(target)
+	return (1 + bot:GetSpellAmp()) * math.max(0.05, 1 - target:GetMagicResist())
+end
+function X.LogCombo(step, why, target, disabled, damage)
+	bot._linaComboLogAt = bot._linaComboLogAt or {}
+	if DotaTime() < (bot._linaComboLogAt[step] or -999) then
+		return
+	end
+	bot._linaComboLogAt[step] = DotaTime() + 2
+	pcall(
+		print,
+		string.format(
+			"[OHA-LINA] t=%.0f lina combo step=%s why=%s target=%s disabled=%s mp=%.2f hp=%d dmg=%d",
+			DotaTime(),
+			step,
+			why,
+			target:GetUnitName(),
+			disabled,
+			mpRatio,
+			target:GetHealth(),
+			damage
+		)
+	)
+end
+-- Solo pressure (#47, replaces the level-15 "and false" Dragon Slave branch). The maintainer, 2026-11-21: Lina "can
+-- solo enemy hero by spamming her ultimate, preferably when enemy is disabled (stunned) so lina can nuke them and enemy
+-- do not run away after being ultimated". On one enemy hero (her target, else the weakest in Dragon Slave's range),
+-- not while retreating, with at most 2 enemy heroes near and at most one more than her side: Light Strike Array -> Dragon Slave -> Laguna Blade, when
+-- the target is held (stunned, rooted, hexed by anyone, or her own LSA is on its way) or her LSA opens the combo, and the
+-- spells she can afford deal NukerRules.NEARLY_KILL of its HP (NukerRules.LinaComboStep). Returns the step and where.
+function X.ConsiderSoloCombo()
+	if Fu.IsRetreating(bot) then
+		return nil
+	end
+	local lsaRange = lightStrikeArrayAbility:GetCastRange() + aetherRange
+	local slaveRange = dragonSlaveAbility:GetCastRange() + aetherRange
+	local lagunaRange = lagunaBladeAbility:GetCastRange() + aetherRange
+	local target = nil
+	if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, slaveRange - 80) then
+		target = botTarget
+	else
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, slaveRange - 80, true, BOT_MODE_NONE)) do
+			if Fu.IsValidHero(enemyHero) and (target == nil or enemyHero:GetHealth() < target:GetHealth()) then
+				target = enemyHero
 			end
 		end
 	end
-	return BOT_ACTION_DESIRE_NONE
+	if
+		target == nil
+		or not Fu.CanCastOnNonMagicImmune(target)
+		or Fu.IsSuspiciousIllusion(target)
+		or Fu.IsHaveAegis(target)
+	then
+		return nil
+	end
+	local enemiesNear = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
+	local alliesNear = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+	-- Solo pressure only: with 3+ enemy heroes near, the team-fight rules (Light Strike Array and Dragon Slave on 2+
+	-- heroes, Laguna on the weakest) choose the casts.
+	if #enemiesNear > 2 or #enemiesNear > #alliesNear + 1 then
+		return nil
+	end
+	-- Her LSA lands 0.45s cast point + 0.5s delay after the order (datafeed): the target counts as held for 1.5s.
+	local lsaPending = bot._linaLsaTarget == target and DotaTime() - (bot._linaLsaAt or -999) < 1.5
+	local disabledNow = Fu.IsDisabled(target)
+	local disabled = disabledNow and "now" or lsaPending and "lsa" or "no"
+	local multiplier = X.SpellMultiplier(target)
+	local lsaDamage = (lightStrikeArrayAbility:GetSpecialValueInt("light_strike_array_damage") + lsaBonusDamage)
+		* multiplier
+	local slaveDamage = dragonSlaveAbility:GetSpecialValueInt("dragon_slave_damage") * multiplier
+	local lagunaDamage = lagunaBladeAbility:GetSpecialValueInt("damage") * multiplier
+	local step, why = NukerRules.LinaComboStep({
+		disabled = disabledNow or lsaPending,
+		hp = target:GetHealth(),
+		mana = bot:GetMana(),
+		lsaReady = lightStrikeArrayAbility:IsFullyCastable(),
+		lsaInRange = Fu.IsInRange(bot, target, lsaRange - 30),
+		lsaCost = lightStrikeArrayAbility:GetManaCost(),
+		lsaDamage = lsaDamage,
+		slaveReady = dragonSlaveAbility:IsFullyCastable(),
+		slaveInRange = true,
+		slaveCost = dragonSlaveAbility:GetManaCost(),
+		slaveDamage = slaveDamage,
+		lagunaReady = lagunaBladeAbility:IsFullyCastable() and X.CanCastAbilityROnTarget(target),
+		lagunaInRange = Fu.IsInRange(bot, target, lagunaRange),
+		lagunaCost = lagunaBladeAbility:GetManaCost(),
+		lagunaDamage = lagunaDamage,
+	})
+	if step == "lsa" then
+		local radius = lightStrikeArrayAbility:GetSpecialValueInt("light_strike_array_aoe")
+		local location = disabledNow and target:GetLocation()
+			or Fu.GetDelayCastLocation(
+				bot,
+				target,
+				lsaRange,
+				radius,
+				lightStrikeArrayAbility:GetCastPoint() + 0.5 + 0.3
+			)
+		if location == nil then
+			return nil
+		end
+		bot._linaLsaTarget = target
+		bot._linaLsaAt = DotaTime()
+		X.LogCombo(step, why, target, disabled, lsaDamage)
+		return step, location
+	elseif step == "slave" then
+		local location = disabledNow and target:GetLocation()
+			or target:GetExtrapolatedLocation(dragonSlaveAbility:GetCastPoint())
+		X.LogCombo(step, why, target, disabled, slaveDamage)
+		return step, location
+	elseif step == "laguna" then
+		X.LogCombo(step, why, target, disabled, lagunaDamage)
+		return step, target
+	end
+	return nil
 end
 function X.ConsiderW()
 	if not lightStrikeArrayAbility:IsFullyCastable() then

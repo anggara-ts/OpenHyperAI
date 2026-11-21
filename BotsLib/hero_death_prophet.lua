@@ -6,6 +6,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local NukerRules = require(GetScriptDirectory() .. "/FuncLib/systems/nuker_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -198,6 +199,59 @@ function X.SkillsComplement()
 		return
 	end
 end
+-- Mana kept for Exorcism (datafeed hero_id 43: 200/300/400 mana, cooldown 145/135/125s) while it is learned, ready
+-- within NukerRules.ULT_SOON seconds and not already running, so a fight swarm never leaves her unable to cast it.
+function X.ExorcismReserve()
+	return NukerRules.UltReserve(
+		exorcismAbility:IsTrained(),
+		exorcismAbility:GetManaCost(),
+		exorcismAbility:GetCooldownTimeRemaining(),
+		bot:HasModifier("modifier_death_prophet_exorcism")
+	)
+end
+-- Spam (harass, creeps) keeps Exorcism's mana and one Silence (datafeed: 80/90/100/110) for the fight that follows.
+function X.SpamReserve()
+	local reserve = X.ExorcismReserve()
+	if silenceAbility:IsTrained() then
+		reserve = reserve + silenceAbility:GetManaCost()
+	end
+	return reserve
+end
+-- Spare mana for a spam swarm (NukerRules.SpareMana): her regen pays the cost back within the cooldown, or she is at
+-- full mana. Datafeed hero_id 43: Crypt Swarm 80/90/100/110 mana, cooldown 10/9/8/7s; base mana regen 1.7/s, so early
+-- on only full mana counts, and regen items (and levels) open the spam.
+function X.SwarmSpare(manaCost)
+	return NukerRules.SpareMana(
+		bot:GetMana(),
+		bot:GetMaxMana(),
+		manaCost,
+		cryptSwarmAbility:GetCooldown(),
+		bot:GetManaRegen(),
+		X.SpamReserve()
+	)
+end
+function X.LogSwarm(why, target, count, reserve)
+	if DotaTime() < (bot._dpSwarmLogAt or -999) then
+		return
+	end
+	bot._dpSwarmLogAt = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-DP] t=%.0f death_prophet swarm why=%s target=%s n=%d mp=%.2f regen=%.1f reserve=%d",
+			DotaTime(),
+			why,
+			target,
+			count,
+			mpRatio,
+			bot:GetManaRegen(),
+			reserve
+		)
+	)
+end
+-- Crypt Swarm (#47). The maintainer, 2026-11-21: "my bad, i thought crypt swarm is the ultimate. okay death prophet
+-- can spam crypt swarm to enemy hero and lane creep to push when the mana regen is enough". So: kills on any hero,
+-- 2+ heroes and fights with Exorcism's mana kept, and harass on one hero or a creep wave whenever the mana is spare.
 function X.ConsiderQ()
 	if not cryptSwarmAbility:IsFullyCastable() then
 		return 0
@@ -209,28 +263,35 @@ function X.ConsiderQ()
 	-- datafeed: Crypt Swarm has no AbilityDamage, its damage is the special value "damage" (100/175/250/325);
 	-- GetAbilityDamage() gave 0, so the kill check never fired and the last-hit AoE had no HP cap.
 	local damage = cryptSwarmAbility:GetSpecialValueInt("damage")
-	local damageType = DAMAGE_TYPE_MAGICAL
+	-- datafeed hero_id 43: start_radius 110, end_radius 300, range 900, speed 1100, slow_movement_pct 0.
 	local radius = cryptSwarmAbility:GetSpecialValueInt("end_radius")
 	local enemiesInRange = Fu.GetNearbyHeroes(bot, castRange - 50, true, BOT_MODE_NONE)
 	local castLocation = nil
+	-- A kill: no mana kept.
 	for _, enemyHero in pairs(enemiesInRange) do
 		if
 			Fu.IsValidHero(enemyHero)
 			and Fu.CanCastOnNonMagicImmune(enemyHero)
 			and Fu.WillMagicKillTarget(bot, enemyHero, damage, castPoint)
 		then
+			X.LogSwarm("kill", enemyHero:GetUnitName(), 1, 0)
 			castLocation = enemyHero:GetLocation()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
 	end
+	-- Fights: keep Exorcism's mana. Before, a fight swarm could take the mana Exorcism needed a moment later.
+	local fightReserve = X.ExorcismReserve()
+	local fightSpend = NukerRules.CanSpend(bot:GetMana(), manaCost, fightReserve)
 	local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius + 50, 0, 0)
-	if aoeLocation.count >= 3 and bot:GetActiveMode() ~= BOT_MODE_RETREAT then
+	if fightSpend and aoeLocation.count >= 3 and bot:GetActiveMode() ~= BOT_MODE_RETREAT then
+		X.LogSwarm("teamfight", "heroes", aoeLocation.count, fightReserve)
 		castLocation = aoeLocation.targetloc
 		return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-Aoe:" .. aoeLocation.count
 	end
-	if Fu.IsLaning(bot) then
+	if Fu.IsLaning(bot) and fightSpend then
 		local heroAoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange - 80, radius, 2)
 		if heroAoeLocation ~= nil and mpRatio > 0.58 then
+			X.LogSwarm("teamfight", "lane-heroes", 2, fightReserve)
 			castLocation = heroAoeLocation
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q对线消耗"
 		end
@@ -238,19 +299,21 @@ function X.ConsiderQ()
 			local creepAoeLocation =
 				bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius + 50, 0, damage)
 			if creepAoeLocation.count >= 3 then
+				X.LogSwarm("push", "lane-creeps", creepAoeLocation.count, fightReserve)
 				castLocation = creepAoeLocation.targetloc
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q对线补刀" .. creepAoeLocation.count
 			end
 		end
 	end
-	if Fu.IsInTeamFight(bot, 1200) then
+	if Fu.IsInTeamFight(bot, 1200) and fightSpend then
 		local heroAoeLocation = Fu.GetAoeEnemyHeroLocation(bot, castRange, radius, 2)
 		if heroAoeLocation ~= nil then
+			X.LogSwarm("teamfight", "heroes", 2, fightReserve)
 			castLocation = heroAoeLocation
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q团战"
 		end
 	end
-	if Fu.IsGoingOnSomeone(bot) then
+	if Fu.IsGoingOnSomeone(bot) and fightSpend then
 		if
 			Fu.IsValidHero(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
@@ -259,6 +322,7 @@ function X.ConsiderQ()
 			if abilityLevel >= 2 or mpRatio > 0.68 or Fu.GetHP(botTarget) < 0.38 then
 				castLocation = botTarget:GetExtrapolatedLocation(castPoint)
 				if Fu.IsInLocRange(bot, castLocation, castRange) then
+					X.LogSwarm("attack", botTarget:GetUnitName(), 1, fightReserve)
 					return BOT_ACTION_DESIRE_HIGH, castLocation, "Q打架" .. Fu.Chat.GetNormName(botTarget)
 				end
 			end
@@ -274,6 +338,30 @@ function X.ConsiderQ()
 			then
 				castLocation = enemyHero:GetLocation()
 				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q撤退:" .. Fu.Chat.GetNormName(enemyHero)
+			end
+		end
+	end
+	-- Spam on one enemy hero (replaces the level-15 "and false" branch, which had no mana guard): any hero in range,
+	-- not while retreating, when the mana is spare (X.SwarmSpare keeps Exorcism + Silence).
+	local spare = X.SwarmSpare(manaCost)
+	if spare and not Fu.IsRetreating(bot) then
+		local harassTarget = nil
+		for _, enemyHero in pairs(enemiesInRange) do
+			if
+				Fu.IsValidHero(enemyHero)
+				and Fu.CanCastOnNonMagicImmune(enemyHero)
+				and not Fu.IsSuspiciousIllusion(enemyHero)
+				and Fu.IsInRange(bot, enemyHero, castRange - 80)
+				and (harassTarget == nil or enemyHero:GetHealth() < harassTarget:GetHealth())
+			then
+				harassTarget = enemyHero
+			end
+		end
+		if harassTarget ~= nil then
+			castLocation = harassTarget:GetExtrapolatedLocation(castPoint)
+			if Fu.IsInLocRange(bot, castLocation, castRange) then
+				X.LogSwarm("harass", harassTarget:GetUnitName(), 1, X.SpamReserve())
+				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q消耗" .. Fu.Chat.GetNormName(harassTarget)
 			end
 		end
 	end
@@ -293,29 +381,45 @@ function X.ConsiderQ()
 			end
 		end
 	end
+	-- Creep waves while laning, pushing, defending or farming a lane: with spare mana (X.SwarmSpare) any time, or with
+	-- the old spam rule (39% mana left) after 8:00 with no enemy hero near. By a tower (an enemy one while pushing,
+	-- ours while defending) the 8:00 and no-hero gates are dropped: that wave is what holds the tower. The swarm does
+	-- not hit buildings, so it is the creeps it clears.
+	local pushing = Fu.IsPushing(bot)
+	local defending = Fu.IsDefending(bot)
 	if
-		(Fu.IsPushing(bot) or Fu.IsDefending(bot) or Fu.IsFarming(bot))
-		and Fu.IsAllowedToSpam(bot, manaCost * 0.32)
+		(pushing or defending or Fu.IsFarming(bot) or Fu.IsLaning(bot))
+		and not Fu.IsRetreating(bot)
 		and abilityLevel >= 2
-		and DotaTime() > 8 * 60
 		and #nearbyAllies <= 3
-		and #nearbyEnemies == 0
 	then
-		local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 400, true)
-		if
-			#laneCreeps >= 3
-			and Fu.IsValid(laneCreeps[1])
-			and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
-		then
-			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, damage)
-			if creepAoeLocation.count >= 2 and #nearbyAllies == 1 then
-				castLocation = creepAoeLocation.targetloc
-				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线1" .. creepAoeLocation.count
-			end
-			local wideAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius + 50, 0, 0)
-			if wideAoeLocation.count >= 3 and #laneCreeps >= 4 then
-				castLocation = wideAoeLocation.targetloc
-				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线2" .. wideAoeLocation.count
+		local nearTower = pushing and #bot:GetNearbyTowers(1200, true) > 0
+			or defending and #bot:GetNearbyTowers(1200, false) > 0
+		local oldSpam = Fu.IsAllowedToSpam(bot, manaCost * 0.32)
+			and NukerRules.CanSpend(bot:GetMana(), manaCost, fightReserve)
+			and (DotaTime() > 8 * 60 and #nearbyEnemies == 0 or nearTower)
+		if spare or oldSpam then
+			local laneCreeps = bot:GetNearbyLaneCreeps(castRange + 400, true)
+			if
+				#laneCreeps >= 3
+				and Fu.IsValid(laneCreeps[1])
+				and not laneCreeps[1]:HasModifier("modifier_fountain_glyph")
+			then
+				local what = nearTower and "tower-wave" or spare and "spare-wave" or "wave"
+				local creepAoeLocation =
+					bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, damage)
+				if creepAoeLocation.count >= 2 and #nearbyAllies == 1 then
+					X.LogSwarm("push", what, creepAoeLocation.count, fightReserve)
+					castLocation = creepAoeLocation.targetloc
+					return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线1" .. creepAoeLocation.count
+				end
+				local wideAoeLocation =
+					bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius + 50, 0, 0)
+				if wideAoeLocation.count >= 3 and #laneCreeps >= 4 then
+					X.LogSwarm("push", what, wideAoeLocation.count, fightReserve)
+					castLocation = wideAoeLocation.targetloc
+					return BOT_ACTION_DESIRE_HIGH, castLocation, "Q带线2" .. wideAoeLocation.count
+				end
 			end
 		end
 	end
@@ -332,24 +436,6 @@ function X.ConsiderQ()
 	if Fu.IsDoingTormentor(bot) then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(botTarget, bot, castRange) and Fu.IsAttacking(bot) then
 			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
-		end
-	end
-	if
-		(#nearbyEnemies > 0 or bot:WasRecentlyDamagedByAnyHero(3.0))
-		and (bot:GetActiveMode() ~= BOT_MODE_RETREAT or #nearbyAllies >= 2)
-		and #enemiesInRange >= 1
-		and botLevel >= 15
-		and false
-	then
-		for _, enemyHero in pairs(enemiesInRange) do
-			if
-				Fu.IsValid(enemyHero)
-				and Fu.CanCastOnNonMagicImmune(enemyHero)
-				and Fu.IsInRange(bot, enemyHero, castRange - 200)
-			then
-				castLocation = enemyHero:GetLocation()
-				return BOT_ACTION_DESIRE_HIGH, castLocation, "Q通用"
-			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE

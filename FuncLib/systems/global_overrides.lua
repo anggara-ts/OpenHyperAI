@@ -1057,5 +1057,32 @@ function CDOTA_Bot_Script:GetMaxMana()
 	end
 	return originalGetMaxMana(self)
 end
+-- A team says the same chat text at most once per 30s (FuncLib/systems/chat_guard.lua, issue #56).
+local ChatGuard = require(GetScriptDirectory() .. "/FuncLib/systems/chat_guard")
+if ChatGuard.originalChat == nil and CDOTA_Bot_Script.ActionImmediate_Chat ~= nil then
+	ChatGuard.originalChat = CDOTA_Bot_Script.ActionImmediate_Chat
+	ChatGuard.said = {}
+	function CDOTA_Bot_Script:ActionImmediate_Chat(text, allChat)
+		local key = tostring(self:GetTeam()) .. (allChat and "a:" or "t:") .. tostring(text)
+		local allowed, since = ChatGuard.Allow(ChatGuard.said, key, DotaTime())
+		if not allowed then
+			if DotaTime() >= (self._chatDropLogAt or -999) then
+				self._chatDropLogAt = DotaTime() + 5
+				pcall(
+					print,
+					string.format(
+						"[OHA-CHAT] t=%.0f %s drop-repeat since=%.0f text=%s",
+						DotaTime(),
+						(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+						since or -1,
+						tostring(text)
+					)
+				)
+			end
+			return
+		end
+		return ChatGuard.originalChat(self, text, allChat)
+	end
+end
 local GlobalOverrides = { orig_GetTeamPlayers = originalGetTeamPlayers, GetTeamPlayers = GetTeamPlayers }
 return GlobalOverrides

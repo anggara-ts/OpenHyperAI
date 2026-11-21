@@ -93,11 +93,6 @@ local function ClearEngageTarget()
 	bot:SetTarget(nil)
 end
 local function adjustDesire(desire)
-	-- #185: the Tombstone priority (close, nearly dead, or allies in its radius) stays above attack mode (0.95); the
-	-- laning cap (0.72) and the push cap (0.5) would put it under again (game 065: `special-unit,raw=0.95,cap=lane`).
-	if hasSpecialUnitTarget and bot._tombstonePriority then
-		return desire
-	end
 	if Fu.IsPushing(bot) then
 		if desire > 0.6 then
 			return 0.5
@@ -109,6 +104,18 @@ local function adjustDesire(desire)
 		end
 	end
 	return desire
+end
+-- #185: the Tombstone priority (close, nearly dead, or allies in its radius) stays above attack mode (0.95); the
+-- laning cap (0.72) and the push cap (0.5) would put it under again (game 065: `special-unit,raw=0.95,cap=lane`).
+-- A wrapper, so the caps above stay as they are (#165 rewrites them).
+do
+	local cappedDesire = adjustDesire
+	adjustDesire = function(desire)
+		if hasSpecialUnitTarget and bot._tombstonePriority then
+			return desire
+		end
+		return cappedDesire(desire)
+	end
 end
 -- Diagnostics (#165, mode flip-flops): the rule that set this think's desire. Assigned before each return of
 -- GetDesire / GetDesireHelper; read only by RoamTrace, never by a decision.

@@ -10,14 +10,15 @@ local HuntTrace = {}
 
 -- target(bot): the hunt's target as the hero script knows it, or nil (an escape cast: no trace).
 local SPECS = {
-	-- Skeleton Walk (clinkz_wind_walk). Main's hero_clinkz.lua keeps no target of its own: its engage cast is for
-	-- the bot's target 1600+ away; open PR #97 adds bot._huntTarget. Read both, nil-safe.
+	-- Skeleton Walk (clinkz_wind_walk): hero_clinkz.lua locks its hunt target in bot._huntTarget (#94). Only that:
+	-- game 064, the bot's own target as a fallback counted walks to heroes 5800-8650 away (t=669, 1247: no hunt
+	-- start, roam <-> farm 16 times) as hunts.
 	npc_dota_hero_clinkz = {
 		modifier = "modifier_clinkz_wind_walk",
 		spell = "skeleton_walk",
 		noRetreat = true,
 		target = function(bot)
-			return bot._huntTarget or bot:GetTarget() or bot:GetAttackTarget()
+			return bot._huntTarget
 		end,
 	},
 	-- Vendetta: hero_nyx_assassin.lua sets bot.canVendettaKill / bot.vendettaTarget for its kill and engage casts.

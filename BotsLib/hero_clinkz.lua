@@ -244,6 +244,44 @@ end
 function X.HasPactCharge()
 	return (pactState.n or 1) >= 1 and deathPactAbility:IsFullyCastable()
 end
+-- Pure: may a non-escape pact (why = heal | other | hunt) spend a charge? Game 064: heal pacts at 82-86% HP (t=2195,
+-- 2431, 2597) used the charges, and at 15% HP (t=2624-2631) the escape pact had none (death-pact-skip
+-- why=no-charge). The last charge is kept for an escape or a heal when HP is low: under 50% anything may use it, a
+-- heal under 60% (the heal rule's own line); the damage/HP pact on the last charge only while the spell has one
+-- charge at most (levels 1-2, datafeed: AbilityCharges 1/1/2/2), where it is the spell's main use.
+function X.PactSpendOk(why, charges, maxCharges, hp)
+	if charges >= 2 or hp < 0.5 then
+		return true
+	end
+	if why == "heal" then
+		return hp < 0.6
+	end
+	return maxCharges <= 1
+end
+-- The game's view of the rule above; logs a held-back pact at most every 10 s.
+function X.CanSpendPact(why)
+	local level = deathPactAbility:GetLevel()
+	local maxCharges = PACT_CHARGES[math.max(1, math.min(level, #PACT_CHARGES))]
+	local charges = pactState.n or maxCharges
+	if X.PactSpendOk(why, charges, maxCharges, Fu.GetHP(bot)) then
+		return true
+	end
+	if DotaTime() >= (bot._pactKeepLogAt or -999) then
+		bot._pactKeepLogAt = DotaTime() + 10
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f death-pact-keep why=%s hp=%.2f charges=%d max=%d",
+				DotaTime(),
+				why,
+				Fu.GetHP(bot),
+				charges,
+				maxCharges
+			)
+		)
+	end
+	return false
+end
 -- The reveal of an invisible hunt, measured 2.5 s later: did the target lose HP (hunt result=).
 local huntReveal = nil
 local function CheckHuntResult()
@@ -293,6 +331,9 @@ function X.SkillsComplement()
 		return
 	end
 	local okH, hunted = pcall(X.HuntStep)
+	-- The outpost hold's heartbeat (mode_outpost_generic.lua): it holds while Skeleton Walk is up, the hunt has a
+	-- target and this step ran in the last 1.5 s. A think skipped above (silence, hex, a cast) lets it lapse.
+	bot._huntBeatAt = okH and hunted and bot._huntTarget ~= nil and DotaTime() or nil
 	if okH and hunted then
 		return
 	end
@@ -429,7 +470,7 @@ function X.EndHunt(why, keepTarget)
 				"[OHA-CLINKZ] t=%.0f hunt end why=%s target=%s dist=%d lasted=%.0f",
 				DotaTime(),
 				why,
-				known and (string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")) or "-",
+				not prey:IsNull() and (string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")) or "-",
 				known and GetUnitToUnitDistance(bot, prey) or -1,
 				DotaTime() - (bot._huntLockAt or DotaTime())
 			)
@@ -451,11 +492,35 @@ function X.HuntTarget()
 		and GetUnitToUnitDistance(bot, locked) < (bot._huntRange or 1600)
 		and Fu.GetHP(bot) >= 0.35
 	then
+		bot._huntGoneAt = nil
 		return locked
 	end
+	-- Alive but out of reach for a moment (Phase Shift, a blink out of vision): wait for it, up to 2.5 s, with the
+	-- lock and the hold kept. Game 064, t=2596-2603: Puck in Phase Shift dropped the hunt twice (drop-target-gone), it
+	-- restarted every think and the mode flipped attack <-> outpost 6 times; the reveal on her came 2 s later anyway.
+	if
+		locked ~= nil
+		and not locked:IsNull()
+		and locked:IsAlive()
+		and not Fu.IsValidHero(locked)
+		and DotaTime() - (bot._huntLockAt or -999) < (bot._huntLockFor or 6)
+		and Fu.GetHP(bot) >= 0.35
+	then
+		bot._huntGoneAt = bot._huntGoneAt or DotaTime()
+		if DotaTime() - bot._huntGoneAt < 2.5 then
+			return locked, true
+		end
+	end
+	local goneFor = bot._huntGoneAt ~= nil and DotaTime() - bot._huntGoneAt or 0
+	bot._huntGoneAt = nil
 	if locked ~= nil then
 		local why = "timeout"
-		if not Fu.IsValidHero(locked) then
+		if locked:IsNull() or not locked:IsAlive() then
+			why = "target-gone"
+		elseif goneFor >= 2.5 then
+			-- Waited 2.5 s for it (above): IsValidHero is false while unseen or invulnerable.
+			why = not locked:CanBeSeen() and "lost-sight" or "target-gone"
+		elseif not Fu.IsValidHero(locked) then
 			why = "target-gone"
 		elseif not locked:CanBeSeen() then
 			why = "lost-sight"
@@ -467,8 +532,14 @@ function X.HuntTarget()
 		if bot._huntPrey ~= nil then
 			X.EndHunt(why)
 		else
-			-- A hunt on the engage target (no hunt start line): say why the hold ends.
-			X.LogHunt("drop-" .. why, Fu.IsValidHero(locked) and locked or nil)
+			-- A hunt on the engage target (no hunt start line): say why the hold ends. The locked target's name too
+			-- (game 064: drop lines printed target=-, so a re-hunt on the same hero could not be told apart).
+			X.LogHunt("drop-" .. why, not locked:IsNull() and locked or nil)
+		end
+		-- Really gone (dead, or unseen for 2.5 s): no new hunt for 2.5 s. Game 064: a target-gone end set no pause,
+		-- the next think picked a target again and the hold came back on (attack <-> outpost every ~0.5 s).
+		if why == "target-gone" or why == "lost-sight" then
+			bot._huntOffUntil = math.max(bot._huntOffUntil or -999, DotaTime() + 2.5)
 		end
 	end
 	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
@@ -501,7 +572,7 @@ function X.HuntTarget()
 		end
 	end
 	if best ~= nil then
-		bot._huntTarget = best
+		bot._huntTarget, bot._huntGoneAt = best, nil
 		bot._huntLockAt = DotaTime()
 		-- Keep the target for the walk (game 063, t=925: picked at 1837, the 1600 lock range dropped it at once; with
 		-- the outpost hold on he is not "going on someone", so no re-pick until the attack mode took over again, four
@@ -546,7 +617,7 @@ function X.HuntStep()
 			bot:GetNearbyCreeps(deathPactAbility:GetCastRange(), true),
 			deathPactAbility:GetSpecialValueInt("creep_level")
 		)
-		if creep ~= nil and not creep:IsAncientCreep() then
+		if creep ~= nil and not creep:IsAncientCreep() and X.CanSpendPact("hunt") then
 			X.LogHunt("pact", nil)
 			-- The cast must not drop the hunt hold (the attack mode took over during it).
 			if bot._huntTarget ~= nil then
@@ -556,10 +627,19 @@ function X.HuntStep()
 			return true
 		end
 	end
-	local target = X.HuntTarget()
+	local target, waiting = X.HuntTarget()
 	if target == nil then
 		bot._clinkzHuntUntil = nil
 		return false
+	end
+	-- The target is alive but can't be seen or hit for now: no order, he stays invisible where he is, the hold stays.
+	if waiting then
+		bot._clinkzHuntUntil = DotaTime() + 0.3
+		if DotaTime() >= (bot._huntWaitLogAt or -999) then
+			bot._huntWaitLogAt = DotaTime() + 3
+			X.LogHunt("wait-unseen", target)
+		end
+		return true
 	end
 	-- A hunt on a lone hero ends when it gets backup (maintainer): another enemy hero within 1200 of the target
 	-- before the reveal. He stays invisible and the modes take over; no new hunt for 15s.
@@ -823,7 +903,7 @@ function X.ConsiderDeathPact()
 		local enemiesNear = #(bot:GetNearbyHeroes(900, true, BOT_MODE_NONE) or {})
 		if (missing >= gain * 0.8 or Fu.GetHP(bot) < 0.6) and enemiesNear == 0 then
 			local creep = GetMostHPCreepLevel(nearbyCreeps, maxCreepLevel)
-			if creep ~= nil and not creep:IsAncientCreep() then
+			if creep ~= nil and not creep:IsAncientCreep() and X.CanSpendPact("heal") then
 				pcall(
 					print,
 					string.format(
@@ -855,6 +935,7 @@ function X.ConsiderDeathPact()
 						and GetUnitToUnitDistance(creep, nearbyAllies[1]) < 600
 						and botTarget ~= creep
 						and not bot:HasModifier("modifier_clinkz_death_pact")
+						and X.CanSpendPact("other")
 					then
 						return BOT_ACTION_DESIRE_HIGH, creep
 					end
@@ -863,7 +944,12 @@ function X.ConsiderDeathPact()
 		end
 	else
 		local creep = GetMostHPCreepLevel(nearbyCreeps, maxCreepLevel)
-		if creep ~= nil and not bot:HasModifier("modifier_clinkz_death_pact") and not creep:IsAncientCreep() then
+		if
+			creep ~= nil
+			and not bot:HasModifier("modifier_clinkz_death_pact")
+			and not creep:IsAncientCreep()
+			and X.CanSpendPact("other")
+		then
 			return BOT_ACTION_DESIRE_HIGH, creep
 		end
 	end

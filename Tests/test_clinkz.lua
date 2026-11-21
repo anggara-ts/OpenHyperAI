@@ -49,3 +49,16 @@ T.test("clinkz: the escape pact and the hunt step run on the stub", function()
 	local okH, errH = pcall(X.HuntStep)
 	T.ok(okH, "HuntStep: " .. tostring(errH))
 end)
+
+T.test("clinkz: the last Death Pact charge is kept unless HP is low", function()
+	local X = clinkz()
+	local ok = X.PactSpendOk
+	-- Game 064, t=2195/2431/2597: heal pacts at 82-86% HP on the last charge; at 15% the escape pact had none.
+	T.eq(ok("heal", 1, 2, 0.84), false, "heal at 84% on the last charge")
+	T.eq(ok("heal", 2, 2, 0.84), true, "heal at 84% with a spare charge")
+	T.eq(ok("heal", 1, 2, 0.55), true, "heal under 60% (the heal rule's line)")
+	T.eq(ok("other", 1, 2, 0.7), false, "damage pact on the last charge")
+	T.eq(ok("hunt", 1, 2, 0.45), true, "under 50% anything may use it")
+	T.eq(ok("other", 1, 1, 0.9), true, "levels 1-2 (one charge): the pact is the spell's main use")
+	T.eq(ok("hunt", 2, 2, 0.9), true, "two charges: spend one")
+end)

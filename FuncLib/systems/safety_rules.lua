@@ -10,16 +10,18 @@ local SafetyRules = {}
 --   heroHit      an enemy hero damaged the bot in the last 2s
 --   enemiesNear  enemy heroes within 1200
 --   alliesNear   allied heroes within 1200, the bot not counted
--- Returns the reason ("low-hp", "hit-outnumbered") or nil (keep defending).
-function SafetyRules.DefendLowHpRelease(hp, heroHit, enemiesNear, alliesNear)
+--   lastStand    the Ancient's last stand is on (enemy heroes at a hurt Ancient): only the 35% rule applies
+-- Returns the reason ("low-hp", "hit-alone") or nil (keep defending). The 60% rule is for a bot with no ally near:
+-- in an even fight at the base every defender under 60% would leave.
+function SafetyRules.DefendLowHpRelease(hp, heroHit, enemiesNear, alliesNear, lastStand)
 	if not heroHit then
 		return nil
 	end
 	if hp < 0.35 then
 		return "low-hp"
 	end
-	if hp < 0.6 and enemiesNear >= 1 and enemiesNear >= alliesNear then
-		return "hit-outnumbered"
+	if not lastStand and hp < 0.6 and enemiesNear >= 1 and alliesNear == 0 then
+		return "hit-alone"
 	end
 	return nil
 end

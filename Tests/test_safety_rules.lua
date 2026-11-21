@@ -9,7 +9,7 @@ end
 T.test("defend low-HP release: game 067 Primal Beast is let go at the group-up", function()
 	local R = rules()
 	-- 50:49 group-up: ~43% HP, Death Prophet (and Nyx) hitting him, no ally within 1200.
-	T.eq(R.DefendLowHpRelease(0.43, true, 1, 0), "hit-outnumbered", "50:49 group-up")
+	T.eq(R.DefendLowHpRelease(0.43, true, 1, 0), "hit-alone", "50:49 group-up")
 	T.eq(R.DefendLowHpRelease(0.29, true, 2, 0), "low-hp", "50:52 defend 0.77 at 29%")
 	-- 50:27: 79-89% HP in a 5v2 - the defence keeps him (retreat's own rules decide that fight).
 	T.eq(R.DefendLowHpRelease(0.85, true, 5, 2), nil, "healthy bot keeps defending")
@@ -20,6 +20,9 @@ T.test("defend low-HP release: no hero damage or more allies keep the bot", func
 	T.eq(R.DefendLowHpRelease(0.2, false, 2, 0), nil, "creeps only: the defence clears them")
 	T.eq(R.DefendLowHpRelease(0.5, true, 1, 2), nil, "hit at 50% with two allies next to him")
 	T.eq(R.DefendLowHpRelease(0.34, true, 1, 3), "low-hp", "under 35% and hit: always let go")
+	T.eq(R.DefendLowHpRelease(0.5, true, 2, 1), nil, "an even fight at the base: stays")
+	T.eq(R.DefendLowHpRelease(0.45, true, 1, 0, true), nil, "last stand: only the 35% rule")
+	T.eq(R.DefendLowHpRelease(0.3, true, 2, 2, true), "low-hp", "last stand under 35%")
 end)
 
 local function dist(x, y, tx, ty)

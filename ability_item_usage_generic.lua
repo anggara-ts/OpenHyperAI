@@ -9728,6 +9728,82 @@ function Usage.DumpHeroAbilities()
 	end
 	ApiPrint("abilities " .. string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""), names)
 end
+-- Each bot once at ~0:05 (#111, 7.42 diagnostic): what GetItemInSlot returns in every slot 0..25, not only the
+-- 0..16 the item code uses, and every ability up to slot 63 that looks like an item or an outpost / watcher
+-- action. 7.42 bots no longer capture outposts or turn watchers on, and the hero has no capture / lamp ability any
+-- more: this shows whether the action moved into a hidden item. "-" empty slot, "!" the call raised an error.
+-- Remove once the line has been read.
+function Usage.ProbeHiddenItems()
+	if bot._hiddenItemsProbed or DotaTime() < 5 or bot:IsIllusion() then
+		return
+	end
+	bot._hiddenItemsProbed = true
+	local function ProbeHiddenItemName(handle)
+		if handle == nil then
+			return "-"
+		end
+		local okNull, isNull = pcall(function()
+			return handle:IsNull()
+		end)
+		if okNull and isNull then
+			return "-"
+		end
+		local okName, handleName = pcall(function()
+			return handle:GetName()
+		end)
+		if not okName or type(handleName) ~= "string" or handleName == "" then
+			return "?"
+		end
+		return handleName
+	end
+	local function ProbeHiddenFlag(handle)
+		local okHidden, hidden = pcall(function()
+			return handle:IsHidden()
+		end)
+		return okHidden and hidden and "(h)" or ""
+	end
+	local slots = {}
+	for slot = 0, 25 do
+		local okItem, item = pcall(function()
+			return bot:GetItemInSlot(slot)
+		end)
+		slots[#slots + 1] = slot .. ":" .. (okItem and ProbeHiddenItemName(item) or "!")
+	end
+	local extra = {}
+	for slot = 0, 63 do
+		local okAbility, ability = pcall(function()
+			return bot:GetAbilityInSlot(slot)
+		end)
+		if okAbility and ability ~= nil then
+			local abilityName = ProbeHiddenItemName(ability)
+			if
+				abilityName ~= "-"
+				and (
+					slot > 35
+					or string.find(abilityName, "^item_")
+					or string.find(abilityName, "capture")
+					or string.find(abilityName, "outpost")
+					or string.find(abilityName, "watcher")
+					or string.find(abilityName, "lamp")
+					or string.find(abilityName, "lantern")
+				)
+			then
+				extra[#extra + 1] = slot .. ":" .. abilityName .. ProbeHiddenFlag(ability)
+			end
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-API] slots %s %s extra-abilities=%d %s t=%.0f",
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			table.concat(slots, ","),
+			#extra,
+			#extra > 0 and table.concat(extra, ",") or "-",
+			DotaTime()
+		)
+	)
+end
 function Usage.DumpBotApi()
 	if _G.OHA_API_DUMPED or GetTeam() ~= TEAM_RADIANT then
 		return
@@ -10097,6 +10173,7 @@ function ItemUsageThink()
 	pcall(Usage.WatchArrivals)
 	pcall(Usage.DumpBotApi)
 	pcall(Usage.DumpHeroAbilities)
+	pcall(Usage.ProbeHiddenItems)
 	pcall(Usage.LogHomeWalk)
 	pcall(Usage.WatchDodgeResults)
 	PartEnd("watchers", tWatch)

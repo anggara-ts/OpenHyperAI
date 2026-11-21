@@ -886,19 +886,22 @@ function GetDesireHelper()
 	-- runs first, so its 0.98 (and the src=roshan hold near the pit) is not cut to 0.70.
 	local roshanPit = Fu.GetCurrentRoshanLocation()
 	local nearPit = roshanPit ~= nil and GetUnitToLocationDistance(bot, roshanPit) < 2500
+	local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
+	local roshanSeenAlive = Fu.IsUnitValid(roshanHandle) and roshanHandle:IsAlive()
 	if nearPit then
-		local roshanHandle = Fu.Utils.GameStates and Fu.Utils.GameStates.roshHandle
 		local attackTarget = bot:GetAttackTarget()
 		if
 			activeMode == BOT_MODE_ROSHAN
 			or attackTarget ~= nil and Fu.IsRoshan(attackTarget)
-			or Fu.IsUnitValid(roshanHandle) and roshanHandle:IsAlive() and roshanHandle:GetAttackTarget() == bot
+			or roshanSeenAlive and roshanHandle:GetAttackTarget() == bot
 		then
 			bot._roshanFightAt = DotaTime()
 		end
 	end
 	if Fu.ShouldLeaveRoshanFight(bot) then
-		local roshanAlive = Fu.IsRoshanAlive()
+		-- Fu.IsRoshanAlive goes by the kill time and a fixed respawn time; a Roshan seen alive counts too (he can be
+		-- back before that time runs out).
+		local roshanAlive = roshanSeenAlive or Fu.IsRoshanAlive()
 		local applies, leaveWhy = RetreatRules.RoshanLeaveApplies(
 			nearPit,
 			roshanAlive,
@@ -930,8 +933,13 @@ function GetDesireHelper()
 			bot._roshLeaveLatched = true
 			return RetreatTag(217, leaveDesire)
 		end
-		if leaveWhy ~= "far" and DotaTime() >= (bot._roshLeaveSkipLogAt or -999) then
-			bot._roshLeaveSkipLogAt = DotaTime() + 5
+		-- On a change of reason, else every 15s (a hurt laner near the pit would repeat it).
+		if
+			leaveWhy ~= "far"
+			and (leaveWhy ~= bot._roshLeaveSkipWhy or DotaTime() >= (bot._roshLeaveSkipLogAt or -999))
+		then
+			bot._roshLeaveSkipWhy = leaveWhy
+			bot._roshLeaveSkipLogAt = DotaTime() + 15
 			pcall(
 				print,
 				string.format(

@@ -214,7 +214,8 @@ end
 --                     attacking  swinging at it, or its own last-hit timing / team roam's overlay holds it (walking
 --                                in, holding after a cancel, waiting for the moment);
 --                     free       alive, laning (or a human), not on a hero, within BACKUP_CORE_NEAR of the creep;
---                     elsewhere  its timing / overlay holds another unit;  busy  another mode or on a hero;
+--                     elsewhere  its timing / overlay holds another unit (it may still take this one: its hit time
+--                                here is not known, so only a hit that kills counts);  busy  another mode or on a hero;
 --                     far        farther than BACKUP_CORE_NEAR;
 --   coreTooLate     the core's hit, started now, lands after the creep dies (CoreTooLate);
 --   coreCanKill     the core's hit kills it when it lands (not killed by others first);
@@ -228,11 +229,14 @@ end
 -- Returns decision, why: "core", "first" (leave it to the core); "wait", "behind" (the core takes it, or ours would
 -- not land after the core's) or "hp" (our hit does not kill yet); "go", why (attack now): "behind" (the core's hit
 -- does not kill it, ours lands BACKUP_MARGIN after it), "late" (the core's hit is too late), or the core's state
--- (elsewhere / busy / far: it cannot take it).
+-- (busy / far: it cannot take it; elsewhere: its hit does not kill this one).
 LastHitRules.BACKUP_MARGIN = 0.15
 -- A core this close to the creep can take it (a walk-in of about one second at 300 movement speed; not a game value).
 LastHitRules.BACKUP_CORE_NEAR = 700
 LastHitRules.CORE_IN_PLAY = { attacking = true, free = true }
+-- States where the core may still take the creep: CORE_IN_PLAY, and a core timing another creep (game 065 t=310 / 754:
+-- Clinkz was in team roam overlay holds; when its hit kills this creep too, the support waits as for a free core).
+LastHitRules.CORE_MAY_TAKE = { attacking = true, free = true, elsewhere = true }
 
 -- The core's hit is too late: other hits already on their way kill the creep before it lands (othersKill), or the
 -- creep's estimated death (DeathEta: our creeps and towers) comes clearly (BACKUP_MARGIN) before it.
@@ -243,8 +247,13 @@ end
 -- True when the support must leave the creep to the core now: the core can take it in time, and either its hit kills
 -- it (it is about to go, or it is going) or ours would not land BACKUP_MARGIN after the core's.
 function LastHitRules.BackupBehindCore(b)
+	if b.coreTooLate then
+		return false
+	end
+	if b.coreState == "elsewhere" then
+		return b.coreCanKill == true
+	end
 	return LastHitRules.CORE_IN_PLAY[b.coreState] == true
-		and not b.coreTooLate
 		and (b.coreCanKill == true or b.myDelay < b.coreEta + LastHitRules.BACKUP_MARGIN)
 end
 
@@ -258,17 +267,21 @@ function LastHitRules.BackupDecision(b)
 	if not b.ourKills then
 		return "wait", "hp"
 	end
+	if LastHitRules.CORE_MAY_TAKE[b.coreState] and b.coreTooLate then
+		return "go", "late"
+	end
 	if LastHitRules.CORE_IN_PLAY[b.coreState] then
-		return "go", b.coreTooLate and "late" or "behind"
+		return "go", "behind"
 	end
 	return "go", b.coreState or "none"
 end
 
--- A backup swing already winding up while the core can still take the creep in time and its hit kills it (game 065
--- t=634: Hoodwink released while Primal Beast's overlay was swinging at the same creep, coreEta 0.59 against myEta
--- 0.54). WindupDecision then stops it at the last look ("core-next").
+-- A backup swing already winding up while the core (on this creep or free next to it, not one timing another creep)
+-- can still take the creep in time and its hit kills it (game 065 t=634: Hoodwink released while Primal Beast's
+-- overlay was swinging at the same creep, coreEta 0.59 against myEta 0.54). WindupDecision then stops it at the last
+-- look ("core-next").
 function LastHitRules.BackupCoreNext(b)
-	return b.coreCanKill == true and LastHitRules.BackupBehindCore(b)
+	return b.coreCanKill == true and LastHitRules.CORE_IN_PLAY[b.coreState] == true and LastHitRules.BackupBehindCore(b)
 end
 
 -- Walk-ins that cannot arrive (#71, game 064: late= rose from 71 to 137; 120 of them were walk-ins that never launched

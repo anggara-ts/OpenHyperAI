@@ -141,11 +141,23 @@ T.test("backup hit: lands after the core's, leaves the creep the core kills", fu
 	decision, why = decide({ coreState = "free", coreCanKill = true, coreTooLate = true, myDelay = 0.5, coreEta = 1.8 })
 	T.eq(decision, "go", "the core's hit comes after the creep dies")
 	T.eq(why, "late")
-	for _, state in ipairs({ "busy", "far", "elsewhere" }) do
+	for _, state in ipairs({ "busy", "far" }) do
 		decision, why = decide({ coreState = state, coreCanKill = true, myDelay = 0.3, coreEta = 0.9 })
 		T.eq(decision, "go", "the core cannot take it: " .. state)
 		T.eq(why, state)
 	end
+	-- A core timing another creep: waits only when the core's hit kills this one too.
+	T.eq(
+		decide({ coreState = "elsewhere", coreCanKill = true, myDelay = 0.3, coreEta = 0.9 }),
+		"wait",
+		"it may take it"
+	)
+	decision, why = decide({ coreState = "elsewhere", coreCanKill = false, myDelay = 0.3, coreEta = 0.9 })
+	T.eq(decision, "go", "its hit does not kill this one")
+	T.eq(why, "elsewhere")
+	decision, why = decide({ coreState = "elsewhere", coreCanKill = true, coreTooLate = true })
+	T.eq(decision, "go", "too late for a core on another creep")
+	T.eq(why, "late")
 end)
 
 T.test("backup: the core's hit is too late only clearly before it lands", function()
@@ -164,6 +176,8 @@ T.test("backup swing: the core can still take it first", function()
 	T.ok(not R.BackupCoreNext(b), "the core's hit does not kill it: ours goes")
 	b.coreCanKill, b.coreState = true, "busy"
 	T.ok(not R.BackupCoreNext(b), "a busy core does not take it")
+	b.coreState = "elsewhere"
+	T.ok(not R.BackupCoreNext(b), "a core timing another creep does not stop our swing")
 	b.coreState, b.coreTooLate = "free", true
 	T.ok(not R.BackupCoreNext(b), "too late for the core")
 	local s = { predictedHp = 30, ourHit = 45, incomingKills = false, frameGap = 0.033, early = false, backup = true }

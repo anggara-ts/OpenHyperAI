@@ -165,7 +165,7 @@ function X.BackupFacts(bot, core, creep, damage, myDelay)
 	local corePredicted, coreHit, coreOthersKill =
 		X.Predict(creep, core:GetAttackDamage(), coreEta, X.TowerShotBefore(bot, creep, coreEta))
 	-- The death estimate (two unit scans) only where it decides something: a core that can take the creep.
-	local deathEta = Rules.CORE_IN_PLAY[coreState] and X.DeathEta(bot, creep) or math.huge
+	local deathEta = Rules.CORE_MAY_TAKE[coreState] and X.DeathEta(bot, creep) or math.huge
 	return {
 		coreKillsFirst = incomingKills,
 		coreState = coreState,

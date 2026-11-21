@@ -1976,6 +1976,9 @@ heroSpecificDesire["npc_dota_hero_hoodwink"] = function()
 	end
 	if highPriorityAbility:IsTrained() then
 		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_hoodwink_sharpshooter_windup") then
+			-- hero_hoodwink.lua turns the bolt and releases it; a move order from this mode's Think (it walks
+			-- toward the fountain when idle) would turn her off the target.
+			bot._outpostHoldUntil = DotaTime() + 0.15
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end

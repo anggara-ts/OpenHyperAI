@@ -30,10 +30,15 @@ T.test("lane pick: the other lane wins when it is clearly worse or the held lane
 		false,
 		"held lane clear"
 	)
-	-- Far from the held lane and out of its defend mode for 12s: no hold.
-	T.eq((R.KeepLane({ desire = 0.6, creeps = 4, dist = 6000 }, { desire = 0.85, creeps = 4 }, 12)), false, "left it")
-	-- Still walking to the lane picked 4s ago: hold.
-	T.eq((R.KeepLane({ desire = 0.6, creeps = 4, dist = 6000 }, { desire = 0.85, creeps = 4 }, 4)), true, "on the way")
+	-- Out of the held lane's defend mode for 12s: no hold; 4s: hold.
+	T.eq((R.KeepLane({ desire = 0.6, creeps = 4 }, { desire = 0.85, creeps = 4 }, 12)), false, "left it")
+	T.eq((R.KeepLane({ desire = 0.6, creeps = 4 }, { desire = 0.85, creeps = 4 }, 4)), true, "left it 4s ago")
+	-- Heroes, a deeper building or an urgent reason on the other lane always win.
+	T.eq((R.KeepLane(held, { desire = 0.7, creeps = 0, heroes = 2 }, 0)), false, "enemy heroes there")
+	T.eq((R.KeepLane({ desire = 0.6, creeps = 8, tier = 3 }, { desire = 0.7, creeps = 6, tier = 4 }, 0)), false, "T4")
+	for _, why in ipairs({ "group-up", "ancient-last-stand", "ancient-heroes", "base-floor" }) do
+		T.eq((R.KeepLane(held, { desire = 0.7, creeps = 0, why = why }, 0)), false, why .. " is never capped")
+	end
 end)
 
 T.test("defend TP: no repeat to the same lane within 20s, no TP away from a base threat", function()

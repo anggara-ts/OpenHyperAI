@@ -2,28 +2,42 @@
 -- so they can be tested with game numbers.
 local DefendLaneRules = {}
 
--- How long a defender keeps the lane it picked (s), and how close counts as "at" that lane.
+-- How long a defender keeps the lane it picked after it left that lane's defend mode (s).
 DefendLaneRules.HOLD_SECONDS = 10
-DefendLaneRules.AT_LANE_DISTANCE = 2500
+-- Reasons of the other lane that are never capped: a siege group-up, heroes at the Ancient, the last stand, the base
+-- floor (FuncLib/systems/defend.lua, bot._defendWhy).
+DefendLaneRules.UNCAPPED = {
+	["group-up"] = true,
+	["ancient-heroes"] = true,
+	["ancient-last-stand"] = true,
+	["base-floor"] = true,
+}
 
 -- Keep the held lane over another threatened lane? Game 066, 81:41-81:55: Elder Titan defended the bottom high ground
 -- (11-21 enemy creeps, 712-998 from his spot); when the base-lane gate let go for a moment, mid (8 creeps) read 0.85
 -- against bottom's 0.37 and he took the mid defence, TP'd away and walked back for 34s. The desire alone can't tell:
 -- mid's 0.85 came from a different rule than bottom's.
---   held / other: { desire = lane defend desire, creeps = enemy creeps at the lane's threat, hp = HP ratio of the
---                   lane's furthest building, dist = the bot's distance to the lane's threat }
---   heldAge       seconds since the bot was last in the held lane's defend mode
+--   held / other: { desire = the lane's final defend desire, creeps = enemy creeps at the lane's threat, heroes = enemy
+--                   heroes seen there, hp = HP ratio of the lane's furthest building, tier = its tier }
+--   other.why     the other lane's defend reason (UNCAPPED reasons always win)
+--   heldAge       seconds since the bot was last in the held lane's defend mode (0 while in it)
 -- Returns true (keep the held lane; the other lane is capped below it), false (the other lane may win), and the
 -- reason.
 function DefendLaneRules.KeepLane(held, other, heldAge)
 	if held == nil or other == nil or (held.desire or 0) <= 0.1 then
 		return false, "no-held"
 	end
-	if
-		(heldAge or math.huge) > DefendLaneRules.HOLD_SECONDS
-		and (held.dist or math.huge) > DefendLaneRules.AT_LANE_DISTANCE
-	then
-		return false, "not-at-held"
+	if (heldAge or math.huge) > DefendLaneRules.HOLD_SECONDS then
+		return false, "expired"
+	end
+	if DefendLaneRules.UNCAPPED[other.why or ""] then
+		return false, "urgent"
+	end
+	if (other.heroes or 0) > (held.heroes or 0) then
+		return false, "more-heroes"
+	end
+	if (other.tier or 0) > (held.tier or 0) then
+		return false, "deeper-tier"
 	end
 	local heldCreeps, otherCreeps = held.creeps or 0, other.creeps or 0
 	if otherCreeps >= heldCreeps + 4 and otherCreeps >= heldCreeps * 1.5 then

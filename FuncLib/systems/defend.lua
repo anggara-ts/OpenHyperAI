@@ -1635,74 +1635,14 @@ local defendModeLane = {
 	[BotMode.DefendTowerMid] = Lane.Mid,
 	[BotMode.DefendTowerBot] = Lane.Bot,
 }
-local function LaneBuildingHp(lane)
+-- HP ratio and tier of the lane's furthest building.
+local function LaneBuilding(lane)
 	local entry = Defend.GetFurthestBuildingOnLane(lane)
 	local building = entry ~= nil and entry[1] or nil
 	if building == nil or not building:IsAlive() then
-		return 1
+		return 1, 0
 	end
-	return building:GetHealth() / math.max(1, building:GetMaxHealth())
-end
--- #53, game 066 81:41-81:55: Elder Titan defended the bottom high ground (11-21 creeps) until the base-lane gate let
--- go for a moment; mid (8 creeps) then read 0.85 against bottom's 0.37, the engine switched him to mid, and he TP'd
--- to the far end of the map. A defender keeps the lane it is in (or picked in the last 10s) unless another lane is
--- clearly worse (DefendLaneRules.KeepLane); that lane is capped just below the held one.
-local function HoldDefendLane(bot, lane, desire)
-	local now = DotaTime()
-	local activeLane = defendModeLane[bot:GetActiveMode()]
-	if activeLane ~= nil then
-		bot._defendHeldLane, bot._defendHeldAt = activeLane, now
-	end
-	bot._defendLaneRead = bot._defendLaneRead or {}
-	bot._defendLaneRead[lane] = { desire = desire, at = now }
-	local heldLane = bot._defendHeldLane
-	if heldLane == nil or heldLane == lane or desire <= 0 then
-		return desire, nil
-	end
-	local heldRead = bot._defendLaneRead[heldLane]
-	if heldRead == nil or now - heldRead.at > 1 or desire < heldRead.desire then
-		return desire, nil
-	end
-	local heldCreeps, heldFront = LaneThreatCreeps(heldLane)
-	local otherCreeps = LaneThreatCreeps(lane)
-	local held = {
-		desire = heldRead.desire,
-		creeps = heldCreeps,
-		hp = LaneBuildingHp(heldLane),
-		dist = GetUnitToLocationDistance(bot, heldFront),
-	}
-	local other = { desire = desire, creeps = otherCreeps, hp = LaneBuildingHp(lane) }
-	local keep, why = DefendLaneRules.KeepLane(held, other, now - (bot._defendHeldAt or -999))
-	local decision = keep and "hold" or why
-	if
-		(decision ~= bot._lanePickLast or now >= (bot._lanePickLogAt or -999))
-		and (keep or why == "more-creeps" or why == "building-low")
-	then
-		bot._lanePickLast = decision
-		bot._lanePickLogAt = now + 5
-		pcall(
-			print,
-			string.format(
-				"[OHA-DEFEND] t=%.0f %s lane-pick chose=%s other=%s myDist=%d threat=%d/%d hp=%.2f/%.2f desire=%.2f/%.2f why=%s",
-				now,
-				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
-				tostring(laneNames[keep and heldLane or lane]),
-				tostring(laneNames[keep and lane or heldLane]),
-				math.floor(held.dist),
-				held.creeps,
-				other.creeps,
-				held.hp,
-				other.hp,
-				held.desire,
-				desire,
-				decision
-			)
-		)
-	end
-	if keep then
-		return math.max(0, heldRead.desire - 0.05), "lane-hold"
-	end
-	return desire, nil
+	return building:GetHealth() / math.max(1, building:GetMaxHealth()), entry[3] or 0
 end
 function Defend.GetDefendDesire(bot, lane)
 	if
@@ -1720,11 +1660,6 @@ function Defend.GetDefendDesire(bot, lane)
 	Defend.GetBaseSiege()
 	local desire = math.min(Defend.GetDefendDesireHelper(bot, lane), 1)
 	local why = bot._defendWhy or "?"
-	local heldWhy
-	desire, heldWhy = HoldDefendLane(bot, lane, desire)
-	if heldWhy ~= nil then
-		why = why .. "+" .. heldWhy
-	end
 	local defendLoc = getDefendState(bot).defendLoc or GetLaneFrontLocation(ourTeam, lane, 0)
 	local alliesNearDefendLoc = Fu.GetAlliesNearLoc(defendLoc, 2000)
 	local enemiesNearDefendLoc = Fu.GetEnemiesNearLoc(defendLoc, 2000)
@@ -2197,4 +2132,90 @@ function Defend.DefendThink(bot, lane)
 	end
 end
 function Defend.OnEnd() end
+-- #53, game 066 81:41-81:55: Elder Titan defended the bottom high ground (11-21 creeps) until the base-lane gate let
+-- go for a moment; mid (8 creeps) then read 0.85 against bottom's 0.37, the engine switched him to mid, and he TP'd
+-- to the far end of the map. A defender keeps the lane whose defend mode it is in (and for 10s after it leaves that
+-- mode) unless another lane is clearly worse (DefendLaneRules.KeepLane); that lane is capped just below the held one.
+-- Compares the final desires (after the group cap and the skirmish cut), so it wraps Defend.GetDefendDesire.
+local function HoldDefendLane(bot, lane, desire, reason)
+	local now = DotaTime()
+	local activeLane = defendModeLane[bot:GetActiveMode()]
+	if activeLane ~= nil then
+		bot._defendHeldLane, bot._defendHeldAt = activeLane, now
+	elseif bot._defendHeldLane ~= nil and now - (bot._defendHeldAt or -999) > DefendLaneRules.HOLD_SECONDS then
+		bot._defendHeldLane = nil
+	end
+	bot._defendLaneRead = bot._defendLaneRead or {}
+	bot._defendLaneRead[lane] = { desire = desire, at = now }
+	local heldLane = bot._defendHeldLane
+	if heldLane == nil or heldLane == lane or desire <= 0 then
+		return desire
+	end
+	local heldRead = bot._defendLaneRead[heldLane]
+	if heldRead == nil or now - heldRead.at > 1 or desire < heldRead.desire then
+		return desire
+	end
+	local heldCreeps, heldFront = LaneThreatCreeps(heldLane)
+	local otherCreeps, otherFront = LaneThreatCreeps(lane)
+	local heldHp, heldTier = LaneBuilding(heldLane)
+	local otherHp, otherTier = LaneBuilding(lane)
+	local held = {
+		desire = heldRead.desire,
+		creeps = heldCreeps,
+		heroes = #Fu.GetLastSeenEnemiesNearLoc(heldFront, 1600),
+		hp = heldHp,
+		tier = heldTier,
+	}
+	local other = {
+		desire = desire,
+		creeps = otherCreeps,
+		heroes = #Fu.GetLastSeenEnemiesNearLoc(otherFront, 1600),
+		hp = otherHp,
+		tier = otherTier,
+		why = reason,
+	}
+	local keep, why = DefendLaneRules.KeepLane(held, other, now - (bot._defendHeldAt or -999))
+	local decision = keep and "hold" or why
+	if (decision ~= bot._lanePickLast or now >= (bot._lanePickLogAt or -999)) and why ~= "no-held" then
+		bot._lanePickLast = decision
+		bot._lanePickLogAt = now + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-DEFEND] t=%.0f %s lane-pick chose=%s other=%s myDist=%d threat=%d/%d heroes=%d/%d hp=%.2f/%.2f tier=%d/%d desire=%.2f/%.2f otherWhy=%s why=%s",
+				now,
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				tostring(laneNames[keep and heldLane or lane]),
+				tostring(laneNames[keep and lane or heldLane]),
+				math.floor(GetUnitToLocationDistance(bot, heldFront)),
+				held.creeps,
+				other.creeps,
+				held.heroes,
+				other.heroes,
+				held.hp,
+				other.hp,
+				held.tier,
+				other.tier,
+				held.desire,
+				desire,
+				tostring(reason),
+				decision
+			)
+		)
+	end
+	if keep then
+		return math.max(0, heldRead.desire - 0.05)
+	end
+	return desire
+end
+do
+	local getDefendDesire = Defend.GetDefendDesire
+	Defend.GetDefendDesire = function(bot, lane)
+		local desire = getDefendDesire(bot, lane)
+		if bot == nil or not bot:IsAlive() then
+			return desire
+		end
+		return HoldDefendLane(bot, lane, desire, bot._defendWhy)
+	end
+end
 return Defend

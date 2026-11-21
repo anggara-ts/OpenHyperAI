@@ -25,6 +25,19 @@ end
 --   ready: castable now (off cooldown, enough mana); onCooldown: cooling down; cost: mana cost.
 RefresherRules.MIN_COOLDOWN = 8
 local REFRESHERS = { item_refresher = true, item_refresher_shard = true }
+-- Movement spells are not what a refresh is for (#47, game 067 t=3818: Zeus held his Refresher 1s for a ready
+-- Heavenly Jump). Spells whose main effect is moving the caster (names from the 7.42 hero files; Heavenly Jump also
+-- shocks one enemy per the Valve datafeed, hero_id=22, but it is a jump). Neither waited for nor paid for.
+RefresherRules.MOVEMENT = {
+	antimage_blink = true,
+	queenofpain_blink = true,
+	zuus_heavenly_jump = true,
+	mirana_leap = true,
+	faceless_void_time_walk = true,
+	puck_ethereal_jaunt = true,
+	hoodwink_scurry = true,
+	monkey_king_tree_dance = true,
+}
 function RefresherRules.IsUseful(spell)
 	return spell ~= nil
 		and spell.learned == true
@@ -34,6 +47,7 @@ function RefresherRules.IsUseful(spell)
 		and not spell.talent
 		and (spell.cooldown or 0) >= RefresherRules.MIN_COOLDOWN
 		and not REFRESHERS[spell.name or ""]
+		and not RefresherRules.MOVEMENT[spell.name or ""]
 end
 
 -- The combo a refresh pays for: the useful spells (besides the ultimate) still ready, and the mana needed: the

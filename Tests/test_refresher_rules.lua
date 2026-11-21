@@ -81,3 +81,28 @@ T.test("refresher: a ready spell holds the refresh up to 1s", function()
 	T.eq(state.holdAt, nil, "reset after the refresh / when the fight ends")
 	T.eq(R.HoldStep(state, 111, 1), "hold", "after a reset the next refresh holds again")
 end)
+
+T.test("refresher: movement spells neither hold the refresh nor count in its mana", function()
+	local R = rules()
+	T.eq(R.IsUseful(spell("zuus_heavenly_jump")), false, "Heavenly Jump")
+	T.eq(R.IsUseful(spell("antimage_blink")), false, "Blink")
+	-- Game 067, t=3818: Zeus, Thundergod's Wrath used, Nimbus on cooldown, Heavenly Jump ready (costs here are
+	-- placeholders, the game read needed=1100).
+	local spells = {
+		spell("zuus_arc_lightning", { cooldown = 1.6, ready = true, cost = 80 }),
+		spell("zuus_lightning_bolt", { cooldown = 6, ready = true, cost = 125 }),
+		spell("zuus_heavenly_jump", { cooldown = 14, ready = true, cost = 100 }),
+		spell("zuus_cloud", { cooldown = 40, onCooldown = true, cost = 275 }),
+		spell("zuus_thundergods_wrath", { ultimate = true, cooldown = 130, onCooldown = true, cost = 400 }),
+	}
+	local othersReady, needed, readyNames, comboNames = R.Combo(325, "zuus_thundergods_wrath", 400, spells)
+	T.eq(othersReady, 0, "the ready jump doesn't hold the refresh")
+	T.eq(#readyNames, 0, "no ready names")
+	T.eq(needed, 325 + 400 + 275, "Orb + Wrath + Nimbus")
+	T.eq(table.concat(comboNames, "+"), "zuus_thundergods_wrath+zuus_cloud", "combo")
+	T.eq(R.HoldStep({}, 3818, othersReady), "go", "refresh at once")
+	-- On cooldown it isn't paid for either.
+	spells[3].ready, spells[3].onCooldown = false, true
+	local _, needed2 = R.Combo(325, "zuus_thundergods_wrath", 400, spells)
+	T.eq(needed2, needed, "a jump on cooldown adds no mana")
+end)

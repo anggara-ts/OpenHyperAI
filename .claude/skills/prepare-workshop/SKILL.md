@@ -42,8 +42,8 @@ host's Steam ID and server IPs) and the local test lineup.
    game.
 
 Not in the copy on purpose (maintainer's decision, #177): `Install-to-vscript/` and docs. The Workshop copy is
-the bot scripts only. `Customize/general.lua` and `Customize/hero/viper.lua` still link the upstream Workshop item
-3246316298 in their comments; a first upload of this fork gets a new ID.
+the bot scripts only. Our Workshop item is 3843444501 (https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501): update it,
+not a new item.
 
 New Lua files: a committed file under the root, `BotsLib/`, `FuncLib/` or `Customize/` is in the copy
 automatically. A `.lua` file in any other new folder stops the export until the folder is added to

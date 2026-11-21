@@ -173,4 +173,4 @@ You can also comment observations on the PR you are testing, with game times (e.
 
 ## Credits
 
-Open Hyper AI builds on [forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI) and earlier community bot scripts. If a fix belongs upstream, consider contributing it back there too.
+See [Credits in the README](README.md#credits).

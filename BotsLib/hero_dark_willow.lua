@@ -125,6 +125,7 @@ X["bDeafaultItem"] = false
 function X.MinionThink(hMinionUnit)
 	Minion.MinionThink(hMinionUnit)
 end
+local ShadowRealmRules = require(GetScriptDirectory() .. "/FuncLib/systems/shadow_realm_rules")
 local brambleMazeAbility =
 	SafeAbility(bot:GetAbilityByName("dark_willow_bramble_maze"), "dark_willow_bramble_maze", "dark_willow")
 local shadowRealmAbility =
@@ -146,7 +147,17 @@ local isGoingOnSomeone
 local isRetreating
 local hpRatio
 local isInTeamFight
+-- Shadow Realm hold (#48): runs inside the realm, even when the item think counts her as invulnerable
+-- (bThinkWhileInvulnerable lets only this tick run then).
+X["bThinkWhileInvulnerable"] = true
 function X.SkillsComplement()
+	local okRealm, realmOrder = pcall(X.ShadowRealmTick)
+	if not okRealm then
+		X.LogRealmError(realmOrder)
+	end
+	if okRealm and realmOrder or bot:IsInvulnerable() then
+		return
+	end
 	local context = AbilityContext.Build(bot)
 	isGoingOnSomeone = context.isEngaging
 	isRetreating = context.isRetreating
@@ -175,8 +186,10 @@ function X.SkillsComplement()
 		lastBedlamTime = DotaTime()
 		return
 	end
-	shadowRealmDesire = X.ConsiderShadowRealm()
+	local shadowRealmWhy, shadowRealmTarget
+	shadowRealmDesire, shadowRealmWhy, shadowRealmTarget = X.ConsiderShadowRealm()
 	if shadowRealmDesire > 0 then
+		X.StartShadowRealm(shadowRealmWhy, shadowRealmTarget)
 		bot:Action_UseAbility(shadowRealmAbility)
 		-- return: without it the Cursed Crown order below replaced Shadow Realm in the same frame.
 		return
@@ -233,10 +246,14 @@ function X.ConsiderShadowRealm()
 		return BOT_ACTION_DESIRE_NONE
 	end
 	local attackRangeBonus = shadowRealmAbility:GetSpecialValueInt("attack_range_bonus")
+	if attackRangeBonus <= 0 then
+		attackRangeBonus = 600
+	end
 	local attackRange = bot:GetAttackRange()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, attackRange + attackRangeBonus, true, BOT_MODE_NONE)
 	botTarget = Fu.GetProperTarget(bot)
 	if isGoingOnSomeone then
+		-- Dodge: hurt in a fight against 2+ (the old rule, kept). The hit after it still ends the realm.
 		if
 			hpRatio < 0.5
 			and Fu.IsValidHero(botTarget)
@@ -248,7 +265,28 @@ function X.ConsiderShadowRealm()
 			and nearbyEnemies ~= nil
 			and #nearbyEnemies >= 2
 		then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "dodge", botTarget
+		end
+		-- Attack (#48, maintainer game 067 4:50): go on the target within attack range + 600, hold the hit up to 3s
+		-- for the full bonus (X.ShadowRealmTick). Only in the attack mode, the one whose attack order the hold
+		-- replaces (override_generic/mode_attack_generic.lua); another mode's attack would end the realm at once.
+		-- The bonus is magic damage: not on a magic-immune target. Mana for Cursed Crown stays.
+		local crownCost = cursedCrownAbility:IsTrained() and cursedCrownAbility:GetManaCost() or 0
+		if
+			bot:GetActiveMode() == BOT_MODE_ATTACK
+			and Fu.IsValidHero(botTarget)
+			and not Fu.IsSuspiciousIllusion(botTarget)
+			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and not botTarget:IsAttackImmune()
+			and not botTarget:HasModifier("modifier_abaddon_borrowed_time")
+			and not botTarget:HasModifier("modifier_dazzle_shallow_grave")
+			and GetUnitToUnitDistance(bot, botTarget) <= attackRange + attackRangeBonus
+			and not Fu.IsRealInvisible(bot)
+			and bot:GetMana() - shadowRealmAbility:GetManaCost() >= crownCost
+			and botTarget:GetHealth()
+				> botTarget:GetActualIncomingDamage(bot:GetAttackDamage() * 2, DAMAGE_TYPE_PHYSICAL)
+		then
+			return BOT_ACTION_DESIRE_HIGH, "attack", botTarget
 		end
 	end
 	if
@@ -258,11 +296,305 @@ function X.ConsiderShadowRealm()
 		and #nearbyEnemies >= 1
 	then
 		if Fu.DidEnemyCastAbility() or hpRatio < 0.5 or Fu.IsStunProjectileIncoming(bot, 800) then
-			return BOT_ACTION_DESIRE_HIGH
+			return BOT_ACTION_DESIRE_HIGH, "retreat", nil
 		end
-		return BOT_ACTION_DESIRE_MODERATE
+		return BOT_ACTION_DESIRE_MODERATE, "retreat", nil
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- The realm she is in (bot._dwRealm): why (attack | dodge | retreat), the cast time, the target, her attack range
+-- at the cast (GetAttackRange may already add the +600 inside the realm) and the bonus values from the ability.
+function X.StartShadowRealm(why, target)
+	local bonusRange = shadowRealmAbility:GetSpecialValueInt("attack_range_bonus")
+	if bonusRange <= 0 then
+		bonusRange = 600
+	end
+	local maxTime = shadowRealmAbility:GetSpecialValueFloat("max_damage_duration")
+	if maxTime <= 0 then
+		maxTime = ShadowRealmRules.MAX_DAMAGE_TIME
+	end
+	local duration = shadowRealmAbility:GetSpecialValueFloat("duration")
+	if duration <= 0 then
+		duration = ShadowRealmRules.DURATION
+	end
+	bot._dwRealm = {
+		why = why or "retreat",
+		at = DotaTime(),
+		target = target,
+		baseRange = bot:GetAttackRange(),
+		bonusRange = bonusRange,
+		maxDamage = shadowRealmAbility:GetSpecialValueInt("damage"),
+		maxTime = maxTime,
+		duration = duration,
+		tp = "-",
+	}
+	pcall(
+		print,
+		string.format(
+			"[OHA-DW] t=%.0f dark_willow shadow-realm-cast why=%s target=%s dist=%d hp=%.2f mode=%d",
+			DotaTime(),
+			tostring(why),
+			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			target ~= nil and GetUnitToUnitDistance(bot, target) or -1,
+			Fu.GetHP(bot),
+			bot:GetActiveMode()
+		)
+	)
+end
+-- [OHA-DW] t= dark_willow shadow-realm why=attack|dodge|retreat held= ended= release= tp= dist= mod= invuln=, one
+-- line per realm when it ends. held: seconds from the cast to the release order (attack) or to the end; ended: when
+-- the realm was seen to end (the hit landed; about 5.2 when it ran out, or when the modifier was never seen).
+function X.EndShadowRealm(realm, since)
+	bot._dwRealm = nil
+	local target = realm.target
+	local dist = -1
+	if target ~= nil and not target:IsNull() and target:IsAlive() and target:CanBeSeen() then
+		dist = GetUnitToUnitDistance(bot, target)
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-DW] t=%.0f dark_willow shadow-realm why=%s held=%.2f ended=%.2f release=%s tp=%s target=%s dist=%d mod=%s invuln=%s",
+			DotaTime(),
+			realm.why,
+			realm.releasedAt or since,
+			since,
+			tostring(realm.released or "-"),
+			tostring(realm.tp),
+			target ~= nil and not target:IsNull() and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			dist,
+			realm.modSeen ~= nil and string.format("%.2f", realm.modSeen) or "no",
+			tostring(realm.invuln == true)
+		)
+	)
+end
+-- Another allied hero within 1500 in the attack mode (the TP rule's attackingAllies, without herself).
+function X.AllyFighting()
+	for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1500, false, BOT_MODE_ATTACK) or {}) do
+		if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+			return true
+		end
+	end
+	return false
+end
+-- Her TP: the TP slot (15) or Boots of Travel in the main slots, ready.
+function X.TeleportItem()
+	for _, name in ipairs({ "item_tpscroll", "item_travel_boots", "item_travel_boots_2" }) do
+		local slot = bot:FindItemSlot(name)
+		if slot == 15 or slot >= 0 and slot <= 5 then
+			local item = bot:GetItemInSlot(slot)
+			if item ~= nil and not item:IsNull() and item:IsFullyCastable() then
+				return item
+			end
+		end
+	end
+	return nil
+end
+-- An escape realm: TP home at once, so the 3s channel ends inside the 5s untargetable time (#48, game 067 17:06:
+-- realm, then a walk, a TP 4s later, dead after the realm ended). The generic TP rule waits out an enemy tower
+-- within 888 (she was 320 from one); towers can't target her in the realm. HP under 0.45 and over 4900 from the
+-- fountain, hit by a hero in the last 6s, no ally fighting within 1500: the gates of the TP rule's own retreat TP
+-- (ability_item_usage_generic.lua 撤退:2: HP under 15% + 24% per enemy hero within 1600, at most 45%), and its
+-- channel gates that still apply (Usage.TpGatesClosed: rooted, already teleporting, Nethertoxin, Macropyre) plus a
+-- hero script's own TP hold (bot._noTpUntil). tp=ordered until the channel shows; up to 3 orders while it fits
+-- (a TP scroll can't start rooted: items_all.txt ROOT_DISABLES), then tp=now, or tp=failed.
+function X.ShadowRealmTeleport(realm, since, castDone)
+	if not castDone or realm.tp ~= "-" and realm.tp ~= "ordered" then
+		return false
+	end
+	if realm.tp == "ordered" and since - realm.tpAt < 0.4 then
+		return false
+	end
+	local fits = ShadowRealmRules.TpFits(since, realm.duration, ShadowRealmRules.TP_CHANNEL, 0.3)
+	if realm.tp == "ordered" then
+		if not fits or realm.tpTries >= 3 then
+			realm.tp = "failed"
+			return false
+		end
+	else
+		local enemyCount = #Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		local hpLine = math.min(0.15 + 0.24 * enemyCount, 0.45)
+		local tp = X.TeleportItem()
+		if tp == nil then
+			realm.tp = "none"
+		elseif not fits then
+			realm.tp = "late"
+		elseif Fu.GetHP(bot) >= hpLine then
+			realm.tp = "skip-hp"
+		elseif bot:DistanceFromFountain() <= 4900 then
+			realm.tp = "skip-near"
+		elseif not bot:WasRecentlyDamagedByAnyHero(6.0) then
+			realm.tp = "skip-safe"
+		elseif X.AllyFighting() then
+			realm.tp = "skip-allies"
+		elseif
+			bot:IsRooted()
+			or bot:HasModifier("modifier_teleporting")
+			or bot:HasModifier("modifier_viper_nethertoxin")
+			or bot:HasModifier("modifier_jakiro_macropyre_burn")
+			or DotaTime() < (bot._noTpUntil or -999)
+		then
+			realm.tp = "skip-gate"
+		end
+		if realm.tp ~= "-" then
+			return false
+		end
+		realm.tpTries = 0
+	end
+	local tp = X.TeleportItem()
+	if tp == nil then
+		realm.tp = realm.tp == "ordered" and "failed" or "none"
+		return false
+	end
+	realm.tp = "ordered"
+	realm.tpAt = since
+	realm.tpTries = realm.tpTries + 1
+	bot:Action_UseAbilityOnLocation(tp, Fu.GetTeamFountain())
+	return true
+end
+-- Every think while she is in a realm. Attack realm: keep within attack range + 600 of the target and hold the hit
+-- until the bonus is full (ShadowRealmRules.HoldStep), then one attack. Retreat realm: the TP. Returns true when it
+-- gave an order the spells below must not replace (the hit, the TP); hold moves return false so a spell can still go
+-- out. Also called by the attack mode's Think (bot._attackHold), in place of its attack order.
+function X.ShadowRealmTick()
+	local realm = bot._dwRealm
+	if realm == nil then
+		return false
+	end
+	local since = DotaTime() - realm.at
+	local inRealm = bot:HasModifier("modifier_dark_willow_shadow_realm_buff")
+	if inRealm and realm.modSeen == nil then
+		realm.modSeen = since
+		realm.invuln = bot:IsInvulnerable()
+	end
+	-- The cast went out: the modifier is on, or the ability went on cooldown (in case the modifier name is wrong).
+	local castDone = inRealm or shadowRealmAbility:GetCooldownTimeRemaining() > 0
+	if since > 0.5 and not castDone then
+		realm.released = realm.released or "no-cast"
+		X.EndShadowRealm(realm, since)
+		return false
+	end
+	if since > realm.duration + 0.2 or realm.modSeen ~= nil and not inRealm then
+		X.EndShadowRealm(realm, since)
+		return false
+	end
+	if realm.tp == "ordered" and bot:IsChanneling() then
+		realm.tp = "now"
+	end
+	if bot:IsChanneling() or bot:IsCastingAbility() or Fu.CanNotUseAction(bot) then
+		return false
+	end
+	if realm.why == "retreat" then
+		return X.ShadowRealmTeleport(realm, since, castDone)
+	end
+	if realm.why ~= "attack" or realm.released ~= nil or not castDone then
+		return false
+	end
+	local target = realm.target
+	if not Fu.IsValidHero(target) or not target:CanBeSeen() then
+		realm.released, realm.releasedAt = "target-gone", since
+		return false
+	end
+	if bot:GetActiveMode() ~= BOT_MODE_ATTACK then
+		realm.released, realm.releasedAt = "mode", since
+		return false
+	end
+	local holdRange = realm.baseRange + realm.bonusRange
+	local dist = GetUnitToUnitDistance(bot, target)
+	local bonusNow = ShadowRealmRules.BonusDamage(realm.maxDamage, since, realm.maxTime)
+	local hitNow = target:GetActualIncomingDamage(bonusNow, DAMAGE_TYPE_MAGICAL)
+		+ target:GetActualIncomingDamage(bot:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+	local killNow = target:GetHealth() <= hitNow
+	local allyNeeds = false
+	for _, ally in pairs(Fu.GetNearbyHeroes(target, 900, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+			-- An ally next to a nearly dead target finishes it anyway.
+			if Fu.GetHP(target) < 0.15 and GetUnitToUnitDistance(ally, target) <= 700 then
+				killNow = true
+			end
+			if
+				Fu.GetHP(ally) < 0.35
+				and (target:GetAttackTarget() == ally or ally:WasRecentlyDamagedByHero(target, 1.0))
+			then
+				allyNeeds = true
+			end
+		end
+	end
+	local action, why = ShadowRealmRules.HoldStep({
+		since = since,
+		maxTime = realm.maxTime,
+		dist = dist,
+		holdRange = holdRange,
+		predictedDist = GetUnitToLocationDistance(bot, target:GetExtrapolatedLocation(0.5)),
+		canFollow = bot:GetCurrentMovementSpeed() > target:GetCurrentMovementSpeed() + 10,
+		killNow = killNow,
+		allyNeeds = allyNeeds,
+	})
+	if action == "attack" then
+		realm.released, realm.releasedAt = why, since
+		bot:Action_AttackUnit(target, true)
+		return true
+	end
+	-- A move order every think, so she never stands idle (an idle unit's own attack would end the realm early).
+	local targetLocation = target:GetLocation()
+	local point
+	if action == "close" then
+		point = target:GetExtrapolatedLocation(0.5)
+	else
+		-- Hold: step 25 degrees around the target at her distance, the way that ends nearer our fountain, so she
+		-- settles on the target's home side (not behind it or under its tower) when the hit makes her targetable.
+		local here = bot:GetLocation()
+		local dx, dy = here.x - targetLocation.x, here.y - targetLocation.y
+		local fountain = Fu.GetTeamFountain()
+		local best, bestDist = nil, nil
+		for _, sign in ipairs({ 1, -1 }) do
+			local angle = math.rad(25) * sign
+			local candidate = Vector(
+				targetLocation.x + dx * math.cos(angle) - dy * math.sin(angle),
+				targetLocation.y + dx * math.sin(angle) + dy * math.cos(angle),
+				here.z
+			)
+			local toFountain = Fu.GetLocationToLocationDistance(candidate, fountain)
+			if bestDist == nil or toFountain < bestDist then
+				best, bestDist = candidate, toFountain
+			end
+		end
+		point = best
+	end
+	bot:Action_MoveToLocation(point)
+	return false
+end
+-- The attack mode asks this before its own attack order (override_generic/mode_attack_generic.lua): true when the
+-- realm gave the order (the hold move or the hit), or the realm cast is still going out (an attack order would
+-- replace it).
+bot._attackHold = function()
+	local realm = bot._dwRealm
+	if realm == nil or realm.why ~= "attack" or realm.released ~= nil then
+		return false
+	end
+	local ok, order = pcall(X.ShadowRealmTick)
+	if not ok then
+		X.LogRealmError(order)
+		return false
+	end
+	if order then
+		return true
+	end
+	realm = bot._dwRealm
+	return realm ~= nil and realm.released == nil
+end
+-- A Lua error in the realm tick (both callers pcall it): [OHA-ERROR] once per distinct message, at most 3, and the
+-- realm state is dropped so a broken hold never keeps her from attacking.
+local realmErrors = {}
+function X.LogRealmError(err)
+	bot._dwRealm = nil
+	local key = tostring(err)
+	if realmErrors[key] or #realmErrors >= 3 then
+		return
+	end
+	realmErrors[key] = true
+	realmErrors[#realmErrors + 1] = key
+	pcall(print, string.format("[OHA-ERROR] t=%.1f dark_willow ShadowRealmTick: %s", DotaTime(), key))
 end
 function X.ConsiderCurseCrown()
 	if not cursedCrownAbility:IsFullyCastable() then

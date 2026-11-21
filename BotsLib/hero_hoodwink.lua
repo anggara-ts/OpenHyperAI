@@ -153,13 +153,29 @@ local ACORN_TREE_DURATION = 20
 -- A tree planted for the combo is thrown at with Bushwhack on that target for this long; after it, only on the
 -- attack target.
 local ACORN_COMBO_WINDOW = 3
+-- An Acorn Shot or Bushwhack order that another order (a mode's move) replaced before it left is given again for
+-- this long; after it the cast is logged as lost.
+local CAST_REISSUE_WINDOW = 1.0
+-- No acorn-tree combo with an enemy hero this close to her: it takes two casts (0.2s cast point each, datafeed
+-- hero_id=123) from Acorn range (675-750), and a hero that close hits her first. The acorn bounces instead.
+local ACORN_COMBO_MIN_ENEMY_DIST = 500
+-- Bushwhack save: an ally under this HP who took damage from an enemy hero within the last SAVE_RECENT_HIT seconds,
+-- in any mode (a retreating ally who was hit still counts at any HP, as before).
+local SAVE_ALLY_HP = 0.5
+local SAVE_RECENT_HIT = 2.5
 local sharpshooterWindup = nil -- { startedAt, target, startFacing, reaims, released }
 local acornTree = nil -- { location, plantedAt, target }
-local acornTreeProbe = nil -- { location, orderedAt, castAt }
+local acornTreeProbe = nil -- { location, castAt }
+local acornPending = nil -- { mode, location, target, why, orderedAt, reissues }
+local bushwhackPending = nil -- { center, why, target, expected, orderedAt, reissues, castAt, checkAt }
+local scurryRun = nil -- { why, target, startedAt, duration, startDist, minDist, reach, ready, used, active, deaths, hp }
 local lastAcornLogAt = -100
+local lastAcornLostLogAt = -100
+local lastBushwhackSkipLogAt = -100
+local lastBushwhackSaveCheckAt = -100
 local acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy
-local bushwhackDesire, bushwhackLocation
-local scurryDesire
+local bushwhackDesire, bushwhackLocation, bushwhackWhy, bushwhackTarget, bushwhackExpected, bushwhackNote
+local scurryDesire, scurryPlan
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
 -- Scurry, game data 7.42 (npc_dota_hero_hoodwink.txt): 2 charges (restore 30/24/18/12s), 35 mana,
 -- movement_speed_pct 20/24/28/32 for duration 3.5/4/4.5/5s. Fallbacks when the API reads 0: level 1 values.
@@ -167,6 +183,9 @@ local SCURRY_FALLBACK_SPEED_PCT = 20
 local SCURRY_FALLBACK_DURATION = 3.5
 -- Sharpshooter is cast from this range (ConsiderSharpshooter), not its 3000 game-file range.
 local SHARPSHOOTER_CAST_RANGE = 1600
+-- Scurry to reach a cast spot only for a walk up to this long (game 064: a 2049 walk after Abaddon, who was faster
+-- than her, ended with no spell on him).
+local SCURRY_POSITION_MAX_WALK = 1000
 local lastScurryOrderAt = -100
 local lastScurryLogAt = -100
 local huntersBoomerangDesire, huntersBoomerangTarget
@@ -183,6 +202,9 @@ function X.SkillsComplement()
 	hpRatio = context.hp
 	-- Charging Sharpshooter: aim and release come before the busy check (it may count the windup as a cast),
 	-- and nothing else is cast meanwhile.
+	-- Results of earlier casts (acorn-cast / acorn-lost, bushwhack-result, scurry-result) come before every gate, so
+	-- they print while she is stunned or casting too.
+	pcall(X.ThinkCastResults)
 	pcall(X.ProbeAcornTree)
 	if X.ThinkSharpshooterWindup() then
 		return
@@ -190,22 +212,27 @@ function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
+	if X.ReissuePendingCast() then
+		return
+	end
 	acornShotDesire, acornShotLocation, acornShotTarget, acornShotWhy = X.ConsiderAcornShot()
 	if acornShotDesire > 0 then
 		X.CastAcornShot(acornShotLocation, acornShotTarget, acornShotWhy)
 		return
 	end
-	bushwhackDesire, bushwhackLocation = X.ConsiderBushwhack()
+	bushwhackDesire, bushwhackLocation, bushwhackWhy, bushwhackTarget, bushwhackExpected, bushwhackNote =
+		X.ConsiderBushwhack()
 	if bushwhackDesire > 0 then
-		bot:Action_UseAbilityOnLocation(bushwhackAbility, bushwhackLocation)
+		X.CastBushwhack(bushwhackLocation, bushwhackWhy, bushwhackTarget, bushwhackExpected, bushwhackNote)
 		return
 	end
-	scurryDesire = X.ConsiderScurry()
+	scurryDesire, scurryPlan = X.ConsiderScurry()
 	if scurryDesire > 0 then
 		bot:Action_UseAbility(scurryAbility)
 		-- No cast point, so the charge tracker only sees the cast through this mark and the mana drop.
 		pcall(ChargeTracker.Issued, bot, scurryAbility)
 		lastScurryOrderAt = DotaTime()
+		X.StartScurryRun(scurryPlan)
 		return
 	end
 	huntersBoomerangDesire, huntersBoomerangTarget = X.ConsiderHuntersBoomerang()
@@ -282,9 +309,12 @@ function X.ConsiderAcornShot()
 	if isGoingOnSomeone then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange + 100, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
+		-- Only a target in range. Game 064: 12 of 25 tree-mode acorns never left; most came right after attack mode
+		-- picked a target 2100-6900 away to follow an ally, so she walked toward it until another order replaced it.
 		if
 			Fu.IsValidTarget(botTarget)
 			and Fu.CanCastOnNonMagicImmune(botTarget)
+			and Fu.IsInRange(bot, botTarget, castRange)
 			and not Fu.IsDisabled(botTarget)
 			and nearbyAllies ~= nil
 			and nearbyEnemies ~= nil
@@ -329,7 +359,8 @@ function X.ConsiderAcornShot()
 end
 -- Acorn Shot, by the goal. "tree": the acorn goes on the ground by the target and plants a tree for Bushwhack.
 -- "bounce": it goes on the unit and bounces between the enemies around it. "ground": on the ground, no combo.
-function X.AcornShotMode(why, bushwhackReady, manaForBoth, targetCanBeTrapped, treeNearTarget)
+-- enemyClose: an enemy hero within ACORN_COMBO_MIN_ENEMY_DIST of her (no time for the two-cast combo).
+function X.AcornShotMode(why, bushwhackReady, manaForBoth, targetCanBeTrapped, treeNearTarget, enemyClose)
 	if why == "wave" then
 		return "tree"
 	end
@@ -338,7 +369,7 @@ function X.AcornShotMode(why, bushwhackReady, manaForBoth, targetCanBeTrapped, t
 	if not targetCanBeTrapped then
 		return "ground"
 	end
-	if why ~= "kill" and bushwhackReady and manaForBoth and not treeNearTarget then
+	if why ~= "kill" and bushwhackReady and manaForBoth and not treeNearTarget and not enemyClose then
 		return "tree"
 	end
 	return "bounce"
@@ -352,20 +383,145 @@ function X.BushwhackCenterForTree(enemyLocation, treeLocation, radius)
 	end
 	return (enemyLocation + treeLocation) / 2
 end
+-- The Bushwhack centre that nets the most enemies, or nil. The net only stuns what it pulls to a tree, so a centre
+-- counts only with a tree inside it. Candidates: each enemy, the midpoint of two enemies, and the point halfway
+-- between an enemy and a tree. Everything is counted 25 inside the radius. mustNet: an index into enemyLocations
+-- that the net has to hold (the acorn's target), or nil. Returns centre, count.
+function X.BestNetSpot(enemyLocations, treeLocations, radius, mustNet)
+	local reach = radius - 25
+	local candidates = {}
+	for i, enemyLocation in ipairs(enemyLocations) do
+		table.insert(candidates, enemyLocation)
+		for j = i + 1, #enemyLocations do
+			if Fu.GetLocationToLocationDistance(enemyLocation, enemyLocations[j]) <= 2 * reach then
+				table.insert(candidates, (enemyLocation + enemyLocations[j]) / 2)
+			end
+		end
+		for _, treeLocation in ipairs(treeLocations) do
+			local center = X.BushwhackCenterForTree(enemyLocation, treeLocation, radius)
+			if center ~= nil then
+				table.insert(candidates, center)
+			end
+		end
+	end
+	local bestCenter, bestCount = nil, 0
+	for _, center in ipairs(candidates) do
+		local hasTree = false
+		for _, treeLocation in ipairs(treeLocations) do
+			if Fu.GetLocationToLocationDistance(center, treeLocation) <= reach then
+				hasTree = true
+				break
+			end
+		end
+		if hasTree then
+			local count, holdsMust = 0, mustNet == nil
+			for i, enemyLocation in ipairs(enemyLocations) do
+				if Fu.GetLocationToLocationDistance(center, enemyLocation) <= reach then
+					count = count + 1
+					if i == mustNet then
+						holdsMust = true
+					end
+				end
+			end
+			if holdsMust and count > bestCount then
+				bestCenter, bestCount = center, count
+			end
+		end
+	end
+	return bestCenter, bestCount
+end
+-- Where to plant the acorn tree for the combo: at the target, or halfway to another enemy within one net of it so
+-- that Bushwhack on the planted tree holds both. otherLocations: the other enemy heroes. Returns spot, count.
+function X.AcornTreeSpot(targetLocation, otherLocations, radius)
+	local reach = radius - 25
+	local bestSpot, bestCount = targetLocation, 1
+	for _, otherLocation in ipairs(otherLocations) do
+		if Fu.GetLocationToLocationDistance(targetLocation, otherLocation) <= 2 * reach then
+			local spot = (targetLocation + otherLocation) / 2
+			local count = 1
+			for _, location in ipairs(otherLocations) do
+				if Fu.GetLocationToLocationDistance(spot, location) <= reach then
+					count = count + 1
+				end
+			end
+			if count > bestCount then
+				bestSpot, bestCount = spot, count
+			end
+		end
+	end
+	return bestSpot, bestCount
+end
+-- Enemy heroes Bushwhack could net, at where they will be when the net lands: locations, units.
+local function NetCandidates(nearLocation, nearRadius, castRange, radius, castPoint, projectileSpeed)
+	local locations, units = {}, {}
+	for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(nearLocation, nearRadius)) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and Fu.CanCastOnNonMagicImmune(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and not Fu.IsDisabled(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange + radius)
+		then
+			local delay = GetUnitToUnitDistance(bot, enemyHero) / math.max(1, projectileSpeed) + castPoint
+			table.insert(locations, enemyHero:GetExtrapolatedLocation(delay))
+			table.insert(units, enemyHero)
+		end
+	end
+	return locations, units
+end
+-- Tree locations within one net of any of the locations (GetNearbyTrees is read once, around her).
+local function TreesNear(locations, radius)
+	local trees = {}
+	if #locations == 0 then
+		return trees
+	end
+	for _, tree in pairs(bot:GetNearbyTrees(1600) or {}) do
+		local treeLocation = GetTreeLocation(tree)
+		for _, location in ipairs(locations) do
+			if Fu.GetLocationToLocationDistance(treeLocation, location) <= 2 * radius then
+				table.insert(trees, treeLocation)
+				break
+			end
+		end
+	end
+	return trees
+end
+local function ShortName(unit)
+	if unit == nil or not Fu.IsValid(unit) then
+		return "none"
+	end
+	return (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
+end
+local function IssueAcornShot(pending)
+	if pending.mode == "bounce" then
+		bot:Action_UseAbilityOnEntity(acornShotAbility, pending.target)
+	else
+		bot:Action_UseAbilityOnLocation(acornShotAbility, pending.location)
+	end
+end
 function X.CastAcornShot(location, target, why)
 	local mode
 	local nearCount = 0
+	local netCount = 0
 	if target == nil then
 		mode = "tree"
 	else
 		local trapRadius = bushwhackAbility:GetSpecialValueInt("trap_radius")
 		local trees = target:GetNearbyTrees(trapRadius - 25)
+		local enemyClose = false
+		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, ACORN_COMBO_MIN_ENEMY_DIST, true, BOT_MODE_NONE) or {}) do
+			if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+				enemyClose = true
+				break
+			end
+		end
 		mode = X.AcornShotMode(
 			why,
 			bushwhackAbility:IsTrained() and bushwhackAbility:GetCooldownTimeRemaining() <= 0.5,
 			bot:GetMana() >= acornShotAbility:GetManaCost() + bushwhackAbility:GetManaCost(),
 			Fu.CanCastOnNonMagicImmune(target),
-			trees ~= nil and #trees > 0
+			trees ~= nil and #trees > 0,
+			enemyClose
 		)
 		local bounceRange = acornShotAbility:GetSpecialValueInt("bounce_range")
 		local heroesNear = Fu.GetEnemiesNearLoc(target:GetLocation(), bounceRange)
@@ -375,46 +531,258 @@ function X.CastAcornShot(location, target, why)
 				nearCount = nearCount + 1
 			end
 		end
+		if mode == "tree" then
+			-- A spot that nets a second enemy too, if one stands within one net of the target and in Acorn range.
+			local otherLocations = {}
+			for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(target:GetLocation(), 2 * trapRadius)) do
+				if
+					Fu.IsValidHero(enemyHero)
+					and enemyHero ~= target
+					and Fu.CanCastOnNonMagicImmune(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+				then
+					local delay = GetUnitToUnitDistance(bot, enemyHero)
+							/ math.max(1, acornShotAbility:GetSpecialValueInt("projectile_speed"))
+						+ acornShotAbility:GetCastPoint()
+					table.insert(otherLocations, enemyHero:GetExtrapolatedLocation(delay))
+				end
+			end
+			local spot, count = X.AcornTreeSpot(location, otherLocations, trapRadius)
+			netCount = 1
+			if
+				count >= 2
+				and GetUnitToLocationDistance(bot, spot)
+					<= Fu.GetProperCastRange(false, bot, acornShotAbility:GetCastRange())
+			then
+				location, netCount = spot, count
+			end
+		end
 	end
 	if DotaTime() - lastAcornLogAt >= 3 then
 		lastAcornLogAt = DotaTime()
 		print(
 			string.format(
-				"[OHA-HOODWINK] t=%.0f hoodwink acorn mode=%s why=%s target=%s near=%d",
+				"[OHA-HOODWINK] t=%.0f hoodwink acorn mode=%s why=%s target=%s near=%d net=%d dist=%d",
 				DotaTime(),
 				mode,
 				tostring(why),
-				target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "ground",
-				nearCount
+				target ~= nil and ShortName(target) or "ground",
+				nearCount,
+				netCount,
+				math.floor(
+					target ~= nil and GetUnitToUnitDistance(bot, target) or GetUnitToLocationDistance(bot, location)
+				)
 			)
 		)
 	end
-	if mode == "bounce" then
-		bot:Action_UseAbilityOnEntity(acornShotAbility, target)
-		return
-	end
-	if mode == "tree" and target ~= nil then
-		acornTree = { location = location, plantedAt = DotaTime(), target = target }
-		acornTreeProbe = { location = location, orderedAt = DotaTime() }
-	end
-	bot:Action_UseAbilityOnLocation(acornShotAbility, location)
+	acornPending = {
+		mode = mode,
+		location = location,
+		target = target,
+		why = why,
+		net = netCount,
+		orderedAt = DotaTime(),
+		reissues = 0,
+	}
+	IssueAcornShot(acornPending)
 end
--- Does the API list a planted tree? One second after the acorn left (its cooldown runs; it flies for at most
--- 0.35s), the distance from the planted spot to the nearest tree GetNearbyTrees returns. Tree mode is only used
--- with no tree within 250 of the target, so a tree within 60 of the spot is the planted one.
+-- A pending Acorn Shot or Bushwhack whose order was replaced (she is free to act, the spell is still ready) is
+-- ordered again, for CAST_REISSUE_WINDOW seconds. True when an order was given.
+function X.ReissuePendingCast()
+	local acorn = acornPending
+	if
+		acorn ~= nil
+		and DotaTime() - acorn.orderedAt <= CAST_REISSUE_WINDOW
+		and acornShotAbility:IsFullyCastable()
+		and (acorn.target == nil or Fu.IsValid(acorn.target) and acorn.target:IsAlive())
+	then
+		acorn.reissues = acorn.reissues + 1
+		IssueAcornShot(acorn)
+		return true
+	end
+	local net = bushwhackPending
+	if
+		net ~= nil
+		and net.castAt == nil
+		and DotaTime() - net.orderedAt <= CAST_REISSUE_WINDOW
+		and bushwhackAbility:IsFullyCastable()
+	then
+		net.reissues = net.reissues + 1
+		bot:Action_UseAbilityOnLocation(bushwhackAbility, net.center)
+		return true
+	end
+	return false
+end
+-- Why a pending cast did not leave in time.
+local function LostReason(target, location, castRange)
+	if not bot:IsAlive() then
+		return "dead"
+	end
+	if bot:IsStunned() or bot:IsSilenced() or bot:IsHexed() then
+		return "disabled"
+	end
+	if target ~= nil and not (Fu.IsValid(target) and target:IsAlive()) then
+		return "target-gone"
+	end
+	local distance = target ~= nil and Fu.IsValid(target) and GetUnitToUnitDistance(bot, target)
+		or GetUnitToLocationDistance(bot, location)
+	if distance > castRange + 100 then
+		return "out-of-range"
+	end
+	return "replaced"
+end
+-- The Hoodwink spells whose cast after a Scurry is checked (scurry-result spell=).
+local function ScurrySpells()
+	return {
+		{ "acorn", acornShotAbility },
+		{ "bushwhack", bushwhackAbility },
+		{ "sharpshooter", sharpshooterAbility },
+	}
+end
+function X.ThinkCastResults()
+	local now = DotaTime()
+	local acorn = acornPending
+	if acorn ~= nil then
+		if not acornShotAbility:IsCooldownReady() then
+			print(
+				string.format(
+					"[OHA-HOODWINK] t=%.0f hoodwink acorn-cast mode=%s why=%s target=%s net=%d after=%.2f reissues=%d",
+					now,
+					acorn.mode,
+					tostring(acorn.why),
+					acorn.target ~= nil and ShortName(acorn.target) or "ground",
+					acorn.net or 0,
+					now - acorn.orderedAt,
+					acorn.reissues
+				)
+			)
+			-- The tree is remembered from the moment the acorn left (its cooldown runs), not from the order.
+			if acorn.mode == "tree" and acorn.target ~= nil then
+				acornTree = { location = acorn.location, plantedAt = now, target = acorn.target }
+				acornTreeProbe = { location = acorn.location, castAt = now }
+			end
+			acornPending = nil
+		elseif now - acorn.orderedAt > CAST_REISSUE_WINDOW and not acornShotAbility:IsInAbilityPhase() then
+			if now - lastAcornLostLogAt >= 3 then
+				lastAcornLostLogAt = now
+				print(
+					string.format(
+						"[OHA-HOODWINK] t=%.0f hoodwink acorn-lost why=%s mode=%s target=%s reissues=%d",
+						now,
+						LostReason(
+							acorn.target,
+							acorn.location,
+							Fu.GetProperCastRange(false, bot, acornShotAbility:GetCastRange())
+						),
+						acorn.mode,
+						acorn.target ~= nil and ShortName(acorn.target) or "ground",
+						acorn.reissues
+					)
+				)
+			end
+			acornPending = nil
+		end
+	end
+	local net = bushwhackPending
+	if net ~= nil then
+		if net.castAt == nil then
+			if not bushwhackAbility:IsCooldownReady() then
+				net.castAt = now
+				-- The net flies at projectile_speed (1200, datafeed); the stun (debuff_duration 1.4-2s) is read
+				-- 0.4s after it lands.
+				local speed = math.max(1, bushwhackAbility:GetSpecialValueInt("projectile_speed"))
+				net.checkAt = now + GetUnitToLocationDistance(bot, net.center) / speed + 0.4
+			elseif now - net.orderedAt > CAST_REISSUE_WINDOW and not bushwhackAbility:IsInAbilityPhase() then
+				print(
+					string.format(
+						"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result why=%s cast=false lost=%s netted=0 expect=%d target=%s",
+						now,
+						net.why,
+						LostReason(nil, net.center, Fu.GetProperCastRange(false, bot, bushwhackAbility:GetCastRange())),
+						net.expected,
+						ShortName(net.target)
+					)
+				)
+				bushwhackPending = nil
+			end
+		elseif now >= net.checkAt then
+			local radius = bushwhackAbility:GetSpecialValueInt("trap_radius")
+			local netted = 0
+			for _, enemyHero in pairs(Fu.GetEnemiesNearLoc(net.center, radius + 150)) do
+				if Fu.IsValidHero(enemyHero) and enemyHero:IsStunned() then
+					netted = netted + 1
+				end
+			end
+			-- The net's modifier name is not in the game data we have: list the target's Hoodwink modifiers so a
+			-- game shows it.
+			local mods = {}
+			if Fu.IsValidHero(net.target) then
+				for i = 0, net.target:NumModifiers() - 1 do
+					local name = net.target:GetModifierName(i)
+					if name ~= nil and string.find(name, "hoodwink", 1, true) then
+						table.insert(mods, name)
+					end
+				end
+			end
+			print(
+				string.format(
+					"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-result why=%s cast=true netted=%d expect=%d target=%s targetStunned=%s mods=%s late=%.1f",
+					now,
+					net.why,
+					netted,
+					net.expected,
+					ShortName(net.target),
+					tostring(Fu.IsValidHero(net.target) and net.target:IsStunned()),
+					#mods > 0 and table.concat(mods, ",") or "-",
+					now - net.checkAt
+				)
+			)
+			bushwhackPending = nil
+		end
+	end
+	local run = scurryRun
+	if run ~= nil then
+		if bot:HasModifier("modifier_hoodwink_scurry_active") then
+			run.active = true
+		end
+		if Fu.IsValidHero(run.target) and run.target:CanBeSeen() then
+			run.minDist = math.min(run.minDist, GetUnitToUnitDistance(bot, run.target))
+		end
+		for _, spell in ipairs(ScurrySpells()) do
+			if run.used == nil and run.ready[spell[1]] and not spell[2]:IsCooldownReady() then
+				run.used = spell[1]
+			end
+		end
+		if now >= run.startedAt + run.duration then
+			local died = GetHeroDeaths(bot:GetPlayerID()) > run.deaths
+			print(
+				string.format(
+					"[OHA-HOODWINK] t=%.0f hoodwink scurry-result why=%s target=%s reached=%s startDist=%d minDist=%d reach=%d spell=%s cast=%s died=%s hp=%.2f->%.2f late=%.1f",
+					now,
+					run.why,
+					ShortName(run.target),
+					tostring(run.minDist <= run.reach),
+					math.floor(run.startDist),
+					math.floor(run.minDist),
+					math.floor(run.reach),
+					run.used or "none",
+					tostring(run.active),
+					tostring(died),
+					run.hp,
+					Fu.GetHP(bot),
+					now - run.startedAt - run.duration
+				)
+			)
+			scurryRun = nil
+		end
+	end
+end
+-- Does the API list a planted tree? One second after the acorn left, the distance from the planted spot to the
+-- nearest tree GetNearbyTrees returns. Tree mode is only used with no tree within 250 of the target, so a tree
+-- within 60 of the spot is the planted one.
 function X.ProbeAcornTree()
 	local probe = acornTreeProbe
-	if probe == nil then
-		return
-	end
-	if acornShotAbility:IsCooldownReady() then
-		if DotaTime() > probe.orderedAt + 1 then
-			acornTreeProbe = nil
-		end
-		return
-	end
-	probe.castAt = probe.castAt or DotaTime()
-	if DotaTime() < probe.castAt + 1 then
+	if probe == nil or DotaTime() < probe.castAt + 1 then
 		return
 	end
 	acornTreeProbe = nil
@@ -436,7 +804,8 @@ function X.ProbeAcornTree()
 	)
 end
 -- Bushwhack on the tree her own acorn planted. GetNearbyTrees may not list a planted tree (the planted-tree log
--- tells), so the spot is remembered: the acorn's target for ACORN_COMBO_WINDOW seconds, then the attack target.
+-- tells), so the spot is remembered from the cast: the acorn's target for ACORN_COMBO_WINDOW seconds, then the
+-- attack target. The net goes where it holds that target and as many other enemies as possible.
 function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectileSpeed)
 	if acornTree == nil then
 		return BOT_ACTION_DESIRE_NONE, 0
@@ -444,14 +813,6 @@ function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectile
 	local age = DotaTime() - acornTree.plantedAt
 	if age > ACORN_TREE_DURATION then
 		acornTree = nil
-		return BOT_ACTION_DESIRE_NONE, 0
-	end
-	-- No net before the acorn has left (its cooldown runs then). Still ready after 0.6s: it never left (order
-	-- replaced, stun), forget the spot.
-	if acornShotAbility:IsCooldownReady() then
-		if age > 0.6 then
-			acornTree = nil
-		end
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local enemyHero = acornTree.target
@@ -468,22 +829,125 @@ function X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectile
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
-	local center = X.BushwhackCenterForTree(enemyHero:GetExtrapolatedLocation(delay), acornTree.location, radius)
-	if center == nil then
+	local locations = { enemyHero:GetExtrapolatedLocation(delay) }
+	local others, otherUnits =
+		NetCandidates(acornTree.location, 2 * radius, castRange, radius, castPoint, projectileSpeed)
+	for i, unit in ipairs(otherUnits) do
+		if unit ~= enemyHero then
+			table.insert(locations, others[i])
+		end
+	end
+	local center, count = X.BestNetSpot(locations, { acornTree.location }, radius, 1)
+	if center == nil or GetUnitToLocationDistance(bot, center) > castRange then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
-	print(
-		string.format(
-			"[OHA-HOODWINK] t=%.0f hoodwink bushwhack why=acorn-tree target=%s treeDist=%d treeAge=%.1f",
-			DotaTime(),
-			(string.gsub(enemyHero:GetUnitName(), "npc_dota_hero_", "")),
-			math.floor(GetUnitToLocationDistance(enemyHero, acornTree.location)),
-			age
-		)
+	local note = string.format(
+		" treeDist=%d treeAge=%.1f",
+		math.floor(GetUnitToLocationDistance(enemyHero, acornTree.location)),
+		age
 	)
 	-- One net per tree: a miss is not thrown again.
 	acornTree = nil
-	return BOT_ACTION_DESIRE_HIGH, center
+	return BOT_ACTION_DESIRE_HIGH, center, "acorn-tree", enemyHero, count, note
+end
+-- Is an ally in trouble enough for a save net? Under SAVE_ALLY_HP and hit by an enemy hero lately, in any mode, or
+-- retreating and hit (the rule before game 064, which missed a 40% HP ally whose mode was not retreat).
+function X.AllyNeedsSave(allyHp, hitByHeroLately, retreating)
+	if not hitByHeroLately then
+		return false
+	end
+	return allyHp < SAVE_ALLY_HP or retreating
+end
+-- Bushwhack for an ally in trouble: every enemy hero near him is checked, and the net goes where it holds the most
+-- of them with a tree inside. Returns desire, centre, target, count, note.
+function X.ConsiderBushwhackSave(castRange, radius, castPoint, projectileSpeed)
+	-- The tree search reads every tree around her: a few times a second is enough.
+	if DotaTime() - lastBushwhackSaveCheckAt < 0.25 then
+		return BOT_ACTION_DESIRE_NONE, 0
+	end
+	lastBushwhackSaveCheckAt = DotaTime()
+	local skipWhy, skipAlly, skipChasers = nil, nil, 0
+	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, math.min(1600, castRange + radius), false, BOT_MODE_NONE) or {}) do
+		if
+			Fu.IsValidHero(allyHero)
+			and allyHero ~= bot
+			and not allyHero:IsIllusion()
+			and X.AllyNeedsSave(
+				Fu.GetHP(allyHero),
+				allyHero:WasRecentlyDamagedByAnyHero(SAVE_RECENT_HIT),
+				Fu.IsRetreating(allyHero)
+			)
+		then
+			local locations, units =
+				NetCandidates(allyHero:GetLocation(), 900, castRange, radius, castPoint, projectileSpeed)
+			if #units == 0 then
+				skipWhy = skipWhy or "no-chaser"
+			else
+				local center, count = X.BestNetSpot(locations, TreesNear(locations, radius), radius, nil)
+				if center ~= nil and GetUnitToLocationDistance(bot, center) <= castRange then
+					local target = units[1]
+					for i, location in ipairs(locations) do
+						if Fu.GetLocationToLocationDistance(center, location) <= radius - 25 then
+							target = units[i]
+							break
+						end
+					end
+					return BOT_ACTION_DESIRE_HIGH,
+						center,
+						"save",
+						target,
+						count,
+						string.format(
+							" ally=%s allyHp=%.2f chasers=%d",
+							ShortName(allyHero),
+							Fu.GetHP(allyHero),
+							#units
+						)
+				end
+				skipWhy = center ~= nil and "out-of-range" or "no-tree"
+			end
+			skipAlly, skipChasers = skipAlly or allyHero, math.max(skipChasers, #units)
+		end
+	end
+	if skipWhy ~= nil and DotaTime() - lastBushwhackSkipLogAt >= 3 then
+		lastBushwhackSkipLogAt = DotaTime()
+		print(
+			string.format(
+				"[OHA-HOODWINK] t=%.0f hoodwink bushwhack-skip why=%s ally=%s allyHp=%.2f chasers=%d",
+				DotaTime(),
+				skipWhy,
+				ShortName(skipAlly),
+				skipAlly ~= nil and Fu.GetHP(skipAlly) or 0,
+				skipChasers
+			)
+		)
+	end
+	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- Gives the Bushwhack order and remembers it for the reissue and the bushwhack-result line.
+function X.CastBushwhack(location, why, target, expected, note)
+	if bushwhackPending == nil or bushwhackPending.castAt == nil and DotaTime() - bushwhackPending.orderedAt > 3 then
+		bushwhackPending = {
+			center = location,
+			why = why,
+			target = target,
+			expected = expected or 1,
+			orderedAt = DotaTime(),
+			reissues = 0,
+		}
+		print(
+			string.format(
+				"[OHA-HOODWINK] t=%.0f hoodwink bushwhack why=%s target=%s expect=%d dist=%d%s",
+				DotaTime(),
+				why,
+				ShortName(target),
+				expected or 1,
+				math.floor(GetUnitToLocationDistance(bot, location)),
+				note or ""
+			)
+		)
+	end
+	bot:Action_UseAbilityOnLocation(bushwhackAbility, location)
 end
 function X.ConsiderBushwhack()
 	if not bushwhackAbility:IsFullyCastable() then
@@ -495,10 +959,10 @@ function X.ConsiderBushwhack()
 	local radius = bushwhackAbility:GetSpecialValueInt("trap_radius")
 	local projectileSpeed = bushwhackAbility:GetSpecialValueInt("projectile_speed")
 	botTarget = Fu.GetProperTarget(bot)
-	local acornTreeDesire, acornTreeLocation =
+	local acornTreeDesire, acornTreeLocation, acornWhy, acornTarget, acornCount, acornNote =
 		X.ConsiderBushwhackAtAcornTree(castRange, radius, castPoint, projectileSpeed)
 	if acornTreeDesire > 0 then
-		return acornTreeDesire, acornTreeLocation
+		return acornTreeDesire, acornTreeLocation, acornWhy, acornTarget, acornCount, acornNote
 	end
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	for _, enemyHero in pairs(nearbyEnemies) do
@@ -510,7 +974,7 @@ function X.ConsiderBushwhack()
 			local nearbyTrees = enemyHero:GetNearbyTrees(radius - 25)
 			if nearbyTrees ~= nil and #nearbyTrees > 0 then
 				if enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
-					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation()
+					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), "channel", enemyHero, 1
 				end
 				if
 					Fu.CanKillTarget(enemyHero, damage, DAMAGE_TYPE_MAGICAL)
@@ -520,34 +984,15 @@ function X.ConsiderBushwhack()
 					and not enemyHero:HasModifier("modifier_templar_assassin_refraction_absorb")
 				then
 					local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
-					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
+					return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay), "kill", enemyHero, 1
 				end
 			end
 		end
 	end
-	local nearbyAllies = Fu.GetNearbyHeroes(bot, castRange, false, BOT_MODE_NONE)
-	for _, allyHero in pairs(nearbyAllies) do
-		local allyNearbyEnemies = Fu.GetNearbyHeroes(allyHero, castRange, true, BOT_MODE_NONE)
-		if
-			Fu.IsValidHero(allyHero)
-			and (Fu.IsRetreating(allyHero) and allyHero:WasRecentlyDamagedByAnyHero(2.5))
-			and not allyHero:IsIllusion()
-		then
-			if
-				allyNearbyEnemies ~= nil
-				and #allyNearbyEnemies >= 1
-				and Fu.IsValidHero(allyNearbyEnemies[1])
-				and Fu.IsInRange(bot, allyNearbyEnemies[1], castRange)
-				and not Fu.IsSuspiciousIllusion(allyNearbyEnemies[1])
-				and not Fu.IsDisabled(allyNearbyEnemies[1])
-			then
-				local nearbyTrees = allyNearbyEnemies[1]:GetNearbyTrees(radius - 25)
-				if nearbyTrees ~= nil and #nearbyTrees > 0 then
-					local delay = GetUnitToUnitDistance(bot, allyNearbyEnemies[1]) / projectileSpeed + castPoint
-					return BOT_ACTION_DESIRE_HIGH, allyNearbyEnemies[1]:GetExtrapolatedLocation(delay)
-				end
-			end
-		end
+	local saveDesire, saveCenter, saveWhy, saveTarget, saveCount, saveNote =
+		X.ConsiderBushwhackSave(castRange, radius, castPoint, projectileSpeed)
+	if saveDesire > 0 then
+		return saveDesire, saveCenter, saveWhy, saveTarget, saveCount, saveNote
 	end
 	if Fu.IsInTeamFight(bot, 1200) then
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
@@ -565,7 +1010,11 @@ function X.ConsiderBushwhack()
 					local nearbyTrees = enemyHero:GetNearbyTrees(radius - 25)
 					if nearbyTrees ~= nil and #nearbyTrees > 0 then
 						local delay = GetUnitToUnitDistance(bot, enemyHero) / projectileSpeed + castPoint
-						return BOT_ACTION_DESIRE_HIGH, enemyHero:GetExtrapolatedLocation(delay)
+						return BOT_ACTION_DESIRE_HIGH,
+							enemyHero:GetExtrapolatedLocation(delay),
+							"teamfight",
+							enemyHero,
+							aoe.count
 					end
 				end
 			end
@@ -582,7 +1031,7 @@ function X.ConsiderBushwhack()
 			local nearbyTrees = botTarget:GetNearbyTrees(radius - 25)
 			if nearbyTrees ~= nil and #nearbyTrees > 0 then
 				local delay = GetUnitToUnitDistance(bot, botTarget) / projectileSpeed + castPoint
-				return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(delay)
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetExtrapolatedLocation(delay), "engage", botTarget, 1
 			end
 		end
 	end
@@ -600,7 +1049,7 @@ function X.ConsiderBushwhack()
 		then
 			local nearbyTrees = nearbyEnemies[1]:GetNearbyTrees(radius - 25)
 			if nearbyTrees ~= nil and #nearbyTrees > 0 then
-				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, nearbyEnemies[1]:GetLocation(), "retreat", nearbyEnemies[1], 1
 			end
 		end
 	end
@@ -624,8 +1073,10 @@ end
 -- reaches the target, or nil).
 --   escape: retreating, heading home, and in danger;
 --   chase: the target is out of attack range but within the extra distance Scurry's speed buys over its duration,
---     running from her and not slower than her (a slower one is caught without it);
---   position: the walk to a spell's cast range takes over 2s, and she still arrives while Scurry lasts.
+--     running from her and not slower than her (a slower one is caught without it), but slower than her Scurry speed;
+--   position: the walk to a spell's cast range takes over 2s but is at most SCURRY_POSITION_MAX_WALK, she still
+--     arrives while Scurry lasts, and the target is not running from her faster than she walks (game 064: Abaddon
+--     at 380 against her 365 ran out of every cast range).
 function X.ScurryReason(s)
 	local charges = s.charges or 1
 	if s.retreating then
@@ -643,13 +1094,16 @@ function X.ScurryReason(s)
 		and s.targetDist <= s.attackRange + extraReach
 		and s.targetRunningAway
 		and s.targetSpeed >= s.mySpeed
+		and s.targetSpeed < s.mySpeed * (1 + s.speedPct / 100)
 	then
 		return "chase"
 	end
 	if
 		s.castWalk ~= nil
 		and s.castWalk / s.mySpeed > 2
+		and s.castWalk <= SCURRY_POSITION_MAX_WALK
 		and s.castWalk <= s.mySpeed * (1 + s.speedPct / 100) * s.duration
+		and not (s.targetRunningAway and (s.targetSpeed or 0) > s.mySpeed)
 	then
 		return "position"
 	end
@@ -702,6 +1156,7 @@ function X.ConsiderScurry()
 		duration = duration,
 	}
 	local logDist, logTarget = -1, "none"
+	local planTarget = nil
 	if isRetreating then
 		local nearbyAllies = Fu.GetNearbyHeroes(bot, 800, false, BOT_MODE_NONE)
 		local nearbyEnemies = Fu.GetNearbyHeroes(bot, 600, true, BOT_MODE_NONE)
@@ -719,6 +1174,7 @@ function X.ConsiderScurry()
 		if nearbyEnemies ~= nil and Fu.IsValidHero(nearbyEnemies[1]) then
 			logDist = GetUnitToUnitDistance(bot, nearbyEnemies[1])
 			logTarget = (string.gsub(nearbyEnemies[1]:GetUnitName(), "npc_dota_hero_", ""))
+			planTarget = nearbyEnemies[1]
 		end
 	elseif isGoingOnSomeone then
 		botTarget = Fu.GetProperTarget(bot)
@@ -737,12 +1193,22 @@ function X.ConsiderScurry()
 			s.castWalk = X.ScurryCastWalk(botTarget, s.targetDist)
 			logDist = s.targetDist
 			logTarget = (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", ""))
+			planTarget = botTarget
 		end
 	end
 	local why = X.ScurryReason(s)
 	if why == nil then
 		return BOT_ACTION_DESIRE_NONE
 	end
+	-- What the scurry-result line checks: chase reaches attack range, position the cast range of the spell it was
+	-- for (the target distance less the walk); escape has no reach (read died= and hp= there).
+	local reach = 0
+	if why == "chase" then
+		reach = s.attackRange
+	elseif why == "position" then
+		reach = s.targetDist - s.castWalk
+	end
+	local plan = { why = why, target = planTarget, duration = duration, startDist = logDist, reach = reach }
 	if DotaTime() - lastScurryLogAt >= 3 then
 		lastScurryLogAt = DotaTime()
 		print(
@@ -760,7 +1226,30 @@ function X.ConsiderScurry()
 			)
 		)
 	end
-	return BOT_ACTION_DESIRE_HIGH
+	return BOT_ACTION_DESIRE_HIGH, plan
+end
+-- Starts the scurry-result check for the Scurry just ordered (ThinkCastResults prints it when Scurry ends).
+function X.StartScurryRun(plan)
+	if plan == nil then
+		return
+	end
+	local ready = {}
+	for _, spell in ipairs(ScurrySpells()) do
+		ready[spell[1]] = spell[2]:IsTrained() and spell[2]:IsCooldownReady()
+	end
+	scurryRun = {
+		why = plan.why,
+		target = plan.target,
+		startedAt = DotaTime(),
+		duration = plan.duration,
+		startDist = plan.startDist,
+		minDist = plan.startDist >= 0 and plan.startDist or 99999,
+		reach = plan.reach,
+		ready = ready,
+		active = false,
+		deaths = GetHeroDeaths(bot:GetPlayerID()),
+		hp = hpRatio,
+	}
 end
 function X.ConsiderSharpshooter()
 	if not sharpshooterAbility:IsFullyCastable() then

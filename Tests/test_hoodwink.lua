@@ -40,6 +40,58 @@ T.test("hoodwink: Acorn Shot mode", function()
 	T.eq(X.AcornShotMode("engage", true, true, true, true), "bounce", "a tree is there already")
 	T.eq(X.AcornShotMode("kill", true, true, true, false), "bounce", "the acorn itself kills")
 	T.eq(X.AcornShotMode("wave", false, false, false, false), "tree", "ground cast on a creep wave")
+	T.eq(X.AcornShotMode("engage", true, true, true, false, true), "bounce", "an enemy hero next to her: no combo")
+	T.eq(X.AcornShotMode("engage", true, true, false, false, true), "ground", "spell-immune target, enemy close")
+end)
+
+T.test("hoodwink: best Bushwhack spot", function()
+	local X = hoodwink()
+	-- trap_radius 275 (datafeed hero_id=123), counted 25 inside: 250.
+	local center, count = X.BestNetSpot({ Vector(0, 0, 0) }, { Vector(100, 0, 0) }, 275, nil)
+	T.eq(count, 1, "one enemy by a tree")
+	T.ok(center ~= nil, "a centre")
+	center, count = X.BestNetSpot({ Vector(0, 0, 0), Vector(400, 0, 0) }, { Vector(200, 50, 0) }, 275, nil)
+	T.eq(count, 2, "two enemies 400 apart with a tree between: both netted")
+	T.near(center.x, 200, 1e-6, "midpoint of the two")
+	center, count = X.BestNetSpot({ Vector(0, 0, 0), Vector(400, 0, 0) }, {}, 275, nil)
+	T.eq(center, nil, "no tree: no net")
+	T.eq(count, 0, "no tree: nothing netted")
+	center, count = X.BestNetSpot({ Vector(0, 0, 0), Vector(1000, 0, 0), Vector(1300, 0, 0) }, {
+		Vector(-100, 0, 0),
+		Vector(1150, 100, 0),
+	}, 275, nil)
+	T.eq(count, 2, "the pair by the second tree beats the lone enemy")
+	T.near(center.x, 1150, 1e-6, "centre between the pair")
+	center, count = X.BestNetSpot({ Vector(0, 0, 0), Vector(1000, 0, 0), Vector(1300, 0, 0) }, {
+		Vector(-100, 0, 0),
+		Vector(1150, 100, 0),
+	}, 275, 1)
+	T.eq(count, 1, "the net has to hold enemy 1")
+	T.ok(center ~= nil and center.x < 300, "centre by enemy 1")
+	center = X.BestNetSpot({ Vector(0, 0, 0) }, { Vector(600, 0, 0) }, 275, nil)
+	T.eq(center, nil, "tree too far for one net")
+end)
+
+T.test("hoodwink: acorn tree spot", function()
+	local X = hoodwink()
+	local spot, count = X.AcornTreeSpot(Vector(0, 0, 0), {}, 275)
+	T.eq(count, 1, "target alone")
+	T.near(spot.x, 0, 1e-6, "tree at the target")
+	spot, count = X.AcornTreeSpot(Vector(0, 0, 0), { Vector(300, 0, 0) }, 275)
+	T.eq(count, 2, "second enemy 300 away: both")
+	T.near(spot.x, 150, 1e-6, "tree halfway")
+	spot, count = X.AcornTreeSpot(Vector(0, 0, 0), { Vector(700, 0, 0) }, 275)
+	T.eq(count, 1, "second enemy beyond one net")
+	T.near(spot.x, 0, 1e-6, "tree stays at the target")
+end)
+
+T.test("hoodwink: ally needs a save net", function()
+	local X = hoodwink()
+	-- ally HP, hit by an enemy hero lately, retreating
+	T.eq(X.AllyNeedsSave(0.4, true, false), true, "40% HP and hit, any mode (game 064 Primal Beast)")
+	T.eq(X.AllyNeedsSave(0.4, false, false), false, "low but nobody hitting him")
+	T.eq(X.AllyNeedsSave(0.8, true, false), false, "healthy and fighting")
+	T.eq(X.AllyNeedsSave(0.8, true, true), true, "retreating and hit: the old rule")
 end)
 
 T.test("hoodwink: Bushwhack centre for a planted tree", function()
@@ -91,10 +143,33 @@ T.test("hoodwink: Scurry reason", function()
 	T.eq(chase({ targetDist = 900 }), nil, "beyond the reach Scurry buys")
 	T.eq(chase({ targetRunningAway = false }), nil, "target not running from her")
 	T.eq(chase({ headingToTarget = false }), nil, "she is not going toward it")
-	T.eq(chase({ targetDist = 1400, castWalk = 700 }), "position", "Bushwhack range 2.2s away")
-	T.eq(chase({ targetDist = 1400, castWalk = 500 }), nil, "walk under 2s")
-	T.eq(chase({ targetDist = 2400, castWalk = 1400 }), nil, "Scurry ends before she gets there")
-	T.eq(chase({ targetDist = 1400, castWalk = 700, charges = 1 }), nil, "position keeps the last charge too")
+	T.eq(chase({ targetSpeed = 400 }), nil, "faster than her Scurry speed: no catching it")
+	-- Position cases: the target is not running from her unless the case says so.
+	local function position(overrides)
+		if overrides.targetRunningAway == nil then
+			overrides.targetRunningAway = false
+		end
+		return chase(overrides)
+	end
+	T.eq(position({ targetDist = 1400, castWalk = 700 }), "position", "Bushwhack range 2.2s away")
+	T.eq(position({ targetDist = 1400, castWalk = 500 }), nil, "walk under 2s")
+	T.eq(position({ targetDist = 2400, castWalk = 1400 }), nil, "Scurry ends before she gets there")
+	T.eq(position({ targetDist = 1400, castWalk = 700, charges = 1 }), nil, "position keeps the last charge too")
+	T.eq(
+		position({ targetDist = 1400, castWalk = 700, targetRunningAway = true, targetSpeed = 380 }),
+		nil,
+		"target running away faster than her (game 064 Abaddon 380 vs 365)"
+	)
+	T.eq(
+		position({ targetDist = 1400, castWalk = 700, targetRunningAway = true, targetSpeed = 300 }),
+		"position",
+		"running away but slower than her"
+	)
+	T.eq(
+		position({ targetDist = 2000, castWalk = 1100, mySpeed = 400, speedPct = 32, duration = 5 }),
+		nil,
+		"walk over the 1000 cap"
+	)
 	local escape = { retreating = true, headingHome = true, inDanger = true, charges = 1 }
 	T.eq(X.ScurryReason(escape), "escape", "escape spends the last charge")
 	escape.charges = 0

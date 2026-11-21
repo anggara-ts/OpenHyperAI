@@ -159,7 +159,6 @@ function X.SkillsComplement()
 		return
 	end
 	local context = AbilityContext.Build(bot)
-	aetherRange = context.aetherRange
 	botLevel = context.level
 	mpRatio = context.mp
 	hpRatio = context.hp

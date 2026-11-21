@@ -347,7 +347,7 @@ function X.ConsiderW()
 			local minCreepCount = mpRatio > 0.5 and 4 or 5
 			local creepAoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), 100, 600, 0, 0)
 			if creepAoeLocation.count >= minCreepCount then
-				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "W-打钱:" .. creepAoeLocation.count
+				return BOT_ACTION_DESIRE_HIGH, nil, "W-打钱:" .. creepAoeLocation.count
 			end
 		end
 	end
@@ -357,7 +357,7 @@ function X.ConsiderW()
 				Fu.IsValid(enemyHero)
 				and (bot:WasRecentlyDamagedByHero(enemyHero, 5.0) or bot:GetActiveModeDesire() > 0.7)
 			then
-				return BOT_ACTION_DESIRE_HIGH, nTargetLocation, "W-撤退:" .. Fu.Chat.GetNormName(enemyHero)
+				return BOT_ACTION_DESIRE_HIGH, nil, "W-撤退:" .. Fu.Chat.GetNormName(enemyHero)
 			end
 		end
 	end

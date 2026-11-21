@@ -2,6 +2,7 @@
 -- Accidental globals made file-local (#13): every bot shares one Lua state, so these were shared.
 local DispelMagic, WindWalk, DispelMagicTarget, CycloneTarget, HurlBoulder, HurlBoulderTarget, AstralPull
 local AstralPullDesire, AttackUnits, UseDispelMagic, UseCyclone, UseWindWalk, UseHurlBoulder, UseAstralPull
+local Cyclone, ConsiderMove
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local MinionUtils = require(GetScriptDirectory() .. "/FuncLib/hero/minion_lib/utils")
 local X = {}
@@ -367,7 +368,8 @@ function UseHurlBoulder(minion)
 	return 0, nil
 end
 function UseAstralPull(minion)
-	if not AstralPull:IsFullyCastable() then
+	-- 7.42 game files (npc_units.txt): the Void brewling's Ability1 is generic_hidden, so the handle is nil.
+	if AstralPull == nil or not AstralPull:IsFullyCastable() then
 		return 0, nil
 	end
 	if Fu.CanNotUseAbility(minion) then

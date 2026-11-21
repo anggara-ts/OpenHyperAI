@@ -152,11 +152,9 @@ end
 local bloodrageAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[1]), "sAbilityList[1]", "bloodseeker")
 local bloodRiteAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[2]), "sAbilityList[2]", "bloodseeker")
 local ruptureAbility = SafeAbility(bot:GetAbilityByName(sAbilityList[6]), "sAbilityList[6]", "bloodseeker")
-local thirstAbility = SafeAbility(bot:GetAbilityByName("bloodseeker_thirst"), "bloodseeker_thirst", "bloodseeker")
 local bloodrageDesire = 0
 local bloodRiteDesire, bloodRiteLocation = 0
 local ruptureDesire, ruptureTarget = 0
-local thirstDesire
 local botTarget
 local isAttacking
 function X.SkillsComplement()
@@ -166,12 +164,6 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	local context = AbilityContext.Build(bot)
 	botTarget = context.target
-	thirstDesire = X.ConsiderThirst()
-	if thirstDesire > 0 then
-		Fu.SetQueuePtToINT(bot, false)
-		bot:ActionQueue_UseAbility(thirstAbility)
-		return
-	end
 	ruptureDesire, ruptureTarget = X.ConsiderR()
 	if ruptureDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
@@ -190,19 +182,6 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbilityOnLocation(bloodRiteAbility, bloodRiteLocation)
 		return
 	end
-end
-function X.ConsiderThirst()
-	if not Fu.CanCastAbility(thirstAbility) then
-		return BOT_MODE_NONE
-	end
-	if Fu.IsGoingOnSomeone(bot) then
-		if Fu.IsValidHero(botTarget) and Fu.CanCastOnMagicImmune(botTarget) and Fu.IsInRange(botTarget, bot, 600) then
-			if not bot:HasModifier("modifier_bloodseeker_thirst") then
-				return BOT_ACTION_DESIRE_HIGH, bot
-			end
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE, 0
 end
 function X.ConsiderQ()
 	if not bloodrageAbility:IsFullyCastable() then

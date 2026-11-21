@@ -359,7 +359,6 @@ function X.ConsiderPlagueWard()
 	local castRange = Fu.GetProperCastRange(false, bot, plagueWardAbility:GetCastRange())
 	local nearbyAllies = bot:GetNearbyHeroes(1600, false, BOT_MODE_NONE)
 	local nearbyEnemies = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
-	local selfCastCheck = 20 -- always 20, so the "< 8" and "< 6" self-cast branches below never run
 	if isEngaging then
 		if
 			Fu.IsValidTarget(botTarget)
@@ -368,13 +367,9 @@ function X.ConsiderPlagueWard()
 			and not Fu.IsSuspiciousIllusion(botTarget)
 			and not botTarget:HasModifier("modifier_necrolyte_reapers_scythe")
 		then
-			if selfCastCheck < 8 then
-				return BOT_ACTION_DESIRE_HIGH, bot, true
-			else
-				local towersNearTarget = botTarget:GetNearbyTowers(700, false)
-				if towersNearTarget ~= nil and #towersNearTarget == 0 then
-					return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), false
-				end
+			local towersNearTarget = botTarget:GetNearbyTowers(700, false)
+			if towersNearTarget ~= nil and #towersNearTarget == 0 then
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), false
 			end
 		end
 	end
@@ -387,11 +382,7 @@ function X.ConsiderPlagueWard()
 				and not Fu.IsSuspiciousIllusion(enemyHero)
 			then
 				if Fu.GetHP(bot) < 0.75 and bot:WasRecentlyDamagedByAnyHero(3.0) or #nearbyAllies < #nearbyEnemies then
-					if Fu.IsInRange(bot, enemyHero, 550) and selfCastCheck < 6 then
-						return BOT_ACTION_DESIRE_HIGH, bot, true
-					else
-						return BOT_ACTION_DESIRE_HIGH, (bot:GetLocation() + enemyHero:GetLocation()) / 2, false
-					end
+					return BOT_ACTION_DESIRE_HIGH, (bot:GetLocation() + enemyHero:GetLocation()) / 2, false
 				end
 			end
 		end

@@ -144,7 +144,7 @@ local laserDesire, laserTarget
 local marchDesire, marchLocation
 local deployTurretsDesire, deployTurretsLocation
 local warpFlareDesire, warpFlareTarget
-local keenConveyanceDesire, keenConveyanceTarget
+local keenConveyanceDesire, keenConveyanceTarget, Type
 local lastTeleportTime = DotaTime()
 local rearmDesire
 local botTarget

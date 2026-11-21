@@ -652,7 +652,7 @@ function Utils.GetItemFromCountedInventory(bot, itemName, slotCount)
 end
 require(GetScriptDirectory() .. "/FuncLib/lib/json")
 Utils.DebugMode = false
-Utils.ScriptID = 3246316298
+Utils.ScriptID = 3843444501
 Utils.RadiantFountainTpPoint = Vector(-7172, -6652, 384)
 Utils.DireFountainTpPoint = Vector(6982, 6422, 392)
 Utils.RadiantRoshanLoc = Vector(-2984, 2349, 384)

@@ -123,7 +123,7 @@ local strings = {
 			},
 			{
 				"#D4AC0D",
-				"* Bot link for any feedback: https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298 . Kudos and thanks all for sharing your ideas.",
+				"* Bot link for any feedback: https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501 . Kudos and thanks all for sharing your ideas.",
 			},
 			{
 				"#839192",
@@ -357,7 +357,7 @@ local strings = {
 			},
 			{
 				"#D4AC0D",
-				"* 机器人反馈链接： https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298 。感谢大家分享你们的想法",
+				"* 机器人反馈链接： https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501 。感谢大家分享你们的想法",
 			},
 			{
 				"#839192",
@@ -585,7 +585,7 @@ local strings = {
 			},
 			{
 				"#D4AC0D",
-				"* Ссылка для обратной связи: https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298 . Спасибо всем за ваши идеи.",
+				"* Ссылка для обратной связи: https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501 . Спасибо всем за ваши идеи.",
 			},
 			{
 				"#839192",
@@ -843,7 +843,7 @@ local strings = {
 			},
 			{
 				"#D4AC0D",
-				"* フィードバック用リンク:  https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298 。アイデアを共有してくれた皆さん、感謝します。",
+				"* フィードバック用リンク:  https://steamcommunity.com/sharedfiles/filedetails/?id=3843444501 。アイデアを共有してくれた皆さん、感謝します。",
 			},
 			{
 				"#839192",

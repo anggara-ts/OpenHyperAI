@@ -862,7 +862,7 @@ local function handleChatCommand(text, senderId, teamOnly)
 				heroPickedByChat = true
 			else
 				log(
-					"Hero name not found or not supported! See: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71"
+					"Hero name not found or not supported! See: https://github.com/anggara-ts/Supercharged-OpenHyperAI/blob/main/FuncLib/data/hero_names.lua"
 				)
 			end
 		elseif action == "!ban" and GetGameState() == GAME_STATE_HERO_SELECTION then
@@ -878,7 +878,7 @@ local function handleChatCommand(text, senderId, teamOnly)
 				Utils.PrintTable(banList)
 			else
 				log(
-					"Hero name not found or not supported! See: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71"
+					"Hero name not found or not supported! See: https://github.com/anggara-ts/Supercharged-OpenHyperAI/blob/main/FuncLib/data/hero_names.lua"
 				)
 			end
 		elseif action == "!pos" and GetGameState() == GAME_STATE_PRE_GAME then

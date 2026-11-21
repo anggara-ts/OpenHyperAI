@@ -171,6 +171,9 @@ function GetDesire()
 		)
 	end
 	LogDesireChange(final)
+	-- Read by Push.GetPushDesire (FuncLib/systems/push.lua): a push stays under a live Roshan call (#12).
+	bot._roshDesireNow = final
+	bot._roshDesireAt = DotaTime()
 	-- Do not shout here — desire alone is not a commit (caused "Let's Rosh" then nothing).
 	return final
 end
@@ -730,6 +733,17 @@ function GetDesireHelper()
 				desire = floor
 			end
 			why = "kill-window"
+			-- A take that fits the kill's window (checked above) is a call the team should answer (#12, game 067
+			-- 32:11: the four callers sat at 0.60 under a 0.99 kill push and nobody walked; game 066: 7 calls dropped
+			-- nobody-acked). Out of a fight it goes in as a gather call (0.96, above the 0.91 kill push; the push
+			-- yields to it in push.lua). Not while the team pushes the T2 / high ground away from the pit.
+			if
+				not (isPushingHighGround and #alliesNearPit < 3)
+				and not bot:WasRecentlyDamagedByAnyHero(2.0)
+				and #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
+			then
+				return Ret(0.92, why, true)
+			end
 		end
 		return Ret(Clamp(desire, 0, BOT_MODE_DESIRE_VERYHIGH), why)
 	end

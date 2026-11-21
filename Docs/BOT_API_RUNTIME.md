@@ -24,6 +24,7 @@ confirmed or disproved.
   - A mode file that defines only `GetDesire` still replaces that Valve mode entirely: Valve's `Think` does not run behind it (the item-mode trial, #141, game 063).
   - No hidden item or extra ability gives outpost capture or watcher use: every bot's slots 17-25 are empty and there is no `capture` / `lamp` / `watcher` ability beyond the normal slots (`[OHA-API] slots`, #172, game 064).
   - Unconfirmed: `IsAlive()` on an enemy hero handle may read false after it TPs out, turns invisible or leaves vision (seen 5 times in game 064's hunt trace).
+- **No respawn time for a dead enemy hero.** `GetRespawnTime()` is a unit method, and asking it on the enemy handle found in `GetUnitList(UNIT_LIST_ENEMY_HEROES)` (or finding no handle) never gave a value: in games 066 and 067 every enemy death (77 of 77) logged `[OHA-FIGHT] ... death <hero> respawn=30s known=false` (the 30s fallback). `IsHeroAlive(pid)` does flip back at the respawn. Own heroes' respawns ran 12-30s early and 70-125s late (`[OHA-DEATH] ... respawned=`). `FuncLib/systems/kill_window.lua` (#12) now learns the respawn time per level from our own deaths (`GetRespawnTime()` on our dead hero, else the observed time) and uses it for an enemy of that level (`GetHeroLevel(pid)`; whether that answers for enemy IDs is not confirmed yet). A game shows it: `[OHA-FIGHT] ... own-respawn <hero> lvl= api= observed=` (is the API value the full timer?) and `death ... src=learned(...)`.
 
 ## 7.42 check (2026-11-19)
 

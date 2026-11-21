@@ -769,7 +769,7 @@ local function ShortName(unit)
 	return (string.gsub(string.gsub(unitName, "^npc_dota_hero_", ""), "^npc_dota_", ""))
 end
 -- Start a sample unless one is still open (one per attack cycle).
-local function KiteSample(unit, attacker, kind, stepped, why)
+local function KiteSample(unit, attacker, kind, stepped, why, stepEnd)
 	if unit._kitePending ~= nil then
 		return
 	end
@@ -790,11 +790,19 @@ local function KiteSample(unit, attacker, kind, stepped, why)
 		at = GameTime(),
 		checkAt = GameTime() + window,
 		window = window,
-		from = unit:GetLocation(),
+		stepEnd = stepEnd,
+		stepLeft = stepEnd ~= nil and Fu.GetLocationToLocationDistance(unit:GetLocation(), stepEnd) or nil,
+		closest = math.huge,
 	}
 end
 function X.KiteResultTick(unit)
 	local pending = unit._kitePending
+	-- moved: the bot came 40+ closer to the step's end point at some think before the check (the mode may walk it
+	-- back by the check, so the position at the check says nothing).
+	if pending ~= nil and pending.stepEnd ~= nil then
+		pending.closest =
+			math.min(pending.closest, Fu.GetLocationToLocationDistance(unit:GetLocation(), pending.stepEnd))
+	end
 	if pending ~= nil and GameTime() >= pending.checkAt then
 		unit._kitePending = nil
 		local kindStats = KiteStats(unit).kinds[pending.kind]
@@ -811,7 +819,7 @@ function X.KiteResultTick(unit)
 			if unit:GetLastAttackTime() < pending.at then
 				kindStats.late = kindStats.late + 1
 			end
-			if pending.from ~= nil and Fu.GetLocationToLocationDistance(pending.from, unit:GetLocation()) >= 40 then
+			if pending.stepLeft ~= nil and pending.stepLeft - pending.closest >= 40 then
 				kindStats.moved = kindStats.moved + 1
 			end
 		elseif hit then
@@ -922,9 +930,12 @@ function X.KiteStep(unit, attacker, target, kind)
 		return false
 	end
 	unit:Action_MoveToLocation(away)
-	KiteSample(unit, attacker, kind, true)
-	if DotaTime() >= (unit._kiteLogAt or -99) + 2 then
-		unit._kiteLogAt = DotaTime()
+	KiteSample(unit, attacker, kind, true, nil, away)
+	-- From lines: every 2s for heroes (about 30 a game), every 10s for creeps (many more steps; the result line
+	-- has the counts).
+	unit._kiteLogAt = unit._kiteLogAt or {}
+	if DotaTime() >= (unit._kiteLogAt[kind] or -99) + (kind == "hero" and 2 or 10) then
+		unit._kiteLogAt[kind] = DotaTime()
 		pcall(
 			print,
 			string.format(
@@ -1010,20 +1021,16 @@ local NO_KITE_MODES = {
 	[BOT_MODE_EVASIVE_MANEUVERS] = true,
 	[BOT_MODE_ROSHAN] = true,
 }
--- Per-think hook (ability_item_usage_generic.lua) for every mode. Heroes on the override attack mode
--- (unit._ohaAttackOverride, set by mode_attack_generic.lua) kite from its Think while attack mode runs. Returns
--- true when it issued the step.
-function X.TryKiteInAttack(unit)
-	if unit ~= nil and unit:IsAlive() then
-		pcall(X.KiteResultTick, unit)
+local function KiteHook(unit)
+	local mode = unit:GetActiveMode()
+	if NO_KITE_MODES[mode] or unit:GetAttackRange() <= KiteRules.MELEE_RANGE then
+		return false
 	end
-	if
-		unit == nil
-		or not unit:IsAlive()
-		or unit:GetAttackRange() <= KiteRules.MELEE_RANGE
-		or Fu.CanNotUseAction(unit)
-		or unit:IsInvisible()
-	then
+	local target = unit:GetAttackTarget()
+	if mode == BOT_MODE_ATTACK and unit._ohaAttackOverride then
+		return false
+	end
+	if not Fu.IsValid(target) and mode ~= BOT_MODE_ATTACK then
 		return false
 	end
 	-- A mode or hero script holding the bot (outpost hold, a cast hold, Clinkz's invisible hunt, Techies' plant).
@@ -1036,15 +1043,10 @@ function X.TryKiteInAttack(unit)
 	then
 		return false
 	end
-	local mode = unit:GetActiveMode()
-	if NO_KITE_MODES[mode] then
+	if Fu.CanNotUseAction(unit) or unit:IsInvisible() then
 		return false
 	end
-	local target = unit:GetAttackTarget()
 	if mode == BOT_MODE_ATTACK then
-		if unit._ohaAttackOverride then
-			return false
-		end
 		local heroTarget = Fu.IsValidHero(target) and target or unit:GetTarget()
 		if Fu.IsValidHero(heroTarget) and heroTarget:GetAttackRange() <= KiteRules.MELEE_RANGE then
 			return X.TryKite(unit, heroTarget)
@@ -1058,5 +1060,27 @@ function X.TryKiteInAttack(unit)
 		return false
 	end
 	return X.KiteStep(unit, attacker, target, kind)
+end
+-- Per-think hook (ability_item_usage_generic.lua) for every mode. Heroes on the override attack mode
+-- (unit._ohaAttackOverride, set by mode_attack_generic.lua) kite from its Think while attack mode runs. Returns
+-- true when it issued the step. The call site's pcall would hide an error (and with it all kiting): the first 3
+-- distinct ones per bot print as [OHA-ERROR].
+function X.TryKiteInAttack(unit)
+	if unit == nil or not unit:IsAlive() then
+		return false
+	end
+	pcall(X.KiteResultTick, unit)
+	local ok, kited = pcall(KiteHook, unit)
+	if ok then
+		return kited == true
+	end
+	unit._kiteErrs = unit._kiteErrs or {}
+	local key = tostring(kited)
+	if not unit._kiteErrs[key] and (unit._kiteErrCount or 0) < 3 then
+		unit._kiteErrs[key] = true
+		unit._kiteErrCount = (unit._kiteErrCount or 0) + 1
+		pcall(print, string.format("[OHA-ERROR] t=%.0f %s kite: %s", DotaTime(), ShortName(unit), key))
+	end
+	return false
 end
 return X

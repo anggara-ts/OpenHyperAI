@@ -133,6 +133,11 @@ T.test("kite hook: jungling steps back from the neutral and reports the result",
 	T.eq(#moves, 1, "one move order")
 	T.ok(moves[1].x > bot:GetLocation().x, "away from the neutral")
 	T.ok(printedWith("kind=jungle") ~= nil, "from line names the kind")
+	-- The bot walks the step (a think before the check), then the mode walks it back: still counts as moved.
+	local start = bot._loc
+	bot._loc = moves[1]
+	SpecialUnits.KiteResultTick(bot)
+	bot._loc = start
 	-- A minute later: the result line for the jungle kind.
 	T.stub.time = T.stub.time + 61
 	bot.GetLastAttackTime = function()
@@ -141,6 +146,7 @@ T.test("kite hook: jungling steps back from the neutral and reports the result",
 	SpecialUnits.KiteResultTick(bot)
 	local result = printedWith("result kind=jungle")
 	T.ok(result ~= nil and string.find(result, "steps=1", 1, true) ~= nil, "result line: " .. tostring(result))
+	T.ok(string.find(result or "", "moved=1", 1, true) ~= nil, "moved counted: " .. tostring(result))
 end)
 
 T.test("kite hook: laning keeps the attack when a last hit is due, and counts it in the baseline", function()
@@ -194,4 +200,20 @@ T.test("kite hook: no step in retreat, while invisible or under a hold", functio
 	end
 	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "invisible")
 	T.eq(#moves, 0, "no move order")
+end)
+
+T.test("kite hook: an error prints once as [OHA-ERROR] instead of vanishing in the call site's pcall", function()
+	local bot, SpecialUnits = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
+	bot.GetActiveMode = function()
+		error("boom")
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no step")
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no step again")
+	local count = 0
+	for _, line in ipairs(T.stub.printed) do
+		if string.find(line, "[OHA-ERROR]", 1, true) and string.find(line, "kite: ", 1, true) then
+			count = count + 1
+		end
+	end
+	T.eq(count, 1, "printed once")
 end)

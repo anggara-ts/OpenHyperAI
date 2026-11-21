@@ -7766,8 +7766,8 @@ end
 -- Plant rules (#15, game 063): FuncLib/systems/banner_rules.lua. Push: an enemy building within 1600 and 5+ of our creeps
 -- in the Banner's radius around a point 250 behind the wave, in a push mode, or in attack / team roam with no more enemy
 -- heroes near than ours (right after a won fight). Defend: our T2, T3, barracks or Ancient within 1600 with enemy
--- creeps or heroes at it, and 4+ of our creeps in the radius around a point 200 behind our creeps toward the building
--- (between it and the enemy wave). Any mode. In game 063 Weaver (Dire) held a Banner in the backpack from 46:34 while
+-- heroes at it (or a hero hit it in the last 3s; enemy creeps alone are a creep clash), and 4+ of our creeps in the
+-- radius around a point 200 behind our creeps toward the building (between it and the enemy wave). Any mode. In game 063 Weaver (Dire) held a Banner in the backpack from 46:34 while
 -- Radiant sieged Dire's bottom T3 and barracks (defend_tower_bot / attack / team_roam) and never planted it: the rule
 -- only ran in a push mode.
 local function BannerCreepsNear(creeps, loc, radius)
@@ -7793,8 +7793,9 @@ local function OwnBannerNear(loc)
 	end
 	return false
 end
--- Our base buildings worth a Banner: T2, T3, the Ancient's towers, barracks, the Ancient. Enemy lane creeps within 900
--- of it or enemy heroes within 1200 count as "under attack".
+-- Our base buildings worth a Banner: T2, T3, the Ancient's towers, barracks, the Ancient, with enemies at it (lane
+-- creeps within 900 or heroes within 1200). Returns the nearest, its distance, the enemy heroes within 1200 of it and
+-- whether a hero hit it in the last 3s: a wave alone at our T2 is a creep clash, not a siege (BannerRules.Why).
 local function BannerDefendBuilding(enemyCreeps, enemyHeroes)
 	local team = GetTeam()
 	local candidates = {}
@@ -7820,7 +7821,7 @@ local function BannerDefendBuilding(enemyCreeps, enemyHeroes)
 	if ancient ~= nil and GetUnitToUnitDistance(bot, ancient) <= 1600 then
 		candidates[#candidates + 1] = ancient
 	end
-	local best, bestDist = nil, 99999
+	local best, bestDist, bestHeroes, bestHit = nil, 99999, 0, false
 	for _, building in ipairs(candidates) do
 		if Fu.IsValidBuilding(building) then
 			local attacked = false
@@ -7830,21 +7831,22 @@ local function BannerDefendBuilding(enemyCreeps, enemyHeroes)
 					break
 				end
 			end
-			if not attacked then
-				for _, enemy in ipairs(enemyHeroes) do
-					if GetUnitToUnitDistance(enemy, building) <= 1200 then
-						attacked = true
-						break
-					end
+			local heroes = 0
+			for _, enemy in ipairs(enemyHeroes) do
+				if GetUnitToUnitDistance(enemy, building) <= 1200 then
+					heroes = heroes + 1
 				end
 			end
 			local dist = GetUnitToUnitDistance(bot, building)
-			if attacked and dist < bestDist then
-				best, bestDist = building, dist
+			if (attacked or heroes > 0) and dist < bestDist then
+				local okHit, hit = pcall(function()
+					return building:WasRecentlyDamagedByAnyHero(3)
+				end)
+				best, bestDist, bestHeroes, bestHit = building, dist, heroes, okHit and hit == true
 			end
 		end
 	end
-	return best, bestDist
+	return best, bestDist, bestHeroes, bestHit
 end
 Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 	if bot:WasRecentlyDamagedByAnyHero(1.5) and Fu.GetHP(bot) < 0.4 then
@@ -7915,7 +7917,7 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 			enemyCreeps[#enemyCreeps + 1] = creep
 		end
 	end
-	local ownBuilding, ownDist = BannerDefendBuilding(enemyCreeps, enemyHeroes)
+	local ownBuilding, ownDist, heroesAtBuilding, heroHitBuilding = BannerDefendBuilding(enemyCreeps, enemyHeroes)
 	local defendLoc, defendCreeps = nil, 0
 	if ownBuilding ~= nil then
 		local guards = {}
@@ -7939,6 +7941,8 @@ Usage.ConsiderItemDesire["item_roshans_banner"] = function(item)
 		enemiesNear = #enemyHeroes,
 		ownBuilding = defendLoc ~= nil,
 		defendCreeps = defendCreeps,
+		heroesAtBuilding = heroesAtBuilding,
+		heroHitBuilding = heroHitBuilding,
 	})
 	if why == nil then
 		return BOT_ACTION_DESIRE_NONE

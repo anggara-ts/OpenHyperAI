@@ -27,11 +27,21 @@ end)
 T.test("banner: defending our base with 4+ creeps, in any mode", function()
 	local R = rules()
 	-- Game 063, ~48:40: Radiant sieged Dire's bottom T3; Weaver held a Banner in defend / attack / team roam.
-	T.eq(R.Why({ ownBuilding = true, defendCreeps = 4 }), "defend", "4 creeps at our T3")
-	T.eq(R.Why({ ownBuilding = true, defendCreeps = 3 }), nil, "3 creeps")
-	T.eq(R.Why({ ownBuilding = false, defendCreeps = 9 }), nil, "no building under attack")
+	T.eq(R.Why({ ownBuilding = true, defendCreeps = 4, heroesAtBuilding = 2 }), "defend", "4 creeps, heroes at our T3")
+	T.eq(R.Why({ ownBuilding = true, defendCreeps = 4, heroHitBuilding = true }), "defend", "a hero hit it")
+	T.eq(R.Why({ ownBuilding = true, defendCreeps = 3, heroesAtBuilding = 2 }), nil, "3 creeps")
+	T.eq(R.Why({ ownBuilding = false, defendCreeps = 9, heroesAtBuilding = 2 }), nil, "no building under attack")
+	-- A lane wave alone at our T2 (no enemy hero): a creep clash, the one-use Banner is kept.
+	T.eq(R.Why({ ownBuilding = true, defendCreeps = 6, heroesAtBuilding = 0 }), nil, "creep clash")
 	T.eq(
-		R.Why({ pushing = true, enemyBuilding = true, pushCreeps = 3, ownBuilding = true, defendCreeps = 5 }),
+		R.Why({
+			pushing = true,
+			enemyBuilding = true,
+			pushCreeps = 3,
+			ownBuilding = true,
+			defendCreeps = 5,
+			heroesAtBuilding = 1,
+		}),
 		"defend",
 		"too few to push, enough to defend"
 	)

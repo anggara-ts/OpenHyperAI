@@ -16,7 +16,9 @@ BannerRules.DEFEND_CREEPS = 4
 -- s: pushing (a push mode), fightMode (attack or team roam), enemyBuilding (one within 1600), pushCreeps (our creeps in
 -- the radius of the push plant point), alliesNear / enemiesNear (heroes within 1600, the bot counted), ownBuilding (our
 -- T2, T3, barracks or Ancient within 1600 with enemies at it), defendCreeps (our creeps in the radius of the defend
--- plant point). Returns "push", "fight-push", "defend" or nil.
+-- plant point), heroesAtBuilding (enemy heroes within 1200 of that building), heroHitBuilding (a hero hit it in the
+-- last 3s). Defend needs an enemy hero there: a lane wave alone at our T2 is a creep clash, and the Banner is used once.
+-- Returns "push", "fight-push", "defend" or nil.
 function BannerRules.Why(s)
 	if s.enemyBuilding and (s.pushCreeps or 0) >= BannerRules.PUSH_CREEPS then
 		if s.pushing then
@@ -26,7 +28,11 @@ function BannerRules.Why(s)
 			return "fight-push"
 		end
 	end
-	if s.ownBuilding and (s.defendCreeps or 0) >= BannerRules.DEFEND_CREEPS then
+	if
+		s.ownBuilding
+		and ((s.heroesAtBuilding or 0) >= 1 or s.heroHitBuilding)
+		and (s.defendCreeps or 0) >= BannerRules.DEFEND_CREEPS
+	then
 		return "defend"
 	end
 	return nil

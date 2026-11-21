@@ -530,6 +530,14 @@ function AttackMode.Think()
 	if Fu.CanNotUseAction(bot) then
 		return
 	end
+	-- A hero script's attack hold (bot._attackHold, Dark Willow's Shadow Realm, #48): it gives its own order (a move
+	-- that keeps the range, or its one hit) in place of this mode's attack.
+	if bot._attackHold ~= nil then
+		local okHold, held = pcall(bot._attackHold)
+		if okHold and held then
+			return
+		end
+	end
 	local nearbyEnemyHeroes = bot:GetNearbyHeroes(1600, true, BOT_MODE_NONE)
 	local enemyTowers = bot:GetNearbyTowers(1600, true)
 	if bot:HasModifier("modifier_pugna_life_drain") then

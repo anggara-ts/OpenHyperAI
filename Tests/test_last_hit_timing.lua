@@ -269,3 +269,65 @@ T.test("backup: a creep the core's hit leaves alive is taken after the core's hi
 	Timing.Tick(bot)
 	T.eq(state.orders[1], "attack", "backup swing")
 end)
+
+T.test("a laning Think that gave another order drops the timing at the next frame's Tick", function()
+	local _, Timing, bot, creep, state = setup(60)
+	Stub.time = 1100
+	-- A walk-in armed by one Think; the next Think (a later frame) denies instead and does not re-arm it. The Tick
+	-- after it must not attack the old creep over the deny.
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true })
+	Stub.time = Stub.time + 0.3
+	Timing.BeginThink(bot)
+	Stub.time = Stub.time + 1 / 30
+	creep._hp = 30
+	Timing.Tick(bot)
+	T.eq(bot._lhTiming, nil, "dropped")
+	T.eq(#state.orders, 0, "no attack over the deny")
+end)
+
+T.test("timed hit and keep: a deny passed over keeps the wind-up armed", function()
+	local _, Timing, bot, creep, state = setup(60)
+	Stub.time = 1200
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = true })
+	state.activity = 1503
+	frames(Timing, bot, creep, 2, 45)
+	T.eq(Timing.TimedHit(bot), creep, "the wind-up is timed")
+	Stub.time = Stub.time + 1 / 30
+	Timing.BeginThink(bot)
+	Timing.KeepTimed(bot)
+	Timing.Tick(bot)
+	T.ok(bot._lhTiming ~= nil, "still armed after a Think that only kept it")
+end)
+
+T.test("death estimate: our creeps and towers hitting the creep", function()
+	local _, Timing, bot, creep = setup(100)
+	local function hitter(target)
+		local unit =
+			Stub.newUnit({ name = "npc_dota_creep_goodguys_melee", loc = creep:GetLocation() + Vector(50, 0, 0) })
+		unit.GetAttackTarget = function()
+			return target
+		end
+		unit.GetAttackDamage = function()
+			return 20
+		end
+		unit.GetSecondsPerAttack = function()
+			return 1
+		end
+		return unit
+	end
+	local units = { hitter(creep), hitter(creep), hitter(bot) }
+	bot.GetNearbyLaneCreeps = function()
+		return units
+	end
+	bot.GetNearbyTowers = function()
+		return {}
+	end
+	creep.GetIncomingTrackingProjectiles = function()
+		return {}
+	end
+	local death, dps = Timing.DeathEta(bot, creep)
+	T.near(dps, 40, 1e-9, "two creeps on it, one on something else")
+	T.near(death, 100 / 40, 1e-9, "100 HP at 40 a second")
+	units = {}
+	T.eq((Timing.DeathEta(bot, creep)), math.huge, "nothing hits it")
+end)

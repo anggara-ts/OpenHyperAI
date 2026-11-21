@@ -232,4 +232,32 @@ function LastHitRules.BackupDecision(b)
 	return "wait"
 end
 
+-- Walk-ins that cannot arrive (#71, game 064: late= rose from 71 to 137; 120 of them were walk-ins that never launched
+-- an attack, and the planned hit time expect= was later than the creep's death took= in 33 of 50 core and 58 of 70
+-- support walk-in misses). The sure / early test only counts the attacks already in flight or mid-swing, so on a long
+-- walk the creeps' next swings are missing and the creep dies first. The death is estimated from the damage per second
+-- of the units hitting the creep: hp is its HP less the hits already flying, dps the sum of each attacker's hit (after
+-- armour) per its seconds per attack. math.huge when nothing hits it.
+function LastHitRules.DeathEta(hp, dps)
+	if hp <= 0 then
+		return 0
+	end
+	if dps == nil or dps <= 0 then
+		return math.huge
+	end
+	return hp / dps
+end
+
+-- A walk-in is not opened when our hit (expect: walk, turn, wind-up, flight) lands after the creep's estimated death.
+function LastHitRules.WalkTooLate(expect, death)
+	return expect > death
+end
+
+-- Supports deny first (#71, maintainer game 064), but a deny does not stop a last hit the per-frame timing is holding
+-- (a wind-up being watched, holding after a cancel, a release decided) unless the denied creep is worth more
+-- (KIND_VALUE: a flagbearer or siege deny over a melee last hit; the same kind: the last hit, it is our gold).
+function LastHitRules.DenyBeatsTimedHit(denyKind, hitKind)
+	return (LastHitRules.KIND_VALUE[denyKind] or 1) > (LastHitRules.KIND_VALUE[hitKind] or 1)
+end
+
 return LastHitRules

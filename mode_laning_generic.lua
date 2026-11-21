@@ -126,6 +126,8 @@ end
 --            lived), -1 when none was seen;
 --   gap=     seconds since the previous look before the death was seen (took= can be late by up to this much);
 --   walk=    1 when the order was a walk-in, pos= the bot's position.
+-- Forward declaration: the harass-and-reset end line, defined with the harass code below.
+local FinishHarassReset
 local function TrackLastHitAttempt()
 	local now = DotaTime()
 	local lastLook = bot._lhLookAt or now
@@ -279,6 +281,10 @@ function GetDesire()
 	pcall(LogCreepScore)
 	pcall(TrackLastHitAttempt)
 	pcall(LastHitTiming.LogMinute, bot)
+	-- A harass-and-reset ends here too when laning is not the mode (its Think does not run then).
+	if bot._harassReset ~= nil and DotaTime() > bot._harassReset.untilTime then
+		pcall(FinishHarassReset)
+	end
 	return GetDesireRaw()
 end
 function GetDesireRaw()
@@ -420,6 +426,38 @@ end
 local function AllowEarlyStart()
 	return LastHitTiming.EarlyAllowed(bot) and (not IsSupportRole() or not Fu.IsThereNonSelfCoreNearby(1000))
 end
+-- A walk-in whose hit (delay: walk, turn, wind-up, flight) lands after the creep's estimated death to our creeps and
+-- towers (#71, game 064: expect= later than the creep's death in 91 of 120 walk-in misses): not opened, so the bot
+-- picks another creep or a deny ([OHA-LH] walk-skip why=too-late, minute walk-skip=).
+local function WalkInTooLate(creep, delay, backup)
+	local ok, death, dps = pcall(LastHitTiming.DeathEta, bot, creep)
+	if not ok or not LastHitRules.WalkTooLate(delay, death) then
+		return false
+	end
+	pcall(LastHitTiming.NoteWalkSkip, bot, creep, delay, death, dps, backup)
+	return true
+end
+-- A support's deny met a last hit being timed (#71): which one it kept. At most every 3s per bot.
+local function LogDenyOverHit(denyCreep, timedCreep, keepHit)
+	if DotaTime() < (bot._lhDenyLogAt or -999) then
+		return
+	end
+	bot._lhDenyLogAt = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-LH] t=%.0f %s deny-vs-hit choice=%s deny=%s hit=%s hit-hp=%d phase=%s backup=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			keepHit and "hit" or "deny",
+			GetCreepKind(denyCreep),
+			Fu.IsValid(timedCreep) and GetCreepKind(timedCreep) or "-",
+			Fu.IsValid(timedCreep) and timedCreep:GetHealth() or -1,
+			bot._lhTiming ~= nil and bot._lhTiming.phase or "-",
+			bot._lhTiming ~= nil and bot._lhTiming.backupCore ~= nil and 1 or 0
+		)
+	)
+end
 -- The last-hit pick (#71). Every creep is classified for the moment our hit would land (turn, walk, wind-up, flight;
 -- attacks in flight, creeps and towers mid-swing, our tower's next shot): "sure" (our hit kills it) or "early" (within
 -- 1.5 of our hits: start the swing, LastHitTiming cancels it if the creep is not low enough at the attack point).
@@ -464,9 +502,12 @@ function GetBestLastHitCreep(creeps)
 					class, hitDamage = "sure", damage + bonus
 				end
 			end
+			local walk = GetUnitToUnitDistance(bot, creep) > attackRange
+			if class ~= nil and walk and WalkInTooLate(creep, attackDelay, false) then
+				class = nil
+			end
 			if class ~= nil then
 				local kind = GetCreepKind(creep)
-				local walk = GetUnitToUnitDistance(bot, creep) > attackRange
 				local score = LastHitRules.PickScore(kind, class == "sure", walk)
 				if best == nil or LastHitRules.BetterPick(score, attackDelay, best.score, best.delay) then
 					best = {
@@ -618,6 +659,38 @@ local function LogHarass(enemyHero, target, why, fresh, hitting, noReset)
 			attackRange,
 			GetUnitToUnitDistance(bot, enemyHero),
 			noReset or "-"
+		)
+	)
+end
+-- The end of a harass-and-reset (#71, game 064: t=57 Zeus hit Nyx with why=reset, and nothing showed whether he
+-- stepped back; the kite lines right after said attack mode). One line per reset, from the laning Think or GetDesire
+-- (which runs in every mode):
+--   hit=    our harass hit went out; steps= laning Thinks that ordered the step back (0: laning was not the mode);
+--   moved=  how far the bot is from where it hit; aggro= enemy lane creeps within 500 still on us; mode= active mode.
+FinishHarassReset = function()
+	local reset = bot._harassReset
+	bot._harassReset = nil
+	if reset == nil then
+		return
+	end
+	local aggro = 0
+	for _, creep in pairs(bot:GetNearbyLaneCreeps(500, true) or {}) do
+		if Fu.IsValid(creep) and creep:GetAttackTarget() == bot then
+			aggro = aggro + 1
+		end
+	end
+	print(
+		string.format(
+			"[OHA-HARASS] t=%.0f %s reset-end target=%s hit=%s steps=%d moved=%d aggro=%d mode=%d hp=%.2f",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			Fu.IsValid(reset.target) and (string.gsub(reset.target:GetUnitName(), "npc_dota_hero_", "")) or "-",
+			(reset.hit or bot:GetLastAttackTime() >= reset.at) and "yes" or "no",
+			reset.steps or 0,
+			reset.from ~= nil and math.floor(Fu.GetLocationToLocationDistance(reset.from, bot:GetLocation())) or -1,
+			aggro,
+			bot:GetActiveMode(),
+			Fu.GetHP(bot)
 		)
 	)
 end
@@ -861,10 +934,23 @@ do
 			end
 		end
 		local bSupport = IsSupportRole()
-		-- Supports deny first and leave the last hits to their core.
+		-- Supports deny first and leave the last hits to their core. A last hit the per-frame timing is holding (a
+		-- backup wind-up, a hold after a cancel, a decided release) goes on unless the deny is worth more (#71,
+		-- maintainer game 064: supports must still deny first); before, the deny order replaced it.
 		if bSupport then
 			local denyCreep = GetBestDenyCreep(allyLaneCreeps)
 			if Fu.IsValid(denyCreep) then
+				local timedCreep = LastHitTiming.TimedHit(bot)
+				local keepHit = Fu.IsValid(timedCreep)
+					and not LastHitRules.DenyBeatsTimedHit(GetCreepKind(denyCreep), GetCreepKind(timedCreep))
+				if timedCreep ~= nil then
+					LogDenyOverHit(denyCreep, timedCreep, keepHit)
+				end
+				if keepHit then
+					LastHitTiming.KeepTimed(bot)
+					return
+				end
+				LastHitTiming.Clear(bot)
 				bot:SetTarget(denyCreep)
 				bot:Action_AttackUnit(denyCreep, true)
 				return
@@ -873,6 +959,15 @@ do
 		-- A support next to its core backs up the creep the core is hitting, else any creep about to die.
 		local backupCore = bSupport and LaneCoreNear() or nil
 		local lastHitCreep = backupCore ~= nil and CoreLastHitCreep(backupCore) or nil
+		-- Not a backup walk-in that lands after the creep dies to our creeps and towers (the core's hit not counted).
+		if
+			lastHitCreep ~= nil
+			and GetUnitToUnitDistance(bot, lastHitCreep) > attackRange
+			and not LastHitTiming.Holding(bot, lastHitCreep)
+			and WalkInTooLate(lastHitCreep, Fu.GetAttackProDelayTime(bot, lastHitCreep), true)
+		then
+			lastHitCreep = nil
+		end
 		if lastHitCreep == nil then
 			lastHitCreep = GetBestLastHitCreep(enemyLaneCreeps)
 		end
@@ -1060,8 +1155,12 @@ do
 			local reset = bot._harassReset
 			if reset ~= nil then
 				if DotaTime() > reset.untilTime or not Fu.IsValidHero(reset.target) then
-					bot._harassReset = nil
+					pcall(FinishHarassReset)
 				elseif bot:GetLastAttackTime() >= reset.at or GameTime() - reset.at > 1 then
+					reset.steps = reset.steps + 1
+					if reset.steps == 1 then
+						reset.hit = bot:GetLastAttackTime() >= reset.at
+					end
 					bot:Action_MoveToLocation(Fu.AdjustLocationWithOffsetTowardsFountain(bot:GetLocation(), 350))
 					return
 				else
@@ -1160,7 +1259,13 @@ do
 					if noReset == nil then
 						target = inRange
 						why = "reset"
-						bot._harassReset = { target = inRange, at = GameTime(), untilTime = DotaTime() + 2.5 }
+						bot._harassReset = {
+							target = inRange,
+							at = GameTime(),
+							untilTime = DotaTime() + 2.5,
+							from = bot:GetLocation(),
+							steps = 0,
+						}
 						bot._harassResetNextAt = DotaTime() + 6
 					end
 				end

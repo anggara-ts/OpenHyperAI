@@ -83,6 +83,27 @@ function X.Predict(creep, damage, delay, towerShot)
 	return effectiveHealth - incoming - towerShot, ourHit, incomingKills
 end
 
+-- Seconds until an enemy lane creep dies to our lane creeps and towers hitting it, our own hit not counted
+-- (LastHitRules.DeathEta), and that damage per second. Heroes are left out: their hits on lane creeps come and go (a
+-- support's backup hit, a core's last hit), the creeps and towers keep swinging.
+function X.DeathEta(bot, creep)
+	local dps = 0
+	local function add(unit)
+		if Fu.IsValid(unit) and unit:GetAttackTarget() == creep then
+			local hit = creep:GetActualIncomingDamage(unit:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
+			dps = dps + hit / math.max(0.1, unit:GetSecondsPerAttack())
+		end
+	end
+	for _, unit in pairs(bot:GetNearbyLaneCreeps(1600, false) or {}) do
+		add(unit)
+	end
+	for _, tower in pairs(bot:GetNearbyTowers(1600, false) or {}) do
+		add(tower)
+	end
+	local hp = creep:GetHealth() - Fu.GetCreepAttackProjectileWillRealDamage(creep, 1.0)
+	return Rules.DeathEta(hp, dps), dps
+end
+
 -- The core's hit on creep: pending (attacking it and not in the previous attack's backswing / cooldown, so a hit is
 -- still to come) and cooling (in the backswing / cooldown: its last hit already went out).
 local function coreHitState(core, creep)
@@ -158,6 +179,8 @@ function X.Stats(bot)
 			backup = 0,
 			backupGot = 0,
 			backupCore = 0,
+			walkSkip = 0,
+			walkSkipped = {},
 		}
 		bot._lhtStats = stats
 	end
@@ -200,13 +223,13 @@ function X.LogMinute(bot)
 		return
 	end
 	bot._lhtStats = nil
-	if stats.got + stats.missed + stats.cancelled + stats.backup == 0 then
+	if stats.got + stats.missed + stats.cancelled + stats.backup + stats.walkSkip == 0 then
 		return
 	end
 	pcall(
 		print,
 		string.format(
-			"[OHA-LH] t=%.0f %s minute got=%d missed=%d late=%d early=%d cancelled=%d cancel-lost=%d released=%d sure-short=%d stop-ok=%d stop-fail=%d backup=%d backupGot=%d backupCore=%d",
+			"[OHA-LH] t=%.0f %s minute got=%d missed=%d late=%d early=%d cancelled=%d cancel-lost=%d released=%d sure-short=%d stop-ok=%d stop-fail=%d backup=%d backupGot=%d backupCore=%d walk-skip=%d",
 			DotaTime(),
 			heroName(bot),
 			stats.got,
@@ -221,7 +244,37 @@ function X.LogMinute(bot)
 			stats.stopFail,
 			stats.backup,
 			stats.backupGot,
-			stats.backupCore
+			stats.backupCore,
+			stats.walkSkip
+		)
+	)
+end
+
+-- A walk-in left out because it lands after the creep's death (counted once per creep per minute), with a throttled
+-- [OHA-LH] walk-skip line.
+function X.NoteWalkSkip(bot, creep, expect, death, dps, backup)
+	local stats = X.Stats(bot)
+	if not stats.walkSkipped[creep] then
+		stats.walkSkipped[creep] = true
+		stats.walkSkip = stats.walkSkip + 1
+	end
+	bot._lhtLogAt = bot._lhtLogAt or {}
+	if DotaTime() < (bot._lhtLogAt.walkSkip or -99) then
+		return
+	end
+	bot._lhtLogAt.walkSkip = DotaTime() + LOG_EVERY
+	pcall(
+		print,
+		string.format(
+			"[OHA-LH] t=%.0f %s walk-skip why=too-late creep-hp=%d expect=%.2f death=%.2f dps=%.0f dist=%d backup=%d",
+			DotaTime(),
+			heroName(bot),
+			creep:GetHealth(),
+			expect,
+			death,
+			dps,
+			GetUnitToUnitDistance(bot, creep),
+			backup and 1 or 0
 		)
 	)
 end
@@ -293,6 +346,23 @@ end
 function X.IsTiming(bot)
 	local st = bot._lhTiming
 	return st ~= nil and (st.phase == "hold" or st.phase == "windup" or st.phase == "decided")
+end
+
+-- The creep (and backup core) of the hit being timed now (X.IsTiming), else nil.
+function X.TimedHit(bot)
+	if not X.IsTiming(bot) then
+		return nil, nil
+	end
+	local st = bot._lhTiming
+	return st.creep, st.backupCore
+end
+
+-- The laning Think keeps the hit being timed this think without changing it (a deny passed over for it).
+function X.KeepTimed(bot)
+	local st = bot._lhTiming
+	if st ~= nil then
+		st.armedAt = GameTime()
+	end
 end
 
 function X.Clear(bot)
@@ -499,7 +569,10 @@ function X.Tick(bot)
 		bot:GetActiveMode() ~= BOT_MODE_LANING
 		-- An enemy tower on us: the tower-aggro step after this hook comes first.
 		or bot:WasRecentlyDamagedByTower(1.0)
-		or (st.thinkAt == now and st.armedAt ~= now)
+		-- The last laning Think did not re-arm it (it gave another order: a deny, a harass hit). Before: only when that
+		-- Think ran in this same frame, so a Think that ran after the frame's Tick left the walk / attack armed for up to
+		-- ARM_MAX_AGE, and the next Tick could replace the Think's deny with the old last-hit attack.
+		or (st.thinkAt ~= nil and st.thinkAt > (st.armedAt or -99))
 		or now - (st.armedAt or -99) > ARM_MAX_AGE
 		or creep == nil
 		or creep:IsNull()

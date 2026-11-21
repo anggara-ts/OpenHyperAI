@@ -145,3 +145,22 @@ T.test("backup swing: stopped when the core's hit kills first, at the last look"
 	s.backup = false
 	T.eq(R.WindupDecision(s), "release", "not a backup: nothing to stop")
 end)
+
+T.test("walk-in too late: the hit lands after the creep's estimated death", function()
+	local R = rules()
+	-- Game 064 t=61 Abaddon: creep 53 HP, expect=2.47, took=0.93. Two melee creeps at ~19 a hit per second: 1.39s.
+	T.near(R.DeathEta(53, 38), 53 / 38, 1e-9, "HP over damage per second")
+	T.eq(R.DeathEta(0, 38), 0, "already dead")
+	T.eq(R.DeathEta(53, 0), math.huge, "nothing hits it")
+	T.ok(R.WalkTooLate(2.47, R.DeathEta(53, 38)), "Abaddon's walk-in is not opened")
+	T.ok(not R.WalkTooLate(0.8, R.DeathEta(53, 38)), "a hit that lands first still goes")
+	T.ok(not R.WalkTooLate(5, R.DeathEta(300, 0)), "a creep nothing hits waits for us")
+end)
+
+T.test("deny over a timed last hit: only a more valuable creep", function()
+	local R = rules()
+	T.ok(not R.DenyBeatsTimedHit("melee", "melee"), "same kind: keep the last hit (our gold)")
+	T.ok(not R.DenyBeatsTimedHit("melee", "ranged"), "a melee deny does not stop a ranged last hit")
+	T.ok(R.DenyBeatsTimedHit("flag", "melee"), "a flagbearer deny beats a melee last hit")
+	T.ok(R.DenyBeatsTimedHit("siege", "ranged"), "a siege deny beats a ranged last hit")
+end)

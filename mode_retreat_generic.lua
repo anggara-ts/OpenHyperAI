@@ -1258,7 +1258,8 @@ local function TowerChaseRun()
 	local act, why
 	if approaching then
 		act, why = DiveRules.TowerApproachDecision({
-			outerTower = outerTower,
+			-- Before the edge: T2/T3 (all 9 game 065 deaths were at a T2; T1 fights stay with the edge rule).
+			outerTower = string.find(tower:GetUnitName() or "", "tower[23]_") ~= nil,
 			pushing = Fu.IsPushing(bot),
 			approaching = true,
 			botHealth = botHealth,
@@ -1316,7 +1317,7 @@ local function TowerChaseRun()
 		pcall(
 			print,
 			string.format(
-				"[OHA-RETREAT] t=%.0f %s %s why=%s tower=%s target=%s hp=%d shot=%d every=%.2f range=%d dmg=%d targetHp=%d mode=%d enemyDmg=%d enemies=%d hold=%d dist=%d",
+				"[OHA-RETREAT] t=%.0f %s %s why=%s tower=%s target=%s hp=%d shot=%d every=%.2f range=%d dmg=%d targetHp=%d mode=%d enemyDmg=%d enemies=%d hold=%d dist=%d allies=%d hpr=%.2f",
 				DotaTime(),
 				(string.gsub(botName, "npc_dota_hero_", "")),
 				name,
@@ -1333,7 +1334,10 @@ local function TowerChaseRun()
 				math.floor(enemyDamage),
 				enemyCount,
 				act == "leave" and DiveRules.HOLD_SECONDS or 0,
-				math.floor(towerDist)
+				math.floor(towerDist),
+				-- Allied heroes within 1200 (not the bot): reads whether a stop came with the fight on our side.
+				math.max(0, #(bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE) or {}) - 1),
+				hpRatio
 			)
 		)
 	end

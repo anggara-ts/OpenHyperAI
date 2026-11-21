@@ -2091,6 +2091,8 @@ function Defend.DefendThink(bot, lane)
 				)
 			end
 		end
+		-- Attack-move at (or behind) the high-ground spot: the "hugging" step.
+		LogDefendStep(bot, lane, "hg-spot", nil)
 		if enemiesOnHG == 0 and #enemiesAtHighGround > 0 and #alliesAtHighGround >= #enemiesAtHighGround + 1 then
 			local attackMoveLocation = vectorAdd(highGroundSpot, Fu.RandomForwardVector(120))
 			bot:Action_AttackMove(attackMoveLocation)
@@ -2101,6 +2103,8 @@ function Defend.DefendThink(bot, lane)
 		end
 		return
 	end
+	-- None of the steps above ran (tier under 3, enemy heroes at our high ground, ...): the lane defence below.
+	LogDefendStep(bot, lane, "lane-defend", nil)
 	local enemiesNearDefendLoc = Fu.GetEnemiesNearLoc(defendLocation, defendRadius)
 	local enemyCount = #enemiesNearDefendLoc
 	local distanceToDefendLoc = GetUnitToLocationDistance(bot, defendLocation)

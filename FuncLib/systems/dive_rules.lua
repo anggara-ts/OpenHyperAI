@@ -48,13 +48,14 @@ function DiveRules.TowerChaseDecision(s)
 	return "leave", "not-killable"
 end
 
--- Before the tower edge: a bot going on someone (attack / roam / team roam / defend ally) toward an enemy T1/T2,
+-- Before the tower edge: a bot going on someone (attack / roam / team roam / defend ally) toward an enemy T2/T3,
 -- up to the tower's range + APPROACH_MARGIN away and not in range yet, while what the visible enemy heroes near can
 -- do to it in the window plus 3 tower shots is its HP or more ("dead on paper"). Game 065: 9 of 30 chase-stop /
 -- tower-entry-stop lines were followed by the bot's death within 5s, all why=low-hp at the tower edge with 1-4 enemy
 -- heroes whose damage was above the bot's HP (e.g. Zeus t=2150 tower-entry-stop hp=396 enemyDmg=5905 enemies=4 at
 -- Dire's top T2, dead the same second): by the edge it was too late to walk out.
---   s.outerTower, s.pushing   as in TowerChaseDecision
+--   s.outerTower   the tower is a T2 or T3 (the caller's check here; the edge rule's is T1/T2)
+--   s.pushing      as in TowerChaseDecision
 --   s.approaching  the bot is outside the tower's range, within range + APPROACH_MARGIN, going on someone, and its
 --                  hero target is nearer the tower than it is, or it is moving toward the tower
 --   s.botHealth, s.shotDamage, s.enemyDamage   as in TowerChaseDecision

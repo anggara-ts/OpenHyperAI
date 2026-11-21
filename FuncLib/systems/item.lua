@@ -1206,6 +1206,20 @@ function Item.GetBasicItems(itemList, owned)
 	end
 	return basicItems
 end
+-- What to buy for one missing part of a held recipe (#15). A built part (Urn of Shadows inside Spirit Vessel) is not
+-- for sale as one item: the shop answers PURCHASE_ITEM_INVALID_ITEM_NAME (33). Game 051, 58:54: Chen held the Spirit
+-- Vessel recipe without an Urn and the rebuild queued item_urn_of_shadows, four failed buys. A built part becomes the
+-- basic parts it is made of that the hero lacks; a basic part is bought as it is.
+function Item.PartsToBuy(part)
+	if type(Item[part]) == "table" then
+		return Item.GetBasicItems({ part })
+	end
+	local ok, sets = pcall(GetItemComponents, part)
+	if ok and type(sets) == "table" and type(sets[1]) == "table" and #sets[1] > 0 then
+		return Item.GetBasicItems(sets[1])
+	end
+	return { part }
+end
 function Item.GetMainInvLessValItemSlot(hero)
 	local lowestCost = 10000
 	local lowestSlot = -1

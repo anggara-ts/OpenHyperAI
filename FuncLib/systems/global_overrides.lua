@@ -68,6 +68,7 @@ if package and package.path then
 end
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 require(GetScriptDirectory() .. "/FuncLib/systems/log")
+local SwapRules = require(GetScriptDirectory() .. "/FuncLib/systems/swap_rules")
 local hasGetInfo = type(debug) == "table" and type(debug.getinfo) == "function"
 local hasTraceback = type(debug) == "table" and type(debug.traceback) == "function"
 local function getStackTrace(level)
@@ -925,6 +926,34 @@ function CDOTA_Bot_Script:ActionImmediate_SwapItems(slotA, slotB)
 	-- leaves it on cooldown. The grenade is the exception: it has to stay throwable.
 	if SwapMovesBranchToBackpack(self, slotA, slotB) or SwapMovesBranchToBackpack(self, slotB, slotA) then
 		LogGrenadeSwap(self, slotA, slotB, "blocked-branch-rule")
+		return nil
+	end
+	-- Dust, a Clarity or a lotus pulled into an occupied main slot is put back by the engine (swap_rules.lua, #15):
+	-- refuse it, and make every pull routine wait (they read _pullBackoff). Pulls into an empty main slot still go.
+	local itemA, itemB = self:GetItemInSlot(slotA), self:GetItemInSlot(slotB)
+	local pulled, occupant = SwapRules.UndonePull(
+		slotA,
+		itemA ~= nil and itemA:GetName() or nil,
+		slotB,
+		itemB ~= nil and itemB:GetName() or nil
+	)
+	if pulled ~= nil then
+		self._pullBackoff = self._pullBackoff or {}
+		self._pullBackoff[pulled] = DotaTime() + SwapRules.PULL_SKIP_BACKOFF
+		self._pullSkipLogAt = self._pullSkipLogAt or {}
+		if DotaTime() >= (self._pullSkipLogAt[pulled] or -999) then
+			self._pullSkipLogAt[pulled] = DotaTime() + 30
+			pcall(
+				print,
+				string.format(
+					"[OHA-ITEM] t=%.0f %s pull-skip item=%s out=%s why=main-full",
+					DotaTime(),
+					(string.gsub(self:GetUnitName(), "npc_dota_hero_", "")),
+					(string.gsub(pulled, "^item_", "")),
+					(string.gsub(occupant, "^item_", ""))
+				)
+			)
+		end
 		return nil
 	end
 	-- The gap is per pair of items. It used to be one timer for every swap, so a routine that kept

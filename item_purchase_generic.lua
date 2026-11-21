@@ -16,6 +16,7 @@ if GAMEMODE_ARDM == nil then
 end
 local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
+local BuyRules = require(GetScriptDirectory() .. "/FuncLib/systems/buy_rules")
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
@@ -839,6 +840,30 @@ local function BuyLog(fmt, ...)
 		string.format("[OHA-BUY] t=%.0f %s " .. fmt, DotaTime(), (string.gsub(botName, "npc_dota_hero_", "")), ...)
 	)
 end
+-- Every purchase order goes through Purchase (#15). Game 063, 10:38: Shadow Fiend's courier took
+-- `stash=tango,boots` with no [OHA-BUY] line, and half the purchase paths (restocks, wards, Smoke, Shard, TP)
+-- printed nothing, so a log could not say which path bought an item. A success prints
+-- `bought <item> via=<path> for=<target>`; a failed order prints `buy-failed` at most once per item every 30s.
+local function Purchase(unit, itemName, via, forItem, extra)
+	local result = unit:ActionImmediate_PurchaseItem(itemName)
+	if result == PURCHASE_ITEM_SUCCESS then
+		BuyLog(
+			"bought %s via=%s for=%s gold=%d%s",
+			ShortItem(itemName),
+			via,
+			ShortItem(forItem or itemName),
+			bot:GetGold(),
+			extra or ""
+		)
+	else
+		bot._buyFailLogAt = bot._buyFailLogAt or {}
+		if DotaTime() >= (bot._buyFailLogAt[itemName] or -999) then
+			bot._buyFailLogAt[itemName] = DotaTime() + 30
+			BuyLog("buy-failed %s via=%s result=%s gold=%d", ShortItem(itemName), via, tostring(result), bot:GetGold())
+		end
+	end
+	return result
+end
 local function IsBasicItem(name)
 	if type(Item[name]) == "table" then
 		return false
@@ -1230,15 +1255,14 @@ local function BuyBasicItem()
 			courier = bot.theCourier
 		end
 		if bot.SecretShop and courier ~= nil and courier:DistanceFromSecretShop() == 0 then
-			local courierResult = courier:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+			local courierResult = Purchase(
+				courier,
+				bot.currBuyingBasicItem,
+				"plan-courier",
+				bot.currBuyingItemInPurchaseList,
+				string.format(" left=%d courier=secret", math.max(0, #bot.currBuyingBasicItemList - 1))
+			)
 			if courierResult == PURCHASE_ITEM_SUCCESS then
-				BuyLog(
-					"bought %s for=%s gold=%d left=%d courier=secret",
-					ShortItem(bot.currBuyingBasicItem),
-					ShortItem(bot.currBuyingItemInPurchaseList),
-					bot:GetGold(),
-					math.max(0, #bot.currBuyingBasicItemList - 1)
-				)
 				FinishBasicItem()
 				bot.SecretShop = false
 				return
@@ -1252,15 +1276,14 @@ local function BuyBasicItem()
 			bot.SecretShop = true
 		else
 			if Utils.CountBackpackEmptySpace(bot) > 0 or bot:DistanceFromSecretShop() > 700 then
-				local result = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+				local result = Purchase(
+					bot,
+					bot.currBuyingBasicItem,
+					"plan",
+					bot.currBuyingItemInPurchaseList,
+					string.format(" left=%d", math.max(0, #bot.currBuyingBasicItemList - 1))
+				)
 				if result == PURCHASE_ITEM_SUCCESS then
-					BuyLog(
-						"bought %s for=%s gold=%d left=%d",
-						ShortItem(bot.currBuyingBasicItem),
-						ShortItem(bot.currBuyingItemInPurchaseList),
-						bot:GetGold(),
-						math.max(0, #bot.currBuyingBasicItemList - 1)
-					)
 					FinishBasicItem()
 					bot.SecretShop = false
 					return
@@ -1279,8 +1302,14 @@ local function BuyBasicItem()
 						FinishBasicItem()
 						bot.SecretShop = false
 					else
-						local retryResult = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
-						log("%s 未能购买物品 %s : %s", botName, bot.currBuyingBasicItem, retryResult)
+						-- A retry that goes through used to leave the item queued, so it was bought again.
+						if
+							Purchase(bot, bot.currBuyingBasicItem, "plan-retry", bot.currBuyingItemInPurchaseList)
+							== PURCHASE_ITEM_SUCCESS
+						then
+							FinishBasicItem()
+							bot.SecretShop = false
+						end
 					end
 				end
 			end
@@ -1288,6 +1317,27 @@ local function BuyBasicItem()
 	else
 		bot.SecretShop = false
 	end
+end
+-- true when the build still uses this item (the item itself or a part of one still to buy); defined with the sell
+-- marks below.
+local NeededLater
+-- A sell rule skips an item the build still uses (#15, game 065: Dark Willow's Circlets for her Urn were sold at the
+-- fountain right after each buy, 5 times from 33:59 and twice at 42:36). One line per item every 60s.
+local function KeepForBuild(itemName, rule)
+	if not NeededLater(itemName) then
+		return false
+	end
+	bot._sellKeepLogAt = bot._sellKeepLogAt or {}
+	if DotaTime() >= (bot._sellKeepLogAt[itemName] or -999) then
+		bot._sellKeepLogAt[itemName] = DotaTime() + 60
+		BuyLog(
+			"sell-keep %s why=%s for=%s",
+			ShortItem(itemName),
+			rule,
+			ShortItem(bot.currBuyingItemInPurchaseList or "-")
+		)
+	end
+	return true
 end
 local function BuyBasicItemTurbo()
 	local nextItem = NextBasicItem()
@@ -1342,15 +1392,14 @@ local function BuyBasicItemTurbo()
 		then
 			return
 		end
-		local result = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
+		local result = Purchase(
+			bot,
+			bot.currBuyingBasicItem,
+			"plan-turbo",
+			bot.currBuyingItemInPurchaseList,
+			string.format(" left=%d", math.max(0, #bot.currBuyingBasicItemList - 1))
+		)
 		if result == PURCHASE_ITEM_SUCCESS then
-			BuyLog(
-				"bought %s for=%s gold=%d left=%d",
-				ShortItem(bot.currBuyingBasicItem),
-				ShortItem(bot.currBuyingItemInPurchaseList),
-				bot:GetGold(),
-				math.max(0, #bot.currBuyingBasicItemList - 1)
-			)
 			FinishBasicItem()
 			return
 		else
@@ -1366,8 +1415,12 @@ local function BuyBasicItemTurbo()
 				)
 				FinishBasicItem()
 			else
-				local retryResult = bot:ActionImmediate_PurchaseItem(bot.currBuyingBasicItem)
-				log("%s 未能购买物品 %s : %s", botName, bot.currBuyingBasicItem, retryResult)
+				if
+					Purchase(bot, bot.currBuyingBasicItem, "plan-retry", bot.currBuyingItemInPurchaseList)
+					== PURCHASE_ITEM_SUCCESS
+				then
+					FinishBasicItem()
+				end
 			end
 		end
 	end
@@ -1668,9 +1721,12 @@ function ItemPurchaseThink()
 		and GetItemStockCount("item_clarity") > 1
 		and Item.GetItemCharges(bot, "item_clarity") <= 0
 		and gold >= GetItemCost("item_clarity")
+		-- Not right after a full-inventory sale of a Clarity (game 067: Undying sold one at 42:29 and bought one at
+		-- 42:30, a 25-gold loop also seen on Zeus and Death Prophet).
+		and now >= (bot._claritySoldAt or -999) + 60
 	then
 		bot.hasBuyClarity = true
-		bot:ActionImmediate_PurchaseItem("item_clarity")
+		Purchase(bot, "item_clarity", "low-mana", "item_clarity")
 	end
 	if Fu.GetPosition(bot) >= 4 then
 		if
@@ -1681,7 +1737,7 @@ function ItemPurchaseThink()
 			and Utils.CountBackpackEmptySpace(bot) >= 2
 		then
 			bot.hasBuyClarity = true
-			bot:ActionImmediate_PurchaseItem("item_clarity")
+			Purchase(bot, "item_clarity", "support-clarity", "item_clarity")
 		elseif
 			botLevel >= 5
 			and Role["invisEnemyExist"] == true
@@ -1692,7 +1748,7 @@ function ItemPurchaseThink()
 			and courierValue == 0
 			and not Fu.HasItem(bot, "item_ward_sentry")
 		then
-			bot:ActionImmediate_PurchaseItem("item_dust")
+			Purchase(bot, "item_dust", "support-dust", "item_dust")
 		end
 	end
 	if Fu.IsInLaningPhase() and not string.find(botName, "lone_druid") then
@@ -1810,7 +1866,7 @@ function ItemPurchaseThink()
 					return false
 				end
 				MatchTrace.Buy(bot, itemName, reason)
-				bot:ActionImmediate_PurchaseItem(itemName)
+				Purchase(bot, itemName, "support-ward", itemName)
 				gold = bot:GetGold()
 				emptySlots = Item.GetEmptyInventoryAmount(bot)
 				return true
@@ -1920,14 +1976,14 @@ function ItemPurchaseThink()
 		-- several early returns never set it back), so Techies bought one at 7:00 in lane.
 		if DotaTime() >= 12 * 60 and not Fu.IsInLaningPhase() then
 			MatchTrace.Buy(bot, "item_smoke_of_deceit", "post_laning support")
-			bot:ActionImmediate_PurchaseItem("item_smoke_of_deceit")
+			Purchase(bot, "item_smoke_of_deceit", "support-smoke", "item_smoke_of_deceit")
 		end
 	end
 	-- No Blood Grenade rebuys: the one in the starting build (bought before the horn) is all a
 	-- hero needs. Rebuys landed in full bags (Lina, Earthshaker in the backpack).
 	if not bot.hasBuyShard and GetItemStockCount("item_aghanims_shard") > 0 and gold >= 1400 then
 		bot.hasBuyShard = true
-		bot:ActionImmediate_PurchaseItem("item_aghanims_shard")
+		Purchase(bot, "item_aghanims_shard", "shard", "item_aghanims_shard")
 	end
 	if wasPreGame == false and now < 0 then
 		wasPreGame = true
@@ -1953,9 +2009,9 @@ function ItemPurchaseThink()
 		end
 		if tpCharges <= 0 or botLevel >= 18 and tpCharges <= 1 then
 			if gold >= tpCost * 2 and now > 25 * 60 then
-				bot:ActionImmediate_PurchaseItem("item_tpscroll")
+				Purchase(bot, "item_tpscroll", "tp-restock", "item_tpscroll")
 			end
-			bot:ActionImmediate_PurchaseItem("item_tpscroll")
+			Purchase(bot, "item_tpscroll", "tp-restock", "item_tpscroll")
 			bot._tpBuyHoldUntil = now + 30
 			if botName == "npc_dota_hero_meepo" then
 				pcall(print, string.format("[OHA-MEEPO] t=%.0f tp-buy charges=%d gold=%d", now, tpCharges, gold))
@@ -2088,7 +2144,7 @@ function ItemPurchaseThink()
 			for i = 1, #Item["tEarlyItem"] do
 				local itemName = Item["tEarlyItem"][i]
 				local itemSlot = bot:FindItemSlot(itemName)
-				if itemSlot >= 0 and itemSlot <= 8 then
+				if itemSlot >= 0 and itemSlot <= 8 and not KeepForBuild(itemName, "full") then
 					sellSlot = itemSlot
 					break
 				end
@@ -2097,7 +2153,7 @@ function ItemPurchaseThink()
 				for i = 1, #Item["tSupportSellWhenFull"] do
 					local itemName = Item["tSupportSellWhenFull"][i]
 					local itemSlot = bot:FindItemSlot(itemName)
-					if itemSlot >= 0 and itemSlot <= 8 then
+					if itemSlot >= 0 and itemSlot <= 8 and not KeepForBuild(itemName, "full") then
 						sellSlot = itemSlot
 						break
 					end
@@ -2116,11 +2172,26 @@ function ItemPurchaseThink()
 			if cheapSlot < 0 then
 				cheapSlot = bot:FindItemSlot("item_wraith_band")
 			end
-			if cheapSlot >= 0 and wandSlot >= 6 and wandSlot <= 8 then
+			if
+				cheapSlot >= 0
+				and wandSlot >= 6
+				and wandSlot <= 8
+				and not KeepForBuild(bot:GetItemInSlot(cheapSlot):GetName(), "full-wand")
+			then
 				sellSlot = cheapSlot
 			end
 		end
 		if sellSlot ~= nil then
+			-- This sale printed nothing, so a part that went missing could not be traced (#15, game 065).
+			if bot:GetItemInSlot(sellSlot):GetName() == "item_clarity" then
+				bot._claritySoldAt = now
+			end
+			BuyLog(
+				"sell-full %s slot=%d empty=%d",
+				ShortItem(bot:GetItemInSlot(sellSlot):GetName()),
+				sellSlot,
+				emptyInventory
+			)
 			bot:ActionImmediate_SellItem(bot:GetItemInSlot(sellSlot))
 		end
 		bot.fullInvCheck = now
@@ -2619,7 +2690,23 @@ function ItemPurchaseThink()
 								for component, needed in pairs(CountList(components)) do
 									if not string.find(component, "recipe") then
 										for _ = CountItem(bot, component) + 1, needed do
-											table.insert(bot.currBuyingBasicItemList, 1, component)
+											-- A built part (Urn for Spirit Vessel) is bought as its basic parts (#15).
+											local parts = Item.PartsToBuy(component)
+											if #parts ~= 1 or parts[1] ~= component then
+												local short = {}
+												for i, part in ipairs(parts) do
+													short[i] = ShortItem(part)
+												end
+												BuyLog(
+													"rebuild-parts %s parts=%s for=%s",
+													ShortItem(component),
+													table.concat(short, ","),
+													ShortItem(bot.currBuyingItemInPurchaseList)
+												)
+											end
+											for _, part in ipairs(parts) do
+												table.insert(bot.currBuyingBasicItemList, 1, part)
+											end
 										end
 									end
 								end
@@ -2631,12 +2718,34 @@ function ItemPurchaseThink()
 						end
 					end
 				end
-				local reducedList = Item.GetReducedPurchaseList(bot, bot.currBuyingBasicItemRefList)
-				for _, itemName in pairs(reducedList) do
-					if not Item.IsItemInHero(itemName) then
-						bot.currBuyingBasicItemList[#bot.currBuyingBasicItemList + 1] = itemName
+				-- Then what the whole item still needs, less what the step above queued (#15, game 065, 40:45: the old
+				-- step appended the ref list less held items, so Dark Willow's four Urn parts were queued twice,
+				-- left=7). GetBasicItems counts held copies (a held Urn is not broken into parts again, a held
+				-- Branch covers one of two).
+				local okW, wanted = pcall(Item.GetBasicItems, { bot.currBuyingItemInPurchaseList })
+				local added = BuyRules.BeyondQueued(bot.currBuyingBasicItemList, okW and wanted or {})
+				for _, part in ipairs(added) do
+					table.insert(bot.currBuyingBasicItemList, 1, part)
+				end
+				local queuedShort, inv = {}, {}
+				for i, part in ipairs(bot.currBuyingBasicItemList) do
+					queuedShort[i] = ShortItem(part)
+				end
+				for slot = 0, 14 do
+					local held = bot:GetItemInSlot(slot)
+					if held ~= nil then
+						inv[#inv + 1] = ShortItem(held:GetName())
 					end
 				end
+				-- At most 5 rebuilds per item, so no throttle. inv= shows what the hero held (slots 0-14).
+				BuyLog(
+					"rebuild for=%s n=%d added=%d queued=%s inv=%s",
+					ShortItem(bot.currBuyingItemInPurchaseList),
+					bot.rebuildCount,
+					#added,
+					#queuedShort > 0 and table.concat(queuedShort, ",") or "-",
+					#inv > 0 and table.concat(inv, ",") or "-"
+				)
 				bot.currBuyingRequiredCounts = RequiredCounts(bot.currBuyingBasicItemList)
 				NextBasicItem()
 			else
@@ -2696,7 +2805,12 @@ end
 -- starting stat item in many builds that is never turned into a Wraith Band / Null Talisman / Bracer
 -- (game 033, 20:00: Death Prophet still carried hers; 20 build lists across 17 heroes do this).
 local UNUSED_SELL = { item_helm_of_iron_will = 0, item_circlet = 15 * 60 }
-local function NeededLater(name)
+-- partsOf for BuyRules.IsPartOf: an item's direct parts from the Item tables, nil for a basic item.
+local function DirectParts(name)
+	local parts = Item[name]
+	return type(parts) == "table" and parts or nil
+end
+function NeededLater(name)
 	local list = {}
 	for _, it in ipairs(bot.purchaseListInReverseOrder or {}) do
 		list[#list + 1] = it
@@ -2705,25 +2819,13 @@ local function NeededLater(name)
 		list[#list + 1] = bot.currBuyingItemInPurchaseList
 	end
 	for _, it in ipairs(list) do
-		if it == name then
-			return true
-		end
 		-- Owned items must still count as parts: GetBasicItems leaves out what the hero holds, so a
 		-- held Helm of Iron Will was not seen as a Crimson Guard part, marked unused and sold, then
-		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). An owned-count
-		-- table that is always 0 makes it list every basic part.
-		local none = setmetatable({}, {
-			__index = function()
-				return 0
-			end,
-		})
-		local ok, parts = pcall(Item.GetBasicItems, { it }, none)
-		if ok and type(parts) == "table" then
-			for _, part in ipairs(parts) do
-				if part == name then
-					return true
-				end
-			end
+		-- bought again (game 017: Magnus bought it 21 times from 26:12 to 40:24). The walk goes through
+		-- the item tables with nothing taken off, built parts included: the Urn of Shadows inside an
+		-- Essence Distiller counts, not only its Circlet (#15, game 065).
+		if BuyRules.IsPartOf(it, name, DirectParts) then
+			return true
 		end
 	end
 	-- Parts still to buy for the item being built right now.
@@ -2746,7 +2848,13 @@ local function MarkedForSale()
 			return
 		end
 		for i = 2, #list, 2 do
-			if bot:FindItemSlot(list[i - 1]) >= 0 then
+			-- Not while the build still uses it: the Wizard Hat / Circlet pair sold the Circlets Dark Willow bought
+			-- for the Urn of her Essence Distiller (#15, game 065, 42:36).
+			if
+				bot:FindItemSlot(list[i - 1]) >= 0
+				and bot:FindItemSlot(list[i]) >= 0
+				and not KeepForBuild(list[i], "pair:" .. ShortItem(list[i - 1]))
+			then
 				marks[list[i]] = "pair:" .. list[i - 1]
 			end
 		end
@@ -2761,6 +2869,35 @@ local function MarkedForSale()
 	for name, after in pairs(UNUSED_SELL) do
 		if DotaTime() >= (tonumber(after) or 0) and bot:FindItemSlot(name) >= 0 and not NeededLater(name) then
 			marks[name] = "unused"
+		end
+	end
+	-- A second pair of plain Boots that nothing left in the build uses (#15, game 063: Shadow Fiend held two).
+	if marks.item_boots == nil then
+		local held = CountItem(bot, "item_boots")
+		if held >= 2 then
+			local plan = {}
+			for _, it in ipairs(bot.purchaseListInReverseOrder or {}) do
+				plan[#plan + 1] = it
+			end
+			if bot.currBuyingItemInPurchaseList ~= nil then
+				plan[#plan + 1] = bot.currBuyingItemInPurchaseList
+			end
+			local none = setmetatable({}, {
+				__index = function()
+					return 0
+				end,
+			})
+			local extra, needed = BuyRules.ExtraBoots(held, plan, function(name)
+				local ok, parts = pcall(Item.GetBasicItems, { name }, none)
+				return ok and parts or nil
+			end)
+			if extra > 0 then
+				marks.item_boots = "extra"
+				if DotaTime() >= (bot._extraBootsLogAt or -999) then
+					bot._extraBootsLogAt = DotaTime() + 30
+					BuyLog("sell-extra boots held=%d needed=%d", held, needed)
+				end
+			end
 		end
 	end
 	return marks
@@ -2851,7 +2988,11 @@ function SetPairedItems(sellPairs)
 	for i = 2, #sellPairs, 2 do
 		local firstSlot = bot:FindItemSlot(sellPairs[i - 1])
 		local secondSlot = bot:FindItemSlot(sellPairs[i])
-		if firstSlot >= 0 and secondSlot >= 0 then
+		if
+			firstSlot >= 0
+			and secondSlot >= 0
+			and not KeepForBuild(sellPairs[i], "pair:" .. ShortItem(sellPairs[i - 1]))
+		then
 			bot:ActionImmediate_SellItem(bot:GetItemInSlot(secondSlot))
 		end
 	end

@@ -162,14 +162,13 @@ local silenceDesire, silenceLocation
 local spiritSiphonDesire, spiritSiphonTarget
 local exorcismDesire
 local aetherRange = 0
-local botLevel, mpRatio, nearbyEnemies, nearbyAllies
+local mpRatio, nearbyEnemies, nearbyAllies
 function X.SkillsComplement()
 	if Fu.CanNotUseAbility(bot) or bot:IsInvisible() then
 		return
 	end
 	local context = AbilityContext.Build(bot)
 	aetherRange = context.aetherRange
-	botLevel = context.level
 	mpRatio = context.mp
 	botTarget = context.target
 	nearbyEnemies = context.enemies

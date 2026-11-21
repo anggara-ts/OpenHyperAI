@@ -1,25 +1,113 @@
 -- Shared helper: item ability.
+local RefresherRules = require(GetScriptDirectory() .. "/FuncLib/systems/refresher_rules")
 local function installItemAbility(Fu)
 	local isDebugLogEnabled = 1 == 10
 	local spamManaThreshold = 0.39
 	function Fu.GetUltimateAbility(unit)
 		return unit:GetAbilityInSlot(5)
 	end
-	function Fu.CanUseRefresherShard(bot)
-		local ultimate = Fu.GetUltimateAbility(bot)
-		if ultimate ~= nil and ultimate:IsPassive() == false then
-			local cooldown = ultimate:GetCooldown()
-			local manaCost = ultimate:GetManaCost()
-			local minElapsed = 2
-			if
-				bot:GetMana() >= manaCost * 2
-				and ultimate:GetCooldownTimeRemaining() >= cooldown / 2
-				and cooldown - ultimate:GetCooldownTimeRemaining() >= minElapsed
-			then
-				return true
+	-- The refresher in the main inventory (Orb first, then Shard), or nil.
+	function Fu.GetRefresherItem(bot)
+		for _, name in ipairs({ "item_refresher", "item_refresher_shard" }) do
+			local slot = bot:FindItemSlot(name)
+			if slot >= 0 and slot <= 5 then
+				return bot:GetItemInSlot(slot)
 			end
 		end
-		return false
+		return nil
+	end
+	-- The ultimate was cast 2s+ ago and has half its cooldown or more left: a refresh brings back most of it.
+	function Fu.RefresherUltWindow(bot)
+		local ultimate = Fu.GetUltimateAbility(bot)
+		if ultimate == nil or ultimate:IsPassive() then
+			return false
+		end
+		local cooldown = ultimate:GetCooldown()
+		local remaining = ultimate:GetCooldownTimeRemaining()
+		return remaining >= cooldown / 2 and cooldown - remaining >= 2
+	end
+	-- Ultimate window (Fu.RefresherUltWindow) and mana for the refresher plus one more cast of the ultimate
+	-- (FuncLib/systems/refresher_rules.lua, #47). Faceless Void's own rule uses this; the shared rule in
+	-- ability_item_usage_generic.lua adds the other spells (Fu.RefresherSpells). refresher: the item (found when nil).
+	-- Returns ok, then the mana it needs (for the log line).
+	function Fu.CanUseRefresherShard(bot, refresher)
+		local ultimate = Fu.GetUltimateAbility(bot)
+		if ultimate == nil or ultimate:IsPassive() then
+			return false
+		end
+		refresher = refresher or Fu.GetRefresherItem(bot)
+		local refresherCost = refresher ~= nil and refresher:GetManaCost() or 0
+		local needed = RefresherRules.ManaNeeded(refresherCost, { ultimate:GetManaCost() })
+		if bot:GetMana() >= needed and Fu.RefresherUltWindow(bot) then
+			return true, needed
+		end
+		return false, needed
+	end
+	-- The bot's spells as plain tables for RefresherRules.Combo: ability slots 0-9 (talents, hidden and empty slots
+	-- are marked or skipped there).
+	function Fu.RefresherSpells(bot)
+		local ultimate = Fu.GetUltimateAbility(bot)
+		local ultimateName = ultimate ~= nil and ultimate:GetName() or nil
+		local spells = {}
+		for slot = 0, 9 do
+			local ability = bot:GetAbilityInSlot(slot)
+			if ability ~= nil and not ability:IsNull() then
+				local name = ability:GetName()
+				spells[#spells + 1] = {
+					name = name,
+					learned = ability:IsTrained(),
+					passive = ability:IsPassive(),
+					toggle = ability:IsToggle(),
+					hidden = ability:IsHidden(),
+					talent = ability:IsTalent() or string.find(name, "^special_bonus_") ~= nil,
+					cooldown = ability:GetCooldown(),
+					ultimate = name == ultimateName,
+					ready = ability:IsFullyCastable(),
+					onCooldown = not ability:IsCooldownReady(),
+					cost = ability:GetManaCost(),
+				}
+			end
+		end
+		return spells
+	end
+	-- The shared refresh decision (#47): step "window" (the ultimate is not in its refresh window), "hold" (a useful
+	-- spell is still ready: wait up to 1s for the hero's rules to cast it, RefresherRules.HoldStep), "mana" (short of
+	-- RefresherRules.Combo's mana) or "go". The hold state lives on the bot (bot._refresherHold).
+	function Fu.RefresherPlan(bot, refresher)
+		local state = bot._refresherHold
+		if state == nil then
+			state = {}
+			bot._refresherHold = state
+		end
+		if not Fu.RefresherUltWindow(bot) then
+			RefresherRules.ResetHold(state)
+			return { step = "window" }
+		end
+		local ultimate = Fu.GetUltimateAbility(bot)
+		local refresherCost = refresher ~= nil and refresher:GetManaCost() or 0
+		local othersReady, needed, readyNames, comboNames =
+			RefresherRules.Combo(refresherCost, ultimate:GetName(), ultimate:GetManaCost(), Fu.RefresherSpells(bot))
+		local plan = {
+			othersReady = othersReady,
+			needed = needed,
+			ready = table.concat(readyNames, ","),
+			combo = table.concat(comboNames, "+"),
+		}
+		local step, started = RefresherRules.HoldStep(state, DotaTime(), othersReady)
+		plan.holdStarted = started
+		if step == "hold" then
+			plan.step = "hold"
+		elseif bot:GetMana() >= needed then
+			plan.step = "go"
+		else
+			plan.step = "mana"
+		end
+		return plan
+	end
+	function Fu.RefresherResetHold(bot)
+		if bot._refresherHold ~= nil then
+			RefresherRules.ResetHold(bot._refresherHold)
+		end
 	end
 	function Fu.GetMostUltimateCDUnit()
 		local bestUnit = nil

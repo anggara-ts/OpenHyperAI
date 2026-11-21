@@ -4449,13 +4449,82 @@ Usage.ConsiderItemDesire["item_refresher"] = function(item)
 	local hEffectTarget = nil
 	local castReason = "刷新技能"
 	local enemyHeroes = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
-	if BotBuild ~= nil and BotBuild.CanUseRefresherShard ~= nil and BotBuild.CanUseRefresherShard() then
+	local heroName = string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")
+	if BotBuild ~= nil and BotBuild.CanUseRefresherShard ~= nil then
+		if BotBuild.CanUseRefresherShard() then
+			Usage.LogRefresher(item, "hero-rule", heroName, -1)
+			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+		end
+		return BOT_ACTION_DESIRE_NONE
+	end
+	if #enemyHeroes == 0 or not (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot)) then
+		Fu.RefresherResetHold(bot)
+		return BOT_ACTION_DESIRE_NONE
+	end
+	-- #47 (maintainer, 2026-11-21): the ultimate in its refresh window; a useful spell (learned, not passive, not a
+	-- toggle, cooldown 8s+) still ready holds the refresh up to 1s so the hero casts it first; the mana covers the
+	-- refresher, the ultimate and every useful spell on cooldown (Fu.RefresherPlan, FuncLib/systems/refresher_rules.lua).
+	local plan = Fu.RefresherPlan(bot, item)
+	if plan.step == "go" then
+		Fu.RefresherResetHold(bot)
+		Usage.LogRefresher(item, "ult", heroName, plan.needed, plan.othersReady, plan.combo)
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 	end
-	if #enemyHeroes > 0 and (Fu.IsGoingOnSomeone(bot) or Fu.IsInTeamFight(bot)) and Fu.CanUseRefresherShard(bot) then
-		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
+	if plan.step == "hold" and plan.holdStarted then
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s refresher-hold others-ready=%d ready=%s mana=%d needed=%d combo=%s",
+				DotaTime(),
+				heroName,
+				plan.othersReady,
+				plan.ready,
+				bot:GetMana(),
+				plan.needed,
+				plan.combo
+			)
+		)
+	elseif plan.step == "mana" and DotaTime() >= (bot._refresherSkipLogAt or -999) then
+		-- Only the mana is short (the ultimate is in its window): say so, every 10s at most.
+		bot._refresherSkipLogAt = DotaTime() + 10
+		pcall(
+			print,
+			string.format(
+				"[OHA-ITEM] t=%.0f %s refresher-skip why=mana item=%s mana=%d needed=%d itemCost=%d others-ready=%d combo=%s",
+				DotaTime(),
+				heroName,
+				item:GetName(),
+				bot:GetMana(),
+				plan.needed,
+				item:GetManaCost(),
+				plan.othersReady,
+				plan.combo
+			)
+		)
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- One line per refresh: which rule, the mana before it and what it needed, the useful spells still ready and the
+-- combo it pays for (-1 / "-": a hero file's own rule).
+function Usage.LogRefresher(item, why, heroName, needed, othersReady, combo)
+	local ultimate = Fu.GetUltimateAbility(bot)
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s refresher why=%s item=%s mana=%d needed=%d itemCost=%d ult=%s ultCd=%.0f others-ready=%d combo=%s",
+			DotaTime(),
+			heroName,
+			why,
+			item:GetName(),
+			bot:GetMana(),
+			needed,
+			item:GetManaCost(),
+			ultimate ~= nil and ultimate:GetName() or "-",
+			ultimate ~= nil and ultimate:GetCooldownTimeRemaining() or -1,
+			othersReady or -1,
+			combo or "-"
+		)
+	)
 end
 Usage.ConsiderItemDesire["item_refresher_shard"] = function(item)
 	return Usage.ConsiderItemDesire["item_refresher"](item)

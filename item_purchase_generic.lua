@@ -666,9 +666,12 @@ end
 -- Games 063-067: no bundle came near any bot before 10:56 (one at 3:41 in game 064, a camp killed from the lane),
 -- because farm mode stays off while the laning phase lasts (mode_laning_generic.lua, up to 10:00). Who took each
 -- bundle was still unknown (every bot near it printed fate=taken), so the gone line names the hero nearest the
--- bundle on the last scan (by=, byDist=; "enemy:" for an enemy hero), each bot counts the bundles it took (own=),
--- and its first neutral item prints a first-neutral line with that count and the seconds since its last own
--- bundle: own x2 against tier 1's 6 Madstone says whether the engine crafts late or the bot collected too little.
+-- bundle on the last scan (by=, byDist=; "enemy:" for an enemy hero), each bot counts the bundles it was nearest to
+-- (own=), and its first neutral item prints a first-neutral line with that count and the seconds since its last own
+-- bundle. The count is a rough lower bound: bundles went within 1 s with the nearest bot 200-400 away (the 1 s
+-- scan misses who touched it), and the "random ally" share never shows as a bundle (game 067: three Dire bots got
+-- their first item with bundlesSeen=0). So it only points at a late engine craft when own>=3 (6+ Madstone, tier 1)
+-- and no item follows soon.
 local MADSTONE_LOG_UNTIL = 1800
 local madstoneNextScan = 0
 -- The hero nearest a location (allied heroes, then visible enemy heroes): name, distance, whether it is this bot.

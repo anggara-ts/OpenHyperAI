@@ -189,31 +189,47 @@ function X.SkillsComplement()
 	end
 end
 -- Interrupt probes (#48): after an interrupt cast, look at the target once the effect should have landed and log
--- whether the teleport/channel stopped. [OHA-DARK_WILLOW] interrupt-result spell= target= rooted= feared= tp= channel=
+-- whether the teleport/channel stopped. [OHA-DARK_WILLOW] interrupt-result spell= target= seen= moved= rooted=
+-- feared= tp= channel=. tp=false alone is ambiguous (a finished TP reads false too): moved= is the distance from
+-- where the target stood at the cast (a completed TP moves it far), seen=false means it is out of vision.
 local interruptProbes = {}
 function X.StartInterruptProbe(spell, target, delay)
-	interruptProbes[spell] = { target = target, checkAt = DotaTime() + delay }
+	interruptProbes[spell] = {
+		target = target,
+		name = target:GetUnitName(),
+		from = target:GetLocation(),
+		checkAt = DotaTime() + delay,
+	}
 end
 function X.CheckInterruptProbes()
 	for spell, probe in pairs(interruptProbes) do
 		if DotaTime() >= probe.checkAt then
 			interruptProbes[spell] = nil
 			local target = probe.target
-			if Fu.IsValidHero(target) then
-				pcall(
-					print,
-					string.format(
-						"[OHA-DARK_WILLOW] t=%.0f interrupt-result spell=%s target=%s rooted=%s feared=%s tp=%s channel=%s",
-						DotaTime(),
-						spell,
-						target:GetUnitName(),
-						tostring(target:HasModifier("modifier_dark_willow_bramble_maze")),
-						tostring(target:HasModifier("modifier_dark_willow_debuff_fear")),
-						tostring(target:HasModifier("modifier_teleporting")),
-						tostring(target:IsChanneling())
-					)
-				)
+			local seen = target ~= nil and not target:IsNull() and target:IsAlive() and target:CanBeSeen()
+			local moved, rooted, feared, tp, channel = -1, "-", "-", "-", "-"
+			if seen then
+				moved = Fu.GetLocationToLocationDistance(probe.from, target:GetLocation())
+				rooted = tostring(target:HasModifier("modifier_dark_willow_bramble_maze"))
+				feared = tostring(target:HasModifier("modifier_dark_willow_debuff_fear"))
+				tp = tostring(target:HasModifier("modifier_teleporting"))
+				channel = tostring(target:IsChanneling())
 			end
+			pcall(
+				print,
+				string.format(
+					"[OHA-DARK_WILLOW] t=%.0f interrupt-result spell=%s target=%s seen=%s moved=%d rooted=%s feared=%s tp=%s channel=%s",
+					DotaTime(),
+					spell,
+					probe.name,
+					tostring(seen),
+					math.floor(moved),
+					rooted,
+					feared,
+					tp,
+					channel
+				)
+			)
 		end
 	end
 end
@@ -257,8 +273,9 @@ function X.ConsiderBrambleMaze()
 			if DotaTime() >= (bot._brambleLogAt or -999) then
 				bot._brambleLogAt = DotaTime() + 3
 				local left = Fu.GetModifierTime(enemy, "modifier_teleporting")
-				-- Game data: cast point 0.3, brambles grow after initial_creation_delay 0.3, latch after 0.1.
-				X.StartInterruptProbe("bramble", enemy, 1.0)
+				-- Game data: cast point 0.3, brambles grow after initial_creation_delay 0.3, 8 of them every
+				-- 0.075s, latch after 0.1; plus turning. The root lasts 1.0s+, so look after 1.5s.
+				X.StartInterruptProbe("bramble", enemy, 1.5)
 				pcall(
 					print,
 					string.format(
@@ -581,10 +598,12 @@ function X.ConsiderTerrorize()
 				local arrive = InterruptRules.ArrivalTime(castPoint, distance, travelSpeed, 0)
 				if InterruptRules.LandsBeforeChannelEnds(arrive, left) then
 					X.LogTerrorize("interrupt", enemy, arrive, left, src)
-					X.StartInterruptProbe("terrorize", enemy, arrive + 0.2)
+					-- arrive has no turning time; the fear lasts 2.8s+, so look 0.5s after the landing.
+					X.StartInterruptProbe("terrorize", enemy, arrive + 0.5)
 					return BOT_ACTION_DESIRE_HIGH, location
 				end
-				X.LogTerrorize("too-late", enemy, arrive, left, src)
+				-- src=unknown: the channel time could not be read from the enemy's ability (bot API check).
+				X.LogTerrorize(src == "unknown" and "unreadable" or "too-late", enemy, arrive, left, src)
 			end
 		end
 	end
@@ -609,7 +628,7 @@ function X.ConsiderTerrorize()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
--- [OHA-DARK_WILLOW] terrorize why=interrupt ... / terrorize-skip why=too-late ... / terrorize why=save-ally ...,
+-- [OHA-DARK_WILLOW] terrorize why=interrupt ... / terrorize-skip why=too-late|unreadable ... / terrorize why=save-ally,
 -- each at most once per 3s. arrive: seconds until the fear lands; left: channel time left; margin = left - arrive.
 local terrorizeLogAt = {}
 function X.LogTerrorize(why, unit, arrive, left, src)
@@ -630,7 +649,7 @@ function X.LogTerrorize(why, unit, arrive, left, src)
 		return
 	end
 	local what = "terrorize"
-	if why == "too-late" then
+	if why ~= "interrupt" then
 		what = "terrorize-skip"
 	end
 	pcall(

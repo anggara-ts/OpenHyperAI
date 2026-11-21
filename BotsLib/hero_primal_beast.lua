@@ -668,13 +668,17 @@ function X.ConsiderPulverize()
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
 end
--- During Trample only an interrupt: an enemy hero in cast range that teleports, channels or is casting an
--- ultimate. Datafeed (hero 137): Pulverize cast point 0.25, cast range 200, a 2.3s channel; Trample lasts 5.5s.
+-- During Trample only an interrupt: an enemy hero in cast range that teleports, channels or is casting a
+-- channelled ultimate. Datafeed (hero 137): Pulverize cast point 0.25, cast range 200, a 2.3s channel; Trample lasts 5.5s.
 -- A TP (3.0s, 7.42 items.txt) must have more than cast point + 0.1s left. Not when the Trample walk turns home
 -- (the same rules as mode_outpost_generic.lua's TrampleToBase: outnumbered, or hurt and weaker): he would stand
 -- 2.3s in a losing fight. [OHA-PRIMAL_BEAST] pulverize why=interrupt-in-trample target= channel= left=
 function X.ConsiderPulverizeInTrample()
 	if not Fu.CanCastAbility(pulverizeAbility) or isRetreating then
+		return nil
+	end
+	-- A Trample cast to escape always walks home (mode_outpost_generic.lua).
+	if type(bot.trample_status) == "table" and bot.trample_status[1] == "retreating" then
 		return nil
 	end
 	local allies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
@@ -693,7 +697,13 @@ function X.ConsiderPulverizeInTrample()
 			and Fu.CanCastOnTargetAdvanced(enemyHero)
 		then
 			local teleporting = enemyHero:HasModifier("modifier_teleporting")
-			if teleporting or enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
+			-- An ultimate in its cast point counts only when it is a channelled one (Black Hole, Death Ward, ...).
+			local channelledUltimate = false
+			if Fu.IsCastingUltimateAbility(enemyHero) then
+				local active = enemyHero:GetCurrentActiveAbility()
+				channelledUltimate = active ~= nil and not active:IsNull() and (active:GetChannelTime() or 0) > 0
+			end
+			if teleporting or enemyHero:IsChanneling() or channelledUltimate then
 				local left = -1
 				local inTime = true
 				if teleporting then

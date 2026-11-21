@@ -220,12 +220,21 @@ end
 -- Spare mana for a spam swarm (NukerRules.SpareMana): her regen pays the cost back within the cooldown, or she is at
 -- full mana. Datafeed hero_id 43: Crypt Swarm 80/90/100/110 mana, cooldown 10/9/8/7s; base mana regen 1.7/s, so early
 -- on only full mana counts, and regen items (and levels) open the spam.
+local cryptSwarmCooldowns = { 10, 9, 8, 7 }
+-- The full cooldown; the datafeed value for her level when the API reads 0 (GetCooldown is not confirmed in game).
+function X.SwarmCooldown()
+	local cooldown = cryptSwarmAbility:GetCooldown() or 0
+	if cooldown <= 0 then
+		cooldown = cryptSwarmCooldowns[math.max(1, math.min(4, cryptSwarmAbility:GetLevel()))]
+	end
+	return cooldown
+end
 function X.SwarmSpare(manaCost)
 	return NukerRules.SpareMana(
 		bot:GetMana(),
 		bot:GetMaxMana(),
 		manaCost,
-		cryptSwarmAbility:GetCooldown(),
+		X.SwarmCooldown(),
 		bot:GetManaRegen(),
 		X.SpamReserve()
 	)
@@ -238,13 +247,15 @@ function X.LogSwarm(why, target, count, reserve)
 	pcall(
 		print,
 		string.format(
-			"[OHA-DP] t=%.0f death_prophet swarm why=%s target=%s n=%d mp=%.2f regen=%.1f reserve=%d",
+			"[OHA-DP] t=%.0f death_prophet swarm why=%s target=%s n=%d mp=%.2f regen=%.1f cd=%.1f apicd=%.1f reserve=%d",
 			DotaTime(),
 			why,
 			target,
 			count,
 			mpRatio,
 			bot:GetManaRegen(),
+			X.SwarmCooldown(),
+			cryptSwarmAbility:GetCooldown() or 0,
 			reserve
 		)
 	)
@@ -279,8 +290,9 @@ function X.ConsiderQ()
 			return BOT_ACTION_DESIRE_HIGH, castLocation, "Q-击杀" .. Fu.Chat.GetNormName(enemyHero)
 		end
 	end
-	-- Fights: keep Exorcism's mana. Before, a fight swarm could take the mana Exorcism needed a moment later.
-	local fightReserve = X.ExorcismReserve()
+	-- Fights: keep Exorcism's mana while she has it (NukerRules.FightReserve). Before, a fight swarm could take the mana
+	-- Exorcism needed a moment later.
+	local fightReserve = NukerRules.FightReserve(bot:GetMana(), X.ExorcismReserve())
 	local fightSpend = NukerRules.CanSpend(bot:GetMana(), manaCost, fightReserve)
 	local aoeLocation = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius + 50, 0, 0)
 	if fightSpend and aoeLocation.count >= 3 and bot:GetActiveMode() ~= BOT_MODE_RETREAT then

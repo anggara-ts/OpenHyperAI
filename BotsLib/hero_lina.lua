@@ -461,11 +461,21 @@ function X.ConsiderSoloCombo()
 	local lsaRange = lightStrikeArrayAbility:GetCastRange() + aetherRange
 	local slaveRange = dragonSlaveAbility:GetCastRange() + aetherRange
 	local lagunaRange = lagunaBladeAbility:GetCastRange() + aetherRange
+	-- A combo already started (bot._linaCombo, by player ID, for 3s after each step) stays on its target.
+	local combo = bot._linaCombo
+	local committedId = combo ~= nil and DotaTime() < combo.untilAt and combo.playerId or nil
 	local target = nil
-	if Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, slaveRange - 80) then
+	local inRange = Fu.GetNearbyHeroes(bot, slaveRange - 80, true, BOT_MODE_NONE) or {}
+	for _, enemyHero in pairs(inRange) do
+		if Fu.IsValidHero(enemyHero) and enemyHero:GetPlayerID() == committedId then
+			target = enemyHero
+		end
+	end
+	if target == nil and Fu.IsValidHero(botTarget) and Fu.IsInRange(bot, botTarget, slaveRange - 80) then
 		target = botTarget
-	else
-		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, slaveRange - 80, true, BOT_MODE_NONE)) do
+	end
+	if target == nil then
+		for _, enemyHero in pairs(inRange) do
 			if Fu.IsValidHero(enemyHero) and (target == nil or enemyHero:GetHealth() < target:GetHealth()) then
 				target = enemyHero
 			end
@@ -479,15 +489,16 @@ function X.ConsiderSoloCombo()
 	then
 		return nil
 	end
-	local enemiesNear = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE)
-	local alliesNear = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
+	local enemiesNear = Fu.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or {}
+	local alliesNear = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE) or {}
 	-- Solo pressure only: with 3+ enemy heroes near, the team-fight rules (Light Strike Array and Dragon Slave on 2+
 	-- heroes, Laguna on the weakest) choose the casts.
 	if #enemiesNear > 2 or #enemiesNear > #alliesNear + 1 then
 		return nil
 	end
 	-- Her LSA lands 0.45s cast point + 0.5s delay after the order (datafeed): the target counts as held for 1.5s.
-	local lsaPending = bot._linaLsaTarget == target and DotaTime() - (bot._linaLsaAt or -999) < 1.5
+	local targetId = target:GetPlayerID()
+	local lsaPending = bot._linaLsaTarget == targetId and DotaTime() - (bot._linaLsaAt or -999) < 1.5
 	local disabledNow = Fu.IsDisabled(target)
 	local disabled = disabledNow and "now" or lsaPending and "lsa" or "no"
 	local multiplier = X.SpellMultiplier(target)
@@ -497,6 +508,7 @@ function X.ConsiderSoloCombo()
 	local lagunaDamage = lagunaBladeAbility:GetSpecialValueInt("damage") * multiplier
 	local step, why = NukerRules.LinaComboStep({
 		disabled = disabledNow or lsaPending,
+		committed = committedId == targetId,
 		hp = target:GetHealth(),
 		mana = bot:GetMana(),
 		lsaReady = lightStrikeArrayAbility:IsFullyCastable(),
@@ -512,6 +524,10 @@ function X.ConsiderSoloCombo()
 		lagunaCost = lagunaBladeAbility:GetManaCost(),
 		lagunaDamage = lagunaDamage,
 	})
+	if step ~= nil then
+		-- LSA lands ~1s after the order and stuns 1.2-2.4s (datafeed): 3s covers the rest of the combo.
+		bot._linaCombo = { playerId = targetId, untilAt = DotaTime() + 3 }
+	end
 	if step == "lsa" then
 		local radius = lightStrikeArrayAbility:GetSpecialValueInt("light_strike_array_aoe")
 		local location = disabledNow and target:GetLocation()
@@ -525,7 +541,7 @@ function X.ConsiderSoloCombo()
 		if location == nil then
 			return nil
 		end
-		bot._linaLsaTarget = target
+		bot._linaLsaTarget = targetId
 		bot._linaLsaAt = DotaTime()
 		X.LogCombo(step, why, target, disabled, lsaDamage)
 		return step, location

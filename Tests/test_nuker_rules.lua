@@ -16,6 +16,13 @@ T.test("ultimate reserve: kept only while the ultimate is learned, idle and comi
 	T.eq(R.UltReserve(true, 300, 0, true), 0, "Exorcism already running")
 end)
 
+T.test("fight reserve: kept only while she has the ultimate's mana", function()
+	local R = rules()
+	T.eq(R.FightReserve(400, 300), 300, "400 mana, Exorcism 300: keep it")
+	T.eq(R.FightReserve(250, 300), 0, "250 mana, Exorcism 300: she can't cast it anyway, fight on")
+	T.eq(R.FightReserve(250, 0), 0, "no ultimate coming")
+end)
+
 T.test("can spend: the reserve stays after the cast", function()
 	local R = rules()
 	T.eq(R.CanSpend(300, 90, 200), true, "300 - 90 leaves 210 >= 200")
@@ -89,6 +96,26 @@ T.test("lina combo: a held target gets the next spell in order", function()
 	T.eq(step, "laguna", "then Laguna Blade")
 	step = R.LinaComboStep(combo({ hp = 400, disabled = true, lsaInRange = false }))
 	T.eq(step, "slave", "out of LSA range: Dragon Slave first")
+end)
+
+T.test("lina combo: once opened it runs to Laguna Blade on the held target", function()
+	local R = rules()
+	-- Opens at 600 HP: 60 + 184 + 270 = 514 >= 510.
+	T.eq(R.LinaComboStep(combo({ hp = 600 })), "lsa", "open")
+	-- LSA on its way (pending), on cooldown: Slave + Laguna = 454 < 510, but the combo is committed.
+	T.eq(R.LinaComboStep(combo({ hp = 600, lsaReady = false })), nil, "not committed: the damage check alone stalls")
+	local step, why = R.LinaComboStep(combo({ hp = 600, lsaReady = false, disabled = true, committed = true }))
+	T.eq(step, "slave", "committed: Dragon Slave next")
+	T.eq(why, "disabled", "why")
+	-- LSA and Slave landed: 600 - 60 - 184 = 356 HP; Laguna's 270 is under 85% of it, still goes.
+	step = R.LinaComboStep(combo({ hp = 356, lsaReady = false, slaveReady = false, disabled = true, committed = true }))
+	T.eq(step, "laguna", "committed: Laguna Blade last")
+	-- The stun ended (or LSA missed): back to the damage check.
+	T.eq(
+		R.LinaComboStep(combo({ hp = 356, lsaReady = false, slaveReady = false, committed = true })),
+		nil,
+		"committed but free: no Laguna"
+	)
 end)
 
 T.test("lina combo: no stun to open it, or not enough mana, means no combo", function()

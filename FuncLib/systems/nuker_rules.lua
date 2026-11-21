@@ -29,6 +29,15 @@ function NukerRules.UltReserve(learned, cost, cooldownLeft, active)
 	return cost
 end
 
+-- The reserve a fight cast keeps: the ultimate's mana only while she has it. A hero who can't cast the ultimate
+-- anyway keeps fighting with her basic spells instead of holding mana she doesn't have.
+function NukerRules.FightReserve(mana, ultReserve)
+	if mana < ultReserve then
+		return 0
+	end
+	return ultReserve
+end
+
 -- Can a spell of this cost be cast and still leave the reserve?
 function NukerRules.CanSpend(mana, cost, reserve)
 	return mana - cost >= reserve
@@ -65,9 +74,12 @@ end
 --   lsaReady, lsaInRange, lsaCost, lsaDamage           (damage after magic resist and spell amp)
 --   slaveReady, slaveInRange, slaveCost, slaveDamage
 --   lagunaReady, lagunaInRange, lagunaCost, lagunaDamage
+--   committed                  the combo already started on this target (a step went in the last few seconds)
 -- Plans the spells she can cast and afford in that order and returns the first one ("lsa", "slave", "laguna") and why
 -- ("disabled" when the target is already held, "kill" when her stun opens the combo), or nil when the plan does not
 -- deal NEARLY_KILL of the target's HP or nothing holds the target (no disable and no Light Strike Array to open).
+-- Once committed and the target is held, the rest of the combo goes without the damage check: the check passed for
+-- the whole combo when it opened, and the spells left (Dragon Slave + Laguna) never pass it again on their own.
 function NukerRules.LinaComboStep(s)
 	local plan = {}
 	local mana = s.mana
@@ -84,7 +96,13 @@ function NukerRules.LinaComboStep(s)
 			plan[#plan + 1] = spell[1]
 		end
 	end
-	if #plan == 0 or s.hp <= 0 or damage < s.hp * NukerRules.NEARLY_KILL then
+	if #plan == 0 or s.hp <= 0 then
+		return nil
+	end
+	if s.committed and s.disabled then
+		return plan[1], "disabled"
+	end
+	if damage < s.hp * NukerRules.NEARLY_KILL then
 		return nil
 	end
 	if s.disabled then

@@ -133,3 +133,55 @@ T.test("tower chase: entering only when the bot can't hit the target from outsid
 	-- Already inside the range: entering whatever the attack range.
 	T.eq(R.MustEnterTowerRange(650, 600, 600, 700), true, "already inside")
 end)
+
+T.test("tower approach: dead on paper before the edge leaves there (game 065, 9 of 30 stops died)", function()
+	local R = rules()
+	local function approach(overrides)
+		local s = { outerTower = true, pushing = false, approaching = true, botHealth = 1800, shotDamage = 148 }
+		for key, value in pairs(overrides or {}) do
+			s[key] = value
+		end
+		return s
+	end
+	-- Zeus t=2150 at Dire's top T2: 4 enemy heroes, enemyDmg 5905. Even at full HP that is death: stop before the edge.
+	local act, why = R.TowerApproachDecision(approach({ enemyDamage = 5905 }))
+	T.eq(act, "leave", "Zeus t=2150: leave")
+	T.eq(why, "low-hp", "Zeus t=2150: why")
+	-- Tiny t=1529 at Radiant's bottom T2 (enemyDmg 1629, 3 tower shots 363) with 1028 HP: leave.
+	T.eq(R.TowerApproachDecision(approach({ botHealth = 1028, shotDamage = 121, enemyDamage = 1629 })), "leave", "Tiny")
+	-- Healthy against one hero: no decision here, the edge rule decides later.
+	T.eq(R.TowerApproachDecision(approach({ botHealth = 1800, enemyDamage = 400 })), nil, "healthy: no decision")
+	-- Not approaching, a push, or a T3/T4: no decision.
+	T.eq(R.TowerApproachDecision(approach({ approaching = false, enemyDamage = 5905 })), nil, "not approaching")
+	T.eq(R.TowerApproachDecision(approach({ pushing = true, enemyDamage = 5905 })), nil, "push")
+	T.eq(R.TowerApproachDecision(approach({ outerTower = false, enemyDamage = 5905 })), nil, "T3")
+	-- After such a stop the hold zone is range + 600: at 1200 from a 700 tower the bot still walks out.
+	T.eq(R.TowerHoldRun(1200, 700, true, R.APPROACH_MARGIN), true, "approach hold: 1200 still inside")
+	T.eq(R.TowerHoldRun(1500, 700, true, R.APPROACH_MARGIN), false, "approach hold: 1500 out")
+	T.eq(R.TowerHoldRun(1200, 700, true), false, "edge hold (default margin): 1200 out")
+end)
+
+T.test("tower hold: a team siege of the hold tower ends a no-target hold (game 065, Dark Willow)", function()
+	local R = rules()
+	local untilTime = 941 + R.HOLD_SECONDS
+	-- t=944: Dark Willow pushes top, the hold tower is Radiant's top T1, 4 allies at it, the stop was no-target.
+	T.eq(R.TowerHoldState(944, untilTime, true, true, nil, true, 4, "no-target"), "siege", "Dark Willow t=944")
+	-- Game 064, Alchemist: the same siege but the stop was a chase (not-killable): still a pause, as before.
+	T.eq(R.TowerHoldState(750, 744 + R.HOLD_SECONDS, true, true, nil, true, 4, "not-killable"), "pause", "Alchemist")
+	-- A low-HP stop keeps the pause too (Nyx at the same siege, 43-50% HP).
+	T.eq(R.TowerHoldState(944, untilTime, true, true, nil, true, 4, "low-hp"), "pause", "Nyx low-hp")
+	-- Alone or one ally: no siege. Another lane's tower: no siege.
+	T.eq(R.TowerHoldState(944, untilTime, true, true, nil, true, 1, "no-target"), "pause", "one ally")
+	T.eq(R.TowerHoldState(944, untilTime, true, true, nil, false, 4, "no-target"), "pause", "other lane")
+	-- Not pushing: the hold runs.
+	T.eq(R.TowerHoldState(945, untilTime, true, false, nil, true, 4, "no-target"), "keep", "not pushing")
+end)
+
+T.test("tower hold: the retreat file checks a live hold ahead of the early NONE returns", function()
+	local src = T.read("mode_retreat_generic.lua")
+	local earlyAt = string.find(src, "return RetreatTag(250, BOT_DESIRE_OVERRIDE * 1.1)", 1, true)
+	local noneAt = string.find(src, "return RetreatTag(272, BOT_MODE_DESIRE_NONE)", 1, true)
+	local pushAt = string.find(src, "return RetreatTag(254, BOT_MODE_DESIRE_NONE)", 1, true)
+	T.ok(earlyAt ~= nil and noneAt ~= nil and pushAt ~= nil, "tags found")
+	T.ok(earlyAt < pushAt and earlyAt < noneAt, "hold check before tags 254 and 272")
+end)

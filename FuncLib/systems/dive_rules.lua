@@ -48,6 +48,28 @@ function DiveRules.TowerChaseDecision(s)
 	return "leave", "not-killable"
 end
 
+-- Before the tower edge: a bot going on someone (attack / roam / team roam / defend ally) toward an enemy T1/T2,
+-- up to the tower's range + APPROACH_MARGIN away and not in range yet, while what the visible enemy heroes near can
+-- do to it in the window plus 3 tower shots is its HP or more ("dead on paper"). Game 065: 9 of 30 chase-stop /
+-- tower-entry-stop lines were followed by the bot's death within 5s, all why=low-hp at the tower edge with 1-4 enemy
+-- heroes whose damage was above the bot's HP (e.g. Zeus t=2150 tower-entry-stop hp=396 enemyDmg=5905 enemies=4 at
+-- Dire's top T2, dead the same second): by the edge it was too late to walk out.
+--   s.outerTower, s.pushing   as in TowerChaseDecision
+--   s.approaching  the bot is outside the tower's range, within range + APPROACH_MARGIN, going on someone, and its
+--                  hero target is nearer the tower than it is, or it is moving toward the tower
+--   s.botHealth, s.shotDamage, s.enemyDamage   as in TowerChaseDecision
+-- Returns "leave", "low-hp", or nil (no decision here: the edge rule decides once the bot gets there).
+DiveRules.APPROACH_MARGIN = 600
+function DiveRules.TowerApproachDecision(s)
+	if not s.outerTower or s.pushing or not s.approaching then
+		return nil
+	end
+	if s.botHealth <= s.shotDamage * 3 + (s.enemyDamage or 0) then
+		return "leave", "low-hp"
+	end
+	return nil
+end
+
 -- Does a chase after a target inside the tower's range take the bot into it? Yes when the bot already stands inside,
 -- or when even the spot on the far side of the target (target distance + the bot's attack range) is inside: a ranged
 -- bot that can hit the target from outside the range is not entering. Distances are to the tower.
@@ -64,12 +86,14 @@ DiveRules.HOLD_MARGIN = 200
 DiveRules.HOLD_RELEASE = 150
 
 -- dist: the bot's distance to the tower; range: the tower's attack range; inside: the bot was in the zone at the
--- last check. Returns whether to run out now, and the new "inside" state.
-function DiveRules.TowerHoldRun(dist, range, inside)
-	if dist < range + DiveRules.HOLD_MARGIN then
+-- last check; margin: the zone beyond the range (HOLD_MARGIN, or APPROACH_MARGIN after a stop before the edge).
+-- Returns whether to run out now, and the new "inside" state.
+function DiveRules.TowerHoldRun(dist, range, inside, margin)
+	margin = margin or DiveRules.HOLD_MARGIN
+	if dist < range + margin then
 		return true, true
 	end
-	if inside and dist < range + DiveRules.HOLD_MARGIN + DiveRules.HOLD_RELEASE then
+	if inside and dist < range + margin + DiveRules.HOLD_RELEASE then
 		return true, true
 	end
 	return false, false
@@ -81,10 +105,23 @@ end
 -- tower 7s later (chase-stop). The 9s clock keeps running while paused; when the push ends the hold resumes.
 --   now, untilTime   game time and the hold's end; towerValid: the tower still stands
 --   pushing          the bot is in a push mode now; paused: the last check paused the hold
--- Returns "expire" (drop the hold), "pause", "resume" (first check after a pause) or "keep".
-function DiveRules.TowerHoldState(now, untilTime, towerValid, pushing, paused)
+-- A team siege of the hold tower ends the hold ("siege"): the bot pushes the hold tower's lane, 2+ allied heroes
+-- stand at that tower, and the stop was why=no-target (no hero chase: the tower simply shot it during the siege).
+-- Game 065, t=941-948: Dark Willow was stopped (no-target) at Radiant's top T1 while her team pushed it; pause and
+-- resume alternated with push 0.90 / attack 0.65 / retreat 1.10 and the 9s ran out with her inside the zone. A chase
+-- stop (low-hp, not-killable) keeps the pause: game 064, Alchemist was stopped chasing Tiny at the mid T1 his team
+-- was pushing, and attack mode walked him back under it once the hold was gone.
+--   pushLaneTower    the hold tower is in the lane the bot pushes; alliesAtTower: other allied heroes at it
+--   why              the stop's reason
+-- Returns "expire" (drop the hold), "siege" (drop it: team siege), "pause", "resume" (first check after a pause)
+-- or "keep".
+DiveRules.SIEGE_ALLIES = 2
+function DiveRules.TowerHoldState(now, untilTime, towerValid, pushing, paused, pushLaneTower, alliesAtTower, why)
 	if now > untilTime or not towerValid then
 		return "expire"
+	end
+	if pushing and pushLaneTower and (alliesAtTower or 0) >= DiveRules.SIEGE_ALLIES and why == "no-target" then
+		return "siege"
 	end
 	if pushing then
 		return "pause"

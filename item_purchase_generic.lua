@@ -1318,6 +1318,27 @@ local function BuyBasicItem()
 		bot.SecretShop = false
 	end
 end
+-- true when the build still uses this item (the item itself or a part of one still to buy); defined with the sell
+-- marks below.
+local NeededLater
+-- A sell rule skips an item the build still uses (#15, game 065: Dark Willow's Circlets for her Urn were sold at the
+-- fountain right after each buy, 5 times from 33:59 and twice at 42:36). One line per item every 60s.
+local function KeepForBuild(itemName, rule)
+	if not NeededLater(itemName) then
+		return false
+	end
+	bot._sellKeepLogAt = bot._sellKeepLogAt or {}
+	if DotaTime() >= (bot._sellKeepLogAt[itemName] or -999) then
+		bot._sellKeepLogAt[itemName] = DotaTime() + 60
+		BuyLog(
+			"sell-keep %s why=%s for=%s",
+			ShortItem(itemName),
+			rule,
+			ShortItem(bot.currBuyingItemInPurchaseList or "-")
+		)
+	end
+	return true
+end
 local function BuyBasicItemTurbo()
 	local nextItem = NextBasicItem()
 	if not nextItem then
@@ -1403,27 +1424,6 @@ local function BuyBasicItemTurbo()
 			end
 		end
 	end
-end
--- true when the build still uses this item (the item itself or a part of one still to buy); defined with the sell
--- marks below.
-local NeededLater
--- A sell rule skips an item the build still uses (#15, game 065: Dark Willow's Circlets for her Urn were sold at the
--- fountain right after each buy, 5 times from 33:59 and twice at 42:36). One line per item every 60s.
-local function KeepForBuild(itemName, rule)
-	if not NeededLater(itemName) then
-		return false
-	end
-	bot._sellKeepLogAt = bot._sellKeepLogAt or {}
-	if DotaTime() >= (bot._sellKeepLogAt[itemName] or -999) then
-		bot._sellKeepLogAt[itemName] = DotaTime() + 60
-		BuyLog(
-			"sell-keep %s why=%s for=%s",
-			ShortItem(itemName),
-			rule,
-			ShortItem(bot.currBuyingItemInPurchaseList or "-")
-		)
-	end
-	return true
 end
 function ItemPurchaseThink()
 	now = DotaTime()

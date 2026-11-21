@@ -154,7 +154,13 @@ T.test("team roam rules: courier hunt in the laning phase (#165, game 067)", fun
 	T.eq(R.CourierSkipWhy(c()), nil, "a courier 800 away in lane, nobody near it: hunt")
 	T.eq(R.CourierSkipWhy(c({ dist = 1100 })), "range", "beyond attack range + 400")
 	T.eq(R.CourierSkipWhy(c({ enemiesNearCourier = 1 })), "enemies", "an enemy hero by the courier")
-	T.eq(R.CourierSkipWhy(c({ onRune = true })), "rune", "walking to or holding a rune")
+	T.eq(R.CourierSkipWhy(c({ onRune = true })), "rune", "holding a rune spot")
+	T.eq(R.CourierSkipWhy(c({ towerNearCourier = true })), "tower", "under an enemy tower in lane")
+	T.eq(
+		R.CourierSkipWhy(c({ laning = false, dist = 600, towerNearCourier = true })),
+		nil,
+		"after laning: no tower check"
+	)
 	T.eq(R.CourierSkipWhy(c({ retreating = true })), "retreat", "retreating")
 	T.eq(R.CourierSkipWhy(c({ hp = 0.25 })), "hp", "low HP")
 	T.eq(R.CourierSkipWhy(c({ pushing = true })), "pushing", "pushing")

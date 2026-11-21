@@ -601,6 +601,11 @@ function GetDesireHelper()
 	-- A hero / courier hunt that won team roam keeps running while team roam is the active mode, until an exit rule
 	-- (#165: the gate below does not list team roam, so it used to switch the hunt off on its first think).
 	local keepHunt = false
+	-- Laning mode is not in the gate below: a courier the lane rule allows opens it (#165, game 067).
+	local laneCourier = nil
+	if bot:GetActiveMode() == BOT_MODE_LANING and #alliesNear >= #enemiesNear then
+		laneCourier = TeamRoam.CourierHunt(bot, math.min(bot:GetAttackRange() + 50, 1200), bot:GetLevel(), hpRatio)
+	end
 	if runningHunt ~= nil and bot:GetActiveMode() == BOT_MODE_TEAM_ROAM then
 		local valid = Fu.IsValid(runningHunt) and TeamRoam.CanBeAttacked(runningHunt)
 		local exitWhy = RoamRules.HuntExitWhy(
@@ -618,6 +623,7 @@ function GetDesireHelper()
 	end
 	if
 		not keepHunt
+		and laneCourier == nil
 		and not Fu.IsFarming(bot)
 		and not Fu.IsPushing(bot)
 		and not Fu.IsDefending(bot)
@@ -1598,9 +1604,9 @@ function TeamRoam.CanBeAttacked(unit)
 end
 -- Courier hunt (RoamRules.CourierSkipWhy, #165 game 067): the nearest visible enemy courier within COURIER_LOOK, and
 -- whether to hunt it. Lane rules: attack range + 400, no enemy hero within 800 of the courier, not retreating or on a
--- rune. Lines (per bot):
+-- rune spot. In laning mode (not in team roam's mode gate) a courier the rule allows lets the hunt rules run. Lines:
 --   [OHA-ROAM] t= <hero> courier-hunt start dist= laning= range=      when the hunt picks a courier
---   [OHA-ROAM] t= <hero> courier-skip why=<pushing|retreat|hp|rune|range|enemies> dist= laning=   on change, or 10s
+--   [OHA-ROAM] t= <hero> courier-skip why=<pushing|retreat|hp|rune|range|enemies|tower> dist= laning=   on change, or 10s
 local COURIER_LOOK = 1600
 function TeamRoam.NearestEnemyCourier(unit)
 	if GetGameMode() == 23 or Fu.GetDistanceFromEnemyFountain(unit) < 1400 then
@@ -1623,6 +1629,24 @@ function TeamRoam.NearestEnemyCourier(unit)
 		end
 	end
 	return best, bestDist
+end
+-- An enemy tower within radius of the unit (towers the bot can see within 1600 of itself).
+function TeamRoam.EnemyTowerNear(bot0, unit, radius)
+	for _, tower in ipairs(bot0:GetNearbyTowers(1600, true) or {}) do
+		if tower ~= nil and tower:IsAlive() and GetUnitToUnitDistance(tower, unit) <= radius then
+			return true
+		end
+	end
+	return false
+end
+-- Within radius of a power-rune or bounty spot.
+function TeamRoam.NearRuneSpot(unit, radius)
+	for _, id in ipairs({ RUNE_POWERUP_1, RUNE_POWERUP_2, RUNE_BOUNTY_1, RUNE_BOUNTY_2 }) do
+		if GetUnitToLocationDistance(unit, GetRuneSpawnLocation(id)) <= radius then
+			return true
+		end
+	end
+	return false
 end
 function TeamRoam.CourierHunt(unit, attackRange, level, hp)
 	-- The enemy list scan at most every 0.3s per bot (GetEnemyCourier's old cadence was 0.1s for all bots).
@@ -1649,8 +1673,9 @@ function TeamRoam.CourierHunt(unit, attackRange, level, hp)
 		enemiesNearCourier = laning
 				and #(Fu.GetEnemiesNearLoc(courier:GetLocation(), RoamRules.COURIER_LANE_SAFE) or {})
 			or 0,
+		towerNearCourier = laning and TeamRoam.EnemyTowerNear(unit, courier, RoamRules.COURIER_LANE_SAFE),
 		retreating = Fu.IsRetreating(unit),
-		onRune = unit:GetActiveMode() == BOT_MODE_RUNE,
+		onRune = unit:GetActiveMode() == BOT_MODE_RUNE and TeamRoam.NearRuneSpot(unit, 400),
 		hp = hp,
 	})
 	local name = string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")

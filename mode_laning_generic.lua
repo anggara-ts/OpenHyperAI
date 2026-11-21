@@ -165,7 +165,27 @@ local function TrackLastHitAttempt()
 	bot._lhAttempt = nil
 	local launch = attempt.launchAt ~= nil and attempt.launchAt - attempt.orderAt or -1
 	local got = bot:GetLastHits() > attempt.lastHits
-	pcall(LastHitTiming.NoteResult, bot, got, launch, attempt.early, attempt.cancels)
+	-- A backup behind the core (#71, game 064): took (we got it), core-took (the core did: the plan worked), lost.
+	local backupResult = nil
+	local core = attempt.backupCore
+	if core ~= nil then
+		local coreGot = not core:IsNull() and attempt.coreLastHits ~= nil and core:GetLastHits() > attempt.coreLastHits
+		backupResult = got and "took" or coreGot and "core-took" or "lost"
+		pcall(
+			print,
+			string.format(
+				"[OHA-LH] t=%.0f %s backup creep-hp=%d coreEta=%.2f myEta=%.2f result=%s core=%s",
+				now,
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				attempt.hp,
+				attempt.coreEta or -1,
+				attempt.delay,
+				backupResult,
+				core:IsNull() and "-" or (string.gsub(core:GetUnitName(), "npc_dota_hero_", ""))
+			)
+		)
+	end
+	pcall(LastHitTiming.NoteResult, bot, got, launch, attempt.early, attempt.cancels, backupResult)
 	pcall(
 		print,
 		string.format(
@@ -216,13 +236,14 @@ local function ProbeAttackTiming(creep)
 end
 -- An attack or walk-in order on a last-hit creep: arms the per-frame timing (LastHitTiming) and starts the attempt the
 -- first time for this creep.
-local function OrderLastHit(creep, walk)
+local function OrderLastHit(creep, walk, backupCore)
 	local pick = bot._lhPick
 	local picked = pick ~= nil and pick.creep == creep
 	LastHitTiming.Arm(bot, creep, {
 		damage = picked and pick.damage or attackDamage - 3,
 		allowEarly = picked and pick.allowEarly or false,
 		walk = walk,
+		backupCore = backupCore,
 	})
 	local attempt = bot._lhAttempt
 	if attempt ~= nil and attempt.creep == creep then
@@ -245,6 +266,9 @@ local function OrderLastHit(creep, walk)
 		turn = picked and pick.turn or 0,
 		early = picked and pick.early or false,
 		cancels = 0,
+		backupCore = backupCore,
+		coreLastHits = backupCore ~= nil and backupCore:GetLastHits() or nil,
+		coreEta = backupCore ~= nil and Fu.GetAttackProDelayTime(backupCore, creep) or nil,
 	}
 end
 function GetDesire()
@@ -663,23 +687,28 @@ local function LaneStandOff()
 	end
 	return standOff
 end
--- Name of an allied core that will get this last hit itself, or nil when none can, plus
--- when its hit would land (nil for a human core, who is always left the creep). A bot core
--- counts when its own attack, including the walk, lands before the creeps kill it.
-local function CoreCanTakeLastHit(creep)
+-- The allied core (bot or human) within 1000 of this support, or nil. A support next to it takes backup last hits
+-- (#71, game 064): its hit lands just after the core's, so it only gets the creeps the core misses.
+local function LaneCoreNear()
 	for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE) or {}) do
 		if Fu.IsValidHero(ally) and ally ~= bot and Fu.IsCore(ally) and not ally:IsIllusion() then
-			local name = (string.gsub(ally:GetUnitName(), "npc_dota_hero_", ""))
-			if not ally:IsBot() then
-				return name, nil
-			end
-			local delay = Fu.GetAttackProDelayTime(ally, creep)
-			if Fu.WillKillTarget(creep, ally:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, delay) then
-				return name, delay
-			end
+			return ally
 		end
 	end
-	return nil, nil
+	return nil
+end
+-- The enemy lane creep the core is attacking, when it is one near us.
+local function CoreLastHitCreep(core)
+	local target = core:GetAttackTarget()
+	if target == nil or target:IsNull() or not target:IsAlive() then
+		return nil
+	end
+	for _, creep in pairs(enemyLaneCreeps or {}) do
+		if creep == target then
+			return target
+		end
+	end
+	return nil
 end
 -- Enemy heroes harassing us: aiming at us now, or hit us in the last 1.5s.
 local function Harassers()
@@ -841,7 +870,12 @@ do
 				return
 			end
 		end
-		local lastHitCreep = GetBestLastHitCreep(enemyLaneCreeps)
+		-- A support next to its core backs up the creep the core is hitting, else any creep about to die.
+		local backupCore = bSupport and LaneCoreNear() or nil
+		local lastHitCreep = backupCore ~= nil and CoreLastHitCreep(backupCore) or nil
+		if lastHitCreep == nil then
+			lastHitCreep = GetBestLastHitCreep(enemyLaneCreeps)
+		end
 		if Fu.IsValid(lastHitCreep) then
 			if
 				Fu.IsValidBuilding(enemyTowers[1])
@@ -856,19 +890,15 @@ do
 			end
 			local bCanLastHit
 			if bSupport then
-				-- Do not compete with a core for last hits, but take one the core cannot reach in time.
-				-- With a bot core on the creep, go too but land after the core's hit: the core
-				-- gets it first, and the support only secures it if the core misses it.
-				local coreName, coreDelay = CoreCanTakeLastHit(lastHitCreep)
-				bCanLastHit = coreName == nil
-				if not bCanLastHit and coreDelay ~= nil then
-					local myDelay = Fu.GetAttackProDelayTime(bot, lastHitCreep)
-					bCanLastHit = myDelay > coreDelay + 0.15
-						and Fu.WillKillTarget(lastHitCreep, bot:GetAttackDamage() - 3, DAMAGE_TYPE_PHYSICAL, myDelay)
-				end
+				-- Game 064: supports got almost nothing (Hoodwink 2 / 23, Abaddon 0 / 21): with a core near they only
+				-- went when their own hit was naturally slower than the core's. Now a support with a core near always
+				-- goes as the core's backup: LastHitTiming lands its hit LastHitRules.BACKUP_MARGIN after the core's
+				-- and stops it when the core's hit kills the creep. Without a core near it takes the creep normally.
+				-- [OHA-LANE] took= counts creeps taken alone, left= creeps backed up behind the core.
+				bCanLastHit = true
 				if bot._laneSupportCreep ~= lastHitCreep then
 					bot._laneSupportCreep = lastHitCreep
-					if bCanLastHit then
+					if backupCore == nil then
 						bot._laneSupportTook = (bot._laneSupportTook or 0) + 1
 					else
 						bot._laneSupportLeft = (bot._laneSupportLeft or 0) + 1
@@ -929,7 +959,21 @@ do
 				-- The per-frame timing owns this hit (a wind-up being watched, holding after a cancel, or an attack it
 				-- ordered): keep it armed and give no order that would replace it.
 				if LastHitTiming.Holding(bot, lastHitCreep) then
-					OrderLastHit(lastHitCreep, false)
+					OrderLastHit(lastHitCreep, false, backupCore)
+					return
+				end
+				-- A backup hit: walk into range, then the per-frame timing attacks when the core's hit is due first.
+				if backupCore ~= nil then
+					OrderLastHit(lastHitCreep, true, backupCore)
+					if creepDistance > attackRange then
+						bot:Action_MoveDirectly(
+							Fu.GetXUnitsTowardsLocation2(
+								lastHitCreep:GetLocation(),
+								bot:GetLocation(),
+								attackRange - lastHitCreep:GetBoundingRadius()
+							)
+						)
+					end
 					return
 				end
 				local pick = bot._lhPick

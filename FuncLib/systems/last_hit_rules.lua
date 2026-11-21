@@ -168,11 +168,19 @@ end
 --   "wait", nil            not killable yet and another look comes before the attack point;
 --   "cancel", "survives"   an early start that would not kill it, at the last look before the point;
 --   "release", "sure"      a sure start that now looks short: kept (never cancelled), counted.
+--   backup     a support's backup hit behind its core: when the core's hit (or anything else) kills it first, the
+--              swing is stopped ("cancel", "core") instead of released for nothing.
 function LastHitRules.WindupDecision(s)
 	if s.ourHit > s.predictedHp and not s.incomingKills then
 		return "release", "kills"
 	end
 	if s.incomingKills then
+		if s.backup and s.remaining <= s.frameGap * 1.5 + 0.02 then
+			return "cancel", "core"
+		end
+		if s.backup then
+			return "wait", nil
+		end
 		return "release", "others"
 	end
 	if s.remaining > s.frameGap * 1.5 + 0.02 then
@@ -195,6 +203,33 @@ function LastHitRules.RestartDecision(kind, cancels)
 		return "early"
 	end
 	return "hold"
+end
+
+-- Backup last hits (maintainer, game 064: "lane supports still don't try to last hit; they must, with a delay slightly
+-- longer than the carry, so that when the carry misses the support gets it"). A support next to its core lands its
+-- hit BACKUP_MARGIN after the core's. b = {
+--   coreKillsFirst  the core's pending hit (or anything else) kills the creep before ours lands;
+--   coreAttacking   the core's attack target is this creep;
+--   coreCanKill     the core is free (laning, not on a hero) and its hit now would kill it: it is about to take it;
+--   myDelay, coreEta  seconds until our hit / the core's hit would land if started now;
+--   ourKills        our hit kills it (after the core's pending hit, when the core is attacking);
+-- }
+-- Returns "core" (leave it to the core), "wait" (not yet), or "go" (attack now).
+LastHitRules.BACKUP_MARGIN = 0.15
+function LastHitRules.BackupDecision(b)
+	if b.coreKillsFirst then
+		return "core"
+	end
+	if b.coreAttacking and b.myDelay < b.coreEta + LastHitRules.BACKUP_MARGIN then
+		return "wait"
+	end
+	if not b.coreAttacking and b.coreCanKill then
+		return "wait"
+	end
+	if b.ourKills then
+		return "go"
+	end
+	return "wait"
 end
 
 return LastHitRules

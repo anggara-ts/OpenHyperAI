@@ -108,3 +108,40 @@ T.test("an early swing needs two looks inside the wind-up", function()
 	T.ok(R.CanTimeWindup(0.21, 0.033), "Dark Willow's 0.21s wind-up at 30 looks a second")
 	T.ok(not R.CanTimeWindup(0.21, 0.125), "at 8 looks a second it is too short")
 end)
+
+T.test("backup hit: lands after the core's, leaves the creep the core kills", function()
+	local R = rules()
+	local function decide(over)
+		local b = {
+			coreKillsFirst = false,
+			coreAttacking = true,
+			coreCanKill = true,
+			myDelay = 0.6,
+			coreEta = 0.4,
+			ourKills = true,
+		}
+		for k, v in pairs(over) do
+			b[k] = v
+		end
+		return R.BackupDecision(b)
+	end
+	T.eq(decide({ coreKillsFirst = true }), "core", "the core's hit kills it first")
+	T.eq(decide({ myDelay = 0.5 }), "wait", "ours would land under 0.15s after the core's")
+	T.eq(decide({}), "go", "ours lands 0.2s after the core's and kills what is left")
+	T.eq(decide({ ourKills = false }), "wait", "still too healthy after the core's hit")
+	T.eq(decide({ coreAttacking = false }), "wait", "the core is free and about to take it")
+	T.eq(decide({ coreAttacking = false, coreCanKill = false }), "go", "the core is busy or cannot take it")
+end)
+
+T.test("backup swing: stopped when the core's hit kills first, at the last look", function()
+	local R = rules()
+	local s = { predictedHp = -5, ourHit = 45, incomingKills = true, frameGap = 0.033, early = false, backup = true }
+	s.remaining = 0.3
+	T.eq(R.WindupDecision(s), "wait", "time for another look")
+	s.remaining = 0.05
+	local decision, why = R.WindupDecision(s)
+	T.eq(decision, "cancel", "the core's hit kills it")
+	T.eq(why, "core")
+	s.backup = false
+	T.eq(R.WindupDecision(s), "release", "not a backup: nothing to stop")
+end)

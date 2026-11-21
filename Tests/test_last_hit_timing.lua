@@ -7,7 +7,12 @@ local function setup(creepHp)
 	local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 	local Timing = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_timing")
 	local bot = GetBot()
-	local creep = Stub.newUnit({ name = "npc_dota_creep_goodguys_melee", hp = creepHp, maxHp = 550 })
+	local creep = Stub.newUnit({
+		name = "npc_dota_creep_goodguys_melee",
+		hp = creepHp,
+		maxHp = 550,
+		loc = bot:GetLocation() + Vector(100, 0, 0),
+	})
 	local state = { activity = 0, lastAttack = -50, orders = {} }
 	bot.GetActiveMode = function()
 		return BOT_MODE_LANING
@@ -187,4 +192,80 @@ T.test("early swings switch off for a bot whose stops never hold", function()
 	T.ok(not Timing.EarlyAllowed(bot), "early swings off")
 	Timing.Arm(bot, creep, { damage = 45, allowEarly = true })
 	T.eq(bot._lhTiming.allowEarly, false, "Arm drops early for this bot")
+end)
+
+-- A bot core next to the support, hitting creep (or not).
+local function addCore(creep, props)
+	local core = Stub.newUnit({
+		name = "npc_dota_hero_juggernaut",
+		team = GetBot():GetTeam(),
+		hero = true,
+		loc = creep:GetLocation() + Vector(-100, 0, 0),
+	})
+	core.GetAttackTarget = function()
+		return props.attacking and creep or nil
+	end
+	core.GetAttackPoint = function()
+		return 0.3
+	end
+	core.GetAttackSpeed = function()
+		return 1
+	end
+	core.GetLastAttackTime = function()
+		return -50
+	end
+	core.GetAttackDamage = function()
+		return 50
+	end
+	core.IsBot = function()
+		return true
+	end
+	core.GetActiveMode = function()
+		return props.mode or BOT_MODE_LANING
+	end
+	return core
+end
+
+T.test("backup: the support leaves a creep the core's pending hit kills", function()
+	local _, Timing, bot, creep, state = setup(40)
+	Stub.time = 800
+	local core = addCore(creep, { attacking = true })
+	for _ = 1, 10 do
+		Stub.time = Stub.time + 1 / 30
+		Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true, backupCore = core })
+		Timing.Tick(bot)
+	end
+	T.eq(#state.orders, 0, "no attack: the core's hit lands first and kills it")
+end)
+
+T.test("backup: waits for a free core, takes it from a busy one", function()
+	local _, Timing, bot, creep, state = setup(40)
+	Stub.time = 900
+	local props = { attacking = false }
+	local core = addCore(creep, props)
+	for _ = 1, 5 do
+		Stub.time = Stub.time + 1 / 30
+		Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true, backupCore = core })
+		Timing.Tick(bot)
+	end
+	T.eq(#state.orders, 0, "the free core is about to take it")
+	props.mode = BOT_MODE_RETREAT
+	Stub.time = Stub.time + 1 / 30
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true, backupCore = core })
+	Timing.Tick(bot)
+	T.eq(state.orders[1], "attack", "the core left: the support takes it")
+end)
+
+T.test("backup: a creep the core's hit leaves alive is taken after the core's hit", function()
+	local _, Timing, bot, creep, state = setup(80)
+	Stub.time = 1000
+	local core = addCore(creep, { attacking = true })
+	local facts = Timing.BackupFacts(bot, core, creep, 45)
+	T.ok(facts.coreAttacking, "the core's hit is pending")
+	T.ok(facts.myDelay >= facts.coreEta, "the support's hit lands later (wind-up 0.5s against 0.3s)")
+	T.ok(facts.ourKills, "80 - 50 from the core leaves one support hit")
+	Stub.time = Stub.time + 1 / 30
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true, backupCore = core })
+	Timing.Tick(bot)
+	T.eq(state.orders[1], "attack", "backup swing")
 end)

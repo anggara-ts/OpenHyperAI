@@ -137,10 +137,18 @@ end)
 
 T.test("hunt trace: end reasons and line format", function()
 	local _, H = load()
-	T.eq(H.EndWhy(true, true, true, 0), "hit", "damaged by the bot")
-	T.eq(H.EndWhy(true, true, false, 0.5), nil, "wait for the hit to land")
-	T.eq(H.EndWhy(true, true, false, 1.0), "cancel", "no hit in 1s")
-	T.eq(H.EndWhy(false, false, false, 1.0), "lost", "target dead or out of sight")
+	-- EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit)
+	T.eq(H.EndWhy(true, true, 0.5, nil, nil, true), nil, "hit: wait the kill window out")
+	T.eq(H.EndWhy(true, true, 3.1, nil, nil, true), "hit", "damaged by the bot, still alive")
+	T.eq(H.EndWhy(true, true, 1.0, nil, nil, false), nil, "wait for the hit to land")
+	T.eq(H.EndWhy(true, true, 3.0, nil, nil, false), "cancel", "no hit in the window")
+	T.eq(H.EndWhy(true, false, 3.0, nil, nil, false), "lost", "out of sight")
+	-- Game 063: Clinkz's reveals that killed Nevermore, Furion and Shadow Fiend were counted as lost.
+	T.eq(H.EndWhy(false, false, 0.8, 0.8, 0.1, true), "kill", "died 0.8s after the reveal")
+	T.eq(H.EndWhy(false, false, 2.5, 2.5, nil, false), "kill", "died in the window, by an ally")
+	T.eq(H.EndWhy(false, false, 0, -5, 0.5, false), "kill", "died to the hunter's hit before the modifier ended")
+	T.eq(H.EndWhy(false, false, 0, -5, nil, false), "lost", "died before the reveal, not by the hunter")
+	T.eq(H.EndWhy(false, false, 0, -5, 8, false), "lost", "the hunter's hit was long before")
 	T.ok(H.IsTraced("npc_dota_hero_nyx_assassin") and not H.IsTraced("npc_dota_hero_medusa"), "traced heroes")
 	local h = { spell = "vendetta", targetName = "lich", changes = 1, snipe = 1, other = 0 }
 	inSample(H.FormatEnd(306, "nyx_assassin", "hit", 120, 6.0, h), "sample HUNT end")
@@ -230,8 +238,14 @@ T.test("hunt trace: Vendetta from the cast to the hit, with a mode change and a 
 	nyx.modifiers[vendetta] = nil
 	lich.damaged = true
 	H.Tick(nyx, "team_roam")
+	T.ok(nyx._huntTrace ~= nil, "hit: waits the kill window")
+	lich.damaged = false
+	T.stub.time = 308
+	H.Tick(nyx, "team_roam")
+	T.stub.time = 309.1
+	H.Tick(nyx, "team_roam")
 	T.eq(nyx._huntTrace, nil, "hunt over")
-	local ends = printed("end why=hit dist=120 lasted=6.0 spell=vendetta target=lich changes=1 snipe=2 other=1")
+	local ends = printed("end why=hit dist=120 lasted=9.1 spell=vendetta target=lich changes=1 snipe=2 other=1")
 	T.eq(#ends, 1, "end line: " .. table.concat(printed("end why"), " / "))
 end)
 
@@ -248,7 +262,9 @@ T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target"
 	sb.modifiers[charge] = nil
 	H.Tick(sb, "outpost")
 	T.ok(sb._huntTrace ~= nil, "waits up to 1s for the hit")
-	T.stub.time = 404.1
+	T.stub.time = 405
+	H.Tick(sb, "farm")
+	T.stub.time = 406.1
 	H.Tick(sb, "farm")
 	T.eq(#printed("end why=cancel"), 1, "no hit: cancel")
 	-- A tick gap of 3s+ during a hunt: the bot died (desires are not asked while dead).
@@ -268,4 +284,29 @@ T.test("hunt trace: a charge that misses, a gap, Clinkz only with a hero target"
 	T.eq(clinkz._huntTrace, nil, "retreating: no hunt")
 	H.Tick(clinkz, "attack")
 	T.ok(clinkz._huntTrace ~= nil and clinkz._huntTrace.spell == "skeleton_walk", "found the hero during the walk")
+end)
+
+T.test("hunt trace: a reveal that kills is a kill, not lost (game 063)", function()
+	local _, H = load()
+	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
+	local sf = fakeUnit("npc_dota_hero_nevermore", 3, 900)
+	local walk = "modifier_clinkz_wind_walk"
+	T.stub.time = 900
+	clinkz.target = sf
+	clinkz.modifiers[walk] = true
+	H.Tick(clinkz, "attack")
+	T.ok(clinkz._huntTrace ~= nil, "hunt on")
+	-- The reveal: the walk ends with the attack; the arrow lands, Nevermore dies 0.7s later.
+	T.stub.time = 902
+	clinkz.modifiers[walk] = nil
+	sf.damaged = true
+	H.Tick(clinkz, "attack")
+	T.stub.time = 902.7
+	sf.alive, sf.visible = false, false
+	H.Tick(clinkz, "attack")
+	T.eq(clinkz._huntTrace, nil, "hunt over")
+	T.eq(#printed("end why=kill"), 1, "kill: " .. table.concat(printed("end why"), " / "))
+	T.eq(#printed("end why=lost"), 0, "not lost")
+	local h = { spell = "skeleton_walk", targetName = "nevermore", changes = 0, snipe = 0, other = 0 }
+	inSample(H.FormatEnd(903, "clinkz", "kill", 180, 2.7, h), "sample HUNT kill")
 end)

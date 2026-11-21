@@ -5,7 +5,7 @@
 --   start spell= target= mode= dist=          the spell's modifier is up and its target is an enemy hero
 --   mode-change from= to= dist=               the active mode changed during the hunt (first 8 per hunt)
 --   interrupt by=snipe|other unit= dist=      an attack on another unit during the hunt (first of each per hunt)
---   end why=hit|cancel|lost|died|timeout dist= lasted= changes= snipe= other=
+--   end why=kill|hit|cancel|lost|died|timeout dist= lasted= changes= snipe= other=
 local HuntTrace = {}
 
 -- target(bot): the hunt's target as the hero script knows it, or nil (an escape cast: no trace).
@@ -64,17 +64,38 @@ local function enemyHero(bot, unit)
 	return unit
 end
 
--- How a hunt ended, once the spell's modifier is gone (and up to 1s more for the hit to land: Clinkz's arrow).
---   alive/seen  the target; damaged: it was damaged by the bot in the last second; waited: seconds since the end
+-- How a hunt ended, once the spell's modifier is gone (the reveal: Clinkz's attack, Nyx's Vendetta strike, the
+-- charge's bash). Game 063 counted Clinkz's reveals that killed Nevermore (15:32), Furion (20:36) and Shadow Fiend
+-- (49:05) as "lost": the target was dead, so not "damaged and seen". Now:
+--   kill    the target died within KILL_WINDOW after the reveal, or within KILL_WINDOW of the hunter's last hit
+--   hit     the hunter damaged it after the reveal (and it lived through the window)
+--   lost    dead without the hunt's part in it, or out of sight at the end of the window
+--   cancel  alive and visible, never hit
+--   alive/seen     the target now
+--   waited         seconds since the reveal
+--   deadAfter      seconds from the reveal to the target's death (negative: died before it), nil while alive
+--   hitToDeath     seconds from the hunter's last damage on it to its death, nil if never damaged or alive
+--   hit            the hunter damaged it since the reveal (1s before it counts: the arrow is in the air)
 -- Returns the reason, or nil to wait another think.
-function HuntTrace.EndWhy(alive, seen, damaged, waited)
-	if alive and seen and damaged then
-		return "hit"
+local KILL_WINDOW = 3
+HuntTrace.KILL_WINDOW = KILL_WINDOW
+function HuntTrace.EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit)
+	if not alive then
+		if deadAfter ~= nil and deadAfter >= -0.5 and deadAfter <= KILL_WINDOW then
+			return "kill"
+		end
+		if hitToDeath ~= nil and hitToDeath <= KILL_WINDOW then
+			return "kill"
+		end
+		return "lost"
 	end
-	if waited < 1 then
+	if waited < KILL_WINDOW then
 		return nil
 	end
-	if not alive or not seen then
+	if hit then
+		return "hit"
+	end
+	if not seen then
 		return "lost"
 	end
 	return "cancel"
@@ -190,6 +211,12 @@ function HuntTrace.Tick(bot, modeName)
 	local seen = alive and target:CanBeSeen()
 	if seen then
 		h.dist = math.floor(GetUnitToUnitDistance(bot, target))
+		if target:WasRecentlyDamagedByHero(bot, 1.0) then
+			h.hitAt = now
+		end
+	end
+	if not alive and h.deadAt == nil then
+		h.deadAt = now
 	end
 	if modeName ~= h.mode then
 		h.changes = h.changes + 1
@@ -238,8 +265,10 @@ function HuntTrace.Tick(bot, modeName)
 		return
 	end
 	h.offAt = h.offAt or now
-	local damaged = seen and target:WasRecentlyDamagedByHero(bot, 1.0)
-	local why = HuntTrace.EndWhy(alive, seen, damaged, now - h.offAt)
+	local deadAfter = h.deadAt ~= nil and h.deadAt - h.offAt or nil
+	local hitToDeath = h.deadAt ~= nil and h.hitAt ~= nil and h.deadAt - h.hitAt or nil
+	local hit = h.hitAt ~= nil and h.hitAt >= h.offAt - 1
+	local why = HuntTrace.EndWhy(alive, seen, now - h.offAt, deadAfter, hitToDeath, hit)
 	if why ~= nil then
 		finish(bot, hero, h, why, now)
 	end

@@ -14,6 +14,8 @@
 // Since #165's fix the snipe and the hunt on a creep are last-hit overlay hits (no team roam activation): snipeLH
 // counts the snipes, creepLH the creep hunts.
 // [OHA-HUNT] (FuncLib/systems/hunt_trace.lua): Clinkz / Nyx Assassin / Spirit Breaker from the spell to the hit.
+// End reasons: kill (the target died within 3s of the reveal or of the hunter's hit), hit, cancel, lost, died,
+// timeout. Builds before the kill reason counted a reveal that killed as "lost".
 // Prints Markdown. Util/after-game.js puts summary() into the review skeleton.
 "use strict";
 const fs = require("fs");
@@ -313,12 +315,13 @@ function render(a) {
 		out.push("", "[OHA-HUNT] by hero:", "");
 		out.push(
 			table(
-				["hero", "hunts", "ended", "why", "avg lasted", "mode changes", "with snipe", "with other attack"],
+				["hero", "hunts", "ended", "landed (kill+hit)", "why", "avg lasted", "mode changes", "with snipe", "with other attack"],
 				Object.entries(h.byHero).map(([k, s]) => [
 					k,
 					s.starts,
 					s.ended,
-					top(s.ends, 5),
+					(s.ends.kill || 0) + (s.ends.hit || 0),
+					top(s.ends, 6),
 					s.ended ? (s.lasted / s.ended).toFixed(1) + "s" : "-",
 					s.changes,
 					s.snipe,
@@ -368,7 +371,8 @@ function selfTest() {
 		["hunts by nyx", a.hunts && a.hunts.byHero.nyx_assassin.starts, 1],
 		["nyx end hit", a.hunts && a.hunts.byHero.nyx_assassin.ends.hit, 1],
 		["nyx with snipe", a.hunts && a.hunts.byHero.nyx_assassin.snipe, 1],
-		["traces", a.hunts && a.hunts.traces.length, 2],
+		["clinkz end kill", a.hunts && a.hunts.byHero.clinkz && a.hunts.byHero.clinkz.ends.kill, 1],
+		["traces", a.hunts && a.hunts.traces.length, 3],
 	];
 	let failed = 0;
 	for (const [name, got, want] of checks) {

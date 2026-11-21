@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local InterruptRules = require(GetScriptDirectory() .. "/FuncLib/systems/interrupt_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -187,20 +188,87 @@ function X.SkillsComplement()
 		return
 	end
 end
+-- Interrupt probes (#48): after an interrupt cast, look at the target once the effect should have landed and log
+-- whether the teleport/channel stopped. [OHA-DARK_WILLOW] interrupt-result spell= target= rooted= feared= tp= channel=
+local interruptProbes = {}
+function X.StartInterruptProbe(spell, target, delay)
+	interruptProbes[spell] = { target = target, checkAt = DotaTime() + delay }
+end
+function X.CheckInterruptProbes()
+	for spell, probe in pairs(interruptProbes) do
+		if DotaTime() >= probe.checkAt then
+			interruptProbes[spell] = nil
+			local target = probe.target
+			if Fu.IsValidHero(target) then
+				pcall(
+					print,
+					string.format(
+						"[OHA-DARK_WILLOW] t=%.0f interrupt-result spell=%s target=%s rooted=%s feared=%s tp=%s channel=%s",
+						DotaTime(),
+						spell,
+						target:GetUnitName(),
+						tostring(target:HasModifier("modifier_dark_willow_bramble_maze")),
+						tostring(target:HasModifier("modifier_dark_willow_debuff_fear")),
+						tostring(target:HasModifier("modifier_teleporting")),
+						tostring(target:IsChanneling())
+					)
+				)
+			end
+		end
+	end
+end
+-- Time left of an enemy's channel: the TP modifier's remaining time, else the channelled ability's channel time
+-- counted from the first think this bot saw it (an upper bound if she saw it late). src: tp|channel|unknown.
+local channelMemory = {}
+function X.EnemyChannelLeft(enemy)
+	if enemy:HasModifier("modifier_teleporting") then
+		return Fu.GetModifierTime(enemy, "modifier_teleporting"), "tp"
+	end
+	local active = enemy:GetCurrentActiveAbility()
+	if active == nil or active:IsNull() then
+		return 0, "unknown"
+	end
+	local channelTime = active:GetChannelTime() or 0
+	if channelTime <= 0 then
+		return 0, "unknown"
+	end
+	return InterruptRules.TrackChannel(channelMemory, enemy:GetUnitName(), active:GetName(), channelTime, DotaTime()),
+		"channel"
+end
 function X.ConsiderBrambleMaze()
+	X.CheckInterruptProbes()
 	if not brambleMazeAbility:IsFullyCastable() then
 		return BOT_ACTION_DESIRE_NONE, 0
 	end
 	local castRange = brambleMazeAbility:GetCastRange()
 	local nearbyEnemies = Fu.GetNearbyHeroes(bot, castRange, true, BOT_MODE_NONE)
 	botTarget = Fu.GetProperTarget(bot)
+	-- Only on a teleport (#48): Bramble's root "does not interrupt channeling spells upon rooting" (7.42
+	-- abilities_english, dark_willow_bramble_maze_Note0), so it was wasted on other channels and ultimate cast
+	-- points; the TP scroll "can be prevented or canceled by Root abilities" (item_tpscroll_Note1, ROOT_DISABLES
+	-- in items.txt). Whether a bramble latches onto a hero standing still in the maze is logged (interrupt-result).
 	for _, enemy in pairs(nearbyEnemies) do
 		if
-			Fu.IsValid(enemy)
-			and (enemy:IsChanneling() or Fu.IsCastingUltimateAbility(enemy))
+			Fu.IsValidHero(enemy)
+			and enemy:HasModifier("modifier_teleporting")
 			and Fu.CanCastOnNonMagicImmune(enemy)
 			and not Fu.IsSuspiciousIllusion(enemy)
 		then
+			if DotaTime() >= (bot._brambleLogAt or -999) then
+				bot._brambleLogAt = DotaTime() + 3
+				local left = Fu.GetModifierTime(enemy, "modifier_teleporting")
+				-- Game data: cast point 0.3, brambles grow after initial_creation_delay 0.3, latch after 0.1.
+				X.StartInterruptProbe("bramble", enemy, 1.0)
+				pcall(
+					print,
+					string.format(
+						"[OHA-DARK_WILLOW] t=%.0f bramble why=tp target=%s left=%.2f",
+						DotaTime(),
+						enemy:GetUnitName(),
+						left
+					)
+				)
+			end
 			return BOT_ACTION_DESIRE_HIGH, enemy:GetLocation()
 		end
 	end
@@ -483,35 +551,101 @@ function X.ConsiderTerrorize()
 			end
 		end
 	end
+	-- A teleporting or channelling enemy (#48): only when the fear lands before the channel ends. Datafeed (hero
+	-- 119): cast point 1.0, the wisp flies from her to the point at destination_travel_speed 2000, no other delay.
+	-- TP scroll channel 3.0s (7.42 items.txt). The old branch also aimed at a 2-hero spot that need not hold
+	-- the teleporter, and took enemies 150 past cast range.
+	local castPoint = terrorizeAbility:GetCastPoint()
+	local travelSpeed = terrorizeAbility:GetSpecialValueInt("destination_travel_speed")
 	for _, enemy in pairs(enemiesInWideRange) do
 		if
-			Fu.IsValid(enemy)
+			Fu.IsValidHero(enemy)
+			and not Fu.IsSuspiciousIllusion(enemy)
 			and (enemy:IsChanneling() or enemy:HasModifier("modifier_teleporting"))
 			and Fu.CanCastOnNonMagicImmune(enemy)
 			and Fu.CanCastOnTargetAdvanced(enemy)
 		then
-			local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, 300, 0, 0)
-			if aoe.count >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
+			local location = enemy:GetLocation()
+			local aoe = bot:FindAoELocation(true, true, bot:GetLocation(), castRange, radius * 0.8, 0, 0)
+			if
+				aoe ~= nil
+				and aoe.count ~= nil
+				and aoe.count >= 2
+				and Fu.GetLocationToLocationDistance(aoe.targetloc, location) <= radius * 0.8
+			then
+				location = aoe.targetloc
 			end
-			return BOT_ACTION_DESIRE_HIGH, enemy:GetLocation()
+			local distance = GetUnitToLocationDistance(bot, location)
+			if distance <= castRange then
+				local left, src = X.EnemyChannelLeft(enemy)
+				local arrive = InterruptRules.ArrivalTime(castPoint, distance, travelSpeed, 0)
+				if InterruptRules.LandsBeforeChannelEnds(arrive, left) then
+					X.LogTerrorize("interrupt", enemy, arrive, left, src)
+					X.StartInterruptProbe("terrorize", enemy, arrive + 0.2)
+					return BOT_ACTION_DESIRE_HIGH, location
+				end
+				X.LogTerrorize("too-late", enemy, arrive, left, src)
+			end
 		end
 	end
 	local nearbyAllies = Fu.GetNearbyHeroes(bot, 1200, false, BOT_MODE_NONE)
 	for _, ally in pairs(nearbyAllies) do
+		-- was "valid and retreating OR retreating and hurt and core and hit": the first half alone matched, so
+		-- any retreating ally (even at full HP) drew the fear. Now a hurt core that is being hit (#48).
 		if
-			Fu.IsValidHero(ally) and Fu.IsRetreating(ally)
-			or Fu.IsRetreating(ally)
-				and Fu.GetHP(ally) < 0.4
-				and Fu.IsCore(ally)
-				and ally:WasRecentlyDamagedByAnyHero(2)
+			Fu.IsValidHero(ally)
+			and not ally:IsIllusion()
+			and Fu.IsRetreating(ally)
+			and Fu.GetHP(ally) < 0.4
+			and Fu.IsCore(ally)
+			and ally:WasRecentlyDamagedByAnyHero(2)
 		then
 			local aoe = bot:FindAoELocation(true, true, ally:GetLocation(), castRange, radius, 0, 0)
-			if aoe.count >= 2 then
+			if aoe.count >= 2 and GetUnitToLocationDistance(bot, aoe.targetloc) <= castRange then
+				X.LogTerrorize("save-ally", ally, 0, Fu.GetHP(ally), "ally")
 				return BOT_ACTION_DESIRE_HIGH, aoe.targetloc
 			end
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
+end
+-- [OHA-DARK_WILLOW] terrorize why=interrupt ... / terrorize-skip why=too-late ... / terrorize why=save-ally ...,
+-- each at most once per 3s. arrive: seconds until the fear lands; left: channel time left; margin = left - arrive.
+local terrorizeLogAt = {}
+function X.LogTerrorize(why, unit, arrive, left, src)
+	if DotaTime() < (terrorizeLogAt[why] or -999) then
+		return
+	end
+	terrorizeLogAt[why] = DotaTime() + 3
+	if why == "save-ally" then
+		pcall(
+			print,
+			string.format(
+				"[OHA-DARK_WILLOW] t=%.0f terrorize why=save-ally ally=%s hp=%.2f",
+				DotaTime(),
+				unit:GetUnitName(),
+				left
+			)
+		)
+		return
+	end
+	local what = "terrorize"
+	if why == "too-late" then
+		what = "terrorize-skip"
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-DARK_WILLOW] t=%.0f %s why=%s target=%s arrive=%.2f left=%.2f margin=%.2f src=%s",
+			DotaTime(),
+			what,
+			why,
+			unit:GetUnitName(),
+			arrive,
+			left,
+			left - arrive,
+			src
+		)
+	)
 end
 return X

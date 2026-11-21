@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local InterruptRules = require(GetScriptDirectory() .. "/FuncLib/systems/interrupt_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -174,6 +175,14 @@ function X.SkillsComplement()
 		and not Fu.CanNotUseAbility(bot)
 		and not bot:HasModifier("modifier_primal_beast_pulverize_self")
 	then
+		-- No Pulverize during Trample, except to stop an enemy's teleport or channel (#48, maintainer 2026-11-21).
+		-- mode_outpost_generic.lua holds its Trample move orders until the Pulverize cast starts.
+		local interruptTarget = X.ConsiderPulverizeInTrample()
+		if interruptTarget ~= nil then
+			bot._pulverizeHoldUntil = DotaTime() + 0.6
+			bot:Action_UseAbilityOnEntity(pulverizeAbility, interruptTarget)
+			return
+		end
 		if X.ConsiderUproar() > 0 then
 			if DotaTime() >= (bot._uproarTrampleLogAt or -999) then
 				bot._uproarTrampleLogAt = DotaTime() + 5
@@ -658,5 +667,64 @@ function X.ConsiderPulverize()
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, nil
+end
+-- During Trample only an interrupt: an enemy hero in cast range that teleports, channels or is casting an
+-- ultimate. Datafeed (hero 137): Pulverize cast point 0.25, cast range 200, a 2.3s channel; Trample lasts 5.5s.
+-- A TP (3.0s, 7.42 items.txt) must have more than cast point + 0.1s left. Not when the Trample walk turns home
+-- (the same rules as mode_outpost_generic.lua's TrampleToBase: outnumbered, or hurt and weaker): he would stand
+-- 2.3s in a losing fight. [OHA-PRIMAL_BEAST] pulverize why=interrupt-in-trample target= channel= left=
+function X.ConsiderPulverizeInTrample()
+	if not Fu.CanCastAbility(pulverizeAbility) or isRetreating then
+		return nil
+	end
+	local allies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
+	local enemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+	if #enemies > #allies + 1 or not Fu.WeAreStronger(bot, 800) and hpRatio < 0.55 or hpRatio < 0.3 then
+		return nil
+	end
+	local castRange = Fu.GetProperCastRange(false, bot, pulverizeAbility:GetCastRange())
+	local castPoint = pulverizeAbility:GetCastPoint()
+	for _, enemyHero in pairs(nearbyEnemies) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and Fu.IsInRange(bot, enemyHero, castRange)
+			and Fu.CanCastOnMagicImmune(enemyHero)
+			and Fu.CanCastOnTargetAdvanced(enemyHero)
+		then
+			local teleporting = enemyHero:HasModifier("modifier_teleporting")
+			if teleporting or enemyHero:IsChanneling() or Fu.IsCastingUltimateAbility(enemyHero) then
+				local left = -1
+				local inTime = true
+				if teleporting then
+					left = Fu.GetModifierTime(enemyHero, "modifier_teleporting")
+					inTime = InterruptRules.LandsBeforeChannelEnds(InterruptRules.ArrivalTime(castPoint, 0), left)
+				end
+				if inTime then
+					local channel = "tp"
+					if not teleporting then
+						local active = enemyHero:GetCurrentActiveAbility()
+						channel = active ~= nil and not active:IsNull() and active:GetName() or "unknown"
+					end
+					if DotaTime() >= (bot._pulverizeTrampleLogAt or -999) then
+						bot._pulverizeTrampleLogAt = DotaTime() + 3
+						pcall(
+							print,
+							string.format(
+								"[OHA-PRIMAL_BEAST] t=%.0f pulverize why=interrupt-in-trample target=%s channel=%s left=%.2f dist=%d",
+								DotaTime(),
+								enemyHero:GetUnitName(),
+								channel,
+								left,
+								GetUnitToUnitDistance(bot, enemyHero)
+							)
+						)
+					end
+					return enemyHero
+				end
+			end
+		end
+	end
+	return nil
 end
 return X

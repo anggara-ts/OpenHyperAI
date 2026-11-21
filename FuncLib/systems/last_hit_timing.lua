@@ -112,34 +112,71 @@ local function coreHitState(core, creep)
 	return core:GetAttackTarget() == creep and not cooling, cooling
 end
 
--- A support's backup hit behind its core (#71, game 064). Returns the facts for LastHitRules.BackupDecision, with
--- coreEta / myDelay for the log. The core's pending hit counts as landing first when it lands before ours; its
--- projectile in flight is already in Fu.GetTotalAttackWillRealDamage.
-function X.BackupFacts(bot, core, creep, damage)
-	local myDelay = Fu.GetAttackProDelayTime(bot, creep)
+-- The core's own hold on a unit: team roam's overlay (core._lhOwn, #171) or its last-hit timing (core._lhTiming: a
+-- walk-in, an attack it ordered, a wind-up, a hold after a cancel, a decided release). "same" when it is this creep,
+-- "other" when another unit, nil when none (a human core has neither). The overlay clears _lhTiming while it owns a
+-- hit, so both are read.
+local CORE_HOLD_PHASES = { walk = true, attack = true, windup = true, hold = true, decided = true }
+local function coreHold(core, creep)
+	local own = core._lhOwn
+	if own ~= nil and own.unit ~= nil then
+		return own.unit == creep and "same" or "other"
+	end
+	local st = core._lhTiming
+	if st ~= nil and CORE_HOLD_PHASES[st.phase] and st.creep ~= nil then
+		return st.creep == creep and "same" or "other"
+	end
+	return nil
+end
+
+-- A support's backup hit behind its core (#71, games 064 / 065). Returns the facts for LastHitRules.BackupDecision /
+-- BackupCoreNext, with coreEta / myDelay / deathEta for the log. myDelay: our hit's landing (default: an attack
+-- started now; the wind-up passes the rest of the swing). The core's pending hit counts as landing first when it
+-- lands before ours; its projectile in flight is already in Fu.GetTotalAttackWillRealDamage. coreEta
+-- (Fu.GetAttackProDelayTime) counts the core's walk, turn and attack cooldown.
+function X.BackupFacts(bot, core, creep, damage, myDelay)
+	myDelay = myDelay or Fu.GetAttackProDelayTime(bot, creep)
 	local coreEta = Fu.GetAttackProDelayTime(core, creep)
-	local pending, cooling = coreHitState(core, creep)
+	local pending = coreHitState(core, creep)
 	local predictedHp, ourHit, incomingKills = X.Predict(creep, damage, myDelay, X.TowerShotBefore(bot, creep, myDelay))
 	if pending and coreEta < myDelay then
 		predictedHp = predictedHp - creep:GetActualIncomingDamage(core:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
 		incomingKills = incomingKills or predictedHp <= 0
 	end
-	-- Free: a bot core in laning mode, any core not hitting a hero, not cooling down after a hit.
+	-- Game 065: a core walking in, holding after a cancel or held by the overlay read as "not attacking", and the
+	-- support went first. Its hold counts as attacking now (before the mode check: the overlay runs in team roam).
+	local hold = coreHold(core, creep)
 	local coreTarget = core:GetAttackTarget()
-	local busy = core:IsBot() and core:GetActiveMode() ~= BOT_MODE_LANING
+	local coreState
+	if pending or hold == "same" then
+		coreState = "attacking"
+	elseif hold == "other" then
+		coreState = "elsewhere"
+	elseif
+		core:IsBot() and core:GetActiveMode() ~= BOT_MODE_LANING
 		or coreTarget ~= nil and not coreTarget:IsNull() and coreTarget:IsHero()
-	local coreCanKill = false
-	if not busy and not cooling then
-		local corePredicted, coreHit, coreOthersKill =
-			X.Predict(creep, core:GetAttackDamage(), coreEta, X.TowerShotBefore(bot, creep, coreEta))
-		coreCanKill = not coreOthersKill and coreHit > corePredicted
+	then
+		coreState = "busy"
+	elseif GetUnitToUnitDistance(core, creep) > Rules.BACKUP_CORE_NEAR then
+		coreState = "far"
+	else
+		coreState = "free"
 	end
+	local corePredicted, coreHit, coreOthersKill =
+		X.Predict(creep, core:GetAttackDamage(), coreEta, X.TowerShotBefore(bot, creep, coreEta))
+	-- The death estimate (two unit scans) only where it decides something: a core that can take the creep.
+	local deathEta = Rules.CORE_IN_PLAY[coreState] and X.DeathEta(bot, creep) or math.huge
 	return {
 		coreKillsFirst = incomingKills,
-		coreAttacking = pending,
-		coreCanKill = coreCanKill,
+		coreState = coreState,
+		coreHold = hold or "-",
+		coreTooLate = Rules.CoreTooLate(coreOthersKill, deathEta, coreEta),
+		coreCanKill = not coreOthersKill and coreHit > corePredicted,
 		myDelay = myDelay,
 		coreEta = coreEta,
+		deathEta = deathEta,
+		predictedHp = predictedHp,
+		ourHit = ourHit,
 		ourKills = not incomingKills and ourHit > predictedHp,
 	}
 end
@@ -286,6 +323,26 @@ local function throttledLog(bot, key, fmt, ...)
 	end
 	bot._lhtLogAt[key] = DotaTime() + LOG_EVERY
 	pcall(print, string.format(fmt, ...))
+end
+
+-- [OHA-LH] backup go: why the support attacks behind its core now (BackupDecision's why, the core's state, lead =
+-- myEta - coreEta: 0.15 or more when it waited behind the core). Throttled per bot.
+local function logBackupGo(bot, facts, why, from)
+	throttledLog(
+		bot,
+		"backupgo",
+		"[OHA-LH] t=%.0f %s backup go why=%s state=%s hold=%s from=%s coreEta=%.2f myEta=%.2f lead=%.2f death=%.2f",
+		DotaTime(),
+		heroName(bot),
+		why,
+		facts.coreState,
+		facts.coreHold,
+		from,
+		facts.coreEta,
+		facts.myDelay,
+		facts.myDelay - facts.coreEta,
+		math.min(99, facts.deathEta)
+	)
 end
 
 -- The laning Think starts: a state it does not re-arm in this think is dropped by the next Tick.
@@ -455,14 +512,12 @@ local function watchWindup(bot, st, now)
 	local predictedHp, ourHit, incomingKills =
 		X.Predict(st.creep, st.damage, delay, X.TowerShotBefore(bot, st.creep, delay))
 	local core = backupCoreOf(st)
-	local coreEta = -1
+	local facts = nil
 	if core ~= nil then
-		-- A backup swing: the core's hit still to come and landing before ours counts too.
-		coreEta = Fu.GetAttackProDelayTime(core, st.creep)
-		if coreHitState(core, st.creep) and coreEta < delay then
-			predictedHp = predictedHp - st.creep:GetActualIncomingDamage(core:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL)
-			incomingKills = incomingKills or predictedHp <= 0
-		end
+		-- A backup swing: the core's hit still to come and landing before ours counts too, and a core that can still
+		-- take it first (its hold, walking in, free next to it) stops ours (LastHitRules.BackupCoreNext).
+		facts = X.BackupFacts(bot, core, st.creep, st.damage, delay)
+		predictedHp, ourHit, incomingKills = facts.predictedHp, facts.ourHit, facts.coreKillsFirst
 	end
 	if st.early == nil then
 		-- Sure when the swing started: never cancelled.
@@ -476,19 +531,27 @@ local function watchWindup(bot, st, now)
 		frameGap = X.FrameGap(bot),
 		early = st.early,
 		backup = core ~= nil,
+		coreNext = facts ~= nil and Rules.BackupCoreNext(facts),
 	})
-	if core ~= nil and (decision == "cancel" or decision == "release") then
+	if facts ~= nil and (decision == "cancel" or decision == "release") then
+		-- state= the core's state, hold= its own hold (same creep, other unit, -), late= its hit too late (1), coreKill= its
+		-- hit kills when it lands (1).
 		throttledLog(
 			bot,
 			"backup",
-			"[OHA-LH] t=%.0f %s backup creep-hp=%d coreEta=%.2f myEta=%.2f result=%s why=%s",
+			"[OHA-LH] t=%.0f %s backup creep-hp=%d coreEta=%.2f myEta=%.2f lead=%.2f result=%s why=%s state=%s hold=%s late=%d coreKill=%d",
 			DotaTime(),
 			heroName(bot),
 			st.creep:GetHealth(),
-			coreEta,
+			facts.coreEta,
 			delay,
+			delay - facts.coreEta,
 			decision,
-			why
+			why,
+			facts.coreState,
+			facts.coreHold,
+			facts.coreTooLate and 1 or 0,
+			facts.coreCanKill and 1 or 0
 		)
 	end
 	if decision == "cancel" then
@@ -543,7 +606,12 @@ local function watchHold(bot, st, now)
 	local core = backupCoreOf(st)
 	local restart
 	if core ~= nil then
-		restart = Rules.BackupDecision(X.BackupFacts(bot, core, st.creep, st.damage)) == "go" and "sure" or "hold"
+		local facts = X.BackupFacts(bot, core, st.creep, st.damage)
+		local decision, why = Rules.BackupDecision(facts)
+		restart = decision == "go" and "sure" or "hold"
+		if decision == "go" then
+			logBackupGo(bot, facts, why, "hold")
+		end
 	else
 		restart = Rules.RestartDecision(classifyNow(bot, st), st.cancels)
 	end
@@ -565,7 +633,9 @@ local function watchWalk(bot, st)
 	if core ~= nil then
 		-- A backup hit: only once the core's hit is due to land first (or the core cannot take it).
 		local facts = X.BackupFacts(bot, core, st.creep, st.damage)
-		if Rules.BackupDecision(facts) == "go" then
+		local decision, why = Rules.BackupDecision(facts)
+		if decision == "go" then
+			logBackupGo(bot, facts, why, "walk")
 			bot:Action_AttackUnit(st.creep, true)
 			st.phase = "attack"
 			return true

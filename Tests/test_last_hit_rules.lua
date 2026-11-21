@@ -114,8 +114,9 @@ T.test("backup hit: lands after the core's, leaves the creep the core kills", fu
 	local function decide(over)
 		local b = {
 			coreKillsFirst = false,
-			coreAttacking = true,
-			coreCanKill = true,
+			coreState = "attacking",
+			coreTooLate = false,
+			coreCanKill = false,
 			myDelay = 0.6,
 			coreEta = 0.4,
 			ourKills = true,
@@ -127,10 +128,53 @@ T.test("backup hit: lands after the core's, leaves the creep the core kills", fu
 	end
 	T.eq(decide({ coreKillsFirst = true }), "core", "the core's hit kills it first")
 	T.eq(decide({ myDelay = 0.5 }), "wait", "ours would land under 0.15s after the core's")
-	T.eq(decide({}), "go", "ours lands 0.2s after the core's and kills what is left")
+	local decision, why = decide({})
+	T.eq(decision, "go", "ours lands 0.2s after the core's and kills what is left")
+	T.eq(why, "behind")
 	T.eq(decide({ ourKills = false }), "wait", "still too healthy after the core's hit")
-	T.eq(decide({ coreAttacking = false }), "wait", "the core is free and about to take it")
-	T.eq(decide({ coreAttacking = false, coreCanKill = false }), "go", "the core is busy or cannot take it")
+	T.eq(decide({ coreState = "free", coreCanKill = true }), "wait", "the core is free and its hit kills: it takes it")
+	T.eq(decide({ coreState = "attacking", coreCanKill = true }), "wait", "the core holds it and its hit kills")
+	-- Game 065 t=310 Dark Willow behind Clinkz: coreEta 0.93 against myEta 0.78, the creep taken first.
+	T.eq(decide({ coreState = "free", myDelay = 0.78, coreEta = 0.93 }), "wait", "a free core walking in lands first")
+	-- Game 065 t=634 Hoodwink behind Primal Beast (overlay hold): coreEta 0.59 against myEta 0.54.
+	T.eq(decide({ myDelay = 0.54, coreEta = 0.59 }), "wait", "the core's hold counts as attacking")
+	decision, why = decide({ coreState = "free", coreCanKill = true, coreTooLate = true, myDelay = 0.5, coreEta = 1.8 })
+	T.eq(decision, "go", "the core's hit comes after the creep dies")
+	T.eq(why, "late")
+	for _, state in ipairs({ "busy", "far", "elsewhere" }) do
+		decision, why = decide({ coreState = state, coreCanKill = true, myDelay = 0.3, coreEta = 0.9 })
+		T.eq(decision, "go", "the core cannot take it: " .. state)
+		T.eq(why, state)
+	end
+end)
+
+T.test("backup: the core's hit is too late only clearly before it lands", function()
+	local R = rules()
+	T.ok(R.CoreTooLate(true, math.huge, 0.4), "hits already on their way kill it first")
+	T.ok(R.CoreTooLate(false, 1.0, 1.8), "dies 0.8s before a walk-in lands")
+	T.ok(not R.CoreTooLate(false, 0.35, 0.45), "within the margin: the core still gets the chance")
+	T.ok(not R.CoreTooLate(false, math.huge, 3), "nothing hits it")
+end)
+
+T.test("backup swing: the core can still take it first", function()
+	local R = rules()
+	local b = { coreState = "attacking", coreTooLate = false, coreCanKill = true, myDelay = 0.54, coreEta = 0.59 }
+	T.ok(R.BackupCoreNext(b), "game 065 t=634: Primal Beast's hit kills it, ours would land first")
+	b.coreCanKill = false
+	T.ok(not R.BackupCoreNext(b), "the core's hit does not kill it: ours goes")
+	b.coreCanKill, b.coreState = true, "busy"
+	T.ok(not R.BackupCoreNext(b), "a busy core does not take it")
+	b.coreState, b.coreTooLate = "free", true
+	T.ok(not R.BackupCoreNext(b), "too late for the core")
+	local s = { predictedHp = 30, ourHit = 45, incomingKills = false, frameGap = 0.033, early = false, backup = true }
+	s.coreNext, s.remaining = true, 0.3
+	T.eq(R.WindupDecision(s), "wait", "another look first")
+	s.remaining = 0.05
+	local decision, why = R.WindupDecision(s)
+	T.eq(decision, "cancel", "stopped for the core")
+	T.eq(why, "core-next")
+	s.coreNext = false
+	T.eq(R.WindupDecision(s), "release", "the core cannot: ours kills it")
 end)
 
 T.test("backup swing: stopped when the core's hit kills first, at the last look", function()

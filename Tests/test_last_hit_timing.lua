@@ -261,13 +261,54 @@ T.test("backup: a creep the core's hit leaves alive is taken after the core's hi
 	Stub.time = 1000
 	local core = addCore(creep, { attacking = true })
 	local facts = Timing.BackupFacts(bot, core, creep, 45)
-	T.ok(facts.coreAttacking, "the core's hit is pending")
+	T.eq(facts.coreState, "attacking", "the core's hit is pending")
 	T.ok(facts.myDelay >= facts.coreEta, "the support's hit lands later (wind-up 0.5s against 0.3s)")
 	T.ok(facts.ourKills, "80 - 50 from the core leaves one support hit")
 	Stub.time = Stub.time + 1 / 30
 	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = true, backupCore = core })
 	Timing.Tick(bot)
 	T.eq(state.orders[1], "attack", "backup swing")
+end)
+
+T.test("backup: a core walking in or held by the overlay counts as attacking", function()
+	local _, Timing, bot, creep = setup(60)
+	Stub.time = 1050
+	local core = addCore(creep, { attacking = false })
+	-- Game 065: the core's own timing walking in on this creep (no attack target yet).
+	core._lhTiming = { creep = creep, phase = "walk" }
+	local facts = Timing.BackupFacts(bot, core, creep, 45)
+	T.eq(facts.coreState, "attacking", "its walk-in on this creep")
+	T.eq(facts.coreHold, "same")
+	core._lhTiming = nil
+	core._lhOwn = { unit = creep }
+	facts = Timing.BackupFacts(bot, core, creep, 45)
+	T.eq(facts.coreState, "attacking", "team roam's overlay holds this creep (any mode)")
+	core.GetActiveMode = function()
+		return BOT_MODE_TEAM_ROAM
+	end
+	T.eq(Timing.BackupFacts(bot, core, creep, 45).coreState, "attacking", "the overlay runs in team roam")
+	core._lhOwn = { unit = Stub.newUnit({ name = "npc_dota_creep_goodguys_ranged", loc = creep:GetLocation() }) }
+	T.eq(Timing.BackupFacts(bot, core, creep, 45).coreState, "elsewhere", "the overlay holds another creep")
+	core._lhOwn = nil
+	T.eq(Timing.BackupFacts(bot, core, creep, 45).coreState, "busy", "team roam without a hold")
+end)
+
+T.test("backup: a wind-up ahead of the core's hit is stopped (core-next)", function()
+	local _, Timing, bot, creep, state = setup(40)
+	Stub.time = 1080
+	local core = addCore(creep, { attacking = false })
+	core._lhTiming = { creep = creep, phase = "hold" }
+	Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = false, backupCore = core })
+	state.activity = 1503
+	for _ = 1, 20 do
+		Stub.time = Stub.time + 1 / 30
+		Timing.Arm(bot, creep, { damage = 45, allowEarly = false, walk = false, backupCore = core })
+		Timing.Tick(bot)
+		if #state.orders > 0 then
+			break
+		end
+	end
+	T.eq(state.orders[1], "clear", "the core holds this creep and its hit kills it: our swing stops")
 end)
 
 T.test("a laning Think that gave another order drops the timing at the next frame's Tick", function()

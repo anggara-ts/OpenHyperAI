@@ -169,18 +169,19 @@ end
 --   "cancel", "survives"   an early start that would not kill it, at the last look before the point;
 --   "release", "sure"      a sure start that now looks short: kept (never cancelled), counted.
 --   backup     a support's backup hit behind its core: when the core's hit (or anything else) kills it first, the
---              swing is stopped ("cancel", "core") instead of released for nothing.
+--              swing is stopped ("cancel", "core") instead of released for nothing;
+--   coreNext   (backup) the core can still take it first (BackupCoreNext): stopped too ("cancel", "core-next").
 function LastHitRules.WindupDecision(s)
+	if s.backup and (s.incomingKills or s.coreNext) then
+		if s.remaining <= s.frameGap * 1.5 + 0.02 then
+			return "cancel", s.incomingKills and "core" or "core-next"
+		end
+		return "wait", nil
+	end
 	if s.ourHit > s.predictedHp and not s.incomingKills then
 		return "release", "kills"
 	end
 	if s.incomingKills then
-		if s.backup and s.remaining <= s.frameGap * 1.5 + 0.02 then
-			return "cancel", "core"
-		end
-		if s.backup then
-			return "wait", nil
-		end
 		return "release", "others"
 	end
 	if s.remaining > s.frameGap * 1.5 + 0.02 then
@@ -209,27 +210,65 @@ end
 -- longer than the carry, so that when the carry misses the support gets it"). A support next to its core lands its
 -- hit BACKUP_MARGIN after the core's. b = {
 --   coreKillsFirst  the core's pending hit (or anything else) kills the creep before ours lands;
---   coreAttacking   the core's attack target is this creep;
---   coreCanKill     the core is free (laning, not on a hero) and its hit now would kill it: it is about to take it;
---   myDelay, coreEta  seconds until our hit / the core's hit would land if started now;
+--   coreState       what the core does about this creep (CORE_IN_PLAY: it can take it, so we land after it):
+--                     attacking  swinging at it, or its own last-hit timing / team roam's overlay holds it (walking
+--                                in, holding after a cancel, waiting for the moment);
+--                     free       alive, laning (or a human), not on a hero, within BACKUP_CORE_NEAR of the creep;
+--                     elsewhere  its timing / overlay holds another unit;  busy  another mode or on a hero;
+--                     far        farther than BACKUP_CORE_NEAR;
+--   coreTooLate     the core's hit, started now, lands after the creep dies (CoreTooLate);
+--   coreCanKill     the core's hit kills it when it lands (not killed by others first);
+--   myDelay, coreEta  seconds until our hit / the core's hit would land if started now (walk and turn included);
 --   ourKills        our hit kills it (after the core's pending hit, when the core is attacking);
 -- }
--- Returns "core" (leave it to the core), "wait" (not yet), or "go" (attack now).
+-- Game 065: 17 of 37 backup releases landed before the core's hit (myEta <= coreEta), and Clinkz (42 -> 31 last hits
+-- at 10:00) and Primal Beast (33 -> 27) lost farm to their supports: the support waited only for a core swinging at
+-- the creep or whose hit killed it at once, so a core walking in, holding after a cancel or held by the overlay
+-- counted as not there.
+-- Returns decision, why: "core", "first" (leave it to the core); "wait", "behind" (the core takes it, or ours would
+-- not land after the core's) or "hp" (our hit does not kill yet); "go", why (attack now): "behind" (the core's hit
+-- does not kill it, ours lands BACKUP_MARGIN after it), "late" (the core's hit is too late), or the core's state
+-- (elsewhere / busy / far: it cannot take it).
 LastHitRules.BACKUP_MARGIN = 0.15
+-- A core this close to the creep can take it (a walk-in of about one second at 300 movement speed; not a game value).
+LastHitRules.BACKUP_CORE_NEAR = 700
+LastHitRules.CORE_IN_PLAY = { attacking = true, free = true }
+
+-- The core's hit is too late: other hits already on their way kill the creep before it lands (othersKill), or the
+-- creep's estimated death (DeathEta: our creeps and towers) comes clearly (BACKUP_MARGIN) before it.
+function LastHitRules.CoreTooLate(othersKill, deathEta, coreEta)
+	return othersKill or deathEta < coreEta - LastHitRules.BACKUP_MARGIN
+end
+
+-- True when the support must leave the creep to the core now: the core can take it in time, and either its hit kills
+-- it (it is about to go, or it is going) or ours would not land BACKUP_MARGIN after the core's.
+function LastHitRules.BackupBehindCore(b)
+	return LastHitRules.CORE_IN_PLAY[b.coreState] == true
+		and not b.coreTooLate
+		and (b.coreCanKill == true or b.myDelay < b.coreEta + LastHitRules.BACKUP_MARGIN)
+end
+
 function LastHitRules.BackupDecision(b)
 	if b.coreKillsFirst then
-		return "core"
+		return "core", "first"
 	end
-	if b.coreAttacking and b.myDelay < b.coreEta + LastHitRules.BACKUP_MARGIN then
-		return "wait"
+	if LastHitRules.BackupBehindCore(b) then
+		return "wait", "behind"
 	end
-	if not b.coreAttacking and b.coreCanKill then
-		return "wait"
+	if not b.ourKills then
+		return "wait", "hp"
 	end
-	if b.ourKills then
-		return "go"
+	if LastHitRules.CORE_IN_PLAY[b.coreState] then
+		return "go", b.coreTooLate and "late" or "behind"
 	end
-	return "wait"
+	return "go", b.coreState or "none"
+end
+
+-- A backup swing already winding up while the core can still take the creep in time and its hit kills it (game 065
+-- t=634: Hoodwink released while Primal Beast's overlay was swinging at the same creep, coreEta 0.59 against myEta
+-- 0.54). WindupDecision then stops it at the last look ("core-next").
+function LastHitRules.BackupCoreNext(b)
+	return b.coreCanKill == true and LastHitRules.BackupBehindCore(b)
 end
 
 -- Walk-ins that cannot arrive (#71, game 064: late= rose from 71 to 137; 120 of them were walk-ins that never launched

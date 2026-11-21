@@ -43,6 +43,33 @@ function RetreatRules.CreepLowRetreat(hp, creepHit, towerHit, canFinish, channel
 	return false, false
 end
 
+-- Does the Roshan pit-leave rule (mode_retreat_generic.lua, tag 217: 0.70 within 2500 of the pit while
+-- Fu.ShouldLeaveRoshanFight) apply to this bot? Game 065, t=126 / 398 / 2609: it fired for lane bots near the pit
+-- (Clinkz 15%, Dark Willow 20%) and, 0.70 being under the creep-low rule's 0.98, cut a creep-low hold; for Primal
+-- Beast at 14% it fired the second Roshan died (Fu.ShouldLeaveRoshanFight reads a dead Roshan as healthy), and
+-- defend 0.94 outbid it and he TP'd into a defence at 15%.
+--   nearPit      within 2500 of the pit
+--   roshanAlive  Fu.IsRoshanAlive
+--   sinceFight   seconds since the bot was last in Roshan mode, hitting Roshan or hit by him
+--   latched      the rule already fired for this fight and the bot has not healed to 60% yet (stay out, as before)
+-- Returns: applies, why ("fight", "latched", "far", "rosh-dead", "not-in-fight").
+RetreatRules.ROSHAN_FIGHT_MEMORY = 5
+function RetreatRules.RoshanLeaveApplies(nearPit, roshanAlive, sinceFight, latched)
+	if not nearPit then
+		return false, "far"
+	end
+	if not roshanAlive then
+		return false, "rosh-dead"
+	end
+	if latched then
+		return true, "latched"
+	end
+	if sinceFight <= RetreatRules.ROSHAN_FIGHT_MEMORY then
+		return true, "fight"
+	end
+	return false, "not-in-fight"
+end
+
 -- Would the bot die before its finishing hit lands? Then the retreat rules give no "finish the kill" exemption.
 -- Game 064, 22:23: Alchemist at 18% HP with 5 enemy heroes on him stayed in the creep wave because an enemy near him
 -- was one hit from death (creep-low-skip why=finish), and died the same second.
@@ -78,33 +105,6 @@ function RetreatRules.HardRetreatOutnumbered(allies, visible, recent, hp, hit, s
 		return allies <= 1 and pressure >= 2 or pressure >= allies + 1 and not stronger
 	end
 	return hit and visible >= allies + 2 and not stronger
-end
-
--- Does the Roshan pit-leave rule (mode_retreat_generic.lua, tag 217: 0.70 within 2500 of the pit while
--- Fu.ShouldLeaveRoshanFight) apply to this bot? Game 065, t=126 / 398 / 2609: it fired for lane bots near the pit
--- (Clinkz 15%, Dark Willow 20%) and, 0.70 being under the creep-low rule's 0.98, cut a creep-low hold; for Primal
--- Beast at 14% it fired the second Roshan died (Fu.ShouldLeaveRoshanFight reads a dead Roshan as healthy), and
--- defend 0.94 outbid it and he TP'd into a defence at 15%.
---   nearPit      within 2500 of the pit
---   roshanAlive  Fu.IsRoshanAlive
---   sinceFight   seconds since the bot was last in Roshan mode, hitting Roshan or hit by him
---   latched      the rule already fired for this fight and the bot has not healed to 60% yet (stay out, as before)
--- Returns: applies, why ("fight", "latched", "far", "rosh-dead", "not-in-fight").
-RetreatRules.ROSHAN_FIGHT_MEMORY = 5
-function RetreatRules.RoshanLeaveApplies(nearPit, roshanAlive, sinceFight, latched)
-	if not nearPit then
-		return false, "far"
-	end
-	if not roshanAlive then
-		return false, "rosh-dead"
-	end
-	if latched then
-		return true, "latched"
-	end
-	if sinceFight <= RetreatRules.ROSHAN_FIGHT_MEMORY then
-		return true, "fight"
-	end
-	return false, "not-in-fight"
 end
 
 return RetreatRules

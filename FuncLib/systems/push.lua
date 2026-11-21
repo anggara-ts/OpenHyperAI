@@ -119,7 +119,7 @@ local advantageByTeam = {}
 local function ShortHeroName(unit)
 	return (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
 end
-local function ReadAdvantage(gameState)
+local function ReadAdvantage(gameState, bot)
 	local now = DotaTime()
 	local team = GetTeam()
 	advantageByTeam[team] = advantageByTeam[team] or { at = -999, desire = nil, why = "none" }
@@ -129,8 +129,12 @@ local function ReadAdvantage(gameState)
 	end
 	advantage.at = now
 	local dead, deadLong, minLeft, names = KillWindow.DeadCounts()
-	-- Our high ground: enemy heroes on it or at the Ancient, or 2+ enemy creeps at the Ancient (ReadBaseThreat).
-	local baseHit = (baseThreat.heroes or 0) >= 1 or (baseThreat.creeps or 0) >= 2
+	-- Our high ground (maintainer: "as long as our base is not being pushed"): enemy heroes on it or at the Ancient
+	-- (ReadBaseThreat), or enemy creeps there: 2+ at the Ancient or a wave at a T3 / barracks (Utils.BaseUnderCreeps,
+	-- the `hgcreeps=` of the [OHA-DEFEND] line).
+	local baseHeroes = baseThreat.heroes or 0
+	local baseCreeps = baseHeroes == 0 and Utils.BaseUnderCreeps(bot) or false
+	local baseHit = baseHeroes >= 1 or baseCreeps
 	local desire, why = PushRules.Advantage({
 		aegis = gameState.hasAegis == true,
 		alliesAlive = gameState.aliveAllyCount or 0,
@@ -156,7 +160,7 @@ local function ReadAdvantage(gameState)
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUSH] t=%.0f %s advantage-%s why=%s dead=%d deadLong=%d respawnLeft=%s aegis=%s alive=%d/%d desire=%.2f",
+				"[OHA-PUSH] t=%.0f %s advantage-%s why=%s dead=%d deadLong=%d respawnLeft=%s aegis=%s alive=%d/%d desire=%.2f baseHeroes=%d baseCreeps=%s",
 				now,
 				GetTeam() == TEAM_DIRE and "dire" or "radiant",
 				desire ~= nil and "start" or "end",
@@ -167,7 +171,9 @@ local function ReadAdvantage(gameState)
 				tostring(gameState.hasAegis == true),
 				gameState.aliveAllyCount or 0,
 				gameState.aliveEnemyCount or 0,
-				desire or 0
+				desire or 0,
+				baseHeroes,
+				tostring(baseCreeps)
 			)
 		)
 	end
@@ -385,7 +391,7 @@ function Push.GetPushDesireHelper(bot, lane)
 	-- Advantage window (#12): Aegis with 4+ alive, or enemies dead (PushRules.Advantage). The group push may go up to
 	-- its desire; the all-alive cap (0.41) and fewer-than-alive (0.4) are lifted for it below, the own-HP, high-ground
 	-- and alone-vs-2 caps stay.
-	local adv = ReadAdvantage(gameState)
+	local adv = ReadAdvantage(gameState, bot)
 	local advDesire = (not gameState.isLaningPhase) and adv.desire or nil
 	if advDesire ~= nil then
 		maxPushDesire = math.max(maxPushDesire, advDesire)
@@ -456,18 +462,25 @@ function Push.GetPushDesireHelper(bot, lane)
 	-- All enemies alive (#12, game 067 33:00: `lock-capped why=cap desire=0.41 allies=2 alive=5/5`, 3 of 5 farmed):
 	-- ahead (2000+ net worth or 1+ level) or the target a T1/T2, 3-4 bots (closest to the lane front) may join a group
 	-- push that is already on this lane (PushRules.FiveAliveCap); the rest keep the 0.41 cap.
-	local pushTier = Push.GetLaneBuildingTier(lane)
-	local fiveInputs = {
-		enemiesAlive = gameState.aliveEnemyCount,
-		alliesAlive = gameState.aliveAllyCount,
-		nwLead = (gameState.teamNetworth or 0) - (gameState.enemyNetworth or 0),
-		levelLead = (gameState.averageLevel or 0) - Fu.GetAverageLevel(true),
-		tier = pushTier,
-	}
-	local fiveCap, fiveJoiners, fiveWhy = PushRules.FiveAliveCap(fiveInputs)
-	local laneRank = AllyRankTo(bot, laneFrontLocation)
-	local groupOnLane = lockedPushLane == lane and DotaTime() < (lockedPushLaneUntil or -999)
-	local fiveJoiner = fiveCap ~= nil and fiveCap > 0.41 and groupOnLane and laneRank < fiveJoiners
+	-- Worked out only with every enemy alive and a group already on this lane (per think, per lane: keep it cheap).
+	local fiveCap, fiveJoiners, fiveWhy = nil, 5, "off"
+	local fiveInputs = { nwLead = 0, levelLead = 0, tier = 0 }
+	local laneRank = -1
+	if gameState.aliveEnemyCount >= 5 and gameState.aliveAllyCount <= gameState.aliveEnemyCount then
+		fiveCap, fiveJoiners, fiveWhy = 0.41, 2, "no-group"
+		if lockedPushLane == lane and DotaTime() < (lockedPushLaneUntil or -999) then
+			fiveInputs = {
+				enemiesAlive = gameState.aliveEnemyCount,
+				alliesAlive = gameState.aliveAllyCount,
+				nwLead = (gameState.teamNetworth or 0) - (gameState.enemyNetworth or 0),
+				levelLead = (gameState.averageLevel or 0) - Fu.GetAverageLevel(true),
+				tier = Push.GetLaneBuildingTier(lane),
+			}
+			fiveCap, fiveJoiners, fiveWhy = PushRules.FiveAliveCap(fiveInputs)
+			laneRank = AllyRankTo(bot, laneFrontLocation)
+		end
+	end
+	local fiveJoiner = fiveCap ~= nil and fiveCap > 0.41 and laneRank >= 0 and laneRank < fiveJoiners
 	-- A bot away from the group comes to it (it used to stop here: alone with 3+ enemies alive) when nobody is near it.
 	if
 		#alliesNearBot <= 1
@@ -802,7 +815,7 @@ function Push.GetPushDesireHelper(bot, lane)
 							laneRank,
 							math.floor(fiveInputs.nwLead),
 							fiveInputs.levelLead,
-							pushTier,
+							fiveInputs.tier,
 							advDesire ~= nil and tostring(adv.why) or "-"
 						)
 					)

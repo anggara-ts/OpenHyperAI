@@ -6,7 +6,8 @@ local PushRules = {}
 -- the same rules hold for both teams). Enemy heroes can't be asked: GetRespawnTime() on an enemy handle never
 -- answered (games 066/067: all 50+ enemy deaths logged `respawn=30s known=false`), so the window used a flat 30s
 -- while late-game respawns ran 70-125s (own deaths, `[OHA-DEATH] ... respawned=`), and Roshan calls were dropped
--- as window-short. Nearest learned level wins (ties: the higher one); nothing learned or no level: `default`.
+-- as window-short. Nearest learned level wins (ties: the higher one); nothing learned or no level: `default`. A value
+-- learned at a lower level never goes under `default` (early samples of 12-20s must not shorten a level-20 window).
 -- Returns seconds, source ("learned" or "default"), level used.
 function PushRules.RespawnEstimate(learned, level, default)
 	if type(learned) ~= "table" or type(level) ~= "number" or level < 1 then
@@ -23,6 +24,9 @@ function PushRules.RespawnEstimate(learned, level, default)
 	end
 	if bestLevel == nil then
 		return default, "default", nil
+	end
+	if bestLevel < level then
+		return math.max(learned[bestLevel], default or 0), "learned", bestLevel
 	end
 	return learned[bestLevel], "learned", bestLevel
 end
@@ -89,13 +93,15 @@ end
 
 -- A Roshan call the team answers outranks a push (#12, game 067 32:11: a 4-bot kill-window call at 0.60 lost to a
 -- 0.99 kill push; 20s later every call dropped window-short). Returns the push desire to use and whether it yielded.
---   roshDesire / roshAge: this bot's Roshan desire and how many seconds ago it was computed
+--   roshDesire / roshAge: this bot's Roshan desire and how many seconds ago it was computed. Only a gather call
+--   (0.9+: a team call, or a kill-window take that fits) wins; a plain 0.60 call (timer, or a kill window held back
+--   while the team is on the T2 / high ground or in a fight) does not cut the push.
 --   finishingTower: the push is finishing a tower the group can kill in ~5s (that one goes first)
 function PushRules.PushUnderRosh(pushDesire, roshDesire, roshAge, finishingTower)
 	if type(pushDesire) ~= "number" or type(roshDesire) ~= "number" then
 		return pushDesire, false
 	end
-	if finishingTower or (roshAge or 99) > 1.5 or roshDesire < 0.5 or pushDesire < roshDesire then
+	if finishingTower or (roshAge or 99) > 1.5 or roshDesire < 0.9 or pushDesire < roshDesire then
 		return pushDesire, false
 	end
 	return math.max(0, roshDesire - 0.05), true

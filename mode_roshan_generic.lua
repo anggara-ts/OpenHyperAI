@@ -736,9 +736,13 @@ function GetDesireHelper()
 			-- A take that fits the kill's window (checked above) is a call the team should answer (#12, game 067
 			-- 32:11: the four callers sat at 0.60 under a 0.99 kill push and nobody walked; game 066: 7 calls dropped
 			-- nobody-acked). Out of a fight it goes in as a gather call (0.96, above the 0.91 kill push; the push
-			-- yields to it in push.lua). Not while the team pushes the T2 / high ground away from the pit.
+			-- yields to it in push.lua). Not while the team pushes the T2 / high ground away from the pit, not with every
+			-- enemy dead (#87's wipe push stays above Roshan: game 045, Dire left a 3-vs-0 push for Roshan), and not while
+			-- this bot finishes a tower (push.lua sets _finishTowerAt).
 			if
 				not (isPushingHighGround and #alliesNearPit < 3)
+				and Fu.GetNumOfAliveHeroes(true) > 0
+				and DotaTime() - (bot._finishTowerAt or -999) > 2
 				and not bot:WasRecentlyDamagedByAnyHero(2.0)
 				and #(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) == 0
 			then

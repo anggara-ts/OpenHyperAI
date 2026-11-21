@@ -67,6 +67,8 @@ T.test("Roshan over push: a live call wins unless the tower is about to fall", f
 	T.eq(select(2, R.PushUnderRosh(0.99, 0.96, 0.1, true)), false, "finishing a tower")
 	T.eq(select(2, R.PushUnderRosh(0.99, 0.96, 3.0, false)), false, "stale Roshan desire")
 	T.eq(select(2, R.PushUnderRosh(0.99, 0.3, 0.1, false)), false, "call off")
+	-- A plain 0.60 call (held back on the high ground, or a timer call) does not cut a 0.99 push.
+	T.eq(select(2, R.PushUnderRosh(0.99, 0.60, 0.1, false)), false, "0.60 call")
 	T.eq(R.PushUnderRosh(0.4, 0.6, 0.1, false), 0.4, "push already lower")
 end)
 
@@ -77,6 +79,9 @@ T.test("respawn estimate: nearest learned level, else the default", function()
 	T.eq(R.RespawnEstimate({ [12] = 44, [20] = 70 }, 13, 30), 44, "nearest below")
 	T.eq(R.RespawnEstimate({ [12] = 44, [20] = 70 }, 18, 30), 70, "nearest above")
 	T.eq(R.RespawnEstimate({ [12] = 44, [14] = 52 }, 13, 30), 52, "tie takes the higher level")
+	-- Only an early sample (level 3, 14s) for a level-20 enemy: not under the 30s default.
+	T.eq(R.RespawnEstimate({ [3] = 14 }, 20, 30), 30, "lower sample floored")
+	T.eq(R.RespawnEstimate({ [25] = 20 }, 20, 30), 20, "higher sample as is")
 	local seconds, source, level = R.RespawnEstimate({ [25] = 100 }, 25, 30)
 	T.eq(seconds, 100, "exact")
 	T.eq(source, "learned", "source")

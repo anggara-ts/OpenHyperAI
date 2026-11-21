@@ -109,8 +109,12 @@ local campChosenAt = nil
 local lastCampKey, lastCampAt, lastDropWhy = nil, -999, nil
 local campSwitchLogAt, campSwitchCount = -999, 0
 -- Camp memory (FarmRules.ReuseDroppedCamp): the camp dropped for a soft reason (mode end, mode-not-suitable,
--- withdraw), read again by PickCamp.
+-- withdraw), read again by PickCamp. keptFrom: the first drop time of a camp picked again from the memory. When
+-- that camp is dropped again within 3s (a pick / drop cycle: the desire picks it and the same call drops it),
+-- the memory keeps the first drop time, so the cycle does not restart the 30s on every drop; a camp farmed
+-- longer after its reuse starts a new 30s when it is dropped.
 local keptCamp = { key = nil, at = nil, why = nil }
+local keptFrom = { key = nil, at = nil }
 local campKeptLogAt, campKeptCount, campKeptSinceSwitch = -999, 0, 0
 local function SetPreferredCamp(camp, why)
 	local now = DotaTime()
@@ -121,10 +125,15 @@ local function SetPreferredCamp(camp, why)
 		return
 	end
 	if toKey == nil then
+		local heldFor = campChosenAt ~= nil and now - campChosenAt or math.huge
 		lastCampKey, lastCampAt, lastDropWhy = fromKey, now, why
 		campChosenAt = nil
 		if FarmRules.SOFT_DROP[why] then
-			keptCamp.key, keptCamp.at, keptCamp.why = fromKey, now, why
+			local droppedAt = now
+			if keptFrom.key == fromKey and keptFrom.at ~= nil and heldFor < 3 then
+				droppedAt = keptFrom.at
+			end
+			keptCamp.key, keptCamp.at, keptCamp.why = fromKey, droppedAt, why
 		else
 			keptCamp.key = nil
 		end
@@ -132,6 +141,9 @@ local function SetPreferredCamp(camp, why)
 	end
 	campChosenAt = now
 	keptCamp.key = nil
+	if why ~= "kept" then
+		keptFrom.key, keptFrom.at = nil, nil
+	end
 	local prevKey = fromKey
 	local switchWhy = why
 	if prevKey == nil and lastCampKey ~= nil and now - lastCampAt <= 30 then
@@ -222,6 +234,7 @@ local function PickCamp(camps, why)
 			)
 			campKeptCount = 0
 		end
+		keptFrom.key, keptFrom.at = keptCamp.key, keptCamp.at
 		SetPreferredCamp(kept, "kept")
 	else
 		SetPreferredCamp(nearest, why)

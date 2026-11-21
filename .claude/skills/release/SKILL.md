@@ -39,7 +39,10 @@ Write the notes for players and server hosts, not for us:
   **Heroes**, **Items and builds**, **Team play** (laning, fights, retreat, objectives), **Fixes**,
   **Known limitations** (new entries of the main post of discussion #50 in the range, one line each, with the
   link), **Project** (one line: docs / install changes, if any).
-- Each line ends with the PR links: `(#130, #115)`. Name heroes and items as the game does.
+- Each line ends with the PR links as markdown links, never a bare `#130`: GitHub release pages expand a bare
+  `#N` into the PR's full title, which buries the line. Write
+  `([#130](https://github.com/<owner>/<repo>/pull/130), [#115](https://github.com/<owner>/<repo>/pull/115))`
+  (maintainer, v0.3). Name heroes and items as the game does.
 - End with `**Full changelog**: https://github.com/<owner>/<repo>/compare/<last tag>...<new tag>`.
 
 ## 4. Dry run output

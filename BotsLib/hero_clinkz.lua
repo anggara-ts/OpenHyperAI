@@ -246,15 +246,17 @@ function X.HasPactCharge()
 end
 -- Pure: may a non-escape pact (why = heal | other | hunt) spend a charge? Game 064: heal pacts at 82-86% HP (t=2195,
 -- 2431, 2597) used the charges, and at 15% HP (t=2624-2631) the escape pact had none (death-pact-skip
--- why=no-charge). The last charge is kept for an escape or a heal when HP is low: under 50% anything may use it, a
--- heal under 60% (the heal rule's own line); the damage/HP pact on the last charge only while the spell has one
--- charge at most (levels 1-2, datafeed: AbilityCharges 1/1/2/2), where it is the spell's main use.
+-- why=no-charge). The last charge is kept for an escape or a heal when HP is low: under 50% anything may use it.
+-- Game 065, t=1004: a heal at 54% took the last charge, the escape pact had none at t=1022-1028 and he died at
+-- 1030, so a heal on the last of two charges waits for 50% too. While the spell has one charge at most (levels 1-2,
+-- datafeed: AbilityCharges 1/1/2/2) the pact is the spell's main use: a heal under 60% (the heal rule's own line)
+-- and the damage/HP pact may spend it.
 function X.PactSpendOk(why, charges, maxCharges, hp)
 	if charges >= 2 or hp < 0.5 then
 		return true
 	end
 	if why == "heal" then
-		return hp < 0.6
+		return maxCharges <= 1 and hp < 0.6
 	end
 	return maxCharges <= 1
 end
@@ -409,22 +411,79 @@ function X.ReadyItem(name)
 	end
 	return nil
 end
-function X.LogHunt(step, target)
+-- name: printed when the target handle is nil or gone (game 065: a hero out of vision reads IsNull()).
+function X.LogHunt(step, target, name)
 	if DotaTime() < (bot._huntLogAt or -999) and step == bot._huntLogStep then
 		return
 	end
 	bot._huntLogAt = DotaTime() + 3
 	bot._huntLogStep = step
+	local shown = name or "-"
+	if target ~= nil and not target:IsNull() then
+		shown = (string.gsub(target:GetUnitName(), "npc_dota_hero_", ""))
+	end
 	pcall(
 		print,
-		string.format(
-			"[OHA-CLINKZ] t=%.0f hunt step=%s target=%s hp=%.2f",
-			DotaTime(),
-			step,
-			target ~= nil and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
-			Fu.GetHP(bot)
-		)
+		string.format("[OHA-CLINKZ] t=%.0f hunt step=%s target=%s hp=%.2f", DotaTime(), step, shown, Fu.GetHP(bot))
 	)
+end
+-- Lock a hunt target and keep its player ID and name. Game 065: once out of vision the enemy handle reads IsNull()
+-- (t=2001 Zeus' Heavenly Jump, t=2353 Alchemist's Blink), so the handle alone can't say who it was or whether it
+-- is alive, and the wait-unseen grace never ran.
+function X.LockHuntTarget(unit)
+	bot._huntTarget, bot._huntGoneAt = unit, nil
+	local okId, pid = pcall(unit.GetPlayerID, unit)
+	bot._huntPid = okId and pid or nil
+	bot._huntName = (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
+end
+-- The locked target's handle went null: find the same hero again by player ID (a visible hero gets a live handle).
+function X.RefindHuntTarget()
+	local locked = bot._huntTarget
+	if locked == nil or not locked:IsNull() or bot._huntPid == nil then
+		return locked
+	end
+	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if
+			Fu.IsValidHero(enemyHero)
+			and not Fu.IsSuspiciousIllusion(enemyHero)
+			and enemyHero:GetPlayerID() == bot._huntPid
+		then
+			if bot._huntPrey == locked then
+				bot._huntPrey = enemyHero
+			end
+			bot._huntTarget = enemyHero
+			X.LogHunt("refind", enemyHero)
+			return enemyHero
+		end
+	end
+	return locked
+end
+-- Is the hero (player ID) alive? Read from the handle while it is live, else from the player ID.
+function X.HuntTargetAlive(locked)
+	if locked == nil then
+		return false
+	end
+	if not locked:IsNull() then
+		return locked:IsAlive()
+	end
+	if bot._huntPid == nil then
+		return false
+	end
+	local okAlive, alive = pcall(IsHeroAlive, bot._huntPid)
+	return okAlive and alive == true
+end
+-- No new hunt on the hero just dropped (target-gone / lost-sight) for 6 s. Game 065, t=904-910: a drop on Hoodwink
+-- (drop-target-gone target=-), the same hero picked again 3 s later, six mode changes in the walk.
+function X.HuntSkipped(unit)
+	if bot._huntSkipPid == nil or DotaTime() >= (bot._huntSkipUntil or -999) then
+		return false
+	end
+	local okId, pid = pcall(unit.GetPlayerID, unit)
+	if okId and pid == bot._huntSkipPid then
+		X.LogHunt("skip-repick", unit)
+		return true
+	end
+	return false
 end
 -- A lone enemy hero worth a hunt (#94, maintainer): visible, within 2500, no other enemy hero within 1200 of it
 -- and none of its towers within 900. Clinkz above 60% HP, not retreating, with mana for the walk, a pact and the
@@ -451,6 +510,7 @@ function X.FindPrey()
 			and Fu.GetHP(enemyHero) < bestHp
 			and #Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 1200) <= 1
 			and #(enemyHero:GetNearbyTowers(900, false) or {}) == 0
+			and not X.HuntSkipped(enemyHero)
 		then
 			best, bestHp = enemyHero, Fu.GetHP(enemyHero)
 		end
@@ -470,7 +530,7 @@ function X.EndHunt(why, keepTarget)
 				"[OHA-CLINKZ] t=%.0f hunt end why=%s target=%s dist=%d lasted=%.0f",
 				DotaTime(),
 				why,
-				not prey:IsNull() and (string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")) or "-",
+				not prey:IsNull() and (string.gsub(prey:GetUnitName(), "npc_dota_hero_", "")) or bot._huntName or "-",
 				known and GetUnitToUnitDistance(bot, prey) or -1,
 				DotaTime() - (bot._huntLockAt or DotaTime())
 			)
@@ -484,7 +544,7 @@ end
 -- The hero to hunt while invisible: the engage target, else the weakest hero within 1400 that isn't covered
 -- by more enemies than we have near. Kept for 6s (game 048: the target changed while he walked).
 function X.HuntTarget()
-	local locked = bot._huntTarget
+	local locked = X.RefindHuntTarget()
 	if
 		Fu.IsValidHero(locked)
 		and locked:CanBeSeen()
@@ -498,10 +558,10 @@ function X.HuntTarget()
 	-- Alive but out of reach for a moment (Phase Shift, a blink out of vision): wait for it, up to 2.5 s, with the
 	-- lock and the hold kept. Game 064, t=2596-2603: Puck in Phase Shift dropped the hunt twice (drop-target-gone), it
 	-- restarted every think and the mode flipped attack <-> outpost 6 times; the reveal on her came 2 s later anyway.
+	-- A null handle (out of vision, game 065) is alive when its player ID says so.
+	local alive = X.HuntTargetAlive(locked)
 	if
-		locked ~= nil
-		and not locked:IsNull()
-		and locked:IsAlive()
+		alive
 		and not Fu.IsValidHero(locked)
 		and DotaTime() - (bot._huntLockAt or -999) < (bot._huntLockFor or 6)
 		and Fu.GetHP(bot) >= 0.35
@@ -515,11 +575,11 @@ function X.HuntTarget()
 	bot._huntGoneAt = nil
 	if locked ~= nil then
 		local why = "timeout"
-		if locked:IsNull() or not locked:IsAlive() then
+		if not alive then
 			why = "target-gone"
 		elseif goneFor >= 2.5 then
 			-- Waited 2.5 s for it (above): IsValidHero is false while unseen or invulnerable.
-			why = not locked:CanBeSeen() and "lost-sight" or "target-gone"
+			why = (locked:IsNull() or not locked:CanBeSeen()) and "lost-sight" or "target-gone"
 		elseif not Fu.IsValidHero(locked) then
 			why = "target-gone"
 		elseif not locked:CanBeSeen() then
@@ -534,12 +594,16 @@ function X.HuntTarget()
 		else
 			-- A hunt on the engage target (no hunt start line): say why the hold ends. The locked target's name too
 			-- (game 064: drop lines printed target=-, so a re-hunt on the same hero could not be told apart).
-			X.LogHunt("drop-" .. why, not locked:IsNull() and locked or nil)
+			X.LogHunt("drop-" .. why, locked, bot._huntName)
 		end
 		-- Really gone (dead, or unseen for 2.5 s): no new hunt for 2.5 s. Game 064: a target-gone end set no pause,
 		-- the next think picked a target again and the hold came back on (attack <-> outpost every ~0.5 s).
+		-- And not the same hero for 6 s (X.HuntSkipped).
 		if why == "target-gone" or why == "lost-sight" then
 			bot._huntOffUntil = math.max(bot._huntOffUntil or -999, DotaTime() + 2.5)
+			if bot._huntPid ~= nil then
+				bot._huntSkipPid, bot._huntSkipUntil = bot._huntPid, DotaTime() + 6
+			end
 		end
 	end
 	bot._huntTarget, bot._huntPrey, bot._huntLockFor, bot._huntRange = nil, nil, nil, nil
@@ -556,7 +620,9 @@ function X.HuntTarget()
 		and not Fu.IsSuspiciousIllusion(botTarget)
 		and GetUnitToUnitDistance(bot, botTarget) <= 2600
 	then
-		best = botTarget
+		if not X.HuntSkipped(botTarget) then
+			best = botTarget
+		end
 	else
 		local alliesNear = #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
 		for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, 1400, true, BOT_MODE_NONE) or {}) do
@@ -566,13 +632,14 @@ function X.HuntTarget()
 				and Fu.CanBeAttacked(enemyHero)
 				and Fu.GetHP(enemyHero) < bestHp
 				and #Fu.GetEnemiesNearLoc(enemyHero:GetLocation(), 900) <= alliesNear
+				and not X.HuntSkipped(enemyHero)
 			then
 				best, bestHp = enemyHero, Fu.GetHP(enemyHero)
 			end
 		end
 	end
 	if best ~= nil then
-		bot._huntTarget, bot._huntGoneAt = best, nil
+		X.LockHuntTarget(best)
 		bot._huntLockAt = DotaTime()
 		-- Keep the target for the walk (game 063, t=925: picked at 1837, the 1600 lock range dropped it at once; with
 		-- the outpost hold on he is not "going on someone", so no re-pick until the attack mode took over again, four
@@ -637,7 +704,7 @@ function X.HuntStep()
 		bot._clinkzHuntUntil = DotaTime() + 0.3
 		if DotaTime() >= (bot._huntWaitLogAt or -999) then
 			bot._huntWaitLogAt = DotaTime() + 3
-			X.LogHunt("wait-unseen", target)
+			X.LogHunt("wait-unseen", target, bot._huntName)
 		end
 		return true
 	end
@@ -681,6 +748,9 @@ function X.HuntStep()
 				X.LogHunt("skip-tower", target)
 				X.EndHunt("tower")
 				bot._huntTarget = nil
+				-- A real cancel: no new hunt for 5 s, like cancel-outnumbered. Game 065, t=659-664: no pause, the
+				-- next think picked Hoodwink again, skip-tower <-> approach and farm <-> outpost 4 times.
+				bot._huntOffUntil = DotaTime() + 5
 				bot._clinkzHuntUntil = nil
 				return false
 			end
@@ -970,7 +1040,7 @@ function X.ConsiderSkeletonWalk()
 	-- Hunt (#94, maintainer's play; game 050 30:40: he saw Lich alone and hit him from the edge of his range).
 	local okPrey, prey = pcall(X.FindPrey)
 	if okPrey and prey ~= nil then
-		bot._huntTarget = prey
+		X.LockHuntTarget(prey)
 		bot._huntPrey = prey
 		bot._huntLockAt = DotaTime()
 		bot._huntLockFor = 30

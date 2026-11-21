@@ -1,4 +1,5 @@
 -- Shared helper: combat.
+local LastHitRules = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_rules")
 local function installCombat(Fu)
 	function Fu.IsOtherAllyCanKillTarget(bot, target)
 		if not Fu.IsValid(target) then
@@ -356,6 +357,21 @@ local function installCombat(Fu)
 		end
 		return nil
 	end
+	-- Seconds a hero needs to turn to face target before it can attack (#71, maintainer 2026-11-21). The formula, the
+	-- 11.5 degree tolerance and the per-hero turn rates (Valve datafeed) are in FuncLib/systems/last_hit_rules.lua.
+	-- 0 for non-heroes (lane creeps, summons: their turn rates are not in the table) and on a bad read.
+	function Fu.GetTurnTime(unit, target)
+		if unit == nil or target == nil or not unit:IsHero() then
+			return 0
+		end
+		local facing = unit:GetFacing()
+		if facing == nil then
+			return 0
+		end
+		local from, to = unit:GetLocation(), target:GetLocation()
+		local angle = LastHitRules.TurnAngle(facing, to.x - from.x, to.y - from.y)
+		return LastHitRules.TurnTime(angle, LastHitRules.TurnRate(unit:GetUnitName()))
+	end
 	function Fu.GetAttackProDelayTime(bot, creep)
 		if creep == nil then
 			log("[ERROR] nil creep target")
@@ -374,7 +390,10 @@ local function installCombat(Fu)
 		if GameTime() - bot:GetLastAttackTime() < backswingTime then
 			cooldownLeft = backswingTime - (GameTime() - bot:GetLastAttackTime())
 		end
-		local delay = attackPointTime + cooldownLeft * 0.98
+		-- The turn to face the creep runs while the attack cooldown counts down, before the wind-up starts. Mid-swing on
+		-- this creep (below) the hero already faces it.
+		local turnTime = Fu.GetTurnTime(bot, creep)
+		local delay = attackPointTime + math.max(cooldownLeft * 0.98, turnTime)
 		local distance = GetUnitToUnitDistance(bot, creep)
 		if
 			bot:CanBeSeen()

@@ -1,5 +1,6 @@
 -- Override for the built-in mode_laning_generic mode.
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local LastHitRules = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_rules")
 BotsInit = require("game/botsinit")
 local X = BotsInit.CreateGeneric()
 local bot = GetBot()
@@ -277,18 +278,27 @@ function GetBestLastHitCreep(creeps)
 			attackDamage = attackDamage + 8
 		end
 	end
+	-- Among the killable creeps, the most valuable (#71: flagbearer > siege > ranged > melee, a walk-in counts less,
+	-- LastHitRules.PickScore); before: the first one in list order.
+	local best, bestScore, bestDelay = nil, nil, nil
+	local attackRange = bot:GetAttackRange()
 	for _, creep in pairs(creeps) do
 		if Fu.IsValid(creep) and Fu.CanBeAttacked(creep) then
 			local attackDelay = Fu.GetAttackProDelayTime(bot, creep)
 			if Fu.WillKillTarget(creep, attackDamage, DAMAGE_TYPE_PHYSICAL, attackDelay) then
-				return creep
+				local walk = GetUnitToUnitDistance(bot, creep) > attackRange
+				local score = LastHitRules.PickScore(LastHitRules.CreepKind(creep:GetUnitName()), true, walk)
+				if LastHitRules.BetterPick(score, attackDelay, bestScore, bestDelay) then
+					best, bestScore, bestDelay = creep, score, attackDelay
+				end
 			end
 		end
 	end
-	return nil
+	return best
 end
 function GetBestDenyCreep(creeps)
-	local fallback = nil
+	local best, bestValue = nil, 0
+	local fallback, fallbackValue = nil, 0
 	local attackRange = bot:GetAttackRange()
 	for _, creep in pairs(creeps) do
 		if
@@ -298,16 +308,19 @@ function GetBestDenyCreep(creeps)
 			and creep:GetHealth() <= bot:GetAttackDamage()
 			and Fu.IsDeniableLaneCreep(creep)
 		then
-			-- Prefer a deny that can be executed immediately. Otherwise keep the
-			-- first valid creep so the bot can walk up to it.
+			-- Prefer a deny that can be executed immediately, the most valuable one (#71: a denied flagbearer gives the
+			-- enemy none of its area gold). Otherwise keep the most valuable creep so the bot can walk up to it.
+			local value = LastHitRules.KIND_VALUE[LastHitRules.CreepKind(creep:GetUnitName())]
 			if GetUnitToUnitDistance(bot, creep) <= attackRange + 100 then
-				return creep
-			elseif fallback == nil then
-				fallback = creep
+				if value > bestValue then
+					best, bestValue = creep, value
+				end
+			elseif value > fallbackValue then
+				fallback, fallbackValue = creep, value
 			end
 		end
 	end
-	return fallback
+	return best or fallback
 end
 function CreepAggroUnsafe(hero)
 	local creeps = hero:GetNearbyLaneCreeps(500, true) or {}

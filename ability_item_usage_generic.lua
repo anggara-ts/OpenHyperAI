@@ -27,6 +27,7 @@ local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
 local BotBuild = dofile(GetScriptDirectory() .. "/BotsLib/" .. string.gsub(botName, "npc_dota_", ""))
 local Localization = require(GetScriptDirectory() .. "/FuncLib/systems/localization")
 local CustomLoader = require(GetScriptDirectory() .. "/FuncLib/systems/custom_loader")
+local LastHitTiming = require(GetScriptDirectory() .. "/FuncLib/systems/last_hit_timing")
 local MatchTrace = require(GetScriptDirectory() .. "/FuncLib/systems/match_trace")
 local TeamMemory = require(GetScriptDirectory() .. "/FuncLib/systems/team_memory")
 local ChargeTracker = require(GetScriptDirectory() .. "/FuncLib/systems/charge_tracker")
@@ -10381,6 +10382,18 @@ function ItemUsageThink()
 		if okH and held then
 			return
 		end
+	end
+	-- Laning last hits every frame (#71): the attack on the right frame, the wind-up release / cancel. While it owns
+	-- the hit, no kiting step, item or spell order replaces it. It lets go while an enemy tower hits the bot, so the
+	-- tower-aggro step below still runs.
+	local okLastHit, timingLastHit = pcall(LastHitTiming.Tick, bot)
+	if not okLastHit and not bot._lhTimingErr then
+		-- Once per bot: a broken hook would silently drop every timed last hit.
+		bot._lhTimingErr = true
+		pcall(print, string.format("[OHA-LH] t=%.0f %s timing error=%s", DotaTime(), botName, tostring(timingLastHit)))
+	elseif okLastHit and timingLastHit then
+		_perfDone()
+		return
 	end
 	-- Tower aggro: one attack order on an allied lane creep under the tower, never a walk.
 	local okDeaggro, deaggroed = pcall(Usage.DeflectTowerAggro)

@@ -76,10 +76,13 @@ end
 --   deadAfter      seconds from the reveal to the target's death (negative: died before it), nil while alive
 --   hitToDeath     seconds from the hunter's last damage on it to its death, nil if never damaged or alive
 --   hit            the hunter damaged it since the reveal (1s before it counts: the arrow is in the air)
+--   sinceHit       seconds since the hunter last damaged it (nil: never). While the hunter is still hitting it
+--                  (under 1s ago) the window stays open, up to 2 x KILL_WINDOW: game 065 t=3077, Nyx's Vendetta on
+--                  Hoodwink ended 3s after the strike while Nyx kept hitting her, and she died in that same think.
 -- Returns the reason, or nil to wait another think.
 local KILL_WINDOW = 3
 HuntTrace.KILL_WINDOW = KILL_WINDOW
-function HuntTrace.EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit)
+function HuntTrace.EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit, sinceHit)
 	if not alive then
 		if deadAfter ~= nil and deadAfter >= -0.5 and deadAfter <= KILL_WINDOW then
 			return "kill"
@@ -90,6 +93,9 @@ function HuntTrace.EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit)
 		return "lost"
 	end
 	if waited < KILL_WINDOW then
+		return nil
+	end
+	if hit and sinceHit ~= nil and sinceHit < 1 and waited < 2 * KILL_WINDOW then
 		return nil
 	end
 	if hit then
@@ -113,9 +119,19 @@ function HuntTrace.TargetDead(deathsAtStart, deathsNow)
 	return false, "unread"
 end
 
+-- A death count read this tick: the new read, or the last good one when this one failed (nil). Game 065: every
+-- "lost" end read death=unread because each tick's failed read replaced the good ones.
+function HuntTrace.KeepRead(last, now)
+	if now ~= nil then
+		return now
+	end
+	return last
+end
+
+-- refound= how many times the target's handle was replaced by a newer one for the same player (findTarget).
 function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 	return string.format(
-		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d death=%s",
+		"[OHA-HUNT] t=%.0f %s end why=%s dist=%d lasted=%.1f spell=%s target=%s changes=%d snipe=%d other=%d death=%s refound=%d",
 		now,
 		hero,
 		why,
@@ -126,24 +142,90 @@ function HuntTrace.FormatEnd(now, hero, why, dist, lasted, h)
 		h.changes,
 		h.snipe,
 		h.other,
-		h.deathCheck or "unread"
+		h.deathCheck or "unread",
+		h.refound or 0
 	)
 end
 
--- The target player's death count (the scoreboard), or nil when it cannot be read.
-local function heroDeaths(unit)
-	if unit == nil or unit:IsNull() then
+-- The target's player ID (h.pid, read once): from the handle, else by its hero name on the enemy team (an enemy out
+-- of sight may give no ID through its handle). nil when neither works; retried next tick.
+-- Game 065: all 10 "lost" ends read death=unread. The ID was re-read every tick from the handle stored at the start,
+-- and that handle went stale once the target left vision (t=3076, Nyx's "interrupt by=other unit=hoodwink" on her
+-- own Vendetta target: a second handle for the same hero).
+local function playerIdOf(unit, fullName)
+	if unit ~= nil and not unit:IsNull() then
+		local ok, pid = pcall(function()
+			return unit:GetPlayerID()
+		end)
+		if ok and type(pid) == "number" and pid >= 0 then
+			return pid
+		end
+	end
+	if fullName == nil then
 		return nil
 	end
-	local okP, pid = pcall(function()
-		return unit:GetPlayerID()
+	local okT, players = pcall(function()
+		return GetTeamPlayers(GetOpposingTeam())
 	end)
-	if not okP or type(pid) ~= "number" or pid < 0 then
+	if not okT or type(players) ~= "table" then
+		return nil
+	end
+	for _, pid in ipairs(players) do
+		local okN, name = pcall(GetSelectedHeroName, pid)
+		if okN and name == fullName then
+			return pid
+		end
+	end
+	return nil
+end
+
+-- The player's death count (the scoreboard), or nil when it cannot be read.
+local function heroDeaths(pid)
+	if pid == nil then
 		return nil
 	end
 	local okD, deaths = pcall(GetHeroDeaths, pid)
 	if okD and type(deaths) == "number" then
 		return deaths
+	end
+	return nil
+end
+
+-- unit is the hunt's hero (the same player, not an illusion), alive and in sight.
+local function isTargetHero(unit, pid)
+	if unit == nil or unit:IsNull() or not unit:IsHero() or not unit:IsAlive() or not unit:CanBeSeen() then
+		return false
+	end
+	if unit:IsIllusion() then
+		return false
+	end
+	local ok, unitPid = pcall(function()
+		return unit:GetPlayerID()
+	end)
+	return ok and unitPid == pid
+end
+
+-- The target's current handle: the stored one while it is alive and in sight, else the attack target, the hero
+-- script's target or a visible enemy hero, matched by player ID. nil while it is out of sight.
+local function findTarget(bot, spec, h)
+	local target = h.target
+	if target ~= nil and not target:IsNull() and target:IsAlive() and target:CanBeSeen() then
+		return target
+	end
+	if h.pid == nil then
+		return nil
+	end
+	if isTargetHero(bot:GetAttackTarget(), h.pid) then
+		return bot:GetAttackTarget()
+	end
+	local scriptTarget = spec.target(bot)
+	if isTargetHero(scriptTarget, h.pid) then
+		return scriptTarget
+	end
+	for _, unit in ipairs(GetUnitList(UNIT_LIST_ENEMY_HEROES) or {}) do
+		if isTargetHero(unit, h.pid) then
+			return unit
+		end
 	end
 	return nil
 end
@@ -215,13 +297,16 @@ function HuntTrace.Tick(bot, modeName)
 			spell = spec.spell,
 			target = target,
 			targetName = shortName(target),
+			fullName = target:GetUnitName(),
 			mode = modeName,
 			dist = math.floor(GetUnitToUnitDistance(bot, target)),
-			deaths = heroDeaths(target),
 			changes = 0,
 			snipe = 0,
 			other = 0,
+			refound = 0,
 		}
+		h.pid = playerIdOf(target, h.fullName)
+		h.deaths = heroDeaths(h.pid)
 		bot._huntTrace = h
 		pcall(
 			print,
@@ -238,13 +323,27 @@ function HuntTrace.Tick(bot, modeName)
 		return
 	end
 	h.seen = now
-	local target = h.target
-	-- The handle can read not-alive for a living enemy out of sight: alive unless the scoreboard has the death.
-	local handleAlive = target ~= nil and not target:IsNull() and target:IsAlive()
-	local dead, deathCheck = HuntTrace.TargetDead(h.deaths, heroDeaths(target))
+	if h.pid == nil then
+		h.pid = playerIdOf(h.target, h.fullName)
+	end
+	-- The scoreboard, by player ID (no handle needed): the first good read is the baseline, a failed read keeps the
+	-- last good one. The handle can read not-alive for a living enemy out of sight: alive unless the scoreboard has
+	-- the death.
+	local deathsNow = heroDeaths(h.pid)
+	if h.deaths == nil then
+		h.deaths = deathsNow
+	end
+	h.deathsNow = HuntTrace.KeepRead(h.deathsNow, deathsNow)
+	local dead, deathCheck = HuntTrace.TargetDead(h.deaths, h.deathsNow)
 	h.deathCheck = deathCheck
 	local alive = not dead
-	local seen = handleAlive and not dead and target:CanBeSeen()
+	local found = findTarget(bot, spec, h)
+	if found ~= nil and found ~= h.target then
+		h.target = found
+		h.refound = h.refound + 1
+	end
+	local target = h.target
+	local seen = not dead and target ~= nil and not target:IsNull() and target:IsAlive() and target:CanBeSeen()
 	if seen then
 		h.dist = math.floor(GetUnitToUnitDistance(bot, target))
 		if target:WasRecentlyDamagedByHero(bot, 1.0) then
@@ -274,7 +373,12 @@ function HuntTrace.Tick(bot, modeName)
 		h.mode = modeName
 	end
 	local attackTarget = bot:GetAttackTarget()
-	if attackTarget ~= nil and attackTarget ~= target and attackTarget ~= h.lastOther then
+	if
+		attackTarget ~= nil
+		and attackTarget ~= target
+		and attackTarget ~= h.lastOther
+		and not (h.pid ~= nil and isTargetHero(attackTarget, h.pid))
+	then
 		h.lastOther = attackTarget
 		h.other = h.other + 1
 		if h.other == 1 then
@@ -304,7 +408,8 @@ function HuntTrace.Tick(bot, modeName)
 	local deadAfter = h.deadAt ~= nil and h.deadAt - h.offAt or nil
 	local hitToDeath = h.deadAt ~= nil and h.hitAt ~= nil and h.deadAt - h.hitAt or nil
 	local hit = h.hitAt ~= nil and h.hitAt >= h.offAt - 1
-	local why = HuntTrace.EndWhy(alive, seen, now - h.offAt, deadAfter, hitToDeath, hit)
+	local sinceHit = h.hitAt ~= nil and now - h.hitAt or nil
+	local why = HuntTrace.EndWhy(alive, seen, now - h.offAt, deadAfter, hitToDeath, hit, sinceHit)
 	if why ~= nil then
 		finish(bot, hero, h, why, now)
 	end

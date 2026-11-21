@@ -191,7 +191,11 @@ local function fakeUnit(name, team, x)
 	function u:GetPlayerID()
 		return self.pid
 	end
+	-- null: a stale handle (game 065: the target's handle after it left vision).
 	function u:IsNull()
+		return self.null == true
+	end
+	function u:IsIllusion()
 		return false
 	end
 	function u:IsAlive()
@@ -402,4 +406,84 @@ T.test("hunt trace: a target that teleports or turns invisible is not a kill (ga
 	restore()
 	T.eq(#printed("end why=kill"), 0, "no kill")
 	T.eq(#printed("end why=hit"), 1, "hit (damaged after the reveal): " .. table.concat(printed("end why"), " / "))
+end)
+
+T.test("hunt trace: the kill window stays open while the hunter keeps hitting (game 065)", function()
+	local _, H = load()
+	-- EndWhy(alive, seen, waited, deadAfter, hitToDeath, hit, sinceHit)
+	T.eq(H.EndWhy(true, false, 3.1, nil, nil, true, 0.2), nil, "still hitting: wait")
+	T.eq(H.EndWhy(true, false, 3.1, nil, nil, true, 1.5), "hit", "stopped hitting: hit")
+	T.eq(H.EndWhy(true, true, 6.0, nil, nil, true, 0.2), "hit", "the longer window is capped")
+	T.eq(H.EndWhy(true, false, 3.1, nil, nil, false, nil), "lost", "never hit, out of sight: lost")
+	T.eq(H.KeepRead(6, nil), 6, "a failed read keeps the last good one")
+	T.eq(H.KeepRead(6, 7), 7, "a new read")
+	T.eq(H.KeepRead(nil, nil), nil, "never read")
+end)
+
+T.test("hunt trace: a stale target handle, the hit on its new handle, a kill read by player ID (game 065)", function()
+	local _, H = load()
+	local deaths, restore = scoreboard()
+	local nyx = fakeUnit("npc_dota_hero_nyx_assassin", 3, 0)
+	local hoodwink = fakeUnit("npc_dota_hero_hoodwink", 2, 600)
+	hoodwink.pid = 9
+	deaths[9] = 6
+	local vendetta = "modifier_nyx_assassin_vendetta"
+	T.stub.time = 3072
+	nyx.canVendettaKill, nyx.vendettaTarget = true, hoodwink
+	nyx.modifiers[vendetta] = true
+	H.Tick(nyx, "attack")
+	T.ok(nyx._huntTrace ~= nil and nyx._huntTrace.pid == 9, "player ID kept at the start")
+	-- The strike at 3074; then the stored handle goes stale and Nyx attacks a second handle of the same hero.
+	T.stub.time = 3074
+	nyx.modifiers[vendetta] = nil
+	hoodwink.damaged = true
+	H.Tick(nyx, "attack")
+	T.stub.time = 3075
+	hoodwink.null = true
+	local again = fakeUnit("npc_dota_hero_hoodwink", 2, 300)
+	again.pid, again.damaged = 9, true
+	nyx.attackTarget = again
+	H.Tick(nyx, "attack")
+	T.eq(#printed("interrupt by=other"), 0, "the same hero on a new handle is not another unit")
+	T.stub.time = 3076
+	H.Tick(nyx, "attack")
+	T.stub.time = 3077.1
+	H.Tick(nyx, "attack")
+	T.ok(nyx._huntTrace ~= nil, "still hitting her: the window stays open")
+	T.stub.time = 3077.3
+	again.alive, again.visible = false, false
+	deaths[9] = 7
+	H.Tick(nyx, "attack")
+	restore()
+	T.eq(nyx._huntTrace, nil, "hunt over")
+	local ends = printed("end why=kill")
+	T.eq(#ends, 1, "kill: " .. table.concat(printed("end why"), " / "))
+	T.ok(string.find(ends[1] or "", "death=deaths refound=1", 1, true) ~= nil, "scoreboard read, handle refound")
+end)
+
+T.test("hunt trace: no player ID on the handle: found by hero name, the death still read", function()
+	local _, H = load()
+	local deaths, restore = scoreboard()
+	-- The stub's enemy team (Dire: GetOpposingTeam for the stub bot) has Zeus as player 16.
+	local clinkz = fakeUnit("npc_dota_hero_clinkz", 2, 0)
+	local zeus = fakeUnit("npc_dota_hero_zuus", 3, 2400)
+	deaths[16] = 2
+	local walk = "modifier_clinkz_wind_walk"
+	T.stub.time = 2645
+	clinkz.target = zeus
+	clinkz.modifiers[walk] = true
+	H.Tick(clinkz, "farm")
+	T.ok(clinkz._huntTrace ~= nil and clinkz._huntTrace.pid == 16, "player ID by name")
+	-- Zeus leaves vision; the walk ends; an ally kills him out of sight 1s later.
+	T.stub.time = 2647
+	zeus.alive, zeus.visible = false, false
+	clinkz.modifiers[walk] = nil
+	H.Tick(clinkz, "farm")
+	T.stub.time = 2648
+	deaths[16] = 3
+	H.Tick(clinkz, "farm")
+	restore()
+	local ends = printed("end why=kill")
+	T.eq(#ends, 1, "kill out of sight: " .. table.concat(printed("end why"), " / "))
+	T.ok(string.find(ends[1] or "", "death=deaths", 1, true) ~= nil, "read from the scoreboard")
 end)

@@ -251,7 +251,14 @@ local function isGone(unit)
 end
 
 -- [OHA-ROAM] overlay-try: one line per finished try (got throttled to one per 10s per bot, miss / drop to one per
--- 3s); the counts are in [OHA-ROAMSTAT] snipeLH / creepLH.
+-- 3s); the counts are in [OHA-ROAMSTAT] snipeLH / creepLH. Game 065: push-mode tries got 37/92 (farm 81%); why is
+-- open (an ally hero taking the creep, the walk to a creep farther off, or a spell order replacing the swing), so the
+-- line also says (diagnostics only):
+--   gap=       distance to the unit minus the bot's attack range at the first order (the walk before the swing)
+--   allies=    other allied heroes within ALLY_RADIUS of the unit at the first order (who may take it first)
+--   replaced=  thinks of the hold that began with another order than the attack (a later order replaced it), and
+--   cast=      how many of those were an ability order
+local ALLY_RADIUS = 700
 local function resolveTries(bot, now)
 	local s = bot._roamStats
 	if s == nil or s.tries == nil or #s.tries == 0 then
@@ -269,7 +276,7 @@ local function resolveTries(bot, now)
 			pcall(
 				print,
 				string.format(
-					"[OHA-ROAM] t=%.0f %s overlay-try result=%s rule=%s mode=%s lasted=%.1f held=%d release=%s",
+					"[OHA-ROAM] t=%.0f %s overlay-try result=%s rule=%s mode=%s lasted=%.1f held=%d release=%s gap=%d allies=%d replaced=%d cast=%d",
 					now,
 					shortName(bot),
 					try.result,
@@ -277,7 +284,11 @@ local function resolveTries(bot, now)
 					try.mode,
 					now - try.t,
 					try.held,
-					try.release or "none"
+					try.release or "none",
+					try.gap or -1,
+					try.allies or -1,
+					try.replaced or 0,
+					try.cast or 0
 				)
 			)
 		end
@@ -287,9 +298,38 @@ end
 -- ItemUsageThink, every think (after the active mode's Think). Returns true when it ordered the hit. The order is
 -- repeated every think while the overlay owns the hit (a later order in the same think, an item or a spell, still
 -- replaces it, as it did while team roam ran).
+-- Other allied heroes within ALLY_RADIUS of the unit (overlay-try allies=).
+local function alliesNear(bot, unit)
+	local n = 0
+	for _, ally in ipairs(Fu.GetAlliesNearLoc(unit:GetLocation(), ALLY_RADIUS)) do
+		if ally ~= bot then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+-- While the overlay owns a hit, the bot's current order at the start of a think is still the attack, unless an order
+-- after the overlay's (an item, a spell) replaced it last think (overlay-try replaced= / cast=).
+local function noteReplaced(bot)
+	local own = bot._lhOwn
+	if own == nil or own.try == nil then
+		return
+	end
+	local action = bot:GetCurrentActionType()
+	if action == BOT_ACTION_TYPE_ATTACK then
+		return
+	end
+	own.try.replaced = (own.try.replaced or 0) + 1
+	if action == BOT_ACTION_TYPE_USE_ABILITY then
+		own.try.cast = (own.try.cast or 0) + 1
+	end
+end
+
 function X.Think(bot)
 	local now = DotaTime()
 	resolveTries(bot, now)
+	noteReplaced(bot)
 	local own = bot._lhOwn
 	if own ~= nil and not X.Owns(bot) then
 		own = nil
@@ -340,6 +380,8 @@ function X.Think(bot)
 	local modeName = mode == BOT_MODE_TEAM_ROAM and "team_roam" or RoamStats.ModeName(mode)
 	local try, isNew = RoamStats.OverlayTry(s, now, unit, why, modeName, score(bot))
 	if isNew then
+		try.gap = math.floor(GetUnitToUnitDistance(bot, unit) - bot:GetAttackRange())
+		try.allies = alliesNear(bot, unit)
 		if bot._huntTrace ~= nil then
 			pcall(HuntTrace.NoteSnipe, bot, unit)
 		end

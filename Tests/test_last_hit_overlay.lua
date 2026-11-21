@@ -193,6 +193,37 @@ T.test("last-hit overlay: a try resolves when its unit dies; a deny counts; one 
 	T.eq(printed("overlay-try result=drop rule=snipe"), 1, "drop line")
 end)
 
+T.test("last-hit overlay: the try line says the walk, the allies near and replaced orders (game 065 pushes)", function()
+	local bot, O, creep = setup()
+	function bot:GetAttackRange()
+		return 150
+	end
+	creep._loc = bot:GetLocation() + Vector(400, 0, 0)
+	local action = BOT_ACTION_TYPE_ATTACK
+	function bot:GetCurrentActionType()
+		return action
+	end
+	O.Offer(bot, creep, 1.5, "snipe")
+	T.eq(O.Think(bot), true, "first order")
+	local try = bot._lhOwn.try
+	T.eq(try.gap, 250, "400 away, range 150")
+	T.eq(try.allies, 4, "the stub's other four heroes stand within 700, the bot not counted")
+	-- A move ordered after the overlay's attack: the next think starts with it; the overlay orders the attack again.
+	action = BOT_ACTION_TYPE_MOVE_TO
+	O.Offer(bot, creep, 1.5, "snipe")
+	T.eq(O.Think(bot), true, "attack ordered again")
+	-- A spell: counted, and the bot is busy with it, so the overlay lets go (release=skip-busy).
+	action = BOT_ACTION_TYPE_USE_ABILITY
+	O.Offer(bot, creep, 1.5, "snipe")
+	T.eq(O.Think(bot), false, "busy with the spell")
+	T.eq(try.replaced, 2, "two thinks began with another order")
+	T.eq(try.cast, 1, "one of them a spell")
+	creep._alive = false
+	T.stub.time = 600.5
+	O.Think(bot)
+	T.eq(printed("release=skip-busy gap=250 allies=4 replaced=2 cast=1"), 1, "fields on the try line")
+end)
+
 T.test("team roam and retreat load and think; retreat publishes its desire", function()
 	local bot = T.stub.reset({ hero = "npc_dota_hero_zuus", time = 600 })
 	local ok, err = T.stub.load("mode_team_roam_generic")

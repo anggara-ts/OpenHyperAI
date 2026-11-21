@@ -99,6 +99,7 @@ local Tower = Dota.Tower
 local Rune = Dota.Rune
 local Shop = Dota.Shop
 local Utils = require(GetScriptDirectory() .. "/FuncLib/systems/utils")
+local FarmRules = require(GetScriptDirectory() .. "/FuncLib/systems/farm_rules")
 local HasItem = Utils.HasItem
 local GetLocationToLocationDistance = Utils.GetLocationToLocationDistance
 local GetOffsetLocationTowardsTargetLocation = Utils.GetOffsetLocationTowardsTargetLocation
@@ -393,8 +394,145 @@ Site.IsCampDangerous = function(bot, camp)
 	end
 	return false
 end
+-- Farm keeps camps as { idx =, cattr = <spawner> } (RefreshCamp); other callers pass the spawner itself.
+local function CampData(camp)
+	return camp.cattr or camp
+end
+-- Camp side by position (FarmRules.CampSide: the nearest lane tower's team). Tower positions are read once,
+-- the first time a side is needed (the farm desire asks before the horn, with every tower standing), and
+-- each camp's side is cached by position.
+local towerSpots = nil
+local campSideCache = {}
+local function TowerSpots()
+	if towerSpots ~= nil then
+		return towerSpots
+	end
+	local spots = { radiant = {}, dire = {}, n = 0 }
+	for _, towerId in ipairs({
+		Tower.Top1,
+		Tower.Top2,
+		Tower.Top3,
+		Tower.Mid1,
+		Tower.Mid2,
+		Tower.Mid3,
+		Tower.Bot1,
+		Tower.Bot2,
+		Tower.Bot3,
+	}) do
+		for teamKey, team in pairs({ radiant = Team.Radiant, dire = Team.Dire }) do
+			local tower = GetTower(team, towerId)
+			if tower ~= nil then
+				local loc = tower:GetLocation()
+				spots[teamKey][#spots[teamKey] + 1] = { x = loc.x, y = loc.y }
+				spots.n = spots.n + 1
+			end
+		end
+	end
+	if spots.n > 0 then
+		towerSpots = spots
+	end
+	return spots
+end
+local function EngineSide(data)
+	return data.team == Team.Radiant and "radiant" or data.team == Team.Dire and "dire" or nil
+end
+-- The side the farm uses (FarmRules.DecideCampSide: position, or the engine's team for a camp by the river),
+-- the margin, what decided it, and the position side alone.
+Site.CampSide = function(camp)
+	local data = CampData(camp)
+	local loc = data.location
+	if loc == nil then
+		return EngineSide(data), 0, "engine", nil
+	end
+	local key = math.floor(loc.x) .. "," .. math.floor(loc.y)
+	local cached = campSideCache[key]
+	if cached == nil then
+		local spots = TowerSpots()
+		local posSide, margin = FarmRules.CampSide(loc.x, loc.y, spots.radiant, spots.dire)
+		if posSide == nil then
+			-- No towers found (should not happen): the closer Ancient, not cached.
+			local radiantDist = GetLocationToLocationDistance(loc, Site.radiant_ancient)
+			local direDist = GetLocationToLocationDistance(loc, Site.dire_ancient)
+			local side = radiantDist <= direDist and "radiant" or "dire"
+			return side, math.abs(radiantDist - direDist), "ancient", nil
+		end
+		local side, by = FarmRules.DecideCampSide(posSide, margin, EngineSide(data))
+		cached = { side = side, margin = margin, by = by, posSide = posSide }
+		campSideCache[key] = cached
+	end
+	return cached.side, cached.margin, cached.by, cached.posSide
+end
+-- Game 062: every camp read as an enemy camp. Farm passes { idx, cattr } wrappers and this read
+-- `camp.team` off the wrapper, which is nil, so nil ~= GetTeam() held for all of them (Radiant dropped
+-- -1454,-3356 in its own jungle, Dire dropped 8430,1263 in its own corner). The side now comes from the
+-- camp's position, or the engine's team for a camp by the river (Site.CampSide).
 Site.IsEnemyCamp = function(camp)
-	return camp.team ~= GetTeam()
+	local side = Site.CampSide(camp)
+	if side == nil then
+		return CampData(camp).team ~= GetTeam()
+	end
+	return (side == "radiant" and Team.Radiant or Team.Dire) ~= GetTeam()
+end
+-- [OHA-CAMP] once per team per game: every camp's index, type, the engine's team, the side by position
+-- (posSide, margin), the side the farm uses and what decided it, so a game shows where they differ.
+local campSurveyDone = {}
+Site.SurveyCamps = function(bot)
+	local team = GetTeam()
+	if campSurveyDone[team] then
+		return
+	end
+	local spawners = objectValues(GetNeutralSpawners() or {})
+	if #spawners == 0 then
+		return
+	end
+	campSurveyDone[team] = true
+	local hero = bot ~= nil and string.gsub(bot:GetUnitName(), "npc_dota_hero_", "") or "?"
+	local spots = TowerSpots()
+	local agree, disagree, total = 0, 0, 0
+	for i, spawner in ipairs(spawners) do
+		if spawner ~= nil and spawner.location ~= nil then
+			total = total + 1
+			local side, margin, by, posSide = Site.CampSide(spawner)
+			local engineTeam = EngineSide(spawner) or tostring(spawner.team)
+			local same = engineTeam == posSide
+			if same then
+				agree = agree + 1
+			else
+				disagree = disagree + 1
+			end
+			pcall(
+				print,
+				string.format(
+					"[OHA-CAMP] t=%.0f %s survey idx=%s type=%s engineTeam=%s posSide=%s margin=%d side=%s by=%s agree=%d at=%.0f,%.0f",
+					DotaTime(),
+					hero,
+					tostring(spawner.idx or i),
+					tostring(spawner.type),
+					engineTeam,
+					tostring(posSide),
+					math.floor(margin or 0),
+					tostring(side),
+					tostring(by),
+					same and 1 or 0,
+					spawner.location.x,
+					spawner.location.y
+				)
+			)
+		end
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-CAMP] t=%.0f %s survey-sum team=%s camps=%d towers=%d agree=%d disagree=%d",
+			DotaTime(),
+			hero,
+			team == Team.Radiant and "radiant" or "dire",
+			total,
+			spots.n,
+			agree,
+			disagree
+		)
+	)
 end
 local campBehindGatesCache = {}
 Site.IsCampBehindEnemyGates = function(camp)
@@ -434,17 +572,19 @@ Site.IsCampBehindEnemyGates = function(camp)
 	end
 	return isBehindGates
 end
+-- Read through the farm wrapper too (game 062: IsAncientCamp(wrapper) was always false, so
+-- GetClosestNeutralSpwan never applied its level 10 / 6 armor rule to ancient camps).
 Site.IsAncientCamp = function(camp)
-	return camp.type == "ancient"
+	return CampData(camp).type == "ancient"
 end
 Site.IsSmallCamp = function(camp)
-	return camp.type == "small"
+	return CampData(camp).type == "small"
 end
 Site.IsMediumCamp = function(camp)
-	return camp.type == "medium"
+	return CampData(camp).type == "medium"
 end
 Site.IsLargeCamp = function(camp)
-	return camp.type == "large"
+	return CampData(camp).type == "large"
 end
 Site.RefreshCamp = function(bot)
 	local neutralSpawners = GetNeutralSpawners()
@@ -754,6 +894,10 @@ Site.IsTimeToFarm = function(bot)
 	if heroFarmCheck ~= nil then
 		isTimeToFarm = heroFarmCheck()
 	end
+	-- The must-have items of every hero's core positions (Site.FarmForMustHave).
+	if not isTimeToFarm then
+		isTimeToFarm = Site.FarmForMustHave(bot)
+	end
 	if not isTimeToFarm and Site.GetPosition(bot) <= 3 then
 		local netWorth = bot:GetNetWorth()
 		local botLevel = bot:GetLevel()
@@ -821,6 +965,58 @@ end
 Site.IsInLaningPhase = function()
 	return IsModeTurbo() and DotaTime() < 8 * 60 or DotaTime() < 12 * 60
 end
+-- Farm rules wait for the hero's must-have items (#38, maintainer 2026-11-20). The items come from match data
+-- (FuncLib/data/must_have_items.lua, written by Util/item-builds/generate.js): per core position, the items of the
+-- hero's buy list that at least half of the players buy, in list order. Until the next one is owned (or an upgrade
+-- of it, or the item a sell pair sells it for), and while net worth is under its cap, it is time to farm: always for
+-- the first one, for a later one only with two allies or fewer within 1100 (not out of a fight). This replaced
+-- item waits picked by hand per hero, which named items many lists never buy (Medusa waited for a Black King Bar
+-- her list has none of, so she farmed alone to 16000 net worth every game).
+local MustHaveItems = require(GetScriptDirectory() .. "/FuncLib/data/must_have_items")
+local function OwnsMustHave(bot, row)
+	if HasItem(bot, row[1]) then
+		return true
+	end
+	for _, other in ipairs(row.done or {}) do
+		if HasItem(bot, other) then
+			return true
+		end
+	end
+	return false
+end
+-- Returns whether it is time to farm for a must-have item, and that item.
+function Site.FarmForMustHave(bot)
+	local heroRows = MustHaveItems[(string.gsub(bot:GetUnitName(), "npc_dota_hero_", ""))]
+	local rows = heroRows ~= nil and heroRows[Site.GetPosition(bot)] or nil
+	local target, farm = nil, false
+	if rows ~= nil then
+		local netWorth = bot:GetNetWorth()
+		for index, row in ipairs(rows) do
+			if not OwnsMustHave(bot, row) and netWorth < row[2] then
+				target = row
+				farm = index == 1 or Site.GetAroundAllyCount(bot, 1100) <= 2
+				break
+			end
+		end
+	end
+	-- One line when the item waited for changes.
+	local targetName = target ~= nil and target[1] or "none"
+	if targetName ~= bot._mustHaveLogged then
+		bot._mustHaveLogged = targetName
+		pcall(
+			print,
+			string.format(
+				"[OHA-FARM] t=%.0f %s must-have item=%s cap=%d nw=%d",
+				DotaTime(),
+				(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+				targetName,
+				target ~= nil and target[2] or 0,
+				bot:GetNetWorth()
+			)
+		)
+	end
+	return farm, target ~= nil and target[1] or nil
+end
 Site.ConsiderIsTimeToFarm = {}
 Site.ConsiderIsTimeToFarm.npc_dota_hero_antimage = function()
 	local bot = GetBot()
@@ -829,26 +1025,12 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_antimage = function()
 	if gameTime > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 23000) then
 		return true
 	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
-		return true
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 28000 then
-		if Site.GetAroundAllyCount(bot, 1200) <= 2 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_arc_warden = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 15 * 60 and (bot:GetLevel() < 25 or netWorth < 22000) then
-		return true
-	end
-	if HasItem(bot, "item_gloves") and not HasItem(bot, "item_hand_of_midas") and bot:GetGold() > 800 then
-		return true
-	end
-	if HasItem(bot, "item_yasha") and not HasItem(bot, "item_manta") and bot:GetGold() > 1000 then
 		return true
 	end
 	if HasItem(bot, "item_hand_of_midas") and Site.GetAroundAllyCount(bot, 1200) <= 3 and netWorth <= 26000 then
@@ -862,14 +1044,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_axe = function()
 	if DotaTime() > 7 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_echo_sabre") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_heart") and netWorth < 21000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_bloodseeker = function()
@@ -877,14 +1051,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_bloodseeker = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 22000) then
 		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_abyssal_blade") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1200) <= 1 then
-			return true
-		end
 	end
 	return false
 end
@@ -911,20 +1077,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_clinkz = function()
 	return Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin()
 end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_dragon_knight = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_assault") and netWorth < 22000 then
-		local nearbyAllyCount = Site.GetAroundAllyCount(bot, 1200)
-		if bot:GetAttackRange() > 300 and nearbyAllyCount <= 2 then
-			return true
-		end
-		if bot:GetMana() > 450 and bot:GetCurrentVisionRange() < 1000 and nearbyAllyCount < 2 then
-			return true
-		end
-	end
-	return false
-end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_drow_ranger = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
@@ -932,15 +1084,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_drow_ranger = function()
 		return true
 	end
 	if HasItem(bot, "item_mask_of_madness") and netWorth < 9999 then
-		return true
-	end
-	if HasItem(bot, "item_blade_of_alacrity") and not HasItem(bot, "item_ultimate_scepter") then
-		return true
-	end
-	if HasItem(bot, "item_shadow_amulet") and not HasItem(bot, "item_invis_sword") and bot:GetGold() > 400 then
-		return true
-	end
-	if HasItem(bot, "item_yasha") and not HasItem(bot, "item_manta") and bot:GetGold() > 1000 then
 		return true
 	end
 	if HasItem(bot, "item_ultimate_scepter") and netWorth < 23000 then
@@ -956,14 +1099,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_huskar = function()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_hurricane_pike") and netWorth < 18000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1100) < 2 then
-			return true
-		end
-	end
 	if bot:GetLevel() > 20 and netWorth < 23333 then
 		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
 			return true
@@ -976,16 +1111,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_juggernaut = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 20000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 2 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 24000 then
-		if Site.GetAroundAllyCount(bot, 1000) <= 1 then
-			return true
-		end
 	end
 	return false
 end
@@ -1004,14 +1129,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_medusa = function()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 28000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_nevermore = function()
@@ -1019,14 +1136,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_nevermore = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 22000) then
 		return true
-	end
-	if not HasItem(bot, "item_skadi") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_sphere") and netWorth < 28000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 2 then
-			return true
-		end
 	end
 	return false
 end
@@ -1042,19 +1151,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_phantom_assassin = function()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_desolator") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 24000 then
-		if Site.GetAroundAllyCount(bot, 1000) <= 2 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_phantom_lancer = function()
@@ -1062,19 +1158,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_phantom_lancer = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 23000) then
 		return true
-	end
-	if not HasItem(bot, "item_skadi") and netWorth < 18000 then
-		return true
-	end
-	if not HasItem(bot, "item_sphere") and netWorth < 22000 then
-		if Site.GetAroundAllyCount(bot, 1300) <= 3 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_heart") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
 	end
 	return false
 end
@@ -1086,14 +1169,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_razor = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 7 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 15000 then
-		return true
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 25000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
 	end
 	return false
 end
@@ -1109,14 +1184,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_legion_commander = function()
 	if DotaTime() > 7 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_echo_sabre") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_heart") and netWorth < 21000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_slark = function()
@@ -1124,19 +1191,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_slark = function()
 	local netWorth = bot:GetNetWorth()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
-	end
-	if not HasItem(bot, "item_invis_sword") and netWorth < 18000 then
-		return true
-	end
-	if not HasItem(bot, "item_silver_edge") and netWorth < 21000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 2 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_abyssal_blade") and netWorth < 25000 then
-		if Site.GetAroundAllyCount(bot, 1300) <= 1 then
-			return true
-		end
 	end
 	return false
 end
@@ -1149,31 +1203,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_sven = function()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_black_king_bar") then
-		return true
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 22000 then
-		if Site.GetAroundAllyCount(bot, 1000) <= 2 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_greater_crit") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_sniper = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if bot:GetLevel() >= 10 and not HasItem(bot, "item_monkey_king_bar") and netWorth < 22000 then
-		local kills = GetHeroKills(bot:GetPlayerID())
-		local deaths = GetHeroDeaths(bot:GetPlayerID())
-		if kills - 3 <= deaths and deaths > 2 and Site.GetAroundAllyCount(bot, 1200) <= 2 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin = function()
@@ -1182,47 +1211,12 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_templar_assassin = function()
 	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_hurricane_pike") and netWorth < 20000 then
-		if Site.GetAroundAllyCount(bot, 1300) <= 3 then
-			return true
-		end
-	end
-	if not HasItem(bot, "item_satanic") and netWorth < 26000 then
-		if Site.GetAroundAllyCount(bot, 1100) <= 1 then
-			return true
-		end
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_tidehunter = function()
-	return Site.ConsiderIsTimeToFarm.npc_dota_hero_sven()
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_viper = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if bot:GetLevel() >= 10 and not HasItem(bot, "item_mjollnir") and netWorth < 20000 then
-		local kills = GetHeroKills(bot:GetPlayerID())
-		local deaths = GetHeroDeaths(bot:GetPlayerID())
-		local nearbyAllyCount = Site.GetAroundAllyCount(bot, 1300)
-		if kills - 4 <= deaths and deaths > 2 and nearbyAllyCount < 3 then
-			return true
-		end
-		if bot:GetMana() > 650 and bot:GetCurrentVisionRange() < 1000 and nearbyAllyCount <= 1 then
-			return true
-		end
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_earthshaker = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_ultimate_scepter") and netWorth < 16000 then
+	if DotaTime() > 9 * 60 and (bot:GetLevel() < 25 or netWorth < 20000) then
 		return true
 	end
 	return false
@@ -1233,229 +1227,12 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_tiny = function()
 	if DotaTime() > 10 * 60 and (bot:GetLevel() < 25 or netWorth < 22000) then
 		return true
 	end
-	if not HasItem(bot, "item_echo_sabre") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_silver_edge") and netWorth < 18000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_beastmaster = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	local why = nil
-	if not HasItem(bot, "item_helm_of_the_dominator") and netWorth < 14000 then
-		why = "no-helm"
-	elseif not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
-		why = "no-bkb"
-	end
-	-- One line when the answer changes (#105: the farm-only switch had no log, so a game could not show it).
-	if why ~= bot._bmFarmWhy then
-		bot._bmFarmWhy = why
-		pcall(
-			print,
-			string.format(
-				"[OHA-FARM] t=%.0f beastmaster farm-rule %s nw=%d",
-				DotaTime(),
-				why ~= nil and ("on why=" .. why) or "off",
-				netWorth
-			)
-		)
-	end
-	return why ~= nil
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_rattletrap = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blade_mail") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_aghanims_shard") and netWorth < 12000 then
-		return true
-	end
 	return false
 end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_alchemist = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
 	if bot:GetLevel() < 25 or netWorth < 35000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_brewmaster = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_ultimate_scepter") and netWorth < 16000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_treant = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_meteor_hammer") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_blink") and netWorth < 12000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_wisp = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_mekansm") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_guardian_greaves") and netWorth < 10000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_centaur = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_pipe") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_shredder = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_bloodstone") and netWorth < 14000 then
-		return true
-	end
-	if not HasItem(bot, "item_lotus_orb") and netWorth < 18000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_tusk = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_desolator") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_elder_titan = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_spirit_vessel") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_blink") and netWorth < 12000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_earth_spirit = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_spirit_vessel") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_blink") and netWorth < 12000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_phoenix = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_mekansm") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_shivas_guard") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_mars = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_abyssal_underlord = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_pipe") and netWorth < 10000 then
-		return true
-	end
-	if not HasItem(bot, "item_guardian_greaves") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_snapfire = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_aether_lens") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_solar_crest") and netWorth < 10000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_dawnbreaker = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_echo_sabre") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_desolator") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_primal_beast = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_vanguard") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_blink") and netWorth < 10000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_marci = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_armlet") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_bounty_hunter = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_spirit_vessel") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_guardian_greaves") and netWorth < 12000 then
 		return true
 	end
 	return false
@@ -1471,12 +1248,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_ember_spirit = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
-		return true
-	end
 	if netWorth < 25000 then
 		return true
 	end
@@ -1485,12 +1256,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_faceless_void = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_mask_of_madness") and netWorth < 6000 then
-		return true
-	end
-	if not HasItem(bot, "item_maelstrom") and netWorth < 10000 then
-		return true
-	end
 	if netWorth < 22000 then
 		return true
 	end
@@ -1500,18 +1265,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_gyrocopter = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
 	if bot:GetLevel() < 25 or netWorth < 22000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_hoodwink = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 12000 then
-		return true
-	end
-	-- Gleipnir's item name is item_gungir (game files); item_gleipnir never matched, so she farmed to 18000 (#109).
-	if not HasItem(bot, "item_gungir") and netWorth < 18000 then
 		return true
 	end
 	return false
@@ -1535,12 +1288,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_monkey_king = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_echo_sabre") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
 	if netWorth < 24000 then
 		return true
 	end
@@ -1554,48 +1301,9 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_morphling = function()
 	end
 	return false
 end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_nyx_assassin = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_ultimate_scepter") and netWorth < 14000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_pangolier = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_blink") and netWorth < 16000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_riki = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_diffusal_blade") and netWorth < 10000 then
-		return true
-	end
-	if not HasItem(bot, "item_abyssal_blade") and netWorth < 18000 then
-		return true
-	end
-	return false
-end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_spectre = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_radiance") and netWorth < 15000 then
-		return true
-	end
-	if not HasItem(bot, "item_manta") and netWorth < 20000 then
-		return true
-	end
 	if netWorth < 28000 then
 		return true
 	end
@@ -1604,12 +1312,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_terrorblade = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_manta") and netWorth < 16000 then
-		return true
-	end
-	if not HasItem(bot, "item_skadi") and netWorth < 22000 then
-		return true
-	end
 	if netWorth < 30000 then
 		return true
 	end
@@ -1618,12 +1320,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_troll_warlord = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 10000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
 	if netWorth < 24000 then
 		return true
 	end
@@ -1632,12 +1328,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_kez = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 10000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 16000 then
-		return true
-	end
 	if netWorth < 24000 then
 		return true
 	end
@@ -1646,12 +1336,6 @@ end
 Site.ConsiderIsTimeToFarm.npc_dota_hero_ursa = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_blink") and netWorth < 8000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 14000 then
-		return true
-	end
 	if netWorth < 22000 then
 		return true
 	end
@@ -1669,28 +1353,6 @@ Site.ConsiderIsTimeToFarm.npc_dota_hero_venomancer = function()
 	local bot = GetBot()
 	local netWorth = bot:GetNetWorth()
 	if Site.GetPosition(bot) >= 4 and netWorth < 8000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_weaver = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_maelstrom") and netWorth < 12000 then
-		return true
-	end
-	if not HasItem(bot, "item_black_king_bar") and netWorth < 18000 then
-		return true
-	end
-	return false
-end
-Site.ConsiderIsTimeToFarm.npc_dota_hero_ringmaster = function()
-	local bot = GetBot()
-	local netWorth = bot:GetNetWorth()
-	if not HasItem(bot, "item_ethereal_blade") and netWorth < 15000 then
-		return true
-	end
-	if not HasItem(bot, "item_dagon_5") and netWorth < 22000 then
 		return true
 	end
 	return false

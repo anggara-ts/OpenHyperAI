@@ -17,64 +17,64 @@ local nTalentBuildList = Fu.Skill.GetTalentBuild(tTalentTreeList)
 -- and before the Shard: by minute 24, 61% of pos 2 Meepos have Blink and 16% the Shard (Shard 38% in all).
 -- Pos 3 gets Sange and Yasha too (94% of its matches; it was missing from that list).
 local sRoleItemsBuyList = {}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 1, 5,550 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_1"] = {
 	"item_tango",
+	"item_circlet",
 	"item_double_branches",
 	"item_quelling_blade",
+	"item_slippers",
 	"item_wraith_band",
-	"item_boots",
-	"item_magic_wand",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_sange_and_yasha",
 	"item_blink",
-	"item_aghanims_shard",
 	"item_skadi",
-	"item_nullifier",
+	"item_aghanims_shard",
 	"item_ultimate_scepter",
-	"item_disperser",
-	"item_ultimate_scepter_2",
+	"item_butterfly",
 	"item_swift_blink",
-	"item_travel_boots_2",
+	"item_ultimate_scepter_2",
+	"item_sheepstick",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 2, 28,121 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_2"] = {
 	"item_tango",
+	"item_circlet",
 	"item_double_branches",
 	"item_quelling_blade",
+	"item_slippers",
 	"item_wraith_band",
-	"item_boots",
-	"item_magic_wand",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_sange_and_yasha",
 	"item_blink",
 	"item_aghanims_shard",
 	"item_skadi",
 	"item_ultimate_scepter",
-	"item_disperser",
-	"item_ultimate_scepter_2",
 	"item_swift_blink",
-	"item_travel_boots_2",
+	"item_ultimate_scepter_2",
+	"item_sheepstick",
+	"item_moon_shard",
+	"item_heart",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 1,566 matches (Util/item-builds/generate.js).
 sRoleItemsBuyList["pos_3"] = {
 	"item_tango",
+	"item_circlet",
 	"item_double_branches",
 	"item_quelling_blade",
+	"item_slippers",
 	"item_wraith_band",
-	"item_boots",
-	"item_magic_wand",
 	"item_power_treads",
-	"item_diffusal_blade",
 	"item_sange_and_yasha",
 	"item_blink",
 	"item_aghanims_shard",
 	"item_skadi",
 	"item_ultimate_scepter",
-	"item_sheepstick",
-	"item_disperser",
+	"item_butterfly",
 	"item_ultimate_scepter_2",
+	"item_diffusal_blade",
+	"item_disperser",
 	"item_swift_blink",
-	"item_travel_boots_2",
 }
 sRoleItemsBuyList["pos_4"] = sRoleItemsBuyList["pos_3"]
 sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_3"]
@@ -119,14 +119,11 @@ end
 local earthbindAbility = SafeAbility(bot:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
 local poofAbility = SafeAbility(bot:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
 local digAbility = SafeAbility(bot:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
-local megaMeepoAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
-local megaMeepoFlingAbility =
-	SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
+-- MegaMeepo and its Fling were removed in 7.42 (Valve patch notes); the Shard now gives a pick-up and
+-- Fling Release on Divided We Stand, which the bot does not use yet.
 local earthbindDesire, earthbindLocation
 local poofDesire, poofTarget
 local digDesire
-local megaMeepoDesire
-local flingDesire, flingTarget
 local meepos = {}
 local botTarget
 local hpRatio
@@ -145,8 +142,6 @@ function X.SkillsComplement()
 	earthbindAbility = SafeAbility(bot:GetAbilityByName("meepo_earthbind"), "meepo_earthbind", "meepo")
 	poofAbility = SafeAbility(bot:GetAbilityByName("meepo_poof"), "meepo_poof", "meepo")
 	digAbility = SafeAbility(bot:GetAbilityByName("meepo_petrify"), "meepo_petrify", "meepo")
-	megaMeepoAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo"), "meepo_megameepo", "meepo")
-	megaMeepoFlingAbility = SafeAbility(bot:GetAbilityByName("meepo_megameepo_fling"), "meepo_megameepo_fling", "meepo")
 	meepos = Fu.GetMeepos()
 	botTarget = context.target
 	hpRatio = context.hp
@@ -162,21 +157,11 @@ function X.SkillsComplement()
 		bot:ActionQueue_UseAbility(digAbility)
 		return
 	end
-	megaMeepoDesire = X.ConsiderMegaMeepo()
-	if megaMeepoDesire > 0 then
-		bot:ActionQueue_UseAbility(megaMeepoAbility)
-		return
-	end
 	earthbindDesire, earthbindLocation = X.ConsiderEarthBind()
 	if earthbindDesire > 0 then
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(earthbindAbility, earthbindLocation)
 		rememberEarthbindCast(earthbindLocation)
-		return
-	end
-	flingDesire, flingTarget = X.ConsiderMegaMeepoFling()
-	if flingDesire > 0 then
-		bot:ActionQueue_UseAbilityOnEntity(megaMeepoFlingAbility, flingTarget)
 		return
 	end
 	local regroupBody = X.ConsiderRegroup()
@@ -712,7 +697,8 @@ function X.ConsiderDig()
 			return BOT_ACTION_DESIRE_NONE
 		end
 	end
-	-- Dig (Shard, datafeed): 3s invulnerable and untargetable, basic dispel, 25% max HP back, 40s cooldown. It was
+	-- Dig (Aghanim's Scepter since 7.42; datafeed): invulnerable and untargetable, basic dispel, 50% max HP back (was
+	-- 25%), 4s (was 3s). It was
 	-- cast whenever HP < 49% in any fight (#8, game 038). Now only when this body is being focused (hit by a hero
 	-- in the last 1.5s under 40% with an enemy near), or to dispel a root / silence while being hit.
 	local enemiesNear = #(Fu.GetNearbyHeroes(bot, 900, true, BOT_MODE_NONE) or {})
@@ -734,62 +720,6 @@ function X.ConsiderDig()
 			)
 		end
 		return BOT_ACTION_DESIRE_HIGH
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function X.ConsiderMegaMeepo()
-	if
-		not megaMeepoAbility:IsTrained()
-		or not megaMeepoAbility:IsFullyCastable()
-		or bot:HasModifier("modifier_meepo_petrify")
-	then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local radius = 600
-	if isGoingOnSomeone then
-		local damagedCloneCount = 0
-		for _, meepo in pairs(meepos) do
-			if
-				meepo:WasRecentlyDamagedByAnyHero(1.2)
-				and Fu.IsMeepoClone(meepo)
-				and Fu.IsInRange(bot, meepo, radius)
-				and not meepo:HasModifier("modifier_meepo_petrify")
-			then
-				damagedCloneCount = damagedCloneCount + 1
-			end
-		end
-		if damagedCloneCount >= 2 then
-			return BOT_ACTION_DESIRE_HIGH
-		end
-	end
-	return BOT_ACTION_DESIRE_NONE
-end
-function X.ConsiderMegaMeepoFling()
-	if megaMeepoFlingAbility:IsHidden() or not megaMeepoFlingAbility:IsFullyCastable() then
-		return BOT_ACTION_DESIRE_NONE
-	end
-	local castRange = megaMeepoFlingAbility:GetCastRange()
-	local allyHeroes = Fu.GetNearbyHeroes(bot, 1000, false, BOT_MODE_NONE)
-	local nearbyEnemyHeroes = Fu.GetNearbyHeroes(bot, 800, true, BOT_MODE_NONE)
-	if isGoingOnSomeone then
-		local weakestTarget = Fu.GetAttackableWeakestUnit(bot, castRange, true, true)
-		if
-			weakestTarget ~= nil
-			and bot:WasRecentlyDamagedByAnyHero(3.1)
-			and not Fu.IsMeepoClone(bot)
-			and not weakestTarget:HasModifier("modifier_faceless_void_chronosphere_freeze")
-			and allyHeroes ~= nil
-			and nearbyEnemyHeroes
-			and #allyHeroes >= #nearbyEnemyHeroes
-		then
-			return BOT_ACTION_DESIRE_HIGH, weakestTarget
-		end
-	end
-	local enemyCreeps = bot:GetNearbyCreeps(castRange, true)
-	if enemyCreeps ~= nil and #enemyCreeps >= 1 and nearbyEnemyHeroes ~= nil and #nearbyEnemyHeroes == 0 then
-		if Fu.IsValid(enemyCreeps[1]) and not Fu.IsMeepoClone(bot) then
-			return BOT_ACTION_DESIRE_HIGH, enemyCreeps[1]
-		end
 	end
 	return BOT_ACTION_DESIRE_NONE
 end

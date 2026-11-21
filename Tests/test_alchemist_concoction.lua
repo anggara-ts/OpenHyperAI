@@ -859,6 +859,47 @@ T.test("enemy spells: a modifier or a vanish in our vision is a seen use, fog an
 	Stub.time = 204
 	E.Observe("alchemist", { clinkz })
 	T.eq(E.State("npc_dota_hero_clinkz", "clinkz_wind_walk", 204), "cooldown", "modifier recorded")
+	-- A modifier from someone else's spell (Mirana's Moonlight Shadow covers her allies): not his use.
+	clinkz.mods.modifier_mirana_moonlight_shadow = true
+	Stub.time = 205
+	E.Observe("alchemist", { clinkz })
+	T.eq(E.State("npc_dota_hero_clinkz", "mirana_invis", 205), "unknown", "not his own spell")
+end)
+
+T.test("enemy spells: the cast-callback probe records an enemy hero's cast, not an ally's", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local captured = nil
+	_G.InstallCastCallback = function(_, callback)
+		captured = callback
+	end
+	local ok, err = Stub.load("BotsLib/hero_alchemist")
+	T.ok(ok, tostring(err))
+	T.ok(printedLine("%[OHA%-ENEMYCD%] t=%S+ cast%-probe installed=yes error=%-"), "installed")
+	T.ok(captured ~= nil, "callback captured")
+	local enemy = Stub.teams[GetOpposingTeam()][1]
+	local vendetta = Stub.newAbility("nyx_assassin_vendetta", enemy, true)
+	vendetta.GetLevel = function()
+		return 3
+	end
+	Stub.time = 500
+	captured({ unit = enemy, ability = vendetta })
+	T.ok(
+		printedLine(
+			"cast%-callback n=1 enemyN=1 arg=table keys=ability,unit caster=npc_dota_hero_%S+"
+				.. " spell=nyx_assassin_vendetta team=enemy"
+		),
+		"enemy call line"
+	)
+	local state, entry = enemySpells().State(enemy:GetUnitName(), "nyx_assassin_vendetta", 500)
+	T.eq(state, "cooldown", "recorded")
+	T.eq(entry.via, "callback", "via callback")
+	T.eq(entry.cooldown, 60, "level 3 (datafeed hero 88)")
+	local ally = Stub.teams[GetTeam()][2]
+	captured({ unit = ally, ability = Stub.newAbility("nyx_assassin_impale", ally, false) })
+	T.ok(printedLine("cast%-callback n=2 enemyN=1 .* team=ally"), "ally call line")
+	T.eq(enemySpells().State(ally:GetUnitName(), "nyx_assassin_impale", 500), "unknown", "an ally's cast: not recorded")
+	captured({ ability = vendetta })
+	T.ok(printedLine("cast%-callback n=3 .* team=unknown"), "no caster: team unknown")
 end)
 
 T.test("concoction rules: disable risk by state and range, runner throw", function()

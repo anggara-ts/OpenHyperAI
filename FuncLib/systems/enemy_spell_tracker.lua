@@ -179,13 +179,43 @@ local function LogSeen(observer, heroName, spell, via, entry)
 	)
 end
 
--- The level and GetCooldown() of a listed ability or item of the hero (items count as level 1), or nil.
+-- Errors in this module, at most every 30s per place: [OHA-ENEMYCD] t= <observer> error=<where>:<message>
+local errorLogAt = {}
+local function LogError(observer, where, err)
+	if DotaTime() < (errorLogAt[where] or -999) then
+		return
+	end
+	errorLogAt[where] = DotaTime() + 30
+	pcall(print, string.format("[OHA-ENEMYCD] t=%.0f %s error=%s:%s", DotaTime(), observer, where, tostring(err)))
+end
+-- Vanishes not counted, at most every 5s: [OHA-ENEMYCD] t= <observer> vanish-skip hero= why=dead|fog|alive-read
+local vanishSkipLogAt = -999
+local function LogVanishSkip(observer, heroName, why)
+	if DotaTime() < vanishSkipLogAt then
+		return
+	end
+	vanishSkipLogAt = DotaTime() + 5
+	pcall(
+		print,
+		string.format("[OHA-ENEMYCD] t=%.0f %s vanish-skip hero=%s why=%s", DotaTime(), observer, heroName, why)
+	)
+end
+-- GetCooldown() of an enemy's ability or item: not proven to read on an enemy handle, so nil when it errors.
+local function SafeCooldown(handle)
+	local ok, cooldown = pcall(function()
+		return handle:GetCooldown()
+	end)
+	return ok and cooldown or nil
+end
+
+-- The level and GetCooldown() of a listed ability or item of the hero (items count as level 1), or nil when the hero
+-- does not have it (not learned: level 0).
 local function SpellOf(hero, spell)
 	if string.sub(spell, 1, 5) == "item_" then
 		for slot = 0, 5 do
 			local item = hero:GetItemInSlot(slot)
 			if item ~= nil and not item:IsNull() and item:GetName() == spell then
-				return 1, item:GetCooldown()
+				return 1, SafeCooldown(item)
 			end
 		end
 		return nil
@@ -194,7 +224,7 @@ local function SpellOf(hero, spell)
 	if ability == nil or ability:IsNull() then
 		return nil
 	end
-	return ability:GetLevel(), ability:GetCooldown()
+	return ability:GetLevel(), SafeCooldown(ability)
 end
 
 -- level / apiCooldown: read while the hero was visible (a vanish), else read from the hero now.
@@ -218,14 +248,14 @@ local function VanishSpellOf(hero)
 		if ability ~= nil and not ability:IsNull() and not ability:IsHidden() then
 			local name = ability:GetName()
 			if EnemySpells.VANISH[name] and ability:GetLevel() > 0 then
-				return name, ability:GetLevel(), ability:GetCooldown()
+				return name, ability:GetLevel(), SafeCooldown(ability)
 			end
 		end
 	end
 	for slot = 0, 5 do
 		local item = hero:GetItemInSlot(slot)
 		if item ~= nil and not item:IsNull() and EnemySpells.VANISH[item:GetName()] then
-			return item:GetName(), 1, item:GetCooldown()
+			return item:GetName(), 1, SafeCooldown(item)
 		end
 	end
 	return nil
@@ -250,12 +280,17 @@ function EnemySpells.Observe(observer, enemies)
 	observeAt = now
 	local visibleNow = {}
 	for _, hero in pairs(enemies or {}) do
-		pcall(function()
+		local okHero, errHero = pcall(function()
 			local heroName = hero:GetUnitName()
 			visibleNow[heroName] = true
 			for modifier, spell in pairs(EnemySpells.MODIFIERS) do
 				if hero:HasModifier(modifier) then
-					RecordAndLog(observer, hero, heroName, spell, "modifier", now)
+					-- Only the hero's own spell or item: Moonlight Shadow covers all of Mirana's allies, a Glimmer Cape
+					-- may come from a teammate.
+					local level, apiCooldown = SpellOf(hero, spell)
+					if level ~= nil and level > 0 then
+						RecordAndLog(observer, hero, heroName, spell, "modifier", now, level, apiCooldown)
+					end
 				end
 			end
 			local sighting = sightings[heroName]
@@ -272,6 +307,9 @@ function EnemySpells.Observe(observer, enemies)
 				sighting.vanishAt = now
 			end
 		end)
+		if not okHero then
+			LogError(observer, "observe", errHero)
+		end
 	end
 	for heroName, sighting in pairs(sightings) do
 		if
@@ -280,18 +318,27 @@ function EnemySpells.Observe(observer, enemies)
 			and not sighting.tp
 			and now - sighting.at <= EnemySpells.VANISH_SEEN_WITHIN
 		then
-			pcall(function()
+			local okVanish, errVanish = pcall(function()
 				-- Out of the caller's list but still in sight (e.g. it walked beyond the list radius): no vanish.
-				if sighting.hero ~= nil and not sighting.hero:IsNull() and sighting.hero:CanBeSeen() then
+				local okSeen, stillSeen = pcall(function()
+					return sighting.hero ~= nil and not sighting.hero:IsNull() and sighting.hero:CanBeSeen()
+				end)
+				if okSeen and stillSeen then
 					return
 				end
 				-- Dead: no vanish (IsHeroAlive on an enemy player ID: FuncLib/systems/kill_window.lua relies on it too).
 				-- A failed read records nothing.
 				local okAlive, alive = pcall(IsHeroAlive, sighting.pid)
-				if not okAlive or not alive then
+				if not okAlive then
+					LogVanishSkip(observer, heroName, "alive-read")
+					return
+				end
+				if not alive then
+					LogVanishSkip(observer, heroName, "dead")
 					return
 				end
 				if not IsRadiusVisible(sighting.loc, EnemySpells.VANISH_VISIBLE_RADIUS) then
+					LogVanishSkip(observer, heroName, "fog")
 					return
 				end
 				RecordAndLog(
@@ -305,6 +352,9 @@ function EnemySpells.Observe(observer, enemies)
 					sighting.vanishCooldown
 				)
 			end)
+			if not okVanish then
+				LogError(observer, "vanish", errVanish)
+			end
 			-- One check per disappearance.
 			sighting.at = -999
 		end
@@ -313,19 +363,25 @@ end
 
 -- Probe: does InstallCastCallback report enemy casts? Installed once per team's Lua state. Lines:
 --   [OHA-ENEMYCD] t= cast-probe installed=yes|no error=
---   [OHA-ENEMYCD] t= cast-callback n= enemyN= arg=<type> keys=<fields> caster= spell= team=ally|enemy
---                                                         the first 5 calls, and the first 5 calls for an enemy caster
+--   [OHA-ENEMYCD] t= cast-callback n= enemyN= arg=<type> keys=<fields> caster= spell= team=ally|enemy|unknown
+--                                    the first 5 calls, and the first 5 calls for an enemy caster (team=unknown: the
+--                                    caster's team could not be read)
 -- An enemy hero's cast of a spell in COOLDOWNS or in the caller's `interest` name set is recorded with via=callback.
 local probeInstalled = false
 local callbackCount = 0
 local enemyCallbackCount = 0
 local probeInterest = {}
+local probeTeam = nil -- our team, read when the probe is installed
 local function OnCast(info)
 	callbackCount = callbackCount + 1
-	local caster, ability = nil, nil
+	local caster, ability, playerId = nil, nil, nil
 	if type(info) == "table" then
-		caster = info.unit or info.caster or info.player
+		caster = info.unit or info.caster
 		ability = info.ability
+		playerId = info.player_id or info.playerid or info.player
+	end
+	if type(caster) == "number" then
+		playerId, caster = caster, nil
 	end
 	local spell = nil
 	if ability ~= nil and type(ability) ~= "string" then
@@ -336,13 +392,22 @@ local function OnCast(info)
 	elseif type(ability) == "string" then
 		spell = ability
 	end
-	local enemy = false
-	if caster ~= nil and type(caster) ~= "number" then
+	-- The caster's team from its handle, else from the player id; nil when neither reads.
+	local casterTeam, heroName = nil, nil
+	if caster ~= nil then
 		local okTeam, team = pcall(function()
 			return caster:GetTeam()
 		end)
-		enemy = okTeam and team ~= GetTeam()
+		casterTeam = okTeam and team or nil
+		heroName = HeroName(caster)
 	end
+	if casterTeam == nil and type(playerId) == "number" then
+		local okTeam, team = pcall(GetTeamForPlayer, playerId)
+		casterTeam = okTeam and team or nil
+		local okName, name = pcall(GetSelectedHeroName, playerId)
+		heroName = okName and name or heroName
+	end
+	local enemy = casterTeam ~= nil and casterTeam ~= probeTeam
 	if enemy then
 		enemyCallbackCount = enemyCallbackCount + 1
 	end
@@ -363,18 +428,24 @@ local function OnCast(info)
 				enemyCallbackCount,
 				type(info),
 				table.concat(keys, ","),
-				caster ~= nil and type(caster) ~= "number" and HeroName(caster) or tostring(caster),
+				tostring(heroName),
 				tostring(spell),
-				enemy and "enemy" or "ally"
+				casterTeam == nil and "unknown" or enemy and "enemy" or "ally"
 			)
 		)
 	end
-	if enemy and spell ~= nil and (EnemySpells.COOLDOWNS[spell] ~= nil or probeInterest[spell]) then
-		local okHero, isHero = pcall(function()
-			return caster:IsHero()
-		end)
-		if okHero and isHero then
-			RecordAndLog("callback", caster, HeroName(caster), spell, "callback", DotaTime())
+	if enemy and spell ~= nil and heroName ~= nil and (EnemySpells.COOLDOWNS[spell] ~= nil or probeInterest[spell]) then
+		local isHero = string.find(heroName, "^npc_dota_hero_") ~= nil
+		if isHero then
+			local level, apiCooldown = nil, nil
+			if ability ~= nil and type(ability) ~= "string" then
+				local okLevel, readLevel = pcall(function()
+					return ability:GetLevel()
+				end)
+				level = okLevel and readLevel or nil
+				apiCooldown = SafeCooldown(ability)
+			end
+			RecordAndLog("callback", caster, heroName, spell, "callback", DotaTime(), level, apiCooldown)
 		end
 	end
 end
@@ -388,8 +459,12 @@ function EnemySpells.InstallCastProbe(interest)
 	probeInstalled = true
 	local ok, err = false, "no-function"
 	if type(InstallCastCallback) == "function" then
+		probeTeam = GetTeam()
 		ok, err = pcall(InstallCastCallback, -1, function(info)
-			pcall(OnCast, info)
+			local okCast, errCast = pcall(OnCast, info)
+			if not okCast then
+				LogError("callback", "cast-callback", errCast)
+			end
 		end)
 	end
 	pcall(

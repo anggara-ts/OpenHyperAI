@@ -816,7 +816,7 @@ local function KiteSample(unit, attacker, kind, stepped, why, stepEnd, checkIn)
 		stepEnd = stepEnd,
 		stepLeft = stepEnd ~= nil and Fu.GetLocationToLocationDistance(unit:GetLocation(), stepEnd) or nil,
 		closest = math.huge,
-		-- from-hit: the unit we stepped from (not any creep) released an attack on us before the check.
+		-- fromHit: the unit we stepped from (not any creep) released an attack on us before the check.
 		attackerLast = attacker:GetLastAttackTime(),
 		fromHit = false,
 	}
@@ -829,7 +829,7 @@ function X.KiteResultTick(unit)
 		pending.closest =
 			math.min(pending.closest, Fu.GetLocationToLocationDistance(unit:GetLocation(), pending.stepEnd))
 	end
-	-- from-hit (#72, game 064: the creep metric counted any creep's hit): the attacker's last attack time moved after
+	-- fromHit (#72, game 064: the creep metric counted any creep's hit): the attacker's last attack time moved after
 	-- the sample started while its target was this bot. Read every frame, so the target at the release is seen.
 	if pending ~= nil and pending.kind ~= "chase" and not pending.fromHit then
 		local attacker = pending.enemy
@@ -919,7 +919,7 @@ function X.KiteResultTick(unit)
 					pcall(
 						print,
 						string.format(
-							"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d from-hit=%d late-attack=%d moved=%d base=%d base-hit=%d base-from-hit=%d no-step=%s window=%.0fs",
+							"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d fromHit=%d late-attack=%d moved=%d base=%d base-hit=%d baseFromHit=%d no-step=%s window=%.0fs",
 							DotaTime(),
 							ShortName(unit),
 							kind,

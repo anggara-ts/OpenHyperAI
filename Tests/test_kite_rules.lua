@@ -378,7 +378,7 @@ T.test("chase hook: too-fast attacks are a no-step reason, not a baseline sample
 	T.ok(string.find(result or "", "no-step=fast:1", 1, true) ~= nil, "counted once: " .. tostring(result))
 end)
 
-T.test("kite result: from-hit names a hit by the creep we stepped from", function()
+T.test("kite result: fromHit names a hit by the creep we stepped from", function()
 	local bot, SpecialUnits, attacker, _, moves = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
 	bot.GetNearbyNeutralCreeps = function()
 		return { attacker }
@@ -396,5 +396,5 @@ T.test("kite result: from-hit names a hit by the creep we stepped from", functio
 	T.stub.time = T.stub.time + 61
 	SpecialUnits.KiteResultTick(bot)
 	local result = printedWith("result kind=jungle")
-	T.ok(result ~= nil and string.find(result, "from-hit=1", 1, true) ~= nil, "from-hit counted: " .. tostring(result))
+	T.ok(result ~= nil and string.find(result, "fromHit=1", 1, true) ~= nil, "fromHit counted: " .. tostring(result))
 end)

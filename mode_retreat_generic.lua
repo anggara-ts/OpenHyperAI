@@ -594,6 +594,21 @@ local function CreepLowDesire(byRoshan)
 				)
 			)
 		end
+		-- A channel that is not a TP (or a TP that modifier_teleporting did not show) ended a live hold: say so,
+		-- so a game without tp-keep lines tells "no TP" from "TP not detected".
+		if channeling and holding then
+			pcall(
+				print,
+				string.format(
+					"[OHA-RETREAT] t=%.0f %s creep-low drop why=channel tp=%s hp=%.2f mode=%d",
+					now,
+					HeroName(),
+					tostring(teleporting),
+					hpRatio,
+					activeMode or -1
+				)
+			)
+		end
 		bot._creepLowUntil = nil
 		bot._creepLowByRoshan = nil
 		bot._creepLowTpLogged = nil
@@ -724,6 +739,30 @@ function GetDesire()
 				)
 			)
 		end
+	end
+	-- The creep-low window is live but another rule returned first with less than its 0.98 (game 064, 42:08: push
+	-- 0.90 won right after a creep-low hold line and the log could not say which rule let it). At most every 3s.
+	if
+		type(desire) == "number"
+		and desire < 0.98
+		and bot._creepLowUntil ~= nil
+		and now < bot._creepLowUntil
+		and now >= (bot._creepLowUnderLogAt or -999)
+	then
+		bot._creepLowUnderLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s creep-low-undercut desire=%.2f line=%d hp=%.2f mode=%d channel=%s",
+				now,
+				HeroName(),
+				desire,
+				retreatLine,
+				hpRatio or -1,
+				activeMode or -1,
+				tostring(bot:IsChanneling())
+			)
+		)
 	end
 	return desire
 end

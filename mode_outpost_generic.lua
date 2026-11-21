@@ -683,6 +683,12 @@ function ThinkIndividualRoaming()
 		end
 	end
 	if bot:HasModifier("modifier_primal_beast_trample") then
+		-- A Pulverize ordered during Trample to stop a channel (#48, hero_primal_beast.lua) is not in its cast
+		-- phase yet while he turns or closes the last units; a move order here would replace it. Think() returns
+		-- by itself once the cast and the channel run.
+		if DotaTime() < (bot._pulverizeHoldUntil or -999) then
+			return true
+		end
 		local allies = Fu.GetAlliesNearLoc(bot:GetLocation(), 1200)
 		local enemies = Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200)
 		if

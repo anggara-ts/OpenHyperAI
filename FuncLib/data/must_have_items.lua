@@ -226,6 +226,14 @@ return {
 			{ "item_echo_sabre", 11000 },
 		},
 	},
+	chen = {
+		[1] = {
+			{ "item_mekansm", 8000, done = { "item_guardian_greaves" } },
+		},
+		[2] = {
+			{ "item_mekansm", 8000, done = { "item_guardian_greaves" } },
+		},
+	},
 	clinkz = {
 		[1] = {
 			{ "item_desolator", 9500 },
@@ -443,6 +451,10 @@ return {
 			{ "item_spirit_vessel", 7500 },
 			{ "item_kaya", 10000, done = { "item_kaya_and_sange" } },
 			{ "item_ultimate_scepter", 17000, done = { "item_ultimate_scepter_2" } },
+		},
+		[3] = {
+			{ "item_spirit_vessel", 7500 },
+			{ "item_ultimate_scepter", 18000, done = { "item_ultimate_scepter_2" } },
 		},
 	},
 	enchantress = {
@@ -1691,6 +1703,14 @@ return {
 			{ "item_helm_of_the_dominator", 6000 },
 			{ "item_ultimate_scepter", 11500, done = { "item_ultimate_scepter_2" } },
 			{ "item_black_king_bar", 21000 },
+		},
+		[2] = {
+			{ "item_ultimate_scepter", 8000, done = { "item_ultimate_scepter_2" } },
+			{ "item_black_king_bar", 13000 },
+			{ "item_shivas_guard", 18500 },
+		},
+		[3] = {
+			{ "item_ultimate_scepter", 8000, done = { "item_ultimate_scepter_2" } },
 		},
 	},
 	witch_doctor = {

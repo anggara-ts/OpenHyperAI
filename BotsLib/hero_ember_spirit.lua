@@ -59,6 +59,45 @@ sRoleItemsBuyList["pos_2"] = {
 	"item_octarine_core",
 	"item_moon_shard",
 }
+-- Stratz 7.41f, week of 9 Nov 2026: pos 3, 2,370 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_3"] = {
+	"item_tango",
+	"item_double_branches",
+	"item_quelling_blade",
+	"item_circlet",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_phase_boots",
+	"item_spirit_vessel",
+	"item_mage_slayer",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_ultimate_scepter_2",
+	"item_sphere",
+	"item_radiance",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 4, 1,215 matches (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_4"] = {
+	"item_tango",
+	"item_blood_grenade",
+	"item_double_branches",
+	"item_magic_stick",
+	"item_faerie_fire",
+	"item_magic_wand",
+	"item_urn_of_shadows",
+	"item_phase_boots",
+	"item_spirit_vessel",
+	"item_cyclone",
+	"item_aghanims_shard",
+	"item_ultimate_scepter",
+	"item_black_king_bar",
+	"item_ultimate_scepter_2",
+	"item_sphere",
+}
+-- Stratz 7.41f, week of 9 Nov 2026: pos 5 has 581 matches, built from pos 4 (1,215) (Util/item-builds/generate.js).
+sRoleItemsBuyList["pos_5"] = sRoleItemsBuyList["pos_4"]
 X["sBuyList"] = sRoleItemsBuyList[sRole]
 X["sSellList"] = {
 	"item_black_king_bar",

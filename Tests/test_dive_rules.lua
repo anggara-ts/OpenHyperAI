@@ -103,6 +103,25 @@ T.test("tower hold: walk out of range + 200, then on to + 350 before letting go"
 	T.eq(run, false, "between + 200 and + 350 coming from outside: free (no flip at the edge)")
 end)
 
+T.test("tower hold: a push pauses it, it resumes after (game 064, Alchemist at Dire's mid T1)", function()
+	local R = rules()
+	-- t=744 tower-entry-stop: hold until 753.
+	local untilTime = 744 + R.HOLD_SECONDS
+	T.eq(R.TowerHoldState(748, untilTime, true, false, nil), "keep", "t=748 attack mode, hold runs")
+	-- t=750: one push-mode think. It used to clear the hold.
+	T.eq(R.TowerHoldState(750, untilTime, true, true, nil), "pause", "t=750 push: pause")
+	T.eq(R.TowerHoldState(750.5, untilTime, true, true, true), "pause", "still pushing: still paused")
+	-- t=751: attack mode again, he walked back toward the tower: the hold is back (he was chase-stopped instead).
+	T.eq(R.TowerHoldState(751, untilTime, true, false, true), "resume", "t=751 push over: resume")
+	T.eq(R.TowerHoldState(751.5, untilTime, true, false, nil), "keep", "after the resume")
+	-- The clock kept running through the pause; a dead tower ends it too.
+	T.eq(R.TowerHoldState(754, untilTime, true, false, true), "expire", "9s over")
+	T.eq(R.TowerHoldState(749, untilTime, false, true, nil), "expire", "tower gone")
+	-- The retreat file pauses instead of clearing on a push.
+	local src = T.read("mode_retreat_generic.lua")
+	T.ok(string.find(src, "DiveRules.TowerHoldState(", 1, true) ~= nil, "retreat uses TowerHoldState")
+end)
+
 T.test("tower chase: entering only when the bot can't hit the target from outside the tower's range", function()
 	local R = rules()
 	-- Tower range 700. Melee (150) after a target 500 from the tower: has to walk in (500 + 150 = 650).

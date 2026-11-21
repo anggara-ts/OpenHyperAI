@@ -1030,15 +1030,53 @@ local function TowerChaseHoldRun()
 		return 0
 	end
 	local now = DotaTime()
-	if now > hold.untilTime or not Fu.IsValidBuilding(hold.tower) or Fu.IsPushing(bot) then
+	-- A push pauses the hold, it doesn't end it (DiveRules.TowerHoldState; game 064, 12:24-12:31, Alchemist).
+	local state =
+		DiveRules.TowerHoldState(now, hold.untilTime, Fu.IsValidBuilding(hold.tower), Fu.IsPushing(bot), hold.paused)
+	if state == "expire" then
 		bot._towerChaseHold = nil
 		return 0
 	end
 	local dist = GetUnitToUnitDistance(bot, hold.tower)
+	-- tower-hold-pause / tower-hold-resume: once per change, at most every 2s (a push / attack flip would repeat it).
+	local function logChange(what)
+		if now < (bot._towerHoldChangeLogAt or -999) then
+			return
+		end
+		bot._towerHoldChangeLogAt = now + 2
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s tower-hold-%s why=%s tower=%s dist=%d zone=%d left=%.1f hp=%.2f mode=%d",
+				now,
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				what,
+				hold.why,
+				hold.tower:GetUnitName(),
+				math.floor(dist),
+				math.floor(hold.range + DiveRules.HOLD_MARGIN),
+				hold.untilTime - now,
+				hpRatio,
+				activeMode or -1
+			)
+		)
+	end
+	if state == "pause" then
+		if not hold.paused then
+			hold.paused = true
+			logChange("pause")
+		end
+		return 0
+	end
+	hold.paused = nil
 	local run
 	run, hold.inside = DiveRules.TowerHoldRun(dist, hold.range, hold.inside)
 	if not run then
 		return 0
+	end
+	if state == "resume" then
+		-- Only when the hold runs again: the push ended with the bot still near that tower.
+		logChange("resume")
 	end
 	if now >= (bot._towerHoldLogAt or -999) then
 		bot._towerHoldLogAt = now + 3

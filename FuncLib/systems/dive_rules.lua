@@ -75,4 +75,24 @@ function DiveRules.TowerHoldRun(dist, range, inside)
 	return false, false
 end
 
+-- What the hold does at this check. A push pauses it instead of ending it: PushThink steps out of tower aggro itself,
+-- and retreat must not pull a bot out of a team siege. Game 064, 12:24-12:31: Alchemist was stopped at Dire's mid T1
+-- (tower-entry-stop), one push-mode think during the hold cleared it, and attack mode walked him back under the
+-- tower 7s later (chase-stop). The 9s clock keeps running while paused; when the push ends the hold resumes.
+--   now, untilTime   game time and the hold's end; towerValid: the tower still stands
+--   pushing          the bot is in a push mode now; paused: the last check paused the hold
+-- Returns "expire" (drop the hold), "pause", "resume" (first check after a pause) or "keep".
+function DiveRules.TowerHoldState(now, untilTime, towerValid, pushing, paused)
+	if now > untilTime or not towerValid then
+		return "expire"
+	end
+	if pushing then
+		return "pause"
+	end
+	if paused then
+		return "resume"
+	end
+	return "keep"
+end
+
 return DiveRules

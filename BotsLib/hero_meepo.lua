@@ -4,6 +4,9 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
+-- [OHA-MTRACE] (#139): true only with Customize.Debug_Meepo_Trace; then a mark goes out before every order below.
+local traceOn = MeepoTrace.IsOn()
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -148,17 +151,26 @@ function X.SkillsComplement()
 	isAttacking = Fu.IsAttacking(bot)
 	poofDesire, poofTarget = X.ConsiderPoof()
 	if poofDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-poof")
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnEntity(poofAbility, poofTarget)
 		return
 	end
 	digDesire = X.ConsiderDig()
 	if digDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-dig")
+		end
 		bot:ActionQueue_UseAbility(digAbility)
 		return
 	end
 	earthbindDesire, earthbindLocation = X.ConsiderEarthBind()
 	if earthbindDesire > 0 then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-earthbind")
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:ActionQueue_UseAbilityOnLocation(earthbindAbility, earthbindLocation)
 		rememberEarthbindCast(earthbindLocation)
@@ -166,6 +178,9 @@ function X.SkillsComplement()
 	end
 	local regroupBody = X.ConsiderRegroup()
 	if regroupBody ~= nil then
+		if traceOn then
+			MeepoTrace.Mark("meepo.order-regroup-move")
+		end
 		bot:Action_MoveToLocation(regroupBody:GetLocation())
 		return
 	end
@@ -393,6 +408,9 @@ function X.ConsiderPoofRaw()
 	if hpRatio < 0.5 and isRetreating then
 		for _, meepo in pairs(meepos) do
 			if meepo ~= bot and meepo:DistanceFromFountain() < 800 and not Fu.IsStunProjectileIncoming(bot, 400) then
+				if traceOn then
+					MeepoTrace.Mark("meepo.poof-out")
+				end
 				return BOT_ACTION_DESIRE_ABSOLUTE, meepo
 			end
 		end
@@ -723,4 +741,13 @@ function X.ConsiderDig()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- [OHA-MTRACE] (#139): start/end lines around the hero code and each spell decision; the functions themselves when
+-- the trace is off. Last, so the engine-facing callers (ability_item_usage_generic, bot_generic) get the wrapped ones.
+X.SkillsComplement = MeepoTrace.Wrap("meepo.SkillsComplement", X.SkillsComplement)
+X.MinionThink = MeepoTrace.Wrap("meepo.MinionThink", X.MinionThink)
+X.ConsiderPoof = MeepoTrace.Wrap("meepo.ConsiderPoof", X.ConsiderPoof)
+X.ConsiderPoofRaw = MeepoTrace.Wrap("meepo.ConsiderPoofRaw", X.ConsiderPoofRaw)
+X.ConsiderDig = MeepoTrace.Wrap("meepo.ConsiderDig", X.ConsiderDig)
+X.ConsiderEarthBind = MeepoTrace.Wrap("meepo.ConsiderEarthBind", X.ConsiderEarthBind)
+X.ConsiderRegroup = MeepoTrace.Wrap("meepo.ConsiderRegroup", X.ConsiderRegroup)
 return X

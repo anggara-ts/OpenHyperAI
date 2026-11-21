@@ -2895,4 +2895,10 @@ do
 	local Perf = require(GetScriptDirectory() .. "/FuncLib/systems/perf")
 	ItemPurchaseThink = Perf.Wrap("ItemPurchaseThink", ItemPurchaseThink)
 end
+-- [OHA-MTRACE] Meepo call trace (#139): FuncLib/systems/meepo_trace.lua. Off unless Customize.Debug_Meepo_Trace;
+-- last, so it is the outermost wrapper and its lines bracket everything the engine calls.
+do
+	local MeepoTrace = require(GetScriptDirectory() .. "/FuncLib/systems/meepo_trace")
+	ItemPurchaseThink = MeepoTrace.Wrap("ItemPurchaseThink", ItemPurchaseThink)
+end
 return ItemPurchase

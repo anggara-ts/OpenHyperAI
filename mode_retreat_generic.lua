@@ -43,6 +43,10 @@ local function RefreshNearby()
 	for _, unit in pairs(allUnits) do
 		if
 			Fu.IsValid(unit)
+			-- Nothing beyond 1600 counts below (heroes within 1600, the rest within 1200), so the distance is read
+			-- first: the name and five modifier reads ran for every unit on the map on every retreat desire (#52:
+			-- retreat.GetDesire was the biggest cost after the item think in games 059 and 062, 38s and 37s).
+			and GetUnitToUnitDistance(bot, unit) <= 1600
 			and unit:GetTeam() ~= TEAM_NEUTRAL
 			and unit:GetTeam() ~= TEAM_NONE
 			and not string.find(unit:GetUnitName(), "lone_druid_bear")

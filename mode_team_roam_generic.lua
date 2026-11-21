@@ -105,6 +105,18 @@ local function adjustDesire(desire)
 	end
 	return desire
 end
+-- #185: the Tombstone priority (close, nearly dead, or allies in its radius) stays above attack mode (0.95); the
+-- laning cap (0.72) and the push cap (0.5) would put it under again (game 065: `special-unit,raw=0.95,cap=lane`).
+-- A wrapper, so the caps above stay as they are (#165 rewrites them).
+do
+	local cappedDesire = adjustDesire
+	adjustDesire = function(desire)
+		if hasSpecialUnitTarget and bot._tombstonePriority then
+			return desire
+		end
+		return cappedDesire(desire)
+	end
+end
 -- Diagnostics (#165, mode flip-flops): the rule that set this think's desire. Assigned before each return of
 -- GetDesire / GetDesireHelper; read only by RoamTrace, never by a decision.
 local roamWhy = "none"
@@ -572,6 +584,34 @@ function TeamRoam.LastHitWithdrawWhy(creep)
 	end
 	return nil
 end
+-- #185: no last-hit snipe on an Undying zombie while a priority Tombstone is within 1600 (SpecialUnits.PriorityTombstone):
+-- the Tombstone first, the zombies stop with it. Game 067, t=1423-1426: Primal Beast and Puck had the Tombstone at
+-- prio=yes 0.98 and the snipe hit zombies instead. Asked only for a zombie the snipe would take, so the log line is a
+-- real skip: [OHA-ROAM] snipe-skip why=tombstone-first (once per 5s per bot).
+function TeamRoam.ZombieWhileTombstone(creep)
+	if string.find(creep:GetUnitName(), "undying_zombie", 1, true) == nil then
+		return false
+	end
+	local tombstone, dist, hitsLeft = SpecialUnits.PriorityTombstone(bot, Fu.IsRetreating(bot), Fu.GetHP(bot))
+	if tombstone == nil then
+		return false
+	end
+	if DotaTime() >= (bot._zombieSnipeSkipLogAt or -999) then
+		bot._zombieSnipeSkipLogAt = DotaTime() + 5
+		pcall(
+			print,
+			string.format(
+				"[OHA-ROAM] t=%.0f %s snipe-skip why=tombstone-first unit=%s tombstone-dist=%d hits-left=%d",
+				DotaTime(),
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				creep:GetUnitName(),
+				dist,
+				hitsLeft
+			)
+		)
+	end
+	return true
+end
 function TeamRoam.GetLastHitCreep()
 	if Fu.IsRetreating(bot) or not Fu.IsCore(bot) and Fu.IsThereCoreNearby(800) or Fu.IsInTeamFight(bot, 1200) then
 		return nil
@@ -596,7 +636,7 @@ function TeamRoam.GetLastHitCreep()
 			then
 				local alliesNearCreep = Fu.GetAlliesNearLoc(creep:GetLocation(), 1000)
 				local enemiesNearCreep = Fu.GetEnemiesNearLoc(creep:GetLocation(), 1000)
-				if #alliesNearCreep >= #enemiesNearCreep then
+				if #alliesNearCreep >= #enemiesNearCreep and not TeamRoam.ZombieWhileTombstone(creep) then
 					return creep
 				end
 			end

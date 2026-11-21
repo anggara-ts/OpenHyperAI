@@ -2,6 +2,7 @@
 local X = {}
 local bot
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
+local SpecialUnitRules = require(GetScriptDirectory() .. "/FuncLib/systems/special_unit_rules")
 function X.GetDesire(thinkingBot)
 	-- bot was set after these four reads, so they described the previous caller (nil at first).
 	bot = thinkingBot
@@ -13,6 +14,7 @@ function X.GetDesire(thinkingBot)
 		return 0
 	end
 	bot.special_unit_target = nil
+	bot._tombstonePriority = false
 	local health = bot:GetHealth()
 	local botHpRatio = hpRatio
 	local botLocation = bot:GetLocation()
@@ -38,6 +40,16 @@ function X.GetDesire(thinkingBot)
 		if wardDesire > 0 and Fu.IsValid(wardTarget) then
 			bot.special_unit_target = wardTarget
 			return wardDesire
+		end
+	end
+	-- Undying's Tombstone first when it is close, nearly dead or our heroes stand in it (#185): before the loop, so a
+	-- zombie or another unit earlier in the list can't return first. Team roam keeps this desire uncapped.
+	do
+		local tombstoneDesire, tombstone = X.GetTombstonePriorityDesire(bot, isRetreating, hpRatio, attackRange)
+		if tombstoneDesire > 0 and Fu.IsValid(tombstone) then
+			bot.special_unit_target = tombstone
+			bot._tombstonePriority = true
+			return tombstoneDesire
 		end
 	end
 	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
@@ -355,6 +367,101 @@ function X.GetDesire(thinkingBot)
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE
+end
+-- The nearest attackable enemy Tombstone within range, and its hits left (SpecialUnitRules.TombstoneHitsLeft).
+function X.NearestTombstone(unit, range)
+	local best, bestDist = nil, range
+	for _, enemy in pairs(GetUnitList(UNIT_LIST_ENEMIES)) do
+		if
+			Fu.IsValid(enemy)
+			and string.find(enemy:GetUnitName(), "npc_dota_unit_tombstone")
+			and Fu.CanBeAttacked(enemy)
+		then
+			local dist = GetUnitToUnitDistance(unit, enemy)
+			if dist <= bestDist then
+				best, bestDist = enemy, dist
+			end
+		end
+	end
+	if best == nil then
+		return nil
+	end
+	return best, bestDist, SpecialUnitRules.TombstoneHitsLeft(best:GetHealth(), best:GetMaxHealth())
+end
+-- [OHA-ROAM] t= <hero> special-unit unit=tombstone hits-left= hp= maxHp= dist= allies= enemies= prio= desire=
+-- allies: allied heroes within the Tombstone's radius (the bot too); enemies: enemy heroes within 1600 of the bot.
+-- Once per 3s per bot, or when the priority or the hits left change.
+function X.LogTombstone(unit, hitsLeft, tombstone, dist, alliesInRadius, enemiesNear, priority, desire)
+	local key = tostring(priority) .. ":" .. hitsLeft
+	if unit._tombstoneLogKey == key and DotaTime() < (unit._tombstoneLogAt or -999) then
+		return
+	end
+	unit._tombstoneLogKey = key
+	unit._tombstoneLogAt = DotaTime() + 3
+	pcall(
+		print,
+		string.format(
+			"[OHA-ROAM] t=%.0f %s special-unit unit=tombstone hits-left=%d hp=%d maxHp=%d dist=%d allies=%d enemies=%d prio=%s desire=%.2f",
+			DotaTime(),
+			(string.gsub(unit:GetUnitName(), "npc_dota_hero_", "")),
+			hitsLeft,
+			tombstone:GetHealth(),
+			tombstone:GetMaxHealth(),
+			dist,
+			alliesInRadius,
+			enemiesNear,
+			priority and "yes" or "no",
+			desire
+		)
+	)
+end
+-- Tombstone priority (SpecialUnitRules.TombstoneDesire): returns the desire and the Tombstone in the priority case,
+-- else 0 (the old even-fight rule in the loop below handles the rest). Logs every Tombstone within 1600.
+function X.GetTombstonePriorityDesire(unit, isRetreating, hpRatio, attackRange)
+	local tombstone, dist, hitsLeft = X.NearestTombstone(unit, 1600)
+	if tombstone == nil then
+		return 0
+	end
+	local alliesInRadius = #(Fu.GetAlliesNearLoc(tombstone:GetLocation(), SpecialUnitRules.TOMBSTONE_RADIUS) or {})
+	local alliesNear = #(unit:GetNearbyHeroes(1600, false, BOT_MODE_NONE) or {})
+	local enemiesNear = #(unit:GetNearbyHeroes(1600, true, BOT_MODE_NONE) or {})
+	local desire, priority = SpecialUnitRules.TombstoneDesire(
+		dist,
+		attackRange,
+		hitsLeft,
+		alliesInRadius,
+		alliesNear,
+		enemiesNear,
+		isRetreating,
+		hpRatio
+	)
+	X.LogTombstone(unit, hitsLeft, tombstone, dist, alliesInRadius, enemiesNear, priority, desire)
+	if priority then
+		return desire, tombstone
+	end
+	return 0
+end
+-- The Tombstone within 1600 when it is the priority case (SpecialUnitRules.TombstonePriority), its distance and hits
+-- left, or nil. Read fresh (no log, no bot field): team roam's last-hit snipe asks before SpecialUnits.GetDesire runs.
+function X.PriorityTombstone(unit, isRetreating, hpRatio)
+	local tombstone, dist, hitsLeft = X.NearestTombstone(unit, 1600)
+	if tombstone == nil then
+		return nil
+	end
+	local alliesInRadius = #(Fu.GetAlliesNearLoc(tombstone:GetLocation(), SpecialUnitRules.TOMBSTONE_RADIUS) or {})
+	if SpecialUnitRules.TombstonePriority(dist, hitsLeft, alliesInRadius, isRetreating, hpRatio) then
+		return tombstone, dist, hitsLeft
+	end
+	return nil
+end
+-- A zombie-slowed bot (mode_outpost_generic.lua) hits a nearly dead Tombstone close by instead of running: the
+-- Tombstone, its distance and hits left, or nil.
+function X.TombstoneToHitWhenSlowed(unit)
+	local tombstone, dist, hitsLeft = X.NearestTombstone(unit, SpecialUnitRules.TOMBSTONE_SLOW_HIT_RANGE)
+	if tombstone ~= nil and SpecialUnitRules.TombstoneHitWhenSlowed(dist, hitsLeft) then
+		return tombstone, dist, hitsLeft
+	end
+	return nil
 end
 function X.Think(unit)
 	local thinkingUnit = unit or bot

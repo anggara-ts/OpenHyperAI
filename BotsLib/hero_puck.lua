@@ -395,20 +395,38 @@ function X.ConsiderSiphonEscape()
 	local orbReady = illusoryOrbAbility:IsFullyCastable() and jauntReady and mana >= illusoryOrbAbility:GetManaCost()
 	local phaseReady = phaseShiftAbility:IsFullyCastable()
 	if orbReady or phaseReady or bot._siphonEscapeFrom ~= nil then
-		bot._noTpUntil = DotaTime() + 0.5
+		bot._noTpUntil = math.max(bot._noTpUntil or -999, DotaTime() + 0.5)
+	end
+	-- Orb and Phase Shift both down (game 067, 4:04: the Orb went on a lane harass, Phase was used): Waning Rift
+	-- (max_distance 350, datafeed hero 13) toward home, then the walk out past the break distance.
+	local riftReady = waningRiftAbility:IsFullyCastable()
+		and not bot:IsRooted()
+		and mana >= waningRiftAbility:GetManaCost()
+		and not bot:HasModifier("modifier_puck_phase_shift")
+	local skipWhy = "-"
+	if not orbReady and not phaseReady then
+		if not illusoryOrbAbility:IsFullyCastable() then
+			skipWhy = "orb-cd"
+		elseif not jauntReady then
+			skipWhy = "jaunt-down"
+		else
+			skipWhy = "no-mana"
+		end
 	end
 	if DotaTime() >= (bot._siphonLogAt or -999) then
 		bot._siphonLogAt = DotaTime() + 3
 		pcall(
 			print,
 			string.format(
-				"[OHA-PUCK] t=%.0f siphoned dist=%d hp=%.2f orb=%s phase=%s jaunt=%s tp-held=%s",
+				"[OHA-PUCK] t=%.0f siphoned dist=%d hp=%.2f orb=%s phase=%s jaunt=%s rift=%s skip=%s tp-held=%s",
 				DotaTime(),
 				GetUnitToUnitDistance(bot, siphoner),
 				Fu.GetHP(bot),
 				tostring(orbReady),
 				tostring(phaseReady),
 				tostring(jauntReady),
+				tostring(riftReady),
+				skipWhy,
 				tostring(DotaTime() < (bot._noTpUntil or -999))
 			)
 		)
@@ -434,6 +452,17 @@ function X.ConsiderSiphonEscape()
 		bot._siphonEscapeFrom = siphoner
 		X.LogEscapeAction("orb", "siphon", point)
 		bot:Action_UseAbilityOnLocation(illusoryOrbAbility, point)
+		return true
+	end
+	-- Hit by the drain in the last second only: no Rift for a link that is about to end.
+	if not orbReady and not phaseReady and riftReady and bot:WasRecentlyDamagedByHero(siphoner, 1.0) then
+		local riftDistance = waningRiftAbility:GetSpecialValueInt("max_distance")
+		if riftDistance == nil or riftDistance <= 0 then
+			riftDistance = 350
+		end
+		local point = X.EscapePoint(riftDistance - 10)
+		X.LogEscapeAction("rift", "siphon", point)
+		bot:Action_UseAbilityOnLocation(waningRiftAbility, point)
 		return true
 	end
 	return false
@@ -521,13 +550,139 @@ end
 -- this instead, so the Phase Shift probe and the "hit: release the hold" check keep running inside the shift
 -- (game 051: every probe printed only after the hold, 1.1s to 3.3s after the order).
 function X.CastHoldTick()
+	pcall(X.SampleHp)
+	pcall(X.HoldTpInDanger)
 	pcall(X.TrackPhaseShift)
 	pcall(X.ShiftExit)
 	if bot._castHoldUntil ~= nil and X.HurtSincePhaseOrder() then
 		bot._castHoldUntil = nil
 	end
 end
+-- No TP while siphoned or next to a hero that is hitting her (EscapeRules.HoldTp, #36 game 067 4:05). Runs first in
+-- every think, before the returns for the shift, the cast hold and silence (silence stops spells, not the TP).
+-- The item think runs the TP rule before this script, so the window rolls 1s ahead of the last check.
+-- [OHA-PUCK] tp-hold why=siphoned|hit-near hitter= dist= hp=, at most once per 3s.
+function X.HoldTpInDanger()
+	local siphoned = bot:HasModifier("modifier_death_prophet_spirit_siphon_slow")
+	local hitter, hitterDist = nil, nil
+	for _, enemyHero in pairs(Fu.GetNearbyHeroes(bot, EscapeRules.TP_HOLD_RANGE, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and bot:WasRecentlyDamagedByHero(enemyHero, 2.0) then
+			local dist = GetUnitToUnitDistance(bot, enemyHero)
+			if hitterDist == nil or dist < hitterDist then
+				hitter, hitterDist = enemyHero, dist
+			end
+		end
+	end
+	local hold, why = EscapeRules.HoldTp(siphoned, hitterDist)
+	if not hold then
+		return false
+	end
+	bot._noTpUntil = math.max(bot._noTpUntil or -999, DotaTime() + 1.0)
+	if DotaTime() >= (bot._tpHoldLogAt or -999) then
+		bot._tpHoldLogAt = DotaTime() + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-PUCK] t=%.0f tp-hold why=%s hitter=%s dist=%d hp=%.2f",
+				DotaTime(),
+				tostring(why),
+				hitter ~= nil and (string.gsub(hitter:GetUnitName(), "npc_dota_hero_", "")) or "-",
+				hitterDist or -1,
+				Fu.GetHP(bot)
+			)
+		)
+	end
+	return true
+end
+-- HP samples (every 0.2s, the last 1.5s) for the HP drop over the last second (X.HpLoss).
+function X.SampleHp()
+	local now = DotaTime()
+	local samples = bot._puckHpSamples or {}
+	bot._puckHpSamples = samples
+	local last = samples[#samples]
+	if last == nil or now - last.t >= 0.2 then
+		samples[#samples + 1] = { t = now, hp = Fu.GetHP(bot) }
+	end
+	while #samples > 0 and now - samples[1].t > 1.5 do
+		table.remove(samples, 1)
+	end
+end
+-- The HP lost over the last second (share of max HP; 0 when it rose).
+function X.HpLoss()
+	local now = DotaTime()
+	local highest = Fu.GetHP(bot)
+	for _, sample in ipairs(bot._puckHpSamples or {}) do
+		if now - sample.t <= 1.0 and sample.hp > highest then
+			highest = sample.hp
+		end
+	end
+	return highest - Fu.GetHP(bot)
+end
+-- Enemy non-hero units (creeps, zombies, summons) within 700 attacking her.
+function X.UnitAttackers()
+	local count = 0
+	for _, unit in pairs(bot:GetNearbyCreeps(700, true) or {}) do
+		if Fu.IsValid(unit) and unit:GetAttackTarget() == bot then
+			count = count + 1
+		end
+	end
+	return count
+end
+-- The nearest enemy Undying Tombstone (zombies spawn by every enemy within its radius 1200, datafeed hero 85), its
+-- distance or -1. Only read when the low-HP Phase rule fires, for the log.
+function X.TombstoneDistance()
+	local best = -1
+	for _, unit in pairs(GetUnitList(UNIT_LIST_ENEMIES) or {}) do
+		if
+			unit ~= nil
+			and not unit:IsNull()
+			and unit:IsAlive()
+			and string.find(unit:GetUnitName(), "npc_dota_unit_tombstone", 1, true)
+		then
+			local dist = GetUnitToUnitDistance(bot, unit)
+			if best < 0 or dist < best then
+				best = dist
+			end
+		end
+	end
+	return best
+end
+-- Time to impact and spell of the skillshot a dodge Phase Shift is for: the linear-projectile finder of the
+-- skillshot dodge (#134) when the build has it (pcall: absent on builds without it), else nil, "-" (the tracking
+-- projectile rules on main have no speed, so no time to impact).
+function X.PhaseDodgeThreat()
+	if Fu.FindLinearProjectileIncoming == nil then
+		return nil, "-"
+	end
+	local ok, threat = pcall(Fu.FindLinearProjectileIncoming, bot, phaseShiftAbility:GetCastPoint(), "cyclone")
+	if not ok or type(threat) ~= "table" or type(threat.tti) ~= "number" then
+		return nil, "-"
+	end
+	return threat.tti, tostring(threat.name or "-")
+end
+-- [OHA-PUCK] phase dodge spell= tti= waited= result=cast|late how=now|waited|cant-cast|expired why=, one per dodge.
+-- result=late: the cast went out after the hit time, or never (stunned first: cant-cast; threat gone: expired).
+function X.LogPhaseDodge(want, result, how)
+	bot._phaseDodgeWant = nil
+	local waited = DotaTime() - want.at
+	result = result or EscapeRules.PhaseDodgeResult(waited, want.tti)
+	pcall(
+		print,
+		string.format(
+			"[OHA-PUCK] t=%.0f phase dodge spell=%s tti=%.2f waited=%.2f result=%s how=%s why=%s",
+			DotaTime(),
+			tostring(want.spell),
+			want.tti or -1,
+			waited,
+			result,
+			tostring(how),
+			tostring(want.why)
+		)
+	)
+end
 function X.SkillsComplement()
+	pcall(X.SampleHp)
+	pcall(X.HoldTpInDanger)
 	pcall(X.TrackPhaseShift)
 	local okExit, exited = pcall(X.ShiftExit)
 	if okExit and exited then
@@ -565,6 +720,11 @@ function X.SkillsComplement()
 			or okReady and orbOut ~= nil and etherealJauntAbility:IsFullyCastable() and not bot:IsRooted()
 		)
 	pcall(X.LogEscapeCheck, okReady and orbOut ~= nil, canCast)
+	-- A dodge that waited for the hold and never went out: stunned first, or the threat passed.
+	local dodgeWant = bot._phaseDodgeWant
+	if dodgeWant ~= nil and (not canCast or DotaTime() - dodgeWant.at > 0.6) then
+		pcall(X.LogPhaseDodge, dodgeWant, "late", canCast and "expired" or "cant-cast")
+	end
 	if not canCast then
 		return
 	end
@@ -590,9 +750,21 @@ function X.SkillsComplement()
 	-- Game 064: two casts went out after the 0.2s wait in attack mode and broke at 0.1s; the outpost GetDesire had
 	-- last run 0.27-0.3s earlier (hold-left age=0.30/0.33, hold-desire=0.00), so the hold had not been asked yet.
 	-- A dodge can't wait (the disjoint on cast is the point); any other shift waits up to 0.4s for the hold.
-	local isDodge = string.sub(tostring(X.phaseWhy), 1, 5) == "dodge"
+	-- Under 20% HP (low-hp-units) the units' next hits can't wait either.
+	local isDodge = string.sub(tostring(X.phaseWhy), 1, 5) == "dodge" or X.phaseWhy == "low-hp-units"
 	local maxWait = isDodge and 0.2 or 0.4
-	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode then
+	-- A dodge whose hit is closer than the wait: cast in this think (game 067, t=3039: Impale tti=0.20, the 0.2s
+	-- wait let the stun land first, canCast=false the next think; she died at 3041). Phase Shift's cast point is
+	-- 0.01 (datafeed hero 13). The cast hold below still starts with the order.
+	local dodgeTti, dodgeSpell = nil, "-"
+	if phaseShiftDesire > 0 and string.sub(tostring(X.phaseWhy), 1, 5) == "dodge" then
+		dodgeTti, dodgeSpell = X.PhaseDodgeThreat()
+		if bot._phaseDodgeWant == nil then
+			bot._phaseDodgeWant = { at = DotaTime(), spell = dodgeSpell, tti = dodgeTti, why = X.phaseWhy }
+		end
+	end
+	local castNow = EscapeRules.PhaseDodgeNow(dodgeTti)
+	if phaseShiftDesire > 0 and bot:GetActiveMode() ~= outpostMode and not castNow then
 		if bot._phaseWantAt == nil or DotaTime() - bot._phaseWantAt > maxWait + 0.3 then
 			bot._phaseWantAt = DotaTime()
 			bot._phaseWantMode = bot:GetActiveMode()
@@ -619,6 +791,9 @@ function X.SkillsComplement()
 				DotaTime() - (bot._outpostLastDesireAt or -99)
 			)
 		)
+		if bot._phaseDodgeWant ~= nil then
+			pcall(X.LogPhaseDodge, bot._phaseDodgeWant, nil, castNow and "now" or "waited")
+		end
 		bot._phaseWantAt = nil
 		bot._phaseWantMode = nil
 		bot._phaseProbeAt = DotaTime() + 0.3
@@ -794,6 +969,41 @@ function X.ConsiderIllusoryOrb()
 			waningRiftAbility:GetManaCost(),
 			illusoryOrbAbility:GetCooldown()
 		)
+		-- Keep the Orb for the Orb + Jaunt escape when an enemy hero is close or she is hurt (EscapeRules.OrbHarassSafe,
+		-- game 067 3:55). [OHA-PUCK] orb-harass-skip why=threat|hp near= dist= hp=, at most once per 5s.
+		if okSpare and spare and not Fu.IsRetreating(bot) then
+			local threat, threatDist = nil, nil
+			for _, enemyHero in
+				pairs(Fu.GetNearbyHeroes(bot, EscapeRules.HARASS_THREAT_RANGE, true, BOT_MODE_NONE) or {})
+			do
+				if
+					Fu.IsValidHero(enemyHero)
+					and not Fu.IsSuspiciousIllusion(enemyHero)
+					and not Fu.IsDisabled(enemyHero)
+					and (threatDist == nil or GetUnitToUnitDistance(bot, enemyHero) < threatDist)
+				then
+					threat, threatDist = enemyHero, GetUnitToUnitDistance(bot, enemyHero)
+				end
+			end
+			local safe, why = EscapeRules.OrbHarassSafe(Fu.GetHP(bot), threatDist)
+			if not safe then
+				spare = false
+				if DotaTime() >= (bot._orbHarassSkipAt or -999) then
+					bot._orbHarassSkipAt = DotaTime() + 5
+					pcall(
+						print,
+						string.format(
+							"[OHA-PUCK] t=%.0f orb-harass-skip why=%s near=%s dist=%d hp=%.2f",
+							DotaTime(),
+							tostring(why),
+							threat ~= nil and (string.gsub(threat:GetUnitName(), "npc_dota_hero_", "")) or "-",
+							threatDist or -1,
+							Fu.GetHP(bot)
+						)
+					)
+				end
+			end
+		end
 		if okSpare and spare and not Fu.IsRetreating(bot) then
 			local target, targetDist = nil, 1100
 			for _, enemyHero in pairs(nearbyEnemyHeroes or {}) do
@@ -1052,6 +1262,34 @@ function X.ConsiderPhaseShift()
 		and roshanHandle:GetAttackTarget() == bot
 	then
 		X.phaseWhy = "roshan"
+		return BOT_ACTION_DESIRE_HIGH
+	end
+	-- Under 20% HP and hit by units (zombies, creeps, summons): EscapeRules.LowHpUnitsPhase (game 067, 42:07-42:16).
+	-- The rules above react to heroes and projectiles only. After the shift the retreat walks her home, out of a
+	-- Tombstone's 1200 radius. [OHA-PUCK] phase why=low-hp-units hp= loss= creep-hit= attackers= tombstone=, once
+	-- per 3s.
+	local lowHp = Fu.GetHP(bot) < EscapeRules.LOW_HP_PHASE
+	local attackers = lowHp and X.UnitAttackers() or 0
+	local hpLoss = lowHp and X.HpLoss() or 0
+	local creepHit = lowHp and bot:WasRecentlyDamagedByCreep(1.0)
+	if lowHp and EscapeRules.LowHpUnitsPhase(Fu.GetHP(bot), hpLoss, creepHit, attackers) then
+		X.phaseWhy = "low-hp-units"
+		if DotaTime() >= (bot._lowHpPhaseLogAt or -999) then
+			bot._lowHpPhaseLogAt = DotaTime() + 3
+			pcall(
+				print,
+				string.format(
+					"[OHA-PUCK] t=%.0f phase why=low-hp-units hp=%.2f loss=%.2f creep-hit=%s attackers=%d hero-hit=%s tombstone=%d",
+					DotaTime(),
+					Fu.GetHP(bot),
+					hpLoss,
+					tostring(creepHit),
+					attackers,
+					tostring(bot:WasRecentlyDamagedByAnyHero(1.0)),
+					X.TombstoneDistance()
+				)
+			)
+		end
 		return BOT_ACTION_DESIRE_HIGH
 	end
 	if isRetreating then

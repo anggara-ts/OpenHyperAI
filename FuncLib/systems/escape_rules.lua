@@ -60,4 +60,63 @@ function EscapeRules.SpareManaOrb(mana, maxMana, regen, orbCost, riftCost, orbCo
 	return mana / maxMana >= 0.9 or regen * orbCooldown >= orbCost
 end
 
+-- Lane Orb harass keeps the Orb + Jaunt escape when it may be needed (#36, game 067, 3:55: she threw her only Orb
+-- at Death Prophet 895 away at about 70% HP; Spirit Siphon caught her at 4:01 with the Orb on cooldown, and she
+-- died at 4:08). No harass below HARASS_MIN_HP, or with a real enemy hero (not disabled) closer than
+-- HARASS_THREAT_RANGE: the Orb's cooldown (12-9s, datafeed hero 13) is longer than any hero needs to walk 900.
+-- nearestDist: the nearest such enemy hero, nil when none. Returns safe, why ("hp" | "threat" | nil).
+EscapeRules.HARASS_THREAT_RANGE = 900
+EscapeRules.HARASS_MIN_HP = 0.7
+function EscapeRules.OrbHarassSafe(hp, nearestDist)
+	if hp < EscapeRules.HARASS_MIN_HP then
+		return false, "hp"
+	end
+	if nearestDist ~= nil and nearestDist < EscapeRules.HARASS_THREAT_RANGE then
+		return false, "threat"
+	end
+	return true, nil
+end
+
+-- No TP channel (3s, 7.42 items_all.txt item_tpscroll AbilityChannelTime) while Spirit Siphon drains her or an
+-- enemy hero that hit her in the last 2s stands within TP_HOLD_RANGE (#36, game 067, 4:05: TP at 23% HP with Death
+-- Prophet 82 away, dead at 4:08 inside the channel). Damage does not stop a channel, so the hitter just keeps
+-- hitting for the 3s. 750 = the Siphon's break distance. Returns hold, why ("siphoned" | "hit-near" | nil).
+EscapeRules.TP_HOLD_RANGE = EscapeRules.SIPHON_BREAK
+function EscapeRules.HoldTp(siphoned, hitterDist)
+	if siphoned then
+		return true, "siphoned"
+	end
+	if hitterDist ~= nil and hitterDist <= EscapeRules.TP_HOLD_RANGE then
+		return true, "hit-near"
+	end
+	return false, nil
+end
+
+-- Phase Shift at low HP against units, not heroes (#36, game 067, 42:07-42:16: Tombstone zombies held her at 1-6%
+-- HP for 9s with Phase Shift ready; every Phase rule reacted to heroes or projectiles). Under LOW_HP_PHASE and
+-- being hit: a creep hit in the last second, a unit attacking her, or HP falling (hpLoss: the drop over the last
+-- second, a share of max HP), so it does not hang on WasRecentlyDamagedByCreep counting zombies.
+EscapeRules.LOW_HP_PHASE = 0.2
+function EscapeRules.LowHpUnitsPhase(hp, hpLoss, hitByCreep, attackers)
+	if hp >= EscapeRules.LOW_HP_PHASE then
+		return false
+	end
+	return hitByCreep == true or (attackers or 0) >= 1 or (hpLoss or 0) >= 0.02
+end
+
+-- A dodge Phase Shift goes out in the same think, without waiting for the outpost hold (up to 0.2s), when the hit
+-- is due sooner than PHASE_NOW_TTI (#36, game 067 t=3039: Impale tti=0.20, the wait let the stun land first).
+-- Phase Shift's cast point is 0.01 (datafeed hero 13). tti nil (unknown): keep the wait.
+EscapeRules.PHASE_NOW_TTI = 0.35
+function EscapeRules.PhaseDodgeNow(tti)
+	return tti ~= nil and tti < EscapeRules.PHASE_NOW_TTI
+end
+-- cast: the order went out before the hit time (or the time was unknown); late: after it.
+function EscapeRules.PhaseDodgeResult(waited, tti)
+	if tti == nil or waited < tti then
+		return "cast"
+	end
+	return "late"
+end
+
 return EscapeRules

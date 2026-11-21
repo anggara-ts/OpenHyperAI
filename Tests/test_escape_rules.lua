@@ -40,6 +40,42 @@ T.test("escape rules: lane Orb harass on spare mana", function()
 	T.eq(R.SIPHON_BREAK, 750, "Spirit Siphon breaks at 500 + 250")
 end)
 
+T.test("escape rules: no lane Orb harass next to a hero or when hurt (game 067, 3:55)", function()
+	local R = load()
+	T.eq((R.OrbHarassSafe(0.72, 895)), false, "game 067: Death Prophet 895 away")
+	T.eq(select(2, R.OrbHarassSafe(0.72, 895)), "threat", "why=threat")
+	T.eq(select(2, R.OrbHarassSafe(0.65, nil)), "hp", "under 70% HP")
+	T.eq((R.OrbHarassSafe(0.9, 950)), true, "the nearest hero past 900")
+	T.eq((R.OrbHarassSafe(0.9, nil)), true, "no hero near")
+end)
+
+T.test("escape rules: no TP while siphoned or next to a hitter (game 067, 4:05)", function()
+	local R = load()
+	T.eq(select(2, R.HoldTp(true, nil)), "siphoned", "siphoned")
+	T.eq(select(2, R.HoldTp(false, 82)), "hit-near", "game 067: Death Prophet 82 away hit her")
+	T.eq((R.HoldTp(false, 760)), false, "past the break distance")
+	T.eq((R.HoldTp(false, nil)), false, "nobody hit her")
+end)
+
+T.test("escape rules: Phase Shift at low HP against units (game 067, 42:07)", function()
+	local R = load()
+	T.eq(R.LowHpUnitsPhase(0.05, 0, false, 3), true, "zombies attacking her")
+	T.eq(R.LowHpUnitsPhase(0.05, 0, true, 0), true, "a creep hit")
+	T.eq(R.LowHpUnitsPhase(0.12, 0.04, false, 0), true, "HP falling")
+	T.eq(R.LowHpUnitsPhase(0.12, 0, false, 0), false, "low but nobody hits her")
+	T.eq(R.LowHpUnitsPhase(0.3, 0.1, true, 4), false, "over 20%")
+end)
+
+T.test("escape rules: a close dodge Phase Shift goes out at once (game 067, t=3039)", function()
+	local R = load()
+	T.eq(R.PhaseDodgeNow(0.20), true, "game 067: Impale tti=0.20")
+	T.eq(R.PhaseDodgeNow(0.5), false, "time for the hold")
+	T.eq(R.PhaseDodgeNow(nil), false, "unknown time: keep the wait")
+	T.eq(R.PhaseDodgeResult(0.0, 0.20), "cast", "cast in the same think")
+	T.eq(R.PhaseDodgeResult(0.21, 0.20), "late", "game 067: waited 0.2s, hit at 0.20")
+	T.eq(R.PhaseDodgeResult(0.2, nil), "cast", "unknown time")
+end)
+
 T.test("puck: the escape helpers run on the stub", function()
 	T.stub.reset({ hero = "npc_dota_hero_puck", slot = 2 })
 	local ok, X = T.stub.load("BotsLib/hero_puck")
@@ -49,6 +85,14 @@ T.test("puck: the escape helpers run on the stub", function()
 		"ShiftExit",
 		"DangerJaunt",
 		"ConsiderIllusoryOrb",
+		"ConsiderPhaseShift",
+		"HoldTpInDanger",
+		"SampleHp",
+		"HpLoss",
+		"UnitAttackers",
+		"TombstoneDistance",
+		"PhaseDodgeThreat",
+		"CastHoldTick",
 		"SkillsComplement",
 	}) do
 		local okRun, err = pcall(X[name])

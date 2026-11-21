@@ -8085,14 +8085,8 @@ Usage.ConsiderItemDesire["item_ninja_gear"] = function(item)
 		end
 	end
 	if Fu.IsDefending(bot) then
-		local activeMode = bot:GetActiveMode()
-		local lane = LANE_MID
-		if activeMode == BOT_MODE_PUSH_TOWER_TOP then
-			lane = LANE_TOP
-		end
-		if activeMode == BOT_MODE_PUSH_TOWER_BOT then
-			lane = LANE_BOT
-		end
+		-- Was a check of the PUSH modes inside this defend branch, so the lane was always mid.
+		local lane = Fu.GetModeLane(bot:GetActiveMode()) or LANE_MID
 		local laneFront = GetLaneFrontLocation(team, lane, 0)
 		if GetUnitToLocationDistance(bot, laneFront) > 3200 then
 			return BOT_ACTION_DESIRE_HIGH, bot, "none", nil

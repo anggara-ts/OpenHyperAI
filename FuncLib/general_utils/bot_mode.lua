@@ -53,6 +53,21 @@ local function installBotMode(Fu)
 		local mode = unit:GetActiveMode()
 		return mode == BOT_MODE_PUSH_TOWER_TOP or mode == BOT_MODE_PUSH_TOWER_MID or mode == BOT_MODE_PUSH_TOWER_BOT
 	end
+	-- The lane of a push or defend mode (LANE_TOP / LANE_MID / LANE_BOT), nil for any other mode. Global
+	-- movement while pushing or defending goes to this lane, not to GetAssignedLane() (game 062, 41:09:
+	-- Nature's Prophet in push mid teleported to his assigned top lane).
+	function Fu.GetModeLane(mode)
+		if mode == BOT_MODE_PUSH_TOWER_TOP or mode == BOT_MODE_DEFEND_TOWER_TOP then
+			return LANE_TOP
+		end
+		if mode == BOT_MODE_PUSH_TOWER_MID or mode == BOT_MODE_DEFEND_TOWER_MID then
+			return LANE_MID
+		end
+		if mode == BOT_MODE_PUSH_TOWER_BOT or mode == BOT_MODE_DEFEND_TOWER_BOT then
+			return LANE_BOT
+		end
+		return nil
+	end
 	function Fu.IsLaning(unit)
 		if not Fu.IsUnitValid(unit) then
 			return false

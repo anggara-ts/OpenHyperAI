@@ -448,8 +448,11 @@ function X.ConsiderPoofRaw()
 			return BOT_ACTION_DESIRE_HIGH, bestMeepo
 		end
 	end
-	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not isRetreating then
-		local laneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
+	-- The lane of the active push / defend mode, not the assigned lane (game 062: Nature's Prophet in push mid
+	-- teleported to his assigned top lane; this Poof had the same mix-up).
+	local modeLane = Fu.GetModeLane(bot:GetActiveMode())
+	if (Fu.IsPushing(bot) or Fu.IsDefending(bot)) and not isRetreating and modeLane ~= nil then
+		local laneFront = GetLaneFrontLocation(GetTeam(), modeLane, 0)
 		for _, meepo in pairs(meepos) do
 			if
 				meepo ~= bot
@@ -457,6 +460,19 @@ function X.ConsiderPoofRaw()
 				and GetUnitToLocationDistance(bot, laneFront) > 3200
 				and hpRatio > 0.6
 			then
+				if DotaTime() >= (bot._poofLaneLogAt or -999) then
+					bot._poofLaneLogAt = DotaTime() + 3
+					pcall(
+						print,
+						string.format(
+							"[OHA-MEEPO] t=%.0f poof-lane lane=%d mode=%d dist=%.0f",
+							DotaTime(),
+							modeLane,
+							bot:GetActiveMode(),
+							GetUnitToLocationDistance(bot, laneFront)
+						)
+					)
+				end
 				return BOT_ACTION_DESIRE_HIGH, meepo
 			end
 		end

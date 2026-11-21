@@ -324,9 +324,10 @@ function X.SkillsComplement()
 	end
 	-- Escape Shukuchi (#48): the first hit ends the invisibility, so while it lasts she only walks to the fountain, in
 	-- every mode. Game 063: 7 of 9 escapes ended 1-2s after the cast, 8 of them cast in retreat mode, where this
-	-- block used to fall through to The Swarm's retreat cast (same trigger as the escape). The retreat mode holds
-	-- its desire above every other mode while the escape lasts (mode_retreat_generic.lua) and item use waits
-	-- (ability_item_usage_generic.lua, Usage.WillBreakInvisible). The end is detected in X.WatchShukuchi.
+	-- block fell through to the rest of the script: The Swarm's retreat cast has the same trigger as the escape
+	-- (one beetle shows in the log, t=289 after the t=280 escape); what ended the others is not logged. The
+	-- retreat mode holds its desire above every other mode while the escape lasts (mode_retreat_generic.lua) and
+	-- item use waits (ability_item_usage_generic.lua, Usage.WillBreakInvisible). X.WatchShukuchi detects the end.
 	if bot._shukuchiEscape ~= nil and bot:HasModifier("modifier_weaver_shukuchi") then
 		bot:Action_MoveToLocation(Fu.GetTeamFountain())
 		return

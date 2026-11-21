@@ -1586,6 +1586,11 @@ function Usage.IsItemInStash(itemName)
 	return false
 end
 function Usage.WillBreakInvisible(unit)
+	-- Weaver's escape Shukuchi (BotsLib/hero_weaver.lua sets _shukuchiEscape): no item until it ends (#161). Before the
+	-- IsInvisible read, so it does not depend on it.
+	if unit._shukuchiEscape ~= nil and unit:HasModifier("modifier_weaver_shukuchi") then
+		return true
+	end
 	if not unit:IsInvisible() then
 		return false
 	end
@@ -1613,10 +1618,6 @@ function Usage.WillBreakInvisible(unit)
 		return true
 	end
 	if unit:HasModifier("modifier_smoke_of_deceit") then
-		return true
-	end
-	-- Weaver's escape Shukuchi (BotsLib/hero_weaver.lua sets _shukuchiEscape): no item until it ends (#161).
-	if unit._shukuchiEscape ~= nil and unit:HasModifier("modifier_weaver_shukuchi") then
 		return true
 	end
 	return false

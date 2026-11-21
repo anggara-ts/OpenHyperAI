@@ -152,6 +152,9 @@ local isInTeamFight
 X["bThinkWhileInvulnerable"] = true
 function X.SkillsComplement()
 	local okRealm, realmOrder = pcall(X.ShadowRealmTick)
+	if not okRealm then
+		X.LogRealmError(realmOrder)
+	end
 	if okRealm and realmOrder or bot:IsInvulnerable() then
 		return
 	end
@@ -338,8 +341,9 @@ function X.StartShadowRealm(why, target)
 		)
 	)
 end
--- [OHA-DW] t= dark_willow shadow-realm why=attack|dodge|retreat held= release= tp= dist= mod= invuln=, one line
--- per realm when it ends. held: seconds from the cast to the release order (attack) or to the end.
+-- [OHA-DW] t= dark_willow shadow-realm why=attack|dodge|retreat held= ended= release= tp= dist= mod= invuln=, one
+-- line per realm when it ends. held: seconds from the cast to the release order (attack) or to the end; ended: when
+-- the realm was seen to end (the hit landed; about 5.2 when it ran out, or when the modifier was never seen).
 function X.EndShadowRealm(realm, since)
 	bot._dwRealm = nil
 	local target = realm.target
@@ -350,10 +354,11 @@ function X.EndShadowRealm(realm, since)
 	pcall(
 		print,
 		string.format(
-			"[OHA-DW] t=%.0f dark_willow shadow-realm why=%s held=%.2f release=%s tp=%s target=%s dist=%d mod=%s invuln=%s",
+			"[OHA-DW] t=%.0f dark_willow shadow-realm why=%s held=%.2f ended=%.2f release=%s tp=%s target=%s dist=%d mod=%s invuln=%s",
 			DotaTime(),
 			realm.why,
 			realm.releasedAt or since,
+			since,
 			tostring(realm.released or "-"),
 			tostring(realm.tp),
 			target ~= nil and not target:IsNull() and (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")) or "-",
@@ -362,6 +367,15 @@ function X.EndShadowRealm(realm, since)
 			tostring(realm.invuln == true)
 		)
 	)
+end
+-- Another allied hero within 1500 in the attack mode (the TP rule's attackingAllies, without herself).
+function X.AllyFighting()
+	for _, ally in pairs(Fu.GetNearbyHeroes(bot, 1500, false, BOT_MODE_ATTACK) or {}) do
+		if Fu.IsValidHero(ally) and ally ~= bot and not ally:IsIllusion() then
+			return true
+		end
+	end
+	return false
 end
 -- Her TP: the TP slot (15) or Boots of Travel in the main slots, ready.
 function X.TeleportItem()
@@ -379,27 +393,64 @@ end
 -- An escape realm: TP home at once, so the 3s channel ends inside the 5s untargetable time (#48, game 067 17:06:
 -- realm, then a walk, a TP 4s later, dead after the realm ended). The generic TP rule waits out an enemy tower
 -- within 888 (she was 320 from one); towers can't target her in the realm. HP under 0.45 and over 4900 from the
--- fountain, the limits of the TP rule's own retreat TP (ability_item_usage_generic.lua 撤退:2). Once per realm.
+-- fountain, hit by a hero in the last 6s, no ally fighting within 1500: the gates of the TP rule's own retreat TP
+-- (ability_item_usage_generic.lua 撤退:2: HP under 15% + 24% per enemy hero within 1600, at most 45%), and its
+-- channel gates that still apply (Usage.TpGatesClosed: rooted, already teleporting, Nethertoxin, Macropyre) plus a
+-- hero script's own TP hold (bot._noTpUntil). tp=ordered until the channel shows; up to 3 orders while it fits
+-- (a TP scroll can't start rooted: items_all.txt ROOT_DISABLES), then tp=now, or tp=failed.
 function X.ShadowRealmTeleport(realm, since, castDone)
-	if realm.tp ~= "-" or not castDone then
+	if not castDone or realm.tp ~= "-" and realm.tp ~= "ordered" then
 		return false
+	end
+	if realm.tp == "ordered" and since - realm.tpAt < 0.4 then
+		return false
+	end
+	local fits = ShadowRealmRules.TpFits(since, realm.duration, ShadowRealmRules.TP_CHANNEL, 0.3)
+	if realm.tp == "ordered" then
+		if not fits or realm.tpTries >= 3 then
+			realm.tp = "failed"
+			return false
+		end
+	else
+		local enemyCount = #Fu.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE)
+		local hpLine = math.min(0.15 + 0.24 * enemyCount, 0.45)
+		local tp = X.TeleportItem()
+		if tp == nil then
+			realm.tp = "none"
+		elseif not fits then
+			realm.tp = "late"
+		elseif Fu.GetHP(bot) >= hpLine then
+			realm.tp = "skip-hp"
+		elseif bot:DistanceFromFountain() <= 4900 then
+			realm.tp = "skip-near"
+		elseif not bot:WasRecentlyDamagedByAnyHero(6.0) then
+			realm.tp = "skip-safe"
+		elseif X.AllyFighting() then
+			realm.tp = "skip-allies"
+		elseif
+			bot:IsRooted()
+			or bot:HasModifier("modifier_teleporting")
+			or bot:HasModifier("modifier_viper_nethertoxin")
+			or bot:HasModifier("modifier_jakiro_macropyre_burn")
+			or DotaTime() < (bot._noTpUntil or -999)
+		then
+			realm.tp = "skip-gate"
+		end
+		if realm.tp ~= "-" then
+			return false
+		end
+		realm.tpTries = 0
 	end
 	local tp = X.TeleportItem()
 	if tp == nil then
-		realm.tp = "none"
-	elseif not ShadowRealmRules.TpFits(since, realm.duration, ShadowRealmRules.TP_CHANNEL, 0.3) then
-		realm.tp = "late"
-	elseif Fu.GetHP(bot) >= 0.45 then
-		realm.tp = "skip-hp"
-	elseif bot:DistanceFromFountain() <= 4900 then
-		realm.tp = "skip-near"
-	else
-		realm.tp = "now"
-		realm.tpAt = since
-		bot:Action_UseAbilityOnLocation(tp, Fu.GetTeamFountain())
-		return true
+		realm.tp = realm.tp == "ordered" and "failed" or "none"
+		return false
 	end
-	return false
+	realm.tp = "ordered"
+	realm.tpAt = since
+	realm.tpTries = realm.tpTries + 1
+	bot:Action_UseAbilityOnLocation(tp, Fu.GetTeamFountain())
+	return true
 end
 -- Every think while she is in a realm. Attack realm: keep within attack range + 600 of the target and hold the hit
 -- until the bonus is full (ShadowRealmRules.HoldStep), then one attack. Retreat realm: the TP. Returns true when it
@@ -426,6 +477,9 @@ function X.ShadowRealmTick()
 	if since > realm.duration + 0.2 or realm.modSeen ~= nil and not inRealm then
 		X.EndShadowRealm(realm, since)
 		return false
+	end
+	if realm.tp == "ordered" and bot:IsChanneling() then
+		realm.tp = "now"
 	end
 	if bot:IsChanneling() or bot:IsCastingAbility() or Fu.CanNotUseAction(bot) then
 		return false
@@ -487,15 +541,25 @@ function X.ShadowRealmTick()
 	if action == "close" then
 		point = target:GetExtrapolatedLocation(0.5)
 	else
-		-- Hold: circle the target at her distance, 25 degrees per order.
+		-- Hold: step 25 degrees around the target at her distance, the way that ends nearer our fountain, so she
+		-- settles on the target's home side (not behind it or under its tower) when the hit makes her targetable.
 		local here = bot:GetLocation()
 		local dx, dy = here.x - targetLocation.x, here.y - targetLocation.y
-		local angle = math.rad(25)
-		point = Vector(
-			targetLocation.x + dx * math.cos(angle) - dy * math.sin(angle),
-			targetLocation.y + dx * math.sin(angle) + dy * math.cos(angle),
-			here.z
-		)
+		local fountain = Fu.GetTeamFountain()
+		local best, bestDist = nil, nil
+		for _, sign in ipairs({ 1, -1 }) do
+			local angle = math.rad(25) * sign
+			local candidate = Vector(
+				targetLocation.x + dx * math.cos(angle) - dy * math.sin(angle),
+				targetLocation.y + dx * math.sin(angle) + dy * math.cos(angle),
+				here.z
+			)
+			local toFountain = Fu.GetLocationToLocationDistance(candidate, fountain)
+			if bestDist == nil or toFountain < bestDist then
+				best, bestDist = candidate, toFountain
+			end
+		end
+		point = best
 	end
 	bot:Action_MoveToLocation(point)
 	return false
@@ -508,11 +572,29 @@ bot._attackHold = function()
 	if realm == nil or realm.why ~= "attack" or realm.released ~= nil then
 		return false
 	end
-	if X.ShadowRealmTick() then
+	local ok, order = pcall(X.ShadowRealmTick)
+	if not ok then
+		X.LogRealmError(order)
+		return false
+	end
+	if order then
 		return true
 	end
 	realm = bot._dwRealm
 	return realm ~= nil and realm.released == nil
+end
+-- A Lua error in the realm tick (both callers pcall it): [OHA-ERROR] once per distinct message, at most 3, and the
+-- realm state is dropped so a broken hold never keeps her from attacking.
+local realmErrors = {}
+function X.LogRealmError(err)
+	bot._dwRealm = nil
+	local key = tostring(err)
+	if realmErrors[key] or #realmErrors >= 3 then
+		return
+	end
+	realmErrors[key] = true
+	realmErrors[#realmErrors + 1] = key
+	pcall(print, string.format("[OHA-ERROR] t=%.1f dark_willow ShadowRealmTick: %s", DotaTime(), key))
 end
 function X.ConsiderCurseCrown()
 	if not cursedCrownAbility:IsFullyCastable() then

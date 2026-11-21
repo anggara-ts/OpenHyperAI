@@ -74,3 +74,93 @@ T.test("dark willow: the realm helpers run on the stub", function()
 	local okSk, errSk = pcall(X.SkillsComplement)
 	T.ok(okSk, "SkillsComplement: " .. tostring(errSk))
 end)
+
+-- Drives the realm tick through the hold, the full-bonus hit and the escape TP (the stub alone stops at "no cast").
+local function realmBot()
+	local bot = T.stub.reset({ hero = "npc_dota_hero_dark_willow", slot = 4, time = 100 })
+	local ok, X = T.stub.load("BotsLib/hero_dark_willow")
+	T.ok(ok, "hero_dark_willow loads: " .. tostring(X))
+	local realm = bot:GetAbilityByName("dark_willow_shadow_realm")
+	realm.GetCooldownTimeRemaining = function()
+		return 15
+	end
+	local orders = {}
+	bot.Action_MoveToLocation = function()
+		orders[#orders + 1] = "move"
+	end
+	bot.Action_AttackUnit = function()
+		orders[#orders + 1] = "attack"
+	end
+	bot.Action_UseAbilityOnLocation = function(_, ability)
+		orders[#orders + 1] = "use:" .. ability:GetName()
+	end
+	return bot, X, orders
+end
+
+T.test("dark willow: an attack realm holds, then hits at 3s", function()
+	local bot, X, orders = realmBot()
+	bot.GetActiveMode = function()
+		return BOT_MODE_ATTACK
+	end
+	bot.GetAttackRange = function()
+		return 475
+	end
+	local target = T.stub.teams[TEAM_DIRE][1]
+	target._loc = bot._loc + Vector(700, 0, 0)
+	X.StartShadowRealm("attack", target)
+	T.stub.time = 101
+	T.eq(X.ShadowRealmTick(), false, "1s in: a hold move, spells may still go out")
+	T.eq(orders[#orders], "move", "she moves, she does not attack")
+	T.eq(bot._attackHold(), true, "the attack mode is held")
+	T.stub.time = 103.05
+	T.eq(X.ShadowRealmTick(), true, "3s in: the hit")
+	T.eq(orders[#orders], "attack", "attack order")
+	T.eq(bot._dwRealm.released, "max", "release=max")
+	T.eq(bot._attackHold(), false, "the attack mode attacks again")
+	T.stub.time = 105.5
+	X.ShadowRealmTick()
+	T.eq(bot._dwRealm, nil, "the realm is over")
+	local line = T.stub.printed[#T.stub.printed] or ""
+	T.ok(string.find(line, "shadow-realm why=attack held=3.05", 1, true) ~= nil, line)
+	T.ok(string.find(line, "release=max", 1, true) ~= nil, line)
+end)
+
+T.test("dark willow: an escape realm starts the TP at once (game 067, 17:06)", function()
+	local bot, X, orders = realmBot()
+	-- 10% HP, alone (the stub's ally list ignores the mode filter: move the allies away).
+	bot._hp = 100
+	for _, ally in ipairs(T.stub.teams[bot._team]) do
+		if ally ~= bot then
+			ally._loc = Vector(0, 0, 0)
+		end
+	end
+	bot.DistanceFromFountain = function()
+		return 9000
+	end
+	bot.WasRecentlyDamagedByAnyHero = function()
+		return true
+	end
+	local scroll = T.stub.newAbility("item_tpscroll", bot, false)
+	scroll.IsFullyCastable = function()
+		return true
+	end
+	bot._items[15] = scroll
+	bot.FindItemSlot = function(_, name)
+		return name == "item_tpscroll" and 15 or -1
+	end
+	X.StartShadowRealm("retreat", nil)
+	T.stub.time = 100.1
+	T.eq(X.ShadowRealmTick(), true, "the TP order: " .. tostring(bot._dwRealm and bot._dwRealm.tp))
+	T.eq(orders[#orders], "use:item_tpscroll", "TP scroll used")
+	T.eq(bot._dwRealm.tp, "ordered", "ordered")
+	bot.IsChanneling = function()
+		return true
+	end
+	T.stub.time = 100.3
+	X.ShadowRealmTick()
+	T.eq(bot._dwRealm.tp, "now", "the channel started")
+	T.stub.time = 105.3
+	X.ShadowRealmTick()
+	local line = T.stub.printed[#T.stub.printed] or ""
+	T.ok(string.find(line, "why=retreat", 1, true) ~= nil and string.find(line, "tp=now", 1, true) ~= nil, line)
+end)

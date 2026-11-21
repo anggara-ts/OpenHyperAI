@@ -135,7 +135,6 @@ local lastUpdateTime = 0
 local UPDATE_INTERVAL = 5
 OFFENSIVE_ITEM_VALUES = {
 	item_desolator = 60,
-	item_desolator_2 = 80,
 	item_daedalus = 88,
 	item_greater_crit = 88,
 	item_bfury = 55,

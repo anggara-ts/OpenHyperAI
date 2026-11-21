@@ -63,3 +63,42 @@ T.test("tower chase: shot at with no hero target: leave", function()
 	T.eq(act, "leave", "act")
 	T.eq(why, "no-target", "why")
 end)
+
+T.test("tower chase: entering after a target inside the tower's range decides before the first shot", function()
+	local R = rules()
+	local act, why = R.TowerChaseDecision(situation({ towerOnBot = false, entering = true }))
+	T.eq(act, "leave", "not killable: stop outside")
+	T.eq(why, "not-killable", "why")
+	act = R.TowerChaseDecision(situation({ towerOnBot = false, entering = true, teamDamage = 950 }))
+	T.eq(act, "stay", "killable: go in")
+	T.eq(
+		R.TowerChaseDecision(situation({ towerOnBot = false, entering = true, hasTarget = false })),
+		nil,
+		"no hero target: walking past a tower is no chase"
+	)
+	T.eq(R.TowerChaseDecision(situation({ towerOnBot = false, entering = true, pushing = true })), nil, "push mode")
+end)
+
+T.test("tower chase: the enemy heroes' damage counts in the survival check (game 063, Earth Spirit)", function()
+	local R = rules()
+	-- Killable target, 1200 HP, tower 150 a shot: 3 shots (450) alone are fine ...
+	T.eq(R.TowerChaseDecision(situation({ teamDamage = 950, enemyDamage = 0 })), "stay", "tower only")
+	-- ... but three heroes doing 800 on top are not.
+	local act, why = R.TowerChaseDecision(situation({ teamDamage = 950, enemyDamage = 800 }))
+	T.eq(act, "leave", "act")
+	T.eq(why, "low-hp", "why")
+end)
+
+T.test("tower hold: walk out of range + 200, then on to + 350 before letting go", function()
+	local R = rules()
+	local run, inside = R.TowerHoldRun(850, 700, false)
+	T.eq(run, true, "inside range + 200: run")
+	T.eq(inside, true, "inside")
+	run, inside = R.TowerHoldRun(960, 700, true)
+	T.eq(run, true, "between + 200 and + 350 after being inside: keep walking")
+	run, inside = R.TowerHoldRun(1060, 700, true)
+	T.eq(run, false, "past + 350: free")
+	T.eq(inside, false, "outside")
+	run = R.TowerHoldRun(960, 700, false)
+	T.eq(run, false, "between + 200 and + 350 coming from outside: free (no flip at the edge)")
+end)

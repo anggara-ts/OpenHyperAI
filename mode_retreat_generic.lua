@@ -1016,13 +1016,55 @@ local function IsCommittedKill()
 		or Fu.GetHP(bot) >= 0.35
 end
 -- After the early game (the #83 anti-dive below covers the first 12 minutes): an enemy tower is shooting this
--- bot outside a push. Stop the chase unless the target dies within the tower's next 2 shots and the bot has the
--- HP for them (FuncLib/systems/dive_rules.lua). Game 048, 17:30: Skywrath chased Sniper past Dire's mid T1 in
--- attack mode and took the tower from t=1058 (he died at t=1069 after leaving push and evasive under it; the chase
--- itself ended in a kill, so this rule would most likely have said "dive"). Tower range, damage and interval are read
--- from the tower (pcall: GetAttackRange / GetSecondsPerAttack on a building are not in Docs/BOT_API_RUNTIME.md;
--- the log prints what was used). Returns the run time (2.88s, as the early rule) or 0.
+-- bot outside a push, or the bot is about to follow its hero target into the tower's range. Stop the chase unless
+-- the target dies within the tower's next 2 shots and the bot has the HP for them and for the enemy heroes near
+-- (FuncLib/systems/dive_rules.lua). Game 048, 17:30: Skywrath chased Sniper past Dire's mid T1 in attack mode and
+-- took the tower from t=1058 (he died at t=1069 after leaving push and evasive under it; the chase itself ended in a
+-- kill, so this rule would most likely have said "dive"). Tower range, damage and interval are read from the tower
+-- (pcall: GetAttackRange / GetSecondsPerAttack on a building are not in Docs/BOT_API_RUNTIME.md; the log prints what
+-- was used). After a stop the bot keeps out of that tower's range + 200 for 9s (TowerChaseHoldRun). Returns the run
+-- time (2.88s, as the early rule; 0.5s per hold check) or 0.
+local function TowerChaseHoldRun()
+	local hold = bot._towerChaseHold
+	if hold == nil then
+		return 0
+	end
+	local now = DotaTime()
+	if now > hold.untilTime or not Fu.IsValidBuilding(hold.tower) or Fu.IsPushing(bot) then
+		bot._towerChaseHold = nil
+		return 0
+	end
+	local dist = GetUnitToUnitDistance(bot, hold.tower)
+	local run
+	run, hold.inside = DiveRules.TowerHoldRun(dist, hold.range, hold.inside)
+	if not run then
+		return 0
+	end
+	if now >= (bot._towerHoldLogAt or -999) then
+		bot._towerHoldLogAt = now + 3
+		pcall(
+			print,
+			string.format(
+				"[OHA-RETREAT] t=%.0f %s tower-hold why=%s tower=%s dist=%d zone=%d left=%.1f hp=%.2f mode=%d",
+				now,
+				(string.gsub(botName, "npc_dota_hero_", "")),
+				hold.why,
+				hold.tower:GetUnitName(),
+				math.floor(dist),
+				math.floor(hold.range + DiveRules.HOLD_MARGIN),
+				hold.untilTime - now,
+				hpRatio,
+				activeMode or -1
+			)
+		)
+	end
+	return 0.5
+end
 local function TowerChaseRun()
+	local holdRun = TowerChaseHoldRun()
+	if holdRun > 0 then
+		return holdRun
+	end
 	local tower = (bot:GetNearbyTowers(1000, true) or {})[1]
 	if not Fu.IsValidBuilding(tower) then
 		return 0
@@ -1031,11 +1073,19 @@ local function TowerChaseRun()
 		return tower:GetAttackRange()
 	end)
 	local towerRange = (okRange and type(rawRange) == "number" and rawRange > 0) and rawRange or 700
-	if GetUnitToUnitDistance(bot, tower) > towerRange + 200 then
+	if GetUnitToUnitDistance(bot, tower) > towerRange + DiveRules.HOLD_MARGIN then
 		return 0
 	end
 	local towerOnBot = tower:GetAttackTarget() == bot or bot:WasRecentlyDamagedByTower(1.5)
-	if not towerOnBot then
+	local hasTarget = Fu.IsValidHero(botTarget)
+		and Fu.CanBeAttacked(botTarget)
+		and not Fu.IsSuspiciousIllusion(botTarget)
+	-- Not shot yet, but chasing a hero who stands inside the tower's range: decide before walking in.
+	local entering = not towerOnBot
+		and hasTarget
+		and Fu.IsGoingOnSomeone(bot)
+		and GetUnitToUnitDistance(botTarget, tower) <= towerRange
+	if not towerOnBot and not entering then
 		return 0
 	end
 	local okRate, rawRate = pcall(function()
@@ -1044,9 +1094,6 @@ local function TowerChaseRun()
 	local shotEvery = (okRate and type(rawRate) == "number" and rawRate > 0) and rawRate or 1.0
 	local window = Clamp(shotEvery * 2, 1.5, 3.0)
 	local shotDamage = bot:GetActualIncomingDamage(tower:GetAttackDamage(), DAMAGE_TYPE_PHYSICAL) or 0
-	local hasTarget = Fu.IsValidHero(botTarget)
-		and Fu.CanBeAttacked(botTarget)
-		and not Fu.IsSuspiciousIllusion(botTarget)
 	local teamDamage, targetHealth = 0, 0
 	if hasTarget then
 		targetHealth = botTarget:GetHealth()
@@ -1058,8 +1105,18 @@ local function TowerChaseRun()
 			end
 		end
 	end
+	-- The visible enemy heroes near: what they can do to the bot in the same window (the engine's estimate, the one
+	-- teamDamage uses, spells that are ready included).
+	local enemyDamage, enemyCount = 0, 0
+	for _, enemyHero in pairs(bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}) do
+		if Fu.IsValidHero(enemyHero) and not Fu.IsSuspiciousIllusion(enemyHero) then
+			enemyCount = enemyCount + 1
+			enemyDamage = enemyDamage + (enemyHero:GetEstimatedDamageToTarget(true, bot, window, DAMAGE_TYPE_ALL) or 0)
+		end
+	end
 	local act, why = DiveRules.TowerChaseDecision({
 		towerOnBot = towerOnBot,
+		entering = entering,
 		-- T1/T2 only (unit names npc_dota_<team>_tower1_mid ...): fights at a T3 or T4 are base fights, where
 		-- running from the tower's target would leave the team short.
 		outerTower = string.find(tower:GetUnitName() or "", "tower[12]_") ~= nil,
@@ -1070,12 +1127,23 @@ local function TowerChaseRun()
 		committed = hasTarget and IsCommittedKill(),
 		botHealth = botHealth,
 		shotDamage = shotDamage,
+		enemyDamage = enemyDamage,
 	})
 	if act == nil then
 		return 0
 	end
-	-- On a change of decision (at most every 2s), else every 5s.
-	local logKey = act .. why
+	if act == "leave" then
+		bot._towerChaseHold = {
+			tower = tower,
+			range = towerRange,
+			untilTime = DotaTime() + DiveRules.HOLD_SECONDS,
+			inside = true,
+			why = why,
+		}
+	end
+	-- On a change of decision (at most every 2s), else every 5s. Lines before the tower shoots have their own
+	-- names (tower-entry-stop / tower-entry-go), so the chase-stop / dive lines stay "the tower is on the bot".
+	local logKey = act .. why .. tostring(entering)
 	if
 		DotaTime() >= (bot._towerChaseAnyAt or -999)
 		and (logKey ~= bot._towerChaseLogKey or DotaTime() >= (bot._towerChaseLogAt or -999))
@@ -1083,13 +1151,19 @@ local function TowerChaseRun()
 		bot._towerChaseLogKey = logKey
 		bot._towerChaseAnyAt = DotaTime() + 2
 		bot._towerChaseLogAt = DotaTime() + 5
+		local name
+		if entering then
+			name = act == "leave" and "tower-entry-stop" or "tower-entry-go"
+		else
+			name = act == "leave" and "chase-stop" or "dive"
+		end
 		pcall(
 			print,
 			string.format(
-				"[OHA-RETREAT] t=%.0f %s %s why=%s tower=%s target=%s hp=%d shot=%d every=%.2f range=%d dmg=%d targetHp=%d mode=%d",
+				"[OHA-RETREAT] t=%.0f %s %s why=%s tower=%s target=%s hp=%d shot=%d every=%.2f range=%d dmg=%d targetHp=%d mode=%d enemyDmg=%d enemies=%d hold=%d",
 				DotaTime(),
 				(string.gsub(botName, "npc_dota_hero_", "")),
-				act == "leave" and "chase-stop" or "dive",
+				name,
 				why,
 				tower:GetUnitName(),
 				hasTarget and (string.gsub(botTarget:GetUnitName(), "npc_dota_hero_", "")) or "none",
@@ -1099,11 +1173,18 @@ local function TowerChaseRun()
 				math.floor(towerRange),
 				math.floor(teamDamage),
 				math.floor(targetHealth),
-				activeMode or -1
+				activeMode or -1,
+				math.floor(enemyDamage),
+				enemyCount,
+				act == "leave" and DiveRules.HOLD_SECONDS or 0
 			)
 		)
 	end
-	return act == "leave" and 2.88 or 0
+	if act ~= "leave" then
+		return 0
+	end
+	-- Shot at: run the 2.88s out; entering: the hold walks it out of the zone from the next check.
+	return entering and 0.5 or 2.88
 end
 function Retreat.ShouldRun()
 	if bot:IsChanneling() or not bot:IsAlive() then

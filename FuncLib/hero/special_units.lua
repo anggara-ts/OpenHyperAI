@@ -748,17 +748,28 @@ end
 -- before the step and the next attack are over. The override attack mode calls X.TryKite from its Think; every
 -- other mode goes through X.TryKiteInAttack, the per-think hook in ability_item_usage_generic.lua.
 local KiteRules = require(GetScriptDirectory() .. "/FuncLib/systems/kite_rules")
-local KITE_KINDS = { "hero", "lane", "jungle" }
+local KITE_KINDS = { "hero", "lane", "jungle", "chase" }
 -- Result of the kiting: does it help? One sample per attack cycle and kind: after a step ("steps"), or when the
 -- same situation came up and the bot did not step ("base", the baseline, with why it did not: fast attacks, no
 -- room for a step, a last hit due, a blocked spot). Once the attacker's next attack could have landed (its seconds
 -- per attack, or ours if longer, + 0.1s): was the bot hit (a hero: by that hero; a creep: by any creep, the API
 -- has no per-creep read), did its own attack come after the step, and did it move 40+. One line per kind per 60s.
+-- Chase samples are checked when our next attack is released: was the target still in attack range (inRangeNext).
 local function KiteStats(unit)
 	if unit._kiteStats == nil then
 		local kinds = {}
 		for _, kind in ipairs(KITE_KINDS) do
-			kinds[kind] = { steps = 0, hitAfter = 0, late = 0, moved = 0, base = 0, baseHit = 0, why = {} }
+			kinds[kind] = {
+				steps = 0,
+				hitAfter = 0,
+				late = 0,
+				moved = 0,
+				base = 0,
+				baseHit = 0,
+				inRange = 0,
+				baseInRange = 0,
+				why = {},
+			}
 		end
 		unit._kiteStats = { since = DotaTime(), kinds = kinds }
 	end
@@ -768,14 +779,15 @@ local function ShortName(unit)
 	local unitName = unit:GetUnitName() or "?"
 	return (string.gsub(string.gsub(unitName, "^npc_dota_hero_", ""), "^npc_dota_", ""))
 end
--- Start a sample unless one is still open (one per attack cycle).
-local function KiteSample(unit, attacker, kind, stepped, why, stepEnd)
+-- Start a sample unless one is still open (one per attack cycle). checkIn: seconds to the check (chase: our next
+-- attack), else the attacker's next attack.
+local function KiteSample(unit, attacker, kind, stepped, why, stepEnd, checkIn)
 	if unit._kitePending ~= nil then
 		return
 	end
 	local spa = unit:GetSecondsPerAttack()
 	local attackerSpa = attacker:GetSecondsPerAttack() or spa
-	local window = math.max(attackerSpa, spa) + 0.1
+	local window = checkIn or math.max(attackerSpa, spa) + 0.1
 	local kindStats = KiteStats(unit).kinds[kind]
 	if stepped then
 		kindStats.steps = kindStats.steps + 1
@@ -806,8 +818,18 @@ function X.KiteResultTick(unit)
 	if pending ~= nil and GameTime() >= pending.checkAt then
 		unit._kitePending = nil
 		local kindStats = KiteStats(unit).kinds[pending.kind]
-		local hit
-		if pending.kind == "hero" then
+		local hit, inRange = false, false
+		if pending.kind == "chase" then
+			local target = pending.enemy
+			inRange = Fu.IsValidHero(target)
+				and target:IsAlive()
+				and KiteRules.InAttackRange(
+					GetUnitToUnitDistance(unit, target),
+					unit:GetAttackRange(),
+					unit:GetBoundingRadius(),
+					target:GetBoundingRadius()
+				)
+		elseif pending.kind == "hero" then
 			hit = Fu.IsValidHero(pending.enemy) and unit:WasRecentlyDamagedByHero(pending.enemy, pending.window)
 		else
 			hit = unit:WasRecentlyDamagedByCreep(pending.window)
@@ -816,14 +838,22 @@ function X.KiteResultTick(unit)
 			if hit then
 				kindStats.hitAfter = kindStats.hitAfter + 1
 			end
+			if inRange then
+				kindStats.inRange = kindStats.inRange + 1
+			end
 			if unit:GetLastAttackTime() < pending.at then
 				kindStats.late = kindStats.late + 1
 			end
 			if pending.stepLeft ~= nil and pending.stepLeft - pending.closest >= 40 then
 				kindStats.moved = kindStats.moved + 1
 			end
-		elseif hit then
-			kindStats.baseHit = kindStats.baseHit + 1
+		else
+			if hit then
+				kindStats.baseHit = kindStats.baseHit + 1
+			end
+			if inRange then
+				kindStats.baseInRange = kindStats.baseInRange + 1
+			end
 		end
 	end
 	local stats = unit._kiteStats
@@ -836,23 +866,42 @@ function X.KiteResultTick(unit)
 					why[#why + 1] = reason .. ":" .. count
 				end
 				table.sort(why)
-				pcall(
-					print,
-					string.format(
-						"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d late-attack=%d moved=%d base=%d base-hit=%d no-step=%s window=%.0fs",
-						DotaTime(),
-						ShortName(unit),
-						kind,
-						kindStats.steps,
-						kindStats.hitAfter,
-						kindStats.late,
-						kindStats.moved,
-						kindStats.base,
-						kindStats.baseHit,
-						#why > 0 and table.concat(why, ",") or "-",
-						DotaTime() - stats.since
+				if kind == "chase" then
+					pcall(
+						print,
+						string.format(
+							"[OHA-KITE] t=%.0f %s result kind=chase steps=%d inRangeNext=%d late-attack=%d moved=%d base=%d base-inRangeNext=%d no-step=%s window=%.0fs",
+							DotaTime(),
+							ShortName(unit),
+							kindStats.steps,
+							kindStats.inRange,
+							kindStats.late,
+							kindStats.moved,
+							kindStats.base,
+							kindStats.baseInRange,
+							#why > 0 and table.concat(why, ",") or "-",
+							DotaTime() - stats.since
+						)
 					)
-				)
+				else
+					pcall(
+						print,
+						string.format(
+							"[OHA-KITE] t=%.0f %s result kind=%s steps=%d hit-after=%d late-attack=%d moved=%d base=%d base-hit=%d no-step=%s window=%.0fs",
+							DotaTime(),
+							ShortName(unit),
+							kind,
+							kindStats.steps,
+							kindStats.hitAfter,
+							kindStats.late,
+							kindStats.moved,
+							kindStats.base,
+							kindStats.baseHit,
+							#why > 0 and table.concat(why, ",") or "-",
+							DotaTime() - stats.since
+						)
+					)
+				end
 			end
 		end
 		unit._kiteStats = nil
@@ -968,14 +1017,20 @@ function X.TryKite(unit, meleeEnemy)
 	then
 		return false
 	end
-	if
-		meleeEnemy:GetAttackTarget() ~= unit
-		and not Fu.IsChasingTarget(meleeEnemy, unit)
-		and GetUnitToUnitDistance(unit, meleeEnemy) >= meleeEnemy:GetAttackRange() + 150
-	then
+	if not X.MeleeThreat(unit, meleeEnemy) then
 		return false
 	end
 	return X.KiteStep(unit, meleeEnemy, meleeEnemy, "hero")
+end
+-- A melee hero on us, chasing us, or close.
+function X.MeleeThreat(unit, meleeEnemy)
+	return meleeEnemy:GetAttackRange() <= KiteRules.MELEE_RANGE
+		and not Fu.IsSuspiciousIllusion(meleeEnemy)
+		and (
+			meleeEnemy:GetAttackTarget() == unit
+			or Fu.IsChasingTarget(meleeEnemy, unit)
+			or GetUnitToUnitDistance(unit, meleeEnemy) < meleeEnemy:GetAttackRange() + 150
+		)
 end
 -- The nearest melee unit hitting unit: an enemy hero first, then a lane creep, then a neutral. The scans only run
 -- when unit was damaged by that kind in the last 1.5s.
@@ -1021,6 +1076,99 @@ local NO_KITE_MODES = {
 	[BOT_MODE_EVASIVE_MANEUVERS] = true,
 	[BOT_MODE_ROSHAN] = true,
 }
+-- A mode or hero script holding the bot (outpost hold, a cast hold, Clinkz's invisible hunt, Techies' plant).
+local function KiteHeld(unit)
+	local now = DotaTime()
+	return now < (unit._outpostHoldUntil or -1)
+		or now < (unit._castHoldUntil or -1)
+		or now < (unit._clinkzHuntUntil or -1)
+		or now < (unit._madHoldUntil or -1)
+end
+-- Chase step toward an enemy hero target that runs out of range (kind=chase). The caller made sure no melee unit
+-- is hitting the bot (stepping away wins). Returns true when it issued the step.
+function X.ChaseStep(unit, target)
+	if target:GetTeam() == unit:GetTeam() or Fu.IsSuspiciousIllusion(target) or unit:IsRooted() then
+		return false
+	end
+	local spa = unit:GetSecondsPerAttack()
+	local range = unit:GetAttackRange()
+	local from, to = KiteRules.Window(spa, unit:GetAttackPoint(), unit:GetAttackSpeed())
+	local since = GameTime() - unit:GetLastAttackTime()
+	local nextIn = KiteRules.NextAttackIn(spa, since, from)
+	local here, targetAt = unit:GetLocation(), target:GetLocation()
+	local ahead = target:GetExtrapolatedLocation(nextIn)
+	local step, endX, endY = KiteRules.ChaseStep(here.x, here.y, targetAt.x, targetAt.y, ahead.x, ahead.y, range)
+	if step == nil then
+		return false
+	end
+	local checkIn = nextIn + 0.1
+	if KiteRules.TooFast(from, to, unit:GetCurrentMovementSpeed()) then
+		KiteSample(unit, target, "chase", false, "fast", nil, checkIn)
+		return false
+	end
+	if not KiteRules.InWindow(since, from, to) then
+		return false
+	end
+	if unit:GetAnimActivity() == 1503 and unit:GetAnimCycle() < unit:GetAttackPoint() + 0.05 then
+		return false
+	end
+	local stepEnd = Vector(endX, endY, here.z)
+	-- Not into an enemy tower's range (+100): #159's chase-stop rule is not on this branch.
+	for _, tower in pairs(unit:GetNearbyTowers(1600, true) or {}) do
+		if Fu.IsValidBuilding(tower) and GetUnitToLocationDistance(tower, stepEnd) <= tower:GetAttackRange() + 100 then
+			KiteSample(unit, target, "chase", false, "tower", nil, checkIn)
+			return false
+		end
+	end
+	if X.KiteLastHitDue(unit, step) then
+		KiteSample(unit, target, "chase", false, "last-hit", nil, checkIn)
+		return false
+	end
+	if not IsLocationPassable(stepEnd) then
+		KiteSample(unit, target, "chase", false, "blocked", nil, checkIn)
+		return false
+	end
+	unit:Action_MoveToLocation(stepEnd)
+	KiteSample(unit, target, "chase", true, nil, stepEnd, checkIn)
+	unit._kiteLogAt = unit._kiteLogAt or {}
+	if DotaTime() >= (unit._kiteLogAt.chase or -99) + 2 then
+		unit._kiteLogAt.chase = DotaTime()
+		pcall(
+			print,
+			string.format(
+				"[OHA-KITE] t=%.0f %s chase %s kind=chase mode=%d dist=%d ahead=%d step=%d since=%.2f window=%.2f-%.2f spa=%.2f",
+				DotaTime(),
+				ShortName(unit),
+				ShortName(target),
+				unit:GetActiveMode(),
+				GetUnitToUnitDistance(unit, target),
+				GetUnitToLocationDistance(unit, ahead),
+				step,
+				since,
+				from,
+				to,
+				spa
+			)
+		)
+	end
+	return true
+end
+-- For the override attack mode's Think (after X.TryKite): chase the hero it attacks, unless a melee unit is on the
+-- bot (stepping away wins) or a hold, invisibility or the mode rules it out.
+function X.TryChase(unit, target)
+	if
+		not Fu.IsValidHero(target)
+		or unit:GetAttackRange() <= KiteRules.MELEE_RANGE
+		or NO_KITE_MODES[unit:GetActiveMode()]
+		or KiteHeld(unit)
+		or unit:IsInvisible()
+		or X.MeleeThreat(unit, target)
+		or X.FindMeleeAttacker(unit) ~= nil
+	then
+		return false
+	end
+	return X.ChaseStep(unit, target)
+end
 local function KiteHook(unit)
 	local mode = unit:GetActiveMode()
 	if NO_KITE_MODES[mode] or unit:GetAttackRange() <= KiteRules.MELEE_RANGE then
@@ -1033,33 +1181,28 @@ local function KiteHook(unit)
 	if not Fu.IsValid(target) and mode ~= BOT_MODE_ATTACK then
 		return false
 	end
-	-- A mode or hero script holding the bot (outpost hold, a cast hold, Clinkz's invisible hunt, Techies' plant).
-	local now = DotaTime()
-	if
-		now < (unit._outpostHoldUntil or -1)
-		or now < (unit._castHoldUntil or -1)
-		or now < (unit._clinkzHuntUntil or -1)
-		or now < (unit._madHoldUntil or -1)
-	then
+	if KiteHeld(unit) or Fu.CanNotUseAction(unit) or unit:IsInvisible() then
 		return false
 	end
-	if Fu.CanNotUseAction(unit) or unit:IsInvisible() then
-		return false
-	end
+	local heroTarget = Fu.IsValidHero(target) and target or nil
 	if mode == BOT_MODE_ATTACK then
-		local heroTarget = Fu.IsValidHero(target) and target or unit:GetTarget()
-		if Fu.IsValidHero(heroTarget) and heroTarget:GetAttackRange() <= KiteRules.MELEE_RANGE then
+		heroTarget = heroTarget or unit:GetTarget()
+		if Fu.IsValidHero(heroTarget) and X.MeleeThreat(unit, heroTarget) then
 			return X.TryKite(unit, heroTarget)
 		end
 	end
-	if not Fu.IsValid(target) then
-		return false
-	end
 	local attacker, kind = X.FindMeleeAttacker(unit)
-	if attacker == nil then
-		return false
+	if attacker ~= nil then
+		if not Fu.IsValid(target) then
+			return false
+		end
+		return X.KiteStep(unit, attacker, target, kind)
 	end
-	return X.KiteStep(unit, attacker, target, kind)
+	-- No melee unit on us: chase a hero target that runs out of range.
+	if Fu.IsValidHero(heroTarget) then
+		return X.ChaseStep(unit, heroTarget)
+	end
+	return false
 end
 -- Per-think hook (ability_item_usage_generic.lua) for every mode. Heroes on the override attack mode
 -- (unit._ohaAttackOverride, set by mode_attack_generic.lua) kite from its Think while attack mode runs. Returns

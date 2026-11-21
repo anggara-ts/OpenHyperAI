@@ -217,3 +217,110 @@ T.test("kite hook: an error prints once as [OHA-ERROR] instead of vanishing in t
 	end
 	T.eq(count, 1, "printed once")
 end)
+
+T.test("chase step: toward a hero running out of range", function()
+	local R = rules()
+	-- Range 600; the hero is 550 away now and 700 away at our next attack: step 700 - 570 = 130 toward it.
+	local step, x, y = R.ChaseStep(0, 0, 550, 0, 700, 0, 600)
+	T.near(step, 130, 1e-6, "just enough")
+	T.near(x, 130, 1e-6, "toward where it heads")
+	T.near(y, 0, 1e-6, "straight")
+	-- Running far: the step is capped at 250.
+	T.near((R.ChaseStep(0, 0, 600, 0, 1000, 0, 600)), 250, 1e-6, "capped")
+	-- Only a little out of range: at least the 60 minimum.
+	T.near((R.ChaseStep(0, 0, 540, 0, 580, 0, 600)), 60, 1e-6, "minimum step")
+	-- Running sideways at the same distance, or toward us: no chase.
+	T.eq(select(4, R.ChaseStep(0, 0, 500, 0, 495, 100, 600)), "not-away", "sideways")
+	T.eq(select(4, R.ChaseStep(0, 0, 500, 0, 300, 0, 600)), "not-away", "coming at us")
+	-- Getting farther but still in range at the next attack.
+	T.eq(select(4, R.ChaseStep(0, 0, 300, 0, 450, 0, 600)), "in-range", "stays in range")
+	-- Already well past our range: the mode walks after it.
+	T.eq(select(4, R.ChaseStep(0, 0, 900, 0, 1100, 0, 600)), "far", "too far")
+end)
+
+T.test("chase: next attack time and attack range between hulls", function()
+	local R = rules()
+	-- 1.7s per attack, 0.8s since the last one, wind-up 0.5s (from = 0.6): 0.9 + 0.5 = 1.4s.
+	T.near(R.NextAttackIn(1.7, 0.8, 0.6), 1.4, 1e-9, "rest of the cycle plus the wind-up")
+	T.near(R.NextAttackIn(1.7, 2.0, 0.6), 0.5, 1e-9, "attack overdue: only the wind-up")
+	T.eq(R.InAttackRange(640, 600, 24, 24), true, "hulls count")
+	T.eq(R.InAttackRange(660, 600, 24, 24), false, "out of range")
+end)
+
+-- A ranged bot attacking an enemy hero that runs east.
+local function chaseScene()
+	local bot, SpecialUnits, _, _, moves = kiteScene("npc_dota_neutral_kobold", TEAM_NEUTRAL)
+	local here = bot:GetLocation()
+	-- A real enemy hero of the stub game (a made-up one has no player and reads as an illusion).
+	local runner = T.stub.teams[TEAM_DIRE][2]
+	runner._loc = here + Vector(550, 0, 0)
+	runner.GetExtrapolatedLocation = function()
+		return here + Vector(700, 0, 0)
+	end
+	bot.GetAttackTarget = function()
+		return runner
+	end
+	bot.WasRecentlyDamagedByCreep = function()
+		return false
+	end
+	bot.GetActiveMode = function()
+		return BOT_MODE_ATTACK
+	end
+	return bot, SpecialUnits, runner, moves
+end
+
+T.test("chase hook: steps toward a running hero and reports inRangeNext", function()
+	local bot, SpecialUnits, runner, moves = chaseScene()
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "stepped")
+	T.eq(#moves, 1, "one move order")
+	T.ok(moves[1].x > bot:GetLocation().x, "toward the runner")
+	T.ok(printedWith("kind=chase") ~= nil, "chase line")
+	-- At the next attack the runner is 600 away: in range.
+	runner._loc = bot:GetLocation() + Vector(600, 0, 0)
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local result = printedWith("result kind=chase")
+	T.ok(result ~= nil and string.find(result, "inRangeNext=1", 1, true) ~= nil, "result line: " .. tostring(result))
+end)
+
+T.test("chase hook: a melee unit hitting the bot wins, and no chase into a tower", function()
+	local bot, SpecialUnits, runner, moves = chaseScene()
+	-- A melee creep hits the bot from the north: the step goes south, away from it, not east after the runner.
+	local creep = T.stub.newUnit({ name = "npc_dota_creep_badguys_melee", loc = bot:GetLocation() + Vector(0, 100, 0) })
+	creep.GetAttackTarget = function()
+		return bot
+	end
+	bot.WasRecentlyDamagedByCreep = function()
+		return true
+	end
+	bot.GetNearbyLaneCreeps = function(_, _, enemy)
+		return enemy and { creep } or {}
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), true, "stepped")
+	T.ok(moves[1].y < bot:GetLocation().y, "away from the creep, not after the runner")
+	T.ok(printedWith("kind=lane") ~= nil, "lane step")
+	-- No creep, but an enemy tower covers the step end: no chase, counted in the baseline.
+	bot._kitePending = nil
+	bot.GetNearbyLaneCreeps = function()
+		return {}
+	end
+	bot.WasRecentlyDamagedByCreep = function()
+		return false
+	end
+	local tower = T.stub.newUnit({ name = "npc_dota_badguys_tower1_mid", loc = runner:GetLocation(), hero = false })
+	tower.IsBuilding = function()
+		return true
+	end
+	tower.GetAttackRange = function()
+		return 700
+	end
+	bot.GetNearbyTowers = function()
+		return { tower }
+	end
+	T.eq(SpecialUnits.TryKiteInAttack(bot), false, "no chase under the tower")
+	T.eq(#moves, 1, "no new move order")
+	T.stub.time = T.stub.time + 61
+	SpecialUnits.KiteResultTick(bot)
+	local result = printedWith("result kind=chase")
+	T.ok(result ~= nil and string.find(result, "no-step=tower:1", 1, true) ~= nil, "result line: " .. tostring(result))
+end)

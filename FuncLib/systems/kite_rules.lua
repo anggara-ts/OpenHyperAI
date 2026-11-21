@@ -80,4 +80,45 @@ function KiteRules.StepSeconds(step, moveSpeed)
 	return step / math.max(100, moveSpeed)
 end
 
+-- Chase (#72, maintainer 2026-11-21: "does kite also move forward to chase running enemy?" - "yes please"): the
+-- attack target is an enemy hero getting farther away. Between attacks the bot steps toward where the hero will be
+-- at our next attack, so the next attack needs no walk.
+--   (bx, by)  the bot          (tx, ty)  the target now
+--   (px, py)  the target at our next attack (its extrapolated location)
+-- Returns the step (MIN_STEP..MAX_STEP) and its end point, or nil and why not:
+--   "not-away"  it does not get CHASE_AWAY_MIN farther by then (standing, coming at us, circling)
+--   "in-range"  it stays within range - RANGE_MARGIN anyway
+--   "far"       already CHASE_FAR past our range now: the mode walks after it, a step does not keep it in range
+KiteRules.CHASE_AWAY_MIN = 20
+KiteRules.CHASE_FAR = 200
+function KiteRules.ChaseStep(bx, by, tx, ty, px, py, range)
+	local nowX, nowY = tx - bx, ty - by
+	local nextX, nextY = px - bx, py - by
+	local distNow = math.sqrt(nowX * nowX + nowY * nowY)
+	local distNext = math.sqrt(nextX * nextX + nextY * nextY)
+	if distNow > range + KiteRules.CHASE_FAR then
+		return nil, nil, nil, "far"
+	end
+	if distNext < distNow + KiteRules.CHASE_AWAY_MIN then
+		return nil, nil, nil, "not-away"
+	end
+	local need = distNext - (range - KiteRules.RANGE_MARGIN)
+	if need <= 0 then
+		return nil, nil, nil, "in-range"
+	end
+	local step = math.max(KiteRules.MIN_STEP, math.min(KiteRules.MAX_STEP, need))
+	return step, bx + nextX / distNext * step, by + nextY / distNext * step
+end
+
+-- Seconds from now until our next attack is released: the rest of this attack's cycle plus the wind-up. from is
+-- KiteRules.Window's first value (wind-up + BUF).
+function KiteRules.NextAttackIn(secondsPerAttack, since, from)
+	return math.max(0, secondsPerAttack - since) + from - KiteRules.BUF
+end
+
+-- Within attack range at the next attack: Dota measures attack range between the two hulls.
+function KiteRules.InAttackRange(dist, range, botRadius, targetRadius)
+	return dist <= range + botRadius + targetRadius
+end
+
 return KiteRules

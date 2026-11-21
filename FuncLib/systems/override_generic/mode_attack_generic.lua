@@ -590,7 +590,8 @@ function AttackMode.Think()
 			bot:Action_MoveToLocation(Fu.VectorTowards(attackTarget.unit:GetLocation(), botLocation, attackRange / 2))
 			return
 		end
-		if SpecialUnits.TryKite(bot, attackTarget.unit) then
+		-- Step away from a melee hero on us, or toward a hero running out of range (#72), between attacks.
+		if SpecialUnits.TryKite(bot, attackTarget.unit) or SpecialUnits.TryChase(bot, attackTarget.unit) then
 			return
 		end
 		bot:Action_AttackUnit(attackTarget.unit, false)

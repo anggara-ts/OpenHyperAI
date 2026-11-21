@@ -2373,6 +2373,18 @@ heroSpecificDesire["npc_dota_hero_nevermore"] = function()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+heroSpecificDesire["npc_dota_hero_alchemist"] = function()
+	-- Concoction keep-range (#34, hero_alchemist.lua X.ConcoctionKeepRange sets bot._alchChaseUntil while it walks
+	-- him back into throw range of a hero): game 063, 7:32, the laning mode's own move replaced that order (dist 606
+	-- -> 1023) and the brew blew up on him. This mode takes him and gives no order meanwhile, so the hero script's
+	-- move stands. 1.05: above the other modes' 1.0 overrides, below retreat's 1.1 (the hero script also stops
+	-- the chase when retreat wants him out).
+	if bot._alchChaseUntil ~= nil and DotaTime() < bot._alchChaseUntil then
+		bot._outpostHoldUntil = DotaTime() + 0.15
+		return BOT_DESIRE_OVERRIDE * 1.05
+	end
+	return BOT_MODE_DESIRE_NONE
+end
 -- Primary-jungle outposts (map dump). Live units override these when the scan finds them.
 local OUTPOST_FALLBACK = {
 	Vector(-4096, -448, 128),

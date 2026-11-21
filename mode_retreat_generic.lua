@@ -475,6 +475,10 @@ function GetDesire()
 	bot._retreatDesireAt = now
 	retreatLine = 0
 	local desire = GetDesireHelper()
+	-- Read by hero scripts that must not start a long cast while the bot wants to run (hero_alchemist.lua: no brew;
+	-- the active mode alone misses it, game 063 t=2060: retreat 1.10 line 383 while another mode was active).
+	-- bot._retreatDesireAt (set above) says how fresh they are.
+	bot._retreatDesireNow, bot._retreatLineNow = type(desire) == "number" and desire or 0, retreatLine
 	-- Rooted: retreat can only order a move, and a rooted hero can't move. Game 040, 5:40: Outworld Destroyer,
 	-- rooted by Earthbind at 26% HP, stood still in retreat mode while Meepo hit him. With an enemy hero in reach,
 	-- step aside (low desire) so attack mode fights back; spells and items run in their own think anyway. Retreat

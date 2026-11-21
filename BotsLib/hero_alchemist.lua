@@ -148,7 +148,7 @@ local chemicalRageAbility =
 	SafeAbility(bot:GetAbilityByName("alchemist_chemical_rage"), "alchemist_chemical_rage", "alchemist")
 local berserkPotionAbility =
 	SafeAbility(bot:GetAbilityByName("alchemist_berserk_potion"), "alchemist_berserk_potion", "alchemist")
-local acidSprayDesire, acidSprayLocation
+local acidSprayDesire, acidSprayLocation, acidSprayWhy, acidSprayCount
 local unstableConcoctionDesire, unstableConcoctionTarget, unstableConcoctionWhy
 local unstableConcoctionThrowDesire, unstableConcoctionThrowTarget, unstableConcoctionThrowWhy
 local berserkPotionDesire, berserkPotionTarget
@@ -950,8 +950,23 @@ function X.SkillsComplement()
 		concoctionStartTime = DotaTime()
 		return
 	end
-	acidSprayDesire, acidSprayLocation = X.ConsiderAcidSpray()
+	acidSprayDesire, acidSprayLocation, acidSprayWhy, acidSprayCount = X.ConsiderAcidSpray()
 	if acidSprayDesire > 0 and not HoldsCastWhileBrewing("acid_spray", brewing, brewed) then
+		-- [OHA-ALCHEMIST] acid-spray why= count=: every cast with its rule (#34: games 063-065 could not show how
+		-- often it went out). The order repeats until it is carried out, so at most once per 2s (cooldown 21s).
+		if DotaTime() >= (bot._alchAcidLogAt or -999) then
+			bot._alchAcidLogAt = DotaTime() + 2
+			pcall(
+				print,
+				string.format(
+					"[OHA-ALCHEMIST] t=%.0f acid-spray why=%s count=%d mp=%.2f",
+					DotaTime(),
+					tostring(acidSprayWhy),
+					acidSprayCount or 0,
+					Fu.GetMP(bot)
+				)
+			)
+		end
 		Fu.SetQueuePtToINT(bot, false)
 		bot:Action_UseAbilityOnLocation(acidSprayAbility, acidSprayLocation)
 		return
@@ -979,7 +994,7 @@ function X.ConsiderAcidSpray()
 		if aoeLocation.count >= 2 then
 			local enemiesInRadius = Fu.GetEnemiesNearLoc(aoeLocation.targetloc, radius)
 			if enemiesInRadius ~= nil and #enemiesInRadius >= 2 then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "fight", #enemiesInRadius
 			end
 		end
 	end
@@ -1001,7 +1016,7 @@ function X.ConsiderAcidSpray()
 		then
 			local targetAllies = Fu.GetNearbyHeroes(botTarget, 900, false, BOT_MODE_NONE)
 			if nearbyAllies ~= nil and targetAllies ~= nil and #nearbyAllies >= #targetAllies then
-				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "engage", #nInRangeEnemy
 			end
 		end
 	end
@@ -1024,22 +1039,34 @@ function X.ConsiderAcidSpray()
 				targetAllies ~= nil
 				and (#targetAllies > #nearbyAllies or hpRatio < 0.45 and bot:WasRecentlyDamagedByAnyHero(2.5))
 			then
-				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation()
+				return BOT_ACTION_DESIRE_HIGH, bot:GetLocation(), "retreat", #nInRangeEnemy
 			end
 		end
 	end
-	if Fu.IsDefending(bot) or Fu.IsPushing(bot) then
+	-- Push / defend (#34, maintainer 2026-11-21): 3+ enemy lane creeps in the spray area around him, or our creeps
+	-- hitting an enemy tower with 2+ enemy creeps near. The old rule needed 5+ creeps AND both lane fronts of
+	-- his ASSIGNED lane within 150 of each other, so it almost never fired on a push of another lane or at a
+	-- tower. The creeps counted are the ones around him, so the lane is the one he is on.
+	-- 7.42 game files: radius 350-500, duration 15, 120 mana, cooldown 21.
+	local pushing = Fu.IsPushing(bot)
+	if (Fu.IsDefending(bot) or pushing) and Fu.GetMP(bot) > 0.33 then
+		local why = pushing and "push" or "defend"
 		local laneCreeps = bot:GetNearbyLaneCreeps(castRange, true)
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
-		local allyLaneFront = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
-		local enemyLaneFront = GetLaneFrontLocation(GetOpposingTeam(), bot:GetAssignedLane(), 0)
-		if
-			laneCreeps ~= nil
-			and #laneCreeps >= 5
-			and aoeLocation.count >= 5
-			and Fu.GetLocationToLocationDistance(allyLaneFront, enemyLaneFront) < 150
-		then
-			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc
+		if laneCreeps ~= nil and #laneCreeps >= 3 and aoeLocation.count >= 3 then
+			return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc, why, aoeLocation.count
+		end
+		if pushing and laneCreeps ~= nil and #laneCreeps >= 2 and aoeLocation.count >= 2 then
+			local enemyTowers = bot:GetNearbyTowers(1600, true)
+			local allyCreeps = bot:GetNearbyLaneCreeps(1600, false)
+			local tower = enemyTowers ~= nil and enemyTowers[1] or nil
+			if tower ~= nil and allyCreeps ~= nil then
+				for _, creep in pairs(allyCreeps) do
+					if Fu.IsValid(creep) and creep:GetAttackTarget() == tower then
+						return BOT_ACTION_DESIRE_MODERATE, aoeLocation.targetloc, "push-tower", aoeLocation.count
+					end
+				end
+			end
 		end
 	end
 	if Fu.IsFarming(bot) then
@@ -1054,10 +1081,10 @@ function X.ConsiderAcidSpray()
 					or #neutralCreeps >= 2 and aoeLocation.count >= 2 and neutralCreeps[1]:IsAncientCreep()
 				)
 			then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "farm", aoeLocation.count
 			end
 			if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "farm", aoeLocation.count
 			end
 		end
 	end
@@ -1066,7 +1093,7 @@ function X.ConsiderAcidSpray()
 		local aoeLocation = bot:FindAoELocation(true, false, bot:GetLocation(), castRange, radius, 0, 0)
 		if isAttacking and Fu.GetMP(bot) > 0.65 then
 			if laneCreeps ~= nil and #laneCreeps >= 4 and aoeLocation.count >= 4 then
-				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc
+				return BOT_ACTION_DESIRE_HIGH, aoeLocation.targetloc, "lane", aoeLocation.count
 			end
 		end
 	end
@@ -1077,12 +1104,12 @@ function X.ConsiderAcidSpray()
 			and Fu.IsInRange(bot, botTarget, 500)
 			and isAttacking
 		then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "roshan", 1
 		end
 	end
 	if Fu.IsDoingTormentor(bot) then
 		if Fu.IsTormentor(botTarget) and Fu.IsInRange(bot, botTarget, 400) and isAttacking then
-			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+			return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), "tormentor", 1
 		end
 	end
 	return BOT_ACTION_DESIRE_NONE, 0

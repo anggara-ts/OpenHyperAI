@@ -108,3 +108,47 @@ T.test("clinkz: a hunt target out of vision (null handle) is found again by play
 	bot._huntPid = pid
 	T.eq(X.HuntTargetAlive(gone), false, "dead by player ID")
 end)
+
+T.test("clinkz: the tower pause hold ends on time, danger or the target leaving the tower", function()
+	local X = clinkz()
+	local function o(over)
+		local base = {
+			now = 3034,
+			untilAt = 3038,
+			hp = 0.98,
+			hit = false,
+			outnumbered = false,
+			targetAlive = true,
+			towerValid = true,
+			targetTowerDist = 600,
+		}
+		for k, v in pairs(over or {}) do
+			base[k] = v
+		end
+		return base
+	end
+	-- Game 067, t=3033: Alchemist under his tower, Clinkz at 0.98: hold.
+	T.eq(X.TowerHoldEndWhy(o()), nil, "holds")
+	T.eq(X.TowerHoldEndWhy(o({ now = 3038 })), "time", "pause over")
+	T.eq(X.TowerHoldEndWhy(o({ hp = 0.3 })), "low-hp", "low")
+	T.eq(X.TowerHoldEndWhy(o({ hit = true })), "hit", "a hero hit him")
+	T.eq(X.TowerHoldEndWhy(o({ outnumbered = true })), "outnumbered", "outnumbered")
+	T.eq(X.TowerHoldEndWhy(o({ targetAlive = false })), "target-gone", "target dead")
+	T.eq(X.TowerHoldEndWhy(o({ towerValid = false })), "tower-gone", "tower gone")
+	T.eq(X.TowerHoldEndWhy(o({ targetTowerDist = 1001 })), "left-tower", "target left the tower")
+end)
+
+T.test("clinkz: hunt mode changes are counted per hunt", function()
+	local X = clinkz()
+	local count = { name = "alchemist", mode = 1, changes = 0, at = 0, path = { "outpost" } }
+	T.ok(not X.HuntModeStep(count, 1, "outpost"), "same mode")
+	T.ok(X.HuntModeStep(count, 2, "attack"), "outpost -> attack")
+	T.ok(X.HuntModeStep(count, 3, "push_tower_bot"), "attack -> push")
+	T.eq(count.changes, 2, "two changes")
+	T.eq(table.concat(count.path, ">"), "outpost>attack>push_tower_bot", "path")
+	for i = 1, 10 do
+		X.HuntModeStep(count, 10 + i, "m" .. i)
+	end
+	T.eq(count.changes, 12, "all changes counted")
+	T.eq(#count.path, 8, "path keeps the first 8")
+end)

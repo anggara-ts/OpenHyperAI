@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local RoamStats = require(GetScriptDirectory() .. "/FuncLib/systems/roam_stats")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -326,6 +327,7 @@ end
 function X.SkillsComplement()
 	pcall(X.PactCharges)
 	pcall(CheckHuntResult)
+	pcall(X.CountHuntModes)
 	if Fu.CanNotUseAbility(bot) then
 		return
 	end
@@ -443,6 +445,135 @@ function X.LockHuntTarget(unit)
 	local okId, pid = pcall(unit.GetPlayerID, unit)
 	bot._huntPid = okId and pid or nil
 	bot._huntName = (string.gsub(unit:GetUnitName(), "npc_dota_hero_", ""))
+	X.StartHuntCount(bot._huntName)
+end
+-- Mode changes during one hunt (#94, game 067 item 13): from the lock on a target (X.LockHuntTarget) until the hunt
+-- lets it go (bot._huntTarget cleared: after the reveal's first hits, a drop, a cancel, a tower skip). The [OHA-HUNT]
+-- trace (FuncLib/systems/hunt_trace.lua) runs for the whole Skeleton Walk, also a walk used for travel 5000-14000
+-- away (game 067 t=2038, 2507, 3930), so its changes= mixes travel flips into the hunt's. One line per hunt:
+-- [OHA-CLINKZ] t= hunt modes target= changes= lasted= path=<mode>><mode>... (the first 8 modes).
+-- count: { name, mode, changes, at, path }; returns true when the mode changed.
+function X.HuntModeStep(count, mode, modeName)
+	if mode == count.mode then
+		return false
+	end
+	count.mode = mode
+	count.changes = count.changes + 1
+	if #count.path < 8 then
+		count.path[#count.path + 1] = modeName
+	end
+	return true
+end
+function X.EndHuntCount()
+	local count = bot._huntCount
+	if count == nil then
+		return
+	end
+	bot._huntCount = nil
+	pcall(
+		print,
+		string.format(
+			"[OHA-CLINKZ] t=%.0f hunt modes target=%s changes=%d lasted=%.1f path=%s",
+			DotaTime(),
+			count.name or "-",
+			count.changes,
+			DotaTime() - count.at,
+			table.concat(count.path, ">")
+		)
+	)
+end
+function X.StartHuntCount(name)
+	local count = bot._huntCount
+	if count ~= nil and count.name == name then
+		return
+	end
+	X.EndHuntCount()
+	local mode = bot:GetActiveMode()
+	bot._huntCount = { name = name, mode = mode, changes = 0, at = DotaTime(), path = { RoamStats.ModeName(mode) } }
+end
+function X.CountHuntModes()
+	local count = bot._huntCount
+	if count == nil then
+		return
+	end
+	if bot._huntTarget == nil or not bot:IsAlive() then
+		X.EndHuntCount()
+		return
+	end
+	X.HuntModeStep(count, bot:GetActiveMode(), RoamStats.ModeName(bot:GetActiveMode()))
+end
+-- Tower pause (#94, game 067 t=3033-3047): a skip-tower ends the hunt and pauses new ones for 5 s, but the outpost
+-- hold ended with it, and Valve's attack mode (0.95; Clinkz is not on the attack override list) and push_tower_bot
+-- (0.55) took turns every second on the same target under its tower (12 mode changes). Now the hold stays for the
+-- pause while Skeleton Walk is up: he steps out of the tower's range (to 1150 from it, toward our fountain) or
+-- stands where he was, invisible, until the pause ends. It ends early (why=) when he is under 35% HP, a hero hit
+-- him in the last second, the enemy has more heroes near him, the target died or left the tower (1000+ from it),
+-- or the tower is gone. o: now, untilAt, hp, hit, outnumbered, targetAlive, towerValid, targetTowerDist.
+X.TOWER_HOLD_LEAVE = 1000
+function X.TowerHoldEndWhy(o)
+	if o.now >= o.untilAt then
+		return "time"
+	end
+	if o.hp < 0.35 then
+		return "low-hp"
+	end
+	if o.hit then
+		return "hit"
+	end
+	if o.outnumbered then
+		return "outnumbered"
+	end
+	if not o.targetAlive then
+		return "target-gone"
+	end
+	if not o.towerValid then
+		return "tower-gone"
+	end
+	if (o.targetTowerDist or 0) > X.TOWER_HOLD_LEAVE then
+		return "left-tower"
+	end
+	return nil
+end
+-- Returns true when it holds (an order given). [OHA-CLINKZ] hunt step=tower-hold-end why= target= held=.
+function X.TowerHoldStep()
+	local pause = bot._huntTowerPause
+	if pause == nil then
+		return false
+	end
+	local target, tower = pause.target, pause.tower
+	local targetAlive = target ~= nil and not target:IsNull() and target:IsAlive()
+	local towerValid = Fu.IsValidBuilding(tower)
+	local why = X.TowerHoldEndWhy({
+		now = DotaTime(),
+		untilAt = pause.untilAt,
+		hp = Fu.GetHP(bot),
+		hit = bot:WasRecentlyDamagedByAnyHero(1.0),
+		outnumbered = #Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #Fu.GetAlliesNearLoc(bot:GetLocation(), 1200),
+		targetAlive = targetAlive,
+		towerValid = towerValid,
+		targetTowerDist = targetAlive and towerValid and GetUnitToUnitDistance(target, tower) or 0,
+	})
+	if why ~= nil then
+		bot._huntTowerPause = nil
+		pcall(
+			print,
+			string.format(
+				"[OHA-CLINKZ] t=%.0f hunt step=tower-hold-end why=%s target=%s held=%.1f",
+				DotaTime(),
+				why,
+				pause.name or "-",
+				DotaTime() - pause.at
+			)
+		)
+		return false
+	end
+	bot._clinkzHuntUntil = DotaTime() + 0.6
+	if GetUnitToUnitDistance(bot, tower) < 1150 then
+		bot:Action_MoveToLocation(Fu.AdjustLocationWithOffsetTowardsFountain(tower:GetLocation(), 1150))
+	else
+		bot:Action_MoveToLocation(pause.stand)
+	end
+	return true
 end
 -- The locked target's handle went null: find the same hero again by player ID (a visible hero gets a live handle).
 function X.RefindHuntTarget()
@@ -684,6 +815,7 @@ function X.HuntStep()
 		end
 		X.EndHunt("invis-gone")
 		bot._huntTarget = nil
+		bot._huntTowerPause = nil
 		return false
 	end
 	-- Invisible: a pact on the biggest creep in range first (heal + max HP, keeps him invisible).
@@ -701,6 +833,9 @@ function X.HuntStep()
 			X.OrderPact(creep, "hunt")
 			return true
 		end
+	end
+	if X.TowerHoldStep() then
+		return true
 	end
 	local target, waiting = X.HuntTarget()
 	if target == nil then
@@ -761,8 +896,18 @@ function X.HuntStep()
 				-- A real cancel: no new hunt for 5 s, like cancel-outnumbered. Game 065, t=659-664: no pause, the
 				-- next think picked Hoodwink again, skip-tower <-> approach and farm <-> outpost 4 times.
 				bot._huntOffUntil = DotaTime() + 5
+				-- And the outpost hold stays for those 5 s, out of the tower's range (X.TowerHoldStep).
+				bot._huntTowerPause = {
+					target = target,
+					tower = tower,
+					name = (string.gsub(target:GetUnitName(), "npc_dota_hero_", "")),
+					at = DotaTime(),
+					untilAt = bot._huntOffUntil,
+					stand = bot:GetLocation(),
+				}
+				X.LogHunt("tower-hold", target)
 				bot._clinkzHuntUntil = nil
-				return false
+				return X.TowerHoldStep()
 			end
 		end
 		-- 0.6 s: a think skipped by a cast or the heavy-think throttle must not let the other modes in.

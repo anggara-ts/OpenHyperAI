@@ -2588,7 +2588,14 @@ Usage.ConsiderItemDesire["item_cyclone"] = function(item)
 			return BOT_ACTION_DESIRE_HIGH, hEffectTarget, castType, castReason
 		end
 	end
-	if Fu.CanCastOnNonMagicImmune(bot) and #nearbyEnemies > 0 then
+	-- Puck's own escapes first (Phase Shift, or Jaunt to an orb in flight): game 044, 38:47, she Eul'd herself
+	-- with the orb out, landed among 8 enemies and died (#15). hero_puck.lua sets bot._puckEscapeReady.
+	if bot._puckEscapeReady and #nearbyEnemies > 0 and not Usage.IsDoomed(bot) and not bot:IsRooted() then
+		if DotaTime() >= (bot._puckEulSkipLogAt or -999) then
+			bot._puckEulSkipLogAt = DotaTime() + 10
+			pcall(print, string.format("[OHA-PUCK] t=%.0f escape-order eul-skip why=own-escape-ready", DotaTime()))
+		end
+	elseif Fu.CanCastOnNonMagicImmune(bot) and #nearbyEnemies > 0 then
 		if Fu.GetHP(bot) < 0.2 and bot:WasRecentlyDamagedByAnyHero(3.0) then
 			hEffectTarget = bot
 			castReason = "撤退:" .. Fu.Chat.GetNormName(hEffectTarget)
@@ -6370,6 +6377,17 @@ do
 			)
 		end
 		return BOT_ACTION_DESIRE_NONE
+	end
+end
+-- A hero script's own escape comes first (Puck under Spirit Siphon, hero_puck.lua ConsiderSiphonEscape sets
+-- bot._noTpUntil). A wrapper, not a line in the TP rule, so it stays apart from the TP rule's own edits (#52).
+do
+	local tpRuleNoTp = Usage.ConsiderItemDesire["item_tpscroll"]
+	Usage.ConsiderItemDesire["item_tpscroll"] = function(item)
+		if DotaTime() < (bot._noTpUntil or -999) then
+			return BOT_ACTION_DESIRE_NONE
+		end
+		return tpRuleNoTp(item)
 	end
 end
 Usage.ConsiderItemDesire["item_urn_of_shadows"] = function(item)
@@ -10322,6 +10340,16 @@ function ItemUsageThink()
 	-- a crash in this think (before it, this think issued no orders at all for most bots); the
 	-- same Dota build (6975) and no rune-mode change in between.
 	if Usage.RunePickupLock() then
+		return
+	end
+	-- A hero file's own hold (Puck's Phase Shift, #36): an item order would end the channel. Game 050: a hero hit
+	-- her within 1s of the cast in 12 of 24 probes, and item orders were the one thing not held.
+	if bot._castHoldUntil ~= nil and DotaTime() < bot._castHoldUntil then
+		-- The hero script does not run during the hold either: its own tick keeps its log and release check going.
+		if BotBuild.CastHoldTick ~= nil then
+			pcall(BotBuild.CastHoldTick)
+		end
+		_perfDone()
 		return
 	end
 	do

@@ -9033,6 +9033,15 @@ function Usage.LogModeFlip()
 		local farmWhy = last ~= nil and last.mode == BOT_MODE_FARM and bot._farmExitReason or nil
 		hist[#hist + 1] =
 			{ t = now, mode = mode, des = bot:GetActiveModeDesire(), loc = bot:GetLocation(), farmWhy = farmWhy }
+		-- Which team roam rule won, before and after its cap (#165): team roam latches bot._roam* while another
+		-- mode runs. "(snipe,raw=1.50,cap=push)"; "(?)" when the latch is not the desire it won with.
+		if mode == BOT_MODE_TEAM_ROAM then
+			local okR, RoamStats = pcall(require, GetScriptDirectory() .. "/FuncLib/systems/roam_stats")
+			if okR then
+				hist[#hist].roamNote =
+					RoamStats.FlipNote(bot._roamWhy, bot._roamRaw, bot._roamDes, bot._roamCap, hist[#hist].des)
+			end
+		end
 	end
 	while #hist > 0 and hist[1].t < now - 20 do
 		table.remove(hist, 1)
@@ -9049,6 +9058,7 @@ function Usage.LogModeFlip()
 	for _, entry in ipairs(hist) do
 		parts[#parts + 1] = string.format("%s:%.2f@%.0f", StuckModeName(entry.mode), entry.des or 0, entry.t)
 			.. (entry.farmWhy and ("(farm-left:" .. tostring(entry.farmWhy) .. ")") or "")
+			.. (entry.roamNote or "")
 	end
 	local loc = bot:GetLocation()
 	pcall(

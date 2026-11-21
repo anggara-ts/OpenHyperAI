@@ -20,6 +20,8 @@ local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local Item = require(GetScriptDirectory() .. "/FuncLib/systems/item")
 local Role = require(GetScriptDirectory() .. "/FuncLib/systems/role")
 local SpecialUnits = require(GetScriptDirectory() .. "/FuncLib/hero/special_units")
+local RoamStats = require(GetScriptDirectory() .. "/FuncLib/systems/roam_stats")
+local HuntTrace = require(GetScriptDirectory() .. "/FuncLib/systems/hunt_trace")
 local TeamRoam = {}
 local team = GetTeam()
 local engageTarget = nil
@@ -103,7 +105,67 @@ local function adjustDesire(desire)
 	end
 	return desire
 end
+-- Diagnostics (#165, mode flip-flops): the rule that set this think's desire. Assigned before each return of
+-- GetDesire / GetDesireHelper; read only by RoamTrace, never by a decision.
+local roamWhy = "none"
+-- What a hunt rule (CarryFindTarget / SupportFindTarget) is after: mostly creeps, not heroes.
+local function HuntKind(target)
+	if target:IsHero() then
+		return target:GetTeam() == team and "ally" or "hero"
+	end
+	if target:IsCourier() then
+		return "courier"
+	end
+	if target:IsBuilding() then
+		return "building"
+	end
+	if target:GetTeam() == team then
+		return "deny"
+	end
+	if target:GetTeam() == TEAM_NEUTRAL then
+		return "neutral"
+	end
+	return "lane"
+end
+local function HuntWhy(prefix, target)
+	local okK, kind = pcall(HuntKind, target)
+	return prefix .. "/" .. (okK and kind or "?")
+end
+-- Every think: the rule, raw and capped desire for [OHA-FLIP] (bot._roam*, latched while another mode runs, so the
+-- values are the ones team roam won with), the per-minute [OHA-ROAMSTAT] line and the [OHA-HUNT] trace.
+local function RoamTrace(raw, final)
+	local now = DotaTime()
+	local activeMode = bot:GetActiveMode()
+	local modeName = RoamStats.ModeName(activeMode)
+	if HuntTrace.IsTraced(botName) then
+		HuntTrace.Tick(bot, modeName)
+	end
+	local cap = RoamStats.CapLabel(raw, final)
+	local roamActive = activeMode == BOT_MODE_TEAM_ROAM
+	if not roamActive then
+		bot._roamWhy, bot._roamRaw, bot._roamDes, bot._roamCap, bot._roamMode = roamWhy, raw, final, cap, modeName
+	end
+	local stats = bot._roamStats
+	if stats == nil then
+		stats = RoamStats.New()
+		bot._roamStats = stats
+	end
+	local targetValid = roamActive
+		and engageTarget ~= nil
+		and Fu.IsValid(engageTarget)
+		and TeamRoam.CanBeAttacked(engageTarget)
+	local line = RoamStats.Step(stats, now, modeName, roamWhy, cap, bot:GetLastHits(), targetValid)
+	if line ~= nil then
+		print(string.format("[OHA-ROAMSTAT] t=%.0f %s %s", now, (string.gsub(botName, "npc_dota_hero_", "")), line))
+	end
+end
+-- Returns final unchanged; the diagnostics cannot change it (pcall).
+local function RoamDone(raw, final)
+	pcall(RoamTrace, raw, final)
+	return final
+end
 function GetDesire()
+	roamWhy = "none"
 	local botMode = bot:GetActiveMode()
 	if
 		DotaTime() > 0
@@ -124,31 +186,34 @@ function GetDesire()
 				end
 			end
 			bot._stuckUnsticking = true
+			roamWhy = "stuck-unstick"
 			local enemyHeroes = bot:GetNearbyHeroes(1200, true, BOT_MODE_NONE) or {}
 			if #enemyHeroes > 0 then
-				return 0.85
+				return RoamDone(0.85, 0.85)
 			end
-			return 0.8
+			return RoamDone(0.8, 0.8)
 		end
 	else
 		bot._stuckModeTime = nil
 		bot._stuckUnsticking = false
 	end
 	if ShouldSkipBotThink(GetBot()) then
-		return 0
+		roamWhy = "skip"
+		return RoamDone(0, 0)
 	end
 	if Fu.GetEnemiesAroundAncient(bot, 3200) > 0 then
-		return BOT_MODE_DESIRE_NONE
+		roamWhy = "ancient-threat"
+		return RoamDone(BOT_MODE_DESIRE_NONE, BOT_MODE_DESIRE_NONE)
 	end
 	if bot:WasRecentlyDamagedByTower(3.0) then
 		local enemyAncient = GetAncient(GetOpposingTeam())
 		if enemyAncient ~= nil and GetUnitToUnitDistance(bot, enemyAncient) < 3000 then
-			return BOT_MODE_DESIRE_NONE
+			roamWhy = "enemy-ancient-tower"
+			return RoamDone(BOT_MODE_DESIRE_NONE, BOT_MODE_DESIRE_NONE)
 		end
 	end
 	local desire = GetDesireHelper()
-	desire = adjustDesire(desire)
-	return desire
+	return RoamDone(desire, adjustDesire(desire))
 end
 function GetDesireHelper()
 	local hpRatio = Fu.GetHP(bot)
@@ -161,15 +226,18 @@ function GetDesireHelper()
 		or not string.find(botName, "hero")
 		or bot:IsIllusion()
 	then
+		roamWhy = "skip"
 		return BOT_MODE_DESIRE_NONE
 	end
 	local dropDesire = Item.RoshanDropDesire(bot)
 	if dropDesire > 0 then
+		roamWhy = "rosh-drop"
 		return dropDesire
 	end
 	if Fu.IsInLaningPhase() then
 		if DotaTime() < towerAvoidUntil and towerAvoidLocation ~= nil then
 			isAvoidingTower = true
+			roamWhy = "tower-avoid"
 			return bot:GetActiveModeDesire() + 0.05
 		end
 		if bot:GetActiveMode() == BOT_MODE_WATCHER then
@@ -180,6 +248,7 @@ function GetDesireHelper()
 					isAvoidingTower = true
 					towerAvoidLocation = Fu.AdjustLocationWithOffsetTowardsFountain(enemyTowers[1]:GetLocation(), 1200)
 					towerAvoidUntil = DotaTime() + towerAvoidDuration
+					roamWhy = "tower-avoid"
 					return bot:GetActiveModeDesire() + 0.05
 				end
 			end
@@ -210,6 +279,7 @@ function GetDesireHelper()
 				setEngageTarget(helpTarget)
 				engageTarget = helpTarget
 				local maxDesire = RemapValClamped(distance, 1000, 4000, 0.85, 0.4)
+				roamWhy = "help-core"
 				return RemapValClamped(hpRatio, 0.25, 0.7, BOT_MODE_DESIRE_NONE, maxDesire)
 			end
 		end
@@ -221,6 +291,7 @@ function GetDesireHelper()
 		if isHelpingAlly then
 			setEngageTarget(helpTarget)
 			engageTarget = helpTarget
+			roamWhy = "help-ally"
 			return RemapValClamped(hpRatio, 0.3, 0.7, BOT_MODE_DESIRE_NONE, 0.4)
 		end
 	end
@@ -228,6 +299,7 @@ function GetDesireHelper()
 	if Fu.IsLaning(bot) then
 		if DotaTime() < towerEscapeUntil and towerEscapeLocation ~= nil then
 			isEscapingTower = true
+			roamWhy = "tower-escape"
 			return 0.7
 		end
 		local enemyTowers = bot:GetNearbyTowers(900, true)
@@ -246,6 +318,7 @@ function GetDesireHelper()
 				isEscapingTower = true
 				towerEscapeLocation = Fu.AdjustLocationWithOffsetTowardsFountain(enemyTowers[1]:GetLocation(), 1200)
 				towerEscapeUntil = DotaTime() + towerEscapeDuration
+				roamWhy = "tower-escape"
 				return 0.7
 			end
 		end
@@ -255,6 +328,7 @@ function GetDesireHelper()
 		if Fu.IsValid(lastHitCreep) and Fu.CanBeAttacked(lastHitCreep) then
 			local why = TeamRoam.LastHitWithdrawWhy(lastHitCreep)
 			if why == nil then
+				roamWhy = "snipe"
 				return BOT_DESIRE_OVERRIDE * 1.5
 			end
 			if DotaTime() >= (bot._roamLastHitSkipLogAt or -999) then
@@ -276,6 +350,7 @@ function GetDesireHelper()
 		end
 	end
 	if not bot:IsAlive() or bot:GetCurrentActionType() == BOT_ACTION_TYPE_DELAY then
+		roamWhy = "action-delay"
 		return BOT_MODE_DESIRE_NONE
 	end
 	if botName == "npc_dota_hero_lone_druid" or bot.isBear and botName == "npc_dota_hero_lone_druid_bear" then
@@ -320,6 +395,7 @@ function GetDesireHelper()
 				end
 				if hasItemToTransfer then
 					bot._ldItemTransfer = true
+					roamWhy = "ld-transfer"
 					return 0.6
 				end
 			end
@@ -353,6 +429,7 @@ function GetDesireHelper()
 				local heroDistance = GetUnitToUnitDistance(bot, loneDruid.hero)
 				if heroDistance > 700 then
 					bot._bearFollowHero = true
+					roamWhy = "bear-follow"
 					return 0.5
 				end
 			end
@@ -363,6 +440,7 @@ function GetDesireHelper()
 				bot._bearFollowHero = false
 			elseif heroDistance > 990 then
 				bot._bearFollowHero = true
+				roamWhy = "bear-follow"
 				return 0.6
 			end
 			local heroMode = loneDruid.hero:GetActiveMode()
@@ -375,6 +453,7 @@ function GetDesireHelper()
 				) and heroDistance > 700
 			then
 				bot._bearFollowHero = true
+				roamWhy = "bear-follow"
 				return 0.5
 			end
 		end
@@ -382,6 +461,7 @@ function GetDesireHelper()
 	local specialUnitDesire = SpecialUnits.GetDesire(bot)
 	if specialUnitDesire > 0 then
 		hasSpecialUnitTarget = true
+		roamWhy = "special-unit"
 		-- Deward / serpent-escape / high-priority specials: keep desire even if HP isn't full.
 		if specialUnitDesire >= 0.95 then
 			return specialUnitDesire
@@ -390,10 +470,12 @@ function GetDesireHelper()
 	end
 	if Fu.IsInLaningPhase() and bot:HasModifier("modifier_warlock_upheaval") then
 		shouldAvoidEffects = true
+		roamWhy = "avoid-effects"
 		return BOT_ACTION_DESIRE_VERYHIGH + 0.1
 	end
 	if HasModifierThatNeedToAvoidEffects() then
 		shouldAvoidEffects = true
+		roamWhy = "avoid-effects"
 		return RemapValClamped(hpRatio, 0.3, 1, BOT_ACTION_DESIRE_VERYHIGH, BOT_ACTION_DESIRE_NONE)
 	end
 	if
@@ -410,6 +492,8 @@ function GetDesireHelper()
 		and bot:GetActiveMode() ~= BOT_MODE_DEFEND_ALLY
 		and bot:GetActiveMode() ~= BOT_MODE_ROAM
 	then
+		-- Team roam itself is not in this list: on its first think as the active mode the hunt is off (#165).
+		roamWhy = "gate-off"
 		return BOT_ACTION_DESIRE_NONE
 	elseif #alliesNear >= #enemiesNear then
 		local maxDesire = BOT_MODE_DESIRE_VERYHIGH + 0.04
@@ -418,6 +502,7 @@ function GetDesireHelper()
 			if attackTarget ~= nil then
 				engageTarget = attackTarget
 				bot:SetTarget(attackTarget)
+				roamWhy = HuntWhy("hunt-carry", attackTarget)
 				local clampedDesire = RemapValClamped(hpRatio, 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
 				return Clamp(clampedDesire, 0, maxDesire)
 			end
@@ -427,6 +512,7 @@ function GetDesireHelper()
 			if attackTarget ~= nil then
 				engageTarget = attackTarget
 				bot:SetTarget(attackTarget)
+				roamWhy = HuntWhy("hunt-support", attackTarget)
 				local clampedDesire = RemapValClamped(hpRatio, 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
 				return Clamp(clampedDesire, 0, maxDesire)
 			end
@@ -437,6 +523,7 @@ function GetDesireHelper()
 				and TeamRoam.IsValid(towerCreepTarget)
 				and DotaTime() < towerCreepStartTime + towerCreepDuration
 			then
+				roamWhy = "tower-creep"
 				return BOT_MODE_DESIRE_VERYHIGH
 			else
 				towerCreepStartTime, isAttackingTowerCreep = 0, false
@@ -448,6 +535,7 @@ function GetDesireHelper()
 					isAttackingTowerCreep = true
 				end
 				bot:SetTarget(towerCreepTarget)
+				roamWhy = "tower-creep"
 				return BOT_MODE_DESIRE_VERYHIGH
 			end
 		end
@@ -606,6 +694,9 @@ function Think()
 	end
 	ItemOpsThink()
 	if Fu.IsValid(lastHitCreep) then
+		if bot._huntTrace ~= nil then
+			pcall(HuntTrace.NoteSnipe, bot, lastHitCreep)
+		end
 		bot:Action_AttackUnit(lastHitCreep, true)
 		return
 	end

@@ -1997,15 +1997,43 @@ end
 heroSpecificDesire["npc_dota_hero_elder_titan"] = function()
 	return CheckHighPriorityChannelAbility("elder_titan_echo_stomp")
 end
+-- Which Primal Beast hold returned 1.50 (#12, game 067 50:24-50:44: attack and outpost/1.50 swapped 4 times in 15s
+-- while Death Prophet chased him, and only one stint printed why=trample; the others were Onslaught or Pulverize,
+-- which logged nothing). Printed when the hold changes, else every 10s. Trample lasts 5.5s (datafeed).
+local function LogPrimalBeastHold(why)
+	local now = DotaTime()
+	if why == bot._pbHoldWhy and now < (bot._pbOverrideLogAt or -999) then
+		return
+	end
+	bot._pbHoldWhy = why
+	bot._pbOverrideLogAt = now + 10
+	local defend = 0
+	for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+		defend = math.max(defend, GetDefendLaneDesire(lane) or 0)
+	end
+	pcall(
+		print,
+		string.format(
+			"[OHA-FLIPSRC] t=%.0f primal_beast override=1.50 why=%s enemies=%d maxDefend=%.2f hp=%.2f heroHit=%s",
+			now,
+			why,
+			#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200),
+			defend,
+			hpRatio or -1,
+			tostring(bot:WasRecentlyDamagedByAnyHero(2.0))
+		)
+	)
+end
 heroSpecificDesire["npc_dota_hero_primal_beast"] = function()
 	highPriorityAbility = bot:GetAbilityByName("primal_beast_onslaught")
 	if highPriorityAbility:IsTrained() then
-		if
-			highPriorityAbility:IsInAbilityPhase()
-			or bot:HasModifier("modifier_primal_beast_onslaught_windup")
-			or bot:HasModifier("modifier_prevent_taunts")
-			or bot:HasModifier("modifier_primal_beast_onslaught_movement_adjustable")
-		then
+		local onslaughtWhy = highPriorityAbility:IsInAbilityPhase() and "onslaught-phase"
+			or bot:HasModifier("modifier_primal_beast_onslaught_windup") and "onslaught-windup"
+			or bot:HasModifier("modifier_prevent_taunts") and "onslaught-taunt"
+			or bot:HasModifier("modifier_primal_beast_onslaught_movement_adjustable") and "onslaught-charge"
+			or nil
+		if onslaughtWhy ~= nil then
+			LogPrimalBeastHold(onslaughtWhy)
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
@@ -2015,33 +2043,19 @@ heroSpecificDesire["npc_dota_hero_primal_beast"] = function()
 			highPriorityAbility:IsInAbilityPhase()
 			or bot:HasModifier("modifier_primal_beast_trample") and hpRatio > 0.3
 		then
-			-- Game 036: outpost/1.50 in 32 of Primal Beast's base-defence samples. Name the source
-			-- (Trample lasts 5.5s, game data) and whether a fight or a lane defence was on.
-			if DotaTime() >= (bot._pbOverrideLogAt or -999) then
-				bot._pbOverrideLogAt = DotaTime() + 10
-				local defend = 0
-				for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
-					defend = math.max(defend, GetDefendLaneDesire(lane) or 0)
-				end
-				pcall(
-					print,
-					string.format(
-						"[OHA-FLIPSRC] t=%.0f primal_beast override=1.50 why=trample enemies=%d maxDefend=%.2f",
-						DotaTime(),
-						#Fu.GetEnemiesNearLoc(bot:GetLocation(), 1200),
-						defend
-					)
-				)
-			end
+			-- Game 036: outpost/1.50 in 32 of Primal Beast's base-defence samples.
+			LogPrimalBeastHold("trample")
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
 	highPriorityAbility = bot:GetAbilityByName("primal_beast_pulverize")
 	if highPriorityAbility:IsTrained() then
 		if highPriorityAbility:IsInAbilityPhase() or bot:HasModifier("modifier_primal_beast_pulverize_self") then
+			LogPrimalBeastHold("pulverize")
 			return BOT_DESIRE_OVERRIDE * 1.5
 		end
 	end
+	bot._pbHoldWhy = nil
 	return BOT_MODE_DESIRE_NONE
 end
 heroSpecificDesire["npc_dota_hero_batrider"] = function()

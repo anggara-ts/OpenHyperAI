@@ -246,14 +246,6 @@ T.test("alchemist: which gates a throw may override, and which casts wait for th
 	T.eq(X.ConcoctionHoldsCast("berserk_potion", true, 4.0), true, "Berserk Potion too")
 	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 2.9), false, "Chemical Rage early in the brew")
 	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 3.0), true, "Chemical Rage held from 3.0s")
-	T.eq(X.ConcoctionKillPointless(0.16, 4, 0, false), true, "a 16% target that allies are killing, nobody else")
-	T.eq(X.ConcoctionKillPointless(0.16, 4, 1, false), false, "another hero in range takes the brew")
-	T.eq(X.ConcoctionKillPointless(0.16, 0, 0, false), false, "no ally on it")
-	-- Game 063: Earth Spirit at 35% died in the brew's start second (2850); the cut-off is 40% now.
-	T.eq(X.ConcoctionKillPointless(0.35, 2, 0, false), true, "35%: allies finish it")
-	T.eq(X.ConcoctionKillPointless(0.45, 2, 0, false), false, "not that low")
-	-- Game 063, 4:40: Weaver at 24% ran and teleported out; a running target is never skipped.
-	T.eq(X.ConcoctionKillPointless(0.24, 1, 0, true), false, "the target runs away")
 end)
 
 T.test("alchemist: no kill brew a hit finishes, no brew while retreat wants him out", function()
@@ -331,7 +323,7 @@ T.test("alchemist: a brew whose end is seen long after (he died meanwhile) reads
 	T.ok(printedLine("concoction brew%-end outcome=died brewed=66.0s seen=1.0s"), "died, not unknown")
 end)
 
-T.test("alchemist: no brew on a low hero his allies are finishing", function()
+T.test("alchemist: a low hero his allies are finishing: save the brew for another hero, else help", function()
 	local X = load()
 	local bot = GetBot()
 	local brew = bot:GetAbilityByName("alchemist_unstable_concoction")
@@ -370,6 +362,9 @@ T.test("alchemist: no brew on a low hero his allies are finishing", function()
 	local enemy = Stub.teams[GetOpposingTeam()][1]
 	enemy._loc = bot._loc + Vector(400, 0, 0)
 	enemy._hp = 150
+	-- Another enemy hero 1000 away (within 1200): the brew is kept for it.
+	local other = Stub.teams[GetOpposingTeam()][2]
+	other._loc = bot._loc + Vector(0, 1000, 0)
 	enemy.GetActualIncomingDamage = function(_, damage)
 		return damage
 	end
@@ -380,17 +375,92 @@ T.test("alchemist: no brew on a low hero his allies are finishing", function()
 	end
 	Stub.time = 1000
 	X.SkillsComplement()
-	T.eq(started, false, "an ally is on it and nobody else is in range: no brew")
+	T.eq(started, false, "an ally is on it, another enemy hero is near: no brew, kept for that one")
 	T.ok(
-		printedLine("concoction no%-brew why=allies%-finishing rule=kill target=npc_dota_hero_%S+ hp=0.15 allies=1"),
-		"line"
+		printedLine(
+			"concoction no%-brew why=save%-for%-next rule=kill target=npc_dota_hero_%S+ hp=0.15 allies=1 other=npc_dota_hero_"
+		),
+		"save line"
 	)
-	-- The ally stops hitting it and walks off: the kill brew starts.
+	-- Nobody else near: the cooldown is free, a help brew (thrown at once).
+	other._loc = bot._loc + Vector(9000, 0, 0)
+	Stub.time = 1010
+	X.SkillsComplement()
+	T.eq(started, true, "nobody else near: help brew")
+	T.ok(
+		printedLine("concoction help%-start rule=kill target=npc_dota_hero_%S+ hp=0.15 allies=1 kind=held"),
+		"help line"
+	)
+	-- The ally stops hitting it and walks off: the plain kill brew starts.
+	started = false
 	ally.GetAttackTarget = function()
 		return nil
 	end
 	ally._loc = bot._loc + Vector(-9000, 0, 0)
-	Stub.time = 1010
+	Stub.time = 1030
 	X.SkillsComplement()
 	T.eq(started, true, "no ally on it: the kill brew starts")
+	T.ok(printedLine("concoction start why=kill"), "kill start")
+end)
+
+-- Maintainer, 2026-11-21: a hero the allies are finishing that can get away gets an early brew; one that can't is
+-- left to them when another enemy hero is near. FuncLib/systems/concoction_rules.lua.
+T.test("concoction rules: stun by brew time, land time, save-or-help, when the help throw goes", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local R = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
+	-- Datafeed 7.42 hero 73: min_stun 0.25, max_stun 1.7 / 3.2 (levels 1 / 4), brew_time 5.0.
+	T.near(R.StunAt(0, 0.25, 3.2, 5), 0.25, 1e-9, "no brew: min stun")
+	T.near(R.StunAt(5, 0.25, 3.2, 5), 3.2, 1e-9, "full brew: max stun")
+	T.near(R.StunAt(2.5, 0.25, 1.7, 5), 0.975, 1e-9, "half way, level 1")
+	T.near(R.StunAt(9, 0.25, 1.7, 5), 1.7, 1e-9, "capped at max")
+	-- Throw cast point 0.2, projectile_speed 900 (npc_heroes.txt, 7.42).
+	T.near(R.LandTime(450), 0.7, 1e-9, "450 away: 0.2 + 0.5")
+	T.eq(R.AlliesFinishing(0.35, 1), true, "35% with an ally on it")
+	T.eq(R.AlliesFinishing(0.45, 2), false, "45%: not finishing")
+	T.eq(R.AlliesFinishing(0.2, 0), false, "no ally attacking it")
+	T.eq(R.FinishingPlan("runner", true), "help", "a runner: help even with another hero near")
+	T.eq(R.FinishingPlan("tp", false), "help", "a Town Portal: help")
+	T.eq(R.FinishingPlan(nil, true), "save", "held, another hero near: save the brew")
+	T.eq(R.FinishingPlan(nil, false), "held", "held, nobody else: throw early anyway")
+	-- Runner / Blink: once the stun covers ~1s. Level 4: 0.25 + 2.95 * b / 5 >= 1.0 from b ~1.27s.
+	T.eq(R.HelpThrowNow("runner", 1.0, R.StunAt(1.0, 0.25, 3.2, 5), nil, 0.7), false, "1.0s brewed: 0.84s stun")
+	T.eq(R.HelpThrowNow("runner", 1.3, R.StunAt(1.3, 0.25, 3.2, 5), nil, 0.7), true, "1.3s brewed: 1.02s stun")
+	T.eq(R.HelpThrowNow("blink", 3.0, R.StunAt(3.0, 0.25, 1.7, 5), nil, 0.7), true, "level 1 needs 2.6s")
+	-- Town Portal (3.0s channel, items.txt): the stun must land before it ends, with 0.6s to spare.
+	T.eq(R.HelpThrowNow("tp", 0.5, 0.4, 2.5, 0.7), false, "2.5s left, lands in 0.7: wait for a longer stun")
+	T.eq(R.HelpThrowNow("tp", 1.3, 0.6, 1.2, 0.7), true, "1.2s left: throw")
+	T.eq(R.HelpThrowNow("tp", 0.3, 0.3, 0, 0.7), true, "time left unknown: throw")
+	T.eq(R.HelpThrowNow("held", 0.1, 0.3, nil, 0.7), false, "the brew has just started")
+	T.eq(R.HelpThrowNow("held", 0.3, 0.3, nil, 0.7), true, "held: at once")
+end)
+
+T.test("alchemist: a held hero the allies are finishing, nobody else near: help brew thrown at once", function()
+	local X = load()
+	local bot = GetBot()
+	local target = Stub.teams[GetOpposingTeam()][1]
+	for _, unit in ipairs(Stub.teams[GetTeam()]) do
+		if unit ~= bot then
+			unit._loc = bot._loc + Vector(-9000, 0, 0)
+		end
+	end
+	local ally = Stub.teams[GetTeam()][2] ~= bot and Stub.teams[GetTeam()][2] or Stub.teams[GetTeam()][3]
+	ally._loc = bot._loc + Vector(500, 0, 0)
+	ally.GetAttackTarget = function()
+		return target
+	end
+	local state = startBrew(X, 300)
+	T.eq(state.enemy, target, "the brew target")
+	T.ok(printedLine("concoction start why=help target=npc_dota_hero_"), "start why=help")
+	Stub.time = 300.1
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "0.1s brewed: not yet")
+	Stub.time = 300.3
+	X.SkillsComplement()
+	T.eq(#state.orders, 1, "0.3s brewed: thrown")
+	T.eq(state.orders[1].target, target, "at the hero the allies are finishing")
+	-- Fallbacks min_stun 0.25, max_stun 1.7 (the stub ability has no values): 0.25 + 1.45 * 0.3 / 5 = 0.34.
+	T.ok(
+		printedLine("concoction throw why=help%-early target=npc_dota_hero_%S+ dist=400 brewed=0.3s .* stun=0.34"),
+		"line"
+	)
 end)

@@ -4,6 +4,7 @@ local bot = GetBot()
 local Fu = require(GetScriptDirectory() .. "/FuncLib/func_utils")
 local AbilityContext = require(GetScriptDirectory() .. "/FuncLib/systems/ability_context")
 local Minion = require(GetScriptDirectory() .. "/FuncLib/hero/minion")
+local ConcoctionRules = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
 local sTalentList = Fu.Skill.GetTalentList(bot)
 local sAbilityList = Fu.Skill.GetAbilityList(bot)
 local sRole = Fu.Item.GetRoleItemsBuyList(bot)
@@ -170,6 +171,9 @@ local brewThreatKind = "-" -- what the stun-threat throw reacted to
 local hpMarkHp, hpMarkAt = 0, -999 -- his HP at most 1s ago, for the HP-drop threat
 local gapSampleUnit, gapSampleDist, gapSampleAt = nil, 0, 0 -- distance sample of the nearest throw target
 local throwOrderUnit, throwOrderAt = nil, 0 -- the hero of the current throw order and when it was first ordered
+local brewHelp = nil -- { kind=, target= }: this brew helps the allies finish a hero (FinishingCase), else nil
+local pendingHelp = nil -- set by FinishingCase for the start that returns why=help
+local helpStun = nil -- the stun of the last help-early throw, for its log line
 local botTarget
 local isEngaging
 local isRetreating
@@ -246,15 +250,6 @@ function X.ConcoctionHoldsCast(castName, brewing, brewed)
 		return brewed >= 3.0
 	end
 	return true
-end
--- #34, game 057: three "kill" brews were started on a hero at 11-16% HP that the allies around it killed in the
--- same second (Puck at 18:52 and 22:40, Zeus at 50:20); with nobody else in range all three blew up on him.
--- A kill brew is pointless when the target is that low, an allied hero is attacking it and no other enemy hero
--- is in the throw range to take the brew instead. Game 063: the cut-off was 30%; Earth Spirit at 35% (2850)
--- died in the start second, so it is 40%. A target running away is never skipped: game 063, 4:40, Weaver at 24%
--- ran from the fight and teleported out (the brew's stun could have stopped her).
-function X.ConcoctionKillPointless(targetHp, alliesOnTarget, otherEnemiesInRange, targetRetreating)
-	return not targetRetreating and targetHp < 0.4 and alliesOnTarget >= 1 and otherEnemiesInRange == 0
 end
 -- #34, game 063: a kill brew is not started when its damage is lethal within KILL_BREW_MIN_SECONDS of brewing,
 -- or when his own attacks kill the target within KILL_BREW_ATTACK_SECONDS (attackKillSeconds: nil when it is
@@ -537,7 +532,7 @@ function X.LogConcoctionThrow(why, target, brewed, gate)
 		print(
 			string.format(
 				"[OHA-ALCHEMIST] t=%.0f concoction throw why=%s target=%s dist=%.0f brewed=%.1fs illusion=%s"
-					.. " threat=%s gate=%s",
+					.. " threat=%s gate=%s stun=%s",
 				DotaTime(),
 				why,
 				UnitNameOrNone(target),
@@ -545,7 +540,8 @@ function X.LogConcoctionThrow(why, target, brewed, gate)
 				brewed,
 				tostring(Fu.IsSuspiciousIllusion(target)),
 				why == "stun-threat" and brewThreatKind or "-",
-				gate or "open"
+				gate or "open",
+				why == "help-early" and helpStun ~= nil and string.format("%.2f", helpStun) or "-"
 			)
 		)
 	end)
@@ -746,6 +742,8 @@ function X.SkillsComplement()
 	unstableConcoctionDesire, unstableConcoctionTarget, unstableConcoctionWhy = X.ConsiderUnstableConcoction()
 	if unstableConcoctionDesire > 0 then
 		brewTarget, brewWhy = unstableConcoctionTarget, unstableConcoctionWhy or "none"
+		brewHelp = brewWhy == "help" and pendingHelp or nil
+		pendingHelp, helpStun = nil, nil
 		brewSeen, brewSeenAt = false, 0
 		lastThrowWhy, lastThrowBrewed = "none", 0
 		lastGateWhy, lastGateBrewed = "none", 0
@@ -914,15 +912,48 @@ function X.ConsiderAcidSpray()
 	end
 	return BOT_ACTION_DESIRE_NONE, 0
 end
--- No brew on a low hero his allies are finishing (X.ConcoctionKillPointless), for the kill and engage starts.
--- His allies are counted from his own list (within 1600 of him) when their attack target is that hero, himself
--- not. A target running away (moving and not facing him) is never skipped.
--- [OHA-ALCHEMIST] concoction no-brew why=allies-finishing, and brew-anyway why=target-running when only the
--- running rule let the brew through; each at most every 5s.
-local function BrewWouldBeWasted(enemyHero, nearbyEnemies, rule)
-	local targetHp = Fu.GetHP(enemyHero)
-	if targetHp >= 0.4 then
+-- How a hero the allies are finishing can still get away (maintainer, 2026-11-21): "tp" (teleporting or
+-- channeling), "blink" (a Blink Dagger ready and moving), "runner" (moving and not facing him), or nil.
+local function EscapeKind(enemyHero)
+	if enemyHero:HasModifier("modifier_teleporting") or enemyHero:IsChanneling() then
+		return "tp"
+	end
+	local moving = Fu.IsRunning(enemyHero)
+	if not moving then
+		return nil
+	end
+	local okBlink, blinkReady = pcall(function()
+		for slot = 0, 5 do
+			local item = enemyHero:GetItemInSlot(slot)
+			if
+				item ~= nil
+				and string.find(item:GetName(), "blink", 1, true) ~= nil
+				and item:GetCooldownTimeRemaining() <= 0
+			then
+				return true
+			end
+		end
 		return false
+	end)
+	if okBlink and blinkReady then
+		return "blink"
+	end
+	if not enemyHero:IsFacingLocation(bot:GetLocation(), 90) then
+		return "runner"
+	end
+	return nil
+end
+-- A brew start on a low hero his allies are finishing (ConcoctionRules.AlliesFinishing), for the kill and engage
+-- starts. His allies are counted from his own list (within 1600 of him) when their attack target is that hero,
+-- himself not. Returns nil when it is not that case (the normal rules decide), "save" (no brew) or "help" (start a
+-- help brew; pendingHelp holds the escape kind, "held" when it is not escaping), with ConcoctionRules.FinishingPlan:
+-- escaping: help, thrown early (X.ConsiderHelpThrow); not escaping with another enemy hero within 1200: save the
+-- brew for that one; nobody else near: help anyway, thrown at once (the cooldown is free then).
+-- [OHA-ALCHEMIST] concoction no-brew why=save-for-next other= and help-start kind=, each at most every 5s.
+local function FinishingCase(enemyHero, rule)
+	local targetHp = Fu.GetHP(enemyHero)
+	if targetHp >= ConcoctionRules.FINISH_HP then
+		return nil
 	end
 	local alliesOnTarget = 0
 	for _, allyHero in pairs(Fu.GetNearbyHeroes(bot, 1600, false, BOT_MODE_NONE) or {}) do
@@ -935,47 +966,59 @@ local function BrewWouldBeWasted(enemyHero, nearbyEnemies, rule)
 			alliesOnTarget = alliesOnTarget + 1
 		end
 	end
-	local otherEnemies = 0
-	for _, otherHero in pairs(nearbyEnemies or {}) do
-		if otherHero ~= enemyHero and Fu.IsValidHero(otherHero) and not Fu.IsSuspiciousIllusion(otherHero) then
-			otherEnemies = otherEnemies + 1
+	if not ConcoctionRules.AlliesFinishing(targetHp, alliesOnTarget) then
+		return nil
+	end
+	local other = nil
+	for _, otherHero in pairs(Fu.GetNearbyHeroes(bot, ConcoctionRules.SAVE_RADIUS, true, BOT_MODE_NONE) or {}) do
+		if
+			otherHero ~= enemyHero
+			and Fu.IsValidHero(otherHero)
+			and otherHero:IsAlive()
+			and not Fu.IsSuspiciousIllusion(otherHero)
+		then
+			other = otherHero
+			break
 		end
 	end
-	local running = Fu.IsRunning(enemyHero) and not enemyHero:IsFacingLocation(bot:GetLocation(), 90)
-	if not X.ConcoctionKillPointless(targetHp, alliesOnTarget, otherEnemies, running) then
-		if running and X.ConcoctionKillPointless(targetHp, alliesOnTarget, otherEnemies, false) then
-			if DotaTime() >= (bot._alchRunningLogAt or -999) then
-				bot._alchRunningLogAt = DotaTime() + 5
-				pcall(
-					print,
-					string.format(
-						"[OHA-ALCHEMIST] t=%.0f concoction brew-anyway why=target-running rule=%s target=%s hp=%.2f allies=%d",
-						DotaTime(),
-						rule,
-						enemyHero:GetUnitName(),
-						targetHp,
-						alliesOnTarget
-					)
+	local escape = EscapeKind(enemyHero)
+	local plan = ConcoctionRules.FinishingPlan(escape, other ~= nil)
+	if plan == "save" then
+		if DotaTime() >= (bot._alchFinishLogAt or -999) then
+			bot._alchFinishLogAt = DotaTime() + 5
+			pcall(
+				print,
+				string.format(
+					"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=save-for-next rule=%s target=%s hp=%.2f allies=%d other=%s",
+					DotaTime(),
+					rule,
+					enemyHero:GetUnitName(),
+					targetHp,
+					alliesOnTarget,
+					other:GetUnitName()
 				)
-			end
+			)
 		end
-		return false
+		return "save"
 	end
-	if DotaTime() >= (bot._alchFinishLogAt or -999) then
-		bot._alchFinishLogAt = DotaTime() + 5
+	pendingHelp = { kind = plan == "help" and escape or "held", target = enemyHero }
+	if DotaTime() >= (bot._alchHelpLogAt or -999) then
+		bot._alchHelpLogAt = DotaTime() + 5
 		pcall(
 			print,
 			string.format(
-				"[OHA-ALCHEMIST] t=%.0f concoction no-brew why=allies-finishing rule=%s target=%s hp=%.2f allies=%d",
+				"[OHA-ALCHEMIST] t=%.0f concoction help-start rule=%s target=%s hp=%.2f allies=%d kind=%s other=%s",
 				DotaTime(),
 				rule,
 				enemyHero:GetUnitName(),
 				targetHp,
-				alliesOnTarget
+				alliesOnTarget,
+				pendingHelp.kind,
+				UnitNameOrNone(other)
 			)
 		)
 	end
-	return true
+	return "help"
 end
 -- #34 (c): logs a kill or engage start that the retreat mode stops (X.ConcoctionRetreatWanted), at most every 5s.
 local function RetreatStopsBrew(enemyHero, rule)
@@ -1020,6 +1063,11 @@ function X.ConsiderUnstableConcoction()
 			and not Fu.IsSuspiciousIllusion(enemyHero)
 		then
 			if enemyHero:IsChanneling() then
+				-- A channeling hero the allies are finishing (often a Town Portal out): a help brew, timed so the
+				-- stun lands before the channel ends (X.ConsiderHelpThrow).
+				if FinishingCase(enemyHero, "channel") == "help" then
+					return BOT_ACTION_DESIRE_HIGH, enemyHero, "help"
+				end
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "channel"
 			end
 			if
@@ -1044,7 +1092,11 @@ function X.ConsiderUnstableConcoction()
 					local hits = math.ceil(enemyHero:GetHealth() / math.max(1, perHit))
 					attackKillSeconds = (hits - 1) * bot:GetSecondsPerAttack()
 				end
-				if X.ConcoctionKillTooEasy(lethalAfter, attackKillSeconds) then
+				-- (b) only for a hero that is not getting away: a runner, a Blink or a Town Portal needs the stun.
+				local finishing = nil
+				local attackInstead = X.ConcoctionKillTooEasy(lethalAfter, attackKillSeconds)
+					and EscapeKind(enemyHero) == nil
+				if attackInstead then
 					-- (b): his attacks kill it as fast; [OHA-ALCHEMIST] no-brew why=attack-kill, at most every 5s.
 					if DotaTime() >= (bot._alchEasyKillLogAt or -999) then
 						bot._alchEasyKillLogAt = DotaTime() + 5
@@ -1061,9 +1113,16 @@ function X.ConsiderUnstableConcoction()
 							)
 						)
 					end
-				elseif
-					WillStayInThrowRange(enemyHero, lethalAfter, castRange, false)
-					and not BrewWouldBeWasted(enemyHero, nearbyEnemies, "kill")
+				else
+					finishing = FinishingCase(enemyHero, "kill")
+					if finishing == "help" and not RetreatStopsBrew(enemyHero, "kill") then
+						return BOT_ACTION_DESIRE_HIGH, enemyHero, "help"
+					end
+				end
+				if
+					finishing == nil
+					and not attackInstead
+					and WillStayInThrowRange(enemyHero, lethalAfter, castRange, false)
 					and not RetreatStopsBrew(enemyHero, "kill")
 				then
 					return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
@@ -1091,14 +1150,11 @@ function X.ConsiderUnstableConcoction()
 				and WillStayInThrowRange(enemyHero, retreatThrowDelay, castRange, false)
 			then
 				local targetAllies = Fu.GetNearbyHeroes(enemyHero, 1000, false, BOT_MODE_NONE)
-				if
-					nearbyAllies ~= nil
-					and targetAllies ~= nil
-					and #nearbyAllies >= #targetAllies
-					and not BrewWouldBeWasted(enemyHero, nearbyEnemies, "engage")
-					and not RetreatStopsBrew(enemyHero, "engage")
-				then
-					return BOT_ACTION_DESIRE_HIGH, enemyHero, "engage"
+				if nearbyAllies ~= nil and targetAllies ~= nil and #nearbyAllies >= #targetAllies then
+					local finishing = FinishingCase(enemyHero, "engage")
+					if finishing ~= "save" and not RetreatStopsBrew(enemyHero, "engage") then
+						return BOT_ACTION_DESIRE_HIGH, enemyHero, finishing == "help" and "help" or "engage"
+					end
 				end
 			end
 		end
@@ -1154,6 +1210,55 @@ function X.ConsiderUnstableConcoction()
 	end
 	return BOT_ACTION_DESIRE_NONE
 end
+-- A help brew (FinishingCase) goes out early, as soon as ConcoctionRules.HelpThrowNow says: the stun of the brew
+-- so far (linear from min_stun at 0s to max_stun at brew_time, read from the ability) covers about 1s for a runner
+-- or a Blink, the stun lands before a Town Portal or channel ends (throw cast point and projectile_speed from the
+-- throw ability), or at once for a held hero with nobody else near. Returns the target, or nil.
+function X.ConsiderHelpThrow(brewed, castRange)
+	if brewHelp == nil then
+		return nil
+	end
+	local target = brewHelp.target
+	if
+		not Fu.IsValidHero(target)
+		or not target:IsAlive()
+		or not target:CanBeSeen()
+		or not Fu.CanCastOnNonMagicImmune(target)
+	then
+		return nil
+	end
+	local distance = GetUnitToUnitDistance(bot, target)
+	if distance > castRange then
+		return nil
+	end
+	local minStun = unstableConcoctionAbility:GetSpecialValueFloat("min_stun")
+	local maxStun = unstableConcoctionAbility:GetSpecialValueFloat("max_stun")
+	if minStun == nil or minStun <= 0 then
+		minStun = 0.25
+	end
+	if maxStun == nil or maxStun <= minStun then
+		maxStun = 1.7
+	end
+	local stun = ConcoctionRules.StunAt(brewed, minStun, maxStun, ConcoctionBrewTime())
+	local speed = unstableConcoctionThrowAbility:GetSpecialValueInt("projectile_speed")
+	local okPoint, castPoint = pcall(function()
+		return unstableConcoctionThrowAbility:GetCastPoint()
+	end)
+	local landTime = ConcoctionRules.LandTime(
+		distance,
+		okPoint and type(castPoint) == "number" and castPoint or nil,
+		speed ~= nil and speed > 0 and speed or nil
+	)
+	local tpLeft = nil
+	if brewHelp.kind == "tp" then
+		tpLeft = Fu.GetModifierTime(target, "modifier_teleporting")
+	end
+	if not ConcoctionRules.HelpThrowNow(brewHelp.kind, brewed, stun, tpLeft, landTime) then
+		return nil
+	end
+	helpStun = stun
+	return target
+end
 -- Returns the desire, the target and the rule that fired (the caller logs the throw).
 function X.ConsiderUnstableConcoctionThrow()
 	if unstableConcoctionThrowAbility:IsHidden() or not unstableConcoctionThrowAbility:IsFullyCastable() then
@@ -1176,7 +1281,8 @@ function X.ConsiderUnstableConcoctionThrow()
 			-- #34: a channel is interrupted now. Any brew stuns (game data: min_stun 0.25), and waiting for
 			-- 4.25s let a Town Portal finish (7.42 items.txt: item_tpscroll AbilityChannelTime 3.0; game 043,
 			-- 41:23: Kez teleported out, the brew blew up on him).
-			if enemyHero:IsChanneling() then
+			-- The help brew's own target: X.ConsiderHelpThrow times the throw to the channel's end.
+			if enemyHero:IsChanneling() and not (brewHelp ~= nil and brewHelp.target == enemyHero) then
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "channel"
 			end
 			if
@@ -1192,6 +1298,10 @@ function X.ConsiderUnstableConcoctionThrow()
 				return BOT_ACTION_DESIRE_HIGH, enemyHero, "kill"
 			end
 		end
+	end
+	local helpTarget = X.ConsiderHelpThrow(brewed, castRange)
+	if helpTarget ~= nil then
+		return BOT_ACTION_DESIRE_HIGH, helpTarget, "help-early"
 	end
 	local nearestCastable, nearestCastableDist = NearestCastable(nearbyEnemies)
 	if nearestCastable ~= nil then

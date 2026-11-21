@@ -246,10 +246,29 @@ T.test("alchemist: which gates a throw may override, and which casts wait for th
 	T.eq(X.ConcoctionHoldsCast("berserk_potion", true, 4.0), true, "Berserk Potion too")
 	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 2.9), false, "Chemical Rage early in the brew")
 	T.eq(X.ConcoctionHoldsCast("chemical_rage", true, 3.0), true, "Chemical Rage held from 3.0s")
-	T.eq(X.ConcoctionKillPointless(0.16, 4, 0), true, "a 16% target that allies are killing, nobody else")
-	T.eq(X.ConcoctionKillPointless(0.16, 4, 1), false, "another hero in range takes the brew")
-	T.eq(X.ConcoctionKillPointless(0.16, 0, 0), false, "no ally on it")
-	T.eq(X.ConcoctionKillPointless(0.35, 2, 0), false, "not that low")
+	T.eq(X.ConcoctionKillPointless(0.16, 4, 0, false), true, "a 16% target that allies are killing, nobody else")
+	T.eq(X.ConcoctionKillPointless(0.16, 4, 1, false), false, "another hero in range takes the brew")
+	T.eq(X.ConcoctionKillPointless(0.16, 0, 0, false), false, "no ally on it")
+	-- Game 063: Earth Spirit at 35% died in the brew's start second (2850); the cut-off is 40% now.
+	T.eq(X.ConcoctionKillPointless(0.35, 2, 0, false), true, "35%: allies finish it")
+	T.eq(X.ConcoctionKillPointless(0.45, 2, 0, false), false, "not that low")
+	-- Game 063, 4:40: Weaver at 24% ran and teleported out; a running target is never skipped.
+	T.eq(X.ConcoctionKillPointless(0.24, 1, 0, true), false, "the target runs away")
+end)
+
+T.test("alchemist: no kill brew a hit finishes, no brew while retreat wants him out", function()
+	local X = load()
+	-- Game 063, 3721: Lina at 8%, the kill throw at 0.3s, she died in its cast point.
+	T.eq(X.ConcoctionKillTooEasy(0.3), true, "lethal at 0.3s brewed: attack instead")
+	T.eq(X.ConcoctionKillTooEasy(0.5), true, "at the 0.5s edge")
+	T.eq(X.ConcoctionKillTooEasy(2.6), false, "needs 2.6s of brewing: brew")
+	-- Game 063, t=2060: retreat 1.10 (line 383, Retreat.ShouldRun) in the start second.
+	T.eq(X.ConcoctionRetreatWanted(1.10, 383, 0.0), true, "run line")
+	T.eq(X.ConcoctionRetreatWanted(0.55, 210, 0.1), true, "desire 0.5 or more")
+	T.eq(X.ConcoctionRetreatWanted(0.2, 374, 0.1), true, "run line 374 at a low desire")
+	T.eq(X.ConcoctionRetreatWanted(0.3, 210, 0.1), false, "low desire, no run")
+	T.eq(X.ConcoctionRetreatWanted(1.10, 383, 2.0), false, "published 2s ago: stale")
+	T.eq(X.ConcoctionRetreatWanted(nil, nil, nil), false, "never published")
 end)
 
 T.test("alchemist: the first open think after a stun during the brew throws it (stun-threat)", function()
@@ -353,6 +372,10 @@ T.test("alchemist: no brew on a low hero his allies are finishing", function()
 		return damage
 	end
 	ally._loc = enemy._loc + Vector(200, 0, 0)
+	-- Game 063: only an ally attacking the target counts.
+	ally.GetAttackTarget = function()
+		return enemy
+	end
 	Stub.time = 1000
 	X.SkillsComplement()
 	T.eq(started, false, "an ally is on it and nobody else is in range: no brew")
@@ -360,7 +383,10 @@ T.test("alchemist: no brew on a low hero his allies are finishing", function()
 		printedLine("concoction no%-brew why=allies%-finishing rule=kill target=npc_dota_hero_%S+ hp=0.15 allies=1"),
 		"line"
 	)
-	-- The ally walks off: the kill brew starts.
+	-- The ally stops hitting it and walks off: the kill brew starts.
+	ally.GetAttackTarget = function()
+		return nil
+	end
 	ally._loc = bot._loc + Vector(-9000, 0, 0)
 	Stub.time = 1010
 	X.SkillsComplement()

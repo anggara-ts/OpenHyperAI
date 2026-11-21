@@ -2048,8 +2048,16 @@ Usage.ConsiderItemDesire["item_blink"] = function(item)
 		return BOT_ACTION_DESIRE_HIGH, retreatLocation, "ground", nil
 	end
 	local attackingAllies = bot:GetNearbyHeroes(800, false, BOT_MODE_ATTACK)
+	-- Alchemist holding a brew (#34; BotsLib/hero_alchemist.lua refreshes the field while brewing): a retreat blink
+	-- carries it away from every target and it blows up on him (game 063, 34:20, blink at 0.7s brewed).
+	local brewHold = bot._alchBrewingUntil ~= nil and DotaTime() < bot._alchBrewingUntil
+	if brewHold and Fu.IsRetreating(bot) and DotaTime() >= (bot._alchBlinkHoldLogAt or -999) then
+		bot._alchBlinkHoldLogAt = DotaTime() + 3
+		pcall(print, string.format("[OHA-ALCHEMIST] t=%.0f concoction hold cast=item_blink why=retreat", DotaTime()))
+	end
 	if
-		Fu.IsRetreating(bot)
+		not brewHold
+		and Fu.IsRetreating(bot)
 		and not Fu.IsRealInvisible(bot)
 		and bot:GetActiveModeDesire() > BOT_MODE_DESIRE_MODERATE
 	then

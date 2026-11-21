@@ -3304,33 +3304,26 @@ local function TeamUnderPush()
 	return maxDefend >= 0.55
 end
 
-local function AnnounceGrisGrisAllChat(reason)
-	local key = "say_consume_grisgris"
-	if reason and string.find(reason, "push") then
-		key = "say_consume_grisgris_push"
-	end
-	local chatLines = Localization.Get(key)
-	if (chatLines == nil or (type(chatLines) == "table" and #chatLines == 0)) and key ~= "say_consume_grisgris" then
-		chatLines = Localization.Get("say_consume_grisgris")
-	end
-	local msg = nil
-	if type(chatLines) == "table" and #chatLines > 0 then
-		msg = chatLines[RandomInt(1, #chatLines)]
-	elseif type(chatLines) == "string" then
-		msg = chatLines
-	else
-		msg = "Consuming Gris-Gris!"
-	end
-	-- true = all-chat
-	bot:ActionImmediate_Chat(msg, true)
-	MatchTrace.Item(bot, "item_grisgris", "announce", reason or "")
+-- Consuming Gris-Gris used to be said in all chat (a debug aid); now only the log line and the match trace.
+local function LogGrisGrisConsume(reason)
+	pcall(
+		print,
+		string.format(
+			"[OHA-ITEM] t=%.0f %s grisgris-consume why=%s gold=%d",
+			DotaTime(),
+			(string.gsub(bot:GetUnitName(), "npc_dota_hero_", "")),
+			tostring(reason or "-"),
+			bot:GetGold()
+		)
+	)
+	MatchTrace.Item(bot, "item_grisgris", "consume", reason or "")
 end
 
 -- Right-click → Consume equivalent for bots is Action_UseAbility on the item handle.
 -- Gris-Gris is NOT sellable (ItemSellable=0); SellItem will not cash it out.
 local function DoConsumeGrisGris(gris, slot, reason)
 	bot._grisGrisConsumeAt = DotaTime()
-	AnnounceGrisGrisAllChat(reason)
+	LogGrisGrisConsume(reason)
 	-- Move into a main slot when possible; consume orders from slot 16 are unreliable.
 	if slot == 16 or slot >= 6 then
 		local freed = FreeMainSlotForGrisGris()

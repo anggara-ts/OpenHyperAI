@@ -23,6 +23,7 @@ confirmed or disproved.
   - `Action_PickUpRune` on a river rune spot: a water rune (type 7) was taken (`river-pickup-try worked=yes type=7`, 1 sample); the river bounty (type 5) was not, 0 of 4 (games 063-064). Valve's own item mode takes both (#149).
   - A mode file that defines only `GetDesire` still replaces that Valve mode entirely: Valve's `Think` does not run behind it (the item-mode trial, #141, game 063).
   - No hidden item or extra ability gives outpost capture or watcher use: every bot's slots 17-25 are empty and there is no `capture` / `lamp` / `watcher` ability beyond the normal slots (`[OHA-API] slots`, #172, game 064).
+  - `GetIncomingTrackingProjectiles()` on an enemy hero lists the projectiles our team has flying at it (caster on our team; `[OHA-ALCHEMIST] no-brew why=finish-hit ... proj=245`, game 065 t=3155: Alchemist's allies' shots at Clinkz, #122).
   - Unconfirmed: `IsAlive()` on an enemy hero handle may read false after it TPs out, turns invisible or leaves vision (seen 5 times in game 064's hunt trace).
 
 ## 7.42 check (2026-11-19)

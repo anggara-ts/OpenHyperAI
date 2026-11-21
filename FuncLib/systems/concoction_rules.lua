@@ -126,4 +126,118 @@ function ConcoctionRules.TpTimeLeft(seenAt, now, channelTime, read, readIsReal)
 	return fromSeen
 end
 
+-- A set from a list of names separated by spaces or line breaks.
+local function NameSet(text)
+	local set = {}
+	for name in string.gmatch(text, "%S+") do
+		set[name] = true
+	end
+	return set
+end
+
+-- #34, game 065: 5 of 10 brews that blew up on him had a target that turned invisible or hid as the brew started
+-- (Clinkz Skeleton Walk t=1079 / 2559 / 2964, Nyx Vendetta t=3199, Dark Willow Shadow Realm t=2827), with nobody else
+-- in sight. No kill, engage or help brew on a hero that has one of these ready, unless it can't use it now.
+-- Names checked in the 7.42 game files (pak01_dir.vpk: scripts/npc/heroes/*.txt, scripts/npc/items.txt; the
+-- tooltips in the English ability strings say each makes the hero invisible, hidden or untargetable):
+-- clinkz_wind_walk, nyx_assassin_vendetta, dark_willow_shadow_realm, bounty_hunter_wind_walk, weaver_shukuchi,
+-- templar_assassin_meld, puck_phase_shift, riki_tricks_of_the_trade, mirana_invis, sandking_sand_storm,
+-- invoker_ghost_walk; Shadow Blade, Silver Edge, Glimmer Cape, Shadow Amulet, Trickster Cloak.
+-- Not riki_permanent_invisibility: it is passive (DOTA_ABILITY_BEHAVIOR_PASSIVE), so it would block every brew on Riki.
+ConcoctionRules.ESCAPE_NAMES = NameSet([[
+clinkz_wind_walk nyx_assassin_vendetta dark_willow_shadow_realm bounty_hunter_wind_walk weaver_shukuchi
+templar_assassin_meld puck_phase_shift riki_tricks_of_the_trade mirana_invis sandking_sand_storm
+invoker_ghost_walk item_invis_sword item_silver_edge item_glimmer_cape item_shadow_amulet
+item_trickster_cloak
+]])
+
+-- #34, game 065: 4 brews blew up on him because a stun, silence or Eul's caught him mid-brew (t=126, 1111, 1204,
+-- 1856). Spells and items that stun, silence, hex, cyclone, fear, taunt or otherwise keep him from throwing.
+-- Taken from the 7.42 game files: every active (not passive) hero ability whose tooltip (English ability strings)
+-- or AbilityValues name a stun, silence, hex, sleep, fear, taunt or petrify, minus self-stuns and talents; plus
+-- channelled and other disables whose tooltip says the target can't act (Shackles, Dismember, Fiend's Grip,
+-- Chronosphere, Black Hole, Duel, Electric Vortex, Winter's Curse, Astral Imprisonment, Tornado, Cold Snap, Walrus
+-- Punch, Flaming Lasso, Will-O-Wisp, Kez's Talon Toss); items: Eul's, Wind Waker, Scythe of Vyse, Orchid,
+-- Bloodthorn, Abyssal Blade (items.txt tooltips: cyclone, hex, silence, stun).
+ConcoctionRules.DISABLE_NAMES = NameSet([[
+ancient_apparition_cold_feet ancient_apparition_ice_blast antimage_mana_void arc_warden_spark_wraith
+axe_berserkers_call bane_fiends_grip bane_nightmare batrider_flamebreak batrider_flaming_lasso
+beastmaster_primal_roar bloodseeker_blood_bath brewmaster_cinder_brew brewmaster_earth_hurl_boulder
+centaur_hoof_stomp chaos_knight_chaos_bolt dark_willow_cursed_crown dark_willow_terrorize
+dawnbreaker_fire_wreath dawnbreaker_solar_guardian death_prophet_silence disruptor_glimpse
+disruptor_static_storm doom_bringer_doom doom_bringer_infernal_blade dragon_knight_dragon_tail
+drow_ranger_silence drow_ranger_wave_of_silence earth_spirit_boulder_smash earth_spirit_geomagnetic_grip
+earth_spirit_magnetize earth_spirit_rolling_boulder earthshaker_fissure elder_titan_echo_stomp
+enigma_black_hole enigma_malefice faceless_void_chronosphere grimstroke_ink_creature grimstroke_spirit_walk
+gyrocopter_homing_missile hoodwink_bushwhack huskar_inner_fire huskar_life_break invoker_cold_snap
+invoker_tornado jakiro_ice_path keeper_of_the_light_will_o_wisp kez_talon_toss kunkka_ghostship
+kunkka_torrent largo_frogstomp legion_commander_duel leshrac_split_earth lina_light_strike_array lion_impale
+lion_voodoo luna_lucent_beam lycan_howl magnataur_reverse_polarity marci_companion_run marci_unleash
+mars_spear medusa_stone_gaze mirana_arrow monkey_king_boundless_strike morphling_adaptive_strike_agi
+muerta_dead_shot muerta_the_calling necrolyte_reapers_scythe nevermore_requiem night_stalker_crippling_fear
+night_stalker_void nyx_assassin_impale nyx_assassin_spiked_carapace obsidian_destroyer_astral_imprisonment
+ogre_magi_fireblast pangolier_gyroshell phoenix_supernova primal_beast_onslaught primal_beast_pulverize
+puck_dream_coil puck_waning_rift pudge_dismember pudge_meat_hook rattletrap_hookshot riki_smoke_screen
+ringmaster_tame_the_beasts ringmaster_the_box ringmaster_wheel rubick_telekinesis sandking_burrowstrike
+shadow_shaman_shackles shadow_shaman_voodoo silencer_curse_of_the_silent silencer_glaives_of_wisdom
+silencer_global_silence silencer_last_word skeleton_king_hellfire_blast skywrath_mage_ancient_seal
+slardar_slithereen_crush snapfire_firesnap_cookie snapfire_scatterblast snapfire_spit_creep
+sniper_assassinate spectre_haunt spirit_breaker_charge_of_darkness storm_spirit_electric_vortex
+sven_storm_bolt techies_stasis_trap techies_sticky_bomb techies_suicide templar_assassin_psionic_trap
+terrorblade_terror_wave tidehunter_ravage tiny_avalanche tusk_snowball tusk_walrus_punch undying_bite
+vengefulspirit_magic_missile venomancer_latent_poison venomancer_venomous_gale visage_summon_familiars
+void_spirit_resonant_pulse warlock_rain_of_chaos windrunner_shackleshot winter_wyvern_splinter_blast
+winter_wyvern_winters_curse witch_doctor_paralyzing_cask zuus_lightning_bolt item_cyclone item_wind_waker
+item_sheepstick item_orchid item_bloodthorn item_abyssal_blade
+]])
+
+-- A spell of an enemy hero is ready: learned, off cooldown, enough mana (as far as the bot API shows it on an
+-- enemy handle; mana nil: unknown, not checked).
+function ConcoctionRules.SpellReady(level, cooldownLeft, manaCost, mana)
+	if level == nil or level <= 0 then
+		return false
+	end
+	return (cooldownLeft or 0) <= 0 and (mana == nil or manaCost == nil or mana >= manaCost)
+end
+
+-- #34, game 065 t=126: a retreat brew on Nyx at 310 was held to 5.5s (the retreat throw needs the retreat mode,
+-- and his mode changed) and he was stunned at 5.4s. A brew started by the retreat rule is thrown at the first hero
+-- in range from RETREAT_BREW_THROW seconds brewed, whatever his mode is then.
+ConcoctionRules.RETREAT_BREW_THROW = 1.5
+function ConcoctionRules.RetreatBrewThrowNow(brewWhy, brewed, targetInRange)
+	return brewWhy == "retreat" and brewed >= ConcoctionRules.RETREAT_BREW_THROW and targetInRange == true
+end
+
+-- #34, game 065: throw early instead of holding the brew while a disable can catch him. From DISABLE_RISK_AFTER
+-- seconds brewed (game data, datafeed hero 73: 2s is 40% of max_damage and, on a straight line, a 0.83-1.43s stun (min_stun 0.25, max_stun 1.7-3.2)):
+--   disableReady  the name of a disable an enemy hero within DISABLE_RISK_RANGE has ready, or nil
+--   hpLost        share of his max HP lost within the last second (being hit)
+-- Returns "disable-ready", "hit" or nil.
+ConcoctionRules.DISABLE_RISK_AFTER = 2.0
+ConcoctionRules.DISABLE_RISK_RANGE = 900
+ConcoctionRules.HIT_HP_SHARE = 0.1
+function ConcoctionRules.DisableRisk(brewed, disableReady, hpLost)
+	if brewed < ConcoctionRules.DISABLE_RISK_AFTER then
+		return nil
+	end
+	if disableReady ~= nil then
+		return "disable-ready"
+	end
+	if (hpLost or 0) >= ConcoctionRules.HIT_HP_SHARE then
+		return "hit"
+	end
+	return nil
+end
+
+-- #34, game 065 t=1198: retreat said 0.51 and blocked an engage brew for one think; the next think (t=1199) an
+-- engage brew started at his 31% HP and blew up on him once he was stunned. The block holds RETREAT_HOLD seconds
+-- after the retreat mode last wanted him out.
+ConcoctionRules.RETREAT_HOLD = 2.0
+function ConcoctionRules.RetreatHeld(wantedNow, lastWantedAt, now)
+	if wantedNow then
+		return true
+	end
+	return lastWantedAt ~= nil and now - lastWantedAt <= ConcoctionRules.RETREAT_HOLD
+end
+
 return ConcoctionRules

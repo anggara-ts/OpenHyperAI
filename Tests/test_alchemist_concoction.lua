@@ -577,3 +577,148 @@ T.test("concoction rules: an enemy TP's time left, from a read that drops or fro
 	T.near(R.TpTimeLeft(100, 101.5, 2.0, 0, nil), 0.5, 1e-9, "Boots 2, no read")
 	T.near(R.TpTimeLeft(100, 104, 3.0, 0, nil), 0, 1e-9, "never below 0")
 end)
+
+-- Game 065: invisibility escapes, disables mid-brew, the retreat hold.
+T.test("concoction rules: spells ready, escape and disable names, retreat brew, disable risk, retreat hold", function()
+	Stub.reset({ hero = "npc_dota_hero_alchemist" })
+	local R = require(GetScriptDirectory() .. "/FuncLib/systems/concoction_rules")
+	T.eq(R.SpellReady(1, 0, 75, 300), true, "learned, off cooldown, mana")
+	T.eq(R.SpellReady(0, 0, 75, 300), false, "not learned")
+	T.eq(R.SpellReady(2, 4.5, 75, 300), false, "on cooldown")
+	T.eq(R.SpellReady(2, 0, 150, 100), false, "not enough mana")
+	T.eq(R.SpellReady(2, 0, 150, nil), true, "mana unknown: not checked")
+	-- The game 065 escapes and disables.
+	for _, name in ipairs({
+		"clinkz_wind_walk",
+		"nyx_assassin_vendetta",
+		"dark_willow_shadow_realm",
+		"item_invis_sword",
+	}) do
+		T.eq(R.ESCAPE_NAMES[name], true, name .. " is an escape")
+	end
+	T.eq(R.ESCAPE_NAMES["riki_permanent_invisibility"], nil, "a passive is not")
+	for _, name in ipairs({ "nyx_assassin_impale", "tiny_avalanche", "death_prophet_silence", "item_cyclone" }) do
+		T.eq(R.DISABLE_NAMES[name], true, name .. " is a disable")
+	end
+	T.eq(R.DISABLE_NAMES["alchemist_unstable_concoction"], nil, "not his own brew")
+	T.eq(R.DISABLE_NAMES["clinkz_wind_walk"], nil, "an escape is not a disable")
+	-- Game 065 t=126: a retreat brew held to 5.5s.
+	T.eq(R.RetreatBrewThrowNow("retreat", 1.4, true), false, "1.4s: not yet")
+	T.eq(R.RetreatBrewThrowNow("retreat", 1.5, true), true, "1.5s, a hero in range")
+	T.eq(R.RetreatBrewThrowNow("retreat", 3.0, false), false, "nobody in range")
+	T.eq(R.RetreatBrewThrowNow("engage", 3.0, true), false, "not a retreat brew")
+	T.eq(R.DisableRisk(1.9, "tiny_avalanche", 0), nil, "before 2s")
+	T.eq(R.DisableRisk(2.0, "tiny_avalanche", 0), "disable-ready", "a stun ready near him")
+	T.eq(R.DisableRisk(2.5, nil, 0.12), "hit", "lost 12% of his HP within 1s")
+	T.eq(R.DisableRisk(2.5, nil, 0.05), nil, "a light hit, nothing ready")
+	-- Game 065 t=1198-1199: the block lasted one think.
+	T.eq(R.RetreatHeld(true, nil, 100), true, "wanted now")
+	T.eq(R.RetreatHeld(false, 99, 100), true, "wanted 1s ago")
+	T.eq(R.RetreatHeld(false, 97.9, 100), false, "wanted 2.1s ago")
+	T.eq(R.RetreatHeld(false, nil, 100), false, "never wanted")
+end)
+
+-- A ready spell in an enemy's ability slot (stub): learned, off cooldown, cheap.
+local function giveSpell(enemy, slot, name)
+	local ability = Stub.newAbility(name, enemy, false)
+	ability.cooldown = 0
+	ability.GetLevel = function()
+		return 1
+	end
+	ability.GetCooldownTimeRemaining = function(self)
+		return self.cooldown
+	end
+	ability.GetManaCost = function()
+		return 50
+	end
+	enemy._slots[slot] = ability
+	enemy.GetMana = function()
+		return 500
+	end
+	return ability
+end
+
+T.test("alchemist: no brew on a hero with Skeleton Walk ready, unless it is stunned or on cooldown", function()
+	local X = load()
+	local state = startBrew(X, 1300, true)
+	giveSpell(state.enemy, 5, "clinkz_wind_walk")
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "Skeleton Walk ready: no kill brew")
+	T.ok(
+		printedLine("concoction no%-brew why=escape%-ready rule=kill target=npc_dota_hero_%S+ escape=clinkz_wind_walk"),
+		"line"
+	)
+	local stunned = true
+	state.enemy.IsStunned = function()
+		return stunned
+	end
+	Stub.time = 1300.5
+	X.SkillsComplement()
+	T.eq(state.brewing, true, "stunned: it can't walk away, the brew starts")
+	-- A fresh setup with the walk on cooldown.
+	X = load()
+	state = startBrew(X, 1400, true)
+	local walk = giveSpell(state.enemy, 5, "clinkz_wind_walk")
+	walk.cooldown = 12
+	X.SkillsComplement()
+	T.eq(state.brewing, true, "on cooldown: the brew starts")
+	T.ok((state.bot._noTpUntil or -1) > Stub.time, "no Town Portal while brewing")
+end)
+
+T.test("alchemist: a stun ready near him throws the brew at 2s (disable-risk)", function()
+	local X = load()
+	local state = startBrew(X, 1500)
+	state.enemy._hp = 1000 -- not a kill
+	giveSpell(state.enemy, 0, "nyx_assassin_impale")
+	Stub.time = 1501.9
+	X.SkillsComplement()
+	T.eq(#state.orders, 0, "1.9s: held")
+	Stub.time = 1502.0
+	X.SkillsComplement()
+	T.eq(#state.orders, 1, "2.0s: thrown")
+	T.eq(state.orders[1].target, state.enemy, "at the brew target")
+	T.ok(
+		printedLine(
+			"concoction throw why=disable%-risk target=npc_dota_hero_%S+ dist=400 brewed=2.0s .*threat=disable%-ready:nyx_assassin_impale@npc_dota_hero_"
+		),
+		"line names the spell"
+	)
+end)
+
+T.test("alchemist: silenced after the brew target is gone, he still walks to the next hero", function()
+	local X = load()
+	local state = startBrew(X, 1600)
+	state.enemy._hp = 1000
+	state.enemy._alive = false
+	local other = Stub.teams[GetOpposingTeam()][2]
+	other._loc = state.bot._loc + Vector(1000, 0, 0)
+	other._hp = 1000
+	state.bot.IsSilenced = function()
+		return true
+	end
+	Stub.time = 1601.5
+	X.SkillsComplement()
+	T.ok(state.movedTo ~= nil, "a move order toward the other hero")
+	T.ok(printedLine("concoction chase%-gate gate=silenced cast=%S+ brewed=1.5s walked=yes"), "chase-gate line")
+	T.ok(
+		printedLine("concoction keep%-range target=npc_dota_hero_%S+ dist=1000 brewed=1.5s .*gate=silenced"),
+		"keep-range"
+	)
+end)
+
+T.test("alchemist: a retreat that wanted him out holds the brew for 2s", function()
+	local X = load()
+	local state = startBrew(X, 1700, true)
+	state.bot._retreatDesireNow, state.bot._retreatLineNow, state.bot._retreatDesireAt = 0.51, 533, 1700
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "retreat 0.51: no brew")
+	state.bot._retreatDesireNow, state.bot._retreatDesireAt = 0.2, 1701
+	Stub.time = 1701
+	X.SkillsComplement()
+	T.eq(state.brewing, false, "1s later at 0.2: still held")
+	T.ok(printedLine("concoction no%-brew why=retreat%-wanted rule=kill .*held=true"), "held line")
+	state.bot._retreatDesireAt = 1702.5
+	Stub.time = 1702.5
+	X.SkillsComplement()
+	T.eq(state.brewing, true, "2.5s after the last want: the brew starts")
+end)
